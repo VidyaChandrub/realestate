@@ -1,0 +1,2 @@
+type,value,slug,description,parentSlug,parentType,isActive,sortOrder,metadataJson
+LOCATION_COUNTRY,India,india,Country,,,true,1,"{""iso2"":""IN""}"

@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: identity
+      POSTGRES_USER: identity
+      POSTGRES_PASSWORD: identity
+    volumes:
+      - identity-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  career-compass-core-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.prod
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+
+  kong-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: kong
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kong
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - kong-db-data:/var/lib/postgresql/data
+      - ./kong/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5433:5432"
+
+  kong-migrations:
+    image: kong:3.6
+    command: kong migrations bootstrap
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-db
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+    depends_on:
+      - kong-db
+
+  kong:
+    image: kong:3.6
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-db
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kong
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    depends_on:
+      - kong-db
+      - kong-migrations
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    restart: always
+
+  konga:
+    image: pantsel/konga:latest
+    environment:
+      DB_ADAPTER: postgres
+      DB_HOST: kong-db
+      DB_USER: kong
+      DB_PASSWORD: kong
+      DB_DATABASE: konga
+      NODE_ENV: production
+    depends_on:
+      - kong
+    ports:
+      - "1337:1337"
+    restart: always
+
+volumes:
+  identity-postgres-data:
+  kong-db-data:
