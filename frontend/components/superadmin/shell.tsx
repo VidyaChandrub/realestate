@@ -2,7 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
 type NavItem = {
   href: string;
@@ -68,7 +69,7 @@ const CRUMB_MAP: Record<string, string> = {
   "/superadmin": "Dashboard",
   "/superadmin/analytics": "Analytics",
   "/superadmin/organisations": "Organisations",
-  "/superadmin/organisation-detail": "Skyline Developers",
+  "/superadmin/organisation-detail": "Organisation",
   "/superadmin/onboarding": "Onboard",
   "/superadmin/admins": "Platform Team",
   "/superadmin/templates": "Templates",
@@ -81,8 +82,22 @@ const CRUMB_MAP: Record<string, string> = {
 
 export function SuperAdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setIsSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      setIsSigningOut(false);
+      router.push("/login");
+      router.refresh();
+    }
+  }
 
   const toggleSidebar = () => {
     if (typeof window !== "undefined" && window.innerWidth <= 820) {
@@ -100,7 +115,14 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
     .filter(Boolean)
     .join(" ");
 
-  const crumb = CRUMB_MAP[pathname] ?? "Dashboard";
+  const crumb =
+    CRUMB_MAP[pathname] ??
+    CRUMB_MAP[
+      Object.keys(CRUMB_MAP)
+        .filter((base) => pathname.startsWith(`${base}/`))
+        .sort((a, b) => b.length - a.length)[0]
+    ] ??
+    "Dashboard";
 
   return (
     <div className={appClass}>
@@ -117,7 +139,10 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
               <ul className="nav-group" key={group.grp}>
                 <li className="grp">{group.grp}</li>
                 {group.items.map((item) => {
-                  const isActive = item.activeMatch?.includes(pathname) ?? false;
+                  const isActive =
+                    item.activeMatch?.some(
+                      (base) => pathname === base || pathname.startsWith(`${base}/`),
+                    ) ?? false;
                   return (
                     <li key={item.href}>
                       <Link
@@ -143,9 +168,15 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
               <b>Pranab Patel</b>
               <span>Platform Owner</span>
             </div>
-            <Link href="/superadmin-login" className="signout" title="Sign out">
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+              className="signout"
+              title="Sign out"
+            >
               ⎋
-            </Link>
+            </button>
           </div>
         </div>
       </aside>

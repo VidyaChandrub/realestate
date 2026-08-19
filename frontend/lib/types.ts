@@ -14,6 +14,7 @@ export interface SafeOrganisation {
   id: string;
   name: string;
   slug: string;
+  city: string;
   status: string;
   created_at: string;
 }
@@ -44,6 +45,7 @@ export interface SignupInput {
   company_name: string;
   work_email: string;
   phone_number: string;
+  city: string;
   password: string;
 }
 
@@ -75,4 +77,98 @@ export interface OrganisationRegistrationInput {
   last_name: string;
   phone_number: string;
   password: string;
+}
+
+export type SendViaChannel = "email" | "whatsapp" | "sms";
+
+export interface OnboardCompanyInput {
+  company_name: string;
+  city: string;
+}
+
+export interface OnboardCompanyResponse {
+  orgId: string;
+  slug: string;
+}
+
+export interface OnboardAdminInput {
+  first_name: string;
+  last_name: string;
+  work_email: string;
+  phone_number: string;
+  force_password_change: boolean;
+  send_via: SendViaChannel[];
+}
+
+export interface ActivateOrganisationResponse {
+  organisation: SafeOrganisation;
+  admin: SafeUser;
+}
+
+export interface OrganisationListRow {
+  id: string;
+  name: string;
+  slug: string;
+  city: string;
+  adminEmail: string | null;
+  status: "active" | "disabled";
+  createdAt: string;
+  userCount: number;
+  plan: null;
+  landingPagesCount: null;
+  mrr: null;
+}
+
+export interface OrganisationListResponse {
+  data: OrganisationListRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface OrganisationSummary {
+  total: number;
+  active: number;
+  onTrial: null;
+  suspended: null;
+}
+
+export interface OrganisationDetail {
+  id: string;
+  name: string;
+  slug: string;
+  city: string;
+  status: "active" | "disabled";
+  createdAt: string;
+  admin: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    phoneNumber: string | null;
+  } | null;
+  userCount: number;
+  teamCount: number;
+  plan: null;
+  landingPagesCount: null;
+  landingPagesPublished: null;
+  leadsCaptured: null;
+  leadsThisMonth: null;
+  planValue: null;
+  subscriptionRenewsAt: null;
+}
+
+export interface OrganisationUserRow {
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  role: string | null;
+  teams: string[];
+}
+
+export interface OrganisationActivityRow {
+  id: string;
+  action: string;
+  entity: string | null;
+  entityId: string | null;
+  createdAt: string;
 }

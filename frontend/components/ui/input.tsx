@@ -53,11 +53,13 @@ export function Label({
 export function Field({
   label,
   hint,
+  error,
   children,
   className,
 }: {
   label: string;
   hint?: string;
+  error?: string | null;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -65,7 +67,9 @@ export function Field({
     <div className={className}>
       <Label>{label}</Label>
       {children}
-      {hint ? (
+      {error ? (
+        <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
+      ) : hint ? (
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p>
       ) : null}
     </div>

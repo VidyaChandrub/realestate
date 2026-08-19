@@ -20,6 +20,7 @@ export function toSafeOrganisation(organisation: Organisation) {
     id: organisation.id,
     name: organisation.name,
     slug: organisation.slug,
+    city: organisation.city,
     status: organisation.status,
     created_at: organisation.createdAt,
   };

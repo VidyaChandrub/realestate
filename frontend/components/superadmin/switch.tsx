@@ -4,21 +4,32 @@ import { useState } from "react";
 
 type SwitchProps = {
   defaultOn?: boolean;
+  checked?: boolean;
+  onChange?: (on: boolean) => void;
 };
 
-export function Switch({ defaultOn = false }: SwitchProps) {
-  const [on, setOn] = useState(defaultOn);
+export function Switch({ defaultOn = false, checked, onChange }: SwitchProps) {
+  const [uncontrolledOn, setUncontrolledOn] = useState(defaultOn);
+  const isControlled = checked !== undefined;
+  const on = isControlled ? checked : uncontrolledOn;
+
+  function toggle() {
+    const next = !on;
+    if (!isControlled) setUncontrolledOn(next);
+    onChange?.(next);
+  }
+
   return (
     <div
       className={`switch${on ? " on" : ""}`}
-      onClick={() => setOn((v) => !v)}
+      onClick={toggle}
       role="switch"
       aria-checked={on}
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          setOn((v) => !v);
+          toggle();
         }
       }}
     />

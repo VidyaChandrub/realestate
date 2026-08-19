@@ -118,7 +118,7 @@ export default function SuperAdminSubscriptionsPage() {
               {SUBS.map((s) => (
                 <tr key={s.name}>
                   <td>
-                    <Link className="u" href="/superadmin/organisation-detail">
+                    <Link className="u" href="/superadmin/organisations">
                       <span className={`av ${s.tone}`}>{s.av}</span>
                       <span>
                         <span className="nm">{s.name}</span>
