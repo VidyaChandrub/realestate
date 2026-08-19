@@ -197,7 +197,7 @@ export default function SuperAdminDashboardPage() {
                   {ORGS.map((o) => (
                     <tr key={o.name}>
                       <td>
-                        <Link className="u" href="/superadmin/organisation-detail">
+                        <Link className="u" href="/superadmin/organisations">
                           <span className={`av ${o.tone}`}>{o.av}</span>
                           <span>
                             <span className="nm">{o.name}</span>

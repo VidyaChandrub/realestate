@@ -5,6 +5,7 @@ export const DEMO_ORGANISATION = {
   id: "org-acme-realty",
   name: "Acme Realty Group",
   slug: "acme-realty",
+  city: "San Francisco",
   status: "active",
   created_at: "2025-03-14T09:00:00.000Z",
 };
@@ -93,9 +94,4 @@ export function findMockAccountByEmail(email: string) {
 
 export function dashboardPathFor(): string {
   return "/superadmin";
-}
-
-export function loginPathFor(role: UserRole) {
-  if (role === "super_admin") return "/superadmin-login";
-  return "/login/organisation";
 }

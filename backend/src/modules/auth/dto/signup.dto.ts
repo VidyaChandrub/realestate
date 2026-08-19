@@ -31,6 +31,11 @@ export class SignupDto {
   phone_number: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  city: string;
+
+  @IsString()
   @MinLength(8)
   @MaxLength(72)
   password: string;

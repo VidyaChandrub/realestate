@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
@@ -15,7 +14,7 @@ import {
   hashToken,
   parseDuration,
 } from '../../common/utils/tokens.util';
-import { slugify } from '../../common/utils/slug.util';
+import { generateUniqueOrgSlug } from '../../common/utils/slug.util';
 import { toSafeOrganisation, toSafeUser } from '../../common/utils/mappers.util';
 
 const BCRYPT_COST_FACTOR = 12;
@@ -39,7 +38,7 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    const slug = await this.generateUniqueSlug(dto.company_name);
+    const slug = await generateUniqueOrgSlug(this.prisma, dto.company_name);
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
     const adminRole = await this.prisma.role.findUniqueOrThrow({
       where: { key: 'admin' },
@@ -48,7 +47,7 @@ export class AuthService {
     const { user, organisation } = await this.prisma.$transaction(
       async (tx) => {
         const organisation = await tx.organisation.create({
-          data: { name: dto.company_name, slug },
+          data: { name: dto.company_name, slug, city: dto.city },
         });
 
         const user = await tx.user.create({
@@ -178,25 +177,5 @@ export class AuthService {
     });
 
     return { access_token: accessToken, refresh_token: rawRefreshToken };
-  }
-
-  private async generateUniqueSlug(companyName: string): Promise<string> {
-    const base = slugify(companyName);
-    let candidate = base;
-    let attempts = 0;
-
-    while (
-      await this.prisma.organisation.findUnique({ where: { slug: candidate } })
-    ) {
-      attempts += 1;
-      if (attempts > 5) {
-        throw new ConflictException(
-          'Could not generate a unique organisation slug',
-        );
-      }
-      candidate = `${base}-${randomBytes(3).toString('hex')}`;
-    }
-
-    return candidate;
   }
 }
