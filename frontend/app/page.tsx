@@ -1,55 +1,73 @@
 "use client";
 
-import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { dashboardPathFor } from "@/lib/mock/sessions";
+import { BrandMark } from "@/components/icons";
+import { LinkButton } from "@/components/ui/button";
 
 export default function Home() {
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading } = useAuth();
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center bg-zinc-50 px-6 dark:bg-black">
-      <div className="flex w-full max-w-3xl flex-col items-center gap-8 text-center">
-        <h1 className="text-4xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
-          BigEstate
-        </h1>
-        <p className="max-w-md text-lg text-zinc-600 dark:text-zinc-400">
-          The real estate SaaS platform for managing your portfolio and teams.
+    <main className="flex flex-1 flex-col items-center justify-center bg-slate-50 px-6 py-16 dark:bg-slate-950">
+      <div className="flex w-full max-w-4xl flex-col items-center gap-8 text-center">
+        <div className="flex items-center gap-3">
+          <BrandMark size={40} />
+          <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
+            BigEstate
+          </h1>
+        </div>
+
+        <p className="max-w-xl text-lg text-slate-600 dark:text-slate-400">
+          The real estate SaaS platform for managing your portfolio, teams,
+          websites and leads — across every branch of your business.
         </p>
 
         {isLoading ? (
-          <p className="text-sm text-zinc-500">Loading…</p>
+          <p className="text-sm text-slate-500">Loading…</p>
         ) : user ? (
           <div className="flex flex-col items-center gap-4">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               Signed in as{" "}
-              <span className="font-medium text-zinc-950 dark:text-zinc-50">
+              <span className="font-medium text-slate-900 dark:text-white">
                 {user.email}
-              </span>
+              </span>{" "}
+              ({user.roleLabel})
             </p>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-900"
-            >
-              Sign out
-            </button>
+            <LinkButton href={dashboardPathFor()} size="lg">
+              Go to your dashboard
+            </LinkButton>
           </div>
         ) : (
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/login"
-              className="flex h-11 items-center justify-center rounded-lg bg-zinc-950 px-6 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200"
-            >
+            <LinkButton href="/login" size="lg">
               Sign in
-            </Link>
-            <Link
-              href="/signup"
-              className="flex h-11 items-center justify-center rounded-lg border border-zinc-300 px-6 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-900"
-            >
-              Create account
-            </Link>
+            </LinkButton>
+            <LinkButton href="/register" size="lg" variant="outline">
+              Register your organisation
+            </LinkButton>
           </div>
         )}
+
+        <div className="mt-4 grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-3">
+          {[
+            { title: "Multi-tenant", text: "Isolated data per organisation" },
+            { title: "Role-based access", text: "Super Admin, Org Admin & Agents" },
+            { title: "All-in-one", text: "Properties, CRM, websites & billing" },
+          ].map((item) => (
+            <div
+              key={item.title}
+              className="rounded-2xl border border-slate-200 bg-white p-5 text-left dark:border-slate-800 dark:bg-slate-900"
+            >
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                {item.title}
+              </p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {item.text}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     </main>
   );

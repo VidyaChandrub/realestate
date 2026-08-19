@@ -13,31 +13,64 @@ import { apiFetch } from "./api";
 import type {
   LoginInput,
   LoginResponse,
+  OrganisationRegistrationInput,
+  Permissions,
   SafeUser,
+  SessionUser,
   SignupInput,
   SignupResponse,
+  UserRole,
 } from "./types";
+import {
+  dashboardPathFor,
+  findMockAccount,
+} from "./mock/sessions";
 
 const STORAGE_KEYS = {
   accessToken: "be.access_token",
   refreshToken: "be.refresh_token",
   user: "be.user",
+  orgSetup: "be.org_setup",
+  verifiedEmail: "be.verified_email",
 } as const;
 
+export interface OrgSetupState {
+  organisationName: string;
+  email: string;
+  step: "verify-email" | "onboarding";
+}
+
 interface AuthContextValue {
-  user: SafeUser | null;
+  user: SessionUser | null;
   accessToken: string | null;
   isLoading: boolean;
+  isMock: boolean;
   login: (input: LoginInput) => Promise<void>;
   signup: (input: SignupInput) => Promise<void>;
   logout: () => Promise<void>;
+  mockLogin: (
+    role: UserRole,
+    email: string,
+    password: string,
+  ) => Promise<void>;
+  mockRegister: (input: OrganisationRegistrationInput) => Promise<OrgSetupState>;
+  completeEmailVerification: (code: string) => boolean;
+  completeOnboarding: () => void;
+  getOrgSetup: () => OrgSetupState | null;
+  hasPermission: (
+    module: string,
+    action: "view" | "add" | "edit" | "delete",
+  ) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function readStoredSession() {
+function readStoredSession(): {
+  accessToken: string | null;
+  user: SessionUser | null;
+} {
   if (typeof window === "undefined") {
-    return { accessToken: null, refreshToken: null, user: null };
+    return { accessToken: null, user: null };
   }
 
   const accessToken = localStorage.getItem(STORAGE_KEYS.accessToken);
@@ -45,21 +78,25 @@ function readStoredSession() {
   const rawUser = localStorage.getItem(STORAGE_KEYS.user);
 
   if (!accessToken || !refreshToken || !rawUser) {
-    return { accessToken: null, refreshToken: null, user: null };
+    return { accessToken: null, user: null };
   }
 
   try {
-    return { accessToken, refreshToken, user: JSON.parse(rawUser) as SafeUser };
+    const parsed = JSON.parse(rawUser) as SessionUser;
+    if (!parsed.role) {
+      return { accessToken: null, user: null };
+    }
+    return { accessToken, user: parsed };
   } catch {
     localStorage.removeItem(STORAGE_KEYS.accessToken);
     localStorage.removeItem(STORAGE_KEYS.refreshToken);
     localStorage.removeItem(STORAGE_KEYS.user);
-    return { accessToken: null, refreshToken: null, user: null };
+    return { accessToken: null, user: null };
   }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SafeUser | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -73,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persist = useCallback(
-    (user: SafeUser, accessToken: string, refreshToken: string) => {
+    (user: SessionUser, accessToken: string, refreshToken: string) => {
       localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
       localStorage.setItem(STORAGE_KEYS.accessToken, accessToken);
       localStorage.setItem(STORAGE_KEYS.refreshToken, refreshToken);
@@ -91,15 +128,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
   }, []);
 
+  const toSessionUser = useCallback(
+    (safeUser: SafeUser, permissions: Permissions): SessionUser => {
+      const role: UserRole = safeUser.org_id
+        ? "organisation_admin"
+        : "super_admin";
+      return {
+        ...safeUser,
+        role,
+        roleLabel: role === "super_admin" ? "Super Admin" : "Organisation Admin",
+        permissions,
+        organisation: null,
+      };
+    },
+    [],
+  );
+
   const login = useCallback(
     async (input: LoginInput) => {
       const response = await apiFetch<LoginResponse>("/auth/login", {
         method: "POST",
         body: JSON.stringify(input),
       });
-      persist(response.user, response.access_token, response.refresh_token);
+      const session = toSessionUser(response.user, {
+        dashboard: { view: true },
+        settings: { view: true, edit: true },
+      });
+      persist(session, response.access_token, response.refresh_token);
     },
-    [persist],
+    [persist, toSessionUser],
   );
 
   const signup = useCallback(
@@ -108,14 +165,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         body: JSON.stringify(input),
       });
-      persist(response.user, response.access_token, response.refresh_token);
+      const session = toSessionUser(response.user, {});
+      persist(session, response.access_token, response.refresh_token);
+    },
+    [persist, toSessionUser],
+  );
+
+  const mockLogin = useCallback(
+    async (role: UserRole, email: string, password: string) => {
+      const account = findMockAccount(email, role);
+      if (!account || account.password !== password) {
+        throw new Error(
+          "Invalid credentials. Use one of the demo accounts shown below.",
+        );
+      }
+      const sessionUser = account.buildUser();
+      persist(sessionUser, `mock-access-${sessionUser.id}`, `mock-refresh-${sessionUser.id}`);
     },
     [persist],
   );
 
+  const mockRegister = useCallback(
+    async (input: OrganisationRegistrationInput) => {
+      const setup: OrgSetupState = {
+        organisationName: input.organisation_name,
+        email: input.work_email,
+        step: "verify-email",
+      };
+      localStorage.setItem(STORAGE_KEYS.orgSetup, JSON.stringify(setup));
+      return setup;
+    },
+    [],
+  );
+
+  const getOrgSetup = useCallback((): OrgSetupState | null => {
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(STORAGE_KEYS.orgSetup);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as OrgSetupState;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const completeEmailVerification = useCallback((code: string) => {
+    if (code.trim().length !== 6) return false;
+    const setup = getOrgSetup();
+    if (!setup) return false;
+    localStorage.setItem(STORAGE_KEYS.verifiedEmail, setup.email);
+    const next: OrgSetupState = { ...setup, step: "onboarding" };
+    localStorage.setItem(STORAGE_KEYS.orgSetup, JSON.stringify(next));
+    return true;
+  }, [getOrgSetup]);
+
+  const completeOnboarding = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEYS.orgSetup);
+  }, []);
+
   const logout = useCallback(async () => {
     const refreshToken = localStorage.getItem(STORAGE_KEYS.refreshToken);
-    if (refreshToken) {
+    if (refreshToken && !refreshToken.startsWith("mock-refresh-")) {
       try {
         await apiFetch("/auth/logout", {
           method: "POST",
@@ -128,9 +238,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearSession();
   }, [clearSession]);
 
+  const hasPermission = useCallback(
+    (module: string, action: "view" | "add" | "edit" | "delete") => {
+      return user?.permissions?.[module]?.[action] === true;
+    },
+    [user],
+  );
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, accessToken, isLoading, login, signup, logout }),
-    [user, accessToken, isLoading, login, signup, logout],
+    () => ({
+      user,
+      accessToken,
+      isLoading,
+      isMock: true,
+      login,
+      signup,
+      logout,
+      mockLogin,
+      mockRegister,
+      completeEmailVerification,
+      completeOnboarding,
+      getOrgSetup,
+      hasPermission,
+    }),
+    [
+      user,
+      accessToken,
+      isLoading,
+      login,
+      signup,
+      logout,
+      mockLogin,
+      mockRegister,
+      completeEmailVerification,
+      completeOnboarding,
+      getOrgSetup,
+      hasPermission,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -142,4 +286,10 @@ export function useAuth(): AuthContextValue {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
+}
+
+export function useDashboardPath() {
+  const { user, isLoading } = useAuth();
+  const path = user ? dashboardPathFor() : "/login";
+  return { path, user, isLoading };
 }

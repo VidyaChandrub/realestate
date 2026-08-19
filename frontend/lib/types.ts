@@ -51,3 +51,28 @@ export interface LoginInput {
   email: string;
   password: string;
 }
+
+export type UserRole = "super_admin" | "organisation_admin" | "team_member";
+
+export type PermissionAction = "view" | "add" | "edit" | "delete";
+
+export type Permissions = Record<
+  string,
+  Partial<Record<PermissionAction, boolean>>
+>;
+
+export interface SessionUser extends SafeUser {
+  role: UserRole;
+  roleLabel: string;
+  permissions: Permissions;
+  organisation: SafeOrganisation | null;
+}
+
+export interface OrganisationRegistrationInput {
+  organisation_name: string;
+  work_email: string;
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+  password: string;
+}
