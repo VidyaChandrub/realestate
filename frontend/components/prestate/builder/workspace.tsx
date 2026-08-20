@@ -225,7 +225,18 @@ export function BuilderWorkspace({
           primary: ensureConfig(page).brand.primary,
           accent: ensureConfig(page).brand.accent,
           font: ensureConfig(page).brand.bodyFont,
+          headingFont: ensureConfig(page).brand.headingFont,
+          name: ensureConfig(page).brand.name,
+          phone: ensureConfig(page).brand.phone,
+          logo: ensureConfig(page).brand.logo,
         }}
+        form={ensureConfig(page).form}
+        chrome={{
+          header: ensureConfig(page).header,
+          footer: ensureConfig(page).footer,
+          brand: ensureConfig(page).brand,
+        }}
+        pageId={page.id}
       />
 
       {dockInspector || inspectorOpen ? (

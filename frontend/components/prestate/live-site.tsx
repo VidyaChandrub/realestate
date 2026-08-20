@@ -6,6 +6,9 @@ import { ExternalLink, Globe, PencilRuler } from "lucide-react";
 import type { Device, LandingPageData } from "@/lib/prestate/types";
 import { Canvas } from "@/components/prestate/builder/canvas";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
+import { applyDocumentSeo } from "@/lib/prestate/seo";
+import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
+import { bumpTracking } from "@/lib/prestate/tracking";
 import { findPageByDomain, findPageBySlug, loadPages } from "@/lib/prestate/store";
 import { builderPath, localDomainPreviewPath } from "@/lib/prestate/paths";
 
@@ -18,6 +21,8 @@ function deviceFromWidth(w: number): Device {
 export function LocalSitePreview({ slug, host }: { slug?: string; host?: string }) {
   const [page, setPage] = useState<LandingPageData | null | undefined>(undefined);
   const [device, setDevice] = useState<Device>("desktop");
+  const [gate, setGate] = useState("");
+  const [unlocked, setUnlocked] = useState(false);
 
   useEffect(() => {
     const sync = () => setDevice(deviceFromWidth(window.innerWidth));
@@ -30,9 +35,11 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
     const pages = loadPages();
     const found = host ? findPageByDomain(host, pages) : slug ? findPageBySlug(slug, pages) : undefined;
     setPage(found ?? null);
+    setUnlocked(false);
+    setGate("");
     if (found) {
-      const cfg = ensureConfig(found);
-      document.title = cfg.seo.metaTitle || found.name;
+      applyDocumentSeo(found);
+      bumpTracking(found.id, "view");
     }
   }, [slug, host]);
 
@@ -58,9 +65,37 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
   const assigned = page.domain.trim();
   const hostHref = assigned ? localDomainPreviewPath(assigned) : "";
   const cfg = ensureConfig(page);
+  const needsPassword = Boolean(cfg.page.password) && !unlocked;
+
+  if (needsPassword) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0c0e14", color: "#f4f1ea", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "Inter, system-ui, sans-serif" }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (gate === cfg.page.password) setUnlocked(true);
+          }}
+          style={{ maxWidth: 360, width: "100%", textAlign: "center" }}
+        >
+          <h1 style={{ fontSize: 22, margin: "0 0 8px" }}>Password protected</h1>
+          <p style={{ color: "#8b92a5", margin: "0 0 16px" }}>This local preview is locked from SEO Center.</p>
+          <input
+            value={gate}
+            onChange={(e) => setGate(e.target.value)}
+            type="password"
+            placeholder="Enter password"
+            style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,.12)", background: "#12151c", color: "#fff", marginBottom: 12 }}
+          />
+          <button type="submit" style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "none", background: "#6D5DFC", color: "#fff", fontWeight: 800, cursor: "pointer" }}>
+            Unlock
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
-    <div className="ps-app ps-live" style={{ minHeight: "100vh", background: "#fff", ...siteThemeStyle(cfg) }}>
+    <div className="ps-app ps-live" style={{ minHeight: "100vh", background: "#fff", ...siteThemeStyle(cfg.brand) }}>
       <div
         style={{
           position: "sticky",
@@ -113,13 +148,22 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
         device={device}
         readOnly
         live
-        theme={{ primary: cfg.brand.primary, accent: cfg.brand.accent, font: cfg.brand.bodyFont }}
+        theme={{
+          primary: cfg.brand.primary,
+          accent: cfg.brand.accent,
+          font: cfg.brand.bodyFont,
+          headingFont: cfg.brand.headingFont,
+          name: cfg.brand.name,
+          phone: cfg.brand.phone,
+          logo: cfg.brand.logo,
+        }}
+        form={cfg.form}
+        chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}
+        pageId={page.id}
         onSelect={() => {}}
         onMutate={() => {}}
       />
-      {cfg.tracking.gtmId || cfg.tracking.gaId || cfg.tracking.customScripts ? (
-        <div style={{ display: "none" }} data-template-tracking={`${cfg.tracking.gtmId}|${cfg.tracking.gaId}`} />
-      ) : null}
+      <PrestateTrackingScripts tracking={cfg.tracking} />
     </div>
   );
 }

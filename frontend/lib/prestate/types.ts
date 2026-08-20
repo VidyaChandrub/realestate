@@ -122,6 +122,7 @@ export interface FormLeadField {
   label: string;
   placeholder: string;
   required: boolean;
+  options?: string[];
 }
 
 export interface SiteConfig {
@@ -150,6 +151,7 @@ export interface SiteConfig {
     accent: string;
     headingFont: string;
     bodyFont: string;
+    logo: string;
     facebook: string;
     instagram: string;
     twitter: string;
@@ -175,12 +177,25 @@ export interface SiteConfig {
     gtmId: string;
     metaPixel: string;
     customScripts: string;
+    utmSource: string;
+    utmMedium: string;
+    utmCampaign: string;
+    goalForm: boolean;
+    goalWhatsapp: boolean;
+    goalCall: boolean;
+    goalBrochure: boolean;
   };
   form: {
     notifyEmail: string;
     whatsapp: string;
     thankYou: string;
     multiStep: boolean;
+    templateId: string;
+    saveToCrm: boolean;
+    sendEmail: boolean;
+    sendWhatsapp: boolean;
+    redirectThankYou: boolean;
+    submitLabel: string;
     fields: FormLeadField[];
   };
   media: {

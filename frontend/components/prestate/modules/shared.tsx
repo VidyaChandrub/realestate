@@ -221,25 +221,19 @@ export function Pills({ options, value, onChange }: { options: string[]; value: 
 export function SiteScopeBar({
   pages,
   activeId,
-  onChange,
 }: {
   pages: LandingPageData[];
   activeId: string;
-  onChange: (id: string) => void;
+  onChange?: (id: string) => void;
 }) {
   const active = pages.find((p) => p.id === activeId) ?? pages[0];
+  if (!active) return null;
   return (
     <div className="ps-scope-bar">
-      <span className="ps-scope-bar-label">This template only</span>
-      <select className="ps-input" value={active?.id ?? ""} onChange={(e) => onChange(e.target.value)} style={{ maxWidth: 360 }}>
-        {pages.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      <span className="ps-scope-bar-label">Editing this template</span>
+      <span className="ps-scope-bar-name">{active.name}</span>
       <span className="ps-scope-bar-meta">
-        {active?.domain || "No domain"} · /{active?.slug}
+        {active.domain || "No domain"} · /{active.slug}
       </span>
     </div>
   );

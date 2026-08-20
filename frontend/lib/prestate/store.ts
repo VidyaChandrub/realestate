@@ -25,3 +25,8 @@ export function normalizeDomain(input: string): string {
     .replace(/\/.*$/, "")
     .replace(/:\d+$/, "");
 }
+
+export function isLikelyHostname(input: string): boolean {
+  const host = normalizeDomain(input);
+  return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(host);
+}

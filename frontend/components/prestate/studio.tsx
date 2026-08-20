@@ -12,11 +12,10 @@ import {
   CreditCard,
   Globe,
   LayoutTemplate,
-  Layers,
+  Plug,
   MessageCircle,
   Palette,
   PencilRuler,
-  Plug,
   Search,
   Settings,
   Sparkles,
@@ -25,14 +24,11 @@ import {
   X,
 } from "lucide-react";
 import type { Device, LandingPageData, ModuleKey, SectionInstance, SiteConfig } from "@/lib/prestate/types";
-import { PAGES, uid, buildTemplateSections } from "@/lib/prestate/data";
-import { loadPages, normalizeDomain, savePages, seedPages } from "@/lib/prestate/store";
+import { loadPages, normalizeDomain, isLikelyHostname, savePages, seedPages } from "@/lib/prestate/store";
 import { localPreviewPath } from "@/lib/prestate/paths";
-import { cloneConfig, defaultSiteConfig, ensureConfig, seedConfigFor } from "@/lib/prestate/site-config";
-import { inferDesignId } from "@/lib/prestate/page-templates";
+import { ensureConfig } from "@/lib/prestate/site-config";
 import { TopNav, MODULE_LABELS } from "@/components/prestate/topnav";
 import { BuilderWorkspace, type BuilderApi } from "@/components/prestate/builder/workspace";
-import { PagesModule } from "@/components/prestate/modules/pages";
 import { PropertiesModule } from "@/components/prestate/modules/properties";
 import { FormsModule } from "@/components/prestate/modules/forms";
 import { BrandModule } from "@/components/prestate/modules/brand";
@@ -43,7 +39,6 @@ import { DomainsModule } from "@/components/prestate/modules/domains";
 
 const NAV_ITEMS: { key: ModuleKey; label: string; icon: React.ComponentType<{ size?: number | string }> }[] = [
   { key: "builder", label: "Builder", icon: PencilRuler },
-  { key: "pages", label: "Pages", icon: Layers },
   { key: "properties", label: "Properties", icon: Building2 },
   { key: "forms", label: "Forms", icon: MessageCircle },
   { key: "brand", label: "Brand", icon: Palette },
@@ -67,8 +62,8 @@ export function PrestateStudio() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [pages, setPages] = useState<LandingPageData[]>(seedPages);
-  const [activePageId, setActivePageId] = useState(PAGES[0]?.id ?? "p1");
+  const [pages, setPages] = useState<LandingPageData[]>(() => seedPages());
+  const [activePageId, setActivePageId] = useState("");
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
@@ -82,13 +77,20 @@ export function PrestateStudio() {
     const design = searchParams.get("design");
     if (id && list.some((p) => p.id === id)) {
       setActivePageId(id);
-    } else if (design) {
+      setModule("builder");
+      return;
+    }
+    if (design) {
       const match =
         list.find((p) => p.designId === design && (p.kind ?? "custom") === "preset") ??
         list.find((p) => p.designId === design);
-      if (match) setActivePageId(match.id);
+      if (match) {
+        setActivePageId(match.id);
+        setModule("builder");
+        return;
+      }
     }
-    setModule("builder");
+    window.location.replace("/superadmin/templates");
   }, [searchParams]);
 
   useEffect(() => {
@@ -101,7 +103,8 @@ export function PrestateStudio() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3400);
   }, []);
 
-  const activePage = pages.find((p) => p.id === activePageId) ?? pages[0];
+  const activePage = pages.find((p) => p.id === activePageId);
+  const scoped = activePage ? [activePage] : [];
 
   const persistPage = useCallback((pageId: string, sections: SectionInstance[], status?: LandingPageData["status"]) => {
     setPages((prev) => {
@@ -123,105 +126,41 @@ export function PrestateStudio() {
 
   const assignDomain = useCallback((pageId: string, raw: string) => {
     const host = normalizeDomain(raw);
-    if (!host) {
-      toast("Enter a domain like auroraresidences.com");
-      return;
+    if (!host || !isLikelyHostname(host)) {
+      toast("Enter a hostname like auroraresidences.com");
+      return false;
     }
     const clash = pages.find((p) => p.id !== pageId && normalizeDomain(p.domain) === host);
     if (clash) {
       toast(`“${host}” is already assigned to ${clash.name}`);
-      return;
+      return false;
     }
-    setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, domain: host, updated: "Just now" } : p)));
-    const page = pages.find((p) => p.id === pageId);
-    toast(`Assigned ${host} · ${page ? localPreviewPath(page) : ""} · /p/host/${host}`);
+    setPages((prev) =>
+      prev.map((p) => {
+        if (p.id !== pageId) return p;
+        const cfg = ensureConfig(p);
+        const prevHost = normalizeDomain(p.domain);
+        const canonical =
+          !cfg.seo.canonical ||
+          cfg.seo.canonical.includes("localhost") ||
+          (prevHost && cfg.seo.canonical.includes(prevHost))
+            ? `https://${host}`
+            : cfg.seo.canonical;
+        return {
+          ...p,
+          domain: host,
+          updated: "Just now",
+          config: { ...cfg, seo: { ...cfg.seo, canonical } },
+        };
+      }),
+    );
+    toast(`Assigned ${host} · /p/host/${host}`);
+    return true;
   }, [pages, toast]);
 
-  const openBuilder = useCallback((pageId: string) => {
-    setActivePageId(pageId);
-    setModule("builder");
-    setNavOpen(false);
-    toast("Opened in the builder — edit, save and publish from the top bar");
-  }, [toast]);
-
-  const duplicatePage = useCallback((pageId: string) => {
-    setPages((prev) => {
-      const src = prev.find((p) => p.id === pageId);
-      if (!src) return prev;
-      const copy: LandingPageData = {
-        ...src,
-        id: uid("p"),
-        name: `${src.name} (copy)`,
-        slug: `${src.slug}-${uid("c").slice(-6)}`,
-        status: "draft",
-        domain: "",
-        views: "—",
-        conversions: "—",
-        updated: "Just now",
-        sections: JSON.parse(JSON.stringify(src.sections)) as SectionInstance[],
-        kind: "custom",
-        config: cloneConfig(ensureConfig(src)),
-      };
-      return [copy, ...prev];
-    });
-    toast("Template duplicated as a draft — config copied independently");
-  }, [toast]);
-
-  const deletePage = useCallback((pageId: string) => {
-    const target = pages.find((p) => p.id === pageId);
-    if (target && (target.kind ?? "custom") === "preset") {
-      const designId = target.designId ?? inferDesignId(target.template);
-      setPages((prev) =>
-        prev.map((p) =>
-          p.id === pageId
-            ? {
-                ...p,
-                sections: buildTemplateSections(designId),
-                config: seedConfigFor({ ...p, sections: [], designId, kind: "preset" }),
-                status: "draft",
-                updated: "Just now",
-              }
-            : p,
-        ),
-      );
-      toast("Predefined template reset — other templates unchanged");
-      return;
-    }
-    setPages((prev) => {
-      const next = prev.filter((p) => p.id !== pageId);
-      if (pageId === activePageId && next[0]) setActivePageId(next[0].id);
-      return next.length ? next : prev;
-    });
-    toast("Template deleted");
-  }, [toast, activePageId, pages]);
-
-  const publishPage = useCallback((pageId: string) => {
-    setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, status: "published", updated: "Just now" } : p)));
-    const target = pages.find((p) => p.id === pageId);
-    toast(
-      target
-        ? `Published · local preview ${localPreviewPath(target)}${target.domain ? ` · ${target.domain}` : " · assign a domain anytime"}`
-        : "Page published",
-    );
-  }, [toast, pages]);
-
-  const unpublishPage = useCallback((pageId: string) => {
-    setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, status: "unpublished", updated: "Just now" } : p)));
-    toast("Page unpublished");
-  }, [toast]);
-
-  const createPage = useCallback((page: LandingPageData) => {
-    const full: LandingPageData = {
-      ...page,
-      kind: page.kind ?? "custom",
-      designId: page.designId,
-      sections: page.sections.length || page.designId === "tpl-blank" ? page.sections : buildTemplateSections(page.template),
-      config: page.config ?? defaultSiteConfig({ name: page.name, slug: page.slug, domain: page.domain }),
-    };
-    setPages((prev) => [full, ...prev]);
-    setActivePageId(full.id);
-    setModule("builder");
-    toast(`Landing page created — opening builder`);
+  const clearDomain = useCallback((pageId: string) => {
+    setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, domain: "", updated: "Just now" } : p)));
+    toast("Domain removed from this template");
   }, [toast]);
 
   const patchConfig = useCallback((pageId: string, recipe: (c: SiteConfig) => SiteConfig) => {
@@ -254,29 +193,14 @@ export function PrestateStudio() {
         ) : (
           <div style={{ padding: 40, color: "var(--ps-muted)" }}>Create a landing page to start building.</div>
         );
-      case "pages":
-        return (
-          <PagesModule
-            pages={pages}
-            onToast={toast}
-            onOpenBuilder={(id) => openBuilder(id)}
-            onPreview={(id) => openLocalPreview(id)}
-            onAssignDomain={assignDomain}
-            onDuplicate={duplicatePage}
-            onDelete={deletePage}
-            onPublish={publishPage}
-            onUnpublish={unpublishPage}
-            onCreate={createPage}
-          />
-        );
       case "properties":
         return <PropertiesModule onToast={toast} />;
       case "forms":
         return activePage ? (
           <FormsModule
             site={activePage}
-            pages={pages}
-            onSelectSite={setActivePageId}
+            pages={scoped}
+            onSelectSite={() => {}}
             onPatch={(fn) => patchConfig(activePage.id, fn)}
             onToast={toast}
           />
@@ -285,8 +209,8 @@ export function PrestateStudio() {
         return activePage ? (
           <BrandModule
             site={activePage}
-            pages={pages}
-            onSelectSite={setActivePageId}
+            pages={scoped}
+            onSelectSite={() => {}}
             onPatch={(fn) => patchConfig(activePage.id, fn)}
             onToast={toast}
           />
@@ -295,8 +219,8 @@ export function PrestateStudio() {
         return activePage ? (
           <HeaderFooterModule
             site={activePage}
-            pages={pages}
-            onSelectSite={setActivePageId}
+            pages={scoped}
+            onSelectSite={() => {}}
             onPatch={(fn) => patchConfig(activePage.id, fn)}
             onToast={toast}
           />
@@ -305,8 +229,8 @@ export function PrestateStudio() {
         return activePage ? (
           <SeoModule
             site={activePage}
-            pages={pages}
-            onSelectSite={setActivePageId}
+            pages={scoped}
+            onSelectSite={() => {}}
             onPatch={(fn) => patchConfig(activePage.id, fn)}
             onPatchPage={(patch) => patchPage(activePage.id, patch)}
             onToast={toast}
@@ -316,21 +240,22 @@ export function PrestateStudio() {
         return activePage ? (
           <TrackingModule
             site={activePage}
-            pages={pages}
-            onSelectSite={setActivePageId}
+            pages={scoped}
+            onSelectSite={() => {}}
             onPatch={(fn) => patchConfig(activePage.id, fn)}
             onToast={toast}
           />
         ) : null;
       case "domains":
-        return (
+        return activePage ? (
           <DomainsModule
-            pages={pages}
+            site={activePage}
             onToast={toast}
             onAssignDomain={assignDomain}
+            onClearDomain={clearDomain}
             onPreview={(id) => openLocalPreview(id)}
           />
-        );
+        ) : null;
       default:
         return null;
     }
@@ -366,7 +291,7 @@ export function PrestateStudio() {
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         {/* Workspace rail */}
         <nav className="ps-rail" data-open={navOpen ? "true" : "false"}>
-          <Link href="/superadmin/templates" className="ps-rail-btn" title="Templates">
+          <Link href="/superadmin/templates" title="Templates" className="ps-rail-btn">
             <LayoutTemplate size={19} />
             <span className="ps-rail-label">Templates</span>
           </Link>

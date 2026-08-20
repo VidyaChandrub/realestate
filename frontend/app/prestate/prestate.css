@@ -657,6 +657,11 @@
   text-transform: uppercase;
   color: var(--ps-primary);
 }
+.ps-scope-bar-name {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--ps-ink);
+}
 .ps-scope-bar-meta {
   font-size: 12px;
   color: var(--ps-muted);
@@ -926,6 +931,14 @@
     right: 12px;
     bottom: 16px;
     max-width: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .ps-brand-grid,
+  .ps-form-builder-grid,
+  .ps-form-meta {
+    grid-template-columns: 1fr !important;
   }
 }
 

@@ -5,7 +5,7 @@ const DEFAULT_FIELDS: FormLeadField[] = [
   { id: "f1", type: "text", label: "Full name", placeholder: "e.g. Rohan Kapoor", required: true },
   { id: "f2", type: "phone", label: "Phone number", placeholder: "+91 98765 43210", required: true },
   { id: "f3", type: "email", label: "Email address", placeholder: "you@email.com", required: false },
-  { id: "f4", type: "select", label: "Interested in", placeholder: "Choose an option", required: true },
+  { id: "f4", type: "select", label: "Interested in", placeholder: "Choose an option", required: true, options: ["3 BHK", "4 BHK", "Penthouse"] },
   { id: "f5", type: "checkbox", label: "I agree to receive updates", placeholder: "", required: true },
 ];
 
@@ -40,6 +40,7 @@ export function defaultSiteConfig(input: {
       accent: input.accent || "#CDA45E",
       headingFont: "Playfair Display",
       bodyFont: "Inter",
+      logo: "",
       facebook: "",
       instagram: "",
       twitter: "",
@@ -65,13 +66,26 @@ export function defaultSiteConfig(input: {
       gtmId: "",
       metaPixel: "",
       customScripts: "",
+      utmSource: "facebook",
+      utmMedium: "cpc",
+      utmCampaign: "launch",
+      goalForm: true,
+      goalWhatsapp: true,
+      goalCall: true,
+      goalBrochure: false,
     },
     form: {
       notifyEmail: "",
       whatsapp: "",
       thankYou: "Thanks — our team will call you shortly.",
       multiStep: false,
-      fields: DEFAULT_FIELDS.map((f) => ({ ...f })),
+      templateId: "f1",
+      saveToCrm: true,
+      sendEmail: true,
+      sendWhatsapp: true,
+      redirectThankYou: false,
+      submitLabel: "Submit",
+      fields: DEFAULT_FIELDS.map((f) => ({ ...f, options: f.options ? [...f.options] : undefined })),
     },
     media: { notes: "" },
   };
@@ -173,10 +187,35 @@ export function cloneConfig(config: SiteConfig): SiteConfig {
   return JSON.parse(JSON.stringify(config)) as SiteConfig;
 }
 
-export function siteThemeStyle(config: SiteConfig): CSSProperties {
+function withAlpha(hex: string, alpha: number): string {
+  const raw = hex.replace("#", "").trim();
+  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  if (full.length !== 6) return `rgba(109, 93, 252, ${alpha})`;
+  const n = Number.parseInt(full, 16);
+  if (Number.isNaN(n)) return `rgba(109, 93, 252, ${alpha})`;
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+export function googleFontsHref(...names: string[]): string {
+  const families = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+  if (families.length === 0) return "";
+  const q = families.map((n) => `family=${n.replace(/ /g, "+")}:wght@400;500;600;700;800`).join("&");
+  return `https://fonts.googleapis.com/css2?${q}&display=swap`;
+}
+
+export function siteThemeStyle(brand: SiteConfig["brand"]): CSSProperties {
+  const primary = brand.primary || "#6D5DFC";
+  const accent = brand.accent || "#CDA45E";
   return {
-    ["--ps-site-primary" as string]: config.brand.primary,
-    ["--ps-site-accent" as string]: config.brand.accent,
-    fontFamily: `${config.brand.bodyFont}, Inter, system-ui, sans-serif`,
+    ["--ps-site-primary" as string]: primary,
+    ["--ps-site-accent" as string]: accent,
+    ["--ps-primary" as string]: primary,
+    ["--ps-primary-dark" as string]: primary,
+    ["--ps-primary-soft" as string]: withAlpha(primary, 0.14),
+    ["--ps-primary-mist" as string]: withAlpha(primary, 0.08),
+    ["--ps-primary-glow" as string]: withAlpha(primary, 0.32),
+    ["--ps-grad-primary" as string]: `linear-gradient(135deg, ${primary}, ${accent})`,
+    ["--ps-heading-font" as string]: `${brand.headingFont}, Georgia, serif`,
+    fontFamily: `${brand.bodyFont}, Inter, system-ui, sans-serif`,
   };
 }

@@ -1,137 +1,170 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Copy, ExternalLink, Globe, Plus, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Copy, ExternalLink, Globe, Link2, ShieldCheck, Trash2 } from "lucide-react";
 import type { LandingPageData } from "@/lib/prestate/types";
 import { localDomainPreviewPath, localPreviewPath } from "@/lib/prestate/paths";
-import { ModuleHeader, StatCard, Table, StatusBadge, RowMenu } from "./shared";
-import { Btn, Chip, Modal, TextField } from "@/components/prestate/ui";
+import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
+import { ModuleHeader, SiteScopeBar, StatCard, StatusBadge } from "./shared";
+import { Btn, Chip, TextField } from "@/components/prestate/ui";
 
 export function DomainsModule({
-  pages,
+  site,
   onToast,
   onAssignDomain,
+  onClearDomain,
   onPreview,
 }: {
-  pages: LandingPageData[];
+  site: LandingPageData;
   onToast: (m: string) => void;
-  onAssignDomain: (pageId: string, domain: string) => void;
+  onAssignDomain: (pageId: string, domain: string) => boolean | void;
+  onClearDomain: (pageId: string) => void;
   onPreview: (pageId: string) => void;
 }) {
-  const [connectOpen, setConnectOpen] = useState(false);
-  const [custom, setCustom] = useState("");
-  const [pageId, setPageId] = useState(pages[0]?.id ?? "");
+  const cfg = ensureConfig(site);
+  const hostPath = site.domain ? localDomainPreviewPath(site.domain) : "";
+  const slugPath = localPreviewPath(site);
+  const [value, setValue] = useState(site.domain);
 
-  const mapped = useMemo(() => pages.filter((p) => p.domain.trim()), [pages]);
-  const unmapped = useMemo(() => pages.filter((p) => !p.domain.trim()), [pages]);
+  useEffect(() => {
+    setValue(site.domain);
+  }, [site.id, site.domain]);
 
-  const connect = () => {
-    if (!pageId || !custom.trim()) return;
-    onAssignDomain(pageId, custom);
-    setConnectOpen(false);
-    setCustom("");
+  const copyAbs = async (path: string, ok: string) => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    try {
+      await navigator.clipboard.writeText(path.startsWith("http") ? path : `${origin}${path}`);
+      onToast(ok);
+    } catch {
+      onToast("Could not copy");
+    }
+  };
+
+  const save = () => {
+    const ok = onAssignDomain(site.id, value);
+    if (ok === false) return;
   };
 
   return (
-    <div style={{ overflowY: "auto", height: "100%" }}>
+    <div style={{ overflowY: "auto", height: "100%", ...siteThemeStyle(cfg.brand) }}>
       <ModuleHeader
         title="Domain Management"
-        description="Assign a hostname to a template. Each template keeps its own domain — mapping one never changes another."
+        description={`Hostname for “${site.name}” only. Local preview stays at ${slugPath}; an assigned domain also opens at /p/host/…`}
         actions={
-          <Btn variant="primary" icon={<Plus size={15} />} onClick={() => { setPageId(pages[0]?.id ?? ""); setConnectOpen(true); }}>
-            Assign domain
+          <Btn variant="primary" icon={<Globe size={14} />} onClick={save} disabled={!value.trim()}>
+            Save domain
           </Btn>
         }
       />
+      <SiteScopeBar pages={[site]} activeId={site.id} />
 
-      <div className="ps-stats-grid">
-        <StatCard label="Assigned domains" value={String(mapped.length)} icon={<Globe size={20} />} />
-        <StatCard label="Pages without a domain" value={String(unmapped.length)} icon={<ExternalLink size={20} />} tone="secondary" />
-        <StatCard label="Local preview" value="Always on" icon={<ShieldCheck size={20} />} tone="success" />
-        <StatCard label="Host mapping" value="/p/host" icon={<Chip tone="primary">Local</Chip>} tone="primary" />
+      <div className="ps-form-meta" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, padding: "0 28px 18px" }}>
+        <StatCard label="Assigned" value={site.domain ? "Yes" : "No"} icon={<Globe size={20} />} tone={site.domain ? "success" : "neutral"} />
+        <StatCard label="Slug preview" value={slugPath} icon={<Link2 size={20} />} />
+        <StatCard label="Host preview" value={hostPath || "—"} icon={<ExternalLink size={20} />} tone="secondary" />
+        <StatCard label="Status" value={site.status} icon={<ShieldCheck size={20} />} tone="primary" />
       </div>
 
-      <div style={{ padding: "0 28px 40px" }}>
-        {mapped.length === 0 ? (
-          <div className="ps-card" style={{ padding: 28, color: "var(--ps-muted)", textAlign: "center" }}>
-            No domains assigned yet. Click Assign domain and map something like auroraresidences.com to a page.
+      <div className="ps-brand-grid" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20, padding: "0 28px 48px", alignItems: "start" }}>
+        <div className="ps-card" style={{ borderRadius: 16, padding: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 12 }}>Assign hostname</div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Domain</div>
+          <TextField value={value} onChange={setValue} placeholder="e.g. auroraresidences.com" />
+          <p style={{ fontSize: 12.5, color: "var(--ps-muted)", lineHeight: 1.55, margin: "10px 0 16px" }}>
+            No DNS is required here. The hostname is mapped inside this app so local preview can load this template at <span style={{ fontFamily: "ui-monospace, monospace" }}>/p/host/yourdomain.com</span>.
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Btn variant="primary" icon={<Globe size={14} />} onClick={save} disabled={!value.trim()}>
+              {site.domain ? "Update domain" : "Assign domain"}
+            </Btn>
+            {site.domain ? (
+              <Btn variant="danger" icon={<Trash2 size={14} />} onClick={() => onClearDomain(site.id)}>
+                Remove
+              </Btn>
+            ) : null}
           </div>
-        ) : (
-          <Table
-            head={["Domain", "Page", "Local preview", "Status", ""]}
-            rows={mapped.map((p) => ({
-              cells: [
-                <div key="d" style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                  <span style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ps-primary)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 14, fontWeight: 800 }}>
-                    {p.domain[0].toUpperCase()}
-                  </span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", fontFamily: "monospace" }}>{p.domain}</div>
-                    <div style={{ fontSize: 10.5, color: "var(--ps-muted)", fontFamily: "monospace" }}>{localDomainPreviewPath(p.domain)}</div>
-                  </div>
-                </div>,
-                <span key="n" style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-slate)" }}>{p.name}</span>,
-                <span key="l" style={{ fontSize: 12, fontWeight: 700, color: "var(--ps-primary)", fontFamily: "monospace" }}>{localPreviewPath(p)}</span>,
-                <div key="s"><StatusBadge status={p.status} /></div>,
-                <div key="m" style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <RowMenu
-                    items={[
-                      { label: "Open local preview", onClick: () => onPreview(p.id) },
-                      {
-                        label: "Open as assigned domain",
-                        onClick: () => {
-                          const href = localDomainPreviewPath(p.domain);
-                          if (href) window.open(href, "_blank", "noopener,noreferrer");
-                        },
-                      },
-                      {
-                        label: "Copy domain",
-                        onClick: () => {
-                          void navigator.clipboard?.writeText(p.domain);
-                          onToast("Domain copied");
-                        },
-                      },
-                    ]}
-                  />
-                </div>,
-              ],
-            }))}
-            rowKey={(i) => mapped[i]?.id ?? String(i)}
-          />
-        )}
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, padding: "12px 16px", background: "var(--ps-success-soft)", borderRadius: 12, fontSize: 12.5, color: "var(--ps-success)", fontWeight: 700 }}>
-          <ShieldCheck size={16} />
-          These hostnames only resolve inside this app. Point real DNS at a host later — for now, use the local URLs above.
+          {site.domain ? (
+            <div style={{ marginTop: 22, padding: 14, borderRadius: 12, border: "1px solid var(--ps-line)", background: "var(--ps-bg)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <span style={{ width: 40, height: 40, borderRadius: 11, background: cfg.brand.primary, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800 }}>
+                  {site.domain[0].toUpperCase()}
+                </span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>{site.domain}</div>
+                  <StatusBadge status={site.status} />
+                </div>
+                <Chip tone="success" style={{ marginLeft: "auto" }}>Mapped locally</Chip>
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                <UrlRow label="Slug preview" path={slugPath} onOpen={() => onPreview(site.id)} onCopy={() => void copyAbs(slugPath, "Slug preview URL copied")} />
+                <UrlRow
+                  label="Host preview"
+                  path={hostPath}
+                  onOpen={() => hostPath && window.open(hostPath, "_blank", "noopener,noreferrer")}
+                  onCopy={() => void copyAbs(hostPath, "Host preview URL copied")}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="ps-card" style={{ marginTop: 18, padding: 16, color: "var(--ps-muted)", fontSize: 13 }}>
+              No hostname yet. This template still previews at <span style={{ fontFamily: "ui-monospace, monospace", color: "var(--ps-ink)" }}>{slugPath}</span>.
+            </div>
+          )}
         </div>
-      </div>
 
-      <Modal open={connectOpen} onClose={() => setConnectOpen(false)} title="Assign a domain" width={560}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Domain name</div>
-            <TextField value={custom} onChange={setCustom} placeholder="e.g. auroraresidences.com" />
-          </div>
-          <div>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Map to landing page</div>
-            <select
-              className="ps-input"
-              value={pageId}
-              onChange={(e) => setPageId(e.target.value)}
-              style={{ width: "100%" }}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="ps-card" style={{ borderRadius: 16, padding: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 8 }}>When you go live later</div>
+            <p style={{ fontSize: 12.5, color: "var(--ps-muted)", lineHeight: 1.6, margin: "0 0 12px" }}>
+              Point DNS at your production host. Until then, only the local URLs above resolve in this app.
+            </p>
+            <div style={{ fontSize: 12, fontFamily: "ui-monospace, monospace", background: "#0b1020", color: "#b8c2ff", borderRadius: 10, padding: 12, lineHeight: 1.7 }}>
+              A     @     → your server{site.domain ? `\nCNAME www → ${site.domain}` : ""}
+            </div>
+            <Btn
+              variant="outline"
+              size="sm"
+              style={{ marginTop: 10 }}
+              icon={<Copy size={12} />}
+              onClick={() => {
+                void navigator.clipboard.writeText(site.domain || "yourdomain.com").then(
+                  () => onToast("Hostname copied"),
+                  () => onToast("Could not copy"),
+                );
+              }}
             >
-              {pages.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({localPreviewPath(p)})
-                </option>
-              ))}
-            </select>
+              Copy hostname
+            </Btn>
           </div>
-          <Btn variant="primary" onClick={connect} disabled={!custom.trim() || !pageId}>
-            <Globe size={14} /> Assign to local preview
-          </Btn>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 16px", background: "var(--ps-success-soft)", borderRadius: 12, fontSize: 12.5, color: "var(--ps-success)", fontWeight: 700, lineHeight: 1.5 }}>
+            <ShieldCheck size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+            Saving a domain updates this template only and refreshes its SEO canonical when it was still a localhost URL.
+          </div>
         </div>
-      </Modal>
+      </div>
+    </div>
+  );
+}
+
+function UrlRow({
+  label,
+  path,
+  onOpen,
+  onCopy,
+}: {
+  label: string;
+  path: string;
+  onOpen: () => void;
+  onCopy: () => void;
+}) {
+  if (!path) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "var(--ps-muted)", width: 92 }}>{label}</span>
+      <span style={{ flex: 1, fontSize: 12, fontFamily: "ui-monospace, monospace", color: "var(--ps-primary)", minWidth: 0 }}>{path}</span>
+      <Btn variant="ghost" size="sm" onClick={onCopy} icon={<Copy size={12} />}>Copy</Btn>
+      <Btn variant="outline" size="sm" onClick={onOpen} icon={<ExternalLink size={12} />}>Open</Btn>
     </div>
   );
 }

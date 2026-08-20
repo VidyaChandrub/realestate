@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Check,
   CheckCircle2,
@@ -29,8 +29,25 @@ import {
   PhoneCall,
   SquareStack,
 } from "lucide-react";
-import type { Device, SectionInstance } from "@/lib/prestate/types";
+import type { Device, SectionInstance, SiteConfig } from "@/lib/prestate/types";
 import { PROPERTY, SLUG_ICONS, resolveVars, WIDGETS } from "@/lib/prestate/data";
+import { googleFontsHref, siteThemeStyle } from "@/lib/prestate/site-config";
+import { bumpTracking } from "@/lib/prestate/tracking";
+import { firePrestateLead } from "@/components/prestate/tracking-scripts";
+
+type CanvasTheme = {
+  primary: string;
+  accent: string;
+  font: string;
+  headingFont?: string;
+  name?: string;
+  phone?: string;
+  logo?: string;
+};
+
+const SiteFormContext = createContext<SiteConfig["form"] | undefined>(undefined);
+const SiteChromeContext = createContext<{ header: SiteConfig["header"]; footer: SiteConfig["footer"]; brand: SiteConfig["brand"] } | undefined>(undefined);
+const SitePageIdContext = createContext("");
 import { SceneImage } from "@/components/prestate/art";
 import { readWidgetId } from "./widgets-panel";
 
@@ -129,41 +146,52 @@ function Eyebrow({ children, gold }: { children: ReactNode; gold?: boolean }) {
 // Header + Footer chrome
 // ---------------------------------------------------------------------------
 
-function PageHeader({ device }: { device: Device }) {
-  const menu = ["Overview", "Amenities", "Floor Plans", "Gallery", "Location", "Contact"];
+function PageHeader({ device, theme }: { device: Device; theme?: CanvasTheme }) {
+  const chrome = useContext(SiteChromeContext);
+  const header = chrome?.header;
+  const brand = chrome?.brand;
+  const menu = header?.menu?.filter(Boolean).length ? header.menu.filter(Boolean) : ["Overview", "Amenities", "Floor Plans", "Gallery", "Contact"];
+  const name = (brand?.name || theme?.name || "Brand").trim();
+  const bits = name.split(/\s+/);
+  const mark = bits[0]?.slice(0, 1).toUpperCase() ?? "B";
+  const accent = brand?.accent || theme?.accent || "#c9a56a";
+  const primary = brand?.primary || theme?.primary || "#4a3ec9";
+  const phone = brand?.phone || theme?.phone || "";
+  const logo = brand?.logo || theme?.logo;
+  const sticky = header?.sticky ?? true;
+  const transparent = header?.transparent ?? false;
+  const variant = header?.variant ?? "dark";
+  const showTopbar = header?.showTopbar ?? false;
+  const cta = header?.cta || "Book Visit";
+  const ctaLink = header?.ctaLink || "#lead-form";
+  const lightText = transparent || variant === "dark";
+  const fg = lightText ? "#fff" : "#111827";
+  const navFg = lightText ? "rgba(255,255,255,.85)" : "#334155";
+  const barBg = transparent
+    ? "linear-gradient(180deg, rgba(8,10,20,.92), rgba(8,10,20,.55))"
+    : variant === "dark"
+      ? "#0b1020"
+      : variant === "glass"
+        ? "rgba(255,255,255,.82)"
+        : "#ffffff";
   return (
-    <div style={{ position: "sticky", top: 0, height: 0, zIndex: 50 }}>
-      <div style={{ position: "absolute", inset: 0, border: "2px solid var(--ps-primary)", pointerEvents: "none", opacity: 0, zIndex: 5 }} />
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          zIndex: 5,
-          padding: "10px 14px",
-          opacity: 0,
-          transition: "opacity .15s",
-          background: "linear-gradient(90deg, var(--ps-primary), #4a3ec9)",
-          color: "#fff",
-          fontSize: 10.5,
-          fontWeight: 800,
-          letterSpacing: 0.8,
-        }}
-      >
-        HEADER
-      </div>
+    <div style={{ position: sticky ? "sticky" : "relative", top: 0, height: sticky && transparent ? 0 : "auto", zIndex: 50 }}>
       <style>{`.ps-sec-holder:hover .ps-header-label { opacity: 1 !important; }`}</style>
-      <div className="ps-header-label" style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", opacity: 0, transition: "opacity .15s" }}>
+      <div className="ps-header-label" style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", opacity: 0, transition: "opacity .15s", pointerEvents: "none" }}>
         <span style={{ background: "var(--ps-primary)", color: "#fff", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.8, padding: "2px 8px", borderRadius: 5 }}>HEADER</span>
-        <span style={{ fontSize: 11, color: "#fff", fontWeight: 600, textShadow: "0 1px 4px rgba(0,0,0,.4)" }}>Global Header · Sticky · Transparent over hero</span>
+        <span style={{ fontSize: 11, color: "#fff", fontWeight: 600, textShadow: "0 1px 4px rgba(0,0,0,.4)" }}>
+          {sticky ? "Sticky" : "Static"} · {transparent ? "Transparent" : variant}
+        </span>
       </div>
+      {showTopbar && phone ? (
+        <div style={{ background: primary, color: "#fff", fontSize: 11.5, fontWeight: 700, padding: "6px 16px", display: "flex", justifyContent: "center", gap: 16 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Phone size={12} /> {phone}</span>
+          {brand?.email ? <span>{brand.email}</span> : null}
+        </div>
+      ) : null}
       <header
         style={{
-          position: "absolute",
+          position: sticky && transparent ? "absolute" : "relative",
           top: 0,
           left: 0,
           right: 0,
@@ -172,101 +200,127 @@ function PageHeader({ device }: { device: Device }) {
           alignItems: "center",
           justifyContent: "space-between",
           padding: device === "mobile" ? "12px 16px" : device === "tablet" ? "14px 22px" : "16px 44px",
-          background: "linear-gradient(180deg, rgba(8,10,20,.92), rgba(8,10,20,.78))",
-          backdropFilter: "blur(8px)",
+          background: barBg,
+          backdropFilter: variant === "glass" || transparent ? "blur(8px)" : undefined,
+          color: fg,
+          borderBottom: transparent ? "none" : "1px solid rgba(15,23,42,.08)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#c9a56a,#a8844a)", color: "#0a0c10", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
-            A
-          </span>
-          <div style={{ lineHeight: 1.1, color: "#fff" }}>
-            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: 2.2 }}>AURORA</div>
-            <div style={{ fontSize: 8.5, fontWeight: 600, letterSpacing: 2.8, color: "#c9a56a" }}>RESIDENCES</div>
+          {logo ? (
+            <img src={logo} alt="" style={{ width: 34, height: 34, borderRadius: 9, objectFit: "cover" }} />
+          ) : (
+            <span style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${accent}, ${primary})`, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+              {mark}
+            </span>
+          )}
+          <div style={{ lineHeight: 1.1, color: fg, fontFamily: theme?.headingFont ? `${theme.headingFont}, Georgia, serif` : undefined }}>
+            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: 0.4 }}>{name}</div>
+            {bits.length > 1 ? (
+              <div style={{ fontSize: 8.5, fontWeight: 600, letterSpacing: 2.2, color: accent }}>{bits.slice(1).join(" ").toUpperCase()}</div>
+            ) : null}
           </div>
         </div>
         {device === "desktop" ? (
-          <nav style={{ display: "flex", gap: 22, color: "rgba(255,255,255,.85)", fontSize: 12.5, fontWeight: 600 }}>
+          <nav style={{ display: "flex", gap: 22, color: navFg, fontSize: 12.5, fontWeight: 600 }}>
             {menu.map((m) => (
-              <span key={m} style={{ cursor: "pointer", transition: "color .15s" }}>
+              <a key={m} href={`#${m.toLowerCase().replace(/\s+/g, "-")}`} style={{ cursor: "pointer", color: "inherit", textDecoration: "none" }}>
                 {m}
-              </span>
+              </a>
             ))}
           </nav>
         ) : device === "tablet" ? (
-          <nav style={{ display: "flex", gap: 14, color: "rgba(255,255,255,.85)", fontSize: 11.5, fontWeight: 600 }}>
+          <nav style={{ display: "flex", gap: 14, color: navFg, fontSize: 11.5, fontWeight: 600 }}>
             {menu.slice(0, 4).map((m) => (
-              <span key={m} style={{ cursor: "pointer" }}>{m}</span>
+              <span key={m}>{m}</span>
             ))}
           </nav>
         ) : (
-          <span style={{ color: "#fff", fontSize: 18, lineHeight: 1, cursor: "pointer", padding: "4px 8px" }} aria-label="Menu">☰</span>
+          <span style={{ color: fg, fontSize: 18, lineHeight: 1, cursor: "pointer", padding: "4px 8px" }} aria-label="Menu">☰</span>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: device === "mobile" ? 8 : 14 }}>
-          {device !== "mobile" ? (
-            <span style={{ display: "flex", alignItems: "center", gap: 7, color: "#fff", fontSize: 12, fontWeight: 700 }}>
-              <Phone size={13} /> +91 90000 12345
+          {device !== "mobile" && phone && !showTopbar ? (
+            <span style={{ display: "flex", alignItems: "center", gap: 7, color: fg, fontSize: 12, fontWeight: 700 }}>
+              <Phone size={13} /> {phone}
             </span>
           ) : null}
-          <span style={{ background: "linear-gradient(135deg,#cda45e,#b08a3e)", color: "#fff", fontSize: device === "mobile" ? 11 : 12, fontWeight: 700, padding: device === "mobile" ? "8px 10px" : "9px 16px", borderRadius: 9, cursor: "pointer", boxShadow: "0 6px 18px rgba(205,164,94,.4)", whiteSpace: "nowrap" }}>
-            Book Visit
-          </span>
+          <a
+            href={ctaLink}
+            style={{ background: `linear-gradient(135deg, ${accent}, ${primary})`, color: "#fff", fontSize: device === "mobile" ? 11 : 12, fontWeight: 700, padding: device === "mobile" ? "8px 10px" : "9px 16px", borderRadius: 9, cursor: "pointer", boxShadow: `0 6px 18px ${accent}66`, whiteSpace: "nowrap", textDecoration: "none" }}
+          >
+            {cta}
+          </a>
         </div>
       </header>
     </div>
   );
 }
 
-function PageFooter({ device }: { device: Device }) {
+function PageFooter({ device, theme }: { device: Device; theme?: CanvasTheme }) {
+  const chrome = useContext(SiteChromeContext);
+  const brand = chrome?.brand;
+  const footer = chrome?.footer;
+  const header = chrome?.header;
+  const name = (brand?.name || theme?.name || "Brand").trim();
+  const mark = name.split(/\s+/)[0]?.slice(0, 1).toUpperCase() ?? "B";
+  const accent = brand?.accent || theme?.accent || "#cda45e";
+  const primary = brand?.primary || theme?.primary || "#4a3ec9";
+  const logo = brand?.logo || theme?.logo;
+  const menu = header?.menu?.filter(Boolean) ?? [];
+  const social = [
+    ["f", brand?.facebook],
+    ["ig", brand?.instagram],
+    ["x", brand?.twitter],
+    ["yt", brand?.youtube],
+    ["in", brand?.linkedin],
+  ].filter(([, href]) => href);
   return (
     <div style={{ position: "relative" }}>
-      <div className="ps-header-label" style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", opacity: 0, transition: "opacity .15s" }}>
+      <div className="ps-header-label" style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", opacity: 0, transition: "opacity .15s", pointerEvents: "none" }}>
         <span style={{ background: "var(--ps-primary)", color: "#fff", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.8, padding: "2px 8px", borderRadius: 5 }}>FOOTER</span>
-        <span style={{ fontSize: 11, color: "#fff", fontWeight: 600, textShadow: "0 1px 4px rgba(0,0,0,.4)" }}>Global Footer · Contact, socials, legal</span>
       </div>
       <footer style={{ background: "#0d1220", color: "#a9b0c2", padding: device === "mobile" ? "40px 22px 24px" : "56px 44px 24px" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "1fr 1fr" : "2fr 1fr 1fr 1fr", gap: 32 }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "1fr 1fr" : "2fr 1fr 1fr", gap: 32 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <span style={{ width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg,#cda45e,#b08a3e)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12 }}>
-                A
-              </span>
+              {logo ? (
+                <img src={logo} alt="" style={{ width: 34, height: 34, borderRadius: 9, objectFit: "cover" }} />
+              ) : (
+                <span style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${accent}, ${primary})`, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12 }}>
+                  {mark}
+                </span>
+              )}
               <div style={{ lineHeight: 1.1, color: "#fff" }}>
-                <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 1.4 }}>AURORA</div>
-                <div style={{ fontSize: 8, fontWeight: 600, letterSpacing: 2.2, color: "#cda45e" }}>RESIDENCES</div>
+                <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 0.4 }}>{name}</div>
               </div>
             </div>
-            <p style={{ fontSize: 12.5, lineHeight: 1.7, maxWidth: 320 }}>Two sculpted towers over a 2.5-acre campus on Sarjapur Road. RERA-approved 3 & 4 BHK residences from ₹1.25 Cr.</p>
-            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              {["f", "x", "in", "yt"].map((s) => (
-                <span key={s} style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(255,255,255,.14)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "#fff", cursor: "pointer" }}>
-                  {s}
-                </span>
-              ))}
-            </div>
+            <p style={{ fontSize: 12.5, lineHeight: 1.7, maxWidth: 320 }}>{brand?.tagline || ""}</p>
+            {social.length ? (
+              <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                {social.map(([label, href]) => (
+                  <a key={label} href={href} target="_blank" rel="noreferrer" style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(255,255,255,.14)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "#fff", textDecoration: "none" }}>
+                    {label}
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </div>
-          {[
-            { title: "Project", links: ["Overview", "Amenities", "Floor Plans", "Gallery", "Pricing"] },
-            { title: "Company", links: ["About Prestige Estates", "Careers", "Press", "Contact"] },
-            { title: "Legal", links: ["Privacy Policy", "Terms", "RERA", "Sitemap"] },
-          ].map((col) => (
-            <div key={col.title}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", marginBottom: 12, letterSpacing: 0.5 }}>{col.title.toUpperCase()}</div>
-              {col.links.map((l) => (
-                <div key={l} style={{ fontSize: 12.5, marginBottom: 9, cursor: "pointer" }}>
-                  {l}
-                </div>
-              ))}
-            </div>
-          ))}
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", marginBottom: 12, letterSpacing: 0.5 }}>LINKS</div>
+            {menu.map((l) => (
+              <div key={l} style={{ fontSize: 12.5, marginBottom: 9 }}>{l}</div>
+            ))}
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", marginBottom: 12, letterSpacing: 0.5 }}>CONTACT</div>
+            {brand?.phone ? <div style={{ fontSize: 12.5, marginBottom: 9 }}>{brand.phone}</div> : null}
+            {brand?.email ? <div style={{ fontSize: 12.5, marginBottom: 9 }}>{brand.email}</div> : null}
+          </div>
         </div>
         <div style={{ maxWidth: 1200, margin: "32px auto 0", borderTop: "1px solid rgba(255,255,255,.08)", paddingTop: 16, fontSize: 11, lineHeight: 1.6, color: "#6b7280" }}>
           <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-            <span>© 2026 Prestige Estates Group. All rights reserved.</span>
-            <span>RERA: PRM/KA/RERA/1251/446/PR/210812/004231</span>
-          </div>
-          <div style={{ marginTop: 10, maxWidth: 900 }}>
-            Disclaimer: The content is for information purposes only and does not constitute an offer to allot. Images are for representational purposes only. Please verify all details with the sales team.
+            <span>{footer?.copyright || `© ${new Date().getFullYear()} ${name}. All rights reserved.`}</span>
+            {footer?.rera ? <span>RERA: {footer.rera}</span> : null}
           </div>
         </div>
       </footer>
@@ -720,61 +774,122 @@ function FaqSection({ s, device }: { s: SectionInstance; device: Device }) {
 
 function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
+  const cfg = useContext(SiteFormContext);
+  const pageId = useContext(SitePageIdContext);
   const [step, setStep] = useState(0);
-  const steps = (st.steps as string[]) ?? ["Your Details", "Preferences", "Confirm"];
-  const fields = (st.fields ?? []) as { type: string; label: string; placeholder?: string; options?: string[] }[];
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1.1fr" : "1fr", gap: 32, alignItems: "center" }}>
-      <div>
-        <Eyebrow gold>★ {String(st.eyebrow)}</Eyebrow>
-        <h2 style={{ fontSize: device === "mobile" ? 26 : 32, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 10px" }}>{String(st.heading)}</h2>
-        <p style={{ fontSize: 14, color: "var(--ps-slate)", lineHeight: 1.7, marginBottom: 26 }}>{String(st.sub)}</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {[
-            { icon: <CalendarClock size={17} />, title: "Private guided tour", text: "Personalised walkthrough of the model & amenity deck" },
-            { icon: <MessageCircle size={17} />, title: "WhatsApp confirmation", text: "Instant booking confirmation on WhatsApp" },
-            { icon: <Wallet size={17} />, title: "Transparent pricing", text: "All-inclusive price & EMI options shared upfront" },
-          ].map((f, i) => (
-            <div key={i} style={{ display: "flex", gap: 13 }}>
-              <span style={{ width: 38, height: 38, borderRadius: 11, background: "var(--ps-secondary-soft)", color: "var(--ps-secondary-dark)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                {f.icon}
-              </span>
-              <div>
-                <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--ps-ink)" }}>{f.title}</div>
-                <div style={{ fontSize: 12, color: "var(--ps-muted)", marginTop: 2 }}>{f.text}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+  const [sent, setSent] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  const fields = (cfg?.fields?.length
+    ? cfg.fields
+    : ((st.fields ?? []) as { type: string; label: string; placeholder?: string; options?: string[]; required?: boolean; id?: string }[])
+  ).filter((f) => f.type !== "hidden");
+
+  const multi = cfg?.multiStep ?? Boolean(st.steps);
+  const chunk = 3;
+  const steps = multi ? Math.max(1, Math.ceil(fields.length / chunk)) : 1;
+  const visible = multi ? fields.slice(step * chunk, step * chunk + chunk) : fields;
+  const submitLabel = cfg?.submitLabel || String(st.button || "Submit");
+  const last = step >= steps - 1;
+
+  const submit = () => {
+    const missing = visible.find((f) => ("required" in f ? f.required : false) && !(values[f.label] || "").trim() && f.type !== "checkbox");
+    if (missing) return;
+    if (!last) {
+      setStep((v) => v + 1);
+      return;
+    }
+    setSent(true);
+    firePrestateLead();
+    if (pageId) bumpTracking(pageId, "form");
+    const digits = (cfg?.whatsapp || "").replace(/\D/g, "");
+    if (cfg?.sendWhatsapp && digits) {
+      if (pageId) bumpTracking(pageId, "whatsapp");
+      const body = fields.map((f) => `${f.label}: ${values[f.label] || ""}`).join("%0A");
+      window.open(`https://wa.me/${digits}?text=${body}`, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  if (sent) {
+    return (
+      <div id="lead-form" style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", padding: device === "mobile" ? "32px 16px" : "48px 24px" }}>
+        <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 10 }}>{cfg?.thankYou || "Thanks — our team will call you shortly."}</h2>
+        {cfg?.notifyEmail ? <p style={{ color: "var(--ps-slate)", fontSize: 14 }}>A copy can be sent to {cfg.notifyEmail}.</p> : null}
+        <button type="button" onClick={() => { setSent(false); setStep(0); setValues({}); }} style={{ marginTop: 16, padding: "10px 16px", borderRadius: 10, border: "1px solid var(--ps-line-strong)", background: "#fff", cursor: "pointer", fontWeight: 700 }}>
+          Send another
+        </button>
       </div>
-      <div className="ps-card" style={{ borderRadius: 20, padding: 28, boxShadow: "var(--ps-shadow-md)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>Step {step + 1} of {steps.length}</span>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-primary)", background: "var(--ps-primary-soft)", padding: "3px 10px", borderRadius: 999 }}>{steps[step]}</span>
-        </div>
-        <div style={{ display: "flex", gap: 5, marginBottom: 22 }}>
-          {steps.map((_, i) => (
-            <span key={i} style={{ flex: 1, height: 5, borderRadius: 999, background: i <= step ? "var(--ps-grad-primary)" : "#e8eaf1" }} />
-          ))}
-        </div>
+    );
+  }
+
+  return (
+    <div id="lead-form" style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1.1fr" : "1fr", gap: 32, alignItems: "center" }}>
+      <div>
+        <Eyebrow gold>★ {String(st.eyebrow || "Enquire")}</Eyebrow>
+        <h2 style={{ fontSize: device === "mobile" ? 26 : 32, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 10px" }}>{String(st.heading || "Book a site visit")}</h2>
+        <p style={{ fontSize: 14, color: "var(--ps-slate)", lineHeight: 1.7, marginBottom: 26 }}>{String(st.sub || "Share your details and our team will get in touch.")}</p>
+      </div>
+      <form
+        className="ps-card"
+        style={{ borderRadius: 20, padding: 28, boxShadow: "var(--ps-shadow-md)" }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        {multi ? (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>Step {step + 1} of {steps}</span>
+            </div>
+            <div style={{ display: "flex", gap: 5, marginBottom: 22 }}>
+              {Array.from({ length: steps }).map((_, i) => (
+                <span key={i} style={{ flex: 1, height: 5, borderRadius: 999, background: i <= step ? "var(--ps-grad-primary)" : "#e8eaf1" }} />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 16 }}>Lead capture</div>
+        )}
         <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
-          {fields.slice(0, 3).map((f) => (
-            <div key={f.label}>
-              <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", marginBottom: 5, display: "block" }}>{f.label}</label>
-              {f.type === "select" ? (
-                <div style={{ position: "relative" }}>
-                  <select className="ps-input" style={{ appearance: "none", paddingRight: 30, cursor: "pointer", padding: "11px 12px" }}>
-                    {f.options?.map((o) => (
-                      <option key={o}>{o}</option>
+          {visible.map((f) => {
+            const key = f.label;
+            const val = values[key] ?? "";
+            return (
+              <div key={("id" in f && f.id) || key}>
+                {f.type !== "checkbox" ? (
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", marginBottom: 5, display: "block" }}>
+                    {f.label} {"required" in f && f.required ? " *" : ""}
+                  </label>
+                ) : null}
+                {f.type === "select" ? (
+                  <select className="ps-input" required={"required" in f ? f.required : false} value={val} onChange={(e) => setValues((p) => ({ ...p, [key]: e.target.value }))} style={{ padding: "11px 12px" }}>
+                    <option value="">{f.placeholder || "Choose"}</option>
+                    {(f.options ?? []).map((o) => (
+                      <option key={o} value={o}>{o}</option>
                     ))}
                   </select>
-                  <ChevronDown size={15} style={{ position: "absolute", right: 11, top: "50%", transform: "translateY(-50%)", color: "var(--ps-muted)", pointerEvents: "none" }} />
-                </div>
-              ) : (
-                <input className="ps-input" placeholder={f.placeholder} style={{ padding: "11px 12px" }} />
-              )}
-            </div>
-          ))}
+                ) : f.type === "textarea" ? (
+                  <textarea className="ps-input" required={"required" in f ? f.required : false} placeholder={f.placeholder} value={val} onChange={(e) => setValues((p) => ({ ...p, [key]: e.target.value }))} style={{ minHeight: 88, padding: "11px 12px" }} />
+                ) : f.type === "checkbox" ? (
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "var(--ps-slate)" }}>
+                    <input type="checkbox" required={"required" in f ? f.required : false} checked={val === "yes"} onChange={(e) => setValues((p) => ({ ...p, [key]: e.target.checked ? "yes" : "" }))} />
+                    {f.label}
+                  </label>
+                ) : (
+                  <input
+                    className="ps-input"
+                    type={f.type === "email" ? "email" : f.type === "phone" ? "tel" : f.type === "date" ? "date" : "text"}
+                    required={"required" in f ? f.required : false}
+                    placeholder={f.placeholder}
+                    value={val}
+                    onChange={(e) => setValues((p) => ({ ...p, [key]: e.target.value }))}
+                    style={{ padding: "11px 12px" }}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           {step > 0 ? (
@@ -782,14 +897,11 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
               Back
             </button>
           ) : null}
-          <button type="button" onClick={() => setStep((v) => Math.min(steps.length - 1, v + 1))} style={{ flex: 2, padding: "12px", borderRadius: 10, border: "none", background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", boxShadow: "0 8px 22px rgba(109,93,252,.3)" }}>
-            {step === steps.length - 1 ? String(st.button) : "Continue"}
+          <button type="submit" style={{ flex: 2, padding: "12px", borderRadius: 10, border: "none", background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            {last ? submitLabel : "Continue"}
           </button>
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 16, fontSize: 11.5, color: "var(--ps-muted)" }}>
-          <ShieldCheck size={13} style={{ color: "var(--ps-success)" }} /> Your details are safe & shared only with the sales team.
-        </div>
-      </div>
+      </form>
     </div>
   );
 }
@@ -1185,6 +1297,9 @@ export function Canvas({
   compact,
   live,
   theme,
+  form,
+  chrome,
+  pageId,
 }: {
   sections: SectionInstance[];
   selectedId: string | null;
@@ -1194,7 +1309,10 @@ export function Canvas({
   onMutate: (patch: (prev: SectionInstance[]) => SectionInstance[]) => void;
   compact?: boolean;
   live?: boolean;
-  theme?: { primary: string; accent: string; font: string };
+  theme?: CanvasTheme;
+  form?: SiteConfig["form"];
+  chrome?: { header: SiteConfig["header"]; footer: SiteConfig["footer"]; brand: SiteConfig["brand"] };
+  pageId?: string;
 }) {
   const [dragOverBg, setDragOverBg] = useState(false);
   const width = live ? "100%" : device === "desktop" ? 1280 : device === "tablet" ? 768 : 390;
@@ -1274,6 +1392,9 @@ export function Canvas({
   );
 
   return (
+    <SitePageIdContext.Provider value={pageId ?? ""}>
+    <SiteChromeContext.Provider value={chrome}>
+    <SiteFormContext.Provider value={form}>
     <div
       className={live ? undefined : "ps-canvas-dots"}
       style={{
@@ -1281,9 +1402,25 @@ export function Canvas({
         overflow: live ? "visible" : "auto",
         position: "relative",
         background: live ? "#fff" : undefined,
-        ["--ps-site-primary" as string]: theme?.primary ?? "#6D5DFC",
-        ["--ps-site-accent" as string]: theme?.accent ?? "#CDA45E",
-        fontFamily: theme?.font ? `${theme.font}, Inter, system-ui, sans-serif` : undefined,
+        ...(theme
+          ? siteThemeStyle({
+              name: theme.name ?? "",
+              tagline: "",
+              email: "",
+              phone: theme.phone ?? "",
+              primary: theme.primary,
+              accent: theme.accent,
+              headingFont: theme.headingFont || "Inter",
+              bodyFont: theme.font,
+              logo: theme.logo ?? "",
+              facebook: "",
+              instagram: "",
+              twitter: "",
+              youtube: "",
+              linkedin: "",
+              accentButtons: true,
+            })
+          : {}),
       }}
       onDragOver={(e) => {
         e.preventDefault();
@@ -1301,6 +1438,9 @@ export function Canvas({
         if (widgetId) handleWidgetDrop(widgetId);
       }}
     >
+      {theme && googleFontsHref(theme.headingFont || "", theme.font) ? (
+        <link rel="stylesheet" href={googleFontsHref(theme.headingFont || "", theme.font)} />
+      ) : null}
       <div style={{ padding: live ? 0 : compact ? "10px 8px 28px" : "34px 18px 90px" }}>
         <div
           style={{
@@ -1331,7 +1471,7 @@ export function Canvas({
           <div style={{ position: "relative" }}>
             {announcements.map(renderSection)}
 
-            <PageHeader device={device} />
+            <PageHeader device={device} theme={theme} />
 
             {sections.length === 0 ? (
               <div style={{ padding: "80px 40px", textAlign: "center" }}>
@@ -1349,11 +1489,14 @@ export function Canvas({
               content.map((s, i) => renderSection(s, announcements.length + i))
             )}
 
-            <PageFooter device={device} />
+            <PageFooter device={device} theme={theme} />
           </div>
         </div>
       </div>
     </div>
+    </SiteFormContext.Provider>
+    </SiteChromeContext.Provider>
+    </SitePageIdContext.Provider>
   );
 }
 

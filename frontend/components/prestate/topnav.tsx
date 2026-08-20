@@ -5,7 +5,6 @@ import type * as React from "react";
 import { useState } from "react";
 import {
   Bell,
-  Check,
   ChevronDown,
   Clock,
   HelpCircle,
@@ -24,7 +23,6 @@ import {
   Undo2,
   User,
   Users,
-  ChevronsUpDown,
   Eye,
 } from "lucide-react";
 import type { Device, ModuleKey } from "@/lib/prestate/types";
@@ -63,12 +61,6 @@ const DEVICES: { key: Device; icon: typeof Monitor; label: string }[] = [
   { key: "desktop", icon: Monitor, label: "Desktop" },
   { key: "tablet", icon: Tablet, label: "Tablet" },
   { key: "mobile", icon: Smartphone, label: "Mobile" },
-];
-
-const WORKSPACES = [
-  { id: "w1", name: "Prestige Estates Group", role: "Marketing Team" },
-  { id: "w2", name: "Rohan & Co. Realty", role: "Growth" },
-  { id: "w3", name: "Skyline Developers", role: "Digital" },
 ];
 
 export function TopNav({
@@ -110,8 +102,6 @@ export function TopNav({
   onMenu: () => void;
   actions?: ReactNode;
 }) {
-  const [wsOpen, setWsOpen] = useState(false);
-  const [workspace, setWorkspace] = useState(WORKSPACES[0]);
   const [profileOpen, setProfileOpen] = useState(false);
   const [dark, setDark] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -129,61 +119,6 @@ export function TopNav({
           <span className="ps-topnav-wordmark">PRESTATE</span>
           <span className="ps-topnav-sub">BUILDER</span>
         </div>
-      </div>
-
-      <div style={{ width: 1, height: 26, background: "var(--ps-line-strong)" }} />
-
-      {/* Workspace selector */}
-      <div className="ps-topnav-ws" style={{ position: "relative" }}>
-        <button
-          type="button"
-          onClick={() => setWsOpen((v) => !v)}
-          style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 10px", borderRadius: 10, border: "1px solid transparent", background: "transparent", cursor: "pointer", maxWidth: 230 }}
-          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)")}
-          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
-        >
-          <span style={{ width: 26, height: 26, borderRadius: 8, background: "var(--ps-grad-brand)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, flexShrink: 0 }}>
-            {workspace.name
-              .split(" ")
-              .map((w) => w[0])
-              .slice(0, 2)
-              .join("")}
-          </span>
-          <span style={{ textAlign: "left", minWidth: 0 }}>
-            <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{workspace.name}</span>
-            <span style={{ display: "block", fontSize: 10.5, color: "var(--ps-muted)", fontWeight: 500 }}>{workspace.role}</span>
-          </span>
-          <ChevronsUpDown size={14} style={{ color: "var(--ps-muted)", flexShrink: 0 }} />
-        </button>
-        {wsOpen ? (
-          <div className="ps-card ps-fade-in" style={{ position: "absolute", top: 42, left: 0, width: 260, padding: 6, zIndex: 500, boxShadow: "var(--ps-shadow-lg)" }}>
-            <div style={{ fontSize: 10.5, fontWeight: 800, color: "var(--ps-muted)", textTransform: "uppercase", letterSpacing: 0.6, padding: "6px 8px 4px" }}>Workspaces</div>
-            {WORKSPACES.map((w) => (
-              <button
-                key={w.id}
-                type="button"
-                onClick={() => {
-                  setWorkspace(w);
-                  setWsOpen(false);
-                }}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "8px 8px", borderRadius: 9, border: "none", background: w.id === workspace.id ? "var(--ps-primary-soft)" : "transparent", cursor: "pointer", textAlign: "left" }}
-              >
-                <span style={{ width: 24, height: 24, borderRadius: 7, background: "var(--ps-grad-brand)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
-                  {w.name
-                    .split(" ")
-                    .map((x) => x[0])
-                    .slice(0, 2)
-                    .join("")}
-                </span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)" }}>{w.name}</span>
-                  <span style={{ display: "block", fontSize: 10.5, color: "var(--ps-muted)" }}>{w.role}</span>
-                </span>
-                {w.id === workspace.id ? <Check size={14} style={{ color: "var(--ps-primary)" }} /> : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
       </div>
 
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minWidth: 0 }}>
