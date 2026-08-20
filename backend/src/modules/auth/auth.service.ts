@@ -15,7 +15,10 @@ import {
   parseDuration,
 } from '../../common/utils/tokens.util';
 import { generateUniqueOrgSlug } from '../../common/utils/slug.util';
-import { toSafeOrganisation, toSafeUser } from '../../common/utils/mappers.util';
+import {
+  toSafeOrganisation,
+  toSafeUser,
+} from '../../common/utils/mappers.util';
 
 const BCRYPT_COST_FACTOR = 12;
 

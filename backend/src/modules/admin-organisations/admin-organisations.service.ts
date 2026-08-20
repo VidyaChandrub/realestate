@@ -9,7 +9,10 @@ import { PrismaService } from '../../database/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { generateUniqueOrgSlug } from '../../common/utils/slug.util';
 import { generateTempPassword } from '../../common/utils/tokens.util';
-import { toSafeOrganisation, toSafeUser } from '../../common/utils/mappers.util';
+import {
+  toSafeOrganisation,
+  toSafeUser,
+} from '../../common/utils/mappers.util';
 import { OnboardCompanyDto } from './dto/onboard-company.dto';
 import { OnboardAdminDto } from './dto/onboard-admin.dto';
 import { ActivateOrganisationDto } from './dto/activate-organisation.dto';
@@ -156,9 +159,10 @@ export class AdminOrganisationsService {
     const where: Prisma.OrganisationWhereInput = {
       // Drafts are incomplete onboarding attempts, never real customers —
       // excluded under every status filter, including "all".
-      status: query.status === 'all' || !query.status
-        ? { not: 'draft' }
-        : query.status,
+      status:
+        query.status === 'all' || !query.status
+          ? { not: 'draft' }
+          : query.status,
     };
 
     if (query.search) {
