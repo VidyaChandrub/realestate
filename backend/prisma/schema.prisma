@@ -68,6 +68,27 @@ enum PaymentStatus {
   @@schema("templates")
 }
 
+enum LandingPageCategory {
+  property_project
+  residential
+  luxury
+  commercial
+  apartments
+  villas
+  plots
+  campaign
+
+  @@schema("templates")
+}
+
+enum LandingPageStatus {
+  draft
+  published
+  archived
+
+  @@schema("templates")
+}
+
 // ---------------------------------------------------------------------------
 // identity — organisations, users, roles, auth tokens
 // (Same idea as QuesPro's "admin" schema — the core identity/account layer)
@@ -278,6 +299,75 @@ model TeamTemplateAccess {
 
   @@id([teamId, templateId])
   @@map("team_template_access")
+  @@schema("templates")
+}
+
+// ---------------------------------------------------------------------------
+// landing_pages — the visual drag-and-drop landing page builder.
+// document is the full Elementor-style tree: { settings, header, footer, rows }
+// ---------------------------------------------------------------------------
+
+model LandingPage {
+  id          String              @id @default(uuid())
+  name        String
+  slug        String              @unique
+  description String?
+  category    LandingPageCategory @default(campaign) @map("category")
+  thumbnail   String?
+  status      LandingPageStatus   @default(draft)
+  // Builder document tree: { settings, header, footer, rows }
+  document    Json                @default("{}")
+  // SEO + tracking + domain config (landing-page-level, independent per page)
+  seo         Json?
+  tracking    Json?
+  domain      Json?
+  publishedAt DateTime?           @map("published_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  leads LandingLead[]
+
+  @@map("landing_pages")
+  @@schema("templates")
+}
+
+// Reusable section designs saved from the builder (hero, pricing, lead form, …)
+model LandingSectionTemplate {
+  id        String   @id @default(uuid())
+  name      String
+  category  String?
+  thumbnail String?
+  document  Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("landing_section_templates")
+  @@schema("templates")
+}
+
+// Leads captured on published landing pages, with UTM/source attribution.
+model LandingLead {
+  id            String   @id @default(uuid())
+  landingPageId String   @map("landing_page_id")
+  name          String?
+  phone         String?
+  email         String?
+  city          String?
+  budget        String?
+  propertyType  String?  @map("property_type")
+  message       String?
+  intent        String? // enquiry | call | whatsapp | site_visit | brochure | pricing | book_visit
+  utmSource     String?  @map("utm_source")
+  utmMedium     String?  @map("utm_medium")
+  utmCampaign   String?  @map("utm_campaign")
+  utmTerm       String?  @map("utm_term")
+  utmContent    String?  @map("utm_content")
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  landingPage LandingPage @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+
+  @@map("landing_leads")
   @@schema("templates")
 }
 
