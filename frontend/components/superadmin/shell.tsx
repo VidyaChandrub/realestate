@@ -45,13 +45,13 @@ const NAV_GROUPS: NavGroup[] = [
   {
     grp: "Product",
     items: [
-      // {
-      //   href: "/superadmin/templates",
-      //   icon: "🧩",
-      //   label: "Templates",
-      //   tip: "Templates",
-      //   activeMatch: ["/superadmin/templates", "/superadmin/template-detail"],
-      // },
+      {
+        href: "/superadmin/templates",
+        icon: "🧩",
+        label: "Templates",
+        tip: "Template Management",
+        activeMatch: ["/superadmin/templates"],
+      },
       {
         href: "/superadmin/landing-pages",
         icon: "🪧",
@@ -80,6 +80,8 @@ const CRUMB_MAP: Record<string, string> = {
   "/superadmin/onboarding": "Onboard",
   "/superadmin/admins": "Platform Team",
   "/superadmin/landing-pages": "Landing Pages",
+  "/superadmin/templates": "Templates",
+  "/prestate": "Builder",
   "/superadmin/approvals": "Approvals",
   "/superadmin/subscriptions": "Subscriptions",
   "/superadmin/audit-logs": "Audit Logs",

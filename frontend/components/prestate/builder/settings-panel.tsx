@@ -1,0 +1,587 @@
+"use client";
+
+import { useState } from "react";
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  Box,
+  ChevronDown,
+  Code2,
+  Copy,
+  Eye,
+  EyeOff,
+  LayoutPanelTop,
+  Monitor,
+  Move,
+  Palette,
+  Plus,
+  SlidersHorizontal,
+  Smartphone,
+  Tablet,
+  Trash2,
+  Type,
+  X,
+} from "lucide-react";
+import type { Device, SectionInstance } from "@/lib/prestate/types";
+import { DYNAMIC_VARS } from "@/lib/prestate/data";
+import { Collapse, FieldRow, SliderField, TextField, Toggle, SelectField, ColorField } from "@/components/prestate/ui";
+
+// ---------------------------------------------------------------------------
+// Generic content field editor (infers control from value type)
+// ---------------------------------------------------------------------------
+
+const FIELD_LABELS: Record<string, string> = {
+  text: "TEXT",
+  ctaLabel: "CTA LABEL",
+  phone: "PHONE",
+  whatsapp: "WHATSAPP",
+};
+
+function formatFieldLabel(key: string): string {
+  return FIELD_LABELS[key] ?? key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
+}
+
+function ContentField({ label, value, onChange }: { label: string; value: unknown; onChange: (v: unknown) => void }) {
+  if (typeof value === "boolean") {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>{label}</label>
+        <Toggle on={value} onChange={onChange} />
+      </div>
+    );
+  }
+  if (typeof value === "number") {
+    return (
+      <FieldRow label={label}>
+        <TextField value={String(value)} onChange={(v) => onChange(Number(v))} />
+      </FieldRow>
+    );
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0 || value.every((v) => typeof v === "string")) {
+      return (
+        <FieldRow label={label}>
+          <StringList value={value as string[]} onChange={(v) => onChange(v)} />
+        </FieldRow>
+      );
+    }
+    return (
+      <FieldRow label={label}>
+        <ObjectList label={label} value={value as Record<string, unknown>[]} onChange={(v) => onChange(v)} />
+      </FieldRow>
+    );
+  }
+  const str = String(value ?? "");
+  return (
+    <FieldRow label={label}>
+      <TextField value={str} onChange={(v) => onChange(v)} placeholder={label} />
+    </FieldRow>
+  );
+}
+
+function StringList({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  return (
+    <div>
+      {value.map((item, i) => (
+        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+          <TextField value={item} onChange={(v) => onChange(value.map((x, j) => (j === i ? v : x)))} />
+          <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} style={{ background: "var(--ps-danger-soft)", color: "var(--ps-danger)", border: "none", borderRadius: 9, padding: "0 10px", cursor: "pointer" }}>
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...value, ""])}
+        style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "7px", borderRadius: 9, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+      >
+        <Plus size={13} /> Add item
+      </button>
+    </div>
+  );
+}
+
+function ObjectList({ label, value, onChange }: { label: string; value: Record<string, unknown>[]; onChange: (v: Record<string, unknown>[]) => void }) {
+  const [open, setOpen] = useState<number | null>(0);
+  const keys = Object.keys(value[0] ?? {});
+  const titleKey = keys.find((k) => ["title", "name", "label", "value", "q", "heading"].includes(k)) ?? keys[0];
+  return (
+    <div>
+      {value.map((item, i) => {
+        const title = String(item[titleKey] ?? `${label} ${i + 1}`);
+        return (
+          <div key={i} style={{ border: open === i ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line)", borderRadius: 11, marginBottom: 7, background: "var(--ps-panel-raised)", overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: open === i ? "var(--ps-primary-mist)" : "var(--ps-bg)" }}>
+              <button type="button" onClick={() => setOpen(open === i ? null : i)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {title}
+              </button>
+              <button type="button" title="Duplicate" onClick={() => { const next = [...value]; next.splice(i + 1, 0, { ...item }); onChange(next); }} style={{ background: "none", border: "none", color: "var(--ps-muted)", cursor: "pointer", padding: 2, display: "inline-flex" }}>
+                <Copy size={13} />
+              </button>
+              <button type="button" title="Delete" onClick={() => onChange(value.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: "#e5484d", cursor: "pointer", padding: 2, display: "inline-flex" }}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+            {open === i ? (
+              <div style={{ padding: "10px 12px 12px", borderTop: "1px solid var(--ps-line)" }}>
+                {keys.map((k) => (
+                  <ContentField key={k} label={k} value={item[k]} onChange={(v) => onChange(value.map((x, j) => (j === i ? { ...x, [k]: v } : x)))} />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() => {
+          const empty: Record<string, unknown> = {};
+          for (const k of keys) empty[k] = "";
+          onChange([...value, empty]);
+        }}
+        style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "7px", borderRadius: 9, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+      >
+        <Plus size={13} /> Add {label.toLowerCase()}
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Variable chips
+// ---------------------------------------------------------------------------
+
+function VarChips() {
+  const [copied, setCopied] = useState<string | null>(null);
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {DYNAMIC_VARS.map((v) => (
+        <button
+          key={v.token}
+          type="button"
+          onClick={() => {
+            navigator.clipboard?.writeText(v.token).catch(() => {});
+            setCopied(v.token);
+            setTimeout(() => setCopied(null), 1200);
+          }}
+          title={v.value}
+          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 7, border: "1px solid var(--ps-line-strong)", background: copied === v.token ? "var(--ps-success-soft)" : "var(--ps-primary-mist)", color: copied === v.token ? "var(--ps-success)" : "var(--ps-primary)", fontSize: 10.5, fontWeight: 700, fontFamily: "monospace", cursor: "pointer" }}
+        >
+          {copied === v.token ? <Copy size={11} /> : null}
+          {v.token}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main settings panel
+// ---------------------------------------------------------------------------
+
+export function SettingsPanel({
+  section,
+  device,
+  setDevice,
+  onChange,
+}: {
+  section: SectionInstance | null;
+  device: Device;
+  setDevice: (d: Device) => void;
+  onChange: (patch: Partial<SectionInstance>) => void;
+}) {
+  const [tab, setTab] = useState<"content" | "style" | "advanced">("content");
+  const [varOpen, setVarOpen] = useState(false);
+
+  if (!section) {
+    return (
+      <div className="ps-inspector">
+        <PanelHead title="Settings" subtitle="Select a section to edit" />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 40, textAlign: "center", color: "var(--ps-muted)" }}>
+          <span style={{ width: 54, height: 54, borderRadius: 16, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+            <LayoutPanelTop size={24} />
+          </span>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 6 }}>Nothing selected</div>
+          <div style={{ fontSize: 12.5, lineHeight: 1.6, maxWidth: 240 }}>
+            Click any section on the canvas, or add a widget from the library to start editing content, style and advanced settings.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const set = (patch: Partial<SectionInstance>) => onChange(patch);
+  const style = section.style;
+  const spacing = style.spacing ?? { padding: { top: 72, right: 24, bottom: 72, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 };
+  const colors = style.colors ?? {};
+  const typo = style.typography ?? {};
+  const border = style.border ?? {};
+  const effects = style.effects ?? {};
+  const layout = style.layout ?? {};
+  const responsive = style.responsive ?? {};
+
+  const setStyle = (patch: Partial<SectionInstance["style"]>) => set({ style: { ...style, ...patch } });
+  const setNested = (key: keyof SectionInstance["style"], patch: Record<string, unknown>) =>
+    setStyle({ [key]: { ...(style[key] as Record<string, unknown>), ...patch } } as Partial<SectionInstance["style"]>);
+
+  return (
+    <div className="ps-inspector">
+      {/* Header */}
+      <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid var(--ps-line)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <span style={{ width: 30, height: 30, borderRadius: 9, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            {iconForSection(section)}
+          </span>
+          <input
+            value={section.label}
+            onChange={(e) => set({ label: e.target.value })}
+            style={{ flex: 1, border: "none", outline: "none", fontWeight: 800, fontSize: 13.5, color: "var(--ps-ink)", background: "transparent", minWidth: 0 }}
+          />
+          <button
+            type="button"
+            title={section.hidden ? "Show section" : "Hide section"}
+            onClick={() => set({ hidden: !section.hidden })}
+            style={{ background: "none", border: "none", color: section.hidden ? "var(--ps-danger)" : "var(--ps-muted)", cursor: "pointer", padding: 4 }}
+          >
+            {section.hidden ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
+        </div>
+        <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 3 }}>{section.type} widget</div>
+      </div>
+
+      {/* Tabs */}
+      <div className="ps-inspector-tabs">
+        {(
+          [
+            { key: "content", label: "Content", icon: <Type size={13} /> },
+            { key: "style", label: "Style", icon: <Palette size={13} /> },
+            { key: "advanced", label: "Advanced", icon: <SlidersHorizontal size={13} /> },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className="ps-inspector-tab"
+            data-active={tab === t.key ? "true" : "false"}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="ps-inspector-body">
+        {tab === "content" ? (
+          <>
+            <div style={{ marginBottom: 6, marginTop: 8 }}>
+              <button type="button" onClick={() => setVarOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 7, background: "linear-gradient(135deg,var(--ps-primary-mist),var(--ps-secondary-soft))", border: "1px solid #e4e0ff", borderRadius: 10, padding: "9px 11px", width: "100%", cursor: "pointer", color: "var(--ps-primary)" }}>
+                <span style={{ display: "inline-flex" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" /><circle cx="12" cy="12" r="3" /></svg>
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 800, flex: 1, textAlign: "left" }}>Dynamic property variables</span>
+                <ChevronDown size={14} style={{ transform: varOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+              </button>
+              {varOpen ? (
+                <div className="ps-fade-in" style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, color: "var(--ps-muted)", marginBottom: 7, lineHeight: 1.5 }}>
+                    Insert a variable into any text field. It auto-fills from your property data and updates across every page instantly.
+                  </div>
+                  <VarChips />
+                </div>
+              ) : null}
+            </div>
+            {Object.entries(section.settings).map(([key, value]) => (
+              <div key={key} style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
+                <ContentField label={formatFieldLabel(key)} value={value} onChange={(v) => set({ settings: { ...section.settings, [key]: v } })} />
+              </div>
+            ))}
+          </>
+        ) : tab === "style" ? (
+          <>
+            {/* device toggle */}
+            <div style={{ display: "flex", gap: 4, background: "var(--ps-bg)", borderRadius: 9, padding: 3, margin: "12px 0 4px", border: "1px solid var(--ps-line)" }}>
+              {DEVICES.map((d) => (
+                <button key={d.key} type="button" title={d.label} onClick={() => setDevice(d.key)} style={{ flex: 1, padding: "6px 0", border: "none", borderRadius: 7, background: device === d.key ? "var(--ps-panel-raised)" : "transparent", color: device === d.key ? "var(--ps-primary)" : "var(--ps-muted)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", boxShadow: device === d.key ? "0 1px 4px rgba(0,0,0,.3)" : "none" }}>
+                  <d.icon size={14} />
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--ps-muted)", margin: "10px 2px 2px" }}>Responsive visibility</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, margin: "8px 0 16px" }}>
+              {DEVICES.map((d) => {
+                const hidden = responsive[`hide${d.key[0].toUpperCase()}${d.key.slice(1)}` as "hideDesktop"] === true;
+                return (
+                  <div key={d.key} style={{ border: "1px solid var(--ps-line)", borderRadius: 10, padding: "9px 10px", background: hidden ? "var(--ps-danger-soft)" : "var(--ps-bg)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "var(--ps-slate)", marginBottom: 7 }}>
+                      <d.icon size={12} /> {d.label}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                      <span style={{ fontSize: 10.5, color: hidden ? "var(--ps-danger)" : "var(--ps-muted)", fontWeight: 600 }}>{hidden ? "Hidden" : "Visible"}</span>
+                      <Toggle
+                        size="sm"
+                        on={!hidden}
+                        onChange={(v) =>
+                          setNested("responsive", { [`hide${d.key[0].toUpperCase()}${d.key.slice(1)}`]: !v })
+                        }
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <Collapse title="Background" icon={<Palette size={14} />} defaultOpen>
+              <ColorField value={colors.bg ?? "#ffffff"} onChange={(v) => setNested("colors", { bg: v })} />
+              <div style={{ height: 10 }} />
+              <ColorField value={colors.overlay ?? ""} onChange={(v) => setNested("colors", { overlay: v })} />
+              <div style={{ height: 10 }} />
+              <ColorField value={colors.text ?? "#111827"} onChange={(v) => setNested("colors", { text: v })} />
+              <div style={{ height: 10 }} />
+              <TextField value={colors.gradient ?? ""} onChange={(v) => setNested("colors", { gradient: v })} placeholder="linear-gradient(…)" />
+            </Collapse>
+
+            <Collapse title="Typography" icon={<Type size={14} />}>
+              <FieldRow label="Font Family">
+                <SelectField
+                  value={typo.fontFamily ?? "Inter"}
+                  onChange={(v) => setNested("typography", { fontFamily: v })}
+                  options={["Inter", "Playfair Display", "Poppins", "Montserrat", "DM Sans", "Lora", "Source Serif 4"].map((f) => ({ value: f, label: f }))}
+                />
+              </FieldRow>
+              <FieldRow label="Font Size">
+                <SliderField value={typo.fontSize ?? 16} onChange={(v) => setNested("typography", { fontSize: v })} min={10} max={72} suffix="px" />
+              </FieldRow>
+              <FieldRow label="Font Weight">
+                <SliderField value={typo.fontWeight ?? 400} onChange={(v) => setNested("typography", { fontWeight: v })} min={300} max={900} step={100} />
+              </FieldRow>
+              <FieldRow label="Line Height">
+                <SliderField value={typo.lineHeight ?? 1.6} onChange={(v) => setNested("typography", { lineHeight: v })} min={1} max={2.5} step={0.05} />
+              </FieldRow>
+              <FieldRow label="Letter Spacing">
+                <SliderField value={typo.letterSpacing ?? 0} onChange={(v) => setNested("typography", { letterSpacing: v })} min={-2} max={8} step={0.5} />
+              </FieldRow>
+            </Collapse>
+
+            <Collapse title="Borders" icon={<Box size={14} />}>
+              <FieldRow label="Border Width">
+                <SliderField value={border.width ?? 0} onChange={(v) => setNested("border", { width: v })} min={0} max={8} suffix="px" />
+              </FieldRow>
+              <FieldRow label="Border Style">
+                <SelectField
+                  value={border.style ?? "solid"}
+                  onChange={(v) => setNested("border", { style: v })}
+                  options={[
+                    { value: "solid", label: "Solid" },
+                    { value: "dashed", label: "Dashed" },
+                    { value: "dotted", label: "Dotted" },
+                    { value: "none", label: "None" },
+                  ]}
+                />
+              </FieldRow>
+              <FieldRow label="Border Radius">
+                <SliderField value={border.radius ?? 0} onChange={(v) => setNested("border", { radius: v })} min={0} max={60} suffix="px" />
+              </FieldRow>
+              <ColorField value={border.color ?? "#e8eaf1"} onChange={(v) => setNested("border", { color: v })} />
+            </Collapse>
+
+            <Collapse title="Effects" icon={<SparkleIcon />}>
+              <FieldRow label="Box Shadow" right={<span style={{ fontSize: 10.5, color: "var(--ps-muted)" }}>css</span>}>
+                <SelectField
+                  value={effects.shadow ?? "none"}
+                  onChange={(v) => setNested("effects", { shadow: v })}
+                  options={[
+                    { value: "none", label: "None" },
+                    { value: "0 4px 18px rgba(17,24,39,.07)", label: "Soft" },
+                    { value: "0 18px 46px rgba(17,24,39,.13)", label: "Large" },
+                    { value: "0 10px 30px rgba(109,93,252,.28)", label: "Brand glow" },
+                  ]}
+                />
+              </FieldRow>
+              <FieldRow label="Blur" right={<span style={{ fontSize: 10.5, color: "var(--ps-muted)" }}>px</span>}>
+                <SliderField value={effects.blur ?? 0} onChange={(v) => setNested("effects", { blur: v })} min={0} max={24} suffix="px" />
+              </FieldRow>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Glassmorphism</span>
+                <Toggle on={effects.glass === true} onChange={(v) => setNested("effects", { glass: v })} />
+              </div>
+              <FieldRow label="Animation">
+                <SelectField
+                  value={effects.animation ?? "none"}
+                  onChange={(v) => setNested("effects", { animation: v })}
+                  options={[
+                    { value: "none", label: "None" },
+                    { value: "fade-up", label: "Fade up" },
+                    { value: "fade-in", label: "Fade in" },
+                    { value: "zoom-in", label: "Zoom in" },
+                  ]}
+                />
+              </FieldRow>
+            </Collapse>
+
+            <Collapse title="Layout" icon={<LayoutPanelTop size={14} />}>
+              <FieldRow label="Width">
+                <SelectField
+                  value={layout.width ?? "full"}
+                  onChange={(v) => setNested("layout", { width: v })}
+                  options={[
+                    { value: "boxed", label: "Boxed (1200px)" },
+                    { value: "full", label: "Full width" },
+                    { value: "custom", label: "Custom" },
+                  ]}
+                />
+              </FieldRow>
+              {layout.width === "custom" ? (
+                <FieldRow label="Custom Width">
+                  <SliderField value={layout.customWidth ?? 900} onChange={(v) => setNested("layout", { customWidth: v })} min={480} max={1600} step={20} suffix="px" />
+                </FieldRow>
+              ) : null}
+              <FieldRow label="Height">
+                <SelectField
+                  value={layout.height ?? "auto"}
+                  onChange={(v) => setNested("layout", { height: v })}
+                  options={[
+                    { value: "auto", label: "Auto" },
+                    { value: "fixed", label: "Fixed (px)" },
+                    { value: "vh", label: "Full screen (100vh)" },
+                  ]}
+                />
+              </FieldRow>
+              {layout.height === "fixed" ? (
+                <FieldRow label="Fixed Height">
+                  <SliderField value={layout.fixedHeight ?? 400} onChange={(v) => setNested("layout", { fixedHeight: v })} min={200} max={1200} step={20} suffix="px" />
+                </FieldRow>
+              ) : null}
+              <FieldRow label="Alignment">
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[
+                    { k: "left", icon: <AlignLeft size={15} /> },
+                    { k: "center", icon: <AlignCenter size={15} /> },
+                    { k: "right", icon: <AlignRight size={15} /> },
+                  ].map((a) => (
+                    <button key={a.k} type="button" onClick={() => setNested("layout", { align: a.k })} style={{ flex: 1, padding: "8px 0", borderRadius: 9, border: layout.align === a.k ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)", background: layout.align === a.k ? "var(--ps-primary-soft)" : "var(--ps-bg)", color: layout.align === a.k ? "var(--ps-primary)" : "var(--ps-slate)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                      {a.icon}
+                    </button>
+                  ))}
+                </div>
+              </FieldRow>
+              <FieldRow label="Direction">
+                <SelectField value={layout.direction ?? "row"} onChange={(v) => setNested("layout", { direction: v })} options={[{ value: "row", label: "Row (horizontal)" }, { value: "column", label: "Column (vertical)" }]} />
+              </FieldRow>
+            </Collapse>
+
+            <Collapse title="Spacing" icon={<Move size={14} />}>
+              <FieldRow label="Padding">
+                <SpacingGrid values={spacing.padding} onChange={(k, v) => setNested("spacing", { padding: { ...spacing.padding, [k]: v } })} />
+              </FieldRow>
+              <FieldRow label="Margin">
+                <SpacingGrid values={spacing.margin} onChange={(k, v) => setNested("spacing", { margin: { ...spacing.margin, [k]: v } })} />
+              </FieldRow>
+              <FieldRow label="Gap">
+                <SliderField value={spacing.gap ?? 0} onChange={(v) => setNested("spacing", { gap: v })} min={0} max={80} suffix="px" />
+              </FieldRow>
+            </Collapse>
+          </>
+        ) : (
+          <>
+            <div style={{ marginTop: 10 }}>
+              <FieldRow label="CSS Classes">
+                <TextField value={style.advanced?.classes ?? ""} onChange={(v) => setNested("advanced", { classes: v })} placeholder=".hero .gold" />
+              </FieldRow>
+              <FieldRow label="Element ID">
+                <TextField value={style.advanced?.elementId ?? ""} onChange={(v) => setNested("advanced", { elementId: v })} placeholder="hero-section" />
+              </FieldRow>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <FieldRow label="Z-Index">
+                  <SliderField value={style.advanced?.zIndex ?? 0} onChange={(v) => setNested("advanced", { zIndex: v })} min={0} max={100} />
+                </FieldRow>
+                <FieldRow label="Position">
+                  <SelectField
+                    value={style.advanced?.position ?? "relative"}
+                    onChange={(v) => setNested("advanced", { position: v })}
+                    options={[
+                      { value: "relative", label: "Relative" },
+                      { value: "absolute", label: "Absolute" },
+                      { value: "fixed", label: "Fixed" },
+                      { value: "sticky", label: "Sticky" },
+                    ]}
+                  />
+                </FieldRow>
+              </div>
+              <FieldRow label="Custom CSS">
+                <textarea className="ps-input" value={style.advanced?.customCss ?? ""} onChange={(e) => setNested("advanced", { customCss: e.target.value })} placeholder=".hero-section { … }" style={{ minHeight: 120, fontFamily: "monospace", fontSize: 12, resize: "vertical" }} />
+              </FieldRow>
+              <FieldRow label="Custom Attributes">
+                <textarea className="ps-input" value={style.advanced?.attributes ?? ""} onChange={(e) => setNested("advanced", { attributes: e.target.value })} placeholder="data-ga-event=&quot;form-submit&quot;" style={{ minHeight: 70, fontFamily: "monospace", fontSize: 12, resize: "vertical" }} />
+              </FieldRow>
+            </div>
+            <div style={{ marginTop: 14, display: "flex", alignItems: "flex-start", gap: 8, background: "var(--ps-bg)", border: "1px solid var(--ps-line)", borderRadius: 10, padding: 10, fontSize: 11.5, color: "var(--ps-muted)", lineHeight: 1.55 }}>
+              <Code2 size={14} style={{ color: "var(--ps-primary)", flexShrink: 0, marginTop: 1 }} />
+              Advanced settings are applied on the live page as inline styles, classes and attributes.
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const DEVICES: { key: Device; icon: typeof Monitor; label: string }[] = [
+  { key: "desktop", icon: Monitor, label: "Desktop" },
+  { key: "tablet", icon: Tablet, label: "Tablet" },
+  { key: "mobile", icon: Smartphone, label: "Mobile" },
+];
+
+function PanelHead({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--ps-line)" }}>
+      <div style={{ fontSize: 14, fontWeight: 800 }}>{title}</div>
+      <div style={{ fontSize: 11.5, color: "var(--ps-muted)", marginTop: 2 }}>{subtitle}</div>
+    </div>
+  );
+}
+
+function SpacingGrid({ values, onChange }: { values?: { top: number; right: number; bottom: number; left: number }; onChange: (k: "top" | "right" | "bottom" | "left", v: number) => void }) {
+  const v = values ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      {(["top", "right", "bottom", "left"] as const).map((k) => (
+        <div key={k} style={{ background: "var(--ps-bg)", border: "1px solid var(--ps-line)", borderRadius: 9, padding: "6px 8px" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--ps-muted)", marginBottom: 4 }}>{k}</div>
+          <SliderField value={v[k]} onChange={(val) => onChange(k, val)} min={0} max={240} suffix="px" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function iconForSection(s: SectionInstance) {
+  const map: Record<string, typeof Palette> = {
+    hero: LayoutPanelTop,
+    highlights: Palette,
+    overview: LayoutPanelTop,
+    amenities: Palette,
+    floorplans: Palette,
+    gallery: Palette,
+    "virtual-tour": Palette,
+    "location-advantages": Palette,
+    pricing: Palette,
+    testimonials: Palette,
+    faq: Palette,
+    "multistep-form": Palette,
+    "cta-banner": Palette,
+    "sticky-cta": Palette,
+    announcement: Palette,
+  };
+  const I = map[s.type] ?? LayoutPanelTop;
+  return <I size={15} />;
+}
+
+function SparkleIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
