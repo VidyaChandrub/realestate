@@ -4,13 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Copy,
   ExternalLink,
   Eye,
   FileText,
   GripVertical,
   Home,
+  Plus,
   Puzzle,
   Redo2,
   Rocket,
@@ -21,11 +24,12 @@ import {
 import { apiFetch } from "@/lib/api";
 import type { Device, LpDocument, LpPage, LpSectionTemplate } from "@/lib/lp-types";
 import type { Selection } from "@/lib/lp-edit";
-import { createRow, duplicateRow, rowFromTemplate, setRowSettings } from "@/lib/lp-edit";
+import { addWidgetToRow, createRow, duplicateRow, rowFromTemplate, setRowSettings } from "@/lib/lp-edit";
 import { WIDGET_MAP } from "@/lib/lp-widgets";
 import { GENERIC_SECTIONS, RE_SECTIONS, type SectionDef } from "@/lib/lp-section-templates";
 import { Icon } from "@/lib/lp-icon";
 import { BuilderCanvas } from "./canvas";
+import { SectionEditor } from "./section-editor";
 import { SettingsPanel } from "./settings-panel";
 
 const DEVICES: { key: Device; label: string; icon: string }[] = [
@@ -235,6 +239,20 @@ export function Builder({ page, accessToken }: { page: LpPage; accessToken: stri
     },
     [document, mutateDocument],
   );
+
+  const addWidgetToSelectedRow = useCallback(
+    (type: string) => {
+      if (selection.kind !== "row") return;
+      mutateRows(addWidgetToRow(document.rows, selection.rowId, type));
+    },
+    [selection, document.rows, mutateRows],
+  );
+
+  const selectedRow = selection.kind === "row" ? document.rows.find((r) => r.id === selection.rowId) : null;
+  const selectedRowName = selectedRow
+    ? selectedRow.settings?.name ||
+      (WIDGET_MAP[selectedRow.columns?.[0]?.elements?.[0]?.type ?? ""]?.label ?? "Section")
+    : "Section";
 
   const statusColor =
     page.status === "published" ? "#16a34a" : page.status === "archived" ? "#6b7280" : "#d97706";
@@ -577,6 +595,14 @@ export function Builder({ page, accessToken }: { page: LpPage; accessToken: stri
                   />
 
                 </div>
+
+                {/* Elements palette — add widgets to the selected section */}
+                {selection.kind === "row" ? (
+                  <WidgetPalette
+                    sectionName={selectedRowName}
+                    onAdd={addWidgetToSelectedRow}
+                  />
+                ) : null}
               </>
             )}
           </div>
@@ -584,7 +610,15 @@ export function Builder({ page, accessToken }: { page: LpPage; accessToken: stri
           {/* Right — section settings */}
           <div style={{ flex: 1, overflowY: "auto", background: "#f8fafc", padding: 16 }}>
             <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #e2e8f0", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", overflow: "hidden", minHeight: "100%", boxSizing: "border-box" }}>
-              {selection.kind !== "page" ? (
+              {selection.kind === "row" ? (
+                <SectionEditor
+                  row={document.rows.find((r) => r.id === selection.rowId) ?? document.rows[0]}
+                  rows={document.rows}
+                  rowId={selection.rowId}
+                  onRowsChange={(nextRows) => patchDocument({ ...document, rows: nextRows })}
+                  onSelectElement={(columnId, elementId) => setSelection({ kind: "element", rowId: selection.rowId, columnId, elementId })}
+                />
+              ) : selection.kind !== "page" ? (
                 <SettingsPanel
                   document={document}
                   selection={selection}
@@ -794,6 +828,48 @@ function SectionCard({ tpl, onAdd }: { tpl: SectionDef; onAdd: (t: SectionDef) =
       <Icon name={tpl.icon} size={22} />
       <span style={{ fontSize: 11.5, fontWeight: 600, color: hover ? "#4f46e5" : "#334155", lineHeight: 1.3 }}>{tpl.label}</span>
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Elements palette (left panel) — add widgets to the selected section
+// ---------------------------------------------------------------------------
+
+function WidgetPalette({ sectionName, onAdd }: { sectionName: string; onAdd: (type: string) => void }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div style={{ borderTop: "1px solid #e2e8f0", background: "#fafbff", flexShrink: 0, borderBottom: "1px solid #e2e8f0" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "none", border: "none", cursor: "pointer" }}
+      >
+        <span style={{ display: "inline-flex", color: "#4f46e5" }}><Plus size={15} /></span>
+        <span style={{ flex: 1, textAlign: "left", fontSize: 12.5, fontWeight: 800, color: "#0f172a" }}>Elements</span>
+        <span style={{ fontSize: 11, color: "#94a3b8", maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          add to “{sectionName}”
+        </span>
+        <span style={{ display: "inline-flex", color: "#94a3b8", flexShrink: 0 }}>
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </span>
+      </button>
+      {open ? (
+        <div style={{ padding: "0 12px 12px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxHeight: 220, overflowY: "auto" }}>
+          {Object.values(WIDGET_MAP).map((w) => (
+            <button
+              key={w.type}
+              type="button"
+              onClick={() => onAdd(w.type)}
+              title={w.description ?? w.label}
+              style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 9px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", cursor: "pointer", textAlign: "left", overflow: "hidden" }}
+            >
+              <span style={{ color: "#6366f1", display: "inline-flex", flexShrink: 0 }}><Icon name={w.icon} size={14} /></span>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

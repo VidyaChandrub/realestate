@@ -164,6 +164,43 @@ export function addElementToColumn(
   }));
 }
 
+// Adds a widget to a row. If the row already has columns holding that widget type
+// (e.g. amenity-card / floor-plan grids), a new matching column is inserted after
+// the last one so the count can grow freely. Otherwise it appends to the first column.
+export function addWidgetToRow(
+  rows: RowNode[],
+  rowId: string,
+  widgetType: string,
+): RowNode[] {
+  return updateRow(rows, rowId, (row) => {
+    const matching = row.columns.filter((col) =>
+      col.elements.some((el) => el.type === widgetType),
+    );
+    if (matching.length > 0) {
+      const last = matching[matching.length - 1];
+      const newCol: ColumnNode = {
+        id: crypto.randomUUID(),
+        settings: { ...last.settings },
+        elements: last.elements
+          .filter((el) => el.type === widgetType)
+          .map((el) => cloneElement(el) as ElementNode),
+      };
+      const columns = [...row.columns];
+      columns.splice(row.columns.indexOf(last) + 1, 0, newCol);
+      return { ...row, columns };
+    }
+    const colId = row.columns[0]?.id;
+    if (!colId) return row;
+    return {
+      ...row,
+      columns: updateColumn(row.columns, colId, (col) => ({
+        ...col,
+        elements: [...col.elements, newElementFromWidget(widgetType)],
+      })),
+    };
+  });
+}
+
 export function addElementToContainer(
   rows: RowNode[],
   rowId: string,

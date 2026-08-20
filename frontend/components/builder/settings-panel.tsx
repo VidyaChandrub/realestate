@@ -23,7 +23,7 @@ import { Icon } from "@/lib/lp-icon";
 // Generic field renderer
 // ---------------------------------------------------------------------------
 
-function FieldInput({
+export function FieldInput({
   field,
   value,
   onChange,
@@ -336,7 +336,7 @@ function ObjectItemEditor({
 // Collapsible settings section
 // ---------------------------------------------------------------------------
 
-function Section({ title, children, defaultOpen = false }: { title: ReactNode; children: ReactNode; defaultOpen?: boolean }) {
+export function Section({ title, children, defaultOpen = false }: { title: ReactNode; children: ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{ borderBottom: "1px solid #f1f5f9", padding: "14px 0" }}>
