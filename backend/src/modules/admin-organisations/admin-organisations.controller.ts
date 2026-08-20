@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -48,6 +49,11 @@ export class AdminOrganisationsController {
     return this.adminOrganisationsService.listUsers(id);
   }
 
+  @Get(':id/templates')
+  listTemplates(@Param('id') id: string) {
+    return this.adminOrganisationsService.listTemplates(id);
+  }
+
   @Get(':id/activity')
   listActivity(@Param('id') id: string) {
     return this.adminOrganisationsService.listActivity(id);
@@ -64,6 +70,11 @@ export class AdminOrganisationsController {
     @Body() dto: UpdateOrganisationStatusDto,
   ) {
     return this.adminOrganisationsService.updateStatus(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
+    return this.adminOrganisationsService.remove(id, actor);
   }
 
   @Post('onboard/company')

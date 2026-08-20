@@ -9,6 +9,7 @@ import { CountUp } from "@/components/superadmin/count-up";
 import type {
   OrganisationActivityRow,
   OrganisationDetail,
+  OrganisationTemplateRow,
   OrganisationUserRow,
 } from "@/lib/types";
 
@@ -57,6 +58,7 @@ export default function SuperAdminOrganisationDetailPage() {
   const [tab, setTab] = useState<Tab>("Overview");
   const [org, setOrg] = useState<OrganisationDetail | null>(null);
   const [users, setUsers] = useState<OrganisationUserRow[] | null>(null);
+  const [templates, setTemplates] = useState<OrganisationTemplateRow[] | null>(null);
   const [activity, setActivity] = useState<OrganisationActivityRow[] | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -68,6 +70,11 @@ export default function SuperAdminOrganisationDetailPage() {
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const [statusSubmitting, setStatusSubmitting] = useState(false);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !accessToken) {
@@ -86,11 +93,13 @@ export default function SuperAdminOrganisationDetailPage() {
     Promise.all([
       apiFetch<OrganisationDetail>(`/admin/organisations/${params.id}`, { headers }),
       apiFetch<OrganisationUserRow[]>(`/admin/organisations/${params.id}/users`, { headers }),
+      apiFetch<OrganisationTemplateRow[]>(`/admin/organisations/${params.id}/templates`, { headers }),
       apiFetch<OrganisationActivityRow[]>(`/admin/organisations/${params.id}/activity`, { headers }),
     ])
-      .then(([orgRes, usersRes, activityRes]) => {
+      .then(([orgRes, usersRes, templatesRes, activityRes]) => {
         setOrg(orgRes);
         setUsers(usersRes);
+        setTemplates(templatesRes);
         setActivity(activityRes);
       })
       .catch(() => setNotFound(true))
@@ -125,11 +134,9 @@ export default function SuperAdminOrganisationDetailPage() {
     }
   }
 
-  async function handleToggleStatus() {
+  async function confirmToggleStatus() {
     if (!org || !accessToken) return;
     const next = org.status === "active" ? "disabled" : "active";
-    const verb = next === "disabled" ? "suspend" : "reactivate";
-    if (!window.confirm(`Are you sure you want to ${verb} ${org.name}?`)) return;
 
     setStatusSubmitting(true);
     try {
@@ -139,10 +146,27 @@ export default function SuperAdminOrganisationDetailPage() {
         body: JSON.stringify({ status: next }),
       });
       setOrg((prev) => (prev ? { ...prev, status: next } : prev));
+      setStatusModalOpen(false);
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Failed to update status.");
     } finally {
       setStatusSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!org || !accessToken) return;
+    setDeleteError(null);
+    setDeleting(true);
+    try {
+      await apiFetch(`/admin/organisations/${org.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      router.push("/superadmin/organisations");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete organisation.");
+      setDeleting(false);
     }
   }
 
@@ -188,7 +212,7 @@ export default function SuperAdminOrganisationDetailPage() {
           <button className="btn btn-ghost" disabled title="Coming soon">
             ✉️ Message admin
           </button>
-          <button className="btn btn-ghost" onClick={handleToggleStatus} disabled={statusSubmitting}>
+          <button className="btn btn-ghost" onClick={() => setStatusModalOpen(true)} disabled={statusSubmitting}>
             {org.status === "active" ? "⏸ Suspend" : "▶ Reactivate"}
           </button>
           <button className="btn btn-primary" disabled title="Coming soon">
@@ -405,9 +429,46 @@ export default function SuperAdminOrganisationDetailPage() {
               <div className="card">
                 <div className="card-h">
                   <span className="t">Templates</span>
+                  <span className="x">{templates?.length ?? 0} assigned</span>
                 </div>
                 <div className="card-b">
-                  <p className="muted">Coming soon — template assignment isn&apos;t built yet.</p>
+                  {!templates || templates.length === 0 ? (
+                    <p className="muted">No templates assigned yet.</p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {templates.map((t) => (
+                        <div
+                          key={t.name + t.assignedAt}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 14,
+                            padding: "10px 14px",
+                            border: "1px solid var(--line)",
+                            borderRadius: 12,
+                          }}
+                        >
+                          {t.thumbnail ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={t.thumbnail}
+                              alt={t.name}
+                              style={{ width: 48, height: 36, borderRadius: 8, objectFit: "cover" }}
+                            />
+                          ) : (
+                            <span className="av" style={{ width: 48, height: 36, borderRadius: 8, fontSize: 12 }}>
+                              {t.name.slice(0, 2).toUpperCase()}
+                            </span>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <b style={{ fontSize: 13.5 }}>{t.name}</b>
+                            <div className="sm muted">assigned {formatDate(t.assignedAt)}</div>
+                          </div>
+                          <span className="badge b-indigo">{t.category}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </Reveal>
@@ -487,7 +548,7 @@ export default function SuperAdminOrganisationDetailPage() {
               <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <button
                   className="btn btn-ghost btn-block"
-                  onClick={handleToggleStatus}
+                  onClick={() => setStatusModalOpen(true)}
                   disabled={statusSubmitting}
                 >
                   {org.status === "active" ? "⏸ Suspend organisation" : "▶ Reactivate organisation"}
@@ -495,8 +556,7 @@ export default function SuperAdminOrganisationDetailPage() {
                 <button
                   className="btn btn-ghost btn-block"
                   style={{ color: "var(--rose)", borderColor: "var(--rose-050)" }}
-                  disabled
-                  title="Coming soon"
+                  onClick={() => setDeleteModalOpen(true)}
                 >
                   🗑 Delete organisation
                 </button>
@@ -505,6 +565,197 @@ export default function SuperAdminOrganisationDetailPage() {
           </Reveal>
         </div>
       </div>
+
+      {statusModalOpen ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 400,
+            padding: 20,
+          }}
+          onClick={() => {
+            if (!statusSubmitting) setStatusModalOpen(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              padding: 32,
+              width: 440,
+              maxWidth: "100%",
+              boxShadow: "0 24px 80px rgba(15,23,42,.2)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+              <span
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  background: "var(--amber-050)",
+                  color: "var(--amber)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  fontSize: 18,
+                }}
+              >
+                {org.status === "active" ? "⏸" : "▶"}
+              </span>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>
+                {org.status === "active" ? "Suspend organisation?" : "Reactivate organisation?"}
+              </h2>
+            </div>
+            <p style={{ margin: "0 0 6px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
+              {org.status === "active" ? (
+                <>
+                  <strong>&quot;{org.name}&quot;</strong> will be marked disabled. No data is deleted — you
+                  can reactivate any time.
+                </>
+              ) : (
+                <>
+                  <strong>&quot;{org.name}&quot;</strong> will be marked active again.
+                </>
+              )}
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                marginTop: 24,
+                paddingTop: 20,
+                borderTop: "1px solid var(--line)",
+              }}
+            >
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => setStatusModalOpen(false)}
+                disabled={statusSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={() => void confirmToggleStatus()}
+                disabled={statusSubmitting}
+              >
+                {statusSubmitting
+                  ? "Saving…"
+                  : org.status === "active"
+                    ? "Suspend organisation"
+                    : "Reactivate organisation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteModalOpen ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 400,
+            padding: 20,
+          }}
+          onClick={() => {
+            if (!deleting) setDeleteModalOpen(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              padding: 32,
+              width: 440,
+              maxWidth: "100%",
+              boxShadow: "0 24px 80px rgba(15,23,42,.2)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+              <span
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  background: "var(--rose-050)",
+                  color: "var(--rose)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  fontSize: 18,
+                }}
+              >
+                🗑
+              </span>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>
+                Delete organisation?
+              </h2>
+            </div>
+            <p style={{ margin: "0 0 6px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
+              <strong>&quot;{org.name}&quot;</strong> and its {org.userCount} user
+              {org.userCount === 1 ? "" : "s"} will be permanently deleted.
+            </p>
+            <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>This action cannot be undone.</p>
+
+            {deleteError ? (
+              <div
+                style={{
+                  color: "var(--rose)",
+                  fontSize: 13,
+                  marginTop: 12,
+                  background: "var(--rose-050)",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                }}
+              >
+                {deleteError}
+              </div>
+            ) : null}
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                marginTop: 24,
+                paddingTop: 20,
+                borderTop: "1px solid var(--line)",
+              }}
+            >
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-danger" type="button" onClick={() => void handleDelete()} disabled={deleting}>
+                {deleting ? "Deleting…" : "Delete organisation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

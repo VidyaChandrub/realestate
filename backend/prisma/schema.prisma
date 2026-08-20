@@ -38,36 +38,6 @@ enum RoleScope {
   @@schema("identity")
 }
 
-enum TemplateType {
-  free
-  paid
-
-  @@schema("templates")
-}
-
-enum PricingModel {
-  global
-  org_specific
-
-  @@schema("templates")
-}
-
-enum TemplateStatus {
-  draft
-  active
-
-  @@schema("templates")
-}
-
-enum PaymentStatus {
-  not_required
-  pending
-  paid
-  verified
-
-  @@schema("templates")
-}
-
 enum LandingPageCategory {
   property_project
   residential
@@ -102,10 +72,10 @@ model Organisation {
   status    OrgStatus @default(active)
   createdAt DateTime  @default(now()) @map("created_at")
 
-  users                  User[]
-  teams                  Team[]
-  organisationTemplates  OrganisationTemplate[]
-  auditLogs              AuditLog[]
+  users                             User[]
+  teams                             Team[]
+  organisationLandingPageTemplates  OrganisationLandingPageTemplate[]
+  auditLogs                         AuditLog[]
 
   @@map("organisations")
   @@schema("identity")
@@ -202,10 +172,9 @@ model Team {
   name      String
   createdAt DateTime @default(now()) @map("created_at")
 
-  organisation   Organisation         @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  members        TeamMember[]
-  moduleAccess   TeamModuleAccess[]
-  templateAccess TeamTemplateAccess[]
+  organisation Organisation       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  members      TeamMember[]
+  moduleAccess TeamModuleAccess[]
 
   @@map("teams")
   @@schema("access")
@@ -253,58 +222,14 @@ model RoleModulePermission {
 }
 
 // ---------------------------------------------------------------------------
-// templates — the Super Admin -> Org -> Team template lifecycle
-// ---------------------------------------------------------------------------
-
-model Template {
-  id           String         @id @default(uuid())
-  name         String
-  type         TemplateType
-  pricingModel PricingModel?  @map("pricing_model")
-  basePrice    Decimal?       @map("base_price") @db.Decimal(10, 2)
-  previewImage String?        @map("preview_image")
-  status       TemplateStatus @default(draft)
-  createdAt    DateTime       @default(now()) @map("created_at")
-
-  organisationTemplates OrganisationTemplate[]
-  teamTemplateAccess    TeamTemplateAccess[]
-
-  @@map("templates")
-  @@schema("templates")
-}
-
-model OrganisationTemplate {
-  orgId            String        @map("org_id")
-  templateId       String        @map("template_id")
-  orgSpecificPrice Decimal?      @map("org_specific_price") @db.Decimal(10, 2)
-  paymentStatus    PaymentStatus @default(not_required) @map("payment_status")
-  activatedAt      DateTime?     @map("activated_at")
-  assignedAt       DateTime      @default(now()) @map("assigned_at")
-
-  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  template     Template     @relation(fields: [templateId], references: [id], onDelete: Cascade)
-
-  @@id([orgId, templateId])
-  @@map("organisation_templates")
-  @@schema("templates")
-}
-
-model TeamTemplateAccess {
-  teamId     String   @map("team_id")
-  templateId String   @map("template_id")
-  grantedAt  DateTime @default(now()) @map("granted_at")
-
-  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  template Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
-
-  @@id([teamId, templateId])
-  @@map("team_template_access")
-  @@schema("templates")
-}
-
-// ---------------------------------------------------------------------------
 // landing_pages — the visual drag-and-drop landing page builder.
 // document is the full Elementor-style tree: { settings, header, footer, rows }
+//
+// "Template" now means a published LandingPage — the old standalone
+// Template/OrganisationTemplate/TeamTemplateAccess catalog (pricing tiers,
+// payment verification) was dropped; grant is immediate for every org, no
+// free/paid distinction. OrganisationLandingPageTemplate is the minimal
+// grant record below.
 // ---------------------------------------------------------------------------
 
 model LandingPage {
@@ -325,9 +250,27 @@ model LandingPage {
   createdAt   DateTime            @default(now()) @map("created_at")
   updatedAt   DateTime            @updatedAt @map("updated_at")
 
-  leads LandingLead[]
+  leads                 LandingLead[]
+  organisationTemplates OrganisationLandingPageTemplate[]
 
   @@map("landing_pages")
+  @@schema("templates")
+}
+
+// Grants an organisation access to use/duplicate a published LandingPage as
+// a starter template. Assigned from the onboarding wizard's Step 4 today.
+// TODO: once subscription plans are defined, which LandingPages an org can
+// select here will likely need filtering by plan — not built yet.
+model OrganisationLandingPageTemplate {
+  orgId         String   @map("org_id")
+  landingPageId String   @map("landing_page_id")
+  assignedAt    DateTime @default(now()) @map("assigned_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  landingPage  LandingPage  @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+
+  @@id([orgId, landingPageId])
+  @@map("organisation_landing_page_templates")
   @@schema("templates")
 }
 
