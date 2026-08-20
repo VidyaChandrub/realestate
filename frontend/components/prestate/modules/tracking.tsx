@@ -64,11 +64,11 @@ export function TrackingModule({
     }
   };
 
-  const pixels = [
+  const pixels: { name: string; id: string; status: "ok" | "warn" | "empty" }[] = [
     { name: "Google Analytics 4", id: tracking.gaId || "Not set", status: idStatus("ga", tracking.gaId) },
     { name: "Google Tag Manager", id: tracking.gtmId || "Not set", status: idStatus("gtm", tracking.gtmId) },
     { name: "Meta Pixel", id: tracking.metaPixel || "Not set", status: idStatus("pixel", tracking.metaPixel) },
-    { name: "Custom scripts", id: tracking.customScripts.trim() ? "Attached" : "Empty", status: tracking.customScripts.trim() ? "ok" : "empty" as const },
+    { name: "Custom scripts", id: tracking.customScripts.trim() ? "Attached" : "Empty", status: tracking.customScripts.trim() ? "ok" : "empty" },
   ];
 
   return (

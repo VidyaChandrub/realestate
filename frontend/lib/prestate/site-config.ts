@@ -56,6 +56,12 @@ export function defaultSiteConfig(input: {
       cta: "Book a Site Visit",
       ctaLink: "#contact",
       menu: ["Amenities", "Floor Plans", "Gallery", "Pricing", "Contact"],
+      floatEnabled: true,
+      floatSide: "right",
+      floatWhatsapp: true,
+      floatCall: true,
+      floatEnquire: true,
+      floatEmail: true,
     },
     footer: {
       rera: "",

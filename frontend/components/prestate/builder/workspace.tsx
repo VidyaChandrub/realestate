@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type * as React from "react";
 import { SlidersHorizontal, LayoutGrid } from "lucide-react";
 import type { Device, LandingPageData, SectionInstance } from "@/lib/prestate/types";
 import { buildTemplateSections, WIDGETS } from "@/lib/prestate/data";
+import { findSection, insertChild, isStructural, patchSection } from "@/lib/prestate/tree";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import { WidgetsPanel } from "./widgets-panel";
 import { Canvas } from "./canvas";
@@ -62,7 +63,7 @@ export function BuilderWorkspace({
   const [vp, setVp] = useState(1400);
 
   const { sections, history, future, selectedId } = state;
-  const selected = sections.find((s) => s.id === selectedId) ?? null;
+  const selected = selectedId ? findSection(sections, selectedId)?.node ?? null : null;
   const dockWidgets = vp >= 900;
   const dockInspector = vp >= 1180;
 
@@ -88,14 +89,25 @@ export function BuilderWorkspace({
     });
   }, [page.id]);
 
-  const mutate = useCallback((patch: (prev: SectionInstance[]) => SectionInstance[]) => {
-    setState((prev) => ({
-      sections: patch(prev.sections),
-      history: [...prev.history.slice(-49), prev.sections],
-      future: [],
-      selectedId: prev.selectedId,
-    }));
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (persistTimer.current) window.clearTimeout(persistTimer.current);
   }, []);
+
+  const mutate = useCallback((patch: (prev: SectionInstance[]) => SectionInstance[]) => {
+    setState((prev) => {
+      const sections = patch(prev.sections);
+      if (persistTimer.current) window.clearTimeout(persistTimer.current);
+      persistTimer.current = window.setTimeout(() => onPersist(sections), 350);
+      return {
+        sections,
+        history: [...prev.history.slice(-49), prev.sections],
+        future: [],
+        selectedId: prev.selectedId,
+      };
+    });
+  }, [onPersist]);
 
   const undo = useCallback(() => {
     setState((prev) => {
@@ -190,16 +202,23 @@ export function BuilderWorkspace({
       const def = WIDGETS.find((w) => w.id === widgetId);
       if (!def) return;
       const section = def.make();
-      mutate((prev) => [...prev, section]);
+      mutate((prev) => {
+        if (selected && isStructural(selected.type)) return insertChild(prev, selected.id, section);
+        if (selectedId) {
+          const ref = findSection(prev, selectedId);
+          if (ref) return insertChild(prev, ref.parentId, section, ref.index + 1);
+        }
+        return insertChild(prev, null, section);
+      });
       setTimeout(() => setState((prev) => ({ ...prev, selectedId: section.id })), 40);
     },
-    [mutate],
+    [mutate, selected, selectedId],
   );
 
   const patchSelected = useCallback(
     (patch: Partial<SectionInstance>) => {
       if (!selectedId) return;
-      mutate((prev) => prev.map((s) => (s.id === selectedId ? { ...s, ...patch } : s)));
+      mutate((prev) => patchSection(prev, selectedId, patch));
     },
     [mutate, selectedId],
   );

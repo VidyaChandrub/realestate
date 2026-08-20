@@ -203,6 +203,46 @@ export function HeaderFooterModule({
                   </FieldRow>
                 </Collapse>
               </div>
+
+              <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
+                <Collapse title="Floating icons" icon={<Phone size={14} />} defaultOpen>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Show floating icons</span>
+                    <Toggle on={header.floatEnabled ?? true} onChange={(v) => patchHeader({ floatEnabled: v })} />
+                  </div>
+                  <p style={{ fontSize: 12, color: "var(--ps-muted)", lineHeight: 1.55, margin: "0 0 8px" }}>
+                    WhatsApp, Call, Enquire and Email stay pinned on the page. Numbers come from Brand Center and Forms.
+                  </p>
+                  {(
+                    [
+                      ["floatWhatsapp", "WhatsApp"],
+                      ["floatCall", "Call"],
+                      ["floatEnquire", "Enquire"],
+                      ["floatEmail", "Email"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>{label}</span>
+                      <Toggle on={header[key] ?? true} onChange={(v) => patchHeader({ [key]: v })} />
+                    </div>
+                  ))}
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Side</div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {(["right", "left"] as const).map((side) => (
+                        <button
+                          key={side}
+                          type="button"
+                          onClick={() => patchHeader({ floatSide: side })}
+                          style={{ flex: 1, padding: "8px", borderRadius: 9, border: (header.floatSide ?? "right") === side ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)", background: (header.floatSide ?? "right") === side ? "var(--ps-primary-soft)" : "#fff", color: "var(--ps-slate)", fontSize: 12, fontWeight: 700, textTransform: "capitalize", cursor: "pointer" }}
+                        >
+                          {side}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </Collapse>
+              </div>
             </>
           ) : (
             <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>

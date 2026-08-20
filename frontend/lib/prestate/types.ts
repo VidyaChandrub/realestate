@@ -14,12 +14,14 @@ export type ModuleKey =
 
 export type WidgetCategory =
   | "Layout"
-  | "Property"
-  | "Trust"
-  | "Location"
-  | "Conversion"
+  | "Basic"
+  | "Real Estate"
   | "Media"
-  | "Marketing";
+  | "Forms"
+  | "Marketing"
+  | "Header & Footer"
+  | "SEO"
+  | "Advanced";
 
 export interface SectionStyle {
   colors?: {
@@ -89,6 +91,7 @@ export interface SectionInstance {
   locked?: boolean;
   settings: Record<string, unknown>;
   style: SectionStyle;
+  children?: SectionInstance[];
 }
 
 export interface PropertyData {
@@ -167,6 +170,12 @@ export interface SiteConfig {
     cta: string;
     ctaLink: string;
     menu: string[];
+    floatEnabled: boolean;
+    floatSide: "left" | "right";
+    floatWhatsapp: boolean;
+    floatCall: boolean;
+    floatEnquire: boolean;
+    floatEmail: boolean;
   };
   footer: {
     rera: string;

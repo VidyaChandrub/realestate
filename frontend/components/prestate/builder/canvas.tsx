@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   Check,
   CheckCircle2,
@@ -28,9 +28,23 @@ import {
   Quote,
   PhoneCall,
   SquareStack,
+  Mail,
 } from "lucide-react";
 import type { Device, SectionInstance, SiteConfig } from "@/lib/prestate/types";
 import { PROPERTY, SLUG_ICONS, resolveVars, WIDGETS } from "@/lib/prestate/data";
+import {
+  cloneTree,
+  duplicateSection,
+  findParentNode,
+  findSection,
+  insertChild,
+  isDescendant,
+  isStructural,
+  newSectionId,
+  removeSection,
+  reorderSection,
+  toggleSectionFlag,
+} from "@/lib/prestate/tree";
 import { googleFontsHref, siteThemeStyle } from "@/lib/prestate/site-config";
 import { bumpTracking } from "@/lib/prestate/tracking";
 import { firePrestateLead } from "@/components/prestate/tracking-scripts";
@@ -49,7 +63,7 @@ const SiteFormContext = createContext<SiteConfig["form"] | undefined>(undefined)
 const SiteChromeContext = createContext<{ header: SiteConfig["header"]; footer: SiteConfig["footer"]; brand: SiteConfig["brand"] } | undefined>(undefined);
 const SitePageIdContext = createContext("");
 import { SceneImage } from "@/components/prestate/art";
-import { readWidgetId } from "./widgets-panel";
+import { isWidgetDrag, readWidgetId } from "./widgets-panel";
 
 // ---------------------------------------------------------------------------
 // section style → css
@@ -328,6 +342,148 @@ function PageFooter({ device, theme }: { device: Device; theme?: CanvasTheme }) 
   );
 }
 
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function FloatingContactDock({
+  live,
+  device,
+  widget,
+}: {
+  live?: boolean;
+  device: Device;
+  widget?: SectionInstance | null;
+}) {
+  const chrome = useContext(SiteChromeContext);
+  const form = useContext(SiteFormContext);
+  const pageId = useContext(SitePageIdContext);
+  const header = chrome?.header;
+  const brand = chrome?.brand;
+  const st = widget?.settings ?? {};
+  const enabled = widget ? true : (header?.floatEnabled ?? true);
+  if (!enabled) return null;
+
+  const showWa = widget ? st.whatsapp !== false : (header?.floatWhatsapp ?? true);
+  const showCall = widget ? st.call !== false : (header?.floatCall ?? true);
+  const showEnquire = widget ? st.enquire !== false : (header?.floatEnquire ?? true);
+  const showEmail = widget ? st.email !== false : (header?.floatEmail ?? true);
+  const side = String(st.side || header?.floatSide || "right") === "left" ? "left" : "right";
+
+  const phone = String(st.phone || brand?.phone || "").trim();
+  const waRaw = String(st.number || form?.whatsapp || phone).trim();
+  const email = String(brand?.email || "").trim();
+  const enquireHref = header?.ctaLink || "#lead-form";
+  const size = device === "mobile" ? 46 : 52;
+
+  const items: { key: string; href: string; title: string; bg: string; icon: ReactNode; track?: "whatsapp" | "call" | "form"; external?: boolean }[] = [];
+  if (showWa && digitsOnly(waRaw)) {
+    items.push({
+      key: "wa",
+      href: `https://wa.me/${digitsOnly(waRaw)}`,
+      title: "WhatsApp",
+      bg: "linear-gradient(135deg,#25d366,#128c7e)",
+      icon: <MessageCircle size={device === "mobile" ? 20 : 22} />,
+      track: "whatsapp",
+      external: true,
+    });
+  }
+  if (showCall && digitsOnly(phone)) {
+    items.push({
+      key: "call",
+      href: `tel:${digitsOnly(phone)}`,
+      title: "Call",
+      bg: "linear-gradient(135deg,#2563eb,#1d4ed8)",
+      icon: <PhoneCall size={device === "mobile" ? 20 : 22} />,
+      track: "call",
+    });
+  }
+  if (showEnquire) {
+    items.push({
+      key: "enquire",
+      href: enquireHref,
+      title: header?.cta || "Enquire",
+      bg: "linear-gradient(135deg,var(--ps-primary),#8a7bff)",
+      icon: <Sparkles size={device === "mobile" ? 20 : 22} />,
+      track: "form",
+    });
+  }
+  if (showEmail && email) {
+    items.push({
+      key: "email",
+      href: `mailto:${email}`,
+      title: "Email",
+      bg: "linear-gradient(135deg,#0f172a,#334155)",
+      icon: <Mail size={device === "mobile" ? 20 : 22} />,
+    });
+  }
+  if (!items.length) return null;
+
+  const onActivate = (item: (typeof items)[number], e: ReactMouseEvent) => {
+    if (!live) {
+      e.preventDefault();
+      return;
+    }
+    if (item.track && pageId) bumpTracking(pageId, item.track === "form" ? "form" : item.track);
+  };
+
+  return (
+    <div
+      className="ps-float-dock"
+      data-side={side}
+      style={{
+        position: live ? "fixed" : "absolute",
+        [side]: live ? 16 : 14,
+        top: live ? undefined : 160,
+        bottom: live ? (device === "mobile" ? 88 : 28) : 100,
+        zIndex: 85,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: live ? "flex-end" : "center",
+        gap: 10,
+        pointerEvents: "none",
+      }}
+    >
+      {items.map((item) => (
+        <a
+          key={item.key}
+          href={item.href}
+          title={item.title}
+          target={item.external ? "_blank" : undefined}
+          rel={item.external ? "noopener noreferrer" : undefined}
+          className={`ps-float-btn${item.key === "wa" ? " ps-float-btn--pulse" : ""}`}
+          onClick={(e) => onActivate(item, e)}
+          style={{
+            pointerEvents: "auto",
+            width: size,
+            height: size,
+            borderRadius: "50%",
+            background: item.bg,
+            color: "#fff",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 10px 24px rgba(15,23,42,.28)",
+            textDecoration: "none",
+          }}
+        >
+          {item.icon}
+          <span className="ps-float-tip">{item.title}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function FloatingIconsHint({ s }: { s: SectionInstance }) {
+  const st = s.settings;
+  return (
+    <div style={{ border: "1.5px dashed var(--ps-line-strong)", borderRadius: 14, padding: "16px 18px", background: "var(--ps-primary-mist)", color: "var(--ps-slate)", fontSize: 13, lineHeight: 1.55 }}>
+      <strong style={{ color: "var(--ps-ink)" }}>Floating icons</strong> — WhatsApp, Call, Enquire and Email stay on the {String(st.side || "right")} edge of the page (builder and live preview).
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Section renderer — actual landing page content
 // ---------------------------------------------------------------------------
@@ -365,7 +521,7 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
             </span>
           </div>
           <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginTop: 28 }}>
-            {(st.highlights as string[]).map((h) => (
+            {((st.highlights as string[] | undefined) ?? []).map((h) => (
               <span key={h} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.18)", color: "#fff", fontSize: 11.5, fontWeight: 600, padding: "7px 13px", borderRadius: 999, backdropFilter: "blur(8px)" }}>
                 <CheckCircle2 size={13} style={{ color: "#cda45e" }} /> {h}
               </span>
@@ -373,7 +529,7 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "repeat(4,1fr)" : "1fr 1fr", gap: 12, width: "100%", marginTop: 44 }}>
-          {(st.heroStats as { value: string; label: string }[]).map((x) => (
+          {((st.heroStats as { value: string; label: string }[] | undefined) ?? []).map((x) => (
             <div key={x.label} style={{ background: "rgba(255,255,255,.09)", border: "1px solid rgba(255,255,255,.16)", borderRadius: 14, padding: "16px 18px", backdropFilter: "blur(12px)" }}>
               <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{x.value}</div>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", marginTop: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>{x.label}</div>
@@ -439,7 +595,7 @@ function OverviewSection({ s, device }: { s: SectionInstance; device: Device }) 
         <h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 14px", lineHeight: 1.15 }}>{String(st.heading)}</h2>
         <p style={{ fontSize: 14.5, lineHeight: 1.75, color: "var(--ps-slate)", marginBottom: 18 }}>{String(st.text)}</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 26 }}>
-          {(st.bullets as string[]).map((b) => (
+          {((st.bullets as string[] | undefined) ?? []).map((b) => (
             <div key={b} style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ width: 20, height: 20, borderRadius: 7, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Check size={12} strokeWidth={3} />
@@ -449,7 +605,7 @@ function OverviewSection({ s, device }: { s: SectionInstance; device: Device }) 
           ))}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
-          {(st.stats as { value: string; label: string }[]).map((x) => (
+          {((st.stats as { value: string; label: string }[] | undefined) ?? []).map((x) => (
             <div key={x.label} style={{ background: "#f8fafc", border: "1px solid var(--ps-line)", borderRadius: 13, padding: "14px 12px", textAlign: "center" }}>
               <div style={{ fontSize: 17, fontWeight: 800, color: "var(--ps-primary)" }}>{x.value}</div>
               <div style={{ fontSize: 10.5, color: "var(--ps-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{x.label}</div>
@@ -567,7 +723,7 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
         <p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 520, lineHeight: 1.65 }}>{String(st.text)}</p>
       </Inner>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14, maxWidth: 1200, margin: "30px auto 0", width: "100%" }}>
-        {(st.images as string[]).slice(0, 6).map((img, i) => (
+        {(Array.isArray(st.images) ? (st.images as string[]) : []).slice(0, 6).map((img, i) => (
           <div key={i} style={{ borderRadius: 16, overflow: "hidden", position: "relative", aspectRatio: "4/3", cursor: "pointer", boxShadow: "var(--ps-shadow-sm)" }}>
             <SceneImage art={GALLERY_ART[i % GALLERY_ART.length]} />
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 55%, rgba(8,10,20,.55))", opacity: 0, transition: "opacity .2s" }} className="ps-gal-overlay" />
@@ -675,7 +831,7 @@ function PricingSection({ s, device }: { s: SectionInstance; device: Device }) {
             </div>
             <div style={{ height: 1, background: "var(--ps-line)", margin: "18px 0" }} />
             <div style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 150 }}>
-              {p.features.map((f) => (
+              {(p.features ?? []).map((f) => (
                 <div key={f} style={{ display: "flex", alignItems: "center", gap: 9 }}>
                   <CheckCircle2 size={15} style={{ color: p.featured ? "var(--ps-primary)" : "#94a3b8", flexShrink: 0 }} />
                   <span style={{ fontSize: 12.5, color: "var(--ps-slate)" }}>{f}</span>
@@ -747,7 +903,7 @@ function TestimonialsSection({ s, device }: { s: SectionInstance; device: Device
 
 function FaqSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
-  const items = (st.items ?? []) as { q: string; a: string }[];
+  const items = (st.items ?? []) as { q?: string; a?: string; title?: string; body?: string }[];
   const [open, setOpen] = useState<number | null>(0);
   return (
     <>
@@ -762,9 +918,9 @@ function FaqSection({ s, device }: { s: SectionInstance; device: Device }) {
               <span style={{ width: 24, height: 24, borderRadius: 8, background: open === i ? "var(--ps-primary-soft)" : "#f1f4f9", color: open === i ? "var(--ps-primary)" : "var(--ps-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <ChevronDown size={14} style={{ transform: open === i ? "rotate(180deg)" : "none", transition: "transform .18s" }} />
               </span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ps-ink)", flex: 1 }}>{it.q}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ps-ink)", flex: 1 }}>{it.q ?? (it as { title?: string }).title}</span>
             </button>
-            {open === i ? <div style={{ padding: "0 20px 18px 56px", fontSize: 13, lineHeight: 1.7, color: "var(--ps-slate)" }}>{it.a}</div> : null}
+            {open === i ? <div style={{ padding: "0 20px 18px 56px", fontSize: 13, lineHeight: 1.7, color: "var(--ps-slate)" }}>{it.a ?? (it as { body?: string }).body}</div> : null}
           </div>
         ))}
       </div>
@@ -780,10 +936,17 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
   const [sent, setSent] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
 
-  const fields = (cfg?.fields?.length
-    ? cfg.fields
-    : ((st.fields ?? []) as { type: string; label: string; placeholder?: string; options?: string[]; required?: boolean; id?: string }[])
-  ).filter((f) => f.type !== "hidden");
+  const rawFields = cfg?.fields?.length ? cfg.fields : (st.fields ?? []);
+  const fields = (Array.isArray(rawFields) ? rawFields : [])
+    .map((f, i) => {
+      if (typeof f === "string") {
+        const type = f === "email" ? "email" : f === "phone" ? "phone" : f === "message" ? "textarea" : "text";
+        const label = f.charAt(0).toUpperCase() + f.slice(1);
+        return { id: `w${i}`, type, label, placeholder: label, required: type !== "textarea" };
+      }
+      return f as { type: string; label: string; placeholder?: string; options?: string[]; required?: boolean; id?: string };
+    })
+    .filter((f) => f && f.type !== "hidden");
 
   const multi = cfg?.multiStep ?? Boolean(st.steps);
   const chunk = 3;
@@ -852,11 +1015,11 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
           <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 16 }}>Lead capture</div>
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
-          {visible.map((f) => {
+          {visible.map((f, i) => {
             const key = f.label;
             const val = values[key] ?? "";
             return (
-              <div key={("id" in f && f.id) || key}>
+              <div key={f.id || key || i}>
                 {f.type !== "checkbox" ? (
                   <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", marginBottom: 5, display: "block" }}>
                     {f.label} {"required" in f && f.required ? " *" : ""}
@@ -1001,31 +1164,350 @@ function StickyCta({ s, device }: { s: SectionInstance; device: Device }) {
   );
 }
 
-// Generic renderers for widgets not in the default page
-function GenericSection({ s, device }: { s: SectionInstance; device: Device }) {
+// ---------------------------------------------------------------------------
+// Generic / basic content widgets
+// ---------------------------------------------------------------------------
+
+function HeadingSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
-  const heading = st.heading ?? st.title ?? null;
-  const text = st.text ?? st.subheading ?? null;
+  const tag = String(st.tag ?? "h2");
+  const size = Number(st.size ?? (tag === "h1" ? 44 : tag === "h3" ? 28 : 34));
+  const align = String(st.align ?? "center") as "left" | "center" | "right";
+  const color = s.style.colors?.text ?? "var(--ps-ink)";
+  const text = String(resolveVars(st.text ?? ""));
+  const fontSize = device === "mobile" ? Math.round(size * 0.8) : size;
+  return (
+    <div style={{ textAlign: align }}>
+      <div style={{ fontSize, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.15, color, margin: 0 }}>{text}</div>
+    </div>
+  );
+}
+
+function TextSection({ s }: { s: SectionInstance }) {
+  const text = String(resolveVars(s.settings.text ?? ""));
+  return <p style={{ fontSize: 15, lineHeight: 1.75, color: "var(--ps-slate)", margin: 0 }}>{text}</p>;
+}
+
+function ButtonSection({ s }: { s: SectionInstance }) {
+  const st = s.settings;
+  const text = String(resolveVars(st.text ?? "Click Here"));
+  const link = String(st.link ?? "#");
+  const variant = String(st.style ?? "solid");
+  const solid = variant !== "outline" && variant !== "ghost";
+  return (
+    <div style={{ textAlign: "center" }}>
+      <a
+        href={link}
+        onClick={(e) => e.preventDefault()}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          padding: "13px 28px",
+          borderRadius: 11,
+          fontWeight: 700,
+          fontSize: 14,
+          background: solid ? "var(--ps-primary)" : "transparent",
+          color: solid ? "#fff" : "var(--ps-primary)",
+          border: variant === "outline" ? "1.5px solid var(--ps-primary)" : "none",
+          boxShadow: solid ? "0 10px 26px rgba(109,93,252,.35)" : "none",
+          textDecoration: "none",
+          cursor: "pointer",
+        }}
+      >
+        {text}
+      </a>
+    </div>
+  );
+}
+
+function ImageSection({ s }: { s: SectionInstance }) {
+  const st = s.settings;
+  const src = String(st.src ?? "");
+  const alt = String(st.alt ?? "Image");
+  const radius = Number(st.radius ?? 12);
+  return (
+    <div style={{ display: "flex", justifyContent: "center" }}>
+      {src ? (
+        <img src={src} alt={alt} style={{ maxWidth: "100%", width: "min(800px,100%)", borderRadius: radius, objectFit: "cover", display: "block" }} />
+      ) : (
+        <div style={{ width: "min(800px,100%)", aspectRatio: "16/9", borderRadius: radius, border: "1.5px dashed var(--ps-line-strong)", background: "var(--ps-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ps-muted)", fontSize: 13, fontWeight: 600, textAlign: "center", padding: "0 20px" }}>
+          Image — set a URL in Content
+        </div>
+      )}
+    </div>
+  );
+}
+
+function IconSection({ s }: { s: SectionInstance }) {
+  const st = s.settings;
+  const name = String(st.name ?? "Sparkles");
+  const size = Number(st.size ?? 48);
+  const color = String(st.color ?? "var(--ps-primary)");
+  const Icon = SLUG_ICONS[name] ?? SLUG_ICONS.Sparkles ?? Sparkles;
+  return (
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: size + 16 }}>
+      <Icon size={size} color={color} strokeWidth={1.8} />
+    </div>
+  );
+}
+
+function IconBoxSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const icon = String(st.icon ?? "Sparkles");
+  const title = String(st.title ?? "");
+  const text = String(st.text ?? "");
+  const Icon = SLUG_ICONS[icon] ?? SLUG_ICONS.Sparkles ?? Sparkles;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        textAlign: "center",
+        gap: 12,
+        padding: device === "mobile" ? "20px 16px" : "28px 22px",
+        borderRadius: 16,
+        border: "1px solid var(--ps-line)",
+        background: "var(--ps-panel-raised)",
+        maxWidth: 360,
+        margin: "0 auto",
+        width: "100%",
+      }}
+    >
+      <span style={{ width: 48, height: 48, borderRadius: 13, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon size={24} />
+      </span>
+      {title ? <div style={{ fontSize: 16, fontWeight: 800, color: "var(--ps-ink)", letterSpacing: -0.2 }}>{title}</div> : null}
+      {text ? <div style={{ fontSize: 13, color: "var(--ps-slate)", lineHeight: 1.6 }}>{text}</div> : null}
+    </div>
+  );
+}
+
+function HtmlSection({ s }: { s: SectionInstance }) {
+  const code = String(s.settings.code ?? "");
+  return (
+    <div style={{ fontFamily: "monospace", fontSize: 12, background: "var(--ps-bg)", border: "1px dashed var(--ps-line-strong)", borderRadius: 10, padding: 14, color: "var(--ps-muted)", whiteSpace: "pre-wrap", overflow: "auto" }}>
+      {code || "<!-- your custom HTML here -->"}
+    </div>
+  );
+}
+
+function SpacerSection({ s }: { s: SectionInstance }) {
+  const h = Math.max(0, Number(s.settings.height ?? 80));
+  return <div style={{ height: h }} aria-hidden />;
+}
+
+function DividerSection({ s }: { s: SectionInstance }) {
+  const st = s.settings;
+  const color = String(st.color ?? "#e8eaf1");
+  const thickness = Math.max(1, Number(st.thickness ?? 1));
+  const width = String(st.width ?? "100%");
+  return (
+    <div style={{ display: "flex", justifyContent: "center" }}>
+      <hr style={{ width, border: "none", borderTop: `${thickness}px solid ${color}`, margin: 0 }} />
+    </div>
+  );
+}
+
+function ContactSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const heading = String(st.heading ?? "Get in Touch");
+  const rows = [
+    { icon: SLUG_ICONS.Phone ?? Sparkles, label: "Call", value: String(st.phone ?? "") },
+    { icon: SLUG_ICONS.Send ?? Sparkles, label: "Email", value: String(st.email ?? "") },
+    { icon: SLUG_ICONS.MapPin ?? Sparkles, label: "Address", value: String(st.address ?? "") },
+  ].filter((r) => r.value);
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
+      {heading ? <h3 style={{ fontSize: device === "mobile" ? 22 : 26, fontWeight: 800, letterSpacing: -0.4, margin: "0 0 18px", textAlign: "center" }}>{heading}</h3> : null}
+      <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
+        {rows.map((r, i) => (
+          <div key={i} style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line)", borderRadius: 14, padding: "16px 18px", display: "flex", gap: 12, alignItems: "center" }}>
+            <span style={{ width: 38, height: 38, borderRadius: 11, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <r.icon size={17} />
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)" }}>{r.label}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ps-ink)", marginTop: 2, overflowWrap: "anywhere" }}>{r.value}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Real-estate widget renderers
+function PropertyDetailsSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const items = (s.settings.items ?? []) as { label?: string; value?: string }[];
+  const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 3;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 12 }}>
+      {items.map((it, i) => (
+        <div key={i} style={{ background: "var(--ps-bg)", border: "1px solid var(--ps-line)", borderRadius: 13, padding: "16px 18px" }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--ps-muted)" }}>{it.label}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: "var(--ps-ink)", marginTop: 5 }}>{String(resolveVars(it.value ?? ""))}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function UnitTypesSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const items = (s.settings.items ?? []) as { name?: string; beds?: string; area?: string; price?: string }[];
+  const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 3;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14 }}>
+      {items.map((it, i) => (
+        <div key={i} style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line)", borderRadius: 15, padding: "20px 20px 18px", position: "relative" }}>
+          <span style={{ position: "absolute", top: 14, right: 14, fontSize: 11, fontWeight: 700, color: "var(--ps-primary)", background: "var(--ps-primary-soft)", padding: "3px 9px", borderRadius: 999 }}>
+            {it.beds} BHK
+          </span>
+          <div style={{ fontSize: 17, fontWeight: 800, color: "var(--ps-ink)", letterSpacing: -0.3 }}>{it.name}</div>
+          <div style={{ fontSize: 13, color: "var(--ps-slate)", marginTop: 8 }}>Area: {it.area}</div>
+          {it.price ? <div style={{ fontSize: 18, fontWeight: 800, color: "var(--ps-primary)", marginTop: 10 }}>{it.price}</div> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PaymentPlansSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const heading = String(st.heading ?? "Payment Plans");
+  const items = (st.items ?? []) as { plan?: string; amount?: string; details?: string }[];
+  const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 3;
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
-      {heading ? <h2 style={{ fontSize: device === "mobile" ? 24 : 30, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center" }}>{String(resolveVars(heading))}</h2> : null}
+      {heading ? <h3 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, margin: "0 0 20px", textAlign: "center" }}>{heading}</h3> : null}
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14 }}>
+        {items.map((it, i) => (
+          <div key={i} style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line)", borderTop: "3px solid var(--ps-primary)", borderRadius: 14, padding: "20px 20px 18px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)" }}>{it.plan}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "var(--ps-ink)", marginTop: 6 }}>{it.amount}</div>
+            {it.details ? <div style={{ fontSize: 12.5, color: "var(--ps-slate)", marginTop: 8, lineHeight: 1.6 }}>{it.details}</div> : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CallCtaSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const text = String(st.text ?? "");
+  const phone = String(st.phone ?? "");
+  const ctaLabel = String(st.ctaLabel ?? "Call Now");
+  return (
+    <div style={{ display: "flex", flexDirection: device === "mobile" ? "column" : "row", alignItems: "center", justifyContent: "space-between", gap: 14, background: "linear-gradient(135deg,var(--ps-primary),#8a7bff)", borderRadius: 16, padding: device === "mobile" ? "18px 18px" : "22px 28px", color: "#fff" }}>
+      <div style={{ fontSize: device === "mobile" ? 15 : 17, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.4 }}>{text}</div>
+      <a href={`tel:${phone.replace(/[^+0-9]/g, "")}`} onClick={(e) => e.preventDefault()} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 22px", borderRadius: 11, background: "#fff", color: "var(--ps-primary)", fontWeight: 800, fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}>
+        <PhoneCall size={16} /> {ctaLabel}
+      </a>
+    </div>
+  );
+}
+
+function WhatsAppCtaSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const text = String(st.text ?? "");
+  const number = String(st.number ?? "");
+  const ctaLabel = String(st.ctaLabel ?? "Chat Now");
+  const href = `https://wa.me/${number.replace(/[^0-9]/g, "")}`;
+  return (
+    <div style={{ display: "flex", flexDirection: device === "mobile" ? "column" : "row", alignItems: "center", justifyContent: "space-between", gap: 14, background: "linear-gradient(135deg,#25d366,#128c7e)", borderRadius: 16, padding: device === "mobile" ? "18px 18px" : "22px 28px", color: "#fff" }}>
+      <div style={{ fontSize: device === "mobile" ? 15 : 17, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.4 }}>{text}</div>
+      <a href={href} onClick={(e) => e.preventDefault()} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 22px", borderRadius: 11, background: "#fff", color: "#128c7e", fontWeight: 800, fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}>
+        <MessageCircle size={16} /> {ctaLabel}
+      </a>
+    </div>
+  );
+}
+
+// Generic renderers for widgets not in the default page
+function CatalogSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const heading = String(st.heading ?? st.title ?? s.label);
+  const text = String(st.text ?? st.subheading ?? st.sub ?? "");
+  const tabs = (st.tabs as string[] | undefined) ?? [];
+  const slides = Number(st.slides ?? 0);
+  const files = (st.files as { name?: string; title?: string }[] | undefined) ?? [];
+  const videos = (st.videos as { title?: string; url?: string }[] | undefined) ?? [];
+  const rows = (st.rows as { label?: string; value?: string }[] | undefined) ?? [];
+  const items = (st.items as { title?: string; name?: string; label?: string; text?: string; body?: string; value?: string; meta?: string }[] | undefined) ?? [];
+  return (
+    <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
+      <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center" }}>{heading}</h2>
       {text ? <p style={{ fontSize: 14.5, color: "var(--ps-slate)", textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7 }}>{String(resolveVars(text))}</p> : null}
-      {st.items && Array.isArray(st.items) && (st.items as unknown[]).length > 0 ? (
-        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "1fr 1fr" : "repeat(3,1fr)", gap: 14, marginTop: 26 }}>
-          {(st.items as { title?: string; name?: string; label?: string; text?: string; body?: string; value?: string }[]).map((it, i) => {
-            const title = it.title ?? it.name ?? it.label ?? it.value ?? `Item ${i + 1}`;
-            const body = it.text ?? it.body;
-            return (
-              <div key={i} className="ps-card" style={{ padding: 18, borderRadius: 14 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>{title}</div>
-                {body ? <div style={{ fontSize: 12.5, color: "var(--ps-slate)", marginTop: 5, lineHeight: 1.6 }}>{body}</div> : null}
-              </div>
-            );
-          })}
+      {tabs.length ? (
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 22 }}>
+          {tabs.map((t, i) => (
+            <span key={t} style={{ padding: "8px 16px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, background: i === 0 ? "var(--ps-primary-soft)" : "#f1f4f9", color: i === 0 ? "var(--ps-primary)" : "var(--ps-slate)", border: "1px solid var(--ps-line)" }}>{t}</span>
+          ))}
+        </div>
+      ) : null}
+      {slides > 0 ? (
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : `repeat(${Math.min(slides, 3)},1fr)`, gap: 12, marginTop: 22 }}>
+          {Array.from({ length: Math.min(slides, 6) }).map((_, i) => (
+            <div key={i} style={{ aspectRatio: "16/9", borderRadius: 14, overflow: "hidden", border: "1px solid var(--ps-line)" }}>
+              <SceneImage art={GALLERY_ART[i % GALLERY_ART.length]} />
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {videos.length ? (
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, marginTop: 22 }}>
+          {videos.map((v, i) => (
+            <div key={i} style={{ borderRadius: 14, overflow: "hidden", border: "1px solid var(--ps-line)", position: "relative", aspectRatio: "16/9" }}>
+              <SceneImage art="tour" />
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>{v.title || "Video"}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {rows.length ? (
+        <div style={{ marginTop: 22, border: "1px solid var(--ps-line)", borderRadius: 14, overflow: "hidden" }}>
+          {rows.map((r, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "12px 16px", background: i % 2 ? "#f8fafc" : "#fff", borderTop: i ? "1px solid var(--ps-line)" : "none" }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-muted)" }}>{r.label}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-ink)" }}>{String(resolveVars(r.value ?? ""))}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {files.length ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 22 }}>
+          {files.map((f, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", border: "1px solid var(--ps-line)", borderRadius: 12 }}>
+              <span style={{ fontWeight: 700, fontSize: 13 }}>{f.name || f.title || `File ${i + 1}`}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ps-primary)" }}>Download</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {items.length ? (
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "1fr 1fr" : "repeat(3,1fr)", gap: 14, marginTop: 22 }}>
+          {items.map((it, i) => (
+            <div key={i} className="ps-card" style={{ padding: 18, borderRadius: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>{it.title ?? it.name ?? it.label ?? it.value ?? `Item ${i + 1}`}</div>
+              {it.text || it.body || it.meta ? <div style={{ fontSize: 12.5, color: "var(--ps-slate)", marginTop: 5, lineHeight: 1.6 }}>{it.text ?? it.body ?? it.meta}</div> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {!text && !tabs.length && !slides && !items.length && !files.length && !rows.length && !videos.length ? (
+        <div style={{ marginTop: 16, padding: "18px 16px", border: "1.5px dashed var(--ps-line-strong)", borderRadius: 12, textAlign: "center", color: "var(--ps-muted)", fontSize: 13 }}>
+          {s.label} added — edit content in Settings
         </div>
       ) : null}
     </div>
   );
+}
+
+function GenericSection({ s, device }: { s: SectionInstance; device: Device }) {
+  return <CatalogSection s={s} device={device} />;
 }
 
 function AnnouncementBar({ s }: { s: SectionInstance }) {
@@ -1069,6 +1551,7 @@ function SectionBody({ s, device }: { s: SectionInstance; device: Device }) {
     case "multistep-form":
     case "lead-form":
     case "whatsapp-form":
+    case "enquiry-form":
       return <LeadFormSection s={s} device={device} />;
     case "cta-banner":
       return <CtaBanner s={s} device={device} />;
@@ -1078,6 +1561,56 @@ function SectionBody({ s, device }: { s: SectionInstance; device: Device }) {
       return <OfferBanner s={s} device={device} />;
     case "sticky-cta":
       return <StickyCta s={s} device={device} />;
+    case "heading":
+      return <HeadingSection s={s} device={device} />;
+    case "text":
+      return <TextSection s={s} />;
+    case "button":
+      return <ButtonSection s={s} />;
+    case "image":
+      return <ImageSection s={s} />;
+    case "icon":
+      return <IconSection s={s} />;
+    case "icon-box":
+      return <IconBoxSection s={s} device={device} />;
+    case "html":
+      return <HtmlSection s={s} />;
+    case "spacer":
+      return <SpacerSection s={s} />;
+    case "divider":
+      return <DividerSection s={s} />;
+    case "contact":
+      return <ContactSection s={s} device={device} />;
+    case "property-details":
+      return <PropertyDetailsSection s={s} device={device} />;
+    case "unit-types":
+      return <UnitTypesSection s={s} device={device} />;
+    case "payment-plans":
+      return <PaymentPlansSection s={s} device={device} />;
+    case "call-cta":
+      return <CallCtaSection s={s} device={device} />;
+    case "whatsapp-cta":
+      return <WhatsAppCtaSection s={s} device={device} />;
+    case "floating-icons":
+      return <FloatingIconsHint s={s} />;
+    case "section":
+    case "tabs":
+    case "carousel":
+    case "slider":
+    case "video-gallery":
+    case "master-plan":
+    case "features":
+    case "specifications":
+    case "timeline":
+    case "construction":
+    case "nearby":
+    case "builder-profile":
+    case "brochure":
+    case "downloads":
+    case "popup-cta":
+    case "popup":
+    case "sticky-footer-bar":
+      return <CatalogSection s={s} device={device} />;
     default:
       return <GenericSection s={s} device={device} />;
   }
@@ -1094,15 +1627,21 @@ function SectionWrap({
   selected,
   device,
   readOnly,
+  structural,
+  wrapStyle,
+  resizable,
   onSelect,
   onReorder,
   onWidgetDrop,
+  onNest,
+  onResizeColumn,
   onDuplicate,
   onDelete,
   onToggleHidden,
   onToggleLock,
   onSaveTemplate,
   onMakeGlobal,
+  children,
 }: {
   s: SectionInstance;
   index: number;
@@ -1110,17 +1649,23 @@ function SectionWrap({
   selected: boolean;
   device: Device;
   readOnly?: boolean;
+  structural?: boolean;
+  wrapStyle?: CSSProperties;
+  resizable?: boolean;
   onSelect: () => void;
-  onReorder: (fromId: string, toId: string) => void;
-  onWidgetDrop: (widgetId: string, afterId?: string) => void;
+  onReorder: (fromId: string, toId: string, after: boolean) => void;
+  onWidgetDrop: (widgetId: string, afterId?: string, after?: boolean) => void;
+  onNest: (fromId: string, isWidget: boolean) => void;
+  onResizeColumn: (delta: number) => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onToggleHidden: () => void;
   onToggleLock: () => void;
   onSaveTemplate: () => void;
   onMakeGlobal: () => void;
+  children?: ReactNode;
 }) {
-  const [dragOver, setDragOver] = useState(false);
+  const [dropPos, setDropPos] = useState<"before" | "after" | "inside" | null>(null);
   const hidden = s.hidden === true;
   const locked = s.locked === true;
   const sc = sectionStyle(s, device);
@@ -1133,7 +1678,9 @@ function SectionWrap({
   return (
     <div
       className="ps-sec-holder"
+      data-sec-id={s.id}
       data-selected={selected && !readOnly ? "true" : "false"}
+      data-structural={structural ? "true" : "false"}
       draggable={!readOnly}
       onDragStart={(e) => {
         e.dataTransfer.setData("text/x-prestate-section", s.id);
@@ -1142,33 +1689,47 @@ function SectionWrap({
       onDragOver={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!readOnly) setDragOver(true);
+        if (readOnly) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        if (structural && y > rect.height * 0.28 && y < rect.height * 0.72) setDropPos("inside");
+        else setDropPos(y < rect.height / 2 ? "before" : "after");
       }}
-      onDragLeave={() => setDragOver(false)}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropPos(null);
+      }}
       onDrop={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        setDragOver(false);
+        const pos = dropPos ?? "after";
+        setDropPos(null);
         if (readOnly) return;
         const widgetId = readWidgetId(e);
+        if (pos === "inside" && structural) {
+          if (widgetId) onNest(widgetId, true);
+          else {
+            const fromId = e.dataTransfer.getData("text/x-prestate-section");
+            if (fromId) onNest(fromId, false);
+          }
+          return;
+        }
         if (widgetId) {
-          onWidgetDrop(widgetId, s.id);
+          onWidgetDrop(widgetId, s.id, pos === "after");
           return;
         }
         const fromId = e.dataTransfer.getData("text/x-prestate-section");
-        if (fromId && fromId !== s.id) onReorder(fromId, s.id);
+        if (fromId && fromId !== s.id) onReorder(fromId, s.id, pos === "after");
       }}
+      onDragEnd={() => setDropPos(null)}
       onClick={readOnly ? undefined : (e) => {
         e.stopPropagation();
         onSelect();
       }}
       style={{
         position: "relative",
-        outline: dragOver && !readOnly ? "2px dashed var(--ps-primary)" : "none",
-        outlineOffset: dragOver ? 2 : 0,
-        transition: "outline-color .12s",
         margin: readOnly ? 0 : "18px 0",
         borderRadius: 14,
+        ...wrapStyle,
       }}
     >
       {!readOnly ? (
@@ -1231,10 +1792,46 @@ function SectionWrap({
         <div style={sc}>
           <Overlay section={s} />
           <div style={{ position: "relative", zIndex: 2 }}>
-            <SectionBody s={s} device={device} />
+            {children ?? <SectionBody s={s} device={device} />}
           </div>
         </div>
       </div>
+
+      {/* column resize handle */}
+      {resizable ? <ColumnResizeHandle onResize={onResizeColumn} /> : null}
+
+      {/* insertion indicator */}
+      {!readOnly && dropPos ? (
+        dropPos === "inside" ? (
+          <div
+            style={{
+              position: "absolute",
+              inset: -3,
+              borderRadius: 16,
+              border: "2px dashed var(--ps-primary)",
+              background: "rgba(109,93,252,.08)",
+              zIndex: 70,
+              pointerEvents: "none",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              position: "absolute",
+              left: -6,
+              right: -6,
+              top: dropPos === "before" ? -10 : undefined,
+              bottom: dropPos === "after" ? -10 : undefined,
+              height: 4,
+              borderRadius: 999,
+              background: "var(--ps-primary)",
+              boxShadow: "0 0 0 3px var(--ps-primary-mist), 0 2px 8px rgba(109,93,252,.5)",
+              zIndex: 70,
+              pointerEvents: "none",
+            }}
+          />
+        )
+      ) : null}
 
       {/* hidden placeholder */}
       {hidden ? (
@@ -1251,6 +1848,52 @@ function SectionWrap({
       ) : null}
 
       <style>{`.ps-sec-holder:hover .ps-sec-toolbar, .ps-sec-holder:hover .ps-sec-label { opacity: 1 !important; }`}</style>
+    </div>
+  );
+}
+
+function ColumnResizeHandle({ onResize }: { onResize: (delta: number) => void }) {
+  const [dragging, setDragging] = useState(false);
+  return (
+    <div
+      draggable={false}
+      onDragStart={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        setDragging(true);
+        const host = (e.currentTarget.parentElement ?? e.currentTarget) as HTMLElement;
+        const startX = e.clientX;
+        const startW = host.getBoundingClientRect().width || 1;
+        const move = (ev: PointerEvent) => onResize(((ev.clientX - startX) / startW) * 100);
+        const up = () => {
+          setDragging(false);
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up);
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+      }}
+      title="Drag to resize column"
+      style={{
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        right: -7,
+        width: 14,
+        cursor: "col-resize",
+        zIndex: 80,
+        touchAction: "none",
+        opacity: dragging ? 1 : 0.45,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <span style={{ width: 4, height: 42, borderRadius: 999, background: dragging ? "var(--ps-primary)" : "var(--ps-line-strong)", transition: "background .12s, box-shadow .12s", boxShadow: dragging ? "0 0 0 3px var(--ps-primary-mist)" : "none" }} />
     </div>
   );
 }
@@ -1319,77 +1962,167 @@ export function Canvas({
 
   const mutate = (patch: (prev: SectionInstance[]) => SectionInstance[]) => onMutate(patch);
 
-  const handleReorder = (fromId: string, toId: string) =>
-    mutate((prev) => {
-      const next = [...prev];
-      const from = next.findIndex((x) => x.id === fromId);
-      const to = next.findIndex((x) => x.id === toId);
-      if (from < 0 || to < 0) return prev;
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+  useEffect(() => {
+    if (!selectedId || readOnly) return;
+    const el = document.querySelector(`[data-sec-id="${CSS.escape(selectedId)}"]`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [selectedId, readOnly]);
 
-  const handleWidgetDrop = (widgetId: string, afterId?: string) => {
-    onMutate((prev) => {
+  const handleReorder = (fromId: string, toId: string, after: boolean) => {
+    mutate((prev) => {
+      const next = reorderSection(prev, fromId, toId, after);
+      return next ?? prev;
+    });
+  };
+
+  const handleWidgetDrop = (widgetId: string, afterId?: string, after = true) => {
+    mutate((prev) => {
       const widget = WIDGET_FROM_ID(widgetId);
       if (!widget) return prev;
-      const copy = { ...widget, id: `sec_${Math.random().toString(36).slice(2, 9)}` };
-      const next = [...prev];
-      const idx = afterId ? prev.findIndex((x) => x.id === afterId) : -1;
-      if (idx >= 0) next.splice(idx + 1, 0, copy);
-      else next.push(copy);
+      const copy = { ...widget, id: newSectionId() };
+      const ref = afterId ? findSection(prev, afterId) : null;
+      const next = ref ? insertChild(prev, ref.parentId, copy, ref.index + (after ? 1 : 0)) : insertChild(prev, null, copy);
       setTimeout(() => onSelect(copy.id), 30);
       return next;
     });
   };
 
+  // Drop a widget or existing section into the children of a structural node.
+  const nestFrom = (fromId: string, isWidget: boolean, targetId: string) => {
+    if (!isWidget) {
+      mutate((prev) => {
+        if (isDescendant(prev, targetId, fromId)) return prev;
+        const { list, removed } = removeSection(prev, fromId);
+        if (!removed) return prev;
+        return insertChild(list, targetId, removed);
+      });
+      return;
+    }
+    mutate((prev) => {
+      const widget = WIDGET_FROM_ID(fromId);
+      if (!widget) return prev;
+      const copy = { ...widget, id: newSectionId() };
+      const next = insertChild(prev, targetId, copy);
+      setTimeout(() => onSelect(copy.id), 30);
+      return next;
+    });
+  };
+
+  // Resize a column inside its row; the width delta is applied to the column
+  // and compensated on its neighbor so the row keeps a sane total.
+  const handleResizeColumn = (colId: string, deltaPercent: number) => {
+    mutate((prev) => {
+      const t = cloneTree(prev);
+      const ctx = findParentNode(t, colId);
+      if (!ctx || ctx.parent.type !== "row") return prev;
+      const cols = ctx.children;
+      const i = cols.findIndex((c) => c.id === colId);
+      if (i < 0) return prev;
+      const share = 100 / Math.max(1, cols.length);
+      const cur = Number(cols[i].settings?.width) || share;
+      const clamp = (v: number) => Math.max(4, Math.min(100, Math.round(v)));
+      const setW = (idx: number, v: number) => {
+        cols[idx] = { ...cols[idx], settings: { ...cols[idx].settings, width: v } };
+      };
+      const next = clamp(cur + deltaPercent);
+      setW(i, next);
+      const delta = next - cur;
+      if (i < cols.length - 1) {
+        const sibCur = Number(cols[i + 1].settings?.width) || share;
+        setW(i + 1, Math.max(0, Math.round(sibCur - delta)));
+      } else if (i > 0) {
+        const sibCur = Number(cols[i - 1].settings?.width) || share;
+        setW(i - 1, Math.max(0, Math.round(sibCur - delta)));
+      }
+      return t;
+    });
+  };
+
   // Announcement bars are global chrome: render them above the sticky header.
   const announcements = sections.filter((s) => s.type === "announcement");
+  const floatWidget = sections.find((s) => s.type === "floating-icons" && !s.hidden) ?? null;
   const content = sections.filter((s) => s.type !== "announcement");
 
-  const renderSection = (s: SectionInstance, i: number) => (
-    <SectionWrap
-      key={s.id}
-      s={s}
-      index={i}
-      total={sections.length}
-      selected={selectedId === s.id}
-      device={device}
-      readOnly={readOnly}
-      onSelect={() => onSelect(s.id)}
-      onReorder={handleReorder}
-      onWidgetDrop={(wid, afterId) =>
-        onMutate((prev) => {
-          const idx = afterId ? prev.findIndex((x) => x.id === afterId) : -1;
-          const widget = WIDGET_FROM_ID(wid);
-          if (!widget) return prev;
-          const copy = { ...widget, id: `sec_${Math.random().toString(36).slice(2, 9)}` };
-          const next = [...prev];
-          if (idx >= 0) next.splice(idx + 1, 0, copy);
-          else next.push(copy);
-          setTimeout(() => onSelect(copy.id), 30);
-          return next;
-        })
-      }
-      onDuplicate={() =>
+  const renderItem = (s: SectionInstance, index: number, total: number, wrapStyle?: CSSProperties, resizable = false) => {
+    const structural = isStructural(s.type);
+    const common = {
+      index,
+      total,
+      structural,
+      device,
+      readOnly,
+      wrapStyle,
+      resizable,
+      selected: selectedId === s.id,
+      onSelect: () => onSelect(s.id),
+      onReorder: handleReorder,
+      onWidgetDrop: handleWidgetDrop,
+      onNest: (fromId: string, isWidget: boolean) => nestFrom(fromId, isWidget, s.id),
+      onResizeColumn: (delta: number) => handleResizeColumn(s.id, delta),
+      onDuplicate: () =>
         mutate((prev) => {
-          const idx = prev.findIndex((x) => x.id === s.id);
-          if (idx < 0) return prev;
-          const copy = { ...deepCloneSection(s), id: `sec_${Math.random().toString(36).slice(2, 9)}` };
-          const next = [...prev];
-          next.splice(idx + 1, 0, copy);
-          setTimeout(() => onSelect(copy.id), 30);
-          return next;
-        })
-      }
-      onDelete={() => mutate((prev) => prev.filter((x) => x.id !== s.id))}
-      onToggleHidden={() => mutate((prev) => prev.map((x) => (x.id === s.id ? { ...x, hidden: !x.hidden } : x)))}
-      onToggleLock={() => mutate((prev) => prev.map((x) => (x.id === s.id ? { ...x, locked: !x.locked } : x)))}
-      onSaveTemplate={() => onSelect("__template_" + s.id)}
-      onMakeGlobal={() => mutate((prev) => prev.map((x) => (x.id === s.id ? { ...x, global: !x.global } : x)))}
-    />
-  );
+          const { list, copy } = duplicateSection(prev, s.id);
+          if (copy) setTimeout(() => onSelect(copy.id), 30);
+          return list;
+        }),
+      onDelete: () => mutate((prev) => removeSection(prev, s.id).list),
+      onToggleHidden: () => mutate((prev) => toggleSectionFlag(prev, s.id, "hidden")),
+      onToggleLock: () => mutate((prev) => toggleSectionFlag(prev, s.id, "locked")),
+      onSaveTemplate: () => onSelect("__template_" + s.id),
+      onMakeGlobal: () => mutate((prev) => toggleSectionFlag(prev, s.id, "global")),
+    };
+    return (
+      <SectionWrap key={s.id} s={s} {...common}>
+        {structural ? renderChildren(s) : undefined}
+      </SectionWrap>
+    );
+  };
+
+  const renderChildren = (s: SectionInstance) => {
+    const kids = s.children ?? [];
+    if (s.type === "row") {
+      const gap = s.style.spacing?.gap ?? 24;
+      return (
+        <div style={{ display: "flex", flexWrap: "wrap", gap, alignItems: "flex-start" }}>
+          {kids.map((child, i) => {
+            const isCol = child.type === "column";
+            const share = 100 / Math.max(1, kids.length);
+            const w = Number(child.settings?.width);
+            const flex = isCol ? (w ? `0 0 ${w}%` : `1 1 ${share}%`) : undefined;
+            return renderItem(
+              child,
+              i,
+              kids.length,
+              {
+                flex,
+                minWidth: isCol ? 0 : undefined,
+                width: isCol ? undefined : "100%",
+                margin: 0,
+              },
+              isCol && !readOnly,
+            );
+          })}
+        </div>
+      );
+    }
+    if (s.type === "grid") {
+      const cols = Math.min(Number(s.settings.columns) || Math.max(1, kids.length), Math.max(1, kids.length));
+      const gap = s.style.spacing?.gap ?? 20;
+      return (
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap }}>
+          {kids.map((child, i) => renderItem(child, i, kids.length, { minWidth: 0, margin: 0 }))}
+        </div>
+      );
+    }
+    // container / column — vertical stack
+    const gap = s.style.spacing?.gap ?? 24;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap }}>
+        {kids.map((child, i) => renderItem(child, i, kids.length, { minWidth: 0, margin: 0 }))}
+        {!readOnly ? <NestedDropZone key="__nested_drop" empty={kids.length === 0} onNest={(fromId, isWidget) => nestFrom(fromId, isWidget, s.id)} /> : null}
+      </div>
+    );
+  };
 
   return (
     <SitePageIdContext.Provider value={pageId ?? ""}>
@@ -1424,8 +2157,8 @@ export function Canvas({
       }}
       onDragOver={(e) => {
         e.preventDefault();
-        const w = readWidgetId(e);
-        if (w) setDragOverBg(true);
+        e.dataTransfer.dropEffect = isWidgetDrag(e) ? "copy" : "move";
+        if (isWidgetDrag(e)) setDragOverBg(true);
       }}
       onDragLeave={(e) => {
         if (e.currentTarget === e.target) setDragOverBg(false);
@@ -1435,7 +2168,18 @@ export function Canvas({
         setDragOverBg(false);
         if (readOnly) return;
         const widgetId = readWidgetId(e);
-        if (widgetId) handleWidgetDrop(widgetId);
+        if (widgetId) {
+          handleWidgetDrop(widgetId);
+          return;
+        }
+        const fromId = e.dataTransfer.getData("text/x-prestate-section");
+        if (fromId) {
+          mutate((prev) => {
+            const { list, removed } = removeSection(prev, fromId);
+            if (!removed) return prev;
+            return insertChild(list, null, removed);
+          });
+        }
       }}
     >
       {theme && googleFontsHref(theme.headingFont || "", theme.font) ? (
@@ -1469,7 +2213,7 @@ export function Canvas({
           ) : null}
 
           <div style={{ position: "relative" }}>
-            {announcements.map(renderSection)}
+            {announcements.map((s, i) => renderItem(s, i, announcements.length))}
 
             <PageHeader device={device} theme={theme} />
 
@@ -1486,10 +2230,24 @@ export function Canvas({
                 </div>
               </div>
             ) : (
-              content.map((s, i) => renderSection(s, announcements.length + i))
+              content.map((s, i) => renderItem(s, i, content.length))
             )}
 
+            {!live ? (
+              <DropZone
+                onWidgetDrop={(wid) => handleWidgetDrop(wid)}
+                onSectionDrop={(fromId) =>
+                  mutate((prev) => {
+                    const { list, removed } = removeSection(prev, fromId);
+                    if (!removed) return prev;
+                    return insertChild(list, null, removed);
+                  })
+                }
+              />
+            ) : null}
+
             <PageFooter device={device} theme={theme} />
+            <FloatingContactDock live={live} device={device} widget={floatWidget} />
           </div>
         </div>
       </div>
@@ -1500,11 +2258,107 @@ export function Canvas({
   );
 }
 
+function DropZone({
+  onWidgetDrop,
+  onSectionDrop,
+}: {
+  onWidgetDrop: (widgetId: string) => void;
+  onSectionDrop: (fromId: string) => void;
+}) {
+  const [over, setOver] = useState(false);
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(false);
+        const widgetId = readWidgetId(e);
+        if (widgetId) {
+          onWidgetDrop(widgetId);
+          return;
+        }
+        const fromId = e.dataTransfer.getData("text/x-prestate-section");
+        if (fromId) onSectionDrop(fromId);
+      }}
+      style={{
+        height: 46,
+        margin: "10px 0",
+        borderRadius: 12,
+        border: over ? "2px dashed var(--ps-primary)" : "2px dashed #c4c9d8",
+        background: over ? "var(--ps-primary-mist)" : "rgba(244,245,250,.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        color: over ? "var(--ps-primary)" : "var(--ps-muted)",
+        fontSize: 12,
+        fontWeight: 700,
+        transition: "border-color .12s, background .12s, color .12s",
+      }}
+    >
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+        <span style={{ fontSize: 16, lineHeight: 1 }}>＋</span> Drop widget or section here
+      </span>
+    </div>
+  );
+}
+
+function NestedDropZone({ empty, onNest }: { empty: boolean; onNest: (fromId: string, isWidget: boolean) => void }) {
+  const [over, setOver] = useState(false);
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setOver(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(false);
+        const widgetId = readWidgetId(e);
+        if (widgetId) {
+          onNest(widgetId, true);
+          return;
+        }
+        const fromId = e.dataTransfer.getData("text/x-prestate-section");
+        if (fromId) onNest(fromId, false);
+      }}
+      style={{
+        height: empty ? 64 : 38,
+        borderRadius: 11,
+        border: over ? "2px dashed var(--ps-primary)" : "2px dashed #c4c9d8",
+        background: over ? "var(--ps-primary-mist)" : "rgba(244,245,250,.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 7,
+        color: over ? "var(--ps-primary)" : "var(--ps-muted)",
+        fontSize: empty ? 12.5 : 11.5,
+        fontWeight: 700,
+        transition: "border-color .12s, background .12s, color .12s",
+        margin: empty ? "6px 0" : "2px 0 6px",
+      }}
+    >
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 15, lineHeight: 1 }}>＋</span> Drop widget or section here
+      </span>
+    </div>
+  );
+}
+
 function WIDGET_FROM_ID(id: string): SectionInstance | null {
   const def = WIDGETS.find((w) => w.id === id);
   return def ? def.make() : null;
-}
-
-function deepCloneSection(s: SectionInstance): SectionInstance {
-  return JSON.parse(JSON.stringify(s)) as SectionInstance;
 }

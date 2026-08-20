@@ -1,24 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type * as React from "react";
 import { ChevronDown, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { WIDGETS, WIDGET_CATEGORY_META } from "@/lib/prestate/data";
 
 export const WIDGET_MIME = "application/x-prestate-widget";
 
+export function isWidgetDrag(e: React.DragEvent): boolean {
+  const types = Array.from(e.dataTransfer?.types ?? []);
+  return types.includes(WIDGET_MIME) || types.includes("text/plain") || types.includes("Text");
+}
+
 export function readWidgetId(e: React.DragEvent): string | null {
-  return e.dataTransfer.getData(WIDGET_MIME) || null;
+  const custom = e.dataTransfer.getData(WIDGET_MIME);
+  if (custom) return custom;
+  const plain = e.dataTransfer.getData("text/plain") || e.dataTransfer.getData("Text");
+  if (!plain) return null;
+  const id = plain.trim();
+  return WIDGETS.some((w) => w.id === id) ? id : null;
 }
 
 const GROUP_COLORS: Record<string, string> = {
   Layout: "var(--ps-primary)",
-  Property: "var(--ps-primary)",
-  "Trust & Content": "var(--ps-gold)",
-  Location: "var(--ps-success)",
-  Conversion: "#9b8aff",
+  Basic: "var(--ps-primary)",
+  "Real Estate": "var(--ps-gold)",
   Media: "#60a5fa",
+  Forms: "#34d399",
   Marketing: "#f472b6",
+  "Header & Footer": "#fbbf24",
+  Advanced: "#a78bfa",
 };
 
 export function WidgetsPanel({
@@ -33,12 +44,13 @@ export function WidgetsPanel({
   const [query, setQuery] = useState("");
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     Layout: true,
-    Property: true,
-    "Trust & Content": false,
-    Location: false,
-    Conversion: true,
+    Basic: true,
+    "Real Estate": true,
     Media: false,
+    Forms: true,
     Marketing: false,
+    "Header & Footer": false,
+    Advanced: false,
   });
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -139,15 +151,29 @@ function WidgetCard({
 }) {
   const Icon = widget.icon;
   const isSection = widget.id === "section";
+  const origin = useRef<{ x: number; y: number } | null>(null);
+  const dragging = useRef(false);
   return (
     <button
       type="button"
       draggable
+      onPointerDown={(e) => {
+        origin.current = { x: e.clientX, y: e.clientY };
+        dragging.current = false;
+      }}
       onDragStart={(e) => {
+        dragging.current = true;
         e.dataTransfer.setData(WIDGET_MIME, widget.id);
+        e.dataTransfer.setData("text/plain", widget.id);
         e.dataTransfer.effectAllowed = "copy";
       }}
-      onClick={onAdd}
+      onPointerUp={(e) => {
+        if (!origin.current) return;
+        const dx = Math.abs(e.clientX - origin.current.x);
+        const dy = Math.abs(e.clientY - origin.current.y);
+        origin.current = null;
+        if (!dragging.current && dx < 8 && dy < 8) onAdd();
+      }}
       onMouseEnter={() => onHover(widget.id)}
       onMouseLeave={() => onHover(null)}
       title={`${widget.label} — ${widget.desc}`}
