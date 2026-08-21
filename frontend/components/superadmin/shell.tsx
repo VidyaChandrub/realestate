@@ -50,7 +50,7 @@ const NAV_GROUPS: NavGroup[] = [
         icon: "🧩",
         label: "Templates",
         tip: "Template Management",
-        activeMatch: ["/superadmin/templates"],
+        activeMatch: ["/superadmin/templates", "/superadmin/template-detail"],
       },
       {
         href: "/superadmin/landing-pages",
@@ -81,6 +81,7 @@ const CRUMB_MAP: Record<string, string> = {
   "/superadmin/admins": "Platform Team",
   "/superadmin/landing-pages": "Landing Pages",
   "/superadmin/templates": "Templates",
+  "/superadmin/template-detail": "Template",
   "/prestate": "Builder",
   "/superadmin/approvals": "Approvals",
   "/superadmin/subscriptions": "Subscriptions",

@@ -1,4 +1,7 @@
+"use client";
+
 import type { CSSProperties, ReactNode } from "react";
+import { useState } from "react";
 import type {
   Device,
   ElementNode,
@@ -14,6 +17,9 @@ import {
 import { LeadForm } from "./lead-form";
 import { LpCountdown } from "./lp-countdown";
 import { Icon } from "@/lib/lp-icon";
+import { Lightbox } from "yet-another-react-lightbox";
+import { Captions, Counter, Zoom, Fullscreen, Download } from "yet-another-react-lightbox/plugins";
+import "yet-another-react-lightbox/styles.css";
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -86,6 +92,109 @@ function radiusOf(settings: ElementSettings, key = "radius"): CSSProperties {
 function shadowOf(settings: ElementSettings, key = "shadow"): CSSProperties {
   const s = str(settings[key]);
   return s ? { boxShadow: s } : {};
+}
+
+function GalleryLightbox({
+  images,
+  captions,
+  columns,
+  gap,
+  height,
+  radius,
+  margins,
+}: {
+  images: string[];
+  captions: string[];
+  columns: number;
+  gap: number;
+  height: number;
+  radius: number;
+  margins: CSSProperties;
+}) {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  const slides = images.map((src, i) => ({
+    src,
+    alt: captions[i] || `Gallery ${i + 1}`,
+    caption: captions[i],
+  }));
+
+  if (openIndex === null) {
+    return (
+      <div style={{ ...margins, width: "100%" }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap }}>
+          {images.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt={captions[i] || `Gallery ${i + 1}`}
+              style={{
+                width: "100%",
+                height,
+                objectFit: "cover",
+                borderRadius: radius,
+                cursor: "zoom-in",
+              }}
+              onClick={() => setOpenIndex(i)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div style={{ ...margins, width: "100%" }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap }}>
+          {images.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt={captions[i] || `Gallery ${i + 1}`}
+              style={{
+                width: "100%",
+                height,
+                objectFit: "cover",
+                borderRadius: radius,
+                cursor: "zoom-in",
+              }}
+              onClick={() => setOpenIndex(i)}
+            />
+          ))}
+        </div>
+      </div>
+      <Lightbox
+        open
+        index={openIndex}
+        slides={slides}
+        close={() => setOpenIndex(null)}
+        plugins={[Captions, Counter, Zoom, Fullscreen, Download]}
+        carousel={{ padding: "16px", spacing: 0 }}
+        toolbar={{
+          buttons: ["fullscreen", "zoom", "download", "close"],
+        }}
+        animation={{ fade: 200, swipe: 300 }}
+        render={{
+          slide: ({ slide, offset, rect }) => {
+            if (slide.type !== "image") return null;
+            return (
+              <img
+                src={slide.src}
+                alt={slide.alt}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  borderRadius: 0,
+                }}
+              />
+            );
+          },
+        }}
+      />
+    </>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -425,21 +534,38 @@ export function LpElement({
     }
     case "gallery": {
       const images = Array.isArray(s.images) ? (s.images as string[]) : [];
+      const captions = Array.isArray(s.captions) ? (s.captions as string[]) : [];
       const cols = num(s.columns) ?? 3;
-      content = (
-        <div style={{ ...margins, width: "100%" }}>
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: num(s.gap) ?? 12 }}>
-            {images.map((src, i) => (
-              <img
-                key={i}
-                src={src}
-                alt={`Gallery ${i + 1}`}
-                style={{ width: "100%", height: num(s.height) ?? 220, objectFit: "cover", borderRadius: num(s.radius) }}
-              />
-            ))}
+      const enableLightbox = s.lightbox !== false;
+
+      if (enableLightbox && images.length > 0) {
+        content = (
+          <GalleryLightbox
+            images={images}
+            captions={captions}
+            columns={cols}
+            gap={num(s.gap) ?? 12}
+            height={num(s.height) ?? 220}
+            radius={num(s.radius) ?? 10}
+            margins={margins}
+          />
+        );
+      } else {
+        content = (
+          <div style={{ ...margins, width: "100%" }}>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: num(s.gap) ?? 12 }}>
+              {images.map((src, i) => (
+                <img
+                  key={i}
+                  src={src}
+                  alt={captions[i] || `Gallery ${i + 1}`}
+                  style={{ width: "100%", height: num(s.height) ?? 220, objectFit: "cover", borderRadius: num(s.radius) }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      );
+        );
+      }
       break;
     }
     case "floor-plan": {

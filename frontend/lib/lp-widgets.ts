@@ -520,14 +520,16 @@ export const WIDGETS: WidgetDef[] = [
     label: "Gallery",
     icon: "images",
     category: "real-estate",
-    description: "Grid of project images.",
-    defaults: { images: [], columns: 3, gap: 12, height: 220, radius: 10 },
+    description: "Grid of project images with optional lightbox.",
+    defaults: { images: [], captions: [], columns: 3, gap: 12, height: 220, radius: 10, lightbox: true },
     fields: [
       { key: "images", label: "Image URLs", type: "list" },
+      { key: "captions", label: "Captions (one per line)", type: "textarea", rows: 4, help: "Optional: one caption per image, matching order" },
       slider("columns", "Columns", 1, 6),
       slider("gap", "Gap", 0, 40),
       slider("height", "Image Height", 100, 500),
       slider("radius", "Radius", 0, 40),
+      { key: "lightbox", label: "Enable Lightbox", type: "toggle", help: "Click images to open in fullscreen lightbox" },
     ],
   },
   {
