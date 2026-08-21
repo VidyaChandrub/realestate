@@ -24,6 +24,7 @@ import {
 import { createRow } from "@/lib/lp-edit";
 import { WIDGET_MAP } from "@/lib/lp-widgets";
 import { Icon } from "@/lib/lp-icon";
+import { backgroundCss } from "@/lib/lp-styles";
 
 const WIDGET_MIME = "application/x-lp-widget";
 
@@ -286,6 +287,7 @@ function ColumnWrap({
         outlineOffset: -2,
         minWidth: 0,
         padding: readOnly ? 0 : 8,
+        ...backgroundCss(column.settings?.background),
       }}
     >
       {selected && !readOnly ? (
@@ -413,16 +415,9 @@ function RowWrap({
       style={{
         position: "relative",
         border: !readOnly && dragOver ? "2px dashed #6366f1" : "none",
-        background: row.settings?.background?.gradient
-          ? undefined
-          : row.settings?.background?.color ?? "transparent",
-        backgroundImage: row.settings?.background?.gradient
-          ? row.settings.background.gradient
-          : row.settings?.background?.image
-            ? `url(${row.settings.background.image})`
-            : undefined,
-        backgroundSize: row.settings?.background?.image ? "cover" : undefined,
-        backgroundPosition: row.settings?.background?.image ? "center" : undefined,
+        ...backgroundCss(row.settings?.background),
+        backgroundSize: row.settings?.background?.image ? "cover" : row.settings?.background?.size,
+        backgroundPosition: row.settings?.background?.image ? "center" : row.settings?.background?.position,
         paddingTop: readOnly ? 0 : (row.settings?.padding?.top ?? 10),
         paddingBottom: readOnly ? 0 : (row.settings?.padding?.bottom ?? 10),
         paddingLeft: readOnly ? 0 : (row.settings?.padding?.left ?? 10),

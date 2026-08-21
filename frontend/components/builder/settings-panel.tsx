@@ -17,7 +17,8 @@ import {
   setRowSettings,
 } from "@/lib/lp-edit";
 import { WIDGET_MAP, type FieldDef } from "@/lib/lp-widgets";
-import { Icon } from "@/lib/lp-icon";
+import { Icon, ICON_OPTIONS } from "@/lib/lp-icon";
+import { MediaPicker } from "@/components/media-picker";
 
 // ---------------------------------------------------------------------------
 // Generic field renderer
@@ -178,22 +179,19 @@ export function FieldInput({
     case "image":
       return (
         <div style={styles.wrap}>
-          <label style={styles.label}>{field.label}</label>
-          <input
-            type="text"
-            style={styles.input}
+          <MediaPicker kind="image" label={field.label} value={(value as string) ?? ""} onChange={onChange} />
+        </div>
+      );
+    case "icon":
+      return (
+        <div style={styles.wrap}>
+          <MediaPicker
+            kind="icon"
+            label={field.label}
             value={(value as string) ?? ""}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="https://…"
+            onChange={onChange}
+            iconNames={(field.options ?? ICON_OPTIONS).map((o) => o.value)}
           />
-          {value ? (
-            <img
-              src={value as string}
-              alt="preview"
-              style={{ marginTop: 6, width: "100%", height: 90, objectFit: "cover", borderRadius: 8 }}
-              onError={(e) => ((e.target as HTMLImageElement).style.opacity = "0.2")}
-            />
-          ) : null}
         </div>
       );
     case "list": {
@@ -476,6 +474,7 @@ export function SettingsPanel({
         content: (
           <ColumnSettings
             width={col.settings?.width}
+            background={col.settings?.background}
             onChange={(patch) =>
               patchDocument({
                 ...document,
@@ -951,11 +950,25 @@ function RowSettings({ row, onChange }: { row: RowNode; onChange: (patch: Record
   );
 }
 
-function ColumnSettings({ width, onChange }: { width?: number; onChange: (patch: Record<string, unknown>) => void }) {
+function ColumnSettings({
+  width,
+  background,
+  onChange,
+}: {
+  width?: number;
+  background?: { color?: string; image?: string; gradient?: string; overlayColor?: string };
+  onChange: (patch: Record<string, unknown>) => void;
+}) {
+  const bg = background ?? {};
   return (
     <>
       <Section title="Width" defaultOpen>
         <FieldInput field={{ key: "width", label: "Column Width %", type: "slider", min: 5, max: 100 }} value={width ?? 50} onChange={(v) => onChange({ width: v })} />
+      </Section>
+      <Section title="Background">
+        <FieldInput field={{ key: "color", label: "Background Color", type: "color" }} value={bg.color} onChange={(v) => onChange({ background: { ...bg, color: v } })} />
+        <FieldInput field={{ key: "image", label: "Background Image", type: "image" }} value={bg.image} onChange={(v) => onChange({ background: { ...bg, image: v } })} />
+        <FieldInput field={{ key: "gradient", label: "Gradient", type: "text" }} value={bg.gradient} onChange={(v) => onChange({ background: { ...bg, gradient: v } })} />
       </Section>
       <Section title="Alignment">
         <FieldInput
@@ -1009,6 +1022,18 @@ function WidgetSettings({
           ))}
         </Section>
       ))}
+      <Section title="Card / widget background">
+        <FieldInput
+          field={{ key: "color", label: "Background Color", type: "color" }}
+          value={(s.background as { color?: string } | undefined)?.color}
+          onChange={(v) => onChange({ background: { ...(typeof s.background === "object" && s.background ? s.background : {}), color: v } })}
+        />
+        <FieldInput
+          field={{ key: "image", label: "Background Image", type: "image" }}
+          value={(s.background as { image?: string } | undefined)?.image}
+          onChange={(v) => onChange({ background: { ...(typeof s.background === "object" && s.background ? s.background : {}), image: v } })}
+        />
+      </Section>
     </>
   );
 }
@@ -1038,7 +1063,7 @@ function SeoTab({ seo, setSeo }: { seo: LpSeo | null; setSeo: (s: LpSeo) => void
         <FieldInput field={{ key: "ogTitle", label: "OG Title", type: "text" }} value={s.ogTitle} onChange={(v) => set("ogTitle", v)} />
         <FieldInput field={{ key: "ogDescription", label: "OG Description", type: "textarea", rows: 2 }} value={s.ogDescription} onChange={(v) => set("ogDescription", v)} />
         <FieldInput field={{ key: "ogImage", label: "OG Image", type: "image" }} value={s.ogImage} onChange={(v) => set("ogImage", v)} />
-        <FieldInput field={{ key: "favicon", label: "Favicon URL", type: "text" }} value={s.favicon} onChange={(v) => set("favicon", v)} />
+        <FieldInput field={{ key: "favicon", label: "Favicon", type: "image" }} value={s.favicon} onChange={(v) => set("favicon", v)} />
       </Section>
       <Section title="Structured Data">
         <FieldInput

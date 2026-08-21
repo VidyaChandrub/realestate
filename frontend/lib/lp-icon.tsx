@@ -4,6 +4,7 @@
 // to plain text rendering so nothing breaks.
 
 import type { CSSProperties, ReactNode } from "react";
+import { isMediaSrc } from "./media";
 import {
   ArrowDown,
   ArrowRight,
@@ -278,6 +279,13 @@ export function Icon({
   strokeWidth?: number;
   style?: CSSProperties;
 }): ReactNode {
+  if (typeof name === "string" && isMediaSrc(name)) {
+    const px = typeof size === "number" ? size : 40;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={name} alt="" style={{ width: px, height: px, objectFit: "contain", flexShrink: 0, ...style }} />
+    );
+  }
   const IconCmp = typeof name === "string" ? ICON_MAP[name] : undefined;
   if (!IconCmp) {
     return (

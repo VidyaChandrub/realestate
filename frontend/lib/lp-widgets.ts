@@ -13,6 +13,7 @@ export type FieldType =
   | "color"
   | "toggle"
   | "image"
+  | "icon"
   | "list"
   | "object-list"
   | "code";
@@ -163,7 +164,7 @@ export const WIDGETS: WidgetDef[] = [
     description: "Image with optional link and caption.",
     defaults: { src: "", alt: "", width: 100, radius: 12 },
     fields: [
-      { key: "src", label: "Image URL", type: "image" },
+      { key: "src", label: "Image", type: "image" },
       text("alt", "Alt Text"),
       slider("width", "Width (%)", 10, 100),
       slider("radius", "Border Radius", 0, 60),
@@ -211,7 +212,7 @@ export const WIDGETS: WidgetDef[] = [
     description: "Standalone icon.",
     defaults: { icon: "star", size: 40, color: "#c9a227" },
     fields: [
-      { key: "icon", label: "Icon", type: "select", options: ICON_OPTIONS },
+      { key: "icon", label: "Icon", type: "icon", options: ICON_OPTIONS },
       slider("size", "Size", 10, 120),
       color("color", "Icon Color"),
       { key: "align", label: "Alignment", type: "select", options: alignOptions },
@@ -408,7 +409,7 @@ export const WIDGETS: WidgetDef[] = [
       image: "",
     },
     fields: [
-      { key: "image", label: "Image URL", type: "image" },
+      { key: "image", label: "Image", type: "image" },
       text("title", "Property Name"),
       text("location", "Location"),
       text("price", "Price"),
@@ -436,7 +437,7 @@ export const WIDGETS: WidgetDef[] = [
       radius: 14,
     },
     fields: [
-      { key: "icon", label: "Icon", type: "select", options: ICON_OPTIONS },
+      { key: "icon", label: "Icon", type: "icon", options: ICON_OPTIONS },
       text("title", "Title"),
       { key: "description", label: "Description", type: "textarea", rows: 3 },
       color("titleColor", "Title Color"),
@@ -463,7 +464,7 @@ export const WIDGETS: WidgetDef[] = [
       radius: 14,
     },
     fields: [
-      { key: "icon", label: "Icon", type: "select", options: ICON_OPTIONS },
+      { key: "icon", label: "Icon", type: "icon", options: ICON_OPTIONS },
       text("title", "Title"),
       { key: "description", label: "Description", type: "textarea", rows: 3 },
       color("iconColor", "Icon Color"),
@@ -491,7 +492,7 @@ export const WIDGETS: WidgetDef[] = [
       radius: 14,
     },
     fields: [
-      { key: "image", label: "Image URL", type: "image" },
+      { key: "image", label: "Image", type: "image" },
       text("kicker", "Kicker / Eyebrow"),
       text("title", "Title"),
       { key: "text", label: "Body Text", type: "textarea", rows: 5 },
