@@ -116,7 +116,32 @@ export class AdminOrganisationsService {
       data: { status: 'active' },
     });
 
-    const templateIds = dto.template_ids ?? [];
+    // "Template" here is a published LandingPage — the old standalone
+    // Template/OrganisationTemplate catalog (free/paid tiers, payment
+    // verification) was dropped. Every published page is granted the same
+    // way, immediately — no pending/verified gate.
+    // TODO: once subscription plans are defined, which pages an org can
+    // select here will likely need filtering by plan — not built yet.
+    const requestedTemplateIds = [...new Set(dto.template_ids ?? [])];
+    const publishedPages = requestedTemplateIds.length
+      ? await this.prisma.landingPage.findMany({
+          where: { id: { in: requestedTemplateIds }, status: 'published' },
+        })
+      : [];
+    const assignedTemplateIds = publishedPages.map((p) => p.id);
+    const skippedTemplateIds = requestedTemplateIds.filter(
+      (id) => !assignedTemplateIds.includes(id),
+    );
+
+    if (publishedPages.length) {
+      await this.prisma.organisationLandingPageTemplate.createMany({
+        data: publishedPages.map((page) => ({
+          orgId: activated.id,
+          landingPageId: page.id,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     await this.prisma.auditLog.create({
       data: {
@@ -125,10 +150,7 @@ export class AdminOrganisationsService {
         action: 'org_onboarded',
         entity: 'Organisation',
         entityId: activated.id,
-        // Templates & modules isn't built yet (separate task) — stashed here
-        // so that work can pick up which templates were requested at
-        // onboarding time without needing its own endpoint yet.
-        metadata: { template_ids: templateIds },
+        metadata: { assigned_template_ids: assignedTemplateIds, skipped_template_ids: skippedTemplateIds },
       },
     });
 
@@ -144,6 +166,8 @@ export class AdminOrganisationsService {
     return {
       organisation: toSafeOrganisation(activated),
       admin: toSafeUser(admin),
+      assignedTemplateIds,
+      skippedTemplateIds,
     };
   }
 
@@ -290,6 +314,24 @@ export class AdminOrganisationsService {
     }));
   }
 
+  async listTemplates(id: string) {
+    await this.getRealOrganisation(id);
+
+    const assignments = await this.prisma.organisationLandingPageTemplate.findMany({
+      where: { orgId: id },
+      include: { landingPage: true },
+      orderBy: { assignedAt: 'desc' },
+    });
+
+    return assignments.map((assignment) => ({
+      name: assignment.landingPage.name,
+      category: assignment.landingPage.category,
+      thumbnail: assignment.landingPage.thumbnail,
+      status: assignment.landingPage.status,
+      assignedAt: assignment.assignedAt,
+    }));
+  }
+
   async listActivity(id: string) {
     await this.getRealOrganisation(id);
 
@@ -330,6 +372,31 @@ export class AdminOrganisationsService {
     });
 
     return toSafeOrganisation(updated);
+  }
+
+  async remove(id: string, actor: JwtPayload) {
+    const organisation = await this.getRealOrganisation(id);
+
+    // users.orgId only SET NULLs on delete by default — deleting the org
+    // alone would leave its accounts orphaned but still able to log in.
+    // Removing the users first cascades their roles/tokens/team membership,
+    // then the org delete cascades its teams and template assignments.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.deleteMany({ where: { orgId: organisation.id } });
+      await tx.organisation.delete({ where: { id: organisation.id } });
+      await tx.auditLog.create({
+        data: {
+          orgId: null,
+          actorId: actor.sub,
+          action: 'org_deleted',
+          entity: 'Organisation',
+          entityId: organisation.id,
+          metadata: { name: organisation.name, slug: organisation.slug },
+        },
+      });
+    });
+
+    return { success: true };
   }
 
   private async getDraftOrganisation(orgId: string) {
