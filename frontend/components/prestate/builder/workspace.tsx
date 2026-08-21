@@ -5,7 +5,7 @@ import type * as React from "react";
 import { SlidersHorizontal, LayoutGrid } from "lucide-react";
 import type { Device, LandingPageData, SectionInstance } from "@/lib/prestate/types";
 import { buildTemplateSections, WIDGETS } from "@/lib/prestate/data";
-import { findSection, insertChild, isStructural, patchSection } from "@/lib/prestate/tree";
+import { findSection, insertChild, isStructural, patchSection, placeColumn } from "@/lib/prestate/tree";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import { WidgetsPanel } from "./widgets-panel";
 import { Canvas } from "./canvas";
@@ -201,6 +201,16 @@ export function BuilderWorkspace({
     (widgetId: string) => {
       const def = WIDGETS.find((w) => w.id === widgetId);
       if (!def) return;
+      if (widgetId === "column") {
+        let selectId = "";
+        mutate((prev) => {
+          const placed = placeColumn(prev, selectedId);
+          selectId = placed.selectId;
+          return placed.list;
+        });
+        setTimeout(() => setState((prev) => ({ ...prev, selectedId: selectId })), 40);
+        return;
+      }
       const section = def.make();
       mutate((prev) => {
         if (selected && isStructural(selected.type)) return insertChild(prev, selected.id, section);

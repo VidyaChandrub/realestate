@@ -5,6 +5,7 @@ import type {
   Device,
   Responsive,
 } from "./lp-types";
+import { cssUrl } from "./media";
 
 // Picks the device-specific value from a responsive object, falling back to
 // desktop then the raw value.
@@ -45,14 +46,13 @@ export function backgroundCss(bg?: BackgroundSettings): CSSProperties {
   const style: CSSProperties = {};
   if (bg.color) style.backgroundColor = bg.color;
   if (bg.gradient) style.backgroundImage = bg.gradient;
-  else if (bg.image) style.backgroundImage = `url(${bg.image})`;
+  else if (bg.image) style.backgroundImage = cssUrl(bg.image);
   if (bg.position) style.backgroundPosition = bg.position;
   if (bg.size) style.backgroundSize = bg.size;
   if (bg.overlayColor) {
-    // Combined overlay + background: layer the overlay above the image.
     style.backgroundImage =
       `linear-gradient(${bg.overlayColor}, ${bg.overlayColor})` +
-      (bg.image ? `, url(${bg.image})` : bg.gradient ? `, ${bg.gradient}` : "");
+      (bg.image ? `, ${cssUrl(bg.image)}` : bg.gradient ? `, ${bg.gradient}` : "");
   }
   return style;
 }

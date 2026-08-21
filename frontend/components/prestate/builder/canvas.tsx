@@ -32,8 +32,10 @@ import {
 } from "lucide-react";
 import type { Device, SectionInstance, SiteConfig } from "@/lib/prestate/types";
 import { PROPERTY, SLUG_ICONS, resolveVars, WIDGETS } from "@/lib/prestate/data";
+import { cssUrl, isMediaSrc } from "@/lib/media";
 import {
   cloneTree,
+  dropColumnOn,
   duplicateSection,
   findParentNode,
   findSection,
@@ -73,9 +75,12 @@ function sectionStyle(s: SectionInstance, device: Device = "desktop"): CSSProper
   const st = s.style;
   const pad = st.spacing?.padding ?? { top: 72, right: 24, bottom: 72, left: 24 };
   const shrink = device === "mobile" ? 0.55 : device === "tablet" ? 0.78 : 1;
-  const bg = st.colors?.bg ?? "#ffffff";
+  const structural = isStructural(s.type);
+  const bg = st.colors?.bg ?? (structural ? "transparent" : "#ffffff");
   const gradient = st.colors?.gradient;
-  const img = (s.settings.image as string) && typeof s.settings.image === "string" && s.settings.image.startsWith("http") ? (s.settings.image as string) : undefined;
+  const styleImg = typeof st.colors?.image === "string" ? st.colors.image : "";
+  const settingImg = typeof s.settings.image === "string" ? s.settings.image : "";
+  const img = isMediaSrc(styleImg) ? styleImg : isMediaSrc(settingImg) && s.type !== "image" ? settingImg : undefined;
 
   const width =
     st.layout?.width === "boxed"
@@ -86,17 +91,21 @@ function sectionStyle(s: SectionInstance, device: Device = "desktop"): CSSProper
   const height =
     st.layout?.height === "vh" ? (device === "mobile" ? "auto" : "100vh") : st.layout?.height === "fixed" ? `${st.layout.fixedHeight ?? 400}px` : "auto";
 
+  const padX = structural ? Math.round(pad.right * shrink) : Math.max(16, Math.round(pad.right * shrink));
+  const padXL = structural ? Math.round(pad.left * shrink) : Math.max(16, Math.round(pad.left * shrink));
+
   return {
     background: gradient ? undefined : bg,
-    backgroundImage: gradient ?? (img ? `url(${img})` : undefined),
+    backgroundImage: gradient ?? (img ? cssUrl(img) : undefined),
     backgroundSize: img || gradient ? "cover" : undefined,
     backgroundPosition: "center",
     position: "relative",
     color: st.colors?.text ?? "#111827",
-    padding: `${Math.round(pad.top * shrink)}px ${Math.max(16, Math.round(pad.right * shrink))}px ${Math.round(pad.bottom * shrink)}px ${Math.max(16, Math.round(pad.left * shrink))}px`,
+    padding: `${Math.round(pad.top * shrink)}px ${padX}px ${Math.round(pad.bottom * shrink)}px ${padXL}px`,
     width,
     maxWidth: "100%",
-    minHeight: height !== "auto" ? height : undefined,
+    minWidth: 0,
+    minHeight: s.type === "column" ? 72 : height !== "auto" ? height : undefined,
     boxSizing: "border-box",
     borderRadius: st.border?.radius ? st.border.radius : undefined,
     overflow: st.border?.radius ? "hidden" : undefined,
@@ -489,6 +498,12 @@ function FloatingIconsHint({ s }: { s: SectionInstance }) {
 // ---------------------------------------------------------------------------
 
 function iconFor(slug: string | undefined, size = 20, fallback = Sparkles) {
+  if (isMediaSrc(slug)) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={slug} alt="" style={{ width: size, height: size, objectFit: "contain", display: "block" }} />
+    );
+  }
   const Icon = (slug && SLUG_ICONS[slug]) || fallback;
   return <Icon size={size} />;
 }
@@ -498,7 +513,12 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
   return (
     <div style={{ position: "relative", minHeight: device === "mobile" ? 560 : device === "tablet" ? 680 : 780, display: "flex", alignItems: "center" }}>
       <div style={{ position: "absolute", inset: 0 }}>
-        <SceneImage art={String(st.heroArt ?? st.image ?? "hero")} />
+        {isMediaSrc(String(st.image || st.heroArt || "")) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={String(st.image || st.heroArt)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ) : (
+          <SceneImage art={String(st.heroArt ?? st.image ?? "hero")} />
+        )}
       </div>
       <Overlay section={s} />
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(8,10,20,.78) 0%, rgba(8,10,20,.35) 55%, transparent 100%)", zIndex: 1 }} />
@@ -578,7 +598,12 @@ function OverviewSection({ s, device }: { s: SectionInstance; device: Device }) 
     <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1.05fr 1fr" : "1fr", gap: device === "mobile" ? 28 : 40, alignItems: "center" }}>
       <div style={{ position: "relative" }}>
         <div style={{ borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(17,24,39,.16)" }}>
-          <SceneImage art={String(st.image)} />
+          {isMediaSrc(String(st.image)) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={String(st.image)} alt="" style={{ width: "100%", height: "100%", minHeight: 280, objectFit: "cover", display: "block" }} />
+          ) : (
+            <SceneImage art={String(st.image || "lobby")} />
+          )}
         </div>
         <div style={{ position: "absolute", bottom: -22, right: 28, background: "#fff", border: "1px solid var(--ps-line)", borderRadius: 16, padding: "14px 18px", boxShadow: "var(--ps-shadow-md)", display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ width: 40, height: 40, borderRadius: 11, background: "var(--ps-grad-primary)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -725,7 +750,12 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14, maxWidth: 1200, margin: "30px auto 0", width: "100%" }}>
         {(Array.isArray(st.images) ? (st.images as string[]) : []).slice(0, 6).map((img, i) => (
           <div key={i} style={{ borderRadius: 16, overflow: "hidden", position: "relative", aspectRatio: "4/3", cursor: "pointer", boxShadow: "var(--ps-shadow-sm)" }}>
-            <SceneImage art={GALLERY_ART[i % GALLERY_ART.length]} />
+            {isMediaSrc(img) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            ) : (
+              <SceneImage art={GALLERY_ART[i % GALLERY_ART.length]} />
+            )}
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 55%, rgba(8,10,20,.55))", opacity: 0, transition: "opacity .2s" }} className="ps-gal-overlay" />
             <style>{`.ps-sec-holder:hover .ps-gal-overlay { opacity: 1 }`}</style>
           </div>
@@ -1233,7 +1263,7 @@ function ImageSection({ s }: { s: SectionInstance }) {
         <img src={src} alt={alt} style={{ maxWidth: "100%", width: "min(800px,100%)", borderRadius: radius, objectFit: "cover", display: "block" }} />
       ) : (
         <div style={{ width: "min(800px,100%)", aspectRatio: "16/9", borderRadius: radius, border: "1.5px dashed var(--ps-line-strong)", background: "var(--ps-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ps-muted)", fontSize: 13, fontWeight: 600, textAlign: "center", padding: "0 20px" }}>
-          Image — set a URL in Content
+          Image — upload a file or paste a URL in Content
         </div>
       )}
     </div>
@@ -1242,9 +1272,17 @@ function ImageSection({ s }: { s: SectionInstance }) {
 
 function IconSection({ s }: { s: SectionInstance }) {
   const st = s.settings;
-  const name = String(st.name ?? "Sparkles");
+  const name = String(st.name ?? st.icon ?? "Sparkles");
   const size = Number(st.size ?? 48);
   const color = String(st.color ?? "var(--ps-primary)");
+  if (isMediaSrc(name)) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: size + 16 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={name} alt="" style={{ width: size, height: size, objectFit: "contain" }} />
+      </div>
+    );
+  }
   const Icon = SLUG_ICONS[name] ?? SLUG_ICONS.Sparkles ?? Sparkles;
   return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: size + 16 }}>
@@ -1277,7 +1315,12 @@ function IconBoxSection({ s, device }: { s: SectionInstance; device: Device }) {
       }}
     >
       <span style={{ width: 48, height: 48, borderRadius: 13, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <Icon size={24} />
+        {isMediaSrc(icon) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={icon} alt="" style={{ width: 24, height: 24, objectFit: "contain" }} />
+        ) : (
+          <Icon size={24} />
+        )}
       </span>
       {title ? <div style={{ fontSize: 16, fontWeight: 800, color: "var(--ps-ink)", letterSpacing: -0.2 }}>{title}</div> : null}
       {text ? <div style={{ fontSize: 13, color: "var(--ps-slate)", lineHeight: 1.6 }}>{text}</div> : null}
@@ -1977,6 +2020,11 @@ export function Canvas({
 
   const handleWidgetDrop = (widgetId: string, afterId?: string, after = true) => {
     mutate((prev) => {
+      if (widgetId === "column" && afterId) {
+        const placed = dropColumnOn(prev, afterId, false);
+        setTimeout(() => onSelect(placed.selectId), 30);
+        return placed.list;
+      }
       const widget = WIDGET_FROM_ID(widgetId);
       if (!widget) return prev;
       const copy = { ...widget, id: newSectionId() };
@@ -1999,6 +2047,11 @@ export function Canvas({
       return;
     }
     mutate((prev) => {
+      if (fromId === "column") {
+        const placed = dropColumnOn(prev, targetId, true);
+        setTimeout(() => onSelect(placed.selectId), 30);
+        return placed.list;
+      }
       const widget = WIDGET_FROM_ID(fromId);
       if (!widget) return prev;
       const copy = { ...widget, id: newSectionId() };
@@ -2019,11 +2072,15 @@ export function Canvas({
       const i = cols.findIndex((c) => c.id === colId);
       if (i < 0) return prev;
       const share = 100 / Math.max(1, cols.length);
-      const cur = Number(cols[i].settings?.width) || share;
-      const clamp = (v: number) => Math.max(4, Math.min(100, Math.round(v)));
+      const total = cols.reduce((a, c) => a + (Number(c.settings?.width) || 0), 0);
+      const clamp = (v: number) => Math.max(8, Math.min(84, Math.round(v)));
       const setW = (idx: number, v: number) => {
         cols[idx] = { ...cols[idx], settings: { ...cols[idx].settings, width: v } };
       };
+      if (total > 105 || total < 5) {
+        cols.forEach((_, idx) => setW(idx, Math.round(share * 100) / 100));
+      }
+      const cur = Number(cols[i].settings?.width) || share;
       const next = clamp(cur + deltaPercent);
       setW(i, next);
       const delta = next - cur;
@@ -2081,44 +2138,73 @@ export function Canvas({
   const renderChildren = (s: SectionInstance) => {
     const kids = s.children ?? [];
     if (s.type === "row") {
-      const gap = s.style.spacing?.gap ?? 24;
+      const gap = (Number(s.settings.gap) || s.style.spacing?.gap) ?? 20;
+      const widths = kids.map((child) => Number(child.settings?.width) || 0);
+      const sum = widths.reduce((a, b) => a + b, 0);
+      const tracks =
+        device === "mobile"
+          ? "1fr"
+          : kids
+              .map((child, i) => {
+                if (child.type !== "column") return "1fr";
+                const w = widths[i];
+                if (!w || sum > 105) return "1fr";
+                return `${w}fr`;
+              })
+              .join(" ");
       return (
-        <div style={{ display: "flex", flexWrap: "wrap", gap, alignItems: "flex-start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: tracks, gap, alignItems: "stretch", width: "100%", minWidth: 0 }}>
           {kids.map((child, i) => {
             const isCol = child.type === "column";
-            const share = 100 / Math.max(1, kids.length);
-            const w = Number(child.settings?.width);
-            const flex = isCol ? (w ? `0 0 ${w}%` : `1 1 ${share}%`) : undefined;
             return renderItem(
               child,
               i,
               kids.length,
               {
-                flex,
-                minWidth: isCol ? 0 : undefined,
-                width: isCol ? undefined : "100%",
+                minWidth: 0,
+                width: "100%",
+                maxWidth: "100%",
                 margin: 0,
+                boxSizing: "border-box",
               },
-              isCol && !readOnly,
+              isCol && !readOnly && i < kids.length - 1,
             );
           })}
+          {!readOnly ? (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <NestedDropZone empty={kids.length === 0} onNest={(fromId, isWidget) => nestFrom(fromId, isWidget, s.id)} />
+            </div>
+          ) : null}
         </div>
       );
     }
     if (s.type === "grid") {
       const cols = Math.min(Number(s.settings.columns) || Math.max(1, kids.length), Math.max(1, kids.length));
-      const gap = s.style.spacing?.gap ?? 20;
+      const gap = (Number(s.settings.gap) || s.style.spacing?.gap) ?? 20;
       return (
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap }}>
-          {kids.map((child, i) => renderItem(child, i, kids.length, { minWidth: 0, margin: 0 }))}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: device === "mobile" ? "1fr" : `repeat(${cols},1fr)`,
+            gap,
+            width: "100%",
+            minWidth: 0,
+          }}
+        >
+          {kids.map((child, i) => renderItem(child, i, kids.length, { minWidth: 0, width: "100%", margin: 0, boxSizing: "border-box" }))}
+          {!readOnly ? (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <NestedDropZone empty={kids.length === 0} onNest={(fromId, isWidget) => nestFrom(fromId, isWidget, s.id)} />
+            </div>
+          ) : null}
         </div>
       );
     }
     // container / column — vertical stack
     const gap = s.style.spacing?.gap ?? 24;
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap }}>
-        {kids.map((child, i) => renderItem(child, i, kids.length, { minWidth: 0, margin: 0 }))}
+      <div style={{ display: "flex", flexDirection: "column", gap, minWidth: 0, width: "100%" }}>
+        {kids.map((child, i) => renderItem(child, i, kids.length, { minWidth: 0, margin: 0, width: "100%" }))}
         {!readOnly ? <NestedDropZone key="__nested_drop" empty={kids.length === 0} onNest={(fromId, isWidget) => nestFrom(fromId, isWidget, s.id)} /> : null}
       </div>
     );

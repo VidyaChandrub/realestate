@@ -140,10 +140,24 @@ const col = (width: number): SectionInstance =>
     "Column",
     "Columns",
     { width },
-    { spacing: { padding: { top: 24, right: 16, bottom: 24, left: 16 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 } },
+    {
+      colors: { bg: "transparent", overlay: "", gradient: "", text: "#111827" },
+      spacing: { padding: { top: 12, right: 8, bottom: 12, left: 8 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 },
+      layout: { width: "full", height: "auto", align: "left", direction: "column" },
+    },
   );
 const rowWith = (widths: number[]): SectionInstance => ({
-  ...sec("row", "Row", "Rows", { gap: 24 }, { spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 } }),
+  ...sec(
+    "row",
+    "Row",
+    "Rows",
+    { gap: 20, columns: widths.length },
+    {
+      colors: { bg: "transparent", overlay: "", gradient: "", text: "#111827" },
+      spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 20 },
+      layout: { width: "full", height: "auto", align: "left", direction: "row" },
+    },
+  ),
   children: widths.map(col),
 });
 const containerWith = (children: SectionInstance[]): SectionInstance => ({
@@ -154,10 +168,11 @@ const containerWith = (children: SectionInstance[]): SectionInstance => ({
 export const WIDGETS: WidgetDef[] = [
   // LAYOUT
   { id: "section", label: "Section", category: "Layout", group: "Layout", icon: SquareStack, desc: "Blank content section", make: () => sec("section", "Section", "SquareStack", { title: "Section Title", text: "Add your content here.", layout: "full" }) },
-  { id: "container", label: "Container", category: "Layout", group: "Layout", icon: Box, desc: "Nestable layout wrapper", make: () => containerWith([rowWith([50, 50])]) },
+  { id: "container", label: "Container", category: "Layout", group: "Layout", icon: Box, desc: "Nestable layout wrapper", make: () => containerWith([rowWith([33.33, 33.33, 33.34])]) },
   { id: "grid", label: "Grid", category: "Layout", group: "Layout", icon: LayoutGrid, desc: "Multi-column grid", make: () => ({ ...sec("grid", "Grid", "LayoutGrid", { columns: 3, gap: 20 }, { spacing: { padding: { top: 40, right: 24, bottom: 40, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 20 } }), children: [col(100), col(100), col(100)] }) },
-  { id: "row", label: "Row", category: "Layout", group: "Layout", icon: Rows, desc: "Horizontal flex row of columns", make: () => rowWith([50, 50]) },
-  { id: "column", label: "Column", category: "Layout", group: "Layout", icon: Columns, desc: "Vertical stack inside a row", make: () => col(100) },
+  { id: "row", label: "3 Columns", category: "Layout", group: "Layout", icon: Rows, desc: "One row with three equal columns", make: () => rowWith([33.33, 33.33, 33.34]) },
+  { id: "row-2", label: "2 Columns", category: "Layout", group: "Layout", icon: Columns, desc: "One row with two equal columns", make: () => rowWith([50, 50]) },
+  { id: "column", label: "Column", category: "Layout", group: "Layout", icon: Columns, desc: "Add a column to a row", make: () => col(33.33) },
   { id: "tabs", label: "Tabs", category: "Layout", group: "Layout", icon: PanelsTopLeft, desc: "Tabbed content", make: () => sec("tabs", "Tabs", "PanelsTopLeft", { tabs: ["Overview", "Details", "Pricing"] }) },
   { id: "accordion", label: "Accordion", category: "Layout", group: "Layout", icon: Layers, desc: "Collapsible list", make: () => sec("accordion", "Accordion", "Layers", { items: [{ title: "Item 1", body: "Content" }] }) },
   { id: "carousel", label: "Carousel", category: "Layout", group: "Layout", icon: Images, desc: "Auto-rotating slides", make: () => sec("carousel", "Carousel", "Images", { slides: 3 }) },

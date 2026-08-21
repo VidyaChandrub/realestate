@@ -24,8 +24,11 @@ import {
   X,
 } from "lucide-react";
 import type { Device, SectionInstance } from "@/lib/prestate/types";
-import { DYNAMIC_VARS } from "@/lib/prestate/data";
+import { DYNAMIC_VARS, SLUG_ICONS } from "@/lib/prestate/data";
+import { setRowColumnCount } from "@/lib/prestate/tree";
 import { Collapse, FieldRow, SliderField, TextField, Toggle, SelectField, ColorField } from "@/components/prestate/ui";
+import { MediaPicker } from "@/components/media-picker";
+import { isIconFieldKey, isImageFieldKey, isImageListKey } from "@/lib/media";
 
 // ---------------------------------------------------------------------------
 // Generic content field editor (infers control from value type)
@@ -42,7 +45,19 @@ function formatFieldLabel(key: string): string {
   return FIELD_LABELS[key] ?? key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 }
 
-function ContentField({ label, value, onChange }: { label: string; value: unknown; onChange: (v: unknown) => void }) {
+function ContentField({
+  label,
+  fieldKey,
+  widgetType,
+  value,
+  onChange,
+}: {
+  label: string;
+  fieldKey: string;
+  widgetType?: string;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
   if (typeof value === "boolean") {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -62,15 +77,29 @@ function ContentField({ label, value, onChange }: { label: string; value: unknow
     if (value.length === 0 || value.every((v) => typeof v === "string")) {
       return (
         <FieldRow label={label}>
-          <StringList value={value as string[]} onChange={(v) => onChange(v)} />
+          <StringList value={value as string[]} onChange={(v) => onChange(v)} media={isImageListKey(fieldKey) || isImageFieldKey(fieldKey)} />
         </FieldRow>
       );
     }
     return (
       <FieldRow label={label}>
-        <ObjectList label={label} value={value as Record<string, unknown>[]} onChange={(v) => onChange(v)} />
+        <ObjectList label={label} widgetType={widgetType} value={value as Record<string, unknown>[]} onChange={(v) => onChange(v)} />
       </FieldRow>
     );
+  }
+  if (isIconFieldKey(fieldKey, widgetType) || (typeof value === "string" && isIconFieldKey(fieldKey))) {
+    return (
+      <MediaPicker
+        kind="icon"
+        label={label}
+        value={String(value ?? "")}
+        onChange={onChange}
+        iconNames={Object.keys(SLUG_ICONS)}
+      />
+    );
+  }
+  if (typeof value === "string" && isImageFieldKey(fieldKey)) {
+    return <MediaPicker kind="image" label={label} value={value} onChange={onChange} />;
   }
   const str = String(value ?? "");
   return (
@@ -80,12 +109,18 @@ function ContentField({ label, value, onChange }: { label: string; value: unknow
   );
 }
 
-function StringList({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+function StringList({ value, onChange, media }: { value: string[]; onChange: (v: string[]) => void; media?: boolean }) {
   return (
     <div>
       {value.map((item, i) => (
-        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 6 }}>
-          <TextField value={item} onChange={(v) => onChange(value.map((x, j) => (j === i ? v : x)))} />
+        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: media ? "flex-start" : "center" }}>
+          {media ? (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <MediaPicker kind="image" compact value={item} onChange={(v) => onChange(value.map((x, j) => (j === i ? v : x)))} />
+            </div>
+          ) : (
+            <TextField value={item} onChange={(v) => onChange(value.map((x, j) => (j === i ? v : x)))} />
+          )}
           <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} style={{ background: "var(--ps-danger-soft)", color: "var(--ps-danger)", border: "none", borderRadius: 9, padding: "0 10px", cursor: "pointer" }}>
             <X size={14} />
           </button>
@@ -102,7 +137,7 @@ function StringList({ value, onChange }: { value: string[]; onChange: (v: string
   );
 }
 
-function ObjectList({ label, value, onChange }: { label: string; value: Record<string, unknown>[]; onChange: (v: Record<string, unknown>[]) => void }) {
+function ObjectList({ label, widgetType, value, onChange }: { label: string; widgetType?: string; value: Record<string, unknown>[]; onChange: (v: Record<string, unknown>[]) => void }) {
   const [open, setOpen] = useState<number | null>(0);
   const keys = Object.keys(value[0] ?? {});
   const titleKey = keys.find((k) => ["title", "name", "label", "value", "q", "heading"].includes(k)) ?? keys[0];
@@ -126,7 +161,7 @@ function ObjectList({ label, value, onChange }: { label: string; value: Record<s
             {open === i ? (
               <div style={{ padding: "10px 12px 12px", borderTop: "1px solid var(--ps-line)" }}>
                 {keys.map((k) => (
-                  <ContentField key={k} label={k} value={item[k]} onChange={(v) => onChange(value.map((x, j) => (j === i ? { ...x, [k]: v } : x)))} />
+                  <ContentField key={k} fieldKey={k} widgetType={widgetType} label={k} value={item[k]} onChange={(v) => onChange(value.map((x, j) => (j === i ? { ...x, [k]: v } : x)))} />
                 ))}
               </div>
             ) : null}
@@ -291,9 +326,39 @@ export function SettingsPanel({
                 </div>
               ) : null}
             </div>
+            {section.type === "row" && !("columns" in section.settings) ? (
+              <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
+                <FieldRow label="Columns">
+                  <SliderField
+                    value={section.children?.length || 3}
+                    min={1}
+                    max={6}
+                    onChange={(n) => {
+                      const next = setRowColumnCount(section, n);
+                      set({ settings: next.settings, children: next.children });
+                    }}
+                  />
+                </FieldRow>
+              </div>
+            ) : null}
             {Object.entries(section.settings).map(([key, value]) => (
               <div key={key} style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
-                <ContentField label={formatFieldLabel(key)} value={value} onChange={(v) => set({ settings: { ...section.settings, [key]: v } })} />
+                {section.type === "row" && key === "columns" ? (
+                  <FieldRow label="Columns">
+                    <SliderField
+                      value={Number(section.children?.length || value) || 3}
+                      min={1}
+                      max={6}
+                      onChange={(n) => {
+                        const next = setRowColumnCount(section, n);
+                        set({ settings: next.settings, children: next.children });
+                      }}
+                      suffix=""
+                    />
+                  </FieldRow>
+                ) : (
+                  <ContentField fieldKey={key} widgetType={section.type} label={formatFieldLabel(key)} value={value} onChange={(v) => set({ settings: { ...section.settings, [key]: v } })} />
+                )}
               </div>
             ))}
           </>
@@ -333,6 +398,8 @@ export function SettingsPanel({
 
             <Collapse title="Background" icon={<Palette size={14} />} defaultOpen>
               <ColorField value={colors.bg ?? "#ffffff"} onChange={(v) => setNested("colors", { bg: v })} />
+              <div style={{ height: 10 }} />
+              <MediaPicker kind="image" label="Background image" value={colors.image ?? ""} onChange={(v) => setNested("colors", { image: v })} />
               <div style={{ height: 10 }} />
               <ColorField value={colors.overlay ?? ""} onChange={(v) => setNested("colors", { overlay: v })} />
               <div style={{ height: 10 }} />

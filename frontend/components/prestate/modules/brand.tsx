@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Check, Download, Palette, Save, Share2, Type, Upload } from "lucide-react";
+import { useState } from "react";
+import { Check, Download, Palette, Save, Share2, Type } from "lucide-react";
 import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
 import { ensureConfig, googleFontsHref, siteThemeStyle } from "@/lib/prestate/site-config";
 import { ModuleHeader, SiteScopeBar } from "./shared";
 import { ColorField, FieldRow, TextField, Toggle, Btn } from "@/components/prestate/ui";
 import { PrestateMark } from "@/components/prestate/topnav";
+import { MediaPicker } from "@/components/media-picker";
 
 const PRIMARY_SWATCHES = [
   ["#6D5DFC", "Indigo"],
@@ -47,7 +48,6 @@ export function BrandModule({
 }) {
   const cfg = ensureConfig(site);
   const { brand } = cfg;
-  const fileRef = useRef<HTMLInputElement>(null);
   const [darkMode, setDarkMode] = useState(false);
 
   const patchBrand = (partial: Partial<SiteConfig["brand"]>) =>
@@ -66,23 +66,6 @@ export function BrandModule({
     } catch {
       onToast("Could not copy brand kit");
     }
-  };
-
-  const onLogoFile = (file: File | undefined) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      onToast("Choose a PNG, SVG or JPG logo");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const data = typeof reader.result === "string" ? reader.result : "";
-      if (data) {
-        patchBrand({ logo: data });
-        onToast("Logo updated on this template");
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const downloadLogo = () => {
@@ -206,19 +189,9 @@ export function BrandModule({
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="ps-card" style={{ borderRadius: 16, padding: "6px 20px 18px" }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", padding: "12px 0 6px" }}>Logo</div>
-            <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => onLogoFile(e.target.files?.[0])} />
-            <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 0" }}>
-              <span style={{ width: 52, height: 52, borderRadius: 14, overflow: "hidden", background: "var(--ps-grad-primary)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                {brand.logo ? <img src={brand.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <PrestateMark size={26} color="#fff" />}
-              </span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--ps-ink)" }}>{brand.name}</div>
-                <div style={{ fontSize: 11.5, color: "var(--ps-muted)" }}>{brand.logo ? "Custom logo on this template" : "PNG · SVG · JPG"}</div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <Btn variant="outline" size="sm" icon={<Upload size={12} />} onClick={() => fileRef.current?.click()}>Replace</Btn>
-                <Btn variant="ghost" size="sm" icon={<Download size={12} />} onClick={downloadLogo}>Download</Btn>
-              </div>
+            <MediaPicker kind="image" label="Logo — upload or URL" value={brand.logo} onChange={(v) => patchBrand({ logo: v })} />
+            <div style={{ display: "flex", justifyContent: "flex-end", margin: "4px 0 10px" }}>
+              <Btn variant="ghost" size="sm" icon={<Download size={12} />} onClick={downloadLogo}>Download</Btn>
             </div>
             <FieldRow label="Brand name">
               <TextField value={brand.name} onChange={(v) => patchBrand({ name: v })} />

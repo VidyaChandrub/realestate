@@ -1,4 +1,4 @@
-import type { SectionInstance } from "./types";
+import type { SectionInstance, SectionStyle } from "./types";
 
 export const STRUCTURAL_TYPES = new Set(["container", "row", "column", "grid"]);
 
@@ -141,4 +141,146 @@ export function toggleSectionFlag(list: SectionInstance[], id: string, flag: "hi
 // Append a node into the children of a structural node (the "drop inside" action).
 export function nestInto(list: SectionInstance[], parentId: string, node: SectionInstance): SectionInstance[] {
   return insertChild(list, parentId, node);
+}
+
+const layoutStyle = (over: Partial<SectionStyle>): SectionStyle => ({
+  colors: { bg: "transparent", overlay: "", gradient: "", text: "#111827" },
+  typography: { fontFamily: "Inter", fontSize: 16, fontWeight: 400, lineHeight: 1.6, letterSpacing: 0 },
+  spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
+  layout: { width: "full", height: "auto", align: "left", direction: "column" },
+  responsive: {},
+  ...over,
+});
+
+export function makeColumn(width = 33.33): SectionInstance {
+  return {
+    id: newSectionId("col"),
+    type: "column",
+    label: "Column",
+    icon: "Columns",
+    settings: { width },
+    style: layoutStyle({
+      spacing: { padding: { top: 12, right: 8, bottom: 12, left: 8 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 },
+    }),
+    children: [],
+  };
+}
+
+export function equalizeRowColumns(row: SectionInstance): SectionInstance {
+  const kids = row.children ?? [];
+  const n = Math.max(1, kids.length);
+  const w = Math.round(10000 / n) / 100;
+  return {
+    ...row,
+    settings: { ...row.settings, columns: n },
+    children: kids.map((c) => (c.type === "column" ? { ...c, settings: { ...c.settings, width: w } } : c)),
+  };
+}
+
+function mapNode(list: SectionInstance[], id: string, fn: (n: SectionInstance) => SectionInstance): SectionInstance[] {
+  return list.map((s) => {
+    if (s.id === id) return fn(s);
+    if (s.children?.length) return { ...s, children: mapNode(s.children, id, fn) };
+    return s;
+  });
+}
+
+export function equalizeRowById(list: SectionInstance[], rowId: string): SectionInstance[] {
+  return mapNode(list, rowId, equalizeRowColumns);
+}
+
+export function setRowColumnCount(row: SectionInstance, count: number): SectionInstance {
+  const n = Math.max(1, Math.min(6, Math.round(Number(count) || 1)));
+  let kids = [...(row.children ?? [])];
+  while (kids.length < n) kids.push(makeColumn());
+  if (kids.length > n) kids = kids.slice(0, n);
+  return equalizeRowColumns({ ...row, children: kids, settings: { ...row.settings, columns: n } });
+}
+
+export function makeThreeColRow(): SectionInstance {
+  return setRowColumnCount(
+    {
+      id: newSectionId("row"),
+      type: "row",
+      label: "Row",
+      icon: "Rows",
+      settings: { gap: 20, columns: 3 },
+      style: layoutStyle({
+        spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 20 },
+        layout: { width: "full", height: "auto", align: "left", direction: "row" },
+      }),
+      children: [],
+    },
+    3,
+  );
+}
+
+function insertColumnIntoRow(list: SectionInstance[], rowId: string, column: SectionInstance, index?: number): SectionInstance[] {
+  return equalizeRowById(insertChild(list, rowId, column, index), rowId);
+}
+
+/** Click "Column" in the widgets panel: add a sibling in a row, or insert a 3-column row. */
+export function placeColumn(list: SectionInstance[], selectedId: string | null): { list: SectionInstance[]; selectId: string } {
+  const col = makeColumn();
+  if (selectedId) {
+    const ref = findSection(list, selectedId);
+    if (ref) {
+      if (ref.node.type === "row") {
+        return { list: insertColumnIntoRow(list, ref.node.id, col), selectId: col.id };
+      }
+      if (ref.node.type === "column") {
+        const parent = findParentNode(list, selectedId);
+        if (parent?.parent.type === "row") {
+          const idx = parent.children.findIndex((c) => c.id === selectedId);
+          return { list: insertColumnIntoRow(list, parent.parent.id, col, idx + 1), selectId: col.id };
+        }
+      }
+      if (ref.node.type === "grid") {
+        return { list: insertChild(list, ref.node.id, col), selectId: col.id };
+      }
+      if (isStructural(ref.node.type)) {
+        const row = makeThreeColRow();
+        return { list: insertChild(list, ref.node.id, row), selectId: row.id };
+      }
+      const row = makeThreeColRow();
+      return { list: insertChild(list, ref.parentId, row, ref.index + 1), selectId: row.id };
+    }
+  }
+  const row = makeThreeColRow();
+  return { list: insertChild(list, null, row), selectId: row.id };
+}
+
+/** Drop/nest the Column widget onto a target section. */
+export function dropColumnOn(list: SectionInstance[], targetId: string, nest: boolean): { list: SectionInstance[]; selectId: string } {
+  const col = makeColumn();
+  const ref = findSection(list, targetId);
+  if (!ref) return { list, selectId: targetId };
+
+  if (nest || ref.node.type === "row") {
+    if (ref.node.type === "row") {
+      return { list: insertColumnIntoRow(list, ref.node.id, col), selectId: col.id };
+    }
+    if (ref.node.type === "column") {
+      const parent = findParentNode(list, targetId);
+      if (parent?.parent.type === "row") {
+        const idx = parent.children.findIndex((c) => c.id === targetId);
+        return { list: insertColumnIntoRow(list, parent.parent.id, col, idx + 1), selectId: col.id };
+      }
+    }
+    if (ref.node.type === "grid") {
+      return { list: insertChild(list, ref.node.id, col), selectId: col.id };
+    }
+    const row = makeThreeColRow();
+    return { list: insertChild(list, ref.node.id, row), selectId: row.id };
+  }
+
+  if (ref.node.type === "column") {
+    const parent = findParentNode(list, targetId);
+    if (parent?.parent.type === "row") {
+      const idx = parent.children.findIndex((c) => c.id === targetId);
+      return { list: insertColumnIntoRow(list, parent.parent.id, col, idx + (nest ? 1 : 1)), selectId: col.id };
+    }
+  }
+  const row = makeThreeColRow();
+  return { list: insertChild(list, ref.parentId, row, ref.index + 1), selectId: row.id };
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef } from "react";
 import { Copy, ExternalLink, FileSearch, Gauge, Link2, ListTree, Save, Search, Settings2, Share2 } from "lucide-react";
 import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
@@ -8,6 +7,8 @@ import { buildJsonLd, jsonLdValid, suggestedCanonical } from "@/lib/prestate/seo
 import { localPreviewPath } from "@/lib/prestate/paths";
 import { ModuleHeader, SiteScopeBar, StatCard } from "./shared";
 import { FieldRow, TextField, Toggle, Btn, Collapse } from "@/components/prestate/ui";
+import { MediaPicker } from "@/components/media-picker";
+import { isMediaSrc } from "@/lib/media";
 
 export function SeoModule({
   site,
@@ -25,7 +26,6 @@ export function SeoModule({
 }) {
   const cfg = ensureConfig(site);
   const { seo, page, brand } = cfg;
-  const fileRef = useRef<HTMLInputElement>(null);
   const patchSeo = (partial: Partial<SiteConfig["seo"]>) => onPatch((c) => ({ ...c, seo: { ...c.seo, ...partial } }));
   const title = seo.metaTitle;
   const desc = seo.metaDescription;
@@ -36,7 +36,7 @@ export function SeoModule({
   const descOk = desc.length >= 120 && desc.length <= 160;
   const ogOk = Boolean(seo.ogImage);
   const schemaOk = jsonLdValid(json);
-  const ogImageSrc = seo.ogImage.startsWith("http") || seo.ogImage.startsWith("data:") || seo.ogImage.startsWith("/") ? seo.ogImage : "";
+  const ogImageSrc = isMediaSrc(seo.ogImage) ? seo.ogImage : "";
 
   const fillMissing = () => {
     const nextTitle = title.trim() || `${brand.name} | ${site.template}`.slice(0, 60);
@@ -61,21 +61,6 @@ export function SeoModule({
     }
   };
 
-  const onOgFile = (file: File | undefined) => {
-    if (!file || !file.type.startsWith("image/")) {
-      onToast("Choose an image for OG");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        patchSeo({ ogImage: reader.result });
-        onToast("OG image updated");
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
   const setSlug = (raw: string) => {
     const next = raw.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "");
     onPatchPage({ slug: next });
@@ -86,7 +71,6 @@ export function SeoModule({
 
   return (
     <div style={{ overflowY: "auto", height: "100%", ...siteThemeStyle(brand) }}>
-      <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => onOgFile(e.target.files?.[0])} />
       <ModuleHeader
         title="SEO Center"
         description={`Meta, Open Graph, slug and schema for “${site.name}”. Applied on this template’s local preview.`}
@@ -148,12 +132,7 @@ export function SeoModule({
                 <TextField value={seo.ogDescription} onChange={(v) => patchSeo({ ogDescription: v })} />
               </FieldRow>
               <FieldRow label="OG image">
-                <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
-                  <button type="button" onClick={() => fileRef.current?.click()} style={{ width: 48, height: 48, borderRadius: 10, overflow: "hidden", border: "1px solid var(--ps-line)", flexShrink: 0, background: "var(--ps-grad-primary)", padding: 0, cursor: "pointer" }}>
-                    {ogImageSrc ? <img src={ogImageSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
-                  </button>
-                  <TextField value={seo.ogImage} onChange={(v) => patchSeo({ ogImage: v })} placeholder="/og.jpg or https://…" />
-                </div>
+                <MediaPicker kind="image" value={seo.ogImage} onChange={(v) => patchSeo({ ogImage: v })} />
               </FieldRow>
               <FieldRow label="Keywords">
                 <TextField value={seo.keywords} onChange={(v) => patchSeo({ keywords: v })} placeholder="apartments, bangalore, rera" />
@@ -167,8 +146,8 @@ export function SeoModule({
               <FieldRow label="Language">
                 <TextField value={page.language} onChange={(v) => onPatch((c) => ({ ...c, page: { ...c.page, language: v } }))} placeholder="en" />
               </FieldRow>
-              <FieldRow label="Favicon path">
-                <TextField value={page.favicon} onChange={(v) => onPatch((c) => ({ ...c, page: { ...c.page, favicon: v } }))} />
+              <FieldRow label="Favicon">
+                <MediaPicker kind="icon" value={page.favicon} onChange={(v) => onPatch((c) => ({ ...c, page: { ...c.page, favicon: v } }))} />
               </FieldRow>
               <FieldRow label="Password (optional)">
                 <TextField value={page.password} onChange={(v) => onPatch((c) => ({ ...c, page: { ...c.page, password: v } }))} placeholder="Leave blank for public preview" />
@@ -233,7 +212,7 @@ export function SeoModule({
               <Share2 size={13} /> Social link preview
             </div>
             <div style={{ border: "1px solid #eef0f5", borderRadius: 12, overflow: "hidden" }}>
-              <div style={{ height: 120, background: ogImageSrc ? `center/cover url(${ogImageSrc})` : "var(--ps-grad-primary)" }} />
+              <div style={{ height: 120, background: ogImageSrc ? `center / cover no-repeat url(${JSON.stringify(ogImageSrc)})` : "var(--ps-grad-primary)" }} />
               <div style={{ padding: 12 }}>
                 <div style={{ fontSize: 11, color: "#5f6368", marginBottom: 4 }}>{site.domain || "localhost"}</div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#202124" }}>{seo.ogTitle || title || "Untitled"}</div>

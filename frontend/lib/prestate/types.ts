@@ -29,6 +29,7 @@ export interface SectionStyle {
     overlay?: string;
     gradient?: string;
     text?: string;
+    image?: string;
   };
   typography?: {
     fontFamily?: string;
