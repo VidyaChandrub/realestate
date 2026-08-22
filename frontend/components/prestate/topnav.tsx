@@ -308,7 +308,6 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   builder: "Builder",
   pages: "Landing Pages",
   templates: "Template Management",
-  properties: "Properties",
   forms: "Form Builder",
   brand: "Brand Center",
   headerfooter: "Header & Footer",

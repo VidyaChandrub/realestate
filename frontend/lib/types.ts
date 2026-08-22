@@ -103,22 +103,6 @@ export interface OnboardAdminInput {
 export interface ActivateOrganisationResponse {
   organisation: SafeOrganisation;
   admin: SafeUser;
-  assignedTemplateIds: string[];
-  skippedTemplateIds: string[];
-}
-
-// "Template" is a published LandingPage — no free/paid distinction exists
-// on that model yet, so the wizard treats every one as free for now.
-export interface AdminTemplate {
-  id: string;
-  name: string;
-}
-
-export interface AdminTemplateListResponse {
-  data: AdminTemplate[];
-  total: number;
-  page: number;
-  limit: number;
 }
 
 export interface OrganisationListRow {
@@ -131,7 +115,6 @@ export interface OrganisationListRow {
   createdAt: string;
   userCount: number;
   plan: null;
-  landingPagesCount: null;
   mrr: null;
 }
 
@@ -165,10 +148,6 @@ export interface OrganisationDetail {
   userCount: number;
   teamCount: number;
   plan: null;
-  landingPagesCount: null;
-  landingPagesPublished: null;
-  leadsCaptured: null;
-  leadsThisMonth: null;
   planValue: null;
   subscriptionRenewsAt: null;
 }
@@ -187,12 +166,4 @@ export interface OrganisationActivityRow {
   entity: string | null;
   entityId: string | null;
   createdAt: string;
-}
-
-export interface OrganisationTemplateRow {
-  name: string;
-  category: string;
-  thumbnail: string | null;
-  status: string;
-  assignedAt: string;
 }

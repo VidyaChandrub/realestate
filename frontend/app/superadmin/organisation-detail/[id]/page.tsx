@@ -9,11 +9,10 @@ import { CountUp } from "@/components/superadmin/count-up";
 import type {
   OrganisationActivityRow,
   OrganisationDetail,
-  OrganisationTemplateRow,
   OrganisationUserRow,
 } from "@/lib/types";
 
-const TABS = ["Overview", "Users & Teams", "Templates", "Subscription", "Activity"] as const;
+const TABS = ["Overview", "Users & Teams", "Subscription", "Activity"] as const;
 type Tab = (typeof TABS)[number];
 
 function initials(name: string): string {
@@ -58,7 +57,6 @@ export default function SuperAdminOrganisationDetailPage() {
   const [tab, setTab] = useState<Tab>("Overview");
   const [org, setOrg] = useState<OrganisationDetail | null>(null);
   const [users, setUsers] = useState<OrganisationUserRow[] | null>(null);
-  const [templates, setTemplates] = useState<OrganisationTemplateRow[] | null>(null);
   const [activity, setActivity] = useState<OrganisationActivityRow[] | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -93,13 +91,11 @@ export default function SuperAdminOrganisationDetailPage() {
     Promise.all([
       apiFetch<OrganisationDetail>(`/admin/organisations/${params.id}`, { headers }),
       apiFetch<OrganisationUserRow[]>(`/admin/organisations/${params.id}/users`, { headers }),
-      apiFetch<OrganisationTemplateRow[]>(`/admin/organisations/${params.id}/templates`, { headers }),
       apiFetch<OrganisationActivityRow[]>(`/admin/organisations/${params.id}/activity`, { headers }),
     ])
-      .then(([orgRes, usersRes, templatesRes, activityRes]) => {
+      .then(([orgRes, usersRes, activityRes]) => {
         setOrg(orgRes);
         setUsers(usersRes);
-        setTemplates(templatesRes);
         setActivity(activityRes);
       })
       .catch(() => setNotFound(true))
@@ -237,7 +233,7 @@ export default function SuperAdminOrganisationDetailPage() {
         <Reveal delay={2}>
           <div className="stat">
             <div className="top">
-              <span className="label">Landing pages</span>
+              <span className="label">Sites</span>
               <span className="ic ic-sky">📄</span>
             </div>
             <div className="value">—</div>
@@ -419,56 +415,6 @@ export default function SuperAdminOrganisationDetailPage() {
                       )}
                     </tbody>
                   </table>
-                </div>
-              </div>
-            </Reveal>
-          ) : null}
-
-          {tab === "Templates" ? (
-            <Reveal delay={2}>
-              <div className="card">
-                <div className="card-h">
-                  <span className="t">Templates</span>
-                  <span className="x">{templates?.length ?? 0} assigned</span>
-                </div>
-                <div className="card-b">
-                  {!templates || templates.length === 0 ? (
-                    <p className="muted">No templates assigned yet.</p>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {templates.map((t) => (
-                        <div
-                          key={t.name + t.assignedAt}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 14,
-                            padding: "10px 14px",
-                            border: "1px solid var(--line)",
-                            borderRadius: 12,
-                          }}
-                        >
-                          {t.thumbnail ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={t.thumbnail}
-                              alt={t.name}
-                              style={{ width: 48, height: 36, borderRadius: 8, objectFit: "cover" }}
-                            />
-                          ) : (
-                            <span className="av" style={{ width: 48, height: 36, borderRadius: 8, fontSize: 12 }}>
-                              {t.name.slice(0, 2).toUpperCase()}
-                            </span>
-                          )}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <b style={{ fontSize: 13.5 }}>{t.name}</b>
-                            <div className="sm muted">assigned {formatDate(t.assignedAt)}</div>
-                          </div>
-                          <span className="badge b-indigo">{t.category}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             </Reveal>

@@ -4,7 +4,6 @@ export type ModuleKey =
   | "builder"
   | "pages"
   | "templates"
-  | "properties"
   | "forms"
   | "brand"
   | "headerfooter"

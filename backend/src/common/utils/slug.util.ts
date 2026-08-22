@@ -27,19 +27,3 @@ export async function generateUniqueOrgSlug(
 
   return candidate;
 }
-
-export async function generateUniquePageSlug(
-  prisma: Pick<PrismaService, 'landingPage'>,
-  name: string,
-): Promise<string> {
-  const base = slugify(name) || 'landing-page';
-  let candidate = base;
-  let suffix = 1;
-
-  while (await prisma.landingPage.findUnique({ where: { slug: candidate } })) {
-    suffix += 1;
-    candidate = `${base}-${suffix}`;
-  }
-
-  return candidate;
-}

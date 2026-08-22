@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   Bell,
-  Building2,
   CheckCircle2,
   Clock,
   CreditCard,
@@ -29,7 +28,6 @@ import { localPreviewPath } from "@/lib/prestate/paths";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import { TopNav, MODULE_LABELS } from "@/components/prestate/topnav";
 import { BuilderWorkspace, type BuilderApi } from "@/components/prestate/builder/workspace";
-import { PropertiesModule } from "@/components/prestate/modules/properties";
 import { FormsModule } from "@/components/prestate/modules/forms";
 import { BrandModule } from "@/components/prestate/modules/brand";
 import { HeaderFooterModule } from "@/components/prestate/modules/headerfooter";
@@ -39,7 +37,6 @@ import { DomainsModule } from "@/components/prestate/modules/domains";
 
 const NAV_ITEMS: { key: ModuleKey; label: string; icon: React.ComponentType<{ size?: number | string }> }[] = [
   { key: "builder", label: "Builder", icon: PencilRuler },
-  { key: "properties", label: "Properties", icon: Building2 },
   { key: "forms", label: "Forms", icon: MessageCircle },
   { key: "brand", label: "Brand", icon: Palette },
   { key: "headerfooter", label: "Header & Footer", icon: PencilRuler },
@@ -193,8 +190,6 @@ export function PrestateStudio() {
         ) : (
           <div style={{ padding: 40, color: "var(--ps-muted)" }}>Create a landing page to start building.</div>
         );
-      case "properties":
-        return <PropertiesModule onToast={toast} />;
       case "forms":
         return activePage ? (
           <FormsModule

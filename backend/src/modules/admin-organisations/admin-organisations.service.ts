@@ -116,33 +116,6 @@ export class AdminOrganisationsService {
       data: { status: 'active' },
     });
 
-    // "Template" here is a published LandingPage — the old standalone
-    // Template/OrganisationTemplate catalog (free/paid tiers, payment
-    // verification) was dropped. Every published page is granted the same
-    // way, immediately — no pending/verified gate.
-    // TODO: once subscription plans are defined, which pages an org can
-    // select here will likely need filtering by plan — not built yet.
-    const requestedTemplateIds = [...new Set(dto.template_ids ?? [])];
-    const publishedPages = requestedTemplateIds.length
-      ? await this.prisma.landingPage.findMany({
-          where: { id: { in: requestedTemplateIds }, status: 'published' },
-        })
-      : [];
-    const assignedTemplateIds = publishedPages.map((p) => p.id);
-    const skippedTemplateIds = requestedTemplateIds.filter(
-      (id) => !assignedTemplateIds.includes(id),
-    );
-
-    if (publishedPages.length) {
-      await this.prisma.organisationLandingPageTemplate.createMany({
-        data: publishedPages.map((page) => ({
-          orgId: activated.id,
-          landingPageId: page.id,
-        })),
-        skipDuplicates: true,
-      });
-    }
-
     await this.prisma.auditLog.create({
       data: {
         orgId: activated.id,
@@ -150,7 +123,6 @@ export class AdminOrganisationsService {
         action: 'org_onboarded',
         entity: 'Organisation',
         entityId: activated.id,
-        metadata: { assigned_template_ids: assignedTemplateIds, skipped_template_ids: skippedTemplateIds },
       },
     });
 
@@ -166,8 +138,6 @@ export class AdminOrganisationsService {
     return {
       organisation: toSafeOrganisation(activated),
       admin: toSafeUser(admin),
-      assignedTemplateIds,
-      skippedTemplateIds,
     };
   }
 
@@ -237,7 +207,6 @@ export class AdminOrganisationsService {
         createdAt: org.createdAt,
         userCount: org._count.users,
         plan: null,
-        landingPagesCount: null,
         mrr: null,
       })),
       total,
@@ -284,10 +253,6 @@ export class AdminOrganisationsService {
       userCount,
       teamCount,
       plan: null,
-      landingPagesCount: null,
-      landingPagesPublished: null,
-      leadsCaptured: null,
-      leadsThisMonth: null,
       planValue: null,
       subscriptionRenewsAt: null,
     };
@@ -311,24 +276,6 @@ export class AdminOrganisationsService {
       email: user.email,
       role: user.userRoles[0]?.role.key ?? null,
       teams: user.teamMembers.map((membership) => membership.team.name),
-    }));
-  }
-
-  async listTemplates(id: string) {
-    await this.getRealOrganisation(id);
-
-    const assignments = await this.prisma.organisationLandingPageTemplate.findMany({
-      where: { orgId: id },
-      include: { landingPage: true },
-      orderBy: { assignedAt: 'desc' },
-    });
-
-    return assignments.map((assignment) => ({
-      name: assignment.landingPage.name,
-      category: assignment.landingPage.category,
-      thumbnail: assignment.landingPage.thumbnail,
-      status: assignment.landingPage.status,
-      assignedAt: assignment.assignedAt,
     }));
   }
 

@@ -89,7 +89,7 @@ export function BuilderWorkspace({
     });
   }, [page.id]);
 
-  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistTimer = useRef<number | null>(null);
 
   useEffect(() => () => {
     if (persistTimer.current) window.clearTimeout(persistTimer.current);
