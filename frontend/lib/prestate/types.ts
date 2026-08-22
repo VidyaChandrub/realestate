@@ -206,6 +206,8 @@ export interface SiteConfig {
     sendWhatsapp: boolean;
     redirectThankYou: boolean;
     submitLabel: string;
+    deliverableUrl: string;
+    deliverableLabel: string;
     fields: FormLeadField[];
   };
   media: {

@@ -29,7 +29,14 @@ import {
   PhoneCall,
   SquareStack,
   Mail,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  FileText,
 } from "lucide-react";
+import { Lightbox } from "yet-another-react-lightbox";
+import { Captions, Counter, Zoom, Fullscreen, Download as LightboxDownload } from "yet-another-react-lightbox/plugins";
+import "yet-another-react-lightbox/styles.css";
 import type { Device, SectionInstance, SiteConfig } from "@/lib/prestate/types";
 import { PROPERTY, SLUG_ICONS, resolveVars, WIDGETS } from "@/lib/prestate/data";
 import { cssUrl, isMediaSrc } from "@/lib/media";
@@ -64,6 +71,7 @@ type CanvasTheme = {
 const SiteFormContext = createContext<SiteConfig["form"] | undefined>(undefined);
 const SiteChromeContext = createContext<{ header: SiteConfig["header"]; footer: SiteConfig["footer"]; brand: SiteConfig["brand"] } | undefined>(undefined);
 const SitePageIdContext = createContext("");
+const SiteLiveContext = createContext(false);
 import { SceneImage } from "@/components/prestate/art";
 import { isWidgetDrag, readWidgetId } from "./widgets-panel";
 
@@ -739,7 +747,22 @@ const GALLERY_ART = ["skyline", "lobby", "pool", "tower", "garden", "interior"];
 
 function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
+  const live = useContext(SiteLiveContext);
   const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 3;
+  const images = (Array.isArray(st.images) ? (st.images as string[]) : []).slice(0, 6);
+  const captions = Array.isArray(st.captions) ? (st.captions as string[]) : [];
+  const lightboxOn = st.lightbox !== false;
+  const canOpen = live && lightboxOn && images.length > 0;
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  const slides = images.map((img, i) => ({
+    type: "image" as const,
+    src: isMediaSrc(img) ? img : "",
+    alt: captions[i] || `${String(st.heading || "Gallery")} ${i + 1}`,
+    caption: captions[i] || undefined,
+    art: isMediaSrc(img) ? undefined : GALLERY_ART[i % GALLERY_ART.length],
+  }));
+
   return (
     <>
       <Inner section={s}>
@@ -748,11 +771,15 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
         <p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 520, lineHeight: 1.65 }}>{String(st.text)}</p>
       </Inner>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14, maxWidth: 1200, margin: "30px auto 0", width: "100%" }}>
-        {(Array.isArray(st.images) ? (st.images as string[]) : []).slice(0, 6).map((img, i) => (
-          <div key={i} style={{ borderRadius: 16, overflow: "hidden", position: "relative", aspectRatio: "4/3", cursor: "pointer", boxShadow: "var(--ps-shadow-sm)" }}>
+        {images.map((img, i) => (
+          <div
+            key={i}
+            onClick={canOpen ? (e) => { e.stopPropagation(); setOpenIndex(i); } : undefined}
+            style={{ borderRadius: 16, overflow: "hidden", position: "relative", aspectRatio: "4/3", cursor: canOpen ? "zoom-in" : "pointer", boxShadow: "var(--ps-shadow-sm)" }}
+          >
             {isMediaSrc(img) ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              <img src={img} alt={captions[i] || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
             ) : (
               <SceneImage art={GALLERY_ART[i % GALLERY_ART.length]} />
             )}
@@ -761,12 +788,48 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
           </div>
         ))}
       </div>
+      {canOpen && openIndex !== null ? (
+        <Lightbox
+          open
+          index={openIndex}
+          slides={slides}
+          close={() => setOpenIndex(null)}
+          plugins={[Captions, Counter, Zoom, Fullscreen, LightboxDownload]}
+          carousel={{ padding: "16px", spacing: 0 }}
+          toolbar={{ buttons: ["fullscreen", "zoom", "download", "close"] }}
+          animation={{ fade: 200, swipe: 300 }}
+          render={{
+            slide: ({ slide }) => {
+              const sl = slide as { art?: string };
+              if (sl.art) {
+                return (
+                  <div style={{ width: "min(92vw, 1100px)", aspectRatio: "4/3", maxHeight: "84vh", borderRadius: 12, overflow: "hidden" }}>
+                    <SceneImage art={sl.art} />
+                  </div>
+                );
+              }
+              return undefined;
+            },
+          }}
+        />
+      ) : null}
     </>
   );
 }
 
+function youtubeId(url: string): string | null {
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/))([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
 function VirtualTourSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
+  const live = useContext(SiteLiveContext);
+  const url = String(st.url ?? "");
+  const [playing, setPlaying] = useState(false);
+  const yt = youtubeId(url);
+  const embedSrc = yt ? `https://www.youtube.com/embed/${yt}?autoplay=1&rel=0` : url;
+  const canPlay = live && !!url;
   return (
     <>
       <Inner section={s}>
@@ -775,17 +838,29 @@ function VirtualTourSection({ s, device }: { s: SectionInstance; device: Device 
         <p style={{ fontSize: 14, color: "rgba(255,255,255,.7)", maxWidth: 520, lineHeight: 1.65 }}>{String(st.text)}</p>
       </Inner>
       <div style={{ maxWidth: 1000, margin: "30px auto 0", width: "100%" }}>
-        <div style={{ position: "relative", borderRadius: 20, overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,.5)", aspectRatio: "16/9", cursor: "pointer" }}>
-          <SceneImage art="tour" />
-          <Overlay section={s} />
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
-            <span style={{ width: 74, height: 74, borderRadius: "50%", background: "rgba(255,255,255,.16)", border: "1.5px solid rgba(255,255,255,.4)", display: "inline-flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)", transition: "transform .2s" }}>
-              <Play size={30} style={{ color: "#fff", marginLeft: 3 }} />
-            </span>
-            <span style={{ color: "#fff", fontSize: 14, fontWeight: 700, background: "rgba(8,10,20,.55)", padding: "6px 14px", borderRadius: 999, backdropFilter: "blur(8px)" }}>
-              {String(st.videoTitle)} · {String(st.duration)}
-            </span>
-          </div>
+        <div style={{ position: "relative", borderRadius: 20, overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,.5)", aspectRatio: "16/9", cursor: canPlay && !playing ? "pointer" : "default" }} onClick={canPlay && !playing ? (e) => { e.stopPropagation(); setPlaying(true); } : undefined}>
+          {playing && canPlay ? (
+            <iframe
+              src={embedSrc}
+              title={String(st.videoTitle || st.heading || "Video")}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none", display: "block" }}
+            />
+          ) : (
+            <>
+              <SceneImage art="tour" />
+              <Overlay section={s} />
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
+                <span style={{ width: 74, height: 74, borderRadius: "50%", background: "rgba(255,255,255,.16)", border: "1.5px solid rgba(255,255,255,.4)", display: "inline-flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)", transition: "transform .2s" }}>
+                  <Play size={30} style={{ color: "#fff", marginLeft: 3 }} />
+                </span>
+                <span style={{ color: "#fff", fontSize: 14, fontWeight: 700, background: "rgba(8,10,20,.55)", padding: "6px 14px", borderRadius: 999, backdropFilter: "blur(8px)" }}>
+                  {String(st.videoTitle)} · {String(st.duration)}
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </>
@@ -794,7 +869,12 @@ function VirtualTourSection({ s, device }: { s: SectionInstance; device: Device 
 
 function LocationSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
+  const live = useContext(SiteLiveContext);
   const items = (st.items ?? []) as { icon?: string; title: string; meta: string }[];
+  const address = String(st.address ?? "").trim();
+  const zoom = Math.min(20, Math.max(1, Number(st.zoom ?? 14) || 14));
+  const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(address)}&z=${zoom}&output=embed`;
+  const dirHref = address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}` : "";
   return (
     <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1.05fr" : "1fr", gap: 32, alignItems: "stretch" }}>
       <div>
@@ -814,12 +894,33 @@ function LocationSection({ s, device }: { s: SectionInstance; device: Device }) 
             </div>
           ))}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 20, fontSize: 13, fontWeight: 600, color: "var(--ps-primary)" }}>
-          <Navigation size={15} /> Get Directions to {PROPERTY.location}
-        </div>
+        {live && dirHref ? (
+          <a
+            href={dirHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 20, fontSize: 13, fontWeight: 600, color: "var(--ps-primary)", textDecoration: "none" }}
+          >
+            <Navigation size={15} /> Get Directions to {PROPERTY.location}
+          </a>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 20, fontSize: 13, fontWeight: 600, color: "var(--ps-primary)" }}>
+            <Navigation size={15} /> Get Directions to {PROPERTY.location}
+          </div>
+        )}
       </div>
       <div style={{ borderRadius: 18, overflow: "hidden", border: "1px solid var(--ps-line)", boxShadow: "var(--ps-shadow-md)", minHeight: 360 }}>
-        <SceneImage art="map" />
+        {live && address ? (
+          <iframe
+            title={`Map — ${address}`}
+            src={mapSrc}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            style={{ width: "100%", height: "100%", minHeight: 360, border: "none", display: "block" }}
+          />
+        ) : (
+          <SceneImage art="map" />
+        )}
       </div>
     </div>
   );
@@ -962,6 +1063,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
   const st = s.settings;
   const cfg = useContext(SiteFormContext);
   const pageId = useContext(SitePageIdContext);
+  const live = useContext(SiteLiveContext);
   const [step, setStep] = useState(0);
   const [sent, setSent] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -985,6 +1087,12 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
   const submitLabel = cfg?.submitLabel || String(st.button || "Submit");
   const last = step >= steps - 1;
 
+  const deliverableUrl = String(st.pdfUrl || cfg?.deliverableUrl || "").trim();
+  const deliverableLabel = String(st.pdfLabel || cfg?.deliverableLabel || "Download brochure").trim() || "Download brochure";
+  const redirectTarget = cfg?.redirectThankYou ? String(cfg?.thankYou ?? "").trim() : "";
+  const doRedirect = live && /^(https?:\/\/|\/)/.test(redirectTarget);
+  const successMsg = !cfg?.redirectThankYou && cfg?.thankYou ? cfg.thankYou : "Thanks — our team will call you shortly.";
+
   const submit = () => {
     const missing = visible.find((f) => ("required" in f ? f.required : false) && !(values[f.label] || "").trim() && f.type !== "checkbox");
     if (missing) return;
@@ -993,6 +1101,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
       return;
     }
     setSent(true);
+    if (!live) return;
     firePrestateLead();
     if (pageId) bumpTracking(pageId, "form");
     const digits = (cfg?.whatsapp || "").replace(/\D/g, "");
@@ -1001,16 +1110,37 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
       const body = fields.map((f) => `${f.label}: ${values[f.label] || ""}`).join("%0A");
       window.open(`https://wa.me/${digits}?text=${body}`, "_blank", "noopener,noreferrer");
     }
+    if (doRedirect) window.location.assign(redirectTarget);
   };
 
   if (sent) {
     return (
       <div id="lead-form" style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", padding: device === "mobile" ? "32px 16px" : "48px 24px" }}>
-        <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 10 }}>{cfg?.thankYou || "Thanks — our team will call you shortly."}</h2>
+        <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 10 }}>{successMsg}</h2>
         {cfg?.notifyEmail ? <p style={{ color: "var(--ps-slate)", fontSize: 14 }}>A copy can be sent to {cfg.notifyEmail}.</p> : null}
-        <button type="button" onClick={() => { setSent(false); setStep(0); setValues({}); }} style={{ marginTop: 16, padding: "10px 16px", borderRadius: 10, border: "1px solid var(--ps-line-strong)", background: "#fff", cursor: "pointer", fontWeight: 700 }}>
-          Send another
-        </button>
+        {deliverableUrl ? (
+          <div>
+            <a
+              href={live ? deliverableUrl : undefined}
+              {...(live ? { download: "", target: "_blank", rel: "noopener noreferrer" } : {})}
+              onClick={(e) => {
+                if (!live) {
+                  e.preventDefault();
+                  return;
+                }
+                if (pageId) bumpTracking(pageId, "brochure");
+              }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 16, padding: "12px 22px", borderRadius: 11, background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 13.5, textDecoration: "none", boxShadow: "0 10px 26px rgba(109,93,252,.32)", cursor: live ? "pointer" : "default" }}
+            >
+              <Download size={16} /> {deliverableLabel}
+            </a>
+          </div>
+        ) : null}
+        <div>
+          <button type="button" onClick={() => { setSent(false); setStep(0); setValues({}); }} style={{ marginTop: 16, padding: "10px 16px", borderRadius: 10, border: "1px solid var(--ps-line-strong)", background: "#fff", cursor: "pointer", fontWeight: 700 }}>
+            Send another
+          </button>
+        </div>
       </div>
     );
   }
@@ -1136,15 +1266,48 @@ function OfferBanner({ s, device }: { s: SectionInstance; device: Device }) {
 
 function CountdownSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
-  const items = (st.items ?? []) as { title?: string; text?: string; value?: string; label?: string }[];
+  const live = useContext(SiteLiveContext);
+  const staticItems = (st.items ?? []) as { title?: string; text?: string; value?: string; label?: string }[];
+  const target = String(st.date ?? "").trim();
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!live || !target) return;
+    const kick = setTimeout(() => setNow(Date.now()), 0);
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      clearTimeout(kick);
+      clearInterval(t);
+    };
+  }, [live, target]);
+
+  const end = target ? new Date(target).getTime() : NaN;
+  const ticking = live && target && now !== null && !Number.isNaN(end);
+  let cells: { value: string; label: string }[];
+  if (ticking) {
+    const diff = Math.max(0, end - now);
+    const days = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    cells = [
+      { value: String(days), label: "Days" },
+      { value: String(hours).padStart(2, "0"), label: "Hours" },
+      { value: String(mins).padStart(2, "0"), label: "Minutes" },
+      { value: String(secs).padStart(2, "0"), label: "Seconds" },
+    ];
+  } else {
+    cells = staticItems.map((it) => ({ value: String(it.title ?? it.value ?? ""), label: String(it.text ?? it.label ?? "") }));
+  }
+
   return (
     <div style={{ textAlign: "center", maxWidth: 720, margin: "0 auto", width: "100%" }}>
       <div style={{ fontSize: device === "mobile" ? 16 : 18, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", marginBottom: 18 }}>{String(st.heading)}</div>
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(items.length || 4, 4)},1fr)`, gap: device === "mobile" ? 8 : 14 }}>
-        {items.map((it, i) => (
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(cells.length || 4, 4)},1fr)`, gap: device === "mobile" ? 8 : 14 }}>
+        {cells.map((it, i) => (
           <div key={i} style={{ background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.16)", borderRadius: 14, padding: device === "mobile" ? "12px 6px" : "16px 10px" }}>
-            <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 26 : 36, fontWeight: 700 }}>{it.title ?? it.value}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", opacity: 0.7, marginTop: 4 }}>{it.text ?? it.label}</div>
+            <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 26 : 36, fontWeight: 700 }}>{it.value}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", opacity: 0.7, marginTop: 4 }}>{it.label}</div>
           </div>
         ))}
       </div>
@@ -1220,15 +1383,32 @@ function TextSection({ s }: { s: SectionInstance }) {
 
 function ButtonSection({ s }: { s: SectionInstance }) {
   const st = s.settings;
+  const live = useContext(SiteLiveContext);
   const text = String(resolveVars(st.text ?? "Click Here"));
   const link = String(st.link ?? "#");
   const variant = String(st.style ?? "solid");
   const solid = variant !== "outline" && variant !== "ghost";
+  const external = /^https?:\/\//i.test(link.trim());
   return (
     <div style={{ textAlign: "center" }}>
       <a
-        href={link}
-        onClick={(e) => e.preventDefault()}
+        href={link || "#"}
+        target={live && external ? "_blank" : undefined}
+        rel={live && external ? "noopener noreferrer" : undefined}
+        onClick={(e) => {
+          if (!live) {
+            e.preventDefault();
+            return;
+          }
+          const target = link.trim();
+          if (target.startsWith("#") && target.length > 1) {
+            const el = document.getElementById(target.slice(1));
+            if (el) {
+              e.preventDefault();
+              el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          }
+        }}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -1440,13 +1620,25 @@ function PaymentPlansSection({ s, device }: { s: SectionInstance; device: Device
 
 function CallCtaSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
+  const live = useContext(SiteLiveContext);
+  const pageId = useContext(SitePageIdContext);
   const text = String(st.text ?? "");
   const phone = String(st.phone ?? "");
   const ctaLabel = String(st.ctaLabel ?? "Call Now");
   return (
     <div style={{ display: "flex", flexDirection: device === "mobile" ? "column" : "row", alignItems: "center", justifyContent: "space-between", gap: 14, background: "linear-gradient(135deg,var(--ps-primary),#8a7bff)", borderRadius: 16, padding: device === "mobile" ? "18px 18px" : "22px 28px", color: "#fff" }}>
       <div style={{ fontSize: device === "mobile" ? 15 : 17, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.4 }}>{text}</div>
-      <a href={`tel:${phone.replace(/[^+0-9]/g, "")}`} onClick={(e) => e.preventDefault()} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 22px", borderRadius: 11, background: "#fff", color: "var(--ps-primary)", fontWeight: 800, fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}>
+      <a
+        href={`tel:${phone.replace(/[^+0-9]/g, "")}`}
+        onClick={(e) => {
+          if (!live) {
+            e.preventDefault();
+            return;
+          }
+          if (pageId) bumpTracking(pageId, "call");
+        }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 22px", borderRadius: 11, background: "#fff", color: "var(--ps-primary)", fontWeight: 800, fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}
+      >
         <PhoneCall size={16} /> {ctaLabel}
       </a>
     </div>
@@ -1455,6 +1647,8 @@ function CallCtaSection({ s, device }: { s: SectionInstance; device: Device }) {
 
 function WhatsAppCtaSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
+  const live = useContext(SiteLiveContext);
+  const pageId = useContext(SitePageIdContext);
   const text = String(st.text ?? "");
   const number = String(st.number ?? "");
   const ctaLabel = String(st.ctaLabel ?? "Chat Now");
@@ -1462,8 +1656,431 @@ function WhatsAppCtaSection({ s, device }: { s: SectionInstance; device: Device 
   return (
     <div style={{ display: "flex", flexDirection: device === "mobile" ? "column" : "row", alignItems: "center", justifyContent: "space-between", gap: 14, background: "linear-gradient(135deg,#25d366,#128c7e)", borderRadius: 16, padding: device === "mobile" ? "18px 18px" : "22px 28px", color: "#fff" }}>
       <div style={{ fontSize: device === "mobile" ? 15 : 17, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.4 }}>{text}</div>
-      <a href={href} onClick={(e) => e.preventDefault()} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 22px", borderRadius: 11, background: "#fff", color: "#128c7e", fontWeight: 800, fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}>
+      <a
+        href={href}
+        target={live ? "_blank" : undefined}
+        rel="noreferrer"
+        onClick={(e) => {
+          if (!live) {
+            e.preventDefault();
+            return;
+          }
+          if (pageId) bumpTracking(pageId, "whatsapp");
+        }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 22px", borderRadius: 11, background: "#fff", color: "#128c7e", fontWeight: 800, fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}
+      >
         <MessageCircle size={16} /> {ctaLabel}
+      </a>
+    </div>
+  );
+}
+
+// Interactive layout widgets (tabs / carousel / slider)
+function TabsSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const items: { label: string; body: string }[] = Array.isArray(st.items)
+    ? (st.items as { label?: string; title?: string; body?: string; text?: string }[]).map((it) => ({
+        label: String(it.label ?? it.title ?? ""),
+        body: String(it.body ?? it.text ?? ""),
+      }))
+    : Array.isArray(st.tabs)
+    ? (st.tabs as unknown[]).map((t) => ({ label: String(t), body: "" }))
+    : [];
+  const [active, setActive] = useState(0);
+  const idx = items.length ? Math.min(active, items.length - 1) : 0;
+  const cur = items[idx];
+  return (
+    <div style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
+      {st.heading ? <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center", marginBottom: 18 }}>{String(st.heading)}</h2> : null}
+      <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 20 }}>
+        {items.map((t, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setActive(i); }}
+            style={{
+              padding: "9px 18px",
+              borderRadius: 999,
+              border: i === idx ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)",
+              background: i === idx ? "var(--ps-primary-soft)" : "#fff",
+              color: i === idx ? "var(--ps-primary)" : "var(--ps-slate)",
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            {t.label || `Tab ${i + 1}`}
+          </button>
+        ))}
+      </div>
+      {cur ? (
+        <div style={{ border: "1px solid var(--ps-line)", borderRadius: 16, background: "#fff", padding: device === "mobile" ? "18px 16px" : "26px 28px", fontSize: 14, lineHeight: 1.7, color: "var(--ps-slate)", boxShadow: "var(--ps-shadow-sm)" }}>
+          {String(resolveVars(cur.body || "")) || "Add tab content in Settings."}
+        </div>
+      ) : (
+        <div style={{ padding: "18px 16px", border: "1.5px dashed var(--ps-line-strong)", borderRadius: 12, textAlign: "center", color: "var(--ps-muted)", fontSize: 13 }}>Add tabs in Settings</div>
+      )}
+    </div>
+  );
+}
+
+function CarouselSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const live = useContext(SiteLiveContext);
+  const slides: { image?: string; caption?: string; art?: string }[] = Array.isArray(st.slides)
+    ? (st.slides as { image?: string; caption?: string }[]).map((sl, i) => ({
+        image: sl.image ? String(sl.image) : undefined,
+        caption: sl.caption ? String(sl.caption) : undefined,
+        art: isMediaSrc(String(sl.image ?? "")) ? undefined : GALLERY_ART[i % GALLERY_ART.length],
+      }))
+    : Array.from({ length: Math.min(Math.max(Number(st.slides ?? 3) || 3, 1), 8) }).map((_, i) => ({ art: GALLERY_ART[i % GALLERY_ART.length] }));
+  const count = slides.length;
+  const [index, setIndex] = useState(0);
+  const autoplay = st.autoplay !== false;
+  const interval = Math.max(2000, Number(st.interval ?? 5000) || 5000);
+
+  useEffect(() => {
+    if (!live || !autoplay || count <= 1) return;
+    const t = setInterval(() => setIndex((v) => (v + 1) % count), interval);
+    return () => clearInterval(t);
+  }, [live, autoplay, count, interval]);
+
+  if (!count) {
+    return (
+      <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%", padding: "18px 16px", border: "1.5px dashed var(--ps-line-strong)", borderRadius: 12, textAlign: "center", color: "var(--ps-muted)", fontSize: 13 }}>Add slides in Settings</div>
+    );
+  }
+  const idx = Math.min(index, count - 1);
+  const cur = slides[idx];
+  const arrowStyle = (side: "left" | "right"): CSSProperties => ({
+    position: "absolute",
+    top: "50%",
+    [side]: 12,
+    transform: "translateY(-50%)",
+    width: 40,
+    height: 40,
+    borderRadius: "50%",
+    border: "none",
+    background: "rgba(8,10,20,.5)",
+    color: "#fff",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    backdropFilter: "blur(6px)",
+  });
+  return (
+    <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
+      {st.heading ? <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center", marginBottom: 18 }}>{String(st.heading)}</h2> : null}
+      <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", aspectRatio: "16/9", boxShadow: "var(--ps-shadow-md)", border: "1px solid var(--ps-line)" }}>
+        {cur.image && isMediaSrc(cur.image) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cur.image} alt={cur.caption || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ) : (
+          <SceneImage art={cur.art ?? "skyline"} />
+        )}
+        {cur.caption ? (
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "28px 20px 16px", background: "linear-gradient(180deg, transparent, rgba(8,10,20,.7))", color: "#fff", fontSize: 14, fontWeight: 700 }}>{cur.caption}</div>
+        ) : null}
+        {count > 1 ? (
+          <>
+            <button type="button" aria-label="Previous slide" onClick={(e) => { e.stopPropagation(); setIndex((v) => (v - 1 + count) % count); }} style={arrowStyle("left")}>
+              <ChevronLeft size={20} />
+            </button>
+            <button type="button" aria-label="Next slide" onClick={(e) => { e.stopPropagation(); setIndex((v) => (v + 1) % count); }} style={arrowStyle("right")}>
+              <ChevronRight size={20} />
+            </button>
+          </>
+        ) : null}
+      </div>
+      {count > 1 ? (
+        <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12 }}>
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Go to slide ${i + 1}`}
+              onClick={(e) => { e.stopPropagation(); setIndex(i); }}
+              style={{ width: i === idx ? 22 : 8, height: 8, borderRadius: 999, border: "none", background: i === idx ? "var(--ps-primary)" : "var(--ps-line-strong)", cursor: "pointer", transition: "width .2s", padding: 0 }}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function anchorNav(link: string, live: boolean) {
+  const target = (link || "").trim();
+  const external = /^https?:\/\//i.test(target);
+  return {
+    href: target || "#",
+    target: live && external ? "_blank" : undefined,
+    rel: live && external ? "noopener noreferrer" : undefined,
+    onClick: (e: ReactMouseEvent) => {
+      if (!live) {
+        e.preventDefault();
+        return;
+      }
+      if (target.startsWith("#") && target.length > 1) {
+        const el = document.getElementById(target.slice(1));
+        if (el) {
+          e.preventDefault();
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+    },
+  };
+}
+
+function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const live = useContext(SiteLiveContext);
+  const heading = String(st.heading ?? "");
+  const text = String(resolveVars(st.text ?? ""));
+  const cta = String(st.cta ?? st.ctaLabel ?? "");
+  const link = String(st.link ?? "#lead-form");
+  const trigger = String(st.trigger ?? "delay");
+  const delaySeconds = Math.max(0, Number(st.delaySeconds ?? 3) || 0);
+  const scrollPercent = Math.min(100, Math.max(1, Number(st.scrollPercent ?? 40) || 40));
+  const [open, setOpen] = useState(false);
+  const storageKey = `prestate.popup.${s.id}`;
+
+  useEffect(() => {
+    if (!live) return;
+    try {
+      if (sessionStorage.getItem(storageKey) === "1") return;
+    } catch {
+      /* private mode */
+    }
+    const fire = () => setOpen(true);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onScroll = () => {
+      const h = document.documentElement;
+      const pct = ((h.scrollTop + window.innerHeight) / h.scrollHeight) * 100;
+      if (pct >= scrollPercent) {
+        fire();
+        window.removeEventListener("scroll", onScroll);
+      }
+    };
+    const onLeave = (e: MouseEvent) => {
+      if (e.clientY <= 0) {
+        fire();
+        document.removeEventListener("mouseout", onLeave);
+      }
+    };
+    if (trigger === "load") {
+      fire();
+    } else if (trigger === "scroll") {
+      window.addEventListener("scroll", onScroll, { passive: true });
+    } else if (trigger === "exit") {
+      document.addEventListener("mouseout", onLeave);
+    } else {
+      timer = setTimeout(fire, delaySeconds * 1000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("mouseout", onLeave);
+    };
+  }, [live, trigger, delaySeconds, scrollPercent, storageKey]);
+
+  const dismiss = () => {
+    setOpen(false);
+    try {
+      sessionStorage.setItem(storageKey, "1");
+    } catch {
+      /* private mode */
+    }
+  };
+
+  if (!live) {
+    return (
+      <div style={{ maxWidth: 460, margin: "0 auto", width: "100%", border: "1.5px dashed var(--ps-line-strong)", borderRadius: 16, padding: "30px 22px 24px", textAlign: "center", background: "var(--ps-panel-raised)", position: "relative" }}>
+        <div style={{ position: "absolute", top: 10, left: 14, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--ps-muted)" }}>Popup preview · {trigger}</div>
+        {heading ? <div style={{ fontSize: 20, fontWeight: 800, color: "var(--ps-ink)" }}>{heading}</div> : null}
+        {text ? <p style={{ fontSize: 13.5, color: "var(--ps-slate)", lineHeight: 1.6, margin: "8px 0 16px" }}>{text}</p> : null}
+        {cta ? <span style={{ display: "inline-flex", background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 13, padding: "11px 22px", borderRadius: 10 }}>{cta}</span> : null}
+      </div>
+    );
+  }
+
+  if (!open) return null;
+  return (
+    <div onClick={dismiss} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(8,10,20,.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} className="ps-fade-in" style={{ position: "relative", width: 440, maxWidth: "100%", background: "#fff", borderRadius: 18, padding: device === "mobile" ? "34px 22px 30px" : "40px 34px", textAlign: "center", boxShadow: "0 30px 80px rgba(8,10,20,.4)" }}>
+        <button type="button" aria-label="Close" onClick={dismiss} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", border: "none", background: "#f1f4f9", color: "var(--ps-slate)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          <X size={16} />
+        </button>
+        {heading ? <div style={{ fontSize: 24, fontWeight: 800, color: "var(--ps-ink)", letterSpacing: -0.4 }}>{heading}</div> : null}
+        {text ? <p style={{ fontSize: 14, color: "var(--ps-slate)", lineHeight: 1.65, margin: "10px 0 22px" }}>{text}</p> : null}
+        {cta ? (
+          <a
+            {...anchorNav(link, live)}
+            onClick={(e) => {
+              anchorNav(link, live).onClick(e);
+              dismiss();
+            }}
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 14, padding: "13px 28px", borderRadius: 11, textDecoration: "none", boxShadow: "0 10px 26px rgba(109,93,252,.35)" }}
+          >
+            {cta} <ArrowRight size={15} />
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function StickyFooterBar({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const live = useContext(SiteLiveContext);
+  const text = String(resolveVars(st.text ?? "")) || "Interested? Get in touch with our team.";
+  const ctaLabel = String(st.ctaLabel ?? "Enquire Now");
+  const link = String(st.link ?? "#lead-form");
+  const bar = (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "var(--ps-ink, #111827)", color: "#fff", padding: device === "mobile" ? "12px 14px" : "14px 24px", boxShadow: "0 -8px 30px rgba(8,10,20,.25)" }}>
+      <div style={{ fontSize: device === "mobile" ? 13 : 15, fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{text}</div>
+      <a {...anchorNav(link, live)} style={{ background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 13, padding: "10px 20px", borderRadius: 10, textDecoration: "none", whiteSpace: "nowrap" }}>
+        {ctaLabel}
+      </a>
+    </div>
+  );
+  if (live) {
+    return <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 60 }}>{bar}</div>;
+  }
+  return <div style={{ borderRadius: 12, overflow: "hidden", boxShadow: "var(--ps-shadow-sm)" }}>{bar}</div>;
+}
+
+function VideoGallerySection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const live = useContext(SiteLiveContext);
+  const videos = (st.videos ?? []) as { title?: string; url?: string }[];
+  const heading = String(st.heading ?? st.title ?? "");
+  const text = String(st.text ?? st.sub ?? "");
+  const [active, setActive] = useState<number | null>(null);
+  const cur = active !== null ? videos[active] : null;
+  const curUrl = cur ? String(cur.url ?? "") : "";
+  const ytId = youtubeId(curUrl);
+  const embedSrc = ytId ? `https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0` : curUrl;
+  return (
+    <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
+      {heading ? <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center" }}>{heading}</h2> : null}
+      {text ? <p style={{ fontSize: 14.5, color: "var(--ps-slate)", textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7 }}>{String(resolveVars(text))}</p> : null}
+      <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, marginTop: 22 }}>
+        {videos.map((v, i) => {
+          const clickable = live && !!v.url;
+          return (
+            <div
+              key={i}
+              onClick={clickable ? (e) => { e.stopPropagation(); setActive(i); } : undefined}
+              style={{ borderRadius: 14, overflow: "hidden", border: "1px solid var(--ps-line)", position: "relative", aspectRatio: "16/9", cursor: clickable ? "pointer" : "default" }}
+            >
+              <SceneImage art="tour" />
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, color: "#fff", background: "rgba(8,10,20,.28)" }}>
+                <span style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(255,255,255,.18)", border: "1.5px solid rgba(255,255,255,.4)", display: "inline-flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)" }}>
+                  <Play size={22} style={{ marginLeft: 3 }} />
+                </span>
+                <span style={{ fontWeight: 700, fontSize: 13 }}>{v.title || `Video ${i + 1}`}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {live && cur ? (
+        <div onClick={() => setActive(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(8,10,20,.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: "relative", width: "min(92vw, 960px)", aspectRatio: "16/9", background: "#000", borderRadius: 14, overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,.6)" }}>
+            <button type="button" aria-label="Close" onClick={() => setActive(null)} style={{ position: "absolute", top: 10, right: 10, zIndex: 2, width: 34, height: 34, borderRadius: "50%", border: "none", background: "rgba(8,10,20,.6)", color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+              <X size={18} />
+            </button>
+            {embedSrc ? (
+              <iframe
+                src={embedSrc}
+                title={cur.title || "Video"}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DownloadsSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const live = useContext(SiteLiveContext);
+  const pageId = useContext(SitePageIdContext);
+  const files = (st.files ?? []) as { name?: string; title?: string; url?: string }[];
+  const heading = String(st.heading ?? st.title ?? "");
+  const text = String(st.text ?? st.sub ?? "");
+  return (
+    <div style={{ maxWidth: 720, margin: "0 auto", width: "100%" }}>
+      {heading ? <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center" }}>{heading}</h2> : null}
+      {text ? <p style={{ fontSize: 14.5, color: "var(--ps-slate)", textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7 }}>{String(resolveVars(text))}</p> : null}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 22 }}>
+        {files.map((f, i) => {
+          const name = f.name || f.title || `File ${i + 1}`;
+          const url = String(f.url ?? "");
+          const active = live && !!url;
+          return (
+            <a
+              key={i}
+              href={active ? url : undefined}
+              {...(active ? { download: "", target: "_blank", rel: "noopener noreferrer" } : {})}
+              onClick={(e) => {
+                if (!active) {
+                  e.preventDefault();
+                  return;
+                }
+                if (pageId) bumpTracking(pageId, "brochure");
+              }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", border: "1px solid var(--ps-line)", borderRadius: 12, textDecoration: "none", background: "#fff", cursor: active ? "pointer" : "default" }}
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 10, fontWeight: 700, fontSize: 13, color: "var(--ps-ink)" }}>
+                <FileText size={16} style={{ color: "var(--ps-primary)" }} /> {name}
+              </span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "var(--ps-primary)" }}>
+                <Download size={14} /> Download
+              </span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function BrochureSection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const live = useContext(SiteLiveContext);
+  const pageId = useContext(SitePageIdContext);
+  const heading = String(st.heading ?? st.title ?? "Download Brochure");
+  const text = String(resolveVars(st.text ?? ""));
+  const btnLabel = String(st.title ?? st.cta ?? "Download Brochure");
+  const file = String(st.file ?? "").trim();
+  const active = live && !!file;
+  return (
+    <div style={{ maxWidth: 640, margin: "0 auto", width: "100%", textAlign: "center", border: "1px solid var(--ps-line)", borderRadius: 18, padding: device === "mobile" ? "26px 20px" : "36px 32px", background: "#fff", boxShadow: "var(--ps-shadow-sm)" }}>
+      <span style={{ width: 54, height: 54, borderRadius: 14, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+        <FileText size={26} />
+      </span>
+      <div style={{ fontSize: device === "mobile" ? 20 : 22, fontWeight: 800, color: "var(--ps-ink)" }}>{heading}</div>
+      {text ? <p style={{ fontSize: 14, color: "var(--ps-slate)", lineHeight: 1.65, margin: "10px auto 20px", maxWidth: 440 }}>{text}</p> : <div style={{ height: 18 }} />}
+      <a
+        href={active ? file : undefined}
+        {...(active ? { download: "", target: "_blank", rel: "noopener noreferrer" } : {})}
+        onClick={(e) => {
+          if (!active) {
+            e.preventDefault();
+            return;
+          }
+          if (pageId) bumpTracking(pageId, "brochure");
+        }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 14, padding: "13px 28px", borderRadius: 11, textDecoration: "none", boxShadow: "0 10px 26px rgba(109,93,252,.35)", cursor: active ? "pointer" : "default" }}
+      >
+        <Download size={16} /> {btnLabel}
       </a>
     </div>
   );
@@ -1636,11 +2253,23 @@ function SectionBody({ s, device }: { s: SectionInstance; device: Device }) {
       return <WhatsAppCtaSection s={s} device={device} />;
     case "floating-icons":
       return <FloatingIconsHint s={s} />;
-    case "section":
     case "tabs":
+      return <TabsSection s={s} device={device} />;
     case "carousel":
     case "slider":
+      return <CarouselSection s={s} device={device} />;
     case "video-gallery":
+      return <VideoGallerySection s={s} device={device} />;
+    case "brochure":
+      return <BrochureSection s={s} device={device} />;
+    case "downloads":
+      return <DownloadsSection s={s} device={device} />;
+    case "popup-cta":
+    case "popup":
+      return <PopupSection s={s} device={device} />;
+    case "sticky-footer-bar":
+      return <StickyFooterBar s={s} device={device} />;
+    case "section":
     case "master-plan":
     case "features":
     case "specifications":
@@ -1648,11 +2277,6 @@ function SectionBody({ s, device }: { s: SectionInstance; device: Device }) {
     case "construction":
     case "nearby":
     case "builder-profile":
-    case "brochure":
-    case "downloads":
-    case "popup-cta":
-    case "popup":
-    case "sticky-footer-bar":
       return <CatalogSection s={s} device={device} />;
     default:
       return <GenericSection s={s} device={device} />;
@@ -1709,9 +2333,17 @@ function SectionWrap({
   children?: ReactNode;
 }) {
   const [dropPos, setDropPos] = useState<"before" | "after" | "inside" | null>(null);
+  const live = useContext(SiteLiveContext);
   const hidden = s.hidden === true;
   const locked = s.locked === true;
   const sc = sectionStyle(s, device);
+  // Overlay widgets render as fixed/portal chrome in live mode — collapse their
+  // in-flow slot so they don't leave an empty band on the published page.
+  if (live && (s.type === "popup" || s.type === "popup-cta" || s.type === "sticky-footer-bar")) {
+    sc.padding = 0;
+    sc.minHeight = 0;
+    sc.background = "transparent";
+  }
   const Icon = SLUG_ICONS[s.icon] ?? SquareStack;
   const resp = s.style.responsive ?? {};
   if ((device === "desktop" && resp.hideDesktop) || (device === "tablet" && resp.hideTablet) || (device === "mobile" && resp.hideMobile)) {
@@ -2214,6 +2846,7 @@ export function Canvas({
     <SitePageIdContext.Provider value={pageId ?? ""}>
     <SiteChromeContext.Provider value={chrome}>
     <SiteFormContext.Provider value={form}>
+    <SiteLiveContext.Provider value={!!live}>
     <div
       className={live ? undefined : "ps-canvas-dots"}
       style={{
@@ -2338,6 +2971,7 @@ export function Canvas({
         </div>
       </div>
     </div>
+    </SiteLiveContext.Provider>
     </SiteFormContext.Provider>
     </SiteChromeContext.Provider>
     </SitePageIdContext.Provider>

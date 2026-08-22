@@ -45,6 +45,41 @@ function formatFieldLabel(key: string): string {
   return FIELD_LABELS[key] ?? key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 }
 
+// Enumerated settings keys get a dropdown instead of a free-text field.
+function enumOptions(fieldKey: string, widgetType?: string): { value: string; label: string }[] | null {
+  if (fieldKey === "trigger") {
+    return [
+      { value: "load", label: "On page load" },
+      { value: "delay", label: "After a delay" },
+      { value: "scroll", label: "On scroll" },
+      { value: "exit", label: "On exit intent" },
+    ];
+  }
+  if (fieldKey === "style" && widgetType === "button") {
+    return [
+      { value: "solid", label: "Solid" },
+      { value: "outline", label: "Outline" },
+      { value: "ghost", label: "Ghost" },
+    ];
+  }
+  if (fieldKey === "tag") {
+    return [
+      { value: "h1", label: "H1" },
+      { value: "h2", label: "H2" },
+      { value: "h3", label: "H3" },
+      { value: "h4", label: "H4" },
+    ];
+  }
+  if (fieldKey === "align") {
+    return [
+      { value: "left", label: "Left" },
+      { value: "center", label: "Center" },
+      { value: "right", label: "Right" },
+    ];
+  }
+  return null;
+}
+
 function ContentField({
   label,
   fieldKey,
@@ -100,6 +135,14 @@ function ContentField({
   }
   if (typeof value === "string" && isImageFieldKey(fieldKey)) {
     return <MediaPicker kind="image" label={label} value={value} onChange={onChange} />;
+  }
+  const opts = enumOptions(fieldKey, widgetType);
+  if (opts) {
+    return (
+      <FieldRow label={label}>
+        <SelectField value={String(value ?? "")} onChange={(v) => onChange(v)} options={opts} placeholder="Choose" />
+      </FieldRow>
+    );
   }
   const str = String(value ?? "");
   return (

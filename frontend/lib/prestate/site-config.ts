@@ -91,6 +91,8 @@ export function defaultSiteConfig(input: {
       sendWhatsapp: true,
       redirectThankYou: false,
       submitLabel: "Submit",
+      deliverableUrl: "",
+      deliverableLabel: "",
       fields: DEFAULT_FIELDS.map((f) => ({ ...f, options: f.options ? [...f.options] : undefined })),
     },
     media: { notes: "" },
