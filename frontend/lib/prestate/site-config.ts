@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { FormLeadField, LandingPageData, SiteConfig } from "./types";
+import { defaultTypography } from "./design-system";
 import {
   DEFAULT_FOOTER_DESIGN,
   DEFAULT_HEADER_DESIGN,
@@ -114,8 +115,14 @@ export function defaultSiteConfig(input: {
       deliverableUrl: "",
       deliverableLabel: "",
       fields: DEFAULT_FIELDS.map((f) => ({ ...f, options: f.options ? [...f.options] : undefined })),
+      successAction: "message",
+      successUrl: "",
+      successTitle: "",
+      errorMessage: "Please fill in the highlighted required fields.",
+      openPopupId: "",
     },
     media: { notes: "" },
+    designSystem: { scope: "template", typography: defaultTypography() },
   };
 }
 
@@ -124,52 +131,53 @@ const SEED: Record<string, Partial<{ primary: string; accent: string; brand: str
     primary: "#6D5DFC",
     accent: "#CDA45E",
     brand: "Aurora Residences",
-    tagline: "Where every morning feels like a holiday.",
-    keywords: "luxury apartments, sarjapur, bangalore, rera",
+    tagline: "Premium 3 & 4 BHK homes on Sarjapur Road.",
+    keywords: "premium apartments, sarjapur, bangalore, rera",
     rera: "PRM/KA/RERA/1251/446/PR/2026/1",
     ga: "G-AURORA01",
     headerDesign: "classic",
     footerDesign: "columns",
   },
   p2: {
-    primary: "#0F766E",
-    accent: "#D4A017",
-    brand: "Palm Grove Villas",
-    tagline: "Gated villas with private gardens.",
-    keywords: "villas, gated community, palm grove",
+    primary: "#2563EB",
+    accent: "#10B981",
+    brand: "Northstar Residences",
+    tagline: "Founders' pricing from ₹89 L in Hebbal.",
+    keywords: "new launch, hebbal, founders offer, northstar",
     rera: "PRM/KA/RERA/1251/447/PR/2026/2",
-    ga: "G-PALM02",
-    headerDesign: "centered",
-    footerDesign: "newsletter",
-  },
-  p3: {
-    primary: "#B45309",
-    accent: "#1E3A5F",
-    brand: "Aether Business Park",
-    tagline: "Grade-A workspace on the growth corridor.",
-    keywords: "commercial, office leasing, aether park",
-    rera: "",
-    ga: "G-AETHER03",
-    headerDesign: "split",
-    footerDesign: "cards",
-  },
-  p4: {
-    primary: "#C026D3",
-    accent: "#111827",
-    brand: "Northstar Founders",
-    tagline: "Limited inventory. Founders' pricing.",
-    keywords: "new launch, founders offer, northstar",
-    rera: "PRM/KA/RERA/1251/448/PR/2026/4",
-    ga: "G-NORTH04",
+    ga: "G-NORTH02",
     headerDesign: "minimal",
     footerDesign: "slimbar",
+  },
+  p3: {
+    primary: "#B08D57",
+    accent: "#171310",
+    brand: "The Residences at Indus",
+    tagline: "Limited-edition sky residences in Whitefield.",
+    keywords: "luxury apartments, whitefield, sky residences, indus",
+    rera: "PRM/KA/RERA/1251/448/PR/2026/3",
+    ga: "G-INDUS03",
+    headerDesign: "overlay",
+    footerDesign: "centered",
+  },
+  p4: {
+    primary: "#E11D48",
+    accent: "#F97316",
+    brand: "Skyline Greens",
+    tagline: "Campaign pricing from ₹62 L in Electronic City.",
+    keywords: "ad campaign, electronic city, discount offer, skyline greens",
+    rera: "PRM/KA/RERA/1251/449/PR/2026/4",
+    ga: "G-SKYLN04",
+    headerDesign: "split",
+    footerDesign: "cards",
   },
 };
 
 export function seedConfigFor(page: LandingPageData): SiteConfig {
-  const extra = SEED[page.id];
+  const extra = SEED[page.id] ?? (page.parentPageId ? SEED[page.parentPageId] : undefined);
+  const brandName = extra?.brand ?? (page.pageType === "thank-you" ? page.name.replace(/ — Thank You$/, "") : page.name);
   const base = defaultSiteConfig({
-    name: extra?.brand || page.name,
+    name: brandName,
     slug: page.slug,
     domain: page.domain,
     primary: extra?.primary,
@@ -262,6 +270,7 @@ function hydrateConfig(raw: SiteConfig, page: LandingPageData): SiteConfig {
       fields: raw.form?.fields?.length ? raw.form.fields : fallback.form.fields,
     },
     media: { ...fallback.media, ...raw.media },
+    ...(raw.designSystem ? { designSystem: raw.designSystem } : {}),
   };
 }
 

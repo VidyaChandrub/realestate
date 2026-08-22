@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type * as React from "react";
-import { SlidersHorizontal, LayoutGrid } from "lucide-react";
+import { ArrowRight, CornerDownLeft, Search, SlidersHorizontal, LayoutGrid } from "lucide-react";
 import type { Device, FooterDesignId, HeaderDesignId, LandingPageData, MenuLink, SectionInstance, SectionStyle, SiteConfig } from "@/lib/prestate/types";
 import {
   CHROME_FOOTER_ID,
@@ -14,6 +14,9 @@ import {
   labelsFromLinks,
 } from "@/lib/prestate/chrome-presets";
 import { buildTemplateSections, WIDGETS } from "@/lib/prestate/data";
+import { buildThankYouSections } from "@/lib/prestate/page-templates";
+import type { DesignBundle } from "./canvas";
+import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts } from "@/lib/prestate/design-system";
 import { findSection, insertChild, isStructural, patchSection, placeColumn } from "@/lib/prestate/tree";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import { WidgetsPanel } from "./widgets-panel";
@@ -37,9 +40,10 @@ interface EditorState {
 }
 
 function seedSections(page: LandingPageData): SectionInstance[] {
-  return page.sections.length > 0
-    ? (JSON.parse(JSON.stringify(page.sections)) as SectionInstance[])
-    : buildTemplateSections(page.template);
+  if (page.sections.length > 0) {
+    return JSON.parse(JSON.stringify(page.sections)) as SectionInstance[];
+  }
+  return page.pageType === "thank-you" ? buildThankYouSections() : buildTemplateSections(page.template);
 }
 
 export function BuilderWorkspace({
@@ -71,7 +75,20 @@ export function BuilderWorkspace({
   }));
   const [widgetsOpen, setWidgetsOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [quickOpen, setQuickOpen] = useState(false);
   const [vp, setVp] = useState(1400);
+
+  // Design system: typography tokens + uploaded fonts → stylesheet for canvas.
+  const design = useMemo<{ css: string; bundle: DesignBundle }>(() => {
+    const cfg = ensureConfig(page);
+    void ensureDesignSystem(cfg); // normalises stored state
+    const { typography } = effectiveTypography(cfg);
+    const fonts = loadFonts();
+    return {
+      css: buildDesignCss({ scopeClass: "ps-typo-scope", typography, fonts }),
+      bundle: { tokens: typography, fonts },
+    };
+  }, [page]);
 
   const { sections, history, future, selectedId } = state;
 
@@ -238,6 +255,9 @@ export function BuilderWorkspace({
       } else if (k === "s") {
         e.preventDefault();
         saveDraft();
+      } else if (k === "k") {
+        e.preventDefault();
+        setQuickOpen((v) => !v);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -338,6 +358,7 @@ export function BuilderWorkspace({
         device={device}
         onSelect={handleSelect}
         onMutate={mutate}
+        design={design}
         theme={{
           primary: ensureConfig(page).brand.primary,
           accent: ensureConfig(page).brand.accent,
@@ -360,7 +381,7 @@ export function BuilderWorkspace({
         <>
           {!dockInspector ? <button type="button" className="ps-drawer-backdrop" aria-label="Close settings" onClick={() => setInspectorOpen(false)} /> : null}
           <div className={dockInspector ? "ps-sidebar-col" : "ps-drawer-right"} style={{ zIndex: dockInspector ? 1 : 430 }}>
-            <SettingsPanel section={selected} device={device} setDevice={setDevice} onChange={patchSelected} />
+            <SettingsPanel section={selected} device={device} setDevice={setDevice} onChange={patchSelected} typographyTokens={design.bundle.tokens} />
           </div>
         </>
       ) : null}
@@ -371,11 +392,130 @@ export function BuilderWorkspace({
             <LayoutGrid size={16} /> Widgets
           </button>
         ) : null}
+        <button type="button" className="ps-fab" onClick={() => setQuickOpen(true)} title="Quick Add (Ctrl+K)">
+          <Search size={15} /> Quick Add
+          <kbd style={{ fontSize: 10, fontWeight: 800, opacity: 0.7 }}>Ctrl K</kbd>
+        </button>
         {!dockInspector ? (
           <button type="button" className="ps-fab" onClick={() => setInspectorOpen((v) => !v)} title="Settings">
             <SlidersHorizontal size={16} /> Settings
           </button>
         ) : null}
+      </div>
+
+      {quickOpen ? <QuickAdd onClose={() => setQuickOpen(false)} onInsert={addWidget} /> : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Quick Add — Ctrl/Cmd+K palette. Type "form", "heading", "image"… and insert
+// the widget at the current selection without leaving the keyboard.
+// ---------------------------------------------------------------------------
+
+function QuickAdd({
+  onClose,
+  onInsert,
+}: {
+  onClose: () => void;
+  onInsert: (widgetId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+
+  const q = query.trim().toLowerCase();
+  const results = WIDGETS.filter(
+    (w) => !q || w.label.toLowerCase().includes(q) || w.desc.toLowerCase().includes(q) || w.group.toLowerCase().includes(q) || w.category.toLowerCase().includes(q),
+  ).slice(0, 12);
+  const safeActive = Math.min(active, Math.max(0, results.length - 1));
+
+  const insert = (id: string) => {
+    onInsert(id);
+    onClose();
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 1600, background: "rgba(8,10,20,.55)", backdropFilter: "blur(3px)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "12vh", padding: "12vh 16px 16px" }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setActive((v) => Math.min(v + 1, results.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActive((v) => Math.max(0, v - 1));
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const pick = results[safeActive];
+            if (pick) insert(pick.id);
+          } else if (e.key === "Escape") {
+            onClose();
+          }
+        }}
+        role="dialog"
+        aria-label="Quick add widget"
+        style={{ width: 560, maxWidth: "100%", background: "var(--ps-panel)", border: "1px solid var(--ps-line)", borderRadius: 16, boxShadow: "0 40px 90px rgba(8,10,20,.45)", overflow: "hidden" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "13px 16px", borderBottom: "1px solid var(--ps-line)" }}>
+          <Search size={16} style={{ color: "var(--ps-muted)", flexShrink: 0 }} />
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActive(0);
+            }}
+            placeholder='Type a widget… try "form", "heading", "image"'
+            style={{ flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--ps-ink)", fontSize: 14.5, fontWeight: 600 }}
+          />
+          <kbd style={{ fontSize: 10, fontWeight: 800, background: "var(--ps-bg)", border: "1px solid var(--ps-line-strong)", borderRadius: 6, padding: "2px 6px", color: "var(--ps-muted)" }}>ESC</kbd>
+        </div>
+        <div style={{ maxHeight: 340, overflowY: "auto", padding: 8 }}>
+          {results.length === 0 ? (
+            <div style={{ padding: "22px 12px", textAlign: "center", color: "var(--ps-muted)", fontSize: 13 }}>No widgets match “{query}”.</div>
+          ) : null}
+          {results.map((w, i) => {
+            const Icon = w.icon;
+            return (
+              <button
+                key={w.id}
+                type="button"
+                onMouseEnter={() => setActive(i)}
+                onClick={() => insert(w.id)}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 11,
+                  textAlign: "left",
+                  padding: "9px 11px",
+                  borderRadius: 10,
+                  border: i === safeActive ? "1.5px solid var(--ps-primary)" : "1px solid transparent",
+                  background: i === safeActive ? "var(--ps-primary-mist)" : "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                <span style={{ width: 30, height: 30, borderRadius: 9, background: i === safeActive ? "var(--ps-primary-soft)" : "var(--ps-bg)", color: i === safeActive ? "var(--ps-primary)" : "var(--ps-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Icon size={15} />
+                </span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: "var(--ps-ink)" }}>{w.label}</span>
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--ps-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.category} · {w.desc}</span>
+                </span>
+                {i === safeActive ? <CornerDownLeft size={13} style={{ color: "var(--ps-primary)", flexShrink: 0 }} /> : <ArrowRight size={0} />}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 14, alignItems: "center", padding: "9px 16px", borderTop: "1px solid var(--ps-line)", fontSize: 11, color: "var(--ps-muted)" }}>
+          <span><strong>↑↓</strong> navigate</span>
+          <span><strong>Enter</strong> insert at selection</span>
+          <span style={{ marginLeft: "auto", fontWeight: 700, color: "var(--ps-primary)" }}>{results.length} widgets</span>
+        </div>
       </div>
     </div>
   );

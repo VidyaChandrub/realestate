@@ -314,6 +314,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   seo: "SEO Center",
   tracking: "Tracking Center",
   domains: "Domains",
+  typography: "Typography & Fonts",
 };
 
 function iconBtn(enabled: boolean) {

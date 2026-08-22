@@ -153,15 +153,20 @@ const layoutStyle = (over: Partial<SectionStyle>): SectionStyle => ({
 });
 
 export function makeColumn(width = 33.33): SectionInstance {
+  const zero = { top: 0, right: 0, bottom: 0, left: 0 };
   return {
     id: newSectionId("col"),
     type: "column",
     label: "Column",
     icon: "Columns",
     settings: { width },
-    style: layoutStyle({
-      spacing: { padding: { top: 12, right: 8, bottom: 12, left: 8 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 },
-    }),
+    style: {
+      colors: { bg: "transparent", overlay: "", gradient: "", text: "" },
+      typography: {},
+      spacing: { padding: { ...zero }, margin: { ...zero }, gap: 12 },
+      layout: { width: "full", height: "auto", align: "left", direction: "column" },
+      responsive: {},
+    },
     children: [],
   };
 }

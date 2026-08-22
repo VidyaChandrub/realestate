@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Globe, PencilRuler } from "lucide-react";
 import type { Device, LandingPageData } from "@/lib/prestate/types";
-import { Canvas } from "@/components/prestate/builder/canvas";
+import { Canvas, type DesignBundle } from "@/components/prestate/builder/canvas";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
+import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts } from "@/lib/prestate/design-system";
 import { applyDocumentSeo } from "@/lib/prestate/seo";
 import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
 import { bumpTracking } from "@/lib/prestate/tracking";
@@ -65,6 +66,13 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
   const assigned = page.domain.trim();
   const hostHref = assigned ? localDomainPreviewPath(assigned) : "";
   const cfg = ensureConfig(page);
+  void ensureDesignSystem(cfg);
+  const { typography } = effectiveTypography(cfg);
+  const fonts = loadFonts();
+  const design: { css: string; bundle: DesignBundle } = {
+    css: buildDesignCss({ scopeClass: "ps-typo-scope", typography, fonts }),
+    bundle: { tokens: typography, fonts },
+  };
   const needsPassword = Boolean(cfg.page.password) && !unlocked;
 
   if (needsPassword) {
@@ -148,6 +156,7 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
         device={device}
         readOnly
         live
+        design={design}
         theme={{
           primary: cfg.brand.primary,
           accent: cfg.brand.accent,

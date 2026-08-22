@@ -271,6 +271,66 @@ export function SliderField({
   );
 }
 
+/**
+ * Length control: slider for px values plus a direct-value entry accepting
+ * "10px", "1rem", "50%", "auto"… Strings are passed through to CSS untouched.
+ */
+export function LengthInput({
+  value,
+  onChange,
+  min = 0,
+  max = 240,
+  step = 1,
+}: {
+  value: number | string | undefined;
+  onChange: (v: number | string) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  const isNumeric = typeof value === "number" || value === undefined || (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim()));
+  const num = typeof value === "number" ? value : isNumeric ? Number(value ?? 0) : 0;
+
+  const [text, setText] = useState<string | null>(null);
+  const display = text ?? (value === undefined ? "" : String(value));
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      {isNumeric ? (
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={num}
+          onChange={(e) => {
+            setText(null);
+            onChange(Number(e.target.value));
+          }}
+          style={{ flex: 1, accentColor: "var(--ps-primary)", cursor: "pointer" }}
+        />
+      ) : (
+        <span style={{ flex: 1, fontSize: 11, fontWeight: 600, color: "var(--ps-muted)", textAlign: "center" }}>custom unit</span>
+      )}
+      <input
+        className="ps-input"
+        value={display}
+        placeholder="0"
+        onChange={(e) => {
+          const raw = e.target.value;
+          setText(raw);
+          const t = raw.trim();
+          if (/^-?\d+(\.\d+)?$/.test(t)) onChange(Number(t));
+          else if (t === "" ) onChange(0);
+          else onChange(t);
+        }}
+        onBlur={() => setText(null)}
+        style={{ width: 74, textAlign: "center", fontSize: 12, fontWeight: 700, padding: "4px 6px" }}
+      />
+    </div>
+  );
+}
+
 export function ColorField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [custom, setCustom] = useState(false);
   return (

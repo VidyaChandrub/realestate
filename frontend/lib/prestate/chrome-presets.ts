@@ -1,4 +1,5 @@
 import type {
+  CssLength,
   FooterDesignId,
   HeaderDesignId,
   MenuLink,
@@ -100,9 +101,9 @@ export interface ChromeStyleOverride {
   colors?: Partial<NonNullable<SectionStyle["colors"]>>;
   typography?: Partial<NonNullable<SectionStyle["typography"]>>;
   spacing?: {
-    padding?: Partial<{ top: number; right: number; bottom: number; left: number }>;
-    margin?: Partial<{ top: number; right: number; bottom: number; left: number }>;
-    gap?: number;
+    padding?: Partial<{ top: CssLength; right: CssLength; bottom: CssLength; left: CssLength }>;
+    margin?: Partial<{ top: CssLength; right: CssLength; bottom: CssLength; left: CssLength }>;
+    gap?: CssLength;
   };
   border?: Partial<NonNullable<SectionStyle["border"]>>;
   effects?: Partial<NonNullable<SectionStyle["effects"]>>;

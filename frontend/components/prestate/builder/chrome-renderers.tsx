@@ -56,19 +56,25 @@ const fsize = (base: number, d: Device): number =>
 
 const digits = (v: string): string => v.replace(/[^+0-9]/g, "");
 
-type Box = { top: number; right: number; bottom: number; left: number };
+type Box = { top: number | string; right: number | string; bottom: number | string; left: number | string };
+
+/** Length value → css: numbers are px (device-scaled), strings pass through. */
+function lenCss(v: number | string | undefined, k: number): string {
+  if (typeof v === "string") return v.trim() || "0px";
+  return `${Math.round((typeof v === "number" ? v : 0) * k)}px`;
+}
 
 function padCss(p: Box | undefined, d: Device): string {
   const v = p ?? { top: 0, right: 0, bottom: 0, left: 0 };
   const k = gscale(d);
   const side = (n: number) => Math.round(n * k);
-  return `${Math.round(v.top * k)}px ${side(v.right)}px ${Math.round(v.bottom * k)}px ${side(v.left)}px`;
+  return `${lenCss(v.top, k)} ${typeof v.right === "number" ? `${side(v.right)}px` : String(v.right)} ${lenCss(v.bottom, k)} ${typeof v.left === "number" ? `${side(v.left)}px` : String(v.left)}`;
 }
 
 function marCss(m: Box | undefined, d: Device): string {
   const v = m ?? { top: 0, right: 0, bottom: 0, left: 0 };
   const k = gscale(d);
-  return `${Math.round(v.top * k)}px ${Math.round(v.right * k)}px ${Math.round(v.bottom * k)}px ${Math.round(v.left * k)}px`;
+  return `${lenCss(v.top, k)} ${lenCss(v.right, k)} ${lenCss(v.bottom, k)} ${lenCss(v.left, k)}`;
 }
 
 function gapCss(style: SectionStyle | undefined, d: Device, fallback = 0): number {

@@ -26,8 +26,11 @@ import {
 import type { Device, SectionInstance } from "@/lib/prestate/types";
 import { DYNAMIC_VARS, SLUG_ICONS } from "@/lib/prestate/data";
 import { FOOTER_DESIGNS, HEADER_DESIGNS } from "@/lib/prestate/chrome-presets";
+import type { TemplateTypography, TypeKey } from "@/lib/prestate/design-system";
+import { fontOptions, loadFonts } from "@/lib/prestate/design-system";
 import { setRowColumnCount } from "@/lib/prestate/tree";
-import { Collapse, FieldRow, SliderField, TextField, Toggle, SelectField, ColorField } from "@/components/prestate/ui";
+import { Collapse, FieldRow, SliderField, TextField, Toggle, SelectField, ColorField, LengthInput, Chip } from "@/components/prestate/ui";
+import { RichTextEditor } from "@/components/prestate/rich-text-editor";
 import { MediaPicker } from "@/components/media-picker";
 import { isIconFieldKey, isImageFieldKey, isImageListKey } from "@/lib/media";
 
@@ -57,8 +60,21 @@ function enumOptions(fieldKey: string, widgetType?: string): { value: string; la
     return [
       { value: "load", label: "On page load" },
       { value: "delay", label: "After a delay" },
-      { value: "scroll", label: "On scroll" },
+      { value: "scroll", label: "On scroll %" },
       { value: "exit", label: "On exit intent" },
+      { value: "click", label: "Button click (by popup id)" },
+      { value: "form-success", label: "After successful form submit" },
+      { value: "url-param", label: "URL / query parameter" },
+    ];
+  }
+  if (fieldKey === "action" && (widgetType === "button" || widgetType === "hero")) {
+    return [
+      { value: "link", label: "Open link / anchor" },
+      { value: "url", label: "Open external URL" },
+      { value: "popup", label: "Open popup (id)" },
+      { value: "brochure", label: "Gated brochure download" },
+      { value: "call", label: "Call phone number" },
+      { value: "whatsapp", label: "WhatsApp chat" },
     ];
   }
   if (fieldKey === "style" && widgetType === "button") {
@@ -68,12 +84,27 @@ function enumOptions(fieldKey: string, widgetType?: string): { value: string; la
       { value: "ghost", label: "Ghost" },
     ];
   }
+  if (fieldKey === "style" && widgetType === "stats") {
+    return [
+      { value: "cards", label: "Cards" },
+      { value: "minimal", label: "Minimal numbers" },
+    ];
+  }
+  if (fieldKey === "size") {
+    return [
+      { value: "sm", label: "Small" },
+      { value: "md", label: "Medium" },
+      { value: "lg", label: "Large" },
+    ];
+  }
   if (fieldKey === "tag") {
     return [
       { value: "h1", label: "H1" },
       { value: "h2", label: "H2" },
       { value: "h3", label: "H3" },
       { value: "h4", label: "H4" },
+      { value: "h5", label: "H5" },
+      { value: "h6", label: "H6" },
     ];
   }
   if (fieldKey === "align") {
@@ -93,6 +124,22 @@ function enumOptions(fieldKey: string, widgetType?: string): { value: string; la
     return [
       { value: "circle", label: "Circle icon" },
       { value: "pill", label: "Pill button" },
+    ];
+  }
+  if (fieldKey.startsWith("primary") && fieldKey.endsWith("Action")) {
+    return [
+      { value: "link", label: "Open link / anchor" },
+      { value: "popup", label: "Open popup (id)" },
+      { value: "brochure", label: "Gated brochure download" },
+      { value: "call", label: "Call phone number" },
+    ];
+  }
+  if (fieldKey.startsWith("secondary") && fieldKey.endsWith("Action")) {
+    return [
+      { value: "link", label: "Open link / anchor" },
+      { value: "popup", label: "Open popup (id)" },
+      { value: "brochure", label: "Gated brochure download" },
+      { value: "call", label: "Call phone number" },
     ];
   }
   return null;
@@ -312,11 +359,14 @@ export function SettingsPanel({
   device,
   setDevice,
   onChange,
+  typographyTokens,
 }: {
   section: SectionInstance | null;
   device: Device;
   setDevice: (d: Device) => void;
   onChange: (patch: Partial<SectionInstance>) => void;
+  /** Effective design-system tokens — used for placeholders & reset-to-global. */
+  typographyTokens?: TemplateTypography;
 }) {
   const [tab, setTab] = useState<"content" | "style" | "advanced">("content");
   const [varOpen, setVarOpen] = useState(false);
@@ -433,7 +483,24 @@ export function SettingsPanel({
                 </FieldRow>
               </div>
             ) : null}
-            {Object.entries(section.settings).map(([key, value]) => (
+            {/* Text Editor widget — full rich-text editor replaces raw fields */}
+            {section.type === "text" ? (
+              <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
+                <FieldRow label="Rich text">
+                  <RichTextEditor
+                    value={String(section.settings.html ?? "")}
+                    fontOptions={fontOptions(loadFonts())}
+                    onChange={(html) => set({ settings: { ...section.settings, html } })}
+                  />
+                </FieldRow>
+                <div style={{ fontSize: 11, color: "var(--ps-muted)", lineHeight: 1.5 }}>
+                  Tip: the text is also editable directly on the canvas — click it and type. Colours & spacing come from Design → Typography unless overridden in Style.
+                </div>
+              </div>
+            ) : null}
+            {Object.entries(section.settings)
+              .filter(([key]) => !(section.type === "text" && (key === "text" || key === "html")))
+              .map(([key, value]) => (
               <div key={key} style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
                 {section.type === "row" && key === "columns" ? (
                   <FieldRow label="Columns">
@@ -504,16 +571,43 @@ export function SettingsPanel({
               <TextField value={colors.gradient ?? ""} onChange={(v) => setNested("colors", { gradient: v })} placeholder="linear-gradient(…)" />
             </Collapse>
 
-            <Collapse title="Typography" icon={<Type size={14} />}>
+            <Collapse
+              title="Typography"
+              icon={<Type size={14} />}
+              badge={
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  {hasTypographyOverride(typo) ? <Chip tone="warn">Custom</Chip> : <Chip tone="primary">Global</Chip>}
+                  {hasTypographyOverride(typo) ? (
+                    <button type="button" onClick={() => setStyle({ typography: {} })} title="Reset to template/global typography" style={{ border: "none", background: "var(--ps-bg)", color: "var(--ps-primary)", borderRadius: 7, fontSize: 10.5, fontWeight: 800, padding: "3px 8px", cursor: "pointer" }}>
+                      ↺ Reset
+                    </button>
+                  ) : null}
+                </span>
+              }
+            >
+              {(() => {
+                const key: TypeKey = section.type === "text" ? "p" : (["h1", "h2", "h3", "h4", "h5", "h6"].includes(String((section.settings as Record<string, unknown>).tag ?? "")) ? (String((section.settings as Record<string, unknown>).tag) as TypeKey) : "h2");
+                const tok = typographyTokens?.[key]?.desktop;
+                return !hasTypographyOverride(typo) && tok ? (
+                  <div style={{ marginBottom: 10, padding: "8px 10px", borderRadius: 9, background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 11, fontWeight: 700, lineHeight: 1.5 }}>
+                    Using {key.toUpperCase()} global defaults{tok.fontSize != null ? ` · ${typeof tok.fontSize === "number" ? `${tok.fontSize}px` : tok.fontSize}` : ""}{tok.fontWeight ? ` · ${tok.fontWeight}` : ""}. Toggle any value below to override just this widget.
+                  </div>
+                ) : null;
+              })()}
               <FieldRow label="Font Family">
                 <SelectField
-                  value={typo.fontFamily ?? "Inter"}
+                  value={typo.fontFamily ?? ""}
                   onChange={(v) => setNested("typography", { fontFamily: v })}
-                  options={["Inter", "Playfair Display", "Poppins", "Montserrat", "DM Sans", "Lora", "Source Serif 4"].map((f) => ({ value: f, label: f }))}
+                  options={[{ value: "", label: "Global default" }, ...fontOptions(loadFonts())]}
                 />
               </FieldRow>
               <FieldRow label="Font Size">
-                <SliderField value={typo.fontSize ?? 16} onChange={(v) => setNested("typography", { fontSize: v })} min={10} max={72} suffix="px" />
+                <LengthInput
+                  value={(typo.fontSize as number | string | undefined) ?? ""}
+                  onChange={(v) => setNested("typography", { fontSize: v })}
+                  min={8}
+                  max={120}
+                />
               </FieldRow>
               <FieldRow label="Font Weight">
                 <SliderField value={typo.fontWeight ?? 400} onChange={(v) => setNested("typography", { fontWeight: v })} min={300} max={900} step={100} />
@@ -524,11 +618,36 @@ export function SettingsPanel({
               <FieldRow label="Letter Spacing">
                 <SliderField value={typo.letterSpacing ?? 0} onChange={(v) => setNested("typography", { letterSpacing: v })} min={-2} max={8} step={0.5} />
               </FieldRow>
+              <FieldRow label="Text Transform">
+                <SelectField
+                  value={typo.textTransform ?? "none"}
+                  onChange={(v) => setNested("typography", { textTransform: v })}
+                  options={[
+                    { value: "none", label: "None" },
+                    { value: "uppercase", label: "Uppercase" },
+                    { value: "capitalize", label: "Capitalize" },
+                    { value: "lowercase", label: "Lowercase" },
+                  ]}
+                />
+              </FieldRow>
+              <FieldRow label="Text Colour">
+                <ColorField value={typo.textColor ?? ""} onChange={(v) => setNested("typography", { textColor: v })} />
+              </FieldRow>
+              {section.type === "text" ? (
+                <FieldRow label="Paragraph Spacing">
+                  <LengthInput
+                    value={(typo.paragraphSpacing as number | string | undefined) ?? ""}
+                    onChange={(v) => setNested("typography", { paragraphSpacing: v })}
+                    min={0}
+                    max={64}
+                  />
+                </FieldRow>
+              ) : null}
             </Collapse>
 
             <Collapse title="Borders" icon={<Box size={14} />}>
               <FieldRow label="Border Width">
-                <SliderField value={border.width ?? 0} onChange={(v) => setNested("border", { width: v })} min={0} max={8} suffix="px" />
+                <LengthInput value={border.width ?? 0} onChange={(v) => setNested("border", { width: v })} min={0} max={16} />
               </FieldRow>
               <FieldRow label="Border Style">
                 <SelectField
@@ -543,7 +662,7 @@ export function SettingsPanel({
                 />
               </FieldRow>
               <FieldRow label="Border Radius">
-                <SliderField value={border.radius ?? 0} onChange={(v) => setNested("border", { radius: v })} min={0} max={60} suffix="px" />
+                <LengthInput value={border.radius ?? 0} onChange={(v) => setNested("border", { radius: v })} min={0} max={80} />
               </FieldRow>
               <ColorField value={border.color ?? "#e8eaf1"} onChange={(v) => setNested("border", { color: v })} />
             </Collapse>
@@ -588,17 +707,24 @@ export function SettingsPanel({
                   value={layout.width ?? "full"}
                   onChange={(v) => setNested("layout", { width: v })}
                   options={[
-                    { value: "boxed", label: "Boxed (1200px)" },
-                    { value: "full", label: "Full width" },
-                    { value: "custom", label: "Custom" },
+                    { value: "full", label: "Full-width section (recommended)" },
+                    { value: "boxed", label: "Boxed band (bg narrows too)" },
+                    { value: "custom", label: "Custom band width" },
                   ]}
                 />
               </FieldRow>
-              {layout.width === "custom" ? (
-                <FieldRow label="Custom Width">
-                  <SliderField value={layout.customWidth ?? 900} onChange={(v) => setNested("layout", { customWidth: v })} min={480} max={1600} step={20} suffix="px" />
-                </FieldRow>
-              ) : null}
+              <FieldRow
+                label="Container Width"
+                hint={
+                  layout.width === "full"
+                    ? "Max width of the content inside the full-bleed background. Accepts px, rem, % — default 1200."
+                    : layout.width === "boxed"
+                      ? "Total band width, background included. Default 1200."
+                      : "Exact band width — e.g. 960, 80%, 75rem."
+                }
+              >
+                <LengthInput value={layout.customWidth ?? ""} onChange={(v) => setNested("layout", { customWidth: v === "" ? undefined : v })} min={280} max={1920} />
+              </FieldRow>
               <FieldRow label="Height">
                 <SelectField
                   value={layout.height ?? "auto"}
@@ -612,7 +738,7 @@ export function SettingsPanel({
               </FieldRow>
               {layout.height === "fixed" ? (
                 <FieldRow label="Fixed Height">
-                  <SliderField value={layout.fixedHeight ?? 400} onChange={(v) => setNested("layout", { fixedHeight: v })} min={200} max={1200} step={20} suffix="px" />
+                  <LengthInput value={layout.fixedHeight} onChange={(v) => setNested("layout", { fixedHeight: v })} min={120} max={1400} />
                 </FieldRow>
               ) : null}
               <FieldRow label="Alignment">
@@ -640,8 +766,8 @@ export function SettingsPanel({
               <FieldRow label="Margin">
                 <SpacingGrid values={spacing.margin} onChange={(k, v) => setNested("spacing", { margin: { ...spacing.margin, [k]: v } })} />
               </FieldRow>
-              <FieldRow label="Gap">
-                <SliderField value={spacing.gap ?? 0} onChange={(v) => setNested("spacing", { gap: v })} min={0} max={80} suffix="px" />
+              <FieldRow label="Gap" hint="Accepts px, rem, % — e.g. 1.5rem">
+                <LengthInput value={spacing.gap} onChange={(v) => setNested("spacing", { gap: v })} min={0} max={80} />
               </FieldRow>
             </Collapse>
           </>
@@ -689,6 +815,13 @@ export function SettingsPanel({
   );
 }
 
+function hasTypographyOverride(typo: SectionInstance["style"]["typography"]): boolean {
+  if (!typo) return false;
+  return (["fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing", "textTransform", "textColor", "paragraphSpacing"] as const).some(
+    (k) => typo[k] != null && typo[k] !== "" && !(k === "fontWeight" && typo.fontWeight === 0) && !(k === "letterSpacing" && typo.letterSpacing === 0),
+  );
+}
+
 const DEVICES: { key: Device; icon: typeof Monitor; label: string }[] = [
   { key: "desktop", icon: Monitor, label: "Desktop" },
   { key: "tablet", icon: Tablet, label: "Tablet" },
@@ -704,14 +837,20 @@ function PanelHead({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
-function SpacingGrid({ values, onChange }: { values?: { top: number; right: number; bottom: number; left: number }; onChange: (k: "top" | "right" | "bottom" | "left", v: number) => void }) {
+function SpacingGrid({
+  values,
+  onChange,
+}: {
+  values?: { top?: number | string; right?: number | string; bottom?: number | string; left?: number | string };
+  onChange: (k: "top" | "right" | "bottom" | "left", v: number | string) => void;
+}) {
   const v = values ?? { top: 0, right: 0, bottom: 0, left: 0 };
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
       {(["top", "right", "bottom", "left"] as const).map((k) => (
         <div key={k} style={{ background: "var(--ps-bg)", border: "1px solid var(--ps-line)", borderRadius: 9, padding: "6px 8px" }}>
           <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "var(--ps-muted)", marginBottom: 4 }}>{k}</div>
-          <SliderField value={v[k]} onChange={(val) => onChange(k, val)} min={0} max={240} suffix="px" />
+          <LengthInput value={v[k]} onChange={(val) => onChange(k, val)} min={0} max={240} />
         </div>
       ))}
     </div>
