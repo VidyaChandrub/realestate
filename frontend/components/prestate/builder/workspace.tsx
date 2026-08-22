@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type * as React from "react";
 import { SlidersHorizontal, LayoutGrid } from "lucide-react";
-import type { Device, LandingPageData, SectionInstance } from "@/lib/prestate/types";
+import type { Device, FooterDesignId, HeaderDesignId, LandingPageData, MenuLink, SectionInstance, SectionStyle, SiteConfig } from "@/lib/prestate/types";
+import {
+  CHROME_FOOTER_ID,
+  CHROME_HEADER_ID,
+  defaultFooterSettings,
+  defaultFooterStyle,
+  defaultHeaderSettings,
+  defaultHeaderStyle,
+  labelsFromLinks,
+} from "@/lib/prestate/chrome-presets";
 import { buildTemplateSections, WIDGETS } from "@/lib/prestate/data";
 import { findSection, insertChild, isStructural, patchSection, placeColumn } from "@/lib/prestate/tree";
 import { ensureConfig } from "@/lib/prestate/site-config";
@@ -41,6 +50,7 @@ export function BuilderWorkspace({
   onCapabilities,
   onToast,
   onPersist,
+  onPatchConfig,
   onOpenLocalPreview,
 }: {
   page: LandingPageData;
@@ -50,6 +60,7 @@ export function BuilderWorkspace({
   onCapabilities: (c: { canUndo: boolean; canRedo: boolean }) => void;
   onToast: (msg: string) => void;
   onPersist: (sections: SectionInstance[], status?: LandingPageData["status"]) => void;
+  onPatchConfig: (recipe: (c: SiteConfig) => SiteConfig) => void;
   onOpenLocalPreview: () => void;
 }) {
   const [state, setState] = useState<EditorState>(() => ({
@@ -63,7 +74,43 @@ export function BuilderWorkspace({
   const [vp, setVp] = useState(1400);
 
   const { sections, history, future, selectedId } = state;
-  const selected = selectedId ? findSection(sections, selectedId)?.node ?? null : null;
+
+  const chromeSection: SectionInstance | null = (() => {
+    if (selectedId === CHROME_HEADER_ID) {
+      const cfg = ensureConfig(page);
+      return {
+        id: CHROME_HEADER_ID,
+        type: "header",
+        label: "Header",
+        icon: "PanelsTopLeft",
+        hidden: false,
+        settings: {
+          design: cfg.header.design,
+          ...(Array.isArray(cfg.header.menuLinks) ? { menuLinks: cfg.header.menuLinks } : {}),
+          ...(cfg.header.settings ?? {}),
+        },
+        style: cfg.header.style ?? { colors: {}, typography: {}, spacing: {}, layout: {}, responsive: {} },
+      };
+    }
+    if (selectedId === CHROME_FOOTER_ID) {
+      const cfg = ensureConfig(page);
+      return {
+        id: CHROME_FOOTER_ID,
+        type: "footer",
+        label: "Footer",
+        icon: "PanelBottom",
+        hidden: false,
+        settings: {
+          design: cfg.footer.design,
+          ...(cfg.footer.settings ?? {}),
+        },
+        style: cfg.footer.style ?? { colors: {}, typography: {}, spacing: {}, layout: {}, responsive: {} },
+      };
+    }
+    return null;
+  })();
+
+  const selected = chromeSection ?? (selectedId ? findSection(sections, selectedId)?.node ?? null : null);
   const dockWidgets = vp >= 900;
   const dockInspector = vp >= 1180;
 
@@ -228,9 +275,50 @@ export function BuilderWorkspace({
   const patchSelected = useCallback(
     (patch: Partial<SectionInstance>) => {
       if (!selectedId) return;
+      const isHeader = selectedId === CHROME_HEADER_ID;
+      const isFooter = selectedId === CHROME_FOOTER_ID;
+      if ((isHeader || isFooter) && onPatchConfig) {
+        onPatchConfig((c) => {
+          if (isHeader) {
+            const next: SiteConfig["header"] = { ...c.header };
+            if (patch.style) next.style = { ...(next.style ?? {}), ...patch.style } as SectionStyle;
+            if (patch.settings) {
+              const { menuLinks, design, ...rest } = patch.settings as Record<string, unknown>;
+              const designChanged = typeof design === "string" && design !== next.design;
+              if (designChanged) {
+                next.design = design as HeaderDesignId;
+                next.settings = defaultHeaderSettings(next.design);
+                next.style = defaultHeaderStyle(next.design);
+              } else {
+                next.settings = { ...(next.settings ?? {}), ...rest };
+              }
+              if (Array.isArray(menuLinks)) {
+                next.menuLinks = menuLinks as MenuLink[];
+                next.menu = labelsFromLinks(next.menuLinks);
+              }
+            }
+            return { ...c, header: next };
+          }
+          const nextF: SiteConfig["footer"] = { ...c.footer };
+          if (patch.style) nextF.style = { ...(nextF.style ?? {}), ...patch.style } as SectionStyle;
+          if (patch.settings) {
+            const { design, ...rest } = patch.settings as Record<string, unknown>;
+            const designChanged = typeof design === "string" && design !== nextF.design;
+            if (designChanged) {
+              nextF.design = design as FooterDesignId;
+              nextF.settings = defaultFooterSettings(nextF.design);
+              nextF.style = defaultFooterStyle(nextF.design);
+            } else {
+              nextF.settings = { ...(nextF.settings ?? {}), ...rest };
+            }
+          }
+          return { ...c, footer: nextF };
+        });
+        return;
+      }
       mutate((prev) => patchSection(prev, selectedId, patch));
     },
-    [mutate, selectedId],
+    [mutate, selectedId, onPatchConfig],
   );
 
   return (

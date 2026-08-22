@@ -22,6 +22,14 @@ export type WidgetCategory =
   | "SEO"
   | "Advanced";
 
+export interface MenuLink {
+  label: string;
+  href: string;
+}
+
+export type HeaderDesignId = "classic" | "centered" | "split" | "minimal" | "overlay";
+export type FooterDesignId = "columns" | "centered" | "newsletter" | "slimbar" | "cards";
+
 export interface SectionStyle {
   colors?: {
     bg?: string;
@@ -176,10 +184,24 @@ export interface SiteConfig {
     floatCall: boolean;
     floatEnquire: boolean;
     floatEmail: boolean;
+    /** Which of the 5 reusable header layouts this template uses. */
+    design?: HeaderDesignId;
+    /** Editable nav links (label + href). Preferred over the legacy string menu. */
+    menuLinks?: MenuLink[];
+    /** Design-specific content settings — every text, button, icon and link. */
+    settings?: Record<string, unknown>;
+    /** Full style customization (colors, typography, spacing, border, layout, responsive). */
+    style?: SectionStyle;
   };
   footer: {
     rera: string;
     copyright: string;
+    /** Which of the 5 reusable footer layouts this template uses. */
+    design?: FooterDesignId;
+    /** Design-specific content settings — every text, button, icon and link. */
+    settings?: Record<string, unknown>;
+    /** Full style customization (colors, typography, spacing, border, layout, responsive). */
+    style?: SectionStyle;
   };
   tracking: {
     gaId: string;

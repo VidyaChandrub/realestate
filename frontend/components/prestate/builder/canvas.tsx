@@ -55,6 +55,15 @@ import {
   toggleSectionFlag,
 } from "@/lib/prestate/tree";
 import { googleFontsHref, siteThemeStyle } from "@/lib/prestate/site-config";
+import {
+  CHROME_FOOTER_ID,
+  CHROME_HEADER_ID,
+  FOOTER_DESIGNS,
+  HEADER_DESIGNS,
+  hydrateFooter,
+  hydrateHeader,
+} from "@/lib/prestate/chrome-presets";
+import { ChromeFooter, ChromeHeader } from "./chrome-renderers";
 import { bumpTracking } from "@/lib/prestate/tracking";
 import { firePrestateLead } from "@/components/prestate/tracking-scripts";
 
@@ -177,188 +186,69 @@ function Eyebrow({ children, gold }: { children: ReactNode; gold?: boolean }) {
 // Header + Footer chrome
 // ---------------------------------------------------------------------------
 
-function PageHeader({ device, theme }: { device: Device; theme?: CanvasTheme }) {
+function PageHeader({
+  device,
+  live,
+  selected,
+  onSelect,
+}: {
+  device: Device;
+  live?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
+}) {
   const chrome = useContext(SiteChromeContext);
   const header = chrome?.header;
   const brand = chrome?.brand;
-  const menu = header?.menu?.filter(Boolean).length ? header.menu.filter(Boolean) : ["Overview", "Amenities", "Floor Plans", "Gallery", "Contact"];
-  const name = (brand?.name || theme?.name || "Brand").trim();
-  const bits = name.split(/\s+/);
-  const mark = bits[0]?.slice(0, 1).toUpperCase() ?? "B";
-  const accent = brand?.accent || theme?.accent || "#c9a56a";
-  const primary = brand?.primary || theme?.primary || "#4a3ec9";
-  const phone = brand?.phone || theme?.phone || "";
-  const logo = brand?.logo || theme?.logo;
-  const sticky = header?.sticky ?? true;
-  const transparent = header?.transparent ?? false;
-  const variant = header?.variant ?? "dark";
-  const showTopbar = header?.showTopbar ?? false;
-  const cta = header?.cta || "Book Visit";
-  const ctaLink = header?.ctaLink || "#lead-form";
-  const lightText = transparent || variant === "dark";
-  const fg = lightText ? "#fff" : "#111827";
-  const navFg = lightText ? "rgba(255,255,255,.85)" : "#334155";
-  const barBg = transparent
-    ? "linear-gradient(180deg, rgba(8,10,20,.92), rgba(8,10,20,.55))"
-    : variant === "dark"
-      ? "#0b1020"
-      : variant === "glass"
-        ? "rgba(255,255,255,.82)"
-        : "#ffffff";
+  if (!header || !brand) return null;
+  const hh = hydrateHeader(header);
+  const overlayDesign = hh.design === "overlay";
+  const abs = overlayDesign || (hh.transparent && hh.sticky);
+  const designName = HEADER_DESIGNS.find((dsg) => dsg.id === hh.design)?.name ?? hh.design;
   return (
-    <div style={{ position: sticky ? "sticky" : "relative", top: 0, height: sticky && transparent ? 0 : "auto", zIndex: 50 }}>
+    <div style={{ position: hh.sticky ? "sticky" : "relative", top: 0, height: abs ? 0 : "auto", zIndex: 50 }}>
       <style>{`.ps-sec-holder:hover .ps-header-label { opacity: 1 !important; }`}</style>
       <div className="ps-header-label" style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", opacity: 0, transition: "opacity .15s", pointerEvents: "none" }}>
         <span style={{ background: "var(--ps-primary)", color: "#fff", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.8, padding: "2px 8px", borderRadius: 5 }}>HEADER</span>
         <span style={{ fontSize: 11, color: "#fff", fontWeight: 600, textShadow: "0 1px 4px rgba(0,0,0,.4)" }}>
-          {sticky ? "Sticky" : "Static"} · {transparent ? "Transparent" : variant}
+          {designName} · {hh.sticky ? "Sticky" : "Static"}{overlayDesign ? " · Overlay" : ""}
         </span>
       </div>
-      {showTopbar && phone ? (
-        <div style={{ background: primary, color: "#fff", fontSize: 11.5, fontWeight: 700, padding: "6px 16px", display: "flex", justifyContent: "center", gap: 16 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Phone size={12} /> {phone}</span>
-          {brand?.email ? <span>{brand.email}</span> : null}
-        </div>
-      ) : null}
-      <header
-        style={{
-          position: sticky && transparent ? "absolute" : "relative",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 4,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: device === "mobile" ? "12px 16px" : device === "tablet" ? "14px 22px" : "16px 44px",
-          background: barBg,
-          backdropFilter: variant === "glass" || transparent ? "blur(8px)" : undefined,
-          color: fg,
-          borderBottom: transparent ? "none" : "1px solid rgba(15,23,42,.08)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {logo ? (
-            <img src={logo} alt="" style={{ width: 34, height: 34, borderRadius: 9, objectFit: "cover" }} />
-          ) : (
-            <span style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${accent}, ${primary})`, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
-              {mark}
-            </span>
-          )}
-          <div style={{ lineHeight: 1.1, color: fg, fontFamily: theme?.headingFont ? `${theme.headingFont}, Georgia, serif` : undefined }}>
-            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: 0.4 }}>{name}</div>
-            {bits.length > 1 ? (
-              <div style={{ fontSize: 8.5, fontWeight: 600, letterSpacing: 2.2, color: accent }}>{bits.slice(1).join(" ").toUpperCase()}</div>
-            ) : null}
-          </div>
-        </div>
-        {device === "desktop" ? (
-          <nav style={{ display: "flex", gap: 22, color: navFg, fontSize: 12.5, fontWeight: 600 }}>
-            {menu.map((m) => (
-              <a key={m} href={`#${m.toLowerCase().replace(/\s+/g, "-")}`} style={{ cursor: "pointer", color: "inherit", textDecoration: "none" }}>
-                {m}
-              </a>
-            ))}
-          </nav>
-        ) : device === "tablet" ? (
-          <nav style={{ display: "flex", gap: 14, color: navFg, fontSize: 11.5, fontWeight: 600 }}>
-            {menu.slice(0, 4).map((m) => (
-              <span key={m}>{m}</span>
-            ))}
-          </nav>
-        ) : (
-          <span style={{ color: fg, fontSize: 18, lineHeight: 1, cursor: "pointer", padding: "4px 8px" }} aria-label="Menu">☰</span>
-        )}
-        <div style={{ display: "flex", alignItems: "center", gap: device === "mobile" ? 8 : 14 }}>
-          {device !== "mobile" && phone && !showTopbar ? (
-            <span style={{ display: "flex", alignItems: "center", gap: 7, color: fg, fontSize: 12, fontWeight: 700 }}>
-              <Phone size={13} /> {phone}
-            </span>
-          ) : null}
-          <a
-            href={ctaLink}
-            style={{ background: `linear-gradient(135deg, ${accent}, ${primary})`, color: "#fff", fontSize: device === "mobile" ? 11 : 12, fontWeight: 700, padding: device === "mobile" ? "8px 10px" : "9px 16px", borderRadius: 9, cursor: "pointer", boxShadow: `0 6px 18px ${accent}66`, whiteSpace: "nowrap", textDecoration: "none" }}
-          >
-            {cta}
-          </a>
-        </div>
-      </header>
+      <div style={{ position: abs ? "absolute" : "relative", top: 0, left: 0, right: 0, zIndex: 4 }}>
+        <ChromeHeader header={header} brand={brand} device={device} live={live} selected={selected} onSelect={onSelect} />
+      </div>
     </div>
   );
 }
 
-function PageFooter({ device, theme }: { device: Device; theme?: CanvasTheme }) {
+function PageFooter({
+  device,
+  live,
+  selected,
+  onSelect,
+}: {
+  device: Device;
+  live?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
+}) {
   const chrome = useContext(SiteChromeContext);
-  const brand = chrome?.brand;
-  const footer = chrome?.footer;
   const header = chrome?.header;
-  const name = (brand?.name || theme?.name || "Brand").trim();
-  const mark = name.split(/\s+/)[0]?.slice(0, 1).toUpperCase() ?? "B";
-  const accent = brand?.accent || theme?.accent || "#cda45e";
-  const primary = brand?.primary || theme?.primary || "#4a3ec9";
-  const logo = brand?.logo || theme?.logo;
-  const menu = header?.menu?.filter(Boolean) ?? [];
-  const social = [
-    ["f", brand?.facebook],
-    ["ig", brand?.instagram],
-    ["x", brand?.twitter],
-    ["yt", brand?.youtube],
-    ["in", brand?.linkedin],
-  ].filter(([, href]) => href);
+  const footer = chrome?.footer;
+  const brand = chrome?.brand;
+  if (!footer || !header || !brand) return null;
+  const hf = hydrateFooter(footer);
+  const designName = FOOTER_DESIGNS.find((dsg) => dsg.id === hf.design)?.name ?? hf.design;
   return (
     <div style={{ position: "relative" }}>
       <div className="ps-header-label" style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", opacity: 0, transition: "opacity .15s", pointerEvents: "none" }}>
         <span style={{ background: "var(--ps-primary)", color: "#fff", fontSize: 9.5, fontWeight: 800, letterSpacing: 0.8, padding: "2px 8px", borderRadius: 5 }}>FOOTER</span>
+        <span style={{ fontSize: 11, color: "#fff", fontWeight: 600, textShadow: "0 1px 4px rgba(0,0,0,.4)" }}>{designName}</span>
       </div>
-      <footer style={{ background: "#0d1220", color: "#a9b0c2", padding: device === "mobile" ? "40px 22px 24px" : "56px 44px 24px" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "1fr 1fr" : "2fr 1fr 1fr", gap: 32 }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              {logo ? (
-                <img src={logo} alt="" style={{ width: 34, height: 34, borderRadius: 9, objectFit: "cover" }} />
-              ) : (
-                <span style={{ width: 34, height: 34, borderRadius: 9, background: `linear-gradient(135deg, ${accent}, ${primary})`, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12 }}>
-                  {mark}
-                </span>
-              )}
-              <div style={{ lineHeight: 1.1, color: "#fff" }}>
-                <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: 0.4 }}>{name}</div>
-              </div>
-            </div>
-            <p style={{ fontSize: 12.5, lineHeight: 1.7, maxWidth: 320 }}>{brand?.tagline || ""}</p>
-            {social.length ? (
-              <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-                {social.map(([label, href]) => (
-                  <a key={label} href={href} target="_blank" rel="noreferrer" style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(255,255,255,.14)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "#fff", textDecoration: "none" }}>
-                    {label}
-                  </a>
-                ))}
-              </div>
-            ) : null}
-          </div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", marginBottom: 12, letterSpacing: 0.5 }}>LINKS</div>
-            {menu.map((l) => (
-              <div key={l} style={{ fontSize: 12.5, marginBottom: 9 }}>{l}</div>
-            ))}
-          </div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", marginBottom: 12, letterSpacing: 0.5 }}>CONTACT</div>
-            {brand?.phone ? <div style={{ fontSize: 12.5, marginBottom: 9 }}>{brand.phone}</div> : null}
-            {brand?.email ? <div style={{ fontSize: 12.5, marginBottom: 9 }}>{brand.email}</div> : null}
-          </div>
-        </div>
-        <div style={{ maxWidth: 1200, margin: "32px auto 0", borderTop: "1px solid rgba(255,255,255,.08)", paddingTop: 16, fontSize: 11, lineHeight: 1.6, color: "#6b7280" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-            <span>{footer?.copyright || `© ${new Date().getFullYear()} ${name}. All rights reserved.`}</span>
-            {footer?.rera ? <span>RERA: {footer.rera}</span> : null}
-          </div>
-        </div>
-      </footer>
+      <ChromeFooter footer={footer} header={header} brand={brand} device={device} live={live} selected={selected} onSelect={onSelect} />
     </div>
   );
 }
-
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
 }
@@ -2934,7 +2824,11 @@ export function Canvas({
           <div style={{ position: "relative" }}>
             {announcements.map((s, i) => renderItem(s, i, announcements.length))}
 
-            <PageHeader device={device} theme={theme} />
+            <PageHeader
+              device={device}
+              selected={!live && !readOnly && selectedId === CHROME_HEADER_ID}
+              onSelect={!live && !readOnly ? () => onSelect(CHROME_HEADER_ID) : undefined}
+            />
 
             {sections.length === 0 ? (
               <div style={{ padding: "80px 40px", textAlign: "center" }}>
@@ -2965,7 +2859,12 @@ export function Canvas({
               />
             ) : null}
 
-            <PageFooter device={device} theme={theme} />
+            <PageFooter
+              device={device}
+              live={live}
+              selected={!live && !readOnly && selectedId === CHROME_FOOTER_ID}
+              onSelect={!live && !readOnly ? () => onSelect(CHROME_FOOTER_ID) : undefined}
+            />
             <FloatingContactDock live={live} device={device} widget={floatWidget} />
           </div>
         </div>

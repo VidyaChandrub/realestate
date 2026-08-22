@@ -1,12 +1,72 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Globe, Menu, Phone, Plus, Save, Trash2 } from "lucide-react";
-import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
+import { Globe, ImagePlus, Link2, Menu, Monitor, Phone, Plus, Save, Smartphone, Tablet, Trash2 } from "lucide-react";
+import type { Device, FooterDesignId, HeaderDesignId, LandingPageData, MenuLink, SiteConfig } from "@/lib/prestate/types";
+import {
+  FOOTER_DESIGNS,
+  HEADER_DESIGNS,
+  defaultFooterSettings,
+  defaultFooterStyle,
+  defaultHeaderSettings,
+  defaultHeaderStyle,
+} from "@/lib/prestate/chrome-presets";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
+import { ChromeFooter, ChromeHeader } from "@/components/prestate/builder/chrome-renderers";
 import { ModuleHeader, SiteScopeBar } from "./shared";
 import { FieldRow, TextField, Toggle, Btn, Collapse } from "@/components/prestate/ui";
-import { PrestateMark } from "@/components/prestate/topnav";
+import { MediaPicker } from "@/components/media-picker";
+
+function slugHref(label: string): string {
+  return `#${label.toLowerCase().replace(/\s+/g, "-")}`;
+}
+
+function DesignGrid({
+  list,
+  value,
+  onChange,
+}: {
+  list: { id: string; name: string; desc: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, paddingTop: 4 }}>
+      {list.map((d) => {
+        const active = value === d.id;
+        return (
+          <button
+            key={d.id}
+            type="button"
+            onClick={() => onChange(d.id)}
+            title={d.desc}
+            style={{
+              textAlign: "left",
+              padding: "12px 12px 11px",
+              borderRadius: 12,
+              border: active ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)",
+              background: active ? "var(--ps-primary-mist)" : "#fff",
+              cursor: "pointer",
+              boxShadow: active ? "0 6px 16px rgba(109,93,252,.14)" : "none",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: active ? "var(--ps-primary)" : "var(--ps-line-strong)", flexShrink: 0 }} />
+              <span style={{ fontSize: 12.5, fontWeight: 800, color: active ? "var(--ps-primary)" : "var(--ps-ink)" }}>{d.name}</span>
+            </div>
+            <div style={{ fontSize: 10.5, color: "var(--ps-muted)", marginTop: 4, lineHeight: 1.45 }}>{d.desc}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+const DEVICES: { key: Device; icon: typeof Monitor; label: string }[] = [
+  { key: "desktop", icon: Monitor, label: "Desktop" },
+  { key: "tablet", icon: Tablet, label: "Tablet" },
+  { key: "mobile", icon: Smartphone, label: "Mobile" },
+];
 
 export function HeaderFooterModule({
   site,
@@ -24,27 +84,66 @@ export function HeaderFooterModule({
   const { header, footer, brand } = cfg;
   const patchHeader = (partial: Partial<SiteConfig["header"]>) => onPatch((c) => ({ ...c, header: { ...c.header, ...partial } }));
   const patchFooter = (partial: Partial<SiteConfig["footer"]>) => onPatch((c) => ({ ...c, footer: { ...c.footer, ...partial } }));
-  const menu = header.menu;
+  const patchHeaderSettings = (partial: Record<string, unknown>) =>
+    patchHeader({ settings: { ...(header.settings ?? {}), ...partial } });
+  const patchFooterSettings = (partial: Record<string, unknown>) =>
+    patchFooter({ settings: { ...(footer.settings ?? {}), ...partial } });
   const [editing, setEditing] = useState<"header" | "footer">("header");
-  const lightText = header.transparent || header.variant === "dark";
-  const barBg = header.transparent
-    ? "linear-gradient(180deg, rgba(17,24,39,.7), rgba(17,24,39,.2))"
-    : header.variant === "dark"
-      ? "#0b1020"
-      : header.variant === "glass"
-        ? "rgba(255,255,255,.82)"
-        : "#fff";
+  const [device, setDevice] = useState<Device>("desktop");
+
+  const links: MenuLink[] =
+    Array.isArray(header.menuLinks) && header.menuLinks.length > 0
+      ? header.menuLinks
+      : (header.menu ?? []).map((label) => ({ label, href: slugHref(label) }));
+
+  const setLinks = (next: MenuLink[]) => patchHeader({ menuLinks: next, menu: next.map((l) => l.label) });
+
+  const setHeaderDesign = (id: string) =>
+    onPatch((c) => ({
+      ...c,
+      header: {
+        ...c.header,
+        design: id as HeaderDesignId,
+        settings: defaultHeaderSettings(id as HeaderDesignId),
+        style: defaultHeaderStyle(id as HeaderDesignId),
+      },
+    }));
+
+  const setFooterDesign = (id: string) =>
+    onPatch((c) => ({
+      ...c,
+      footer: {
+        ...c.footer,
+        design: id as FooterDesignId,
+        settings: defaultFooterSettings(id as FooterDesignId),
+        style: defaultFooterStyle(id as FooterDesignId),
+      },
+    }));
+
+  const footerSettings = footer.settings ?? {};
+  const footerLinkList: MenuLink[] = Array.isArray(footerSettings.links) ? (footerSettings.links as MenuLink[]) : [];
+  const copyrightValue = typeof footerSettings.copyrightText === "string" && footerSettings.copyrightText ? footerSettings.copyrightText : footer.copyright;
+  const reraValue = typeof footerSettings.reraText === "string" && footerSettings.reraText ? footerSettings.reraText : footer.rera;
+  const patchFooterText = (settingsKey: "copyrightText" | "reraText", rootKey: "copyright" | "rera", v: string) =>
+    onPatch((c) => ({
+      ...c,
+      footer: {
+        ...c.footer,
+        settings: { ...(c.footer.settings ?? {}), [settingsKey]: v },
+        [rootKey]: v,
+      },
+    }));
 
   return (
     <div style={{ overflowY: "auto", height: "100%", ...siteThemeStyle(brand) }}>
       <ModuleHeader
         title="Header & Footer"
-        description={`Header and footer for “${site.name}”. Menu, style and copyright appear on this template’s builder and local preview.`}
+        description={`Pick a reusable layout for “${site.name}”, edit its content here, then fine-tune styles by clicking the header or footer inside the builder canvas.`}
         actions={<Btn variant="primary" icon={<Save size={14} />} onClick={() => onToast(`Header & footer saved for ${site.name}`)}>Save</Btn>}
       />
       <SiteScopeBar pages={pages} activeId={site.id} />
 
-      <div style={{ padding: "0 28px 16px", display: "flex", gap: 8 }}>
+      <div style={{ padding: "0 28px 16px", display: "flex", gap: 8, flexWrap: "wrap" }}>
         {(["header", "footer"] as const).map((v) => (
           <button
             key={v}
@@ -60,75 +159,62 @@ export function HeaderFooterModule({
       <div className="ps-brand-grid" style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20, padding: "0 28px 48px", alignItems: "start" }}>
         <div>
           <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--ps-line)", background: "#f3f4f9" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "#e9ebf2", fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", fontFamily: "monospace" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "#e9ebf2", fontSize: 11, fontWeight: 700, color: "var(--ps-muted)" }}>
               <Globe size={12} /> {site.domain || `/${site.slug}`}
+              <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4, background: "#fff", border: "1px solid var(--ps-line)", borderRadius: 8, padding: 3 }}>
+                {DEVICES.map((dev) => (
+                  <button
+                    key={dev.key}
+                    type="button"
+                    title={dev.label}
+                    onClick={() => setDevice(dev.key)}
+                    style={{
+                      width: 26,
+                      height: 22,
+                      border: "none",
+                      borderRadius: 6,
+                      background: device === dev.key ? "var(--ps-primary)" : "transparent",
+                      color: device === dev.key ? "#fff" : "var(--ps-muted)",
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <dev.icon size={13} />
+                  </button>
+                ))}
+              </span>
             </div>
-            <div style={{ background: "var(--ps-panel-raised)", minHeight: 420, display: "flex", flexDirection: "column" }}>
-              {header.showTopbar && brand.phone ? (
-                <div style={{ background: brand.primary, color: "#fff", fontSize: 11, fontWeight: 700, padding: "6px 16px", display: "flex", justifyContent: "center", gap: 12 }}>
-                  <span>{brand.phone}</span>
-                  {brand.email ? <span>{brand.email}</span> : null}
-                </div>
-              ) : null}
+            <div style={{ padding: 18, display: "flex", justifyContent: "center" }}>
               <div
                 style={{
-                  borderBottom: header.transparent ? "none" : "1px solid #eef0f5",
-                  background: barBg,
-                  backdropFilter: header.variant === "glass" ? "blur(10px)" : undefined,
-                  padding: "0 22px",
-                  minHeight: 62,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  color: lightText ? "#fff" : "#111827",
+                  width: device === "desktop" ? "100%" : device === "tablet" ? 620 : 348,
+                  maxWidth: "100%",
+                  background: "#fff",
+                  borderRadius: device === "desktop" ? 12 : 18,
+                  overflow: "hidden",
+                  boxShadow: "0 18px 50px rgba(17,24,39,.16)",
                 }}
               >
-                {brand.logo ? (
-                  <img src={brand.logo} alt="" style={{ width: 24, height: 24, borderRadius: 7, objectFit: "cover" }} />
-                ) : (
-                  <PrestateMark size={24} color={lightText ? "#fff" : brand.primary} />
-                )}
-                <span style={{ fontSize: 14.5, fontWeight: 800 }}>{brand.name}</span>
-                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 14, fontSize: 12.5, fontWeight: 700, opacity: 0.9, flexWrap: "wrap" }}>
-                  {menu.map((m) => (
-                    <span key={m} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{m} <ChevronDown size={12} /></span>
-                  ))}
+                <ChromeHeader header={header} brand={brand} device={device} live={false} />
+                <div
+                  style={{
+                    minHeight: device === "mobile" ? 150 : 190,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "column",
+                    gap: 6,
+                    background: "linear-gradient(180deg, #eef2ff, #f8fafc)",
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ps-muted)" }}>Page content</span>
+                  <span style={{ fontSize: 10.5, color: "var(--ps-muted)", opacity: 0.7 }}>
+                    {(HEADER_DESIGNS.find((d) => d.id === header.design)?.name ?? header.design)} · {(FOOTER_DESIGNS.find((d) => d.id === footer.design)?.name ?? footer.design)}
+                  </span>
                 </div>
-                <span style={{ padding: "9px 16px", borderRadius: 9, background: `linear-gradient(135deg, ${brand.accent}, ${brand.primary})`, color: "#fff", fontSize: 12, fontWeight: 800, marginLeft: 8, whiteSpace: "nowrap" }}>{header.cta}</span>
-                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, border: "1px solid rgba(148,163,184,.35)" }}><Menu size={14} /></span>
-              </div>
-
-              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 40, flexDirection: "column", gap: 6, background: "linear-gradient(180deg, #eef2ff, #f8fafc)" }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-muted)" }}>
-                  {header.sticky ? "Sticky" : "Static"} header · {header.transparent ? "Transparent over hero" : header.variant} style
-                </span>
-              </div>
-
-              <div style={{ background: "#0b1020", color: "#fff", padding: "28px 22px" }}>
-                <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
-                  <div style={{ flex: 1.4, minWidth: 200 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                      {brand.logo ? <img src={brand.logo} alt="" style={{ width: 22, height: 22, borderRadius: 6, objectFit: "cover" }} /> : <PrestateMark size={22} color="#fff" />}
-                      <span style={{ fontSize: 14.5, fontWeight: 800 }}>{brand.name}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.7, maxWidth: 280 }}>{brand.tagline}</div>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 130 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8, color: brand.accent, marginBottom: 10 }}>Links</div>
-                    {menu.map((i) => (
-                      <div key={i} style={{ fontSize: 12, color: "#94a3b8", padding: "3px 0" }}>{i}</div>
-                    ))}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 130 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8, color: brand.accent, marginBottom: 10 }}>Contact</div>
-                    {brand.phone ? <div style={{ fontSize: 12, color: "#94a3b8", padding: "3px 0" }}>{brand.phone}</div> : null}
-                    {brand.email ? <div style={{ fontSize: 12, color: "#94a3b8", padding: "3px 0" }}>{brand.email}</div> : null}
-                  </div>
-                </div>
-                <div style={{ borderTop: "1px solid rgba(255,255,255,.1)", marginTop: 22, paddingTop: 14, display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", fontSize: 11, color: "#64748b" }}>
-                  <span>{footer.copyright}</span>
-                  {footer.rera ? <span>RERA: {footer.rera}</span> : null}
-                </div>
+                <ChromeFooter footer={footer} header={header} brand={brand} device={device} live={false} />
               </div>
             </div>
           </div>
@@ -138,25 +224,61 @@ export function HeaderFooterModule({
           {editing === "header" ? (
             <>
               <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", padding: "12px 0 2px" }}>Layout design</div>
+                <p style={{ fontSize: 11.5, color: "var(--ps-muted)", lineHeight: 1.5, margin: "2px 0 6px" }}>
+                  Switching design resets its content knobs — each template keeps its own choice.
+                </p>
+                <DesignGrid list={HEADER_DESIGNS} value={header.design ?? "classic"} onChange={setHeaderDesign} />
+              </div>
+
+              <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
+                <Collapse title="Logo & brand" icon={<ImagePlus size={14} />} defaultOpen>
+                  <FieldRow label="Logo image">
+                    <MediaPicker
+                      kind="image"
+                      label="Upload or paste a URL"
+                      value={String((header.settings as Record<string, unknown>)?.logoUrl ?? "")}
+                      onChange={(v) => patchHeaderSettings({ logoUrl: v })}
+                    />
+                  </FieldRow>
+                  <p style={{ fontSize: 11.5, color: "var(--ps-muted)", lineHeight: 1.5, margin: "0 0 6px" }}>
+                    Leave empty to fall back to the Brand Center logo. Size and radius are editable in the builder canvas.
+                  </p>
+                </Collapse>
+              </div>
+
+              <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", padding: "12px 0 6px" }}>Menu links</div>
-                {menu.map((m, i) => (
-                  <div key={`${i}-${m}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
+                {links.map((l, i) => (
+                  <div key={`${i}-${l.label}`} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 0" }}>
                     <input
                       className="ps-input"
-                      value={m}
-                      onChange={(e) => {
-                        const next = [...menu];
-                        next[i] = e.target.value;
-                        patchHeader({ menu: next });
-                      }}
-                      style={{ flex: 1 }}
+                      value={l.label}
+                      placeholder="Label"
+                      onChange={(e) => setLinks(links.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
+                      style={{ flex: 1, minWidth: 0 }}
                     />
-                    <button type="button" onClick={() => patchHeader({ menu: menu.filter((_, idx) => idx !== i) })} style={{ background: "none", border: "none", color: "var(--ps-muted)", cursor: "pointer", display: "inline-flex" }}>
+                    <input
+                      className="ps-input"
+                      value={l.href}
+                      placeholder="#section"
+                      onChange={(e) => setLinks(links.map((x, j) => (j === i ? { ...x, href: e.target.value } : x)))}
+                      style={{ flex: 1, minWidth: 0, fontFamily: "monospace", fontSize: 11.5 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLinks(links.filter((_, idx) => idx !== i))}
+                      style={{ background: "none", border: "none", color: "var(--ps-muted)", cursor: "pointer", display: "inline-flex" }}
+                    >
                       <Trash2 size={14} />
                     </button>
                   </div>
                 ))}
-                <button type="button" onClick={() => patchHeader({ menu: [...menu, "New link"] })} style={{ width: "100%", marginTop: 6, padding: "8px", borderRadius: 9, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => setLinks([...links, { label: "New link", href: "#" }])}
+                  style={{ width: "100%", marginTop: 6, padding: "8px", borderRadius: 9, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                >
                   <Plus size={14} /> Add link
                 </button>
               </div>
@@ -176,7 +298,7 @@ export function HeaderFooterModule({
                     <Toggle on={header.showTopbar} onChange={(v) => patchHeader({ showTopbar: v })} />
                   </div>
                   <div style={{ marginTop: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Style</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Base palette</div>
                     <div style={{ display: "flex", gap: 6 }}>
                       {(["light", "dark", "glass"] as const).map((v) => (
                         <button
@@ -204,63 +326,137 @@ export function HeaderFooterModule({
                 </Collapse>
               </div>
 
+              <FloatingIconsCard header={header} patchHeader={patchHeader} />
+            </>
+          ) : (
+            <>
               <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-                <Collapse title="Floating icons" icon={<Phone size={14} />} defaultOpen>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0" }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Show floating icons</span>
-                    <Toggle on={header.floatEnabled ?? true} onChange={(v) => patchHeader({ floatEnabled: v })} />
-                  </div>
-                  <p style={{ fontSize: 12, color: "var(--ps-muted)", lineHeight: 1.55, margin: "0 0 8px" }}>
-                    WhatsApp, Call, Enquire and Email stay pinned on the page. Numbers come from Brand Center and Forms.
+                <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", padding: "12px 0 2px" }}>Layout design</div>
+                <p style={{ fontSize: 11.5, color: "var(--ps-muted)", lineHeight: 1.5, margin: "2px 0 6px" }}>
+                  Switching design resets its content knobs — each template keeps its own choice.
+                </p>
+                <DesignGrid list={FOOTER_DESIGNS} value={footer.design ?? "columns"} onChange={setFooterDesign} />
+              </div>
+
+              <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
+                <Collapse title="Logo & link lists" icon={<Link2 size={14} />} defaultOpen>
+                  <FieldRow label="Footer logo">
+                    <MediaPicker
+                      kind="image"
+                      label="Upload or paste a URL"
+                      value={String(footerSettings.logoUrl ?? "")}
+                      onChange={(v) => patchFooterSettings({ logoUrl: v })}
+                    />
+                  </FieldRow>
+                  <p style={{ fontSize: 11.5, color: "var(--ps-muted)", lineHeight: 1.5, margin: "0 0 10px" }}>
+                    Leave empty to reuse the Brand Center logo.
                   </p>
-                  {(
-                    [
-                      ["floatWhatsapp", "WhatsApp"],
-                      ["floatCall", "Call"],
-                      ["floatEnquire", "Enquire"],
-                      ["floatEmail", "Email"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>{label}</span>
-                      <Toggle on={header[key] ?? true} onChange={(v) => patchHeader({ [key]: v })} />
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Custom link list</div>
+                  {footerLinkList.map((l, i) => (
+                    <div key={`${i}-${l.label}`} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0" }}>
+                      <input
+                        className="ps-input"
+                        value={l.label}
+                        placeholder="Label"
+                        onChange={(e) => patchFooterSettings({ links: footerLinkList.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })}
+                        style={{ flex: 1, minWidth: 0 }}
+                      />
+                      <input
+                        className="ps-input"
+                        value={l.href}
+                        placeholder="#section"
+                        onChange={(e) => patchFooterSettings({ links: footerLinkList.map((x, j) => (j === i ? { ...x, href: e.target.value } : x)) })}
+                        style={{ flex: 1, minWidth: 0, fontFamily: "monospace", fontSize: 11.5 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => patchFooterSettings({ links: footerLinkList.filter((_, idx) => idx !== i) })}
+                        style={{ background: "none", border: "none", color: "var(--ps-muted)", cursor: "pointer", display: "inline-flex" }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   ))}
-                  <div style={{ marginTop: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Side</div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {(["right", "left"] as const).map((side) => (
-                        <button
-                          key={side}
-                          type="button"
-                          onClick={() => patchHeader({ floatSide: side })}
-                          style={{ flex: 1, padding: "8px", borderRadius: 9, border: (header.floatSide ?? "right") === side ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)", background: (header.floatSide ?? "right") === side ? "var(--ps-primary-soft)" : "#fff", color: "var(--ps-slate)", fontSize: 12, fontWeight: 700, textTransform: "capitalize", cursor: "pointer" }}
-                        >
-                          {side}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => patchFooterSettings({ links: [...footerLinkList, { label: "New link", href: "#" }] })}
+                    style={{ width: "100%", marginTop: 6, padding: "8px", borderRadius: 9, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                  >
+                    <Plus size={14} /> Add footer link
+                  </button>
+                  <p style={{ fontSize: 11.5, color: "var(--ps-muted)", lineHeight: 1.5, margin: "8px 0 0" }}>
+                    When this list is empty the footer reuses the header menu links — fill it to give the footer its own navigation.
+                  </p>
+                </Collapse>
+              </div>
+
+              <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
+                <Collapse title="Footer settings" icon={<Globe size={14} />} defaultOpen>
+                  <FieldRow label="Copyright text">
+                    <TextField value={copyrightValue} onChange={(v) => patchFooterText("copyrightText", "copyright", v)} />
+                  </FieldRow>
+                  <FieldRow label="RERA number">
+                    <TextField value={reraValue} onChange={(v) => patchFooterText("reraText", "rera", v)} placeholder="PRM/KA/RERA/…" />
+                  </FieldRow>
+                  <p style={{ fontSize: 12, color: "var(--ps-muted)", lineHeight: 1.55, margin: "8px 0 0" }}>
+                    Links match the header menu. Brand name, phone, email and socials come from Brand Center. Colors, fonts and spacing are editable by clicking the footer in the builder canvas.
+                  </p>
                 </Collapse>
               </div>
             </>
-          ) : (
-            <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-              <Collapse title="Footer settings" icon={<Globe size={14} />} defaultOpen>
-                <FieldRow label="RERA number">
-                  <TextField value={footer.rera} onChange={(v) => patchFooter({ rera: v })} placeholder="PRM/KA/RERA/…" />
-                </FieldRow>
-                <FieldRow label="Copyright text">
-                  <TextField value={footer.copyright} onChange={(v) => patchFooter({ copyright: v })} />
-                </FieldRow>
-                <p style={{ fontSize: 12, color: "var(--ps-muted)", lineHeight: 1.55, margin: "8px 0 0" }}>
-                  Footer links match the header menu. Brand name, phone, email and socials come from Brand Center.
-                </p>
-              </Collapse>
-            </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function FloatingIconsCard({
+  header,
+  patchHeader,
+}: {
+  header: SiteConfig["header"];
+  patchHeader: (partial: Partial<SiteConfig["header"]>) => void;
+}) {
+  return (
+    <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
+      <Collapse title="Floating icons" icon={<Phone size={14} />} defaultOpen>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0" }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Show floating icons</span>
+          <Toggle on={header.floatEnabled ?? true} onChange={(v) => patchHeader({ floatEnabled: v })} />
+        </div>
+        <p style={{ fontSize: 12, color: "var(--ps-muted)", lineHeight: 1.55, margin: "0 0 8px" }}>
+          WhatsApp, Call, Enquire and Email stay pinned on the page. Numbers come from Brand Center and Forms.
+        </p>
+        {(
+          [
+            ["floatWhatsapp", "WhatsApp"],
+            ["floatCall", "Call"],
+            ["floatEnquire", "Enquire"],
+            ["floatEmail", "Email"],
+          ] as const
+        ).map(([key, label]) => (
+          <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>{label}</span>
+            <Toggle on={header[key] ?? true} onChange={(v) => patchHeader({ [key]: v })} />
+          </div>
+        ))}
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Side</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["right", "left"] as const).map((side) => (
+              <button
+                key={side}
+                type="button"
+                onClick={() => patchHeader({ floatSide: side })}
+                style={{ flex: 1, padding: "8px", borderRadius: 9, border: (header.floatSide ?? "right") === side ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)", background: (header.floatSide ?? "right") === side ? "var(--ps-primary-soft)" : "#fff", color: "var(--ps-slate)", fontSize: 12, fontWeight: 700, textTransform: "capitalize", cursor: "pointer" }}
+              >
+                {side}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Collapse>
     </div>
   );
 }

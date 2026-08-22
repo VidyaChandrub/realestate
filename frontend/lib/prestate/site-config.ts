@@ -1,5 +1,15 @@
 import type { CSSProperties } from "react";
 import type { FormLeadField, LandingPageData, SiteConfig } from "./types";
+import {
+  DEFAULT_FOOTER_DESIGN,
+  DEFAULT_HEADER_DESIGN,
+  defaultFooterSettings,
+  defaultFooterStyle,
+  defaultHeaderSettings,
+  defaultHeaderStyle,
+  labelsFromLinks,
+  linksOf,
+} from "./chrome-presets";
 
 const DEFAULT_FIELDS: FormLeadField[] = [
   { id: "f1", type: "text", label: "Full name", placeholder: "e.g. Rohan Kapoor", required: true },
@@ -56,6 +66,13 @@ export function defaultSiteConfig(input: {
       cta: "Book a Site Visit",
       ctaLink: "#contact",
       menu: ["Amenities", "Floor Plans", "Gallery", "Pricing", "Contact"],
+      menuLinks: ["Amenities", "Floor Plans", "Gallery", "Pricing", "Contact"].map((label) => ({
+        label,
+        href: `#${label.toLowerCase().replace(/\s+/g, "-")}`,
+      })),
+      design: DEFAULT_HEADER_DESIGN,
+      settings: defaultHeaderSettings(DEFAULT_HEADER_DESIGN),
+      style: defaultHeaderStyle(DEFAULT_HEADER_DESIGN),
       floatEnabled: true,
       floatSide: "right",
       floatWhatsapp: true,
@@ -66,6 +83,9 @@ export function defaultSiteConfig(input: {
     footer: {
       rera: "",
       copyright: `© ${new Date().getFullYear()} ${input.name}. All rights reserved.`,
+      design: DEFAULT_FOOTER_DESIGN,
+      settings: defaultFooterSettings(DEFAULT_FOOTER_DESIGN),
+      style: defaultFooterStyle(DEFAULT_FOOTER_DESIGN),
     },
     tracking: {
       gaId: "",
@@ -99,7 +119,7 @@ export function defaultSiteConfig(input: {
   };
 }
 
-const SEED: Record<string, Partial<{ primary: string; accent: string; brand: string; tagline: string; keywords: string; rera: string; ga: string }>> = {
+const SEED: Record<string, Partial<{ primary: string; accent: string; brand: string; tagline: string; keywords: string; rera: string; ga: string; headerDesign: string; footerDesign: string }>> = {
   p1: {
     primary: "#6D5DFC",
     accent: "#CDA45E",
@@ -108,6 +128,8 @@ const SEED: Record<string, Partial<{ primary: string; accent: string; brand: str
     keywords: "luxury apartments, sarjapur, bangalore, rera",
     rera: "PRM/KA/RERA/1251/446/PR/2026/1",
     ga: "G-AURORA01",
+    headerDesign: "classic",
+    footerDesign: "columns",
   },
   p2: {
     primary: "#0F766E",
@@ -117,6 +139,8 @@ const SEED: Record<string, Partial<{ primary: string; accent: string; brand: str
     keywords: "villas, gated community, palm grove",
     rera: "PRM/KA/RERA/1251/447/PR/2026/2",
     ga: "G-PALM02",
+    headerDesign: "centered",
+    footerDesign: "newsletter",
   },
   p3: {
     primary: "#B45309",
@@ -126,6 +150,8 @@ const SEED: Record<string, Partial<{ primary: string; accent: string; brand: str
     keywords: "commercial, office leasing, aether park",
     rera: "",
     ga: "G-AETHER03",
+    headerDesign: "split",
+    footerDesign: "cards",
   },
   p4: {
     primary: "#C026D3",
@@ -135,6 +161,8 @@ const SEED: Record<string, Partial<{ primary: string; accent: string; brand: str
     keywords: "new launch, founders offer, northstar",
     rera: "PRM/KA/RERA/1251/448/PR/2026/4",
     ga: "G-NORTH04",
+    headerDesign: "minimal",
+    footerDesign: "slimbar",
   },
 };
 
@@ -148,6 +176,7 @@ export function seedConfigFor(page: LandingPageData): SiteConfig {
     accent: extra?.accent,
   });
   if (!extra) return base;
+  const menuLinks = linksOf(base.header);
   return {
     ...base,
     seo: {
@@ -164,7 +193,21 @@ export function seedConfigFor(page: LandingPageData): SiteConfig {
       tagline: extra.tagline || base.brand.tagline,
       email: `hello@${page.domain || "example.com"}`,
     },
-    footer: { ...base.footer, rera: extra.rera || "" },
+    header: {
+      ...base.header,
+      design: (extra.headerDesign as SiteConfig["header"]["design"]) || DEFAULT_HEADER_DESIGN,
+      settings: defaultHeaderSettings((extra.headerDesign as SiteConfig["header"]["design"]) || DEFAULT_HEADER_DESIGN),
+      style: defaultHeaderStyle((extra.headerDesign as SiteConfig["header"]["design"]) || DEFAULT_HEADER_DESIGN),
+      menuLinks,
+      menu: labelsFromLinks(menuLinks),
+    },
+    footer: {
+      ...base.footer,
+      rera: extra.rera || "",
+      design: (extra.footerDesign as SiteConfig["footer"]["design"]) || DEFAULT_FOOTER_DESIGN,
+      settings: defaultFooterSettings((extra.footerDesign as SiteConfig["footer"]["design"]) || DEFAULT_FOOTER_DESIGN),
+      style: defaultFooterStyle((extra.footerDesign as SiteConfig["footer"]["design"]) || DEFAULT_FOOTER_DESIGN),
+    },
     tracking: { ...base.tracking, gaId: extra.ga || "" },
   };
 }
@@ -175,12 +218,43 @@ export function ensureConfig(page: LandingPageData): SiteConfig {
 
 function hydrateConfig(raw: SiteConfig, page: LandingPageData): SiteConfig {
   const fallback = seedConfigFor(page);
+  // Header/footer chrome: keep the stored design + customizations when present,
+  // otherwise fall back to this page's own seed — never another page's config.
+  const rawHeader = raw.header ?? fallback.header;
+  const headerDesign = rawHeader.design ?? fallback.header.design ?? DEFAULT_HEADER_DESIGN;
+  const headerMenuLinks =
+    Array.isArray(rawHeader.menuLinks) && rawHeader.menuLinks.length > 0
+      ? rawHeader.menuLinks
+      : Array.isArray(fallback.header.menuLinks)
+        ? fallback.header.menuLinks
+        : linksOf(rawHeader);
+  const header = {
+    ...fallback.header,
+    ...rawHeader,
+    design: headerDesign,
+    settings: { ...defaultHeaderSettings(headerDesign), ...(rawHeader.settings ?? {}) },
+    style: { ...defaultHeaderStyle(headerDesign), ...(rawHeader.style ?? {}) },
+    menuLinks: headerMenuLinks,
+    menu:
+      Array.isArray(rawHeader.menu) && rawHeader.menu.length > 0
+        ? rawHeader.menu
+        : headerMenuLinks.map((l) => l.label),
+  } as SiteConfig["header"];
+  const rawFooter = raw.footer ?? fallback.footer;
+  const footerDesign = rawFooter.design ?? fallback.footer.design ?? DEFAULT_FOOTER_DESIGN;
+  const footer = {
+    ...fallback.footer,
+    ...rawFooter,
+    design: footerDesign,
+    settings: { ...defaultFooterSettings(footerDesign), ...(rawFooter.settings ?? {}) },
+    style: { ...defaultFooterStyle(footerDesign), ...(rawFooter.style ?? {}) },
+  } as SiteConfig["footer"];
   return {
     page: { ...fallback.page, ...raw.page },
     seo: { ...fallback.seo, ...raw.seo },
     brand: { ...fallback.brand, ...raw.brand },
-    header: { ...fallback.header, ...raw.header, menu: raw.header?.menu?.length ? raw.header.menu : fallback.header.menu },
-    footer: { ...fallback.footer, ...raw.footer },
+    header,
+    footer,
     tracking: { ...fallback.tracking, ...raw.tracking },
     form: {
       ...fallback.form,

@@ -185,6 +185,7 @@ export function PrestateStudio() {
             }}
             onToast={toast}
             onPersist={(sections, status) => persistPage(activePage.id, sections, status)}
+            onPatchConfig={(recipe) => patchConfig(activePage.id, recipe)}
             onOpenLocalPreview={() => openLocalPreview(activePage.id)}
           />
         ) : (

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import type { Device, SectionInstance } from "@/lib/prestate/types";
 import { DYNAMIC_VARS, SLUG_ICONS } from "@/lib/prestate/data";
+import { FOOTER_DESIGNS, HEADER_DESIGNS } from "@/lib/prestate/chrome-presets";
 import { setRowColumnCount } from "@/lib/prestate/tree";
 import { Collapse, FieldRow, SliderField, TextField, Toggle, SelectField, ColorField } from "@/components/prestate/ui";
 import { MediaPicker } from "@/components/media-picker";
@@ -44,6 +45,11 @@ const FIELD_LABELS: Record<string, string> = {
 function formatFieldLabel(key: string): string {
   return FIELD_LABELS[key] ?? key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
 }
+
+const OBJECT_LIST_SEEDS: Record<string, string[]> = {
+  links: ["label", "href"],
+  socials: ["label", "href"],
+};
 
 // Enumerated settings keys get a dropdown instead of a free-text field.
 function enumOptions(fieldKey: string, widgetType?: string): { value: string; label: string }[] | null {
@@ -77,7 +83,49 @@ function enumOptions(fieldKey: string, widgetType?: string): { value: string; la
       { value: "right", label: "Right" },
     ];
   }
+  if (fieldKey === "side") {
+    return [
+      { value: "left", label: "Left" },
+      { value: "right", label: "Right" },
+    ];
+  }
+  if (fieldKey === "ctaShape") {
+    return [
+      { value: "circle", label: "Circle icon" },
+      { value: "pill", label: "Pill button" },
+    ];
+  }
   return null;
+}
+
+function DesignPicker({ kind, value, onChange }: { kind: "header" | "footer"; value: string; onChange: (v: string) => void }) {
+  const list = kind === "header" ? HEADER_DESIGNS : FOOTER_DESIGNS;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      {list.map((d) => {
+        const active = value === d.id;
+        return (
+          <button
+            key={d.id}
+            type="button"
+            onClick={() => onChange(d.id)}
+            title={d.desc}
+            style={{
+              textAlign: "left",
+              padding: "10px 11px",
+              borderRadius: 11,
+              border: active ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)",
+              background: active ? "var(--ps-primary-soft)" : "#fff",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, color: active ? "var(--ps-primary)" : "var(--ps-ink)" }}>{d.name}</div>
+            <div style={{ fontSize: 10, color: "var(--ps-muted)", marginTop: 2, lineHeight: 1.35 }}>{d.desc}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function ContentField({
@@ -118,7 +166,7 @@ function ContentField({
     }
     return (
       <FieldRow label={label}>
-        <ObjectList label={label} widgetType={widgetType} value={value as Record<string, unknown>[]} onChange={(v) => onChange(v)} />
+        <ObjectList label={label} widgetType={widgetType} value={value as Record<string, unknown>[]} onChange={(v) => onChange(v)} seedKeys={OBJECT_LIST_SEEDS[fieldKey]} />
       </FieldRow>
     );
   }
@@ -180,9 +228,10 @@ function StringList({ value, onChange, media }: { value: string[]; onChange: (v:
   );
 }
 
-function ObjectList({ label, widgetType, value, onChange }: { label: string; widgetType?: string; value: Record<string, unknown>[]; onChange: (v: Record<string, unknown>[]) => void }) {
+function ObjectList({ label, widgetType, value, onChange, seedKeys }: { label: string; widgetType?: string; value: Record<string, unknown>[]; onChange: (v: Record<string, unknown>[]) => void; seedKeys?: string[] }) {
   const [open, setOpen] = useState<number | null>(0);
-  const keys = Object.keys(value[0] ?? {});
+  let keys = Object.keys(value[0] ?? {});
+  if (!keys.length && seedKeys?.length) keys = seedKeys;
   const titleKey = keys.find((k) => ["title", "name", "label", "value", "q", "heading"].includes(k)) ?? keys[0];
   return (
     <div>
@@ -398,6 +447,10 @@ export function SettingsPanel({
                       }}
                       suffix=""
                     />
+                  </FieldRow>
+                ) : key === "design" && (section.type === "header" || section.type === "footer") ? (
+                  <FieldRow label="Layout design">
+                    <DesignPicker kind={section.type} value={String(value ?? "")} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
                   </FieldRow>
                 ) : (
                   <ContentField fieldKey={key} widgetType={section.type} label={formatFieldLabel(key)} value={value} onChange={(v) => set({ settings: { ...section.settings, [key]: v } })} />
@@ -667,6 +720,8 @@ function SpacingGrid({ values, onChange }: { values?: { top: number; right: numb
 
 function iconForSection(s: SectionInstance) {
   const map: Record<string, typeof Palette> = {
+    header: Monitor,
+    footer: Tablet,
     hero: LayoutPanelTop,
     highlights: Palette,
     overview: LayoutPanelTop,
