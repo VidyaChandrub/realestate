@@ -1,16 +1,18 @@
+import type { DesignSystemState } from "./design-system";
+
 export type Device = "desktop" | "tablet" | "mobile";
 
 export type ModuleKey =
   | "builder"
   | "pages"
   | "templates"
-  | "properties"
   | "forms"
   | "brand"
   | "headerfooter"
   | "seo"
   | "tracking"
-  | "domains";
+  | "domains"
+  | "typography";
 
 export type WidgetCategory =
   | "Layout"
@@ -23,6 +25,17 @@ export type WidgetCategory =
   | "SEO"
   | "Advanced";
 
+export interface MenuLink {
+  label: string;
+  href: string;
+}
+
+export type HeaderDesignId = "classic" | "centered" | "ribbon" | "minimal" | "overlay";
+export type FooterDesignId = "columns" | "centered" | "newsletter" | "slimbar" | "cards";
+
+/** Length value: a plain number is treated as px; strings pass through as-is ("10px", "1rem", "50%"). */
+export type CssLength = number | string;
+
 export interface SectionStyle {
   colors?: {
     bg?: string;
@@ -33,15 +46,19 @@ export interface SectionStyle {
   };
   typography?: {
     fontFamily?: string;
-    fontSize?: number;
+    fontSize?: CssLength;
     fontWeight?: number;
     lineHeight?: number;
     letterSpacing?: number;
+    /** Per-widget overrides for the design-system tokens. */
+    textTransform?: string;
+    textColor?: string;
+    paragraphSpacing?: CssLength;
   };
   border?: {
-    width?: number;
+    width?: CssLength;
     style?: string;
-    radius?: number;
+    radius?: CssLength;
     color?: string;
   };
   effects?: {
@@ -52,15 +69,15 @@ export interface SectionStyle {
     animation?: string;
   };
   spacing?: {
-    padding?: { top: number; right: number; bottom: number; left: number };
-    margin?: { top: number; right: number; bottom: number; left: number };
-    gap?: number;
+    padding?: { top: CssLength; right: CssLength; bottom: CssLength; left: CssLength };
+    margin?: { top: CssLength; right: CssLength; bottom: CssLength; left: CssLength };
+    gap?: CssLength;
   };
   layout?: {
     width?: "boxed" | "full" | "custom";
-    customWidth?: number;
+    customWidth?: CssLength;
     height?: "auto" | "fixed" | "vh";
-    fixedHeight?: number;
+    fixedHeight?: CssLength;
     align?: "left" | "center" | "right";
     direction?: "row" | "column";
     wrap?: boolean;
@@ -177,10 +194,24 @@ export interface SiteConfig {
     floatCall: boolean;
     floatEnquire: boolean;
     floatEmail: boolean;
+    /** Which of the 5 reusable header layouts this template uses. */
+    design?: HeaderDesignId;
+    /** Editable nav links (label + href). Preferred over the legacy string menu. */
+    menuLinks?: MenuLink[];
+    /** Design-specific content settings — every text, button, icon and link. */
+    settings?: Record<string, unknown>;
+    /** Full style customization (colors, typography, spacing, border, layout, responsive). */
+    style?: SectionStyle;
   };
   footer: {
     rera: string;
     copyright: string;
+    /** Which of the 5 reusable footer layouts this template uses. */
+    design?: FooterDesignId;
+    /** Design-specific content settings — every text, button, icon and link. */
+    settings?: Record<string, unknown>;
+    /** Full style customization (colors, typography, spacing, border, layout, responsive). */
+    style?: SectionStyle;
   };
   tracking: {
     gaId: string;
@@ -206,11 +237,25 @@ export interface SiteConfig {
     sendWhatsapp: boolean;
     redirectThankYou: boolean;
     submitLabel: string;
+    deliverableUrl: string;
+    deliverableLabel: string;
     fields: FormLeadField[];
+    /** Post-submit behaviour: inline message, Thank You page redirect, or custom URL. */
+    successAction: FormSuccessAction;
+    /** Custom URL used when successAction === "url". */
+    successUrl: string;
+    /** Headline shown on the inline success state. */
+    successTitle: string;
+    /** Message shown above fields when validation fails. */
+    errorMessage: string;
+    /** Conditional action: open this popup (by id) after a successful submit. */
+    openPopupId: string;
   };
   media: {
     notes: string;
   };
+  /** Per-template design system — typography scope (template/global) + tokens. */
+  designSystem?: DesignSystemState;
 }
 
 export interface LandingPageData {
@@ -228,7 +273,17 @@ export interface LandingPageData {
   config?: SiteConfig;
   kind?: "preset" | "custom";
   designId?: string;
+  /** Landing pages convert; thank-you pages confirm and hand over deliverables. */
+  pageType?: "landing" | "thank-you";
+  /** For thank-you pages: the landing page id they belong to. */
+  parentPageId?: string;
 }
+
+/** What happens after a successful (validated) form submission. */
+export type FormSuccessAction = "message" | "thankyou" | "url";
+
+/** How a conditional popup is opened on the live page. */
+export type PopupTrigger = "load" | "delay" | "scroll" | "exit" | "click" | "form-success" | "url-param";
 
 export interface FormTemplateData {
   id: string;

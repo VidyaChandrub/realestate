@@ -49,11 +49,6 @@ export class AdminOrganisationsController {
     return this.adminOrganisationsService.listUsers(id);
   }
 
-  @Get(':id/templates')
-  listTemplates(@Param('id') id: string) {
-    return this.adminOrganisationsService.listTemplates(id);
-  }
-
   @Get(':id/activity')
   listActivity(@Param('id') id: string) {
     return this.adminOrganisationsService.listActivity(id);

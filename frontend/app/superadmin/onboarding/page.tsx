@@ -9,8 +9,6 @@ import { slugify } from "@/lib/slug";
 import { Switch } from "@/components/superadmin/switch";
 import type {
   ActivateOrganisationResponse,
-  AdminTemplate,
-  AdminTemplateListResponse,
   OnboardAdminInput,
   OnboardCompanyInput,
   OnboardCompanyResponse,
@@ -22,8 +20,7 @@ const STEPS = [
   { n: 1, label: "Company" },
   { n: 2, label: "Admin account" },
   { n: 3, label: "Plan" },
-  { n: 4, label: "Templates & modules" },
-  { n: 5, label: "Review" },
+  { n: 4, label: "Review" },
 ];
 
 const STORAGE_KEY = "be.onboarding_wizard";
@@ -35,7 +32,6 @@ interface WizardState {
   slug: string | null;
   admin: Omit<OnboardAdminInput, "send_via"> & { send_via: SendViaChannel[] };
   adminSummary: SafeUser | null;
-  templateIds: string[];
   activated: ActivateOrganisationResponse | null;
 }
 
@@ -53,7 +49,6 @@ const INITIAL_STATE: WizardState = {
     send_via: ["email"],
   },
   adminSummary: null,
-  templateIds: [],
   activated: null,
 };
 
@@ -95,10 +90,6 @@ export default function SuperAdminOnboardingPage() {
   const [activateError, setActivateError] = useState<string | null>(null);
   const [activating, setActivating] = useState(false);
 
-  const [templates, setTemplates] = useState<AdminTemplate[] | null>(null);
-  const [templatesLoading, setTemplatesLoading] = useState(false);
-  const [templatesError, setTemplatesError] = useState<string | null>(null);
-
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
     setWizard(loadWizardState());
@@ -117,36 +108,8 @@ export default function SuperAdminOnboardingPage() {
     }
   }, [authLoading, accessToken, router]);
 
-  useEffect(() => {
-    if (!accessToken || wizard.step !== 4 || templates !== null || templatesLoading) return;
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setTemplatesLoading(true);
-    setTemplatesError(null);
-    /* eslint-enable react-hooks/set-state-in-effect */
-    // "Template" is a published LandingPage — reusing the builder's own
-    // listing endpoint rather than a separate templates catalog.
-    apiFetch<AdminTemplateListResponse>("/admin/landing-pages?status=published&limit=100", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then((res) => setTemplates(res.data))
-      .catch((err) =>
-        setTemplatesError(err instanceof Error ? err.message : "Failed to load templates."),
-      )
-      .finally(() => setTemplatesLoading(false));
-  }, [accessToken, wizard.step, templates, templatesLoading]);
-
   function authHeaders() {
     return { Authorization: `Bearer ${accessToken}` };
-  }
-
-  function toggleTemplate(id: string) {
-    setWizard((w) => {
-      const has = w.templateIds.includes(id);
-      const templateIds = has
-        ? w.templateIds.filter((t) => t !== id)
-        : [...w.templateIds, id];
-      return { ...w, templateIds };
-    });
   }
 
   function goTo(step: number) {
@@ -217,7 +180,7 @@ export default function SuperAdminOnboardingPage() {
         {
           method: "POST",
           headers: authHeaders(),
-          body: JSON.stringify({ template_ids: wizard.templateIds }),
+          body: JSON.stringify({}),
         },
       );
       setWizard((w) => ({ ...w, activated: res }));
@@ -264,8 +227,8 @@ export default function SuperAdminOnboardingPage() {
           <div className="eyebrow">✨ New organisation</div>
           <h1>Onboard an organisation</h1>
           <div className="sub">
-            Set up a developer or agency, create its admin, choose a plan, and grant starter
-            templates — all in one flow.
+            Set up a developer or agency, create its admin, and choose a plan — all in one
+            flow.
           </div>
         </div>
       </div>
@@ -320,24 +283,11 @@ export default function SuperAdminOnboardingPage() {
           ) : null}
 
           {wizard.step === 4 ? (
-            <StepTemplates
-              templates={templates}
-              loading={templatesLoading}
-              error={templatesError}
-              selectedIds={wizard.templateIds}
-              onToggle={toggleTemplate}
-              onBack={() => goTo(3)}
-              onContinue={() => goTo(5)}
-            />
-          ) : null}
-
-          {wizard.step === 5 ? (
             <StepReview
               wizard={wizard}
-              templates={templates}
               activateError={activateError}
               activating={activating}
-              onBack={() => goTo(4)}
+              onBack={() => goTo(3)}
               onActivate={handleActivate}
               onStartOver={startOver}
             />
@@ -411,27 +361,6 @@ export default function SuperAdminOnboardingPage() {
                   <b style={{ fontSize: 13, color: "var(--muted)" }}>Plan</b>
                   <div className="tt">Skipped — not built yet</div>
                 </li>
-                <li>
-                  <span
-                    className="td"
-                    style={{
-                      background: wizard.templateIds.length ? "var(--green)" : "var(--line-2)",
-                    }}
-                  />
-                  <b
-                    style={{
-                      fontSize: 13,
-                      color: wizard.templateIds.length ? undefined : "var(--muted)",
-                    }}
-                  >
-                    Templates &amp; modules
-                  </b>
-                  <div className="tt">
-                    {wizard.templateIds.length
-                      ? `${wizard.templateIds.length} template${wizard.templateIds.length === 1 ? "" : "s"} selected`
-                      : "None selected"}
-                  </div>
-                </li>
               </ul>
             </div>
           </div>
@@ -439,8 +368,8 @@ export default function SuperAdminOnboardingPage() {
             <b>What happens on activate</b>
             <br />
             The organisation goes live, the admin&apos;s credentials are emailed, and an audit
-            log entry is recorded. The admin can then sign in and start creating teams &amp;
-            landing pages.
+            log entry is recorded. The admin can then sign in and start building sites with the
+            Prestate builder.
           </div>
         </div>
       </div>
@@ -701,82 +630,8 @@ function StepComingSoon({
   );
 }
 
-function StepTemplates({
-  templates,
-  loading,
-  error,
-  selectedIds,
-  onToggle,
-  onBack,
-  onContinue,
-}: {
-  templates: AdminTemplate[] | null;
-  loading: boolean;
-  error: string | null;
-  selectedIds: string[];
-  onToggle: (id: string) => void;
-  onBack: () => void;
-  onContinue: () => void;
-}) {
-  return (
-    <>
-      <div className="card-h">
-        <span className="t">Step 4 · Templates &amp; modules</span>
-        <span className="x">Grant starter templates now, or skip and assign later</span>
-      </div>
-      <div className="card-b">
-        {error ? <div className="form-alert">{error}</div> : null}
-        {loading ? (
-          <p className="muted">Loading templates…</p>
-        ) : !templates || templates.length === 0 ? (
-          <p className="muted">No templates available yet.</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {templates.map((t) => (
-              <div
-                key={t.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "10px 14px",
-                  border: "1px solid var(--line)",
-                  borderRadius: 12,
-                }}
-              >
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(t.id)}
-                    onChange={() => onToggle(t.id)}
-                  />{" "}
-                  {t.name}
-                </label>
-                {/* Every LandingPage is free for now — it has no pricing field.
-                    TODO: once subscription plans exist, this may need a real
-                    Free/Paid badge driven by plan-based access. */}
-                <span className="badge b-green">Free</span>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="divider" />
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <button className="btn btn-ghost" type="button" onClick={onBack}>
-            ← Back
-          </button>
-          <button className="btn btn-primary" type="button" onClick={onContinue}>
-            Continue to review →
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
 function StepReview({
   wizard,
-  templates,
   activateError,
   activating,
   onBack,
@@ -784,16 +639,12 @@ function StepReview({
   onStartOver,
 }: {
   wizard: WizardState;
-  templates: AdminTemplate[] | null;
   activateError: string | null;
   activating: boolean;
   onBack: () => void;
   onActivate: () => void;
   onStartOver: () => void;
 }) {
-  const selectedTemplateNames = wizard.templateIds
-    .map((id) => templates?.find((t) => t.id === id)?.name)
-    .filter((name): name is string => Boolean(name));
   if (wizard.activated) {
     return (
       <>
@@ -822,7 +673,7 @@ function StepReview({
   return (
     <>
       <div className="card-h">
-        <span className="t">Step 5 · Review &amp; activate</span>
+        <span className="t">Step 4 · Review &amp; activate</span>
         <span className="x">Double-check before going live</span>
       </div>
       <div className="card-b">
@@ -848,12 +699,6 @@ function StepReview({
         <div className="field">
           <label>Plan</label>
           <div className="hint">Skipped — not built yet</div>
-        </div>
-        <div className="field">
-          <label>Templates &amp; modules</label>
-          <div className="hint">
-            {selectedTemplateNames.length ? selectedTemplateNames.join(", ") : "None selected"}
-          </div>
         </div>
         {activateError ? <div className="form-alert">{activateError}</div> : null}
         <div className="divider" />

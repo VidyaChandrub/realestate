@@ -5,9 +5,9 @@ function uid(prefix = "sec"): string {
 }
 
 const defaultStyle = (over?: Partial<SectionStyle>): SectionStyle => ({
-  colors: { bg: "#ffffff", overlay: "", gradient: "", text: "#111827" },
-  typography: { fontFamily: "Inter", fontSize: 16, fontWeight: 400, lineHeight: 1.6, letterSpacing: 0 },
-  spacing: { padding: { top: 72, right: 24, bottom: 72, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 },
+  colors: { bg: "transparent", overlay: "", gradient: "", text: "" },
+  typography: {},
+  spacing: { padding: { top: 64, right: 24, bottom: 64, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 },
   layout: { width: "full", height: "auto", align: "center", direction: "row", wrap: true, justify: "center", alignItems: "center" },
   responsive: {},
   ...over,
@@ -28,54 +28,62 @@ const sec = (
   style: defaultStyle(style),
 });
 
+// ---------------------------------------------------------------------------
+// Template catalog — four conversion-focused advertising layouts
+// ---------------------------------------------------------------------------
+
 export const PAGE_TEMPLATES: TemplateData[] = [
   {
-    id: "tpl-luxury",
-    name: "Luxury Apartments",
-    category: "Apartment",
+    id: "tpl-premium",
+    name: "Premium Property",
+    category: "Premium",
     icon: "Building2",
-    pages: 24,
-    conversions: "12.4%",
+    pages: 26,
+    conversions: "12.8%",
     accent: "#6D5DFC",
-    accent2: "#0e1220",
+    accent2: "#101322",
     thumbnail: "hero",
-    description: "High-rise residences with a cinematic hero, amenity deck, floor plans, pricing and a sticky booking bar.",
+    description:
+      "Classic premium funnel — hero with proof stats, overview, gallery, amenities, pricing, location, testimonials, enquiry and a gated brochure.",
   },
   {
-    id: "tpl-villas",
-    name: "Villa Estates",
-    category: "Villa",
-    icon: "Home",
-    pages: 18,
-    conversions: "11.2%",
-    accent: "#0F766E",
-    accent2: "#06201e",
-    thumbnail: "villa",
-    description: "Gated villa community with estate overview, private amenities, plot sizes and a quieter, editorial layout.",
-  },
-  {
-    id: "tpl-commercial",
-    name: "Commercial Park",
-    category: "Commercial",
-    icon: "Store",
-    pages: 12,
-    conversions: "8.9%",
-    accent: "#B45309",
-    accent2: "#2a1600",
-    thumbnail: "commercial",
-    description: "Grade-A office and retail leasing page with specs, floor plates, location connectivity and a tenant enquiry form.",
-  },
-  {
-    id: "tpl-launch",
-    name: "New Launch",
-    category: "Campaign",
+    id: "tpl-leads",
+    name: "Lead Generation",
+    category: "Lead Gen",
     icon: "Rocket",
-    pages: 19,
-    conversions: "17.1%",
-    accent: "#C026D3",
-    accent2: "#24022a",
+    pages: 21,
+    conversions: "16.9%",
+    accent: "#2563EB",
+    accent2: "#0b1220",
     thumbnail: "tour",
-    description: "Urgency-led launch campaign with countdown, offer banner, limited inventory CTA and a fast lead form.",
+    description:
+      "Above-the-fold lead form beside the hero, benefits, pricing, features, gallery, location, countdown offer, FAQ and a final CTA wall.",
+  },
+  {
+    id: "tpl-luxe",
+    name: "Luxury Property",
+    category: "Luxury",
+    icon: "Crown",
+    pages: 17,
+    conversions: "11.4%",
+    accent: "#B08D57",
+    accent2: "#171310",
+    thumbnail: "lobby",
+    description:
+      "Cinematic full-screen visuals, champagne-gold detailing, property details, lightboxed gallery, floor plans, developer story and enquiry.",
+  },
+  {
+    id: "tpl-adcamp",
+    name: "Ad Campaign Landing Page",
+    category: "Campaign",
+    icon: "Megaphone",
+    pages: 23,
+    conversions: "18.2%",
+    accent: "#E11D48",
+    accent2: "#2a0a12",
+    thumbnail: "commercial",
+    description:
+      "Built for Google/Meta traffic — urgency countdown, statistics, configurations, lifestyle benefits, connectivity, FAQ, lead form and gated brochure.",
   },
 ];
 
@@ -92,66 +100,89 @@ export const BLANK_TEMPLATE: TemplateData = {
   description: "Empty canvas. Add any layout, hero, form or media widget and build your own section pattern.",
 };
 
+/** Map any legacy/template name onto the current four-template catalog. */
 export function inferDesignId(template: string): string {
   const key = template.trim().toLowerCase();
   if (key === "tpl-blank" || key.includes("scratch") || key === "blank" || key === "custom") return "tpl-blank";
-  if (key.includes("villa") || key === "tpl-villas") return "tpl-villas";
-  if (key.includes("commercial") || key === "tpl-commercial") return "tpl-commercial";
-  if (key.includes("launch") || key.includes("campaign") || key === "tpl-launch") return "tpl-launch";
-  if (key.includes("luxury") || key === "tpl-luxury") return "tpl-luxury";
-  return "tpl-luxury";
+  if (
+    key.includes("premium") ||
+    key === "tpl-premium" ||
+    key.includes("villa") ||
+    key === "tpl-villas"
+  )
+    return "tpl-premium";
+  if (key.includes("luxe") || key === "tpl-luxe" || key.includes("luxury")) return "tpl-luxe";
+  if (
+    key.includes("adcamp") ||
+    key.includes("campaign") ||
+    key.includes("launch") ||
+    key.includes("commercial") ||
+    key === "tpl-launch" ||
+    key === "tpl-commercial"
+  )
+    return "tpl-adcamp";
+  if (key.includes("lead") || key === "tpl-leads") return "tpl-leads";
+  return "tpl-premium";
 }
 
 export function buildTemplateSections(idOrName: string): SectionInstance[] {
   const key = idOrName.trim().toLowerCase();
   if (key === "tpl-blank" || key.includes("scratch") || key === "blank") return [];
-  if (key.includes("villa") || key === "tpl-villas") return villaSections();
-  if (key.includes("commercial") || key === "tpl-commercial") return commercialSections();
-  if (key.includes("launch") || key.includes("campaign") || key === "tpl-launch") return launchSections();
-  return luxurySections();
+  const design = inferDesignId(key);
+  switch (design) {
+    case "tpl-leads":
+      return leadGenSections();
+    case "tpl-luxe":
+      return luxeSections();
+    case "tpl-adcamp":
+      return adCampaignSections();
+    default:
+      return premiumSections();
+  }
 }
 
-function luxurySections(): SectionInstance[] {
+// ---------------------------------------------------------------------------
+// Template 1 — Premium Property
+// Hero → Overview → Highlights → Gallery → Amenities → Pricing → Location →
+// Testimonials → Enquiry → Brochure CTA
+// ---------------------------------------------------------------------------
+
+function premiumSections(): SectionInstance[] {
   return [
-    sec("announcement", "Announcement Bar", "Megaphone", { text: "Launch Offer — Flat 5% off on the first 20 bookings.", linkLabel: "", link: "#lead" }, { colors: { bg: "#000000", text: "#f4f1ea" }, spacing: { padding: { top: 10, right: 24, bottom: 10, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
     sec(
       "hero",
       "Hero Banner",
       "LayoutPanelTop",
       {
         eyebrow: "RERA APPROVED • SARJAPUR ROAD",
-        heading: "Luxury Apartments in Bangalore",
-        subheading: "3 & 4 BHK Premium Residences",
-        price: "₹1.25 Cr",
+        heading: "Premium 3 & 4 BHK Residences in Bangalore",
+        subheading: "Two sculpted towers on a 2.5-acre landscaped campus",
+        price: "{{starting_price}}",
         priceLabel: "STARTING FROM",
         heroArt: "hero",
         accent: "#cda45e",
         priceNote: "All-inclusive · Possession Dec 2027",
+        primaryAction: "link",
+        primaryLink: "#enquiry",
         ctaPrimary: "Book Site Visit",
+        secondaryAction: "brochure",
         ctaSecondary: "Download Brochure",
-        highlights: ["25+ Amenities", "RERA Approved", "2 Towers", "2.5 Acres", "Metro Connectivity"],
+        highlights: ["25+ Amenities", "RERA Approved", "Metro Connectivity"],
         heroStats: [
           { value: "3 & 4 BHK", label: "Configurations" },
           { value: "312", label: "Residences" },
           { value: "2.5 Ac", label: "Campus" },
           { value: "Dec 2027", label: "Possession" },
         ],
+        gateHeading: "Get the Aurora brochure",
+        gateText: "Share your details — the PDF downloads instantly.",
       },
       {
-        colors: { bg: "#0e1220", overlay: "rgba(8,10,20,0.55)", text: "#ffffff" },
-        layout: { width: "full", height: "vh", fixedHeight: 780, align: "left", direction: "column", justify: "center", alignItems: "flex-start" },
-        spacing: { padding: { top: 160, right: 0, bottom: 120, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
+        colors: { bg: "#101322", overlay: "rgba(10,13,28,0.52)", text: "#ffffff" },
+        layout: { width: "full", height: "vh", fixedHeight: 760, align: "left", direction: "column", justify: "center", alignItems: "flex-start" },
+        spacing: { padding: { top: 150, right: 0, bottom: 110, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
       },
     ),
-    sec("highlights", "Property Highlights", "Award", {
-      items: [
-        { icon: "SwimmingPool", value: "25+", label: "Resort Amenities" },
-        { icon: "ShieldCheck", value: "RERA", label: "Approved Project" },
-        { icon: "Building2", value: "2", label: "Premium Towers" },
-        { icon: "LandPlot", value: "2.5 Ac", label: "Landscaped Campus" },
-        { icon: "TrainFront", value: "500 m", label: "Metro Connectivity" },
-      ],
-    }, { colors: { bg: "#ffffff", text: "#111827" }, spacing: { padding: { top: 28, right: 24, bottom: 28, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 } }),
     sec("overview", "Property Overview", "Building2", {
       eyebrow: "About the Project",
       heading: "A New Address for Elevated Living",
@@ -160,480 +191,556 @@ function luxurySections(): SectionInstance[] {
       stats: [
         { value: "312", label: "Residences" },
         { value: "28", label: "Floors" },
-        { value: "Dec 2027", label: "Possession" },
+        { value: "70%", label: "Open Space" },
       ],
       image: "overview",
+    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("highlights", "Key Highlights", "Award", {
+      items: [
+        { icon: "SwimmingPool", value: "25+", label: "Resort Amenities" },
+        { icon: "ShieldCheck", value: "RERA", label: "Approved Project" },
+        { icon: "TrainFront", value: "500 m", label: "To Metro" },
+        { icon: "LandPlot", value: "2.5 Ac", label: "Green Campus" },
+        { icon: "CalendarClock", value: "2027", label: "Possession" },
+      ],
+    }, { colors: { bg: "#f8fafc", text: "#111827" }, spacing: { padding: { top: 26, right: 24, bottom: 26, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 } }),
+    sec("gallery", "Project Gallery", "Images", {
+      eyebrow: "Gallery",
+      heading: "Step Inside the Residences",
+      text: "Towers, amenity deck and landscaped campus — captured in natural light.",
+      images: ["skyline", "lobby", "pool", "tower", "garden", "interior"],
+      columns: 3,
+      lightbox: true,
     }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
     sec("amenities", "Amenities", "Dumbbell", {
       eyebrow: "Lifestyle",
       heading: "25+ Resort-Grade Amenities",
-      text: "Four levels of leisure, wellness and recreation — curated for every generation in your family.",
+      text: "Four levels of leisure, wellness and recreation — curated for every generation.",
       items: [
-        { icon: "SwimmingPool", title: "Infinity Pool", desc: "Temperature-controlled lap pool on the sky deck" },
-        { icon: "Dumbbell", title: "Gymnasium", desc: "Imported strength & cardio equipment" },
-        { icon: "Music", title: "Sky Lounge", desc: "Private lounge with panoramic city views" },
-        { icon: "Leaf", title: "Yoga Deck", desc: "Morning wellness overlooking the gardens" },
+        { icon: "SwimmingPool", title: "Infinity Pool", desc: "Temperature-controlled lap pool" },
+        { icon: "Dumbbell", title: "Gymnasium", desc: "Strength & cardio equipment" },
+        { icon: "Music", title: "Sky Lounge", desc: "Panoramic city views" },
+        { icon: "Leaf", title: "Yoga Deck", desc: "Morning wellness sessions" },
         { icon: "Trophy", title: "Clubhouse", desc: "6,000 sq.ft member clubhouse" },
-        { icon: "Sun", title: "Spa & Steam", desc: "Rejuvenation suites with spa grade amenities" },
-        { icon: "BookOpen", title: "Reading Lounge", desc: "Quiet library with curated collection" },
-        { icon: "Car", title: "EV Charging", desc: "Charging for every parking bay" },
+        { icon: "Sun", title: "Spa & Steam", desc: "Rejuvenation suites" },
+        { icon: "BookOpen", title: "Reading Lounge", desc: "Quiet curated library" },
+        { icon: "Car", title: "EV Charging", desc: "Every parking bay ready" },
       ],
     }, { colors: { bg: "#f8fafc", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("floorplans", "Floor Plans", "Grid", {
-      eyebrow: "Configurations",
-      heading: "Floor Plans That Breathe",
-      text: "Every plan is designed for natural light and cross-ventilation, with generous balconies and Vastu-compliant orientation.",
-      plans: [
-        { name: "3 BHK", beds: "3", area: "1,650 sq.ft", price: "₹1.25 Cr" },
-        { name: "3 BHK + Study", beds: "3", area: "1,950 sq.ft", price: "₹1.55 Cr" },
-        { name: "4 BHK", beds: "4", area: "2,450 sq.ft", price: "₹1.95 Cr" },
-        { name: "Penthouse", beds: "4", area: "3,100 sq.ft", price: "₹3.20 Cr" },
-      ],
-      note: "All prices include clubhouse membership.",
-    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("gallery", "Property Gallery", "Images", {
-      eyebrow: "Gallery",
-      heading: "Step Inside Aurora",
-      text: "Explore the residences, amenity deck and landscaped campus.",
-      images: ["skyline", "lobby", "pool", "tower", "garden", "interior"],
-      columns: 3,
-    }, { colors: { bg: "#f8fafc", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("virtual-tour", "Virtual Tour", "Play", {
-      eyebrow: "Experience",
-      heading: "Take the Virtual Tour",
-      text: "Walk through the model apartment, amenity deck and sky lounge from anywhere.",
-      videoTitle: "Aurora Residences — Official Walkthrough",
-      duration: "2:14",
-      poster: "tour",
-    }, { colors: { bg: "#111827", text: "#ffffff", overlay: "rgba(17,24,39,0.5)" }, layout: { width: "boxed", height: "auto", align: "center", direction: "column" } }),
-    sec("location-advantages", "Location Advantages", "Navigation", {
-      eyebrow: "Location",
-      heading: "Everything You Need, Within Reach",
-      text: "Positioned on Sarjapur Road, Aurora connects you to the city's best schools, offices and lifestyle districts in minutes.",
-      items: [
-        { icon: "School", title: "Greenwood High", meta: "2.4 km" },
-        { icon: "Store", title: "Gopalan Signature Mall", meta: "3.1 km" },
-        { icon: "Hospital", title: "Columbia Asia Hospital", meta: "2.8 km" },
-        { icon: "TrainFront", title: "Metro Station", meta: "500 m" },
-        { icon: "Building2", title: "ORR Tech Corridor", meta: "4.2 km" },
-        { icon: "LandPlot", title: "Silk Board Junction", meta: "5.6 km" },
-      ],
-      mapAddress: "Sarjapur Road, Bangalore",
-    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
     sec("pricing", "Pricing Table", "Wallet", {
       eyebrow: "Investment",
-      heading: "Pricing & Configurations",
-      text: "Transparent pricing with flexible payment plans from all major banks.",
+      heading: "Transparent Pricing",
+      text: "Flexible payment plans from all major banks. Prices all-inclusive.",
       plans: [
-        { name: "3 BHK", area: "1,650 sq.ft", price: "₹1.25 Cr", per: "Onwards", features: ["3 Bedrooms", "3 Bathrooms", "Balcony", "2 Parking", "Clubhouse Access"], cta: "Book a Site Visit", featured: false },
-        { name: "4 BHK", area: "2,450 sq.ft", price: "₹1.95 Cr", per: "Onwards", features: ["4 Bedrooms", "4 Bathrooms", "Large Balcony", "2 Parking", "Smart Home"], cta: "Book a Site Visit", featured: true },
-        { name: "Penthouse", area: "3,100 sq.ft", price: "₹3.20 Cr", per: "Onwards", features: ["Sky Deck Access", "Private Elevator", "3 Parking", "Private Pool"], cta: "Request a Call", featured: false },
+        { name: "3 BHK", area: "1,650 sq.ft", price: "₹1.25 Cr", per: "onwards", features: ["3 Bedrooms", "3 Bathrooms", "2 Parking", "Clubhouse Access"], cta: "Enquire Now", featured: false },
+        { name: "4 BHK", area: "2,450 sq.ft", price: "₹1.95 Cr", per: "onwards", features: ["4 Bedrooms", "Large Balcony", "2 Parking", "Smart Home"], cta: "Enquire Now", featured: true },
+        { name: "Penthouse", area: "3,100 sq.ft", price: "₹3.20 Cr", per: "onwards", features: ["Private Elevator", "Sky Deck", "3 Parking", "Private Pool"], cta: "Request Callback", featured: false },
+      ],
+    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("map", "Location & Map", "MapPin", {
+      address: "Sarjapur Road, Bangalore",
+      zoom: 14,
+      eyebrow: "Location",
+      heading: "Everything Within Reach",
+      text: "Schools, hospitals, malls and the metro — minutes from your door.",
+      items: [
+        { icon: "School", title: "Greenwood High", meta: "2.4 km" },
+        { icon: "Hospital", title: "Columbia Asia", meta: "2.8 km" },
+        { icon: "TrainFront", title: "Metro Station", meta: "500 m" },
+        { icon: "Store", title: "Signature Mall", meta: "3.1 km" },
       ],
     }, { colors: { bg: "#f8fafc", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
     sec("testimonials", "Testimonials", "Quote", {
       eyebrow: "What Homebuyers Say",
       heading: "Loved by Families Like Yours",
       items: [
-        { name: "Rahul & Ananya Sharma", role: "Booked 4 BHK · Tower B", quote: "The transparency on pricing and the construction quality sold us instantly.", rating: 5 },
-        { name: "Kavitha Reddy", role: "Booked 3 BHK · Tower A", quote: "Aurora's amenity deck and 500m metro access made the decision easy.", rating: 5 },
-        { name: "Amit & Neha Joshi", role: "Booked 3 BHK + Study", quote: "From the virtual tour to the final booking, every step was seamless.", rating: 5 },
+        { name: "Rahul & Ananya Sharma", role: "Booked 4 BHK · Tower B", quote: "The transparency on pricing and construction quality sold us instantly.", rating: 5 },
+        { name: "Kavitha Reddy", role: "Booked 3 BHK · Tower A", quote: "The amenity deck and 500m metro access made the decision easy.", rating: 5 },
+        { name: "Amit & Neha Joshi", role: "Booked 3 BHK + Study", quote: "From virtual tour to booking, every step was seamless.", rating: 5 },
       ],
     }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("faq", "FAQ", "Tabs", {
-      eyebrow: "Have Questions?",
-      heading: "Frequently Asked Questions",
-      items: [
-        { q: "When is possession?", a: "December 2027. Construction is on track." },
-        { q: "What is the 3 BHK price range?", a: "3 BHK homes start from ₹1.25 Cr, all-inclusive." },
-        { q: "Is the project RERA approved?", a: "Yes — PRM/KA/RERA/1251/446/PR/210812/004231." },
-        { q: "Can I book a virtual site visit?", a: "Yes. Use the form below and we will schedule a guided walkthrough." },
-      ],
-    }, { colors: { bg: "#f8fafc", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("multistep-form", "Book Site Visit", "Table2", {
+    sec("enquiry-form", "Enquiry Form", "Send", {
       eyebrow: "Private Tour",
       heading: "Book Your Site Visit",
-      sub: "Reserve your private tour in under a minute.",
-      steps: ["Your Details", "Preferences", "Confirm"],
-      button: "Book My Visit",
-      fields: [
-        { type: "text", label: "Full Name", placeholder: "e.g. Rahul Sharma" },
-        { type: "phone", label: "Phone", placeholder: "+91 98XXX XXXXX" },
-        { type: "select", label: "Configuration", options: ["3 BHK", "4 BHK", "Penthouse"] },
-        { type: "select", label: "Preferred Date", options: ["This Weekend", "Next Week", "Weekend After"] },
-      ],
-      action: "whatsapp",
-      actionLabel: "Confirm on WhatsApp",
-    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("cta-banner", "CTA Banner", "MousePointerClick", {
-      eyebrow: "Limited Inventory",
-      heading: "Only 27 Residences Left Across Both Towers",
-      sub: "Book a site visit this week and get a flat 5% launch discount plus assured parking.",
-      ctaPrimary: "Book Site Visit",
-      ctaSecondary: "Call Sales Team",
-      phone: "+91 90000 12345",
-    }, { colors: { bg: "#111827", overlay: "rgba(17,24,39,0.35)", gradient: "linear-gradient(120deg, #6D5DFC 0%, #5A4BE0 40%, #111827 100%)", text: "#ffffff" }, layout: { width: "full", height: "auto", align: "center", direction: "column" } }),
-    sec("sticky-cta", "Sticky CTA", "Compass", { text: "3 & 4 BHK FROM ₹1.25 Cr", ctaLabel: "Book Site Visit", phone: "+91 90000 12345", whatsapp: "+91 90000 12345" }, { colors: { bg: "#ffffff", text: "#111827" } }),
-  ];
-}
-
-function villaSections(): SectionInstance[] {
-  return [
-    sec("announcement", "Announcement Bar", "Megaphone", { text: "Private gated community · only 48 villas on 12 acres.", linkLabel: "Enquire", link: "#lead" }, { colors: { bg: "#0f3d38", text: "#ecfdf5" }, spacing: { padding: { top: 10, right: 24, bottom: 10, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
-    sec(
-      "hero",
-      "Hero Banner",
-      "LayoutPanelTop",
-      {
-        eyebrow: "WHITEFIELD · GATED ESTATE",
-        heading: "Independent Villas with Private Gardens",
-        subheading: "4 & 5 BHK residences on 30–45 ft plots",
-        price: "₹3.40 Cr",
-        priceLabel: "STARTING FROM",
-        heroArt: "villa",
-        accent: "#34d399",
-        priceNote: "Freehold · Possession Mar 2028",
-        ctaPrimary: "Schedule Estate Tour",
-        ctaSecondary: "View Master Plan",
-        highlights: ["Private Pool Options", "12 Acre Campus", "Gated Security", "Clubhouse", "Wide Internal Roads"],
-        heroStats: [
-          { value: "4 & 5 BHK", label: "Villas" },
-          { value: "48", label: "Homes" },
-          { value: "12 Ac", label: "Estate" },
-          { value: "Mar 2028", label: "Possession" },
-        ],
-      },
-      {
-        colors: { bg: "#06201e", overlay: "rgba(6,32,30,0.48)", text: "#ffffff" },
-        layout: { width: "full", height: "vh", fixedHeight: 760, align: "left", direction: "column", justify: "center", alignItems: "flex-start" },
-        spacing: { padding: { top: 150, right: 0, bottom: 110, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
-      },
-    ),
-    sec("highlights", "Estate Highlights", "Award", {
-      items: [
-        { icon: "LandPlot", value: "12 Ac", label: "Gated Campus" },
-        { icon: "Leaf", value: "40%", label: "Open Greens" },
-        { icon: "Car", value: "40 ft", label: "Internal Roads" },
-        { icon: "ShieldCheck", value: "RERA", label: "Approved" },
-        { icon: "Sun", value: "E–W", label: "Vastu Plots" },
-      ],
-    }, { colors: { bg: "#f0fdf4", text: "#111827" }, spacing: { padding: { top: 28, right: 24, bottom: 28, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 } }),
-    sec("overview", "Estate Overview", "Building2", {
-      eyebrow: "The Estate",
-      heading: "A Quiet Address, Designed for Family Life",
-      text: "Palm Grove is a low-density villa community in Whitefield. Each home sits on its own plot with a garden, optional plunge pool and a clubhouse that feels like a boutique resort rather than a high-rise podium.",
-      bullets: ["Independent villas — no shared walls", "Rainwater harvesting on every plot", "Dedicated servant quarters on 5 BHK"],
-      stats: [
-        { value: "48", label: "Villas" },
-        { value: "G+2", label: "Elevation" },
-        { value: "Mar 2028", label: "Handover" },
-      ],
-      image: "villa",
-    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("amenities", "Estate Amenities", "Dumbbell", {
-      eyebrow: "Club & Landscape",
-      heading: "Amenities That Belong Outdoors",
-      text: "The clubhouse and gardens are sized for a 48-home community — never crowded, always maintained.",
-      items: [
-        { icon: "SwimmingPool", title: "Resort Pool", desc: "Adult lap pool plus kids’ splash zone" },
-        { icon: "Leaf", title: "Orchard Walk", desc: "Fruit trees and a shaded jogging loop" },
-        { icon: "Dumbbell", title: "Wellness Barn", desc: "Gym opening onto the lawn" },
-        { icon: "Trophy", title: "Club Pavilion", desc: "Dining, library and party lawn" },
-        { icon: "Car", title: "EV Ready", desc: "Charger on every driveway" },
-        { icon: "ShieldCheck", title: "Manhattan Security", desc: "Single-entry boom with ANPR" },
-      ],
-    }, { colors: { bg: "#f7f5ef", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("master-plan", "Master Plan", "Map", {
-      heading: "Estate Master Plan",
-      text: "48 plots arranged around a central green with 40-ft spine roads and 30-ft secondary lanes.",
-      image: "garden",
-      items: [
-        { title: "Central green", text: "2.1 acres of shared landscape" },
-        { title: "Club cluster", text: "North edge, away from residences" },
-        { title: "Service spine", text: "Hidden utilities along the west edge" },
-      ],
-    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("pricing", "Villa Pricing", "Wallet", {
-      eyebrow: "Typologies",
-      heading: "Plots & Villa Sizes",
-      text: "Choose a 4 BHK garden villa or a 5 BHK pool villa. Land is freehold.",
-      plans: [
-        { name: "4 BHK Garden", area: "3,200 sq.ft", price: "₹3.40 Cr", per: "Onwards", features: ["30×40 plot", "Garden", "4 Bath", "2 Car"], cta: "Hold This Plot", featured: false },
-        { name: "4 BHK Corner", area: "3,450 sq.ft", price: "₹3.85 Cr", per: "Onwards", features: ["30×50 plot", "Side lawn", "Study", "3 Car"], cta: "Hold This Plot", featured: true },
-        { name: "5 BHK Pool", area: "4,200 sq.ft", price: "₹4.90 Cr", per: "Onwards", features: ["40×60 plot", "Plunge pool", "Home office", "4 Car"], cta: "Request Brochure", featured: false },
-      ],
-    }, { colors: { bg: "#ecfdf5", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("gallery", "Estate Gallery", "Images", {
-      eyebrow: "Gallery",
-      heading: "Villas, Gardens & Club",
-      text: "A quieter visual language — timber, limewash and tropical planting.",
-      images: ["villa", "garden", "pool", "interior", "lobby", "tower"],
-      columns: 3,
-    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("location-advantages", "Location", "Navigation", {
-      eyebrow: "Whitefield",
-      heading: "Close to Work. Far from the Rush.",
-      text: "Set behind ITPL Main Road, with schools and hospitals within a short drive and no high-rise neighbours.",
-      items: [
-        { icon: "Building2", title: "ITPL", meta: "4.8 km" },
-        { icon: "School", title: "Vydehi School", meta: "3.2 km" },
-        { icon: "Hospital", title: "Manipal Whitefield", meta: "5.1 km" },
-        { icon: "Store", title: "Phoenix Marketcity", meta: "7.4 km" },
-        { icon: "TrainFront", title: "Whitefield Metro", meta: "6.0 km" },
-        { icon: "LandPlot", title: "Varthur Lake", meta: "2.1 km" },
-      ],
-      mapAddress: "Whitefield, Bangalore",
-    }, { colors: { bg: "#f7f5ef", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("testimonials", "Testimonials", "Quote", {
-      eyebrow: "Residents",
-      heading: "Families Who Chose Space Over Height",
-      items: [
-        { name: "Meera & Vikram Rao", role: "4 BHK Garden Villa", quote: "We wanted a garden our children could actually use. Palm Grove delivered that without leaving the city.", rating: 5 },
-        { name: "Sanjay Iyer", role: "5 BHK Pool Villa", quote: "The density is honest — 48 homes, not 480. You feel it the moment you enter the gate.", rating: 5 },
-        { name: "Anita Kapoor", role: "Corner 4 BHK", quote: "The estate tour was unhurried. We held a plot the same afternoon.", rating: 5 },
-      ],
-    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("lead-form", "Estate Enquiry", "Send", {
-      heading: "Request an Estate Tour",
-      text: "A relationship manager will confirm a private walkthrough within one business day.",
-      button: "Request Tour",
+      sub: "Reserve a guided walkthrough in under a minute.",
+      button: "Request Callback",
       fields: ["name", "phone", "email"],
-    }, { colors: { bg: "#06201e", text: "#ecfdf5" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("sticky-cta", "Sticky CTA", "Compass", { text: "VILLAS FROM ₹3.40 Cr · 12 ACRE ESTATE", ctaLabel: "Schedule Tour", phone: "+91 90000 33445", whatsapp: "+91 90000 33445" }, { colors: { bg: "#ffffff", text: "#111827" } }),
+    }, { colors: { bg: "#f4f2ff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("brochure", "Brochure Download", "FileText", {
+      heading: "Download Project Brochure",
+      title: "Download Brochure",
+      file: "/brochure/aurora.pdf",
+      text: "Floor plans, specifications, pricing sheet and payment plans — one PDF.",
+      gateEnabled: true,
+      gateHeading: "Get the Aurora brochure",
+      gateText: "Share your details — the download starts instantly.",
+      gateButton: "Submit & Download",
+      gateSuccessMessage: "Verified — your brochure is downloading.",
+    }, { colors: { bg: "#ffffff", text: "#111827" }, spacing: { padding: { top: 40, right: 24, bottom: 64, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("sticky-cta", "Sticky CTA", "Compass", { text: "3 & 4 BHK FROM ₹1.25 CR · SARJAPUR ROAD", ctaLabel: "Book Site Visit", phone: "+91 90000 12345" }, { colors: { bg: "#ffffff", text: "#111827" } }),
   ];
 }
 
-function commercialSections(): SectionInstance[] {
-  return [
-    sec("announcement", "Announcement Bar", "Megaphone", { text: "Pre-lease now — 1.2 lakh sq.ft Grade-A office ready Q4 2027.", linkLabel: "", link: "#lead" }, { colors: { bg: "#1c1917", text: "#fde68a" }, spacing: { padding: { top: 10, right: 24, bottom: 10, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
-    sec(
-      "hero",
-      "Hero Banner",
-      "LayoutPanelTop",
-      {
-        eyebrow: "ORR · GRADE A CAMPUS",
-        heading: "Aether Business Park",
-        subheading: "Office, retail and F&B on Outer Ring Road",
-        price: "₹125 / sq.ft",
-        priceLabel: "LEASE STARTING",
-        heroArt: "commercial",
-        accent: "#f59e0b",
-        priceNote: "Warm shell · 9 ft floor-to-floor · LEED Gold targeted",
-        ctaPrimary: "Request Floor Plate",
-        ctaSecondary: "Download Specs",
-        highlights: ["LEED Gold", "3 Basements", "Dedicated Drop-off", "Retail Podium", "100% Power Backup"],
-        heroStats: [
-          { value: "1.2 L", label: "Sq.ft" },
-          { value: "G+14", label: "Office Tower" },
-          { value: "ORR", label: "Frontage" },
-          { value: "Q4 2027", label: "Ready" },
-        ],
-      },
-      {
-        colors: { bg: "#1c1917", overlay: "rgba(28,25,23,0.5)", text: "#ffffff" },
-        layout: { width: "full", height: "vh", fixedHeight: 740, align: "left", direction: "column", justify: "center", alignItems: "flex-start" },
-        spacing: { padding: { top: 150, right: 0, bottom: 100, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
-      },
-    ),
-    sec("highlights", "Park Highlights", "Award", {
-      items: [
-        { icon: "Building2", value: "1.2 L", label: "Leasable Sq.ft" },
-        { icon: "Car", value: "1:500", label: "Parking Ratio" },
-        { icon: "Gauge", value: "9 ft", label: "Floor Height" },
-        { icon: "ShieldCheck", value: "LEED", label: "Gold Target" },
-        { icon: "TrainFront", value: "350 m", label: "Metro" },
-      ],
-    }, { colors: { bg: "#fffbeb", text: "#111827" }, spacing: { padding: { top: 28, right: 24, bottom: 28, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 } }),
-    sec("overview", "Campus Overview", "Building2", {
-      eyebrow: "The Campus",
-      heading: "A Workplace That Signals Intent",
-      text: "Aether is a single-tower Grade-A campus with a two-level retail podium, triple-height lobby and column-free typical floors of 18,500 sq.ft. Designed for GCCs, product companies and boutique funds.",
-      bullets: ["Column-free typical plates", "Dedicated service core", "Separate F&B service lift"],
-      stats: [
-        { value: "18.5k", label: "Sq.ft / floor" },
-        { value: "3", label: "Basements" },
-        { value: "LEED", label: "Gold" },
-      ],
-      image: "commercial",
-    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("specifications", "Specifications", "Gauge", {
-      heading: "Technical Specifications",
-      items: [
-        { title: "Structure", text: "RCC with 4.5 kN/sq.m live load" },
-        { title: "HVAC", text: "VRV ready, tenant-metered" },
-        { title: "Power", text: "8 W/sq.ft + 100% DG backup" },
-        { title: "IT", text: "Two fibre entry points" },
-        { title: "Façade", text: "Unitised DGU, 6+12+6" },
-        { title: "Lifts", text: "6 passenger + 2 service" },
-      ],
-    }, { colors: { bg: "#fafaf9", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("floorplans", "Floor Plates", "Grid", {
-      eyebrow: "Availability",
-      heading: "Typical Floor Plates",
-      text: "Lease a full floor or a 6,000 sq.ft demi-plate. Warm shell handover.",
-      plans: [
-        { name: "Full Plate", beds: "1", area: "18,500 sq.ft", price: "₹125 / sq.ft" },
-        { name: "Demi A", beds: "1", area: "9,200 sq.ft", price: "₹128 / sq.ft" },
-        { name: "Demi B", beds: "1", area: "9,300 sq.ft", price: "₹128 / sq.ft" },
-        { name: "Retail Bay", beds: "G", area: "1,800 sq.ft", price: "₹220 / sq.ft" },
-      ],
-      note: "CAM extra. Lock-in 5 years on office.",
-    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("gallery", "Campus Gallery", "Images", {
-      eyebrow: "Gallery",
-      heading: "Lobby, Plates & Podium",
-      text: "Stone lobby, unitised façade and a landscaped drop-off.",
-      images: ["commercial", "lobby", "tower", "interior", "garden", "skyline"],
-      columns: 3,
-    }, { colors: { bg: "#fafaf9", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("location-advantages", "Connectivity", "Navigation", {
-      eyebrow: "Outer Ring Road",
-      heading: "On the Corridor Your Teams Already Use",
-      text: "350 m from the metro, with Bellandur, Sarjapur and Marathahalli in a single commute pattern.",
-      items: [
-        { icon: "TrainFront", title: "Bellandur Metro", meta: "350 m" },
-        { icon: "Building2", title: "Embassy Tech Village", meta: "2.2 km" },
-        { icon: "Car", title: "Sarjapur Signal", meta: "1.8 km" },
-        { icon: "Store", title: "Central Mall", meta: "3.4 km" },
-        { icon: "Hospital", title: "Sakra World", meta: "4.1 km" },
-        { icon: "LandPlot", title: "Kempfort", meta: "5.0 km" },
-      ],
-      mapAddress: "Outer Ring Road, Bangalore",
-    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("builder-profile", "Developer", "Building2", {
-      heading: "Aether Estates",
-      text: "18 million sq.ft delivered across office and mixed-use in Bengaluru, Hyderabad and Pune.",
-      items: [
-        { title: "18 Mn", text: "Sq.ft delivered" },
-        { title: "42", text: "Institutional tenants" },
-        { title: "12 yr", text: "Track record" },
-      ],
-    }, { colors: { bg: "#1c1917", text: "#fafaf9" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("lead-form", "Tenant Enquiry", "Send", {
-      heading: "Request a Floor Plate Pack",
-      text: "Share your requirement and a leasing manager will send CAD, rent stack and a site slot.",
-      button: "Send Requirement",
-      fields: ["name", "phone", "email"],
-    }, { colors: { bg: "#fffbeb", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("sticky-cta", "Sticky CTA", "Compass", { text: "GRADE-A OFFICE FROM ₹125 / SQ.FT", ctaLabel: "Enquire", phone: "+91 90000 77881", whatsapp: "+91 90000 77881" }, { colors: { bg: "#ffffff", text: "#111827" } }),
-  ];
-}
+// ---------------------------------------------------------------------------
+// Template 2 — Lead Generation
+// Hero + Lead Form → Key Benefits → Pricing → Property Features → Gallery →
+// Location → Offer/Countdown → FAQ → Final CTA
+// ---------------------------------------------------------------------------
 
-function launchSections(): SectionInstance[] {
+function leadGenSections(): SectionInstance[] {
   return [
-    sec("announcement", "Announcement Bar", "Megaphone", { text: "Founders’ list opens Friday 6 PM — 40 homes only.", linkLabel: "Join list", link: "#lead" }, { colors: { bg: "#4a044e", text: "#fce7f3" }, spacing: { padding: { top: 10, right: 24, bottom: 10, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
-    sec("countdown", "Countdown Timer", "Timer", {
-      heading: "Founders’ List Closes In",
-      date: "2026-08-28",
+    // Split hero: nested container > row > two columns (copy | inline form)
+    {
+      ...sec(
+        "container",
+        "Split Hero Container",
+        "Box",
+        { width: "1200px", align: "center" },
+        {
+          colors: { bg: "#0b1220", overlay: "", gradient: "", text: "#eef2ff", image: "/prestate/hero-aurora.jpg" },
+          spacing: { padding: { top: 120, right: 32, bottom: 90, left: 32 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 20 },
+          layout: { width: "full", height: "fixed", fixedHeight: 720, align: "center", direction: "column" },
+        },
+      ),
+      children: [
+        sec("heading", "Hero Heading", "Type", { text: "Northstar Residences — Founders' Preview", tag: "h1", size: 44, align: "left" }, { colors: { bg: "transparent", text: "#ffffff" }, spacing: { padding: { top: 0, right: 0, bottom: 8, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+        sec("text", "Hero Subtext", "AlignLeft", { text: "2.5 & 3 BHK homes in Hebbal from ₹89 L*. First 40 bookings lock today's price — join the founders' list." }, { colors: { bg: "transparent", text: "rgba(238,242,255,.85)" }, spacing: { padding: { top: 0, right: 0, bottom: 18, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+        {
+          ...sec("row", "Hero Row", "Rows", { gap: 28, columns: 2 }, {
+            colors: { bg: "transparent", text: "#eef2ff" },
+            spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 28 },
+            layout: { width: "full", height: "auto", align: "left", direction: "row" },
+          }),
+          children: [
+            {
+              ...sec("column", "Copy Column", "Columns", { width: 55 }, {
+                colors: { bg: "transparent", text: "#eef2ff" },
+                spacing: { padding: { top: 8, right: 8, bottom: 8, left: 8 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 },
+              }),
+              children: [
+                sec("highlights", "Trust Chips", "Award", { items: [
+                  { icon: "Wallet", value: "₹89 L", label: "Founders' Price" },
+                  { icon: "Gift", value: "PLC", label: "Waived" },
+                  { icon: "ShieldCheck", value: "RERA", label: "Filed" },
+                ] }, { colors: { bg: "transparent", text: "#eef2ff" }, spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 } }),
+                sec("text", "Proof Line", "AlignLeft", { text: "★ Rated 4.8 by 1,240+ buyers who booked through this page." }, { colors: { bg: "transparent", text: "rgba(238,242,255,.7)" }, spacing: { padding: { top: 10, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+              ],
+            },
+            {
+              ...sec("column", "Form Column", "Columns", { width: 45 }, {
+                colors: { bg: "transparent", text: "#eef2ff" },
+                spacing: { padding: { top: 8, right: 8, bottom: 8, left: 8 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 },
+              }),
+              children: [
+                sec("lead-form", "Inline Lead Form", "Send", { heading: "Get Pricing on WhatsApp", sub: "", button: "Get Instant Pricing", fields: ["name", "phone"], pdfUrl: "", pdfLabel: "" }, { colors: { bg: "#ffffff", text: "#111827" }, border: { radius: 16 }, effects: { shadow: "0 24px 60px rgba(2,6,23,.5)" }, spacing: { padding: { top: 22, right: 22, bottom: 22, left: 22 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 } }),
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    sec("features", "Key Benefits", "BadgeCheck", {
+      heading: "Why Buyers Convert With Northstar",
       items: [
-        { title: "02", text: "Days" },
-        { title: "14", text: "Hours" },
-        { title: "37", text: "Minutes" },
-        { title: "08", text: "Seconds" },
+        { title: "Price lock-in", text: "Founders' pricing frozen for 72 hours after you enquire." },
+        { title: "Zero PLC weekend", text: "No preferential-location charge on the first release." },
+        { title: "Assured parking", text: "Every founders' home comes with a bundled bay." },
+        { title: "Direct flyover access", text: "Hebbal interchange 4 minutes from the gate." },
+        { title: "Bank-approved", text: "SBI, HDFC & ICICI pre-approved projects." },
+        { title: "Refundable token", text: "₹1 L token fully refundable for 7 days." },
       ],
-    }, { colors: { bg: "#2e1065", text: "#fdf4ff" }, spacing: { padding: { top: 28, right: 24, bottom: 28, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 } }),
-    sec(
-      "hero",
-      "Hero Banner",
-      "LayoutPanelTop",
-      {
-        eyebrow: "NEW LAUNCH · HEBBAL",
-        heading: "Northstar Residences — Preview Night",
-        subheading: "2.5 & 3 BHK. First 40 bookings lock today’s price.",
-        price: "₹89 L",
-        priceLabel: "FOUNDERS’ PRICE FROM",
-        heroArt: "tour",
-        accent: "#e879f9",
-        priceNote: "Price steps up after the founders’ window",
-        ctaPrimary: "Join Founders’ List",
-        ctaSecondary: "Get Offer PDF",
-        highlights: ["₹89 L lock-in", "No PLC this weekend", "Assured parking", "RERA filed"],
-        heroStats: [
-          { value: "40", label: "Founders’ homes" },
-          { value: "2.5–3 BHK", label: "Plans" },
-          { value: "Hebbal", label: "Location" },
-          { value: "2029", label: "Possession" },
-        ],
-      },
-      {
-        colors: { bg: "#24022a", overlay: "rgba(36,2,42,0.5)", text: "#ffffff" },
-        layout: { width: "full", height: "vh", fixedHeight: 720, align: "left", direction: "column", justify: "center", alignItems: "flex-start" },
-        spacing: { padding: { top: 140, right: 0, bottom: 90, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
-      },
-    ),
-    sec("offer-banner", "Offer Banner", "Gift", {
-      heading: "Weekend-only founders’ stack",
-      text: "Price freeze + waived PLC + 1 year CAM credit. Expires when the 40-home list fills.",
-      cta: "Claim my slot",
-    }, { colors: { bg: "#c026d3", text: "#ffffff" }, spacing: { padding: { top: 22, right: 24, bottom: 22, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 } }),
-    sec("highlights", "Launch Highlights", "Award", {
-      items: [
-        { icon: "Rocket", value: "40", label: "Founders’ Units" },
-        { icon: "Wallet", value: "₹89 L", label: "From" },
-        { icon: "Gift", value: "PLC", label: "Waived" },
-        { icon: "ShieldCheck", value: "RERA", label: "Filed" },
-        { icon: "Timer", value: "72 h", label: "Window" },
-      ],
-    }, { colors: { bg: "#fdf4ff", text: "#111827" }, spacing: { padding: { top: 24, right: 24, bottom: 24, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 } }),
-    sec("overview", "The Launch", "Building2", {
-      eyebrow: "Why this weekend",
-      heading: "The First Release Is the Cheapest Release",
-      text: "Northstar is a 2-tower launch in Hebbal. The founders’ list is a genuine 40-home tranche at today’s ticket — after Friday the stack moves to public pricing.",
-      bullets: ["Token of ₹1 L holds the unit 7 days", "Plans from 1,120 sq.ft", "Direct Hebbal flyover access"],
-      stats: [
-        { value: "2", label: "Towers" },
-        { value: "240", label: "Total homes" },
-        { value: "2029", label: "Handover" },
-      ],
-      image: "tour",
     }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("pricing", "Founders’ Pricing", "Wallet", {
+    sec("pricing", "Founders' Pricing", "Wallet", {
       eyebrow: "This weekend only",
-      heading: "Lock These Tickets",
-      text: "Public list will be ₹6–9 L higher per unit.",
+      heading: "Lock These Tickets Before Public Launch",
+      text: "Public list moves ₹6–9 L higher once the founders' tranche fills.",
       plans: [
-        { name: "2.5 BHK", area: "1,120 sq.ft", price: "₹89 L", per: "Founders’", features: ["2.5 Bed", "2 Bath", "Balcony", "1 Parking"], cta: "Hold Unit", featured: false },
-        { name: "3 BHK", area: "1,410 sq.ft", price: "₹1.12 Cr", per: "Founders’", features: ["3 Bed", "3 Bath", "Utility", "1 Parking"], cta: "Hold Unit", featured: true },
-        { name: "3 BHK Corner", area: "1,520 sq.ft", price: "₹1.24 Cr", per: "Founders’", features: ["Corner", "Dual balcony", "2 Parking"], cta: "Hold Unit", featured: false },
+        { name: "2.5 BHK", area: "1,120 sq.ft", price: "₹89 L", per: "founders'", features: ["2.5 Bed", "2 Bath", "Balcony", "1 Parking"], cta: "Hold Unit", featured: false },
+        { name: "3 BHK", area: "1,410 sq.ft", price: "₹1.12 Cr", per: "founders'", features: ["3 Bed", "3 Bath", "Utility", "1 Parking"], cta: "Hold Unit", featured: true },
+        { name: "Corner 3 BHK", area: "1,520 sq.ft", price: "₹1.24 Cr", per: "founders'", features: ["Corner unit", "Dual balcony", "2 Parking"], cta: "Hold Unit", featured: false },
       ],
-    }, { colors: { bg: "#faf5ff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("gallery", "Preview Gallery", "Images", {
-      eyebrow: "Lookbook",
-      heading: "Renders from the launch deck",
+    }, { colors: { bg: "#eff6ff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("gallery", "Lookbook Gallery", "Images", {
+      eyebrow: "Gallery",
+      heading: "Renders From the Launch Deck",
       text: "Lobby, typical living and the Hebbal skyline.",
       images: ["tour", "interior", "lobby", "tower", "skyline", "pool"],
       columns: 3,
+      lightbox: true,
     }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("map", "Location & Map", "MapPin", {
+      address: "Hebbal, Bangalore",
+      zoom: 13,
+      eyebrow: "Location",
+      heading: "4 Minutes From the Flyover",
+      text: "Hebbal's next landmark address — airport in 35 minutes, ORR in 12.",
+      items: [
+        { icon: "Car", title: "Hebbal Flyover", meta: "1.2 km" },
+        { icon: "Hospital", title: "Aster CMI", meta: "3.0 km" },
+        { icon: "Store", title: "Elements Mall", meta: "4.1 km" },
+        { icon: "School", title: "Kendriya Vidyalaya", meta: "2.6 km" },
+      ],
+    }, { colors: { bg: "#f8fafc", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("countdown", "Offer Countdown", "Timer", {
+      heading: "Founders' Window Closes In",
+      date: "",
+      items: [
+        { value: "02", label: "Days" },
+        { value: "14", label: "Hours" },
+        { value: "37", label: "Mins" },
+        { value: "08", label: "Secs" },
+      ],
+    }, { colors: { bg: "#1d4ed8", overlay: "", gradient: "linear-gradient(120deg,#1d4ed8 0%,#2563eb 45%,#0ea5e9 100%)", text: "#ffffff" }, spacing: { padding: { top: 34, right: 24, bottom: 34, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 } }),
     sec("faq", "FAQ", "Tabs", {
       eyebrow: "Before you join",
-      heading: "Founders’ List FAQ",
+      heading: "Frequently Asked Questions",
       items: [
-        { q: "Is the ₹89 L price real?", a: "Yes. It applies only to the first 40 expressions of interest that complete token." },
-        { q: "What if the list fills?", a: "You move to the waitlist at public pricing. We text you either way." },
-        { q: "Can I cancel the token?", a: "Token is refundable within 7 days if you do not select a unit." },
+        { q: "Is the ₹89 L price real?", a: "Yes — it applies to the first 40 expressions of interest that complete token." },
+        { q: "What happens after I submit the form?", a: "Our team calls within 15 minutes during working hours and WhatsApps the price sheet." },
+        { q: "Can I cancel the token?", a: "The ₹1 L token is refundable within 7 days if no unit is selected." },
+        { q: "Is the project RERA registered?", a: "Yes — registration details are printed on every page of the brochure." },
       ],
-    }, { colors: { bg: "#fdf4ff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("multistep-form", "Join the List", "Table2", {
-      eyebrow: "Founders’ list",
-      heading: "Reserve Your Slot",
-      sub: "Takes under 45 seconds. We WhatsApp the offer PDF immediately.",
-      steps: ["You", "Budget", "Confirm"],
-      button: "Join Founders’ List",
-      fields: [
-        { type: "text", label: "Full Name", placeholder: "Your name" },
-        { type: "phone", label: "WhatsApp", placeholder: "+91" },
-        { type: "select", label: "Plan", options: ["2.5 BHK", "3 BHK", "Corner 3 BHK"] },
-      ],
-      action: "whatsapp",
-      actionLabel: "Send on WhatsApp",
     }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("cta-banner", "CTA Banner", "MousePointerClick", {
-      eyebrow: "40 homes",
-      heading: "Don’t Watch This List Fill from the Sidelines",
-      sub: "Join now. If the tranche is gone, we’ll say so in the same thread.",
-      ctaPrimary: "Join Founders’ List",
+    sec("cta-banner", "Final CTA Wall", "MousePointerClick", {
+      eyebrow: "40 homes · one list",
+      heading: "Don't Watch This List Fill From the Sidelines",
+      sub: "Submit the form now — if the tranche is gone we'll tell you honestly on the same call.",
+      ctaPrimary: "Get Instant Pricing",
       ctaSecondary: "Call Launch Desk",
       phone: "+91 90000 88990",
-    }, { colors: { bg: "#4a044e", overlay: "", gradient: "linear-gradient(120deg, #c026d3 0%, #6d28d9 50%, #24022a 100%)", text: "#ffffff" }, layout: { width: "full", height: "auto", align: "center", direction: "column" } }),
-    sec("sticky-cta", "Sticky CTA", "Compass", { text: "FOUNDERS’ PRICE FROM ₹89 L · 40 HOMES", ctaLabel: "Join List", phone: "+91 90000 88990", whatsapp: "+91 90000 88990" }, { colors: { bg: "#ffffff", text: "#111827" } }),
+    }, { colors: { bg: "#0b1220", overlay: "", gradient: "linear-gradient(120deg,#1d4ed8 0%,#2563eb 50%,#0b1220 100%)", text: "#ffffff" }, layout: { width: "full", height: "auto", align: "center", direction: "column" } }),
+    sec("popup", "Exit Popup", "PartyPopper", { popupId: "exit-offer", heading: "Wait — grab the price sheet", text: "Enter your details and we'll WhatsApp the founders' price list before you go.", cta: "", link: "", showForm: true, trigger: "exit", delaySeconds: 0, scrollPercent: 40, urlParam: "offer", oncePerSession: true }),
+    sec("sticky-footer-bar", "Sticky Footer Bar", "PanelBottom", { text: "Founders' price from ₹89 L — ends this weekend", ctaLabel: "Get Pricing", link: "#lead-form" }),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Template 3 — Luxury Property
+// Large Visual Hero → Luxury Highlights → Property Details → Amenities →
+// Gallery + Lightbox → Floor Plans → Location → Developer → Testimonials → Enquiry
+// ---------------------------------------------------------------------------
+
+function luxeSections(): SectionInstance[] {
+  return [
+    sec(
+      "hero",
+      "Cinematic Hero",
+      "LayoutPanelTop",
+      {
+        eyebrow: "THE RESIDENCES AT INDUS",
+        heading: "Where the Skyline Becomes Your Address",
+        subheading: "Limited-edition sky residences · Whitefield",
+        price: "₹4.80 Cr",
+        priceLabel: "RESIDENCES FROM",
+        heroArt: "skyline",
+        accent: "#d4af6a",
+        priceNote: "By invitation · Private previews open",
+        primaryAction: "link",
+        primaryLink: "#enquiry",
+        ctaPrimary: "Request Private Preview",
+        secondaryAction: "link",
+        secondaryLink: "#gallery",
+        ctaSecondary: "View the Gallery",
+        highlights: ["Sky villas", "Private elevators", "Concierge"],
+        heroStats: [
+          { value: "4 & 5 BHK", label: "Residences" },
+          { value: "86", label: "Homes Only" },
+          { value: "G+32", label: "Tower" },
+          { value: "2028", label: "Completion" },
+        ],
+        gateHeading: "Receive the private collection",
+        gateText: "Share your details to receive the digital brochure.",
+      },
+      {
+        colors: { bg: "#171310", overlay: "rgba(23,19,16,0.42)", text: "#fdfbf7" },
+        layout: { width: "full", height: "vh", fixedHeight: 860, align: "left", direction: "column", justify: "center", alignItems: "flex-start" },
+        spacing: { padding: { top: 170, right: 0, bottom: 130, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
+      },
+    ),
+    sec("stats", "Luxury Highlights", "Gauge", {
+      heading: "",
+      items: [
+        { icon: "Crown", value: "86", label: "Signature Residences" },
+        { icon: "ConciergeBell", value: "24×7", label: "White-Glove Concierge" },
+        { icon: "Waves", value: "38 M", label: "Sky Deck Pool" },
+        { icon: "Leaf", value: "1 Ac", label: "Private Forest Court" },
+      ],
+      style: "minimal",
+    }, { colors: { bg: "#faf7f1", text: "#171310" }, spacing: { padding: { top: 44, right: 24, bottom: 44, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 } }),
+    sec("property-details", "Property Details", "Gauge", {
+      items: [
+        { label: "Configuration", value: "4 & 5 BHK Sky Residences" },
+        { label: "Super Built-Up", value: "3,400 – 5,200 sq.ft" },
+        { label: "Price Range", value: "₹4.80 – ₹8.60 Cr" },
+        { label: "Possession", value: "December 2028" },
+        { label: "RERA", value: "PRM/KA/RERA/1251/446" },
+        { label: "Ownership", value: "Freehold" },
+      ],
+    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("amenities", "Amenities", "Dumbbell", {
+      eyebrow: "Curated Living",
+      heading: "Amenities Composed Like a Private Club",
+      text: "Every space is sized generously and finished by award-winning studios.",
+      items: [
+        { icon: "Waves", title: "Sky Pool", desc: "38-metre lap pool on level 32" },
+        { icon: "ConciergeBell", title: "Concierge", desc: "Curated by a five-star partner" },
+        { icon: "Music", title: "Listening Room", desc: "Acoustic lounge & vinyl bar" },
+        { icon: "UtensilsCrossed", title: "Chef's Table", desc: "Private dining for twelve" },
+        { icon: "Leaf", title: "Forest Court", desc: "Acre-scale native planting" },
+        { icon: "Sparkles", title: "Spa Suites", desc: "Treatment rooms & hammam" },
+      ],
+    }, { colors: { bg: "#faf7f1", text: "#171310" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("gallery", "Gallery + Lightbox", "Images", {
+      eyebrow: "Gallery",
+      heading: "A Study in Light and Material",
+      text: "Click any frame for the full-resolution view.",
+      images: ["lobby", "interior", "pool", "garden", "tower", "skyline"],
+      columns: 3,
+      lightbox: true,
+    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("floorplans", "Floor Plans", "Grid", {
+      eyebrow: "Layouts",
+      heading: "Residence Plans",
+      text: "Four plan families, each with a private elevator lobby.",
+      plans: [
+        { name: "4 BHK Grand", beds: "4", area: "3,400 sq.ft", price: "₹4.80 Cr" },
+        { name: "4 BHK Wing", beds: "4", area: "4,050 sq.ft", price: "₹5.95 Cr" },
+        { name: "5 BHK Signature", beds: "5", area: "5,200 sq.ft", price: "₹8.60 Cr" },
+      ],
+      note: "Plans are indicative. Detailed CAD sets shared during private previews.",
+    }, { colors: { bg: "#faf7f1", text: "#171310" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("location-advantages", "Location", "Navigation", {
+      eyebrow: "Whitefield",
+      heading: "An Address That Precedes You",
+      text: "Set along the palm avenue of Whitefield's quiet quarter — minutes from the city's best schools, clubs and the tech corridor.",
+      items: [
+        { icon: "School", title: "Inventure Academy", meta: "3.5 km" },
+        { icon: "Store", title: "VR Bengaluru", meta: "6.0 km" },
+        { icon: "Hospital", title: "Manipal Hospital", meta: "5.2 km" },
+        { icon: "TrainFront", title: "Metro Purple Line", meta: "4.8 km" },
+        { icon: "Building2", title: "ITPL Tech Park", meta: "7.4 km" },
+        { icon: "Car", title: "Airport Expressway", meta: "18 km" },
+      ],
+      mapAddress: "Whitefield, Bangalore",
+    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("builder-profile", "Developer", "Building2", {
+      heading: "Indus Estates",
+      text: "Three decades of landmark residences across Bengaluru, Mumbai and Goa. Indus builds fewer than 300 homes a year — each finished to a private-collection standard.",
+      items: [
+        { title: "30 yr", text: "Legacy" },
+        { title: "4.6 Mn", text: "Sq.ft delivered" },
+        { title: "96%", text: "On-time handover" },
+      ],
+    }, { colors: { bg: "#171310", text: "#faf7f1" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("testimonials", "Testimonials", "Quote", {
+      eyebrow: "Residents",
+      heading: "Words From Our First Homeowners",
+      items: [
+        { name: "Meera Alva", role: "4 BHK Grand · Level 24", quote: "The privacy planning is exceptional — you never hear a neighbour.", rating: 5 },
+        { name: "Arjun Khanna", role: "5 BHK Signature · Penthouse", quote: "Materials you'd expect in Europe, delivered here on schedule.", rating: 5 },
+      ],
+    }, { colors: { bg: "#faf7f1", text: "#171310" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("enquiry-form", "Private Enquiry", "Send", {
+      eyebrow: "Invitation",
+      heading: "Request a Private Preview",
+      sub: "Our client relations team arranges viewings by appointment only.",
+      button: "Request Invitation",
+      fields: ["name", "phone", "email", "message"],
+    }, { colors: { bg: "#171310", overlay: "", gradient: "linear-gradient(140deg,#171310 0%,#33261a 100%)", text: "#fdfbf7" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("whatsapp-cta", "WhatsApp Concierge", "MessageCircle", { text: "Prefer to chat? Message the concierge desk", number: "+91 90000 55555", ctaLabel: "Chat on WhatsApp" }, { spacing: { padding: { top: 0, right: 24, bottom: 56, left: 24 }, margin: { top: -36, right: 0, bottom: 0, left: 0 }, gap: 12 }, layout: { width: "full", height: "auto", align: "center", direction: "column" }, colors: { bg: "#171310", text: "#fdfbf7" } }),
+    sec("popup", "Preview Popup", "PartyPopper", { popupId: "preview-invite", heading: "Private previews are filling", text: "Leave your number and the concierge will confirm a slot this week.", cta: "", link: "", showForm: true, trigger: "delay", delaySeconds: 12, scrollPercent: 55, urlParam: "invite", oncePerSession: true }),
+    sec("sticky-cta", "Sticky CTA", "Compass", { text: "SKY RESIDENCES FROM ₹4.80 CR · WHITEFIELD", ctaLabel: "Request Preview", phone: "+91 90000 55555" }, { colors: { bg: "#171310", text: "#fdfbf7" } }),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Template 4 — Ad Campaign Landing Page
+// Ad-focused Hero → Offer/Urgency → Property Statistics → Configuration →
+// Lifestyle Benefits → Gallery → Connectivity → FAQ → Lead Form →
+// Brochure Download → Final CTA
+// ---------------------------------------------------------------------------
+
+function adCampaignSections(): SectionInstance[] {
+  return [
+    sec("announcement", "Announcement Bar", "Megaphone", { text: "⚡ AD CAMPAIGN SPECIAL — Flat ₹7.77 L launch discount + free modular kitchen this week only", linkLabel: "", link: "" }, { colors: { bg: "#e11d48", text: "#fff1f2" }, spacing: { padding: { top: 10, right: 24, bottom: 10, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+    sec(
+      "hero",
+      "Ad Hero",
+      "LayoutPanelTop",
+      {
+        eyebrow: "NEW LAUNCH · ELECTRONIC CITY",
+        heading: "Skyline Greens — 2 & 3 BHK Starting ₹62 L",
+        subheading: "Ad-exclusive pricing · 42 homes released for this campaign",
+        price: "₹62 L",
+        priceLabel: "CAMPAIGN PRICE FROM",
+        heroArt: "commercial",
+        accent: "#f97316",
+        priceNote: "Regular price ₹69 L — discount auto-applied this week",
+        primaryAction: "link",
+        primaryLink: "#lead-form",
+        ctaPrimary: "Claim the Discount",
+        secondaryAction: "brochure",
+        ctaSecondary: "Download Offer PDF",
+        highlights: ["₹7.77 L off", "Free kitchen", "No floor-rise", "RERA approved"],
+        heroStats: [
+          { value: "42", label: "Campaign Homes" },
+          { value: "2 & 3", label: "BHK" },
+          { value: "₹62 L", label: "Entry Price" },
+          { value: "Mar 2029", label: "Possession" },
+        ],
+        gateHeading: "Download the offer PDF",
+        gateText: "Verified leads get the full campaign kit instantly.",
+      },
+      {
+        colors: { bg: "#1f0a12", overlay: "rgba(31,10,18,0.5)", text: "#fff1f2" },
+        layout: { width: "full", height: "vh", fixedHeight: 700, align: "left", direction: "column", justify: "center", alignItems: "flex-start" },
+        spacing: { padding: { top: 140, right: 0, bottom: 90, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
+      },
+    ),
+    sec("offer-banner", "Urgency Offer Banner", "Gift", {
+      heading: "Campaign stack worth ₹11.4 L",
+      text: "Launch discount + free modular kitchen + waived floor rise + stamp duty support. Ends Sunday or when 42 homes are claimed.",
+      cta: "Claim My Slot",
+    }, { colors: { bg: "#e11d48", text: "#ffffff" }, spacing: { padding: { top: 20, right: 24, bottom: 20, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 } }),
+    sec("stats", "Property Statistics", "Gauge", {
+      heading: "The Project In Numbers",
+      items: [
+        { icon: "Building2", value: "4", label: "Towers" },
+        { icon: "LandPlot", value: "6 Ac", label: "Campus" },
+        { icon: "Grid", value: "620", label: "Total Homes" },
+        { icon: "Dumbbell", value: "35+", label: "Amenities" },
+        { icon: "CalendarClock", value: "2029", label: "Possession" },
+      ],
+      style: "cards",
+    }, { colors: { bg: "#fff7ed", text: "#111827" }, spacing: { padding: { top: 40, right: 24, bottom: 40, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 } }),
+    sec("unit-types", "Configurations", "Grid", {
+      items: [
+        { name: "2 BHK Classic", beds: "2", area: "905 sq.ft", price: "₹62 L*" },
+        { name: "2 BHK Optima", beds: "2", area: "1,040 sq.ft", price: "₹71 L*" },
+        { name: "3 BHK Prime", beds: "3", area: "1,310 sq.ft", price: "₹92 L*" },
+        { name: "3 BHK Max", beds: "3", area: "1,545 sq.ft", price: "₹1.08 Cr*" },
+      ],
+    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("features", "Lifestyle Benefits", "BadgeCheck", {
+      heading: "Built For How Ad Buyers Actually Live",
+      items: [
+        { title: "Zero maintenance for 2 yrs", text: "Builder-funded society corpus on campaign bookings." },
+        { title: "Rooftop cinema", text: "Screening lawn with projector nights every Friday." },
+        { title: "Work-from-roof pods", text: "Bookable cabins with fibre + meeting screens." },
+        { title: "Pet park & play zone", text: "Separate zones so kids and pets never share turf." },
+        { title: "EV bays standard", text: "Charger conduits in every second parking." },
+        { title: "5-min metro shuttle", text: "Free shuttle to Bommasandra station." },
+      ],
+    }, { colors: { bg: "#fff7ed", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("gallery", "Gallery", "Images", {
+      eyebrow: "See it yourself",
+      heading: "Campaign Renders & Site Progress",
+      text: "Updated monthly from the actual site camera.",
+      images: ["tower", "pool", "garden", "lobby", "interior", "skyline"],
+      columns: 3,
+      lightbox: true,
+    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("location-advantages", "Connectivity", "Navigation", {
+      eyebrow: "Electronic City",
+      heading: "Connected To Everything That Pays Your Bills",
+      text: "IT campuses, the metro and the elevated expressway — all inside a 10-minute ring.",
+      items: [
+        { icon: "TrainFront", title: "Bommasandra Metro", meta: "2.1 km" },
+        { icon: "Building2", title: "Infosys EC Campus", meta: "3.4 km" },
+        { icon: "Car", title: "Elevated Expressway", meta: "1.8 km" },
+        { icon: "School", title: "TISB School", meta: "4.0 km" },
+        { icon: "Hospital", title: "Narayana Health", meta: "5.2 km" },
+        { icon: "Store", title: "Neo Mall", meta: "2.9 km" },
+      ],
+      mapAddress: "Electronic City, Bangalore",
+    }, { colors: { bg: "#fff7ed", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("faq", "FAQ", "Tabs", {
+      eyebrow: "Campaign questions",
+      heading: "Everything About This Offer, Answered",
+      items: [
+        { q: "Is the ₹7.77 L discount genuine?", a: "Yes — it is funded by the marketing budget and applies to bookings made during this campaign window." },
+        { q: "How do I claim the free kitchen?", a: "Complete token within 7 days of your form submission. The kitchen credit reflects in your cost sheet." },
+        { q: "Are these prices negotiable?", a: "Campaign pricing is fixed — that is how the discount stays real. No hidden PLC either." },
+        { q: "Is the project RERA registered?", a: "Yes — RERA details are on the brochure cover page." },
+      ],
+    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("lead-form", "Campaign Lead Form", "Send", {
+      eyebrow: "Step 1 of 2",
+      heading: "Lock Your Campaign Price",
+      sub: "Takes 30 seconds. We call back within 10 minutes with your personalised cost sheet.",
+      button: "Get My Cost Sheet",
+      fields: ["name", "phone", "email"],
+    }, { colors: { bg: "#fff1f2", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("downloads", "Brochure Downloads", "Download", {
+      heading: "Campaign Kit",
+      text: "Brochure, cost sheets and floor plans — gated so we know where to send updates.",
+      files: [{ name: "Skyline Greens Brochure.pdf", url: "/brochure/skyline.pdf" }],
+    }, { colors: { bg: "#fff7ed", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("cta-banner", "Final CTA", "MousePointerClick", {
+      eyebrow: "Last call",
+      heading: "42 Homes. One Week. One Price.",
+      sub: "When the counter hits zero, the regular ₹69 L price returns — no exceptions.",
+      ctaPrimary: "Claim My Discount",
+      ctaSecondary: "Call Campaign Desk",
+      phone: "+91 90000 42042",
+    }, { colors: { bg: "#88101f", overlay: "", gradient: "linear-gradient(120deg,#e11d48 0%,#be123c 55%,#4c0519 100%)", text: "#ffffff" }, layout: { width: "full", height: "auto", align: "center", direction: "column" } }),
+    sec("popup", "Campaign Popup", "PartyPopper", { popupId: "campaign-offer", heading: "₹7.77 L discount expires soon", text: "Drop your number and lock this week's campaign price before it resets.", cta: "", link: "", showForm: true, trigger: "scroll", delaySeconds: 0, scrollPercent: 45, urlParam: "promo", oncePerSession: true }),
+    sec("floating-icons", "Floating Icons", "PhoneCall", { side: "right", whatsapp: true, call: true, enquire: true, email: false, phone: "+91 90000 42042", number: "+91 90000 42042" }),
+    sec("sticky-footer-bar", "Sticky Footer Bar", "PanelBottom", { text: "⚡ Campaign price ₹62 L — resets to ₹69 L when the timer ends", ctaLabel: "Claim Discount", link: "#lead-form" }),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Thank You Page sections — composed entirely from builder widgets
+// ---------------------------------------------------------------------------
+
+export function buildThankYouSections(): SectionInstance[] {
+  return [
+    sec("heading", "Thank You Heading", "Type", { text: "Thank You — You're All Set!", tag: "h1", size: 44, align: "center" }, { colors: { bg: "#ffffff", text: "#111827" }, spacing: { padding: { top: 84, right: 24, bottom: 8, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+    sec("text", "Confirmation Message", "AlignLeft", { text: "Your enquiry has been received successfully. A relationship manager will call you within 15 minutes during working hours. Meanwhile, here's everything you need next." }, { colors: { bg: "#ffffff", text: "var(--ps-slate)" }, spacing: { padding: { top: 0, right: 24, bottom: 20, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 }, typography: { fontFamily: "Inter", fontSize: 17, fontWeight: 400, lineHeight: 1.75, letterSpacing: 0 } }),
+    sec("brochure", "Brochure Download", "FileText", {
+      heading: "Your Brochure Is Ready",
+      title: "Download Brochure",
+      file: "/brochure/project.pdf",
+      text: "No forms needed — your download unlocks instantly on this page.",
+      gateEnabled: false,
+    }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    {
+      ...sec("row", "Next Actions Row", "Rows", { gap: 16, columns: 2 }, {
+        colors: { bg: "#ffffff", text: "#111827" },
+        spacing: { padding: { top: 8, right: 24, bottom: 24, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
+        layout: { width: "full", height: "auto", align: "center", direction: "row" },
+      }),
+      children: [
+        {
+          ...sec("column", "Call Column", "Columns", { width: 50 }, {
+            colors: { bg: "transparent", text: "#111827" },
+            spacing: { padding: { top: 8, right: 8, bottom: 8, left: 8 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 8 },
+          }),
+          children: [
+            sec("call-cta", "Call Now CTA", "PhoneCall", { text: "Want answers right now?", phone: "+91 90000 12345", ctaLabel: "Call Now" }),
+          ],
+        },
+        {
+          ...sec("column", "WhatsApp Column", "Columns", { width: 50 }, {
+            colors: { bg: "transparent", text: "#111827" },
+            spacing: { padding: { top: 8, right: 8, bottom: 8, left: 8 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 8 },
+          }),
+          children: [
+            sec("whatsapp-cta", "WhatsApp CTA", "MessageCircle", { text: "Continue the chat on WhatsApp", number: "+91 90000 12345", ctaLabel: "Chat Now" }),
+          ],
+        },
+      ],
+    },
+    sec("image", "Property Image", "Images", { src: "", alt: "Project view", title: "", link: "", width: 900, align: "center", radius: 18 }, { colors: { bg: "#ffffff", text: "#111827" }, spacing: { padding: { top: 16, right: 24, bottom: 16, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+    sec("cta-banner", "Recommended Next Step", "MousePointerClick", {
+      eyebrow: "While you wait",
+      heading: "Book a Priority Site Visit",
+      sub: "Thank-you customers skip the queue — pick a slot before public calendars fill.",
+      ctaPrimary: "Schedule Visit",
+      ctaSecondary: "Browse Floor Plans",
+    }, { colors: { bg: "#111827", overlay: "", gradient: "linear-gradient(120deg,#6D5DFC 0%,#8a7bff 55%,#111827 100%)", text: "#ffffff" }, layout: { width: "full", height: "auto", align: "center", direction: "column" } }),
+    sec("button", "Back to Website", "MousePointerClick", { text: "← Back to Website", action: "url", link: "/", style: "outline", size: "md", popupId: "" }, { colors: { bg: "#ffffff", text: "#111827" }, spacing: { padding: { top: 28, right: 24, bottom: 20, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+    sec("social-share", "Social Sharing", "Share2", { heading: "Know someone house-hunting? Share:", channels: ["whatsapp", "facebook", "x", "linkedin", "copy"] }, { colors: { bg: "#f8fafc", text: "#111827" }, spacing: { padding: { top: 28, right: 24, bottom: 40, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 } }),
   ];
 }

@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   Bell,
-  Building2,
   CheckCircle2,
   Clock,
   CreditCard,
@@ -21,25 +20,28 @@ import {
   Sparkles,
   Target,
   TrendingUp,
+  Type,
   X,
 } from "lucide-react";
 import type { Device, LandingPageData, ModuleKey, SectionInstance, SiteConfig } from "@/lib/prestate/types";
+import { uid } from "@/lib/prestate/data";
 import { loadPages, normalizeDomain, isLikelyHostname, savePages, seedPages } from "@/lib/prestate/store";
-import { localPreviewPath } from "@/lib/prestate/paths";
-import { ensureConfig } from "@/lib/prestate/site-config";
+import { buildThankYouSections } from "@/lib/prestate/page-templates";
+import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
+import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
 import { TopNav, MODULE_LABELS } from "@/components/prestate/topnav";
 import { BuilderWorkspace, type BuilderApi } from "@/components/prestate/builder/workspace";
-import { PropertiesModule } from "@/components/prestate/modules/properties";
 import { FormsModule } from "@/components/prestate/modules/forms";
 import { BrandModule } from "@/components/prestate/modules/brand";
 import { HeaderFooterModule } from "@/components/prestate/modules/headerfooter";
 import { SeoModule } from "@/components/prestate/modules/seo";
 import { TrackingModule } from "@/components/prestate/modules/tracking";
 import { DomainsModule } from "@/components/prestate/modules/domains";
+import { TypographyModule } from "@/components/prestate/modules/typography";
 
 const NAV_ITEMS: { key: ModuleKey; label: string; icon: React.ComponentType<{ size?: number | string }> }[] = [
   { key: "builder", label: "Builder", icon: PencilRuler },
-  { key: "properties", label: "Properties", icon: Building2 },
+  { key: "typography", label: "Typography & Fonts", icon: Type },
   { key: "forms", label: "Forms", icon: MessageCircle },
   { key: "brand", label: "Brand", icon: Palette },
   { key: "headerfooter", label: "Header & Footer", icon: PencilRuler },
@@ -188,16 +190,56 @@ export function PrestateStudio() {
             }}
             onToast={toast}
             onPersist={(sections, status) => persistPage(activePage.id, sections, status)}
+            onPatchConfig={(recipe) => patchConfig(activePage.id, recipe)}
             onOpenLocalPreview={() => openLocalPreview(activePage.id)}
           />
         ) : (
           <div style={{ padding: 40, color: "var(--ps-muted)" }}>Create a landing page to start building.</div>
         );
-      case "properties":
-        return <PropertiesModule onToast={toast} />;
       case "forms":
         return activePage ? (
           <FormsModule
+            site={activePage}
+            pages={pages}
+            onSelectSite={() => {}}
+            onPatch={(fn) => patchConfig(activePage.id, fn)}
+            onToast={toast}
+            onCreateThankYouPage={
+              pages.some((p) => p.pageType === "thank-you" && p.parentPageId === activePage.id)
+                ? undefined
+                : () => {
+                    const id = `ty_${uid("p")}`;
+                    const slug = `${activePage.slug}-thanks`;
+                    const ty: LandingPageData = {
+                      id,
+                      name: `${ensureConfig(activePage).brand.name} — Thank You`,
+                      slug,
+                      status: activePage.status === "published" ? "published" : "draft",
+                      template: "Thank You Page",
+                      domain: "",
+                      views: "—",
+                      conversions: "—",
+                      updated: "Just now",
+                      thumbnail: activePage.thumbnail,
+                      sections: buildThankYouSections(),
+                      kind: "custom",
+                      designId: "tpl-thankyou",
+                      pageType: "thank-you",
+                      parentPageId: activePage.id,
+                      config: cloneConfig(ensureConfig(activePage)),
+                    };
+                    const next = [ty, ...pages];
+                    setPages(next);
+                    savePages(next);
+                    toast("Thank You page created — opening in builder");
+                    window.location.assign(builderPath(id));
+                  }
+            }
+          />
+        ) : null;
+      case "typography":
+        return activePage ? (
+          <TypographyModule
             site={activePage}
             pages={scoped}
             onSelectSite={() => {}}

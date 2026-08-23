@@ -7,7 +7,9 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Circle,
   Copy,
+  FilePlus2,
   GripVertical,
   Mail,
   MessageSquare,
@@ -20,16 +22,19 @@ import {
   Sparkles,
   TextCursorInput,
   Trash2,
+  Upload,
   Users,
 } from "lucide-react";
 import { FORM_TEMPLATES, uid } from "@/lib/prestate/data";
 import { FORM_PRESETS } from "@/lib/prestate/form-presets";
 import type { FormLeadField, LandingPageData, SiteConfig } from "@/lib/prestate/types";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
+import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
+import { savePages } from "@/lib/prestate/persist";
 import { ModuleHeader, SiteScopeBar } from "./shared";
 import { Btn, Chip, Collapse, FieldRow, SelectField, TextField, Toggle } from "@/components/prestate/ui";
 
-type FieldType = "text" | "phone" | "email" | "select" | "checkbox" | "date" | "textarea" | "hidden";
+type FieldType = "text" | "phone" | "email" | "select" | "radio" | "checkbox" | "date" | "file" | "textarea" | "hidden";
 
 const FIELD_TYPES: { type: FieldType; label: string; icon: React.ReactNode }[] = [
   { type: "text", label: "Text input", icon: <TextCursorInput size={15} /> },
@@ -37,8 +42,10 @@ const FIELD_TYPES: { type: FieldType; label: string; icon: React.ReactNode }[] =
   { type: "email", label: "Email", icon: <Mail size={15} /> },
   { type: "textarea", label: "Text area", icon: <MessageSquare size={15} /> },
   { type: "select", label: "Dropdown", icon: <Settings2 size={15} /> },
-  { type: "date", label: "Date picker", icon: <Calendar size={15} /> },
+  { type: "radio", label: "Radio group", icon: <Circle size={15} /> },
   { type: "checkbox", label: "Checkbox", icon: <Check size={15} /> },
+  { type: "date", label: "Date picker", icon: <Calendar size={15} /> },
+  { type: "file", label: "File upload", icon: <Upload size={15} /> },
   { type: "hidden", label: "Hidden field", icon: <Smartphone size={15} /> },
 ];
 
@@ -51,16 +58,20 @@ export function FormsModule({
   pages,
   onPatch,
   onToast,
+  onCreateThankYouPage,
 }: {
   site: LandingPageData;
   pages: LandingPageData[];
   onSelectSite: (id: string) => void;
   onPatch: (fn: (c: SiteConfig) => SiteConfig) => void;
   onToast: (m: string) => void;
+  /** Creates a Thank You companion page and opens it in the builder. */
+  onCreateThankYouPage?: () => void;
 }) {
   const cfg = ensureConfig(site);
   const form = cfg.form;
   const fields = form.fields;
+  const thankYouPages = pages.filter((p) => p.pageType === "thank-you");
   const [selected, setSelected] = useState(fields[0]?.id ?? "");
   const [previewSent, setPreviewSent] = useState(false);
   const sel = fields.find((f) => f.id === selected) ?? fields[0];
@@ -79,9 +90,9 @@ export function FormsModule({
       id: uid("fld"),
       type,
       label: meta?.label ?? type,
-      placeholder: type === "select" ? "Choose an option" : "",
+      placeholder: type === "select" || type === "radio" ? "Choose an option" : "",
       required: false,
-      options: type === "select" ? ["Option 1", "Option 2"] : undefined,
+      options: type === "select" || type === "radio" ? ["Option 1", "Option 2", "Option 3"] : undefined,
     };
     setFields((f) => [...f, field]);
     setSelected(field.id);
@@ -257,6 +268,18 @@ export function FormsModule({
                                 <option key={o}>{o}</option>
                               ))}
                             </select>
+                          ) : f.type === "radio" ? (
+                            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", padding: "4px 0" }}>
+                              {(f.options ?? []).map((o) => (
+                                <span key={o} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ps-muted)" }}>
+                                  <Circle size={13} /> {o}
+                                </span>
+                              ))}
+                            </div>
+                          ) : f.type === "file" ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 9, border: "1.5px dashed var(--ps-line-strong)", background: "var(--ps-bg)", fontSize: 12, color: "var(--ps-muted)" }}>
+                              <Upload size={13} /> {f.placeholder || "Choose file…"}
+                            </div>
                           ) : (
                             <input className="ps-input" readOnly value={f.placeholder} style={{ height: 34, fontSize: 12.5, background: "var(--ps-bg)" }} />
                           )}
@@ -354,16 +377,84 @@ export function FormsModule({
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Send WhatsApp</span>
                 <Toggle on={form.sendWhatsapp} onChange={(v) => patchForm({ sendWhatsapp: v })} />
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0" }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Redirect to thank-you</span>
-                <Toggle on={form.redirectThankYou} onChange={(v) => patchForm({ redirectThankYou: v })} />
-              </div>
             </Collapse>
-            <div style={{ marginTop: 10 }}>
-              <FieldRow label="Success message">
-                <TextField value={form.thankYou} onChange={(v) => patchForm({ thankYou: v })} />
+
+            <Collapse title="After successful submission" icon={<Check size={14} />} defaultOpen>
+              <FieldRow label="Success action">
+                <SelectField
+                  value={form.successAction ?? "message"}
+                  onChange={(v) => patchForm({ successAction: v as SiteConfig["form"]["successAction"], redirectThankYou: v === "thankyou" })}
+                  options={[
+                    { value: "message", label: "Stay on page — show message" },
+                    { value: "thankyou", label: "Redirect to Thank You page" },
+                    { value: "url", label: "Redirect to custom URL" },
+                  ]}
+                />
               </FieldRow>
-            </div>
+              {form.successAction === "thankyou" ? (
+                <>
+                  <FieldRow label="Thank You page">
+                    <SelectField
+                      value={(() => {
+                        const match = thankYouPages.find((p) => form.thankYou.includes(p.slug));
+                        return match ? match.id : "";
+                      })()}
+                      onChange={(id) => {
+                        const p = thankYouPages.find((x) => x.id === id);
+                        if (p) patchForm({ thankYou: `/p/${p.slug}` });
+                      }}
+                      options={thankYouPages.map((p) => ({ value: p.id, label: `${p.name} · /${p.slug}` }))}
+                      placeholder="Select a Thank You page"
+                    />
+                  </FieldRow>
+                  {(() => {
+                    const selected = thankYouPages.find((p) => form.thankYou.includes(p.slug));
+                    if (!selected) {
+                      return (
+                        <div style={{ padding: "10px 12px", borderRadius: 10, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", fontSize: 12, color: "var(--ps-slate)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                          <span>No Thank You page selected yet{thankYouPages.length ? "" : " — none exists for this workspace"}.</span>
+                          {onCreateThankYouPage ? (
+                            <Btn size="sm" variant="primary" icon={<FilePlus2 size={13} />} onClick={onCreateThankYouPage}>Create for this template</Btn>
+                          ) : null}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "9px 11px", borderRadius: 10, border: "1px solid var(--ps-line)", background: "var(--ps-bg)" }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>Redirects to</div>
+                          <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{localPreviewPath(selected)}</div>
+                        </div>
+                        <Btn size="sm" variant="outline" onClick={() => { savePages([site]); window.location.assign(builderPath(selected.id)); }}>Edit page</Btn>
+                      </div>
+                    );
+                  })()}
+                </>
+              ) : null}
+              {form.successAction === "url" ? (
+                <FieldRow label="Custom redirect URL">
+                  <TextField value={form.successUrl ?? ""} onChange={(v) => patchForm({ successUrl: v })} placeholder="https://example.com/welcome" />
+                </FieldRow>
+              ) : null}
+              <FieldRow label="Open popup after submit (popup id)" hint="Conditional action — opens a Conditional Popup whose id matches after a successful submit.">
+                <TextField value={form.openPopupId ?? ""} onChange={(v) => patchForm({ openPopupId: v })} placeholder="offer-popup" />
+              </FieldRow>
+              <FieldRow label="Success headline">
+                <TextField value={form.successTitle ?? ""} onChange={(v) => patchForm({ successTitle: v })} placeholder="Thanks — we'll call you shortly." />
+              </FieldRow>
+              <FieldRow label="Validation error message">
+                <TextField value={form.errorMessage ?? ""} onChange={(v) => patchForm({ errorMessage: v })} placeholder="Please fill in the required fields." />
+              </FieldRow>
+              <FieldRow label="Auto-download file (post-submit)">
+                <TextField value={form.deliverableUrl ?? ""} onChange={(v) => patchForm({ deliverableUrl: v })} placeholder="/brochure/project.pdf" />
+              </FieldRow>
+              {form.deliverableUrl ? (
+                <FieldRow label="Download button label">
+                  <TextField value={form.deliverableLabel ?? ""} onChange={(v) => patchForm({ deliverableLabel: v })} placeholder="Download brochure" />
+                </FieldRow>
+              ) : null}
+            </Collapse>
+
             <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
               <Btn variant="outline" size="sm" icon={<Sparkles size={13} />} onClick={optimize}>Tighten copy</Btn>
               <Btn variant="ghost" size="sm" onClick={() => void copyEmbed()}>Embed</Btn>

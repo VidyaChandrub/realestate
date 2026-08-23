@@ -308,13 +308,13 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   builder: "Builder",
   pages: "Landing Pages",
   templates: "Template Management",
-  properties: "Properties",
   forms: "Form Builder",
   brand: "Brand Center",
   headerfooter: "Header & Footer",
   seo: "SEO Center",
   tracking: "Tracking Center",
   domains: "Domains",
+  typography: "Typography & Fonts",
 };
 
 function iconBtn(enabled: boolean) {
