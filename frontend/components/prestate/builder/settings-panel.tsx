@@ -126,6 +126,12 @@ function enumOptions(fieldKey: string, widgetType?: string): { value: string; la
       { value: "pill", label: "Pill button" },
     ];
   }
+  if (fieldKey === "navStyle") {
+    return [
+      { value: "chip", label: "Chip pills" },
+      { value: "plain", label: "Plain uppercase links" },
+    ];
+  }
   if (fieldKey.startsWith("primary") && fieldKey.endsWith("Action")) {
     return [
       { value: "link", label: "Open link / anchor" },

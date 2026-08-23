@@ -168,7 +168,7 @@ const SEED: Record<string, Partial<{ primary: string; accent: string; brand: str
     keywords: "ad campaign, electronic city, discount offer, skyline greens",
     rera: "PRM/KA/RERA/1251/449/PR/2026/4",
     ga: "G-SKYLN04",
-    headerDesign: "split",
+    headerDesign: "ribbon",
     footerDesign: "cards",
   },
 };

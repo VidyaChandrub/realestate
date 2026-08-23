@@ -30,7 +30,7 @@ export interface MenuLink {
   href: string;
 }
 
-export type HeaderDesignId = "classic" | "centered" | "split" | "minimal" | "overlay";
+export type HeaderDesignId = "classic" | "centered" | "ribbon" | "minimal" | "overlay";
 export type FooterDesignId = "columns" | "centered" | "newsletter" | "slimbar" | "cards";
 
 /** Length value: a plain number is treated as px; strings pass through as-is ("10px", "1rem", "50%"). */

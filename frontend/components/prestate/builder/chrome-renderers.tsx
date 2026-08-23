@@ -740,179 +740,243 @@ function HeaderCentered({ h, shell }: HProps) {
   );
 }
 
-function HeaderSplit({ h, shell }: HProps) {
+function HeaderRibbon({ h, shell }: HProps) {
   const { b, d, live, selected, onSelect } = shell;
   const s = h.settings;
   const mobile = d === "mobile";
-  const sideLeft = sstr(s, "side", "left") !== "right";
-  const panelW = Math.min(50, Math.max(24, snum(s, "brandPanelWidth", 34)));
-  const panelBg = sstr(s, "brandPanelBg") || b.primary;
-  const panelFg = sstr(s, "brandPanelText", "#ffffff");
-  const mainBg = h.style.colors?.bg || "#f6f7fb";
-  const mainFg = h.style.colors?.text || "#111827";
-  const cols = d === "desktop" ? Math.min(Math.max(1, snum(s, "navColumns", 2)), 3) : 1;
-  const accentBar = sstr(s, "accentBarColor") || b.accent;
-  const iconBg = sstr(s, "iconCircleBg") || "#ffffff";
+  const bandBg = h.style.colors?.bg || "#111827";
+  const bandFg = h.style.colors?.text || "#f8fafc";
+  const tabBg = sstr(s, "brandTabBg") || b.primary;
+  const tabFg = sstr(s, "brandTabText", "#ffffff");
+  const ribbonBg = sstr(s, "ribbonBgColor") || b.accent;
+  const underline = sstr(s, "underlineColor") || b.accent;
+  const chipNav = sstr(s, "navStyle", "chip") !== "plain";
   const cta = ctaOf(h);
+  const ctaLabel = sstr(s, "ctaText") || cta.label;
   const logoUrl = sstr(s, "logoUrl") || b.logoUrl;
-  const markSize = snum(s, "logoSize", 40);
+  const markSize = snum(s, "logoSize", 38);
+  const showRibbon = sbool(s, "showRibbon", true) && !!sstr(s, "ribbonText");
 
-  const iconBtn = (icon: ReactNode, title: string, href: string) => (
+  const navChip = (l: MenuLink) => (
     <a
-      {...anchor(href, live)}
-      title={title}
-      aria-label={title}
-      style={{
-        width: 36,
-        height: 36,
-        borderRadius: "50%",
-        background: iconBg,
-        border: "1px solid rgba(15,23,42,.1)",
-        color: b.primary,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        textDecoration: "none",
-        flexShrink: 0,
-      }}
+      key={`${l.label}-${l.href}`}
+      {...anchor(l.href, live)}
+      style={
+        chipNav
+          ? {
+              color: bandFg,
+              fontSize: fsize(snum(s, "navFontSize", 12), d),
+              fontWeight: 700,
+              textTransform: sbool(s, "navUppercase", true) ? "uppercase" : "none",
+              letterSpacing: 0.7,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              padding: "7px 14px",
+              borderRadius: 999,
+              border: `1px solid ${alpha(bandFg.startsWith("#") ? bandFg : "#f8fafc", 0.28)}`,
+              background: alpha(bandFg.startsWith("#") ? bandFg : "#f8fafc", 0.06),
+            }
+          : {
+              color: alpha(bandFg.startsWith("#") ? bandFg : "#f8fafc", 0.82),
+              fontSize: fsize(snum(s, "navFontSize", 12), d),
+              fontWeight: 700,
+              textTransform: sbool(s, "navUppercase", true) ? "uppercase" : "none",
+              letterSpacing: 1,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }
+      }
     >
-      {icon}
+      {l.label}
     </a>
   );
 
   return (
     <ChromeFrame shell={{ selected, onSelect }}>
       <div style={{ margin: marCss(h.style.spacing?.margin, d), position: "relative", zIndex: 50 }}>
+        {showRibbon ? (
+          <div
+            style={{
+              background: ribbonBg,
+              color: sstr(s, "ribbonTextColor", "#ffffff"),
+              textAlign: "center",
+              fontSize: fsize(11.5, d),
+              fontWeight: 800,
+              letterSpacing: 0.8,
+              textTransform: "uppercase",
+              padding: mobile ? "7px 14px" : "8px 18px",
+            }}
+          >
+            {sstr(s, "ribbonText")}
+          </div>
+        ) : null}
+
         <div
           style={{
             ...chromeBox(h.style),
             display: "flex",
-            flexDirection: mobile ? "column" : sideLeft ? "row" : "row-reverse",
-            alignItems: "stretch",
+            flexDirection: "column",
+            gap: 0,
           }}
         >
           <div
             style={{
-              background: panelBg,
-              color: panelFg,
-              flex: mobile ? "1 1 auto" : `0 0 ${panelW}%`,
-              minWidth: 0,
-              boxSizing: "border-box",
-              padding: mobile ? "18px 20px" : "26px 30px",
               display: "flex",
-              flexDirection: mobile ? "row" : "column",
-              alignItems: mobile ? "center" : "flex-start",
-              justifyContent: mobile ? "center" : "flex-start",
-              gap: mobile ? 12 : 14,
-              textAlign: mobile ? "center" : "left",
+              flexDirection: mobile ? "column" : "row",
+              alignItems: mobile ? "stretch" : "stretch",
+              justifyContent: "space-between",
+              background: bandBg,
+              color: bandFg,
             }}
           >
-            {logoUrl && isMediaSrc(logoUrl) ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt="" style={{ width: markSize, height: markSize, borderRadius: 11, objectFit: "cover", flexShrink: 0 }} />
-            ) : (
-              <span
-                style={{
-                  width: markSize,
-                  height: markSize,
-                  borderRadius: 11,
-                  background: "rgba(255,255,255,.16)",
-                  border: "1px solid rgba(255,255,255,.3)",
-                  color: "#fff",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 800,
-                  fontSize: Math.round(markSize * 0.42),
-                  flexShrink: 0,
-                }}
-              >
-                {b.name.slice(0, 1).toUpperCase()}
-              </span>
-            )}
-            <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontFamily: b.headingFont ? `${b.headingFont}, Georgia, serif` : undefined,
-                  fontSize: fsize(snum(s, "brandFontSize", 17), d),
-                  fontWeight: 800,
-                  letterSpacing: 0.4,
-                }}
-              >
-                {sstr(s, "logoText") || b.name}
-              </div>
-              {!mobile ? (
-                <div style={{ fontSize: fsize(10.5, d), fontWeight: 600, letterSpacing: 1.2, textTransform: "uppercase", color: alpha(panelFg.startsWith("#") ? panelFg : "#ffffff", 0.75), marginTop: 4 }}>
-                  {sstr(s, "taglineText") || b.tagline}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div
-            style={{
-              background: mainBg,
-              color: mainFg,
-              flex: 1,
-              minWidth: 0,
-              padding: mobile ? "16px 18px 18px" : "20px 30px 22px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-              justifyContent: "center",
-            }}
-          >
-            <nav
+            {/* Hanging brand tab */}
+            <div
               style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                gap: `${snum(s, "navGap", 16) * 0.7}px 22px`,
-                maxWidth: 560,
-                width: "100%",
+                background: tabBg,
+                color: tabFg,
+                borderRadius: mobile ? "0" : "0 0 16px 16px",
+                padding: mobile ? "14px 20px 14px" : "16px 30px 20px",
+                display: "flex",
+                flexDirection: mobile ? "row" : "column",
+                alignItems: mobile ? "center" : "flex-start",
+                justifyContent: "center",
+                gap: mobile ? 12 : 10,
+                flex: mobile ? "1 1 auto" : "0 0 auto",
               }}
             >
-              {h.links.map((l) => (
-                <a
-                  key={`${l.label}-${l.href}`}
-                  {...anchor(l.href, live)}
+              {logoUrl && isMediaSrc(logoUrl) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="" style={{ width: markSize, height: markSize, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} />
+              ) : (
+                <span
                   style={{
-                    color: alpha(mainFg.startsWith("#") ? mainFg : "#111827", 0.78),
-                    fontSize: fsize(snum(s, "navFontSize", 12.5), d),
-                    fontWeight: 700,
-                    textTransform: sbool(s, "navUppercase", true) ? "uppercase" : "none",
-                    letterSpacing: 0.8,
-                    textDecoration: "none",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
+                    width: markSize,
+                    height: markSize,
+                    borderRadius: 10,
+                    background: "rgba(255,255,255,.16)",
+                    border: `1px solid ${alpha(tabFg.startsWith("#") ? tabFg : "#ffffff", 0.35)}`,
+                    color: tabFg,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                    fontSize: Math.round(markSize * 0.42),
+                    flexShrink: 0,
                   }}
                 >
-                  {l.label}
-                </a>
-              ))}
+                  {b.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: b.headingFont ? `${b.headingFont}, Georgia, serif` : undefined,
+                    fontSize: fsize(snum(s, "brandFontSize", 16), d),
+                    fontWeight: 800,
+                    letterSpacing: 0.4,
+                    lineHeight: 1.15,
+                  }}
+                >
+                  {sstr(s, "logoText") || b.name}
+                </div>
+                {!mobile && sbool(s, "showTaglineInTab", true) ? (
+                  <div
+                    style={{
+                      fontSize: fsize(10, d),
+                      fontWeight: 700,
+                      letterSpacing: 1.4,
+                      textTransform: "uppercase",
+                      color: alpha(tabFg.startsWith("#") ? tabFg : "#ffffff", 0.75),
+                      marginTop: 3,
+                    }}
+                  >
+                    {sstr(s, "taglineText") || b.tagline}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Nav chips */}
+            <nav
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: mobile ? "center" : "center",
+                gap: `${snum(s, "navGap", 10)}px ${snum(s, "navGap", 10) * 0.8}px`,
+                padding: mobile ? "14px 16px 4px" : "18px 22px",
+                flex: "1 1 auto",
+                minWidth: 0,
+              }}
+            >
+              {h.links.map(navChip)}
             </nav>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              {sbool(s, "showPhoneIcon", true) && b.phone ? iconBtn(<Phone size={15} />, "Call", `tel:${digits(b.phone)}`) : null}
-              {sbool(s, "showEmailIcon", true) && b.email ? iconBtn(<Mail size={15} />, "Email", `mailto:${b.email}`) : null}
+
+            {/* Phone + sharp CTA */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: mobile ? "center" : "flex-end",
+                gap: 14,
+                padding: mobile ? "6px 16px 18px" : "18px 26px 18px 10px",
+                flexWrap: "wrap",
+              }}
+            >
+              {sbool(s, "showPhone", true) && b.phone ? (
+                <a
+                  {...anchor(`tel:${digits(b.phone)}`, live)}
+                  title="Call"
+                  aria-label="Call"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 7,
+                    color: bandFg,
+                    fontSize: fsize(13, d),
+                    fontWeight: 800,
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 999,
+                      background: alpha(bandFg.startsWith("#") ? bandFg : "#f8fafc", 0.1),
+                      border: `1px solid ${alpha(bandFg.startsWith("#") ? bandFg : "#f8fafc", 0.25)}`,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Phone size={14} />
+                  </span>
+                  {sstr(s, "phoneLabel") || digits(b.phone)}
+                </a>
+              ) : null}
               {sbool(s, "showCta", true) ? (
-                <span onClick={(e) => e.stopPropagation()}>
+                <span onClick={(e) => e.stopPropagation()} style={mobile ? { width: "100%" } : undefined}>
                   <CtaButton
-                    label={cta.label}
+                    label={ctaLabel}
                     href={cta.href}
                     live={live}
                     bg={sstr(s, "ctaBgColor") || b.accent}
-                    fg={sstr(s, "ctaTextColor", "#0a0c10")}
-                    radius={snum(s, "ctaRadius", 8)}
-                    fontSize={fsize(12, d)}
-                    paddingX={20}
-                    shadow={`0 8px 20px ${alpha(b.accent, 0.45)}`}
+                    fg={sstr(s, "ctaTextColor", "#ffffff")}
+                    radius={snum(s, "ctaRadius", 2)}
+                    fontSize={fsize(snum(s, "ctaFontSize", 12.5), d)}
+                    paddingX={22}
+                    shadow={`0 10px 24px ${alpha(b.accent, 0.5)}`}
                   />
                 </span>
               ) : null}
             </div>
           </div>
+
+          <div aria-hidden style={{ height: 4, background: underline }} />
         </div>
-        <div aria-hidden style={{ height: 4, background: accentBar }} />
       </div>
     </ChromeFrame>
   );
@@ -1263,8 +1327,8 @@ export function ChromeHeader({ header, device, brand, live, selected, onSelect }
   switch (h.design) {
     case "centered":
       return <HeaderCentered h={h} shell={shell} />;
-    case "split":
-      return <HeaderSplit h={h} shell={shell} />;
+    case "ribbon":
+      return <HeaderRibbon h={h} shell={shell} />;
     case "minimal":
       return <HeaderMinimal h={h} shell={shell} />;
     case "overlay":

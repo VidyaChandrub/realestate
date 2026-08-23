@@ -25,7 +25,7 @@ export interface ChromeDesignMeta {
 export const HEADER_DESIGNS: ChromeDesignMeta[] = [
   { id: "classic", name: "Classic Bar", desc: "Top strip + logo left, nav right, CTA button" },
   { id: "centered", name: "Centered Stack", desc: "Centered brand over a centered link row" },
-  { id: "split", name: "Split Contrast", desc: "Colored brand panel beside a nav column" },
+  { id: "ribbon", name: "Ribbon Promo", desc: "Offer ribbon + hanging brand tab, chip nav & sharp CTA" },
   { id: "minimal", name: "Minimal Toggle", desc: "Slim bar with an expandable menu panel" },
   { id: "overlay", name: "Overlay Pill", desc: "Floating glass pill for hero sections" },
 ];
@@ -192,31 +192,33 @@ export function defaultHeaderSettings(design: HeaderDesignId): Settings {
         dividerColor: "",
         centerAlign: true,
       };
-    case "split":
+    case "ribbon":
       return {
-        brandPanelWidth: 34,
-        logoText: "",
+        ribbonText: "",
+        ribbonBgColor: "",
+        ribbonTextColor: "#ffffff",
+        showRibbon: true,
+        brandTabBg: "",
+        brandTabText: "#ffffff",
         logoUrl: "",
+        logoText: "",
+        logoSize: 38,
+        brandFontSize: 16,
+        taglineText: "",
+        showTaglineInTab: true,
+        navStyle: "chip",
+        navGap: 10,
+        navFontSize: 12,
+        navUppercase: true,
+        showPhone: true,
+        phoneLabel: "Call",
         ctaText: "",
         ctaHref: "",
-        brandPanelBg: "",
-        brandPanelText: "#ffffff",
-        logoSize: 40,
-        brandFontSize: 17,
-        taglineText: "",
-        navFontSize: 12.5,
-        navGap: 16,
-        navUppercase: true,
-        navColumns: 2,
-        showPhoneIcon: true,
-        showEmailIcon: true,
-        iconCircleBg: "",
-        showCta: true,
         ctaBgColor: "",
-        ctaTextColor: "#0a0c10",
-        ctaRadius: 8,
-        accentBarColor: "",
-        side: "left",
+        ctaTextColor: "#ffffff",
+        ctaRadius: 2,
+        ctaFontSize: 12.5,
+        underlineColor: "",
       };
     case "minimal":
       return {
@@ -282,10 +284,10 @@ export function defaultHeaderStyle(design: HeaderDesignId): SectionStyle {
         border: { width: 1, style: "solid", radius: 0, color: "rgba(15,23,42,.08)" },
         layout: { align: "center", direction: "column" },
       });
-    case "split":
+    case "ribbon":
       return styleOver({
-        spacing: { padding: pad(0, 0, 0, 0), margin: margin0, gap: 24 },
-        colors: { bg: "#f6f7fb", text: "#111827" },
+        spacing: { padding: pad(0, 0, 0, 0), margin: margin0, gap: 14 },
+        colors: { bg: "#111827", text: "#f8fafc" },
         border: { width: 0, style: "solid", radius: 0, color: "#e8eaf1" },
       });
     case "minimal":
@@ -466,7 +468,10 @@ export type HydratedFooter = SiteConfig["footer"] & {
 };
 
 export function hydrateHeader(header: SiteConfig["header"]): HydratedHeader {
-  const design = isHeaderDesign(header.design) ? header.design : DEFAULT_HEADER_DESIGN;
+  const raw = header.design;
+  // Legacy designs map onto their replacements so stored pages keep a look.
+  const legacy: Record<string, HeaderDesignId> = { split: "ribbon" };
+  const design = isHeaderDesign(raw) ? raw : (legacy[String(raw)] ?? DEFAULT_HEADER_DESIGN);
   return {
     ...header,
     design,
