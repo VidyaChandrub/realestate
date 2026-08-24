@@ -36,6 +36,17 @@ export type FooterDesignId = "columns" | "centered" | "newsletter" | "slimbar" |
 /** Length value: a plain number is treated as px; strings pass through as-is ("10px", "1rem", "50%"). */
 export type CssLength = number | string;
 
+/**
+ * Per-device (tablet / mobile) overrides stored under style.responsive.
+ * Only spacing, layout and typography are overridable — colors/borders/effects
+ * stay shared so a device tweak can never silently re-theme a section.
+ */
+export interface ResponsiveOverrides {
+  spacing?: Partial<SectionStyle["spacing"]>;
+  layout?: Partial<SectionStyle["layout"]>;
+  typography?: Partial<SectionStyle["typography"]>;
+}
+
 export interface SectionStyle {
   colors?: {
     bg?: string;
@@ -88,6 +99,9 @@ export interface SectionStyle {
     hideDesktop?: boolean;
     hideTablet?: boolean;
     hideMobile?: boolean;
+    /** Per-device overrides — merged over the desktop values when previewing/publishing. */
+    tablet?: ResponsiveOverrides;
+    mobile?: ResponsiveOverrides;
   };
   advanced?: {
     classes?: string;
@@ -137,6 +151,30 @@ export interface PropertyData {
   units: string;
 }
 
+export type FieldLogicOp =
+  | "eq"
+  | "neq"
+  | "contains"
+  | "notcontains"
+  | "gt"
+  | "lt"
+  | "empty"
+  | "notempty";
+
+export interface FieldLogicRule {
+  /** id of the controlling field (see FormLeadField.id). */
+  field: string;
+  op: FieldLogicOp;
+  value: string;
+}
+
+export interface FieldLogic {
+  enabled: boolean;
+  /** AND = all rules must match; OR = any rule must match. */
+  match: "any" | "all";
+  rules: FieldLogicRule[];
+}
+
 export interface FormLeadField {
   id: string;
   type: string;
@@ -144,6 +182,8 @@ export interface FormLeadField {
   placeholder: string;
   required: boolean;
   options?: string[];
+  /** Conditional logic — show this field only when rules match. */
+  logic?: FieldLogic;
 }
 
 export interface SiteConfig {

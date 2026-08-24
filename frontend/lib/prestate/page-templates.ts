@@ -237,7 +237,7 @@ function premiumSections(): SectionInstance[] {
         { name: "Penthouse", area: "3,100 sq.ft", price: "₹3.20 Cr", per: "onwards", features: ["Private Elevator", "Sky Deck", "3 Parking", "Private Pool"], cta: "Request Callback", featured: false },
       ],
     }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("map", "Location & Map", "MapPin", {
+    sec("location-advantages", "Location & Map", "Navigation", {
       address: "Sarjapur Road, Bangalore",
       zoom: 14,
       eyebrow: "Location",
@@ -259,7 +259,7 @@ function premiumSections(): SectionInstance[] {
         { name: "Amit & Neha Joshi", role: "Booked 3 BHK + Study", quote: "From virtual tour to booking, every step was seamless.", rating: 5 },
       ],
     }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("enquiry-form", "Enquiry Form", "Send", {
+    sec("lead-form", "Enquiry Form", "Send", {
       eyebrow: "Private Tour",
       heading: "Book Your Site Visit",
       sub: "Reserve a guided walkthrough in under a minute.",
@@ -368,7 +368,7 @@ function leadGenSections(): SectionInstance[] {
       columns: 3,
       lightbox: true,
     }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("map", "Location & Map", "MapPin", {
+    sec("location-advantages", "Location & Map", "Navigation", {
       address: "Hebbal, Bangalore",
       zoom: 13,
       eyebrow: "Location",
@@ -383,7 +383,9 @@ function leadGenSections(): SectionInstance[] {
     }, { colors: { bg: "#f8fafc", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
     sec("countdown", "Offer Countdown", "Timer", {
       heading: "Founders' Window Closes In",
-      date: "",
+      // Live ticking target — falls back to the static items below only when
+      // the date is cleared or already past.
+      date: "2026-12-31T23:59:00",
       items: [
         { value: "02", label: "Days" },
         { value: "14", label: "Hours" },
@@ -410,7 +412,7 @@ function leadGenSections(): SectionInstance[] {
       phone: "+91 90000 88990",
     }, { colors: { bg: "#0b1220", overlay: "", gradient: "linear-gradient(120deg,#1d4ed8 0%,#2563eb 50%,#0b1220 100%)", text: "#ffffff" }, layout: { width: "full", height: "auto", align: "center", direction: "column" } }),
     sec("popup", "Exit Popup", "PartyPopper", { popupId: "exit-offer", heading: "Wait — grab the price sheet", text: "Enter your details and we'll WhatsApp the founders' price list before you go.", cta: "", link: "", showForm: true, trigger: "exit", delaySeconds: 0, scrollPercent: 40, urlParam: "offer", oncePerSession: true }),
-    sec("sticky-footer-bar", "Sticky Footer Bar", "PanelBottom", { text: "Founders' price from ₹89 L — ends this weekend", ctaLabel: "Get Pricing", link: "#lead-form" }),
+    sec("sticky-cta", "Sticky CTA", "Compass", { text: "Founders' price from ₹89 L — ends this weekend", ctaLabel: "Get Pricing", link: "#lead-form" }),
   ];
 }
 
@@ -540,14 +542,14 @@ function luxeSections(): SectionInstance[] {
         { name: "Arjun Khanna", role: "5 BHK Signature · Penthouse", quote: "Materials you'd expect in Europe, delivered here on schedule.", rating: 5 },
       ],
     }, { colors: { bg: "#faf7f1", text: "#171310" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("enquiry-form", "Private Enquiry", "Send", {
+    sec("lead-form", "Private Enquiry", "Send", {
       eyebrow: "Invitation",
       heading: "Request a Private Preview",
       sub: "Our client relations team arranges viewings by appointment only.",
       button: "Request Invitation",
       fields: ["name", "phone", "email", "message"],
     }, { colors: { bg: "#171310", overlay: "", gradient: "linear-gradient(140deg,#171310 0%,#33261a 100%)", text: "#fdfbf7" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("whatsapp-cta", "WhatsApp Concierge", "MessageCircle", { text: "Prefer to chat? Message the concierge desk", number: "+91 90000 55555", ctaLabel: "Chat on WhatsApp" }, { spacing: { padding: { top: 0, right: 24, bottom: 56, left: 24 }, margin: { top: -36, right: 0, bottom: 0, left: 0 }, gap: 12 }, layout: { width: "full", height: "auto", align: "center", direction: "column" }, colors: { bg: "#171310", text: "#fdfbf7" } }),
+    sec("call-cta", "WhatsApp Concierge", "MessageCircle", { mode: "whatsapp",  text: "Prefer to chat? Message the concierge desk", number: "+91 90000 55555", ctaLabel: "Chat on WhatsApp" }, { spacing: { padding: { top: 0, right: 24, bottom: 56, left: 24 }, margin: { top: -36, right: 0, bottom: 0, left: 0 }, gap: 12 }, layout: { width: "full", height: "auto", align: "center", direction: "column" }, colors: { bg: "#171310", text: "#fdfbf7" } }),
     sec("popup", "Preview Popup", "PartyPopper", { popupId: "preview-invite", heading: "Private previews are filling", text: "Leave your number and the concierge will confirm a slot this week.", cta: "", link: "", showForm: true, trigger: "delay", delaySeconds: 12, scrollPercent: 55, urlParam: "invite", oncePerSession: true }),
     sec("sticky-cta", "Sticky CTA", "Compass", { text: "SKY RESIDENCES FROM ₹4.80 CR · WHITEFIELD", ctaLabel: "Request Preview", phone: "+91 90000 55555" }, { colors: { bg: "#171310", text: "#fdfbf7" } }),
   ];
@@ -597,7 +599,7 @@ function adCampaignSections(): SectionInstance[] {
         spacing: { padding: { top: 140, right: 0, bottom: 90, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
       },
     ),
-    sec("offer-banner", "Urgency Offer Banner", "Gift", {
+    sec("cta-banner", "Urgency Offer Banner", "Gift", { layout: "strip", 
       heading: "Campaign stack worth ₹11.4 L",
       text: "Launch discount + free modular kitchen + waived floor rise + stamp duty support. Ends Sunday or when 42 homes are claimed.",
       cta: "Claim My Slot",
@@ -686,7 +688,7 @@ function adCampaignSections(): SectionInstance[] {
     }, { colors: { bg: "#88101f", overlay: "", gradient: "linear-gradient(120deg,#e11d48 0%,#be123c 55%,#4c0519 100%)", text: "#ffffff" }, layout: { width: "full", height: "auto", align: "center", direction: "column" } }),
     sec("popup", "Campaign Popup", "PartyPopper", { popupId: "campaign-offer", heading: "₹7.77 L discount expires soon", text: "Drop your number and lock this week's campaign price before it resets.", cta: "", link: "", showForm: true, trigger: "scroll", delaySeconds: 0, scrollPercent: 45, urlParam: "promo", oncePerSession: true }),
     sec("floating-icons", "Floating Icons", "PhoneCall", { side: "right", whatsapp: true, call: true, enquire: true, email: false, phone: "+91 90000 42042", number: "+91 90000 42042" }),
-    sec("sticky-footer-bar", "Sticky Footer Bar", "PanelBottom", { text: "⚡ Campaign price ₹62 L — resets to ₹69 L when the timer ends", ctaLabel: "Claim Discount", link: "#lead-form" }),
+    sec("sticky-cta", "Sticky CTA", "Compass", { text: "⚡ Campaign price ₹62 L — resets to ₹69 L when the timer ends", ctaLabel: "Claim Discount", link: "#lead-form" }),
   ];
 }
 
@@ -727,12 +729,12 @@ export function buildThankYouSections(): SectionInstance[] {
             spacing: { padding: { top: 8, right: 8, bottom: 8, left: 8 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 8 },
           }),
           children: [
-            sec("whatsapp-cta", "WhatsApp CTA", "MessageCircle", { text: "Continue the chat on WhatsApp", number: "+91 90000 12345", ctaLabel: "Chat Now" }),
+            sec("call-cta", "WhatsApp CTA", "MessageCircle", { mode: "whatsapp",  text: "Continue the chat on WhatsApp", number: "+91 90000 12345", ctaLabel: "Chat Now" }),
           ],
         },
       ],
     },
-    sec("image", "Property Image", "Images", { src: "", alt: "Project view", title: "", link: "", width: 900, align: "center", radius: 18 }, { colors: { bg: "#ffffff", text: "#111827" }, spacing: { padding: { top: 16, right: 24, bottom: 16, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+    sec("image", "Property Image", "Images", { src: "interior", alt: "Project view", title: "", link: "", width: 900, align: "center", radius: 18 }, { colors: { bg: "#ffffff", text: "#111827" }, spacing: { padding: { top: 16, right: 24, bottom: 16, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
     sec("cta-banner", "Recommended Next Step", "MousePointerClick", {
       eyebrow: "While you wait",
       heading: "Book a Priority Site Visit",

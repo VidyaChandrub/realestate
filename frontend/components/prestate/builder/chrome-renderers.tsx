@@ -82,7 +82,42 @@ function gapCss(style: SectionStyle | undefined, d: Device, fallback = 0): numbe
   return Math.round((typeof g === "number" ? g : fallback) * gscale(d));
 }
 
-function chromeBox(style: SectionStyle | undefined): CSSProperties {
+/**
+ * Device-merged typography (Style → Typography incl. tablet/mobile overrides)
+ * as inheritable CSS for header/footer roots. Manual values win; unset ones
+ * keep each design's styling.
+ */
+function chromeTypo(style: SectionStyle | undefined, device: Device): CSSProperties {
+  const resp = style?.responsive ?? {};
+  const ov = device === "desktop" ? undefined : device === "mobile" ? resp.mobile : resp.tablet;
+  const t = { ...(style?.typography ?? {}), ...(ov?.typography ?? {}) };
+  const out: CSSProperties = {};
+  if (t.fontFamily) out.fontFamily = t.fontFamily.includes('"') || t.fontFamily.includes("'") ? t.fontFamily : `${t.fontFamily}, Inter, system-ui, sans-serif`;
+  const devSize = ov?.typography?.fontSize;
+  if (devSize != null && devSize !== "") {
+    // Explicit per-device size is used exactly — never re-scaled.
+    out.fontSize = typeof devSize === "number" ? `${devSize}px` : String(devSize).trim();
+  } else if (t.fontSize != null && t.fontSize !== "") {
+    const k = device === "mobile" ? 0.8 : device === "tablet" ? 0.9 : 1;
+    if (typeof t.fontSize === "number") out.fontSize = `${Math.round(t.fontSize * k)}px`;
+    else if (String(t.fontSize).trim()) out.fontSize = String(t.fontSize).trim();
+  }
+  if (t.fontWeight != null) out.fontWeight = t.fontWeight;
+  if (t.lineHeight != null) out.lineHeight = t.lineHeight;
+  if (t.letterSpacing != null) out.letterSpacing = t.letterSpacing;
+  if (t.textTransform && t.textTransform !== "none") out.textTransform = t.textTransform;
+  if (t.textColor) out.color = t.textColor;
+  return out;
+}
+
+/** Manual Style→Typography text colour wins over the section/design fallback. */
+function typoColor(style: SectionStyle | undefined, device: Device, fallback: string): string {
+  const resp = style?.responsive ?? {};
+  const ov = device === "desktop" ? undefined : device === "mobile" ? resp.mobile : resp.tablet;
+  return ov?.typography?.textColor || style?.typography?.textColor || fallback;
+}
+
+function chromeBox(style: SectionStyle | undefined, device: Device = "desktop"): CSSProperties {
   const st = style ?? {};
   const bg = st.colors?.bg ?? "";
   const gradient = st.colors?.gradient ?? "";
@@ -101,8 +136,9 @@ function chromeBox(style: SectionStyle | undefined): CSSProperties {
     border: border.width ? `${border.width}px ${border.style || "solid"} ${border.color || "#e8eaf1"}` : undefined,
     boxShadow: effects.shadow && effects.shadow !== "none" ? effects.shadow : undefined,
     ...(effects.glass ? { backdropFilter: "blur(14px) saturate(1.3)", WebkitBackdropFilter: "blur(14px) saturate(1.3)" as never } : {}),
-    ...(st.typography?.fontFamily ? { fontFamily: `${st.typography.fontFamily}, Inter, system-ui, sans-serif` } : {}),
     ...(st.advanced?.zIndex ? { zIndex: st.advanced.zIndex } : {}),
+    // Typography last — manual values beat the section colour above.
+    ...chromeTypo(st, device),
   };
 }
 
@@ -472,7 +508,7 @@ function HeaderClassic({ h, shell }: HProps) {
         : "#ffffff";
   const customBg = h.style.colors?.bg || "";
   const bg = customBg || autoBg;
-  const fg = h.style.colors?.text || (light ? "#ffffff" : "#111827");
+  const fg = typoColor(h.style, d, h.style.colors?.text || (light ? "#ffffff" : "#111827"));
   const navFg = h.style.colors?.text ? alpha(h.style.colors.text, 0.85) : light ? "rgba(255,255,255,.85)" : "#334155";
   const upper = sbool(s, "navUppercase");
   const cta = ctaOf(h);
@@ -513,7 +549,7 @@ function HeaderClassic({ h, shell }: HProps) {
         ) : null}
         <header
           style={{
-            ...chromeBox(h.style),
+            ...chromeBox(h.style, d),
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -636,7 +672,7 @@ function HeaderCentered({ h, shell }: HProps) {
   const { b, d, live, selected, onSelect } = shell;
   const s = h.settings;
   const bg = h.style.colors?.bg || "#ffffff";
-  const fg = h.style.colors?.text || "#111827";
+  const fg = typoColor(h.style, d, h.style.colors?.text || "#111827");
   const divider = sstr(s, "dividerColor") || alpha("#94a3b8", 0.35);
   const dots = sbool(s, "navSeparatorDot", true);
   const cta = ctaOf(h);
@@ -668,7 +704,7 @@ function HeaderCentered({ h, shell }: HProps) {
         ) : null}
         <header
           style={{
-            ...chromeBox(h.style),
+            ...chromeBox(h.style, d),
             background: bg,
             color: fg,
             display: "flex",
@@ -813,7 +849,7 @@ function HeaderRibbon({ h, shell }: HProps) {
 
         <div
           style={{
-            ...chromeBox(h.style),
+            ...chromeBox(h.style, d),
             display: "flex",
             flexDirection: "column",
             gap: 0,
@@ -987,7 +1023,7 @@ function HeaderMinimal({ h, shell }: HProps) {
   const s = h.settings;
   const [open, setOpen] = useState(sbool(s, "autoOpen"));
   const bg = h.style.colors?.bg || "#ffffff";
-  const fg = h.style.colors?.text || "#111827";
+  const fg = typoColor(h.style, d, h.style.colors?.text || "#111827");
   const toggleBorder = sstr(s, "toggleBorderColor") || alpha("#94a3b8", 0.6);
   const cta = ctaOf(h);
 
@@ -996,7 +1032,7 @@ function HeaderMinimal({ h, shell }: HProps) {
       <div style={{ margin: marCss(h.style.spacing?.margin, d), position: "relative", zIndex: open ? 70 : 50 }}>
         <header
           style={{
-            ...chromeBox(h.style),
+            ...chromeBox(h.style, d),
             background: bg,
             color: fg,
             display: "flex",
@@ -1151,7 +1187,7 @@ function HeaderOverlay({ h, shell }: HProps) {
       <div style={{ margin: marCss(h.style.spacing?.margin, d), position: "relative", zIndex: 60 }}>
         <header
           style={{
-            ...chromeBox(h.style),
+            ...chromeBox(h.style, d),
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -1376,7 +1412,7 @@ function FooterColumns({ f, links, shell }: FProps) {
   const { b, d, live, selected, onSelect } = shell;
   const s = f.settings;
   const bg = f.style.colors?.bg || "#0d1220";
-  const txt = sstr(s, "textColor") || f.style.colors?.text || "#a9b0c2";
+  const txt = sstr(s, "textColor") || typoColor(f.style, d, f.style.colors?.text || "#a9b0c2");
   const head = sstr(s, "headingColor") || "#ffffff";
   const colGap = Math.round(snum(s, "colGap", 32) * gscale(d));
   const cols = d === "desktop" ? "2fr 1fr 1fr" : d === "tablet" ? "1fr 1fr" : "1fr";
@@ -1386,7 +1422,7 @@ function FooterColumns({ f, links, shell }: FProps) {
     <ChromeFrame shell={{ selected, onSelect }}>
       <footer
         style={{
-          ...chromeBox(f.style),
+          ...chromeBox(f.style, d),
           background: bg,
           color: txt,
           padding: padCss(f.style.spacing?.padding, d),
@@ -1443,7 +1479,7 @@ function FooterCentered({ f, links, shell }: FProps) {
   const { b, d, live, selected, onSelect } = shell;
   const s = f.settings;
   const bg = f.style.colors?.bg || "#101423";
-  const txt = sstr(s, "textColor") || f.style.colors?.text || "#b6bccb";
+  const txt = sstr(s, "textColor") || typoColor(f.style, d, f.style.colors?.text || "#b6bccb");
   const ring = sstr(s, "ringColor") || b.accent;
   const rera = reraOf(f);
   const dots = sbool(s, "navSeparatorDot", true);
@@ -1452,7 +1488,7 @@ function FooterCentered({ f, links, shell }: FProps) {
     <ChromeFrame shell={{ selected, onSelect }}>
       <footer
         style={{
-          ...chromeBox(f.style),
+          ...chromeBox(f.style, d),
           background: bg,
           color: txt,
           padding: padCss(f.style.spacing?.padding, d),
@@ -1524,7 +1560,7 @@ function FooterNewsletter({ f, links, shell }: FProps) {
   const { b, d, live, selected, onSelect } = shell;
   const s = f.settings;
   const bg = f.style.colors?.bg || "#ffffff";
-  const txt = f.style.colors?.text || "#475569";
+  const txt = typoColor(f.style, d, f.style.colors?.text || "#475569");
   const bandBg = sstr(s, "bandBgColor") || alpha(b.primary, 0.07);
   const inputRadius = snum(s, "inputRadius", 10);
   const buttonRadius = snum(s, "buttonRadius", 10);
@@ -1536,7 +1572,7 @@ function FooterNewsletter({ f, links, shell }: FProps) {
     <ChromeFrame shell={{ selected, onSelect }}>
       <footer
         style={{
-          ...chromeBox(f.style),
+          ...chromeBox(f.style, d),
           background: bg,
           color: txt,
           padding: padCss(f.style.spacing?.padding, d),
@@ -1646,7 +1682,7 @@ function FooterSlimbar({ f, links, shell }: FProps) {
   const { b, d, live, selected, onSelect } = shell;
   const s = f.settings;
   const bg = f.style.colors?.bg || "#f6f7fb";
-  const txt = sstr(s, "textColor") || f.style.colors?.text || "#475569";
+  const txt = sstr(s, "textColor") || typoColor(f.style, d, f.style.colors?.text || "#475569");
   const mobile = d === "mobile";
   const minH = mobile ? undefined : snum(s, "minHeight", 64);
   const rera = reraOf(f);
@@ -1656,7 +1692,7 @@ function FooterSlimbar({ f, links, shell }: FProps) {
     <ChromeFrame shell={{ selected, onSelect }}>
       <footer
         style={{
-          ...chromeBox(f.style),
+          ...chromeBox(f.style, d),
           background: bg,
           color: txt,
           minHeight: minH,
@@ -1723,7 +1759,7 @@ function FooterCards({ f, shell }: FProps) {
     <ChromeFrame shell={{ selected, onSelect }}>
       <footer
         style={{
-          ...chromeBox(f.style),
+          ...chromeBox(f.style, d),
           padding: padCss(f.style.spacing?.padding, d),
           margin: marCss(f.style.spacing?.margin, d),
         }}

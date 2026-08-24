@@ -10,6 +10,7 @@ import {
   Circle,
   Copy,
   FilePlus2,
+  GitBranch,
   GripVertical,
   Mail,
   MessageSquare,
@@ -27,10 +28,11 @@ import {
 } from "lucide-react";
 import { FORM_TEMPLATES, uid } from "@/lib/prestate/data";
 import { FORM_PRESETS } from "@/lib/prestate/form-presets";
-import type { FormLeadField, LandingPageData, SiteConfig } from "@/lib/prestate/types";
+import { FIELD_LOGIC_OPS } from "@/lib/prestate/form-logic";
+import type { FieldLogicOp, FormLeadField, LandingPageData, SiteConfig } from "@/lib/prestate/types";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
 import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
-import { savePages } from "@/lib/prestate/persist";
+import { loadPages, savePage } from "@/lib/prestate/persist";
 import { ModuleHeader, SiteScopeBar } from "./shared";
 import { Btn, Chip, Collapse, FieldRow, SelectField, TextField, Toggle } from "@/components/prestate/ui";
 
@@ -359,6 +361,16 @@ export function FormsModule({
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Required field</span>
                 <Toggle on={sel.required} onChange={(v) => patchField(sel.id, { required: v })} />
               </div>
+
+              <div style={{ borderTop: "1px solid var(--ps-line)", marginTop: 10, paddingTop: 12 }}>
+                <Collapse title="Conditional logic" icon={<GitBranch size={14} />}>
+                  <LogicEditor
+                    field={sel}
+                    allFields={fields}
+                    onChange={(logic) => patchField(sel.id, { logic })}
+                  />
+                </Collapse>
+              </div>
             </>
           ) : (
             <p style={{ fontSize: 12.5, color: "var(--ps-muted)" }}>Select a field to edit it.</p>
@@ -425,7 +437,7 @@ export function FormsModule({
                           <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>Redirects to</div>
                           <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{localPreviewPath(selected)}</div>
                         </div>
-                        <Btn size="sm" variant="outline" onClick={() => { savePages([site]); window.location.assign(builderPath(selected.id)); }}>Edit page</Btn>
+                        <Btn size="sm" variant="outline" onClick={() => { savePage(loadPages(), { ...site, updated: new Date().toISOString() }); window.location.assign(builderPath(selected.id)); }}>Edit page</Btn>
                       </div>
                     );
                   })()}
@@ -464,4 +476,197 @@ export function FormsModule({
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Conditional logic editor for a single form field.
+// Lets a non-technical user show/hide the field based on answers to other
+// fields, with multiple rules combined via AND / OR.
+// ---------------------------------------------------------------------------
+
+function LogicEditor({
+  field,
+  allFields,
+  onChange,
+}: {
+  field: FormLeadField;
+  allFields: FormLeadField[];
+  onChange: (logic: FormLeadField["logic"]) => void;
+}) {
+  const logic = field.logic;
+  const enabled = Boolean(logic?.enabled);
+  const match = logic?.match ?? "all";
+  const rules = logic?.rules ?? [];
+  // Fields that can control this one (anything except itself).
+  const candidates = allFields.filter((f) => f.id !== field.id && f.type !== "hidden");
+
+  const update = (patch: Partial<NonNullable<FormLeadField["logic"]>>) => {
+    onChange({
+      enabled: enabled,
+      match,
+      rules: rules.map((r) => ({ ...r })),
+      ...patch,
+    });
+  };
+
+  const setEnabled = (v: boolean) => update({ enabled: v });
+  const setMatch = (v: "any" | "all") => update({ match: v });
+
+  const addRule = () => {
+    const target = candidates[0];
+    if (!target) return;
+    update({
+      enabled: true,
+      rules: [...rules, { field: target.id, op: "eq", value: "" }],
+    });
+  };
+
+  const patchRule = (i: number, patch: Partial<{ field: string; op: FieldLogicOp; value: string }>) => {
+    update({ rules: rules.map((r, idx) => (idx === i ? { ...r, ...patch } : r)) });
+  };
+
+  const removeRule = (i: number) => {
+    const next = rules.filter((_, idx) => idx !== i);
+    update({ rules: next });
+  };
+
+  const duplicateRule = (i: number) => {
+    update({ rules: [...rules.slice(0, i + 1), { ...rules[i] }, ...rules.slice(i + 1)] });
+  };
+
+  const moveRule = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= rules.length) return;
+    const next = [...rules];
+    const [item] = next.splice(i, 1);
+    next.splice(j, 0, item);
+    update({ rules: next });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>
+          Show this field only when…
+        </span>
+        <Toggle on={enabled} onChange={setEnabled} />
+      </div>
+
+      {!enabled ? (
+        <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: 0, lineHeight: 1.5 }}>
+          Off — this field is always visible. Turn on to reveal it based on previous answers.
+        </p>
+      ) : candidates.length === 0 ? (
+        <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: 0, lineHeight: 1.5 }}>
+          Add another field first — conditions compare against earlier answers.
+        </p>
+      ) : (
+        <>
+          {rules.length > 1 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, color: "var(--ps-slate)" }}>
+              <span>Match</span>
+              <SelectField
+                value={match}
+                onChange={(v) => setMatch(v as "any" | "all")}
+                options={[
+                  { value: "all", label: "ALL of these (AND)" },
+                  { value: "any", label: "ANY of these (OR)" },
+                ]}
+              />
+              <span>rules</span>
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {rules.map((r, i) => {
+              const controlling = allFields.find((f) => f.id === r.field);
+              const op = FIELD_LOGIC_OPS.find((o) => o.op === r.op);
+              const showValue = op ? op.needsValue : true;
+              const isChoice = controlling?.type === "select" || controlling?.type === "radio";
+              return (
+                <div key={i} style={{ border: "1px solid var(--ps-line)", borderRadius: 10, padding: 9, background: "var(--ps-bg)", display: "flex", flexDirection: "column", gap: 7 }}>
+                  {i > 0 ? (
+                    <div style={{ fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-primary)" }}>
+                      {match === "all" ? "AND" : "OR"}
+                    </div>
+                  ) : null}
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <div style={{ flex: "1 1 120px", minWidth: 110 }}>
+                      <SelectField
+                        value={r.field}
+                        onChange={(v) => patchRule(i, { field: v })}
+                        options={candidates.map((f) => ({ value: f.id, label: f.label }))}
+                      />
+                    </div>
+                    <div style={{ flex: "1 1 110px", minWidth: 100 }}>
+                      <SelectField
+                        value={r.op}
+                        onChange={(v) => patchRule(i, { op: v as FieldLogicOp })}
+                        options={FIELD_LOGIC_OPS.map((o) => ({ value: o.op, label: o.label }))}
+                      />
+                    </div>
+                  </div>
+                  {showValue ? (
+                    <div>
+                      {isChoice ? (
+                        <SelectField
+                          value={r.value}
+                          onChange={(v) => patchRule(i, { value: v })}
+                          options={[
+                            { value: "", label: "— choose —" },
+                            ...(controlling?.options ?? []).map((o) => ({ value: o, label: o })),
+                          ]}
+                        />
+                      ) : (
+                        <TextField
+                          value={r.value}
+                          onChange={(v) => patchRule(i, { value: v })}
+                          placeholder="value to compare"
+                        />
+                      )}
+                    </div>
+                  ) : null}
+                  <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                    <button type="button" title="Move up" disabled={i === 0} onClick={() => moveRule(i, -1)} style={iconBtn(i === 0)}>
+                      <ChevronUp size={13} />
+                    </button>
+                    <button type="button" title="Move down" disabled={i === rules.length - 1} onClick={() => moveRule(i, 1)} style={iconBtn(i === rules.length - 1)}>
+                      <ChevronDown size={13} />
+                    </button>
+                    <button type="button" title="Duplicate" onClick={() => duplicateRule(i)} style={iconBtn(false)}>
+                      <Copy size={13} />
+                    </button>
+                    <button type="button" title="Remove" onClick={() => removeRule(i)} style={{ ...iconBtn(false), color: "#e5484d" }}>
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={addRule}
+            disabled={candidates.length === 0}
+            style={{ padding: "9px", borderRadius: 10, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+          >
+            + Add condition
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function iconBtn(disabled: boolean): React.CSSProperties {
+  return {
+    background: "none",
+    border: "none",
+    color: "var(--ps-muted)",
+    cursor: disabled ? "default" : "pointer",
+    padding: 4,
+    display: "inline-flex",
+    opacity: disabled ? 0.35 : 1,
+  };
 }
