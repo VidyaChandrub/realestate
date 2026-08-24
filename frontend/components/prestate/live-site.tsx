@@ -10,7 +10,7 @@ import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts } fr
 import { applyDocumentSeo } from "@/lib/prestate/seo";
 import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
 import { bumpTracking } from "@/lib/prestate/tracking";
-import { findPageByDomain, findPageBySlug, loadPages } from "@/lib/prestate/store";
+import { findPageByDomain, findPageBySlug } from "@/lib/prestate/store";
 import { builderPath, localDomainPreviewPath } from "@/lib/prestate/paths";
 
 function deviceFromWidth(w: number): Device {
@@ -33,15 +33,21 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
   }, []);
 
   useEffect(() => {
-    const pages = loadPages();
-    const found = host ? findPageByDomain(host, pages) : slug ? findPageBySlug(slug, pages) : undefined;
-    setPage(found ?? null);
-    setUnlocked(false);
-    setGate("");
-    if (found) {
-      applyDocumentSeo(found);
-      bumpTracking(found.id, "view");
-    }
+    let cancelled = false;
+    (async () => {
+      const found = host ? await findPageByDomain(host) : slug ? await findPageBySlug(slug) : undefined;
+      if (cancelled) return;
+      setPage(found ?? null);
+      setUnlocked(false);
+      setGate("");
+      if (found) {
+        applyDocumentSeo(found);
+        bumpTracking(found.id, "view");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [slug, host]);
 
   if (page === undefined) {

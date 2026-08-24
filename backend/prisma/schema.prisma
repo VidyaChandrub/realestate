@@ -235,3 +235,57 @@ model AuditLog {
   @@map("audit_logs")
   @@schema("audit")
 }
+
+// ---------------------------------------------------------------------------
+// templates — Super Admin landing-page template library (builder content
+// lives in `content`, stored as-is; the frontend owns the shape of that JSON)
+// ---------------------------------------------------------------------------
+
+enum TemplateStatus {
+  draft
+  published
+  scheduled
+  password
+  unpublished
+
+  @@schema("templates")
+}
+
+enum TemplateKind {
+  preset
+  custom
+
+  @@schema("templates")
+}
+
+enum TemplatePageType {
+  landing
+  thank_you
+
+  @@schema("templates")
+}
+
+model Template {
+  id             String            @id @default(uuid())
+  name           String
+  slug           String            @unique
+  status         TemplateStatus    @default(draft)
+  isPaid         Boolean           @default(false) @map("is_paid")
+  thumbnail      String?
+  designId       String            @map("design_id")
+  baseDesignName String            @map("base_design_name")
+  category       String?
+  kind           TemplateKind      @default(custom)
+  pageType       TemplatePageType  @default(landing) @map("page_type")
+  parentId       String?           @map("parent_id")
+  domain         String            @default("")
+  content        Json
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  parent     Template?  @relation("TemplatePages", fields: [parentId], references: [id], onDelete: SetNull)
+  childPages Template[] @relation("TemplatePages")
+
+  @@map("templates")
+  @@schema("templates")
+}

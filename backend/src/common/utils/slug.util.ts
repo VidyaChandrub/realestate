@@ -27,3 +27,20 @@ export async function generateUniqueOrgSlug(
 
   return candidate;
 }
+
+// Same collision-suffix scheme as generateUniqueOrgSlug, scoped to templates.
+export async function generateUniqueTemplateSlug(
+  prisma: Pick<PrismaService, 'template'>,
+  name: string,
+): Promise<string> {
+  const base = slugify(name);
+  let candidate = base;
+  let suffix = 1;
+
+  while (await prisma.template.findUnique({ where: { slug: candidate } })) {
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+
+  return candidate;
+}

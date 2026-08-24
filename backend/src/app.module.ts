@@ -7,6 +7,8 @@ import { TeamModule } from './modules/team/team.module';
 import { AdminOrganisationsModule } from './modules/admin-organisations/admin-organisations.module';
 import { OrgSettingsModule } from './modules/org-settings/org-settings.module';
 import { OrgUsersModule } from './modules/org-users/org-users.module';
+import { AdminTemplatesModule } from './modules/admin-templates/admin-templates.module';
+import { OrgTemplatesModule } from './modules/org-templates/org-templates.module';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { OrgUsersModule } from './modules/org-users/org-users.module';
     AdminOrganisationsModule,
     OrgSettingsModule,
     OrgUsersModule,
+    AdminTemplatesModule,
+    OrgTemplatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

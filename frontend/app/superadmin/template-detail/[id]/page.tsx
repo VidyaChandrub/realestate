@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Copy, Eye, LayoutTemplate, Pencil, X } from "lucide-react";
 import { Reveal } from "@/components/superadmin/reveal";
 import { StatusBadge, TemplateCover, manageHref, statusStyle } from "@/components/superadmin/templates/shared";
-import { loadPages, savePages } from "@/lib/prestate/persist";
+import { loadTemplate, duplicateTemplate, saveTemplate } from "@/lib/prestate/persist";
 import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
-import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
-import { uid } from "@/lib/prestate/data";
-import type { LandingPageData, SectionInstance } from "@/lib/prestate/types";
+import { ensureConfig } from "@/lib/prestate/site-config";
+import type { LandingPageData } from "@/lib/prestate/types";
 
 type Tab = "overview" | "settings" | "preview";
 const TABS: { key: Tab; label: string }[] = [
@@ -25,26 +24,28 @@ export default function SuperAdminTemplateDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
 
-  const [pages, setPages] = useState<LandingPageData[]>([]);
+  const [template, setTemplate] = useState<LandingPageData | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
   const [toast, setToast] = useState<string | null>(null);
+  const [duplicating, setDuplicating] = useState(false);
 
   // Editable draft
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [status, setStatus] = useState<LandingPageData["status"]>("draft");
   const [domain, setDomain] = useState("");
+  const [isPaid, setIsPaid] = useState(false);
 
   useEffect(() => {
-    const list = loadPages();
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setPages(list);
-    setLoaded(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, []);
-
-  const template = useMemo(() => pages.find((p) => p.id === params.id), [pages, params.id]);
+    if (!params.id) return;
+    loadTemplate(params.id).then((t) => {
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setTemplate(t);
+      setLoaded(true);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    });
+  }, [params.id]);
 
   useEffect(() => {
     if (!template) return;
@@ -54,6 +55,7 @@ export default function SuperAdminTemplateDetailPage() {
     setSlug(template.slug);
     setStatus(template.status);
     setDomain(template.domain);
+    setIsPaid(template.isPaid ?? false);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [template]);
 
@@ -82,43 +84,39 @@ export default function SuperAdminTemplateDetailPage() {
   if (!template) return null;
 
   const cfg = ensureConfig(template);
-  const dirty = name !== template.name || slug !== template.slug || status !== template.status || domain !== template.domain;
+  const dirty =
+    name !== template.name ||
+    slug !== template.slug ||
+    status !== template.status ||
+    domain !== template.domain ||
+    isPaid !== (template.isPaid ?? false);
 
-  function save() {
+  async function save() {
     if (!template) return;
     const cleanSlug =
       slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || template.slug;
-    setPages((prev) => {
-      const next = prev.map((p) =>
-        p.id === template.id ? { ...p, name: name.trim() || p.name, slug: cleanSlug, status, domain: domain.trim(), updated: "Just now" } : p,
-      );
-      savePages(next);
-      return next;
+    const updated = await saveTemplate({
+      ...template,
+      name: name.trim() || template.name,
+      slug: cleanSlug,
+      status,
+      domain: domain.trim(),
+      isPaid,
     });
+    setTemplate(updated);
     setSlug(cleanSlug);
     notify("Template settings saved");
   }
 
-  function duplicate() {
-    if (!template) return;
-    const copy: LandingPageData = {
-      ...template,
-      id: uid("p"),
-      name: `${template.name} (copy)`,
-      slug: `${template.slug}-${uid("c").slice(-6)}`,
-      status: "draft",
-      domain: "",
-      views: "—",
-      conversions: "—",
-      updated: "Just now",
-      sections: JSON.parse(JSON.stringify(template.sections)) as SectionInstance[],
-      kind: "custom",
-      config: cloneConfig(cfg),
-    };
-    const next = [copy, ...pages];
-    savePages(next);
-    setPages(next);
-    router.push(manageHref(copy.id));
+  async function duplicate() {
+    if (!template || duplicating) return;
+    setDuplicating(true);
+    try {
+      const copy = await duplicateTemplate(template.id);
+      router.push(manageHref(copy.id));
+    } finally {
+      setDuplicating(false);
+    }
   }
 
   const previewHref = localPreviewPath(template);
@@ -144,8 +142,8 @@ export default function SuperAdminTemplateDetailPage() {
           <a className="btn btn-ghost" href={previewHref} target="_blank" rel="noreferrer">
             <Eye size={15} /> Preview
           </a>
-          <button type="button" className="btn btn-ghost" onClick={duplicate}>
-            <Copy size={15} /> Duplicate
+          <button type="button" className="btn btn-ghost" disabled={duplicating} onClick={() => void duplicate()}>
+            <Copy size={15} /> {duplicating ? "Duplicating…" : "Duplicate"}
           </button>
           <a className="btn btn-primary" href={builderPath(template.id)}>
             <Pencil size={15} /> Edit in builder
@@ -249,16 +247,24 @@ export default function SuperAdminTemplateDetailPage() {
                     <input className="inp" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="e.g. homes.example.com" />
                   </div>
                 </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label>Pricing</label>
+                  <select className="inp" value={isPaid ? "paid" : "free"} onChange={(e) => setIsPaid(e.target.value === "paid")}>
+                    <option value="free">Free</option>
+                    <option value="paid">Paid</option>
+                  </select>
+                </div>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
                   <button type="button" className="btn btn-ghost" disabled={!dirty} onClick={() => {
                     setName(template.name);
                     setSlug(template.slug);
                     setStatus(template.status);
                     setDomain(template.domain);
+                    setIsPaid(template.isPaid ?? false);
                   }}>
                     Reset
                   </button>
-                  <button type="button" className="btn btn-primary" disabled={!dirty} onClick={save}>
+                  <button type="button" className="btn btn-primary" disabled={!dirty} onClick={() => void save()}>
                     Save changes
                   </button>
                 </div>

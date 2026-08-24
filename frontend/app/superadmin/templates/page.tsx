@@ -15,19 +15,20 @@ import {
   type TemplateRow,
 } from "@/components/superadmin/templates/shared";
 import { TemplateCard } from "@/components/superadmin/templates/template-card";
-import { BLANK_TEMPLATE, TEMPLATES, buildTemplateSections, uid } from "@/lib/prestate/data";
-import { loadPages, savePages, seedPages } from "@/lib/prestate/persist";
+import { BLANK_TEMPLATE, TEMPLATES, buildTemplateSections } from "@/lib/prestate/data";
+import { createTemplate, deleteTemplate, duplicateTemplate, loadTemplates, resetTemplate, saveTemplate } from "@/lib/prestate/persist";
 import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
-import { cloneConfig, defaultSiteConfig, ensureConfig, seedConfigFor } from "@/lib/prestate/site-config";
+import { defaultSiteConfig, seedConfigFor } from "@/lib/prestate/site-config";
 import { inferDesignId } from "@/lib/prestate/page-templates";
-import type { LandingPageData, SectionInstance, TemplateData } from "@/lib/prestate/types";
+import type { LandingPageData, TemplateData } from "@/lib/prestate/types";
 
 function goToBuilder(pageId: string) {
   window.location.assign(builderPath(pageId));
 }
 
 export default function SuperAdminTemplatesPage() {
-  const [pages, setPages] = useState<LandingPageData[]>(() => seedPages());
+  const [pages, setPages] = useState<LandingPageData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
   const [filterIndex, setFilterIndex] = useState(0);
@@ -40,14 +41,14 @@ export default function SuperAdminTemplatesPage() {
   const [deleteFor, setDeleteFor] = useState<TemplateRow | null>(null);
 
   useEffect(() => {
-    // Hydrate from localStorage after mount; SSR-safe seed is set above.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPages(loadPages());
+    // Hydrate from the server after mount.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setLoading(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    loadTemplates()
+      .then(setPages)
+      .finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    savePages(pages);
-  }, [pages]);
 
   // Debounce free-text search.
   useEffect(() => {
@@ -60,46 +61,33 @@ export default function SuperAdminTemplatesPage() {
     window.setTimeout(() => setToast(null), 3200);
   }, []);
 
-  const openBuilder = useCallback(
-    (pageId: string) => {
-      savePages(pages);
-      goToBuilder(pageId);
-    },
-    [pages],
-  );
+  const openBuilder = useCallback((pageId: string) => {
+    goToBuilder(pageId);
+  }, []);
 
   const createFromDesign = useCallback(
-    (template: TemplateData, name?: string) => {
-      const id = uid("p");
+    async (template: TemplateData, name?: string) => {
       const label = name?.trim() || (template.id === "tpl-blank" ? "Untitled template" : `${template.name} — New`);
       const slug =
         label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "new-template";
-      const page: LandingPageData = {
-        id,
+      const created = await createTemplate({
         name: label,
         slug,
-        status: "draft",
-        template: template.name,
-        domain: "",
-        views: "—",
-        conversions: "—",
-        updated: "Just now",
-        thumbnail: template.thumbnail,
-        kind: "custom",
         designId: template.id,
+        template: template.name,
+        kind: "custom",
+        thumbnail: template.thumbnail,
         sections: buildTemplateSections(template.id),
         config: defaultSiteConfig({ name: label, slug, primary: template.accent, accent: "#CDA45E" }),
-      };
-      const next = [page, ...pages];
-      setPages(next);
-      savePages(next);
-      goToBuilder(id);
+      });
+      setPages((prev) => [created, ...prev]);
+      goToBuilder(created.id);
     },
-    [pages],
+    [],
   );
 
   const openPreset = useCallback(
-    (design: string) => {
+    async (design: string) => {
       const existing =
         pages.find((p) => (p.kind ?? "custom") === "preset" && p.designId === design) ??
         pages.find((p) => p.designId === design);
@@ -109,26 +97,35 @@ export default function SuperAdminTemplatesPage() {
       }
       const template = TEMPLATES.find((t) => t.id === design);
       if (!template) return;
-      const restored: LandingPageData = {
-        id: uid("p"),
+      const slug = template.id.replace(/^tpl-/, "");
+      const sections = buildTemplateSections(template.id);
+      const config = seedConfigFor({
+        id: "",
         name: template.name,
-        slug: template.id.replace(/^tpl-/, ""),
+        slug,
         status: "draft",
         template: template.name,
         domain: "",
         views: "—",
         conversions: "—",
-        updated: "Just now",
+        updated: "",
         thumbnail: template.thumbnail,
+        sections,
         kind: "preset",
         designId: template.id,
-        sections: buildTemplateSections(template.id),
-      };
-      restored.config = seedConfigFor(restored);
-      const next = [restored, ...pages];
-      setPages(next);
-      savePages(next);
-      goToBuilder(restored.id);
+      });
+      const created = await createTemplate({
+        name: template.name,
+        slug,
+        designId: template.id,
+        template: template.name,
+        kind: "preset",
+        thumbnail: template.thumbnail,
+        sections,
+        config,
+      });
+      setPages((prev) => [created, ...prev]);
+      goToBuilder(created.id);
     },
     [pages, openBuilder],
   );
@@ -142,53 +139,43 @@ export default function SuperAdminTemplatesPage() {
   );
 
   const duplicate = useCallback(
-    (pageId: string) => {
-      setPages((prev) => {
-        const src = prev.find((p) => p.id === pageId);
-        if (!src) return prev;
-        const copy: LandingPageData = {
-          ...src,
-          id: uid("p"),
-          name: `${src.name} (copy)`,
-          slug: `${src.slug}-${uid("c").slice(-6)}`,
-          status: "draft",
-          domain: "",
-          views: "—",
-          conversions: "—",
-          updated: "Just now",
-          sections: JSON.parse(JSON.stringify(src.sections)) as SectionInstance[],
-          kind: "custom",
-          config: cloneConfig(ensureConfig(src)),
-        };
-        return [copy, ...prev];
-      });
+    async (pageId: string) => {
+      const copy = await duplicateTemplate(pageId);
+      setPages((prev) => [copy, ...prev]);
       notify("Template duplicated");
     },
     [notify],
   );
 
   const remove = useCallback(
-    (row: TemplateRow) => {
+    async (row: TemplateRow) => {
       const pageId = row.pageId;
       if (!pageId) return;
       if (row.kind === "preset") {
         const design = row.designId ?? inferDesignId(row.name);
-        setPages((prev) =>
-          prev.map((p) =>
-            p.id === pageId
-              ? {
-                  ...p,
-                  sections: buildTemplateSections(design),
-                  config: seedConfigFor({ ...p, sections: [], designId: design, kind: "preset" }),
-                  status: "draft",
-                  updated: "Just now",
-                }
-              : p,
-          ),
-        );
+        const updated = await resetTemplate(pageId, {
+          sections: buildTemplateSections(design),
+          config: seedConfigFor({
+            id: pageId,
+            name: row.name,
+            slug: "",
+            status: "draft",
+            template: row.name,
+            domain: "",
+            views: "—",
+            conversions: "—",
+            updated: "",
+            thumbnail: "",
+            sections: [],
+            designId: design,
+            kind: "preset",
+          }),
+        });
+        setPages((prev) => prev.map((p) => (p.id === pageId ? updated : p)));
         notify("Predefined template reset");
         return;
       }
+      await deleteTemplate(pageId);
       setPages((prev) => prev.filter((p) => p.id !== pageId));
       notify("Template deleted");
     },
@@ -196,11 +183,14 @@ export default function SuperAdminTemplatesPage() {
   );
 
   const setStatus = useCallback(
-    (pageId: string, status: LandingPageData["status"]) => {
-      setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, status, updated: "Just now" } : p)));
+    async (pageId: string, status: LandingPageData["status"]) => {
+      const page = pages.find((p) => p.id === pageId);
+      if (!page) return;
+      const updated = await saveTemplate({ ...page, status });
+      setPages((prev) => prev.map((p) => (p.id === pageId ? updated : p)));
       notify(status === "published" ? "Published" : "Unpublished");
     },
-    [notify],
+    [pages, notify],
   );
 
   const rows = useMemo(() => buildTemplateRows(pages), [pages]);

@@ -244,3 +244,22 @@ export interface OrganisationActivityRow {
   entityId: string | null;
   createdAt: string;
 }
+
+// GET /org/templates row — the free-template library card list. No `content`;
+// fetch GET /org/templates/:id for the full sections/config to preview one.
+export interface OrgTemplateSummary {
+  id: string;
+  name: string;
+  slug: string;
+  thumbnail: string | null;
+  category: string | null;
+  template: string;
+  updatedAt: string;
+}
+
+export interface OrgTemplatesListResponse {
+  data: OrgTemplateSummary[];
+  total: number;
+  page: number;
+  limit: number;
+}

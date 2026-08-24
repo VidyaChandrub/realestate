@@ -408,6 +408,11 @@ export interface LandingPageData {
   pageType?: "landing" | "thank-you";
   /** For thank-you pages: the landing page id they belong to. */
   parentPageId?: string;
+  /** Server-persisted fields (backend persistence layer). */
+  isPaid?: boolean;
+  category?: string | null;
+  /** ISO timestamp from the backend — `updated` is still the display string derived from this. */
+  updatedAt?: string;
 }
 
 /** What happens after a successful (validated) form submission. */

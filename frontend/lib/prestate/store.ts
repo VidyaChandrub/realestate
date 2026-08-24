@@ -1,16 +1,25 @@
 import type { LandingPageData } from "./types";
-import { loadPages } from "./persist";
+import { loadTemplates } from "./persist";
 
-export { loadPages, savePages, seedPages, PAGES_STORAGE_KEY } from "./persist";
+export {
+  loadTemplates,
+  loadTemplate,
+  createTemplate,
+  saveTemplate,
+  deleteTemplate,
+  duplicateTemplate,
+  resetTemplate,
+} from "./persist";
+export type { CreateTemplateInput } from "./persist";
 
-export function findPageBySlug(slug: string, pages?: LandingPageData[]): LandingPageData | undefined {
-  const list = pages ?? (typeof window === "undefined" ? [] : loadPages());
+export async function findPageBySlug(slug: string, pages?: LandingPageData[]): Promise<LandingPageData | undefined> {
+  const list = pages ?? (typeof window === "undefined" ? [] : await loadTemplates());
   const key = decodeURIComponent(slug).toLowerCase();
   return list.find((p) => p.slug.toLowerCase() === key);
 }
 
-export function findPageByDomain(domain: string, pages?: LandingPageData[]): LandingPageData | undefined {
-  const list = pages ?? (typeof window === "undefined" ? [] : loadPages());
+export async function findPageByDomain(domain: string, pages?: LandingPageData[]): Promise<LandingPageData | undefined> {
+  const list = pages ?? (typeof window === "undefined" ? [] : await loadTemplates());
   const host = normalizeDomain(domain);
   if (!host) return undefined;
   return list.find((p) => normalizeDomain(p.domain) === host);
