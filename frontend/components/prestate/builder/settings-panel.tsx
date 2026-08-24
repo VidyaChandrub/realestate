@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlignCenter,
   AlignLeft,
@@ -23,9 +23,16 @@ import {
   Type,
   X,
 } from "lucide-react";
-import type { Device, SectionInstance } from "@/lib/prestate/types";
+import type { Device, LandingPageData, SectionInstance, SiteConfig } from "@/lib/prestate/types";
 import { SLUG_ICONS } from "@/lib/prestate/data";
+import { ensureConfig } from "@/lib/prestate/site-config";
+import { FIELD_LOGIC_OPS } from "@/lib/prestate/form-logic";
+import type { FieldLogicOp, FormLeadField } from "@/lib/prestate/types";
+import { GitBranch, Copy as CopyIcon, ChevronDown as ChevronDownIcon, ChevronUp } from "lucide-react";
+import { loadFormLibrary, saveFormLibrary } from "@/lib/prestate/forms-store";
+import type { FormDefinition } from "@/lib/prestate/forms-store";
 import { FOOTER_DESIGNS, HEADER_DESIGNS } from "@/lib/prestate/chrome-presets";
+import { designsForWidget } from "@/lib/prestate/widget-designs";
 import type { TemplateTypography, TypeKey } from "@/lib/prestate/design-system";
 import { fontOptions, loadFonts } from "@/lib/prestate/design-system";
 import { setRowColumnCount } from "@/lib/prestate/tree";
@@ -52,6 +59,35 @@ function formatFieldLabel(key: string): string {
 const OBJECT_LIST_SEEDS: Record<string, string[]> = {
   links: ["label", "href"],
   socials: ["label", "href"],
+};
+
+// Per-widget object-array seeds — ensures "Add item" works even when list is empty
+const WIDGET_OBJECT_SEEDS: Record<string, Record<string, string[]>> = {
+  hero: { heroStats: ["value", "label"], highlights: ["label"] },
+  overview: { stats: ["value", "label"], bullets: ["label"] },
+  highlights: { items: ["icon", "value", "label"] },
+  stats: { items: ["icon", "value", "label"] },
+  amenities: { items: ["icon", "title", "desc"] },
+  gallery: { captions: ["label"] },
+  "video-gallery": { videos: ["title", "url"] },
+  floorplans: { plans: ["name", "beds", "area", "price"] },
+  "master-plan": { items: ["label", "value"] },
+  pricing: { plans: ["name", "area", "price", "per", "features", "cta", "featured"] },
+  features: { items: ["title", "text"] },
+  specifications: { rows: ["label", "value"] },
+  timeline: { items: ["title", "text"] },
+  construction: { items: ["title", "text"] },
+  "property-details": { items: ["label", "value"] },
+  "unit-types": { items: ["name", "beds", "area", "price"] },
+  "payment-plans": { items: ["plan", "amount", "details"] },
+  "location-advantages": { items: ["icon", "title", "meta"] },
+  "builder-profile": { items: ["title", "text"] },
+  brochure: { gateFields: ["label", "type"] },
+  downloads: { files: ["name", "url"] },
+  testimonials: { items: ["name", "role", "quote", "rating"] },
+  faq: { items: ["q", "a"] },
+  tabs: { items: ["label", "body"] },
+  carousel: { slides: ["caption", "image"] },
 };
 
 // Enumerated settings keys get a dropdown instead of a free-text field.
@@ -193,6 +229,36 @@ function DesignPicker({ kind, value, onChange }: { kind: "header" | "footer"; va
   );
 }
 
+function WidgetDesignPicker({ widgetType, value, onChange }: { widgetType: string; value: string; onChange: (v: string) => void }) {
+  const list = designsForWidget(widgetType);
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: list.length === 2 ? "1fr 1fr" : "1fr 1fr 1fr", gap: 8 }}>
+      {list.map((d) => {
+        const active = value === d.id;
+        return (
+          <button
+            key={d.id}
+            type="button"
+            onClick={() => onChange(d.id)}
+            title={d.desc}
+            style={{
+              textAlign: "left",
+              padding: "10px 11px",
+              borderRadius: 11,
+              border: active ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)",
+              background: active ? "var(--ps-primary-soft)" : "#fff",
+              cursor: "pointer",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, color: active ? "var(--ps-primary)" : "var(--ps-ink)" }}>{d.name}</div>
+            <div style={{ fontSize: 10, color: "var(--ps-muted)", marginTop: 2, lineHeight: 1.35 }}>{d.desc}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ContentField({
   label,
   fieldKey,
@@ -231,7 +297,7 @@ function ContentField({
     }
     return (
       <FieldRow label={label}>
-        <ObjectList label={label} widgetType={widgetType} value={value as Record<string, unknown>[]} onChange={(v) => onChange(v)} seedKeys={OBJECT_LIST_SEEDS[fieldKey]} />
+        <ObjectList label={label} fieldKey={fieldKey} widgetType={widgetType} value={value as Record<string, unknown>[]} onChange={(v) => onChange(v)} seedKeys={OBJECT_LIST_SEEDS[fieldKey]} />
       </FieldRow>
     );
   }
@@ -293,10 +359,16 @@ function StringList({ value, onChange, media }: { value: string[]; onChange: (v:
   );
 }
 
-function ObjectList({ label, widgetType, value, onChange, seedKeys }: { label: string; widgetType?: string; value: Record<string, unknown>[]; onChange: (v: Record<string, unknown>[]) => void; seedKeys?: string[] }) {
+function ObjectList({ label, fieldKey, widgetType, value, onChange, seedKeys }: { label: string; fieldKey?: string; widgetType?: string; value: Record<string, unknown>[]; onChange: (v: Record<string, unknown>[]) => void; seedKeys?: string[] }) {
   const [open, setOpen] = useState<number | null>(0);
   let keys = Object.keys(value[0] ?? {});
   if (!keys.length && seedKeys?.length) keys = seedKeys;
+  if (!keys.length && widgetType && fieldKey && WIDGET_OBJECT_SEEDS[widgetType]?.[fieldKey]) keys = WIDGET_OBJECT_SEEDS[widgetType][fieldKey];
+  if (!keys.length && widgetType && WIDGET_OBJECT_SEEDS[widgetType]) {
+    const fallback = Object.values(WIDGET_OBJECT_SEEDS[widgetType])[0];
+    if (fallback?.length) keys = fallback;
+  }
+  if (!keys.length) keys = ["title"];
   const titleKey = keys.find((k) => ["title", "name", "label", "value", "q", "heading"].includes(k)) ?? keys[0];
   return (
     <div>
@@ -352,6 +424,8 @@ export function SettingsPanel({
   setDevice,
   onChange,
   typographyTokens,
+  page,
+  onPatchConfig,
 }: {
   section: SectionInstance | null;
   device: Device;
@@ -359,6 +433,8 @@ export function SettingsPanel({
   onChange: (patch: Partial<SectionInstance>) => void;
   /** Effective design-system tokens — used for placeholders & reset-to-global. */
   typographyTokens?: TemplateTypography;
+  page?: LandingPageData;
+  onPatchConfig?: (recipe: (c: SiteConfig) => SiteConfig) => void;
 }) {
   const [tab, setTab] = useState<"content" | "style" | "advanced">("content");
 
@@ -524,7 +600,10 @@ export function SettingsPanel({
               </div>
             ) : null}
             {section.type === "popup" ? <PopupSettingsEditor section={section} onChange={(p) => set({ settings: { ...section.settings, ...p } })} /> : null}
-            {Object.entries(section.settings)
+            {section.type === "lead-form" ? (
+              <FormWidgetConditionalEditor section={section} onChange={set} page={page} onPatchConfig={onPatchConfig} />
+            ) : null}
+            {section.type !== "lead-form" && Object.entries(section.settings)
               .filter(([key]) => !(section.type === "text" && (key === "text" || key === "html")))
               .filter(([key]) => !(section.type === "popup" && POPUP_MANAGED_KEYS.includes(key)))
               .filter(([key]) => !(section.type === "html" && key === "code"))
@@ -543,9 +622,13 @@ export function SettingsPanel({
                       suffix=""
                     />
                   </FieldRow>
-                ) : key === "design" && (section.type === "header" || section.type === "footer") ? (
-                  <FieldRow label="Layout design">
-                    <DesignPicker kind={section.type} value={String(value ?? "")} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
+                ) : key === "design" ? (
+                  <FieldRow label={section.type === "header" || section.type === "footer" ? "Layout design" : "Premium design"}>
+                    {section.type === "header" || section.type === "footer" ? (
+                      <DesignPicker kind={section.type} value={String(value ?? "")} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
+                    ) : (
+                      <WidgetDesignPicker widgetType={section.type} value={String(value ?? "")} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
+                    )}
                   </FieldRow>
                 ) : (
                   <ContentField fieldKey={key} widgetType={section.type} label={formatFieldLabel(key)} value={value} onChange={(v) => set({ settings: { ...section.settings, [key]: v } })} />
@@ -1148,6 +1231,149 @@ function PopupSettingsEditor({
       <FieldRow label="Success message">
         <TextField value={String(st.successMessage ?? "")} onChange={(v) => onChange({ successMessage: v })} placeholder="Thanks! We'll be in touch shortly." />
       </FieldRow>
+    </div>
+  );
+}
+
+function FormWidgetConditionalEditor({ section, onChange, page, onPatchConfig }: { section: SectionInstance; onChange: (patch: Partial<SectionInstance>) => void; page?: LandingPageData; onPatchConfig?: (r: (c: SiteConfig) => SiteConfig) => void }) {
+  const [library, setLibrary] = useState<FormDefinition[]>(() => loadFormLibrary());
+  const refresh = () => setLibrary(loadFormLibrary());
+  useEffect(() => {
+    refresh();
+    if (typeof window === "undefined") return;
+    const onStorage = (e: StorageEvent) => { if (e.key === "prestate.forms.v1") refresh(); };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", refresh);
+    return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("focus", refresh); };
+  }, [page?.id]);
+  const selectedFormId = String((section.settings as Record<string, unknown>).formId ?? "");
+  const pageCfg = page ? ensureConfig(page) : null;
+  const pageForm = pageCfg?.form;
+  const libraryForm = selectedFormId ? library.find((f) => f.id === selectedFormId) : undefined;
+  const form = libraryForm ?? pageForm;
+  const fields = form?.fields ?? [];
+  const patchLogic = (fieldId: string, logic: FormLeadField["logic"]) => {
+    if (libraryForm) {
+      const next = library.map((f) => (f.id === libraryForm.id ? { ...f, fields: f.fields.map((fld) => (fld.id === fieldId ? { ...fld, logic } : fld)), updatedAt: new Date().toISOString() } : f));
+      saveFormLibrary(next);
+      setLibrary(next);
+      return;
+    }
+    if (!onPatchConfig) return;
+    onPatchConfig((c) => ({ ...c, form: { ...c.form, fields: c.form.fields.map((f) => (f.id === fieldId ? { ...f, logic } : f)) } }));
+  };
+  const selectOptions: { value: string; label: string }[] = [
+    { value: "", label: pageForm ? `Page form — ${pageForm.name || "Default"} (${pageForm.fields.length} fields)` : "Page form (default)" },
+    ...library.map((f) => ({ value: f.id, label: `${f.name} — ${f.fields.length} fields` })),
+  ];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+      <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
+        <FieldRow label="Form to display" hint="Dropdown shows whatever you created in Forms — pick any form. Each has its own embed code, fields, PDF & thank-you page.">
+          <SelectField value={selectedFormId} onChange={(v) => onChange({ settings: { ...section.settings, formId: v } })} options={selectOptions} placeholder="Page form" />
+        </FieldRow>
+        {library.length === 0 ? (
+          <div style={{ fontSize: 11.5, color: "var(--ps-muted)", background: "var(--ps-bg)", border: "1px dashed var(--ps-line-strong)", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>
+            No library forms yet — open <strong>Forms</strong> module and click <em>Create new form</em>. After saving, it appears here automatically.
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: "var(--ps-muted)", lineHeight: 1.5 }}>Selected: <strong style={{ color: "var(--ps-slate)" }}>{form?.name ?? "—"}</strong> {libraryForm ? <span>· embed <code style={{ fontSize: 10 }}>{libraryForm.embed.id}</code></span> : <span>· page form</span>}</div>
+        )}
+      </div>
+      <div style={{ padding: "8px 10px", borderRadius: 9, background: "var(--ps-primary-mist)", border: "1px solid rgba(109,93,252,.18)", margin: "10px 0" }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: "var(--ps-primary)", display: "flex", alignItems: "center", gap: 6 }}><GitBranch size={13} /> Conditional Form</div>
+        <div style={{ fontSize: 11.5, color: "var(--ps-slate)", lineHeight: 1.5, marginTop: 4 }}>This widget renders only the form (pure). Build any conditional flow here — it edits the selected form’s logic directly (same as Forms module). Edits stay independent per form.</div>
+      </div>
+      {fields.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "var(--ps-muted)", padding: "10px", border: "1px dashed var(--ps-line-strong)", borderRadius: 9, textAlign: "center" }}>No fields yet — add fields in Forms module, then set conditions here. Every field can be shown/hidden based on previous answers.</div>
+      ) : (
+        fields.map((fld) => (
+          <div key={fld.id} style={{ borderBottom: "1px solid var(--ps-line)", padding: "10px 0" }}>
+            <Collapse title={`${fld.label} — ${fld.type}${fld.required ? " *" : ""}`} icon={<GitBranch size={13} />} >
+              <FormFieldLogicEditor field={fld} allFields={fields} onChange={(logic) => patchLogic(fld.id, logic)} />
+            </Collapse>
+          </div>
+        ))
+      )}
+      <div style={{ fontSize: 11, color: "var(--ps-muted)", lineHeight: 1.5, padding: "8px 2px" }}>Conditions use field ID (stable) and preview hides/shows instantly on the canvas.</div>
+    </div>
+  );
+}
+
+function FormFieldLogicEditor({ field, allFields, onChange }: { field: FormLeadField; allFields: FormLeadField[]; onChange: (logic: FormLeadField["logic"]) => void }) {
+  const logic = field.logic;
+  const enabled = Boolean(logic?.enabled);
+  const match = logic?.match ?? "all";
+  const rules = logic?.rules ?? [];
+  const candidates = allFields.filter((f) => f.id !== field.id && f.type !== "hidden");
+  const update = (patch: Partial<NonNullable<FormLeadField["logic"]>>) => {
+    onChange({ enabled, match, rules: rules.map((r) => ({ ...r })), ...patch });
+  };
+  const setEnabled = (v: boolean) => update({ enabled: v });
+  const setMatch = (v: "any" | "all") => update({ match: v });
+  const addRule = () => {
+    const target = candidates[0];
+    if (!target) return;
+    update({ enabled: true, rules: [...rules, { field: target.id, op: "eq", value: "" }] });
+  };
+  const patchRule = (i: number, patch: Partial<{ field: string; op: FieldLogicOp; value: string }>) => update({ rules: rules.map((r, idx) => (idx === i ? { ...r, ...patch } : r)) });
+  const removeRule = (i: number) => update({ rules: rules.filter((_, idx) => idx !== i) });
+  const duplicateRule = (i: number) => update({ rules: [...rules.slice(0, i + 1), { ...rules[i] }, ...rules.slice(i + 1)] });
+  const moveRule = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= rules.length) return;
+    const next = [...rules];
+    const [item] = next.splice(i, 1);
+    next.splice(j, 0, item);
+    update({ rules: next });
+  };
+  const iconBtn = (disabled: boolean): React.CSSProperties => ({ background: "none", border: "none", color: "var(--ps-muted)", cursor: disabled ? "default" : "pointer", padding: 4, display: "inline-flex", opacity: disabled ? 0.35 : 1 });
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Show this field only when…</span>
+        <Toggle on={enabled} onChange={setEnabled} />
+      </div>
+      {!enabled ? (
+        <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: 0, lineHeight: 1.5 }}>Off — always visible. Turn on to condition on previous answers.</p>
+      ) : candidates.length === 0 ? (
+        <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: 0, lineHeight: 1.5 }}>Add another field first.</p>
+      ) : (
+        <>
+          {rules.length > 1 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, color: "var(--ps-slate)" }}>
+              <span>Match</span>
+              <SelectField value={match} onChange={(v) => setMatch(v as "any" | "all")} options={[{ value: "all", label: "ALL (AND)" }, { value: "any", label: "ANY (OR)" }]} />
+              <span>rules</span>
+            </div>
+          ) : null}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {rules.map((r, i) => {
+              const controlling = allFields.find((f) => f.id === r.field);
+              const op = FIELD_LOGIC_OPS.find((o) => o.op === r.op);
+              const showValue = op ? op.needsValue : true;
+              const isChoice = controlling?.type === "select" || controlling?.type === "radio";
+              return (
+                <div key={i} style={{ border: "1px solid var(--ps-line)", borderRadius: 10, padding: 9, background: "var(--ps-bg)", display: "flex", flexDirection: "column", gap: 7 }}>
+                  {i > 0 ? <div style={{ fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-primary)" }}>{match === "all" ? "AND" : "OR"}</div> : null}
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <div style={{ flex: "1 1 120px", minWidth: 110 }}><SelectField value={r.field} onChange={(v) => patchRule(i, { field: v })} options={candidates.map((f) => ({ value: f.id, label: f.label }))} /></div>
+                    <div style={{ flex: "1 1 110px", minWidth: 100 }}><SelectField value={r.op} onChange={(v) => patchRule(i, { op: v as FieldLogicOp })} options={FIELD_LOGIC_OPS.map((o) => ({ value: o.op, label: o.label }))} /></div>
+                  </div>
+                  {showValue ? (<div>{isChoice ? (<SelectField value={r.value} onChange={(v) => patchRule(i, { value: v })} options={[{ value: "", label: "— choose —" }, ...(controlling?.options ?? []).map((o) => ({ value: o, label: o }))]} />) : (<TextField value={r.value} onChange={(v) => patchRule(i, { value: v })} placeholder="value to compare" />)}</div>) : null}
+                  <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+                    <button type="button" disabled={i===0} onClick={() => moveRule(i,-1)} style={iconBtn(i===0)}><ChevronUp size={13} /></button>
+                    <button type="button" disabled={i===rules.length-1} onClick={() => moveRule(i,1)} style={iconBtn(i===rules.length-1)}><ChevronDownIcon size={13} /></button>
+                    <button type="button" onClick={() => duplicateRule(i)} style={iconBtn(false)}><CopyIcon size={13} /></button>
+                    <button type="button" onClick={() => removeRule(i)} style={{ ...iconBtn(false), color: "#e5484d" }}><Trash2 size={13} /></button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button type="button" onClick={addRule} disabled={candidates.length===0} style={{ padding: "9px", borderRadius: 10, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ Add condition</button>
+        </>
+      )}
     </div>
   );
 }

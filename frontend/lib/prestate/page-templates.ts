@@ -7,7 +7,8 @@ function uid(prefix = "sec"): string {
 const defaultStyle = (over?: Partial<SectionStyle>): SectionStyle => ({
   colors: { bg: "transparent", overlay: "", gradient: "", text: "" },
   typography: {},
-  spacing: { padding: { top: 64, right: 24, bottom: 64, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 },
+  // Premium spacing: generous vertical whitespace, readable container padding
+  spacing: { padding: { top: 80, right: 24, bottom: 80, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 },
   layout: { width: "full", height: "auto", align: "center", direction: "row", wrap: true, justify: "center", alignItems: "center" },
   responsive: {},
   ...over,

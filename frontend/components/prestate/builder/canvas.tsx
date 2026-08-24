@@ -41,6 +41,7 @@ import "yet-another-react-lightbox/styles.css";
 import type { Device, FormLeadField, SectionInstance, SiteConfig } from "@/lib/prestate/types";
 import { isFieldVisible, withFieldValue } from "@/lib/prestate/form-logic";
 import { PROPERTY, SLUG_ICONS, resolveVars, WIDGETS } from "@/lib/prestate/data";
+import { loadFormLibrary } from "@/lib/prestate/forms-store";
 import type { FontDef, TemplateTypography, TypeKey, TypeToken } from "@/lib/prestate/design-system";
 import { cssUrl, isMediaSrc } from "@/lib/media";
 import { sanitizeHtml } from "@/components/prestate/rich-text-editor";
@@ -220,6 +221,10 @@ function sectionStyle(s: SectionInstance, device: Device = "desktop"): CSSProper
   // inner container (containerCss) so backgrounds bleed edge-to-edge.
   void st.layout?.width;
 
+  const toCss = (v: number | string | undefined): string => {
+    const len = cssLen(v, shrink, 0);
+    return typeof len === "number" ? `${len}px` : String(len);
+  };
   return {
     background: gradient ? undefined : bg,
     backgroundImage: gradient ?? (img ? cssUrl(img) : undefined),
@@ -228,8 +233,8 @@ function sectionStyle(s: SectionInstance, device: Device = "desktop"): CSSProper
     position: "relative",
     color: st.colors?.text ?? "#111827",
     ...baseTypo,
-    padding: `${cssLen(pad.top, shrink)}px ${cssLen(pad.right, shrink)}px ${cssLen(pad.bottom, shrink)}px ${cssLen(pad.left, shrink)}px`,
-    margin: `${cssLen(mar.top, shrink)}px ${cssLen(mar.right, shrink)}px ${cssLen(mar.bottom, shrink)}px ${cssLen(mar.left, shrink)}px`,
+    padding: `${toCss(pad.top)} ${toCss(pad.right)} ${toCss(pad.bottom)} ${toCss(pad.left)}`,
+    margin: `${toCss(mar.top)} ${toCss(mar.right)} ${toCss(mar.bottom)} ${toCss(mar.left)}`,
     width: "100%",
     maxWidth: "100%",
     minWidth: 0,
@@ -786,6 +791,7 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
   const live = useContext(SiteLiveContext);
   const pageId = useContext(SitePageIdContext);
   const T = typoCss(s, device);
+  const design = String(s.settings.design ?? "classic");
   const primaryAction = String(st.primaryAction ?? "link") as CtaAction;
   const secondaryAction = String(st.secondaryAction ?? "link") as CtaAction;
   const primaryLink = String(st.primaryLink ?? "#enquiry");
@@ -799,6 +805,8 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
         { label: "Full Name", type: "text", required: true },
         { label: "Phone Number", type: "phone", required: true },
       ];
+  const isCentered = design === "centered";
+  const isSplit = design === "split";
   return (
     <div style={{ position: "relative", minHeight: device === "mobile" ? 560 : device === "tablet" ? 680 : 780, display: "flex", alignItems: "center" }}>
       <div style={{ position: "absolute", inset: 0 }}>
@@ -811,17 +819,17 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
       </div>
       <Overlay section={s} />
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(8,10,20,.78) 0%, rgba(8,10,20,.35) 55%, transparent 100%)", zIndex: 1 }} />
-      <Inner section={s} align="left">
-        <div style={{ maxWidth: device === "mobile" ? "100%" : 640 }}>
+      <Inner section={s} align={isCentered ? "center" : "left"}>
+        <div style={{ maxWidth: isCentered ? 760 : device === "mobile" ? "100%" : 640, margin: isCentered ? "0 auto" : undefined, textAlign: isCentered ? "center" : "left" }}>
           <Eyebrow gold>★ {String(resolveVars(st.eyebrow))}</Eyebrow>
-          <h1 className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 32 : device === "tablet" ? 42 : 56, lineHeight: 1.08, fontWeight: 700, color: "#fff", letterSpacing: -0.5, margin: "16px 0 10px", ...T }}>{String(resolveVars(st.heading))}</h1>
-          <p style={{ fontSize: device === "mobile" ? 16 : device === "tablet" ? 18 : 21, color: "#c9a56a", fontWeight: 600, letterSpacing: 0.3, marginBottom: 20, ...T }}>{String(resolveVars(st.subheading))}</p>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
+          <h1 className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 32 : device === "tablet" ? 42 : 56, lineHeight: 1.08, fontWeight: 700, color: "#fff", letterSpacing: -0.5, margin: "16px 0 10px", textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.heading))}</h1>
+          <p style={{ fontSize: device === "mobile" ? 16 : device === "tablet" ? 18 : 21, color: "#c9a56a", fontWeight: 600, letterSpacing: 0.3, marginBottom: 20, textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.subheading))}</p>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, justifyContent: isCentered ? "center" : "flex-start" }}>
             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, textTransform: "uppercase", color: "rgba(255,255,255,.55)" }}>{String(st.priceLabel ?? "STARTING FROM")}</span>
           </div>
-          <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 28 : 36, fontWeight: 700, color: "#fff", ...T }}>{String(resolveVars(st.price)).replace(/^Starting From\s*/i, "")}</div>
-          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.6)", margin: "4px 0 26px" }}>{String(st.priceNote)}</div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 28 : 36, fontWeight: 700, color: "#fff", textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.price)).replace(/^Starting From\s*/i, "")}</div>
+          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.6)", margin: "4px 0 26px", textAlign: isCentered ? "center" : "left" }}>{String(st.priceNote)}</div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: isCentered ? "center" : "flex-start" }}>
             <a
               href={resolveCtaHref(primaryAction, primaryLink)}
               {...handle(primaryAction, primaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
@@ -829,30 +837,36 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
             >
               {String(resolveVars(st.ctaPrimary))} <ArrowRight size={15} />
             </a>
-            <a
-              href={resolveCtaHref(secondaryAction, secondaryLink || (gateFile ? "#" : ""))}
-              {...handle(secondaryAction, secondaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
-              style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.35)", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "13px 24px", borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)", textDecoration: "none" }}
-            >
-              <Download size={15} /> {String(resolveVars(st.ctaSecondary))}
-            </a>
+            {!isCentered ? (
+              <a
+                href={resolveCtaHref(secondaryAction, secondaryLink || (gateFile ? "#" : ""))}
+                {...handle(secondaryAction, secondaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
+                style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.35)", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "13px 24px", borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)", textDecoration: "none" }}
+              >
+                <Download size={15} /> {String(resolveVars(st.ctaSecondary))}
+              </a>
+            ) : null}
           </div>
-          <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginTop: 28 }}>
-            {((st.highlights as string[] | undefined) ?? []).map((h) => (
-              <span key={h} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.18)", color: "#fff", fontSize: 11.5, fontWeight: 600, padding: "7px 13px", borderRadius: 999, backdropFilter: "blur(8px)" }}>
-                <CheckCircle2 size={13} style={{ color: "#cda45e" }} /> {h}
-              </span>
+          {!isCentered ? (
+            <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginTop: 28, justifyContent: isSplit ? "flex-start" : "flex-start" }}>
+              {((st.highlights as string[] | undefined) ?? []).map((h) => (
+                <span key={h} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.18)", color: "#fff", fontSize: 11.5, fontWeight: 600, padding: "7px 13px", borderRadius: 999, backdropFilter: "blur(8px)" }}>
+                  <CheckCircle2 size={13} style={{ color: "#cda45e" }} /> {h}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        {!isCentered ? (
+          <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "repeat(4,1fr)" : "1fr 1fr", gap: 12, width: "100%", marginTop: 44 }}>
+            {((st.heroStats as { value: string; label: string }[] | undefined) ?? []).map((x) => (
+              <div key={x.label} style={{ background: "rgba(255,255,255,.09)", border: "1px solid rgba(255,255,255,.16)", borderRadius: 14, padding: "16px 18px", backdropFilter: "blur(12px)" }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{x.value}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", marginTop: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>{x.label}</div>
+              </div>
             ))}
           </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "repeat(4,1fr)" : "1fr 1fr", gap: 12, width: "100%", marginTop: 44 }}>
-          {((st.heroStats as { value: string; label: string }[] | undefined) ?? []).map((x) => (
-            <div key={x.label} style={{ background: "rgba(255,255,255,.09)", border: "1px solid rgba(255,255,255,.16)", borderRadius: 14, padding: "16px 18px", backdropFilter: "blur(12px)" }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{x.value}</div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", marginTop: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>{x.label}</div>
-            </div>
-          ))}
-        </div>
+        ) : null}
       </Inner>
       {(secondaryAction === "brochure" || primaryAction === "brochure") ? (
         <GatedDownloadModal
@@ -1098,9 +1112,37 @@ function OverviewSection({ s, device }: { s: SectionInstance; device: Device }) 
 
 function AmenitiesSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
+  const design = String(s.settings.design ?? "grid");
   const items = (st.items ?? []) as { icon?: string; title: string; desc: string }[];
-  const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 4;
   const T = typoCss(s, device);
+  const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 4;
+  if (design === "list") {
+    return (
+      <>
+        <Inner section={s}><Eyebrow>{String(st.eyebrow)}</Eyebrow><h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2><p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 560, lineHeight: 1.65, ...T }}>{String(st.text)}</p></Inner>
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, width: "100%", margin: "34px 0 0" }}>
+          {items.map((it, i) => (
+            <div key={i} className="ps-card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 14 }}>
+              <span style={{ width: 44, height: 44, borderRadius: 12, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{iconFor(it.icon, 20)}</span>
+              <div><div style={{ fontSize: 14, fontWeight: 800, color: "var(--ps-ink)", ...T }}>{it.title}</div><div style={{ fontSize: 12.5, color: "var(--ps-slate)", lineHeight: 1.5, ...T }}>{it.desc}</div></div>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
+  if (design === "compact") {
+    return (
+      <>
+        <Inner section={s}><Eyebrow>{String(st.eyebrow)}</Eyebrow><h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2><p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 560, lineHeight: 1.65, ...T }}>{String(st.text)}</p></Inner>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, width: "100%", margin: "34px 0 0", justifyContent: device === "mobile" ? "flex-start" : "center" }}>
+          {items.map((it, i) => (
+            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 999, background: "#fff", border: "1px solid var(--ps-line)", boxShadow: "var(--ps-shadow-sm)", fontSize: 13, fontWeight: 700, color: "var(--ps-ink)" }}><span style={{ color: "var(--ps-primary)", display: "inline-flex" }}>{iconFor(it.icon, 16)}</span> {it.title}</span>
+          ))}
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <Inner section={s}>
@@ -1558,7 +1600,20 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
   const [sent, setSent] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
 
-  const rawFields = cfg?.fields?.length ? cfg.fields : (st.fields ?? []);
+  // Form widget dropdown: if the widget has a formId set, render that library form instead of the page's form.
+  const widgetFormId = String((s.settings as Record<string, unknown>).formId ?? "").trim();
+  const [libraryForm, setLibraryForm] = useState<SiteConfig["form"] | null>(null);
+  useEffect(() => {
+    if (!widgetFormId) { setLibraryForm(null); return; }
+    try {
+      const lib = loadFormLibrary();
+      const found = lib.find((f) => f.id === widgetFormId);
+      setLibraryForm(found ? (found as unknown as SiteConfig["form"]) : null);
+    } catch { setLibraryForm(null); }
+  }, [widgetFormId]);
+  const effectiveForm = (libraryForm ?? cfg) as SiteConfig["form"];
+
+  const rawFields = effectiveForm?.fields?.length ? effectiveForm.fields : (st.fields ?? []);
   const fields = (Array.isArray(rawFields) ? rawFields : [])
     .map((f, i) => {
       if (typeof f === "string") {
@@ -1573,30 +1628,30 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
   // Conditional logic — hide fields whose rules do not match the current answers.
   const visibleAll = fields.filter((f) => isFieldVisible(f as unknown as FormLeadField, fields as unknown as FormLeadField[], values));
 
-  const multi = cfg?.multiStep ?? Boolean(st.steps);
+  const multi = effectiveForm?.multiStep ?? Boolean(st.steps);
   const chunk = 3;
   const steps = multi ? Math.max(1, Math.ceil(visibleAll.length / chunk)) : 1;
   const visible = multi ? visibleAll.slice(step * chunk, step * chunk + chunk) : visibleAll;
-  const submitLabel = cfg?.submitLabel || String(st.button || "Submit");
+  const submitLabel = effectiveForm?.submitLabel || String(st.button || "Submit");
   const last = step >= steps - 1;
 
   // Universal Dynamic Form: deliverable may come from canvas widget prop, legacy field, or new pdf config per form.
-  const pdfCfg = (cfg as unknown as { pdf?: { enabled?: boolean; url?: string; filename?: string; autoDownload?: boolean } })?.pdf;
-  const deliverableUrl = String(pdfCfg?.url || st.pdfUrl || cfg?.deliverableUrl || "").trim();
+  const pdfCfg = (effectiveForm as unknown as { pdf?: { enabled?: boolean; url?: string; filename?: string; autoDownload?: boolean } })?.pdf;
+  const deliverableUrl = String(pdfCfg?.url || st.pdfUrl || effectiveForm?.deliverableUrl || "").trim();
   const pdfEnabled = pdfCfg ? pdfCfg.enabled !== false : true;
   const pdfAuto = pdfCfg?.autoDownload ?? true;
   const pdfFilename = String(pdfCfg?.filename ?? "").trim() || "brochure.pdf";
-  const deliverableLabel = String(st.pdfLabel || cfg?.deliverableLabel || pdfFilename.replace(/\.pdf$/i, "") || "Download brochure").trim() || "Download brochure";
+  const deliverableLabel = String(st.pdfLabel || effectiveForm?.deliverableLabel || pdfFilename.replace(/\.pdf$/i, "") || "Download brochure").trim() || "Download brochure";
   // Success actions: inline message · Thank You page redirect · custom URL.
-  const legacyRedirect = Boolean(cfg?.redirectThankYou);
-  const successAction = String(cfg?.successAction ?? (legacyRedirect ? "thankyou" : "message"));
-  const thankYouTarget = String(cfg?.thankYou ?? "").trim();
-  const customUrl = String(cfg?.successUrl ?? "").trim();
+  const legacyRedirect = Boolean(effectiveForm?.redirectThankYou);
+  const successAction = String(effectiveForm?.successAction ?? (legacyRedirect ? "thankyou" : "message"));
+  const thankYouTarget = String(effectiveForm?.thankYou ?? "").trim();
+  const customUrl = String(effectiveForm?.successUrl ?? "").trim();
   const redirectTarget = successAction === "thankyou" ? thankYouTarget : successAction === "url" ? customUrl : "";
   const doRedirect = live && /^(https?:\/\/|\/)/.test(redirectTarget);
-  const thankYouPage = (cfg as unknown as { thankYouPage?: { heading?: string; successMessage?: string; showPdfConfirmation?: boolean; enabled?: boolean } })?.thankYouPage;
-  const successMsg = String(thankYouPage?.successMessage || thankYouPage?.heading || cfg?.successTitle || cfg?.thankYou || "Thanks — our team will call you shortly.");
-  const errorMsg = String(cfg?.errorMessage || "Please fill in the highlighted required fields.");
+  const thankYouPage = (effectiveForm as unknown as { thankYouPage?: { heading?: string; successMessage?: string; showPdfConfirmation?: boolean; enabled?: boolean } })?.thankYouPage;
+  const successMsg = String(thankYouPage?.successMessage || thankYouPage?.heading || effectiveForm?.successTitle || effectiveForm?.thankYou || "Thanks — our team will call you shortly.");
+  const errorMsg = String(effectiveForm?.errorMessage || "Please fill in the highlighted required fields.");
   const [error, setError] = useState("");
   // Note: answers for fields hidden by conditional logic simply stop being read
 
@@ -1647,10 +1702,10 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
     if (pageId) bumpTracking(pageId, "form");
     window.dispatchEvent(new CustomEvent(LEAD_SUCCESS_EVENT));
     // Conditional action: open a popup (offer / thank-you / download gate).
-    const popupAfterSubmit = String(cfg?.openPopupId ?? "").trim();
+    const popupAfterSubmit = String(effectiveForm?.openPopupId ?? "").trim();
     if (popupAfterSubmit) openPopupById(popupAfterSubmit);
-    const digits = digitsOnly(cfg?.whatsapp || "");
-    if (cfg?.sendWhatsapp && digits) {
+    const digits = digitsOnly(effectiveForm?.whatsapp || "");
+    if (effectiveForm?.sendWhatsapp && digits) {
       if (pageId) bumpTracking(pageId, "whatsapp");
       const body = visibleAll.map((f) => `${f.label}: ${values[(f as { id?: string }).id || f.label] || ""}`).join("%0A");
       window.open(`https://wa.me/${digits}?text=${body}`, "_blank", "noopener,noreferrer");
@@ -1666,7 +1721,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
   };
 
   if (sent) {
-    const ty = (cfg as unknown as { thankYouPage?: { heading?: string; description?: string; text?: string; image?: string; icon?: string; buttons?: { label: string; href: string; variant: string }[]; html?: string; showPdfConfirmation?: boolean; enabled?: boolean; alignment?: string; background?: string; typography?: { fontFamily?: string; fontSize?: string | number; textColor?: string }; colors?: { bg?: string; text?: string; accent?: string } } })?.thankYouPage;
+    const ty = (effectiveForm as unknown as { thankYouPage?: { heading?: string; description?: string; text?: string; image?: string; icon?: string; buttons?: { label: string; href: string; variant: string }[]; html?: string; showPdfConfirmation?: boolean; enabled?: boolean; alignment?: string; background?: string; typography?: { fontFamily?: string; fontSize?: string | number; textColor?: string }; colors?: { bg?: string; text?: string; accent?: string } } })?.thankYouPage;
     const useCustomThankYou = Boolean(ty?.enabled !== false && (ty?.heading || ty?.description));
     return (
       <div id="lead-form" style={{ maxWidth: 640, margin: "0 auto", textAlign: (ty?.alignment as never) ?? "center", padding: device === "mobile" ? "32px 16px" : "48px 24px", background: ty?.background ?? undefined, borderRadius: 16 }}>
@@ -1681,7 +1736,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
         ) : (
           <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 10 }}>{successMsg}</h2>
         )}
-        {!useCustomThankYou && cfg?.notifyEmail ? <p style={{ color: "var(--ps-slate)", fontSize: 14 }}>A copy can be sent to {cfg.notifyEmail}.</p> : null}
+        {!useCustomThankYou && effectiveForm?.notifyEmail ? <p style={{ color: "var(--ps-slate)", fontSize: 14 }}>A copy can be sent to {effectiveForm.notifyEmail}.</p> : null}
         {deliverableUrl ? (
           <div>
             <a
