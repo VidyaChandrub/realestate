@@ -409,7 +409,7 @@ export default function SuperAdminSubscriptionsPage() {
                         <td style={{ fontWeight: 600 }}>{feat}</td>
                         {plans.map(p => {
                           const has = p.features.some(f => f.toLowerCase().includes(feat.toLowerCase().split(" ")[0]));
-                          return <td key={p.id} style={{ textAlign: "center" }}>{has ? "✓" : "—"}</td>;
+                          return <td key={p.id} style={{ textAlign: "center" }}>{has ? "" : "—"}</td>;
                         })}
                       </tr>
                     ))}

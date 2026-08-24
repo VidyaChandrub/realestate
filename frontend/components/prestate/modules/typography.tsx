@@ -221,7 +221,7 @@ export function TypographyModule({
         <div style={{ maxWidth: 420 }}>
           <TabBar
             tabs={[
-              { key: "desktop", label: "🖥 Desktop" },
+              { key: "desktop", label: " Desktop" },
               { key: "tablet", label: "<Icon name="phone" size={14} /> Tablet" },
               { key: "mobile", label: "<Icon name="phone" size={14} /> Mobile" },
             ]}

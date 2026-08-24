@@ -249,7 +249,7 @@ export default function OrgUsersPage() {
     <>
       <div className="page-head reveal in">
         <div>
-          <div className="eyebrow">👤 Team</div>
+          <div className="eyebrow"> Team</div>
           <h1>Users</h1>
           <div className="sub">
             People who can sign in to your organisation&apos;s workspace.
@@ -408,7 +408,7 @@ export default function OrgUsersPage() {
                   color: "var(--faint)",
                 }}
               >
-                🔎
+                
               </span>
             </div>
             <select
@@ -550,7 +550,7 @@ export default function OrgUsersPage() {
                                 disabled={busyId === user.id}
                                 onClick={() => void resendInvite(user)}
                               >
-                                {resentId === user.id ? "Sent ✓" : "Resend"}
+                                {resentId === user.id ? "Sent " : "Resend"}
                               </button>
                             ) : null}
                           </div>

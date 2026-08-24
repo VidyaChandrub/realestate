@@ -4,7 +4,7 @@ export default function OrgProjectsPage() {
   return (
     <ComingSoon
       title="Projects"
-      icon="🏗️"
+      icon="building"
       description="Manage your property projects and their listings."
     />
   );

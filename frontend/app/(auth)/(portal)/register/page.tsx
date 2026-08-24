@@ -225,7 +225,7 @@ export default function RegisterPage() {
       <div className="mb-6 flex items-center justify-center gap-2">
         {STEPS.map(s=>(
           <div key={s.n} className="flex items-center gap-2">
-            <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${step===s.n?"bg-indigo-600 text-white": step> s.n?"bg-green-600 text-white":"bg-slate-200 text-slate-500"}`}>{step> s.n?"✓":s.n}</div>
+            <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${step===s.n?"bg-indigo-600 text-white": step> s.n?"bg-green-600 text-white":"bg-slate-200 text-slate-500"}`}>{step> s.n?<Icon name="check" size={12} />:s.n}</div>
             <span className={`text-xs font-semibold ${step===s.n?"text-slate-900 dark:text-white": step> s.n?"text-green-600":"text-slate-400"}`}>{s.label}</span>
             {s.n<3? <div className={`mx-2 h-0.5 w-8 ${step> s.n?"bg-green-600":"bg-slate-200"}`} /> : null}
           </div>
@@ -300,11 +300,11 @@ export default function RegisterPage() {
                           {p.isPopular? <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white">POPULAR</span>:null}
                           <span className="text-2xl font-extrabold">₹{price.toLocaleString("en-IN")}<span className="text-xs font-medium text-slate-500">{per}</span></span>
                         </div>
-                        <span className={`h-5 w-5 rounded-full border-2 flex items-center justify-center text-[10px] ${isSel?"border-indigo-600 bg-indigo-600 text-white":"border-slate-300"}`}>{isSel?"✓":""}</span>
+                        <span className={`h-5 w-5 rounded-full border-2 flex items-center justify-center text-[10px] ${isSel?"border-indigo-600 bg-indigo-600 text-white":"border-slate-300"}`}>{isSel?<Icon name="check" size={10} />:""}</span>
                       </div>
                       <div className="mt-2 text-xs font-medium text-slate-700 dark:text-slate-300">{p.description}</div>
                       <ul className="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-400">
-                        {p.features.slice(0,6).map(f=> <li key={f} className="flex gap-2"><span className="text-green-600">✓</span>{f}</li>)}
+                        {p.features.slice(0,6).map(f=> <li key={f} className="flex gap-2"><span className="text-green-600"><Icon name="check" size={12} /></span>{f}</li>)}
                       </ul>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-bold text-white dark:bg-white dark:text-slate-900">{tplLimit} templates</span>
@@ -338,7 +338,7 @@ export default function RegisterPage() {
                   return (
                     <div key={id} onClick={()=> !dis && toggleTemplate(id)} className={`cursor-pointer overflow-hidden rounded-xl border-2 ${sel?"border-indigo-600":"border-slate-200 dark:border-slate-700"} ${dis?"opacity-40":""} relative`}>
                       <div className="h-24 bg-slate-100 dark:bg-slate-800" style={tpl.thumbnail? { background: `url(${tpl.thumbnail}) center/cover` }:undefined}>
-                        <span className={`m-2 inline-block rounded-full px-2 py-1 text-[10px] font-bold text-white ${sel?"bg-indigo-600":"bg-black/60"}`}>{sel?"✓ Selected": dis?"Max reached":"Select"}</span>
+                        <span className={`m-2 inline-block rounded-full px-2 py-1 text-[10px] font-bold text-white ${sel?"bg-indigo-600":"bg-black/60"}`}>{sel?<><Icon name="check" size={10} /> Selected</>: dis?"Max reached":"Select"}</span>
                         <button type="button" onClick={(e)=>{ e.stopPropagation(); setPreviewTpl(tpl); }} className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 text-slate-700 shadow hover:bg-white" title="Preview">
                           <Icon name="eye" size={14} />
                         </button>
@@ -369,7 +369,7 @@ export default function RegisterPage() {
                     {previewTpl.thumbnail ? <img src={previewTpl.thumbnail} alt={previewTpl.name} className="h-auto w-full rounded-lg border" /> : <p className="text-sm text-slate-500">No thumbnail available</p>}
                     <div className="mt-3 flex gap-2">
                       <button type="button" onClick={()=>{ if(!selectedTemplateIds.includes(previewTpl.id) && selectedTemplateIds.length<maxTemplates){ toggleTemplate(previewTpl.id); } setPreviewTpl(null); }} className={`rounded-full px-4 py-1.5 text-xs font-bold ${selectedTemplateIds.includes(previewTpl.id)?"bg-green-600 text-white":"bg-indigo-600 text-white"}`}>
-                        {selectedTemplateIds.includes(previewTpl.id)?"✓ Selected":"Select this template"}
+                        {selectedTemplateIds.includes(previewTpl.id)?<><Icon name="check" size={12} /> Selected</>:"Select this template"}
                       </button>
                       <button type="button" onClick={()=>setPreviewTpl(null)} className="rounded-full border px-4 py-1.5 text-xs font-semibold">Close</button>
                     </div>

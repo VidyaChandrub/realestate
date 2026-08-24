@@ -4,7 +4,7 @@ export default function OrgLandingPagesPage() {
   return (
     <ComingSoon
       title="Landing Pages"
-      icon="📄"
+      icon="document"
       description="Campaign and project landing pages for your listings."
     />
   );

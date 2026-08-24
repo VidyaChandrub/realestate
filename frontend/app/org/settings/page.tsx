@@ -128,13 +128,13 @@ export default function OrgSettingsPage() {
     <>
       <div className="page-head reveal in">
         <div>
-          <div className="eyebrow">⚙️ More</div>
+          <div className="eyebrow"> More</div>
           <h1>Organisation Settings</h1>
           <div className="sub">Manage your organisation profile, branding, notifications, billing and security.</div>
         </div>
         <div className="actions">
           <button className="btn btn-primary" onClick={() => void handleSave()} disabled={saving}>
-            {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
+            {saving ? "Saving…" : saved ? "Saved " : "Save changes"}
           </button>
         </div>
       </div>

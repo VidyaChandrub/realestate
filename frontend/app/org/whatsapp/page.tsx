@@ -4,7 +4,7 @@ export default function OrgWhatsAppPage() {
   return (
     <ComingSoon
       title="WhatsApp"
-      icon="💬"
+      icon="mail"
       description="Automated WhatsApp workflows for lead follow-up."
     />
   );

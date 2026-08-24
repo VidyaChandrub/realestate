@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
-import type { Plan, OrganisationListResponse, OrganisationDetail } from "@/lib/types";
 import { Icon } from "@/components/icons";
+import type { Plan, OrganisationListResponse, OrganisationDetail } from "@/lib/types";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "—";
+  if (parts.length === 0) return "—";
   return parts.slice(0,2).map(p=>p[0]?.toUpperCase()).join("");
 }
 
@@ -150,7 +150,7 @@ export default function SuperAdminApprovalsPage() {
             <span className="badge b-amber">{totalPending}</span>
           </div>
           <div className="card-b" style={{ padding:8, maxHeight:600, overflow:"auto" }}>
-            {loading ? <div style={{ padding:16, color:"var(--muted)"}}>Loading…</div> : rows.length===0 ? <div style={{ padding:16, color:"var(--muted)"}}>No pending organisations 🎉</div> : rows.map((s,i)=>(
+            {loading ? <div style={{ padding:16, color:"var(--muted)"}}>Loading…</div> : rows.length===0 ? <div style={{ padding:16, color:"var(--muted)"}}>No pending organisations <Icon name="check" size={14} /></div> : rows.map((s,i)=>(
               <div key={s.id} onClick={()=>setSelectedId(s.id)} style={{ display:"flex", alignItems:"center", gap:12, padding:14, borderRadius:12, background: selectedId===s.id?"var(--surface-2)":undefined, cursor:"pointer", border: selectedId===s.id?"1px solid var(--brand-100)":"1px solid transparent" }}>
                 <span className="av">{initials(s.name)}</span>
                 <span style={{ flex:1, minWidth:0 }}>
@@ -203,7 +203,7 @@ export default function SuperAdminApprovalsPage() {
                             <span className="chip" style={{ fontSize:10 }}>{tplLimit} templates</span>
                             <span className="chip" style={{ fontSize:10 }}>{p.limits?.projects} projects</span>
                           </div>
-                          <div style={{ fontSize:11, fontWeight:700, color:isSel?"var(--brand)":"var(--muted)", marginTop:6}}>{isSel?"✓ Selected":"Select"}</div>
+                          <div style={{ fontSize:11, fontWeight:700, color:isSel?"var(--brand)":"var(--muted)", marginTop:6}}>{isSel?" Selected":"Select"}</div>
                         </div>
                       );
                     })}
@@ -224,7 +224,7 @@ export default function SuperAdminApprovalsPage() {
                         return (
                           <div key={id} onClick={()=> !dis && toggleTemplate(id)} style={{ border:"1px solid", borderColor:sel?"var(--brand)":"var(--line)", borderRadius:12, overflow:"hidden", cursor: dis?"not-allowed":"pointer", opacity: dis?0.5:1}}>
                             <div style={{ height:80, background: tpl.thumbnail? `url(${tpl.thumbnail}) center/cover`:"#eef1f6", position:"relative"}}>
-                              <span style={{ position:"absolute", left:6, top:6, background: sel?"var(--brand)":"rgba(0,0,0,.55)", color:"#fff", fontSize:10, fontWeight:700, padding:"2px 6px", borderRadius:999}}>{sel?"✓":"Select"}</span>
+                              <span style={{ position:"absolute", left:6, top:6, background: sel?"var(--brand)":"rgba(0,0,0,.55)", color:"#fff", fontSize:10, fontWeight:700, padding:"2px 6px", borderRadius:999}}>{sel?"":"Select"}</span>
                             </div>
                             <div style={{ padding:8}}>
                               <div style={{ fontWeight:700, fontSize:12}}>{tpl.name}</div>
@@ -243,10 +243,10 @@ export default function SuperAdminApprovalsPage() {
                 <div className="divider" />
                 <div style={{ display:"flex", gap:10}}>
                   <button className="btn btn-success" style={{ flex:1, justifyContent:"center"}} disabled={actionLoading || !selectedPlanId || selectedTemplateIds.length===0} onClick={handleApprove}>
-                    {actionLoading?"Approving…":"<Icon name="check" size={14} /> Approve & activate"}
+                    {actionLoading?"Approving…":<><Icon name="check" size={14} /> Approve & activate</>}
                   </button>
                   <button className="btn btn-danger" style={{ flex:1, justifyContent:"center"}} disabled={actionLoading} onClick={handleReject}>
-                    ✕ Reject
+                    <Icon name="close" size={14} /> Reject
                   </button>
                 </div>
                 <div style={{ fontSize:11, color:"var(--muted)", textAlign:"center"}}>

@@ -821,7 +821,7 @@ export default function SuperAdminOrganisationDetailPage() {
                   <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:16, padding:16, width:720, maxWidth:"100%", maxHeight:"85vh", overflow:"auto"}}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10}}>
                       <b>Add templates</b>
-                      <button className="btn btn-ghost btn-sm" onClick={()=>setAddTemplateOpen(false)}>✕</button>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>setAddTemplateOpen(false)}></button>
                     </div>
                     <div style={{ fontSize:12, color:"var(--muted)", marginBottom:10}}>
                       Current plan allows {(()=>{
@@ -841,7 +841,7 @@ export default function SuperAdminOrganisationDetailPage() {
                         return (
                           <div key={tpl.id} onClick={()=> !dis && setSelectedNewTemplateIds(prev=> sel? prev.filter(x=>x!==tpl.id): [...prev, tpl.id])} style={{ border:"1px solid", borderColor: sel?"var(--brand)":"var(--line)", borderRadius:12, overflow:"hidden", cursor: dis?"not-allowed":"pointer", opacity: dis?0.5:1}}>
                             <div style={{ height:90, background: tpl.thumbnail? `url(${tpl.thumbnail}) center/cover`:"#eef1f6", position:"relative"}}>
-                              <span className={`m-1 inline-block rounded-full px-2 py-1 text-[10px] font-bold text-white ${sel?"bg-indigo-600":"bg-black/60"}`}>{sel?"✓":"Select"}</span>
+                              <span className={`m-1 inline-block rounded-full px-2 py-1 text-[10px] font-bold text-white ${sel?"bg-indigo-600":"bg-black/60"}`}>{sel?"":"Select"}</span>
                               <button type="button" onClick={(e)=>{ e.stopPropagation(); setPreviewTpl(tpl); }} className="absolute right-1 top-1 rounded-full bg-white/90 p-1"><Icon name="eye" size={12}/></button>
                             </div>
                             <div style={{ padding:8}}>
@@ -953,7 +953,7 @@ export default function SuperAdminOrganisationDetailPage() {
                   onClick={() => setStatusModalOpen(true)}
                   disabled={statusSubmitting}
                 >
-                  {org.status === "active" ? "<Icon name="close" size={14} /> Suspend organisation" : "<Icon name="chevron-right" size={14} /> Reactivate organisation"}
+                  {org.status === "active" ? <><Icon name="close" size={14} /> Suspend organisation</> : <><Icon name="chevron-right" size={14} /> Reactivate organisation</>}
                 </button>
                 <button
                   className="btn btn-ghost btn-block"
@@ -1010,7 +1010,7 @@ export default function SuperAdminOrganisationDetailPage() {
                   fontSize: 18,
                 }}
               >
-                {org.status === "active" ? "<Icon name="close" size={14} />" : "<Icon name="chevron-right" size={14} />"}
+                {org.status === "active" ? <Icon name="close" size={14} /> : <Icon name="chevron-right" size={14} />}
               </span>
               <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>
                 {org.status === "active" ? "Suspend organisation?" : "Reactivate organisation?"}

@@ -4,7 +4,7 @@ export default function OrgTeamsPage() {
   return (
     <ComingSoon
       title="Teams"
-      icon="👥"
+      icon="users"
       description="Organise your agents into teams."
     />
   );
