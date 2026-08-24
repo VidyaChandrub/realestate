@@ -8,6 +8,18 @@ export const DEMO_ORGANISATION = {
   city: "San Francisco",
   status: "active",
   created_at: "2025-03-14T09:00:00.000Z",
+  timezone: "Asia/Kolkata",
+  currency: "INR",
+  default_language: "en-IN",
+  logo_url: null,
+  favicon_url: null,
+  brand_colour: null,
+  website: null,
+  address_line1: null,
+  address_line2: null,
+  state: null,
+  postal_code: null,
+  country: null,
 };
 
 export interface MockAccount {
@@ -92,6 +104,6 @@ export function findMockAccountByEmail(email: string) {
   );
 }
 
-export function dashboardPathFor(): string {
-  return "/superadmin";
+export function dashboardPathFor(role?: UserRole): string {
+  return role === "organisation_admin" ? "/org" : "/superadmin";
 }

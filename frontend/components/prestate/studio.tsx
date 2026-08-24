@@ -24,8 +24,7 @@ import {
   X,
 } from "lucide-react";
 import type { Device, LandingPageData, ModuleKey, SectionInstance, SiteConfig } from "@/lib/prestate/types";
-import { uid } from "@/lib/prestate/data";
-import { loadPages, normalizeDomain, isLikelyHostname, savePages, seedPages } from "@/lib/prestate/store";
+import { loadTemplate, loadTemplates, saveTemplate, createTemplate, normalizeDomain, isLikelyHostname } from "@/lib/prestate/store";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
 import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
 import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
@@ -64,40 +63,75 @@ export function PrestateStudio() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [pages, setPages] = useState<LandingPageData[]>(() => seedPages());
-  const [activePageId, setActivePageId] = useState("");
+  const [activePage, setActivePage] = useState<LandingPageData | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const apiRef = useRef<BuilderApi | null>(null);
   const toastId = useRef(0);
+  // Lightweight (no content) index of every template — feeds FormsModule's
+  // site-scope bar/thank-you-page lookup, and the client-side domain
+  // collision check in assignDomain() (which DomainsModule calls
+  // synchronously, so this has to be state read at call time, not a fetch).
+  const [allPages, setAllPages] = useState<LandingPageData[]>([]);
 
   useEffect(() => {
-    const list = loadPages();
-    setPages(list);
+    let cancelled = false;
     const id = searchParams.get("id");
     const design = searchParams.get("design");
-    if (id && list.some((p) => p.id === id)) {
-      setActivePageId(id);
-      setModule("builder");
-      return;
-    }
-    if (design) {
-      const match =
-        list.find((p) => p.designId === design && (p.kind ?? "custom") === "preset") ??
-        list.find((p) => p.designId === design);
-      if (match) {
-        setActivePageId(match.id);
-        setModule("builder");
-        return;
+
+    (async () => {
+      if (id) {
+        const page = await loadTemplate(id);
+        if (cancelled) return;
+        if (page) {
+          setActivePage(page);
+          setModule("builder");
+          return;
+        }
       }
-    }
-    window.location.replace("/superadmin/templates");
+      if (design) {
+        // Unreachable in practice today (nothing sets ?design=; builderPath()
+        // only ever produces ?id=) but kept correct: a design could in theory
+        // be a thank-you one, so search both pageTypes, not just landing.
+        const [landing, thankYou] = await Promise.all([
+          loadTemplates({ pageType: "landing" }),
+          loadTemplates({ pageType: "thank-you" }),
+        ]);
+        if (cancelled) return;
+        const list = [...landing, ...thankYou];
+        const match =
+          list.find((p) => p.designId === design && (p.kind ?? "custom") === "preset") ??
+          list.find((p) => p.designId === design);
+        if (match) {
+          setActivePage(match);
+          setModule("builder");
+          return;
+        }
+      }
+      if (!cancelled) window.location.replace("/superadmin/templates");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams]);
 
   useEffect(() => {
-    savePages(pages);
-  }, [pages]);
+    let cancelled = false;
+    // FormsModule needs both: its thank-you picker lists every thank-you
+    // page in the workspace (not just this page's own companion), and the
+    // scope bar / domain-collision check need every landing page.
+    Promise.all([
+      loadTemplates({ includeContent: false, pageType: "landing" }),
+      loadTemplates({ includeContent: false, pageType: "thank-you" }),
+    ]).then(([landing, thankYou]) => {
+      if (!cancelled) setAllPages([...landing, ...thankYou]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage?.id]);
 
   const toast = useCallback((text: string) => {
     const id = ++toastId.current;
@@ -105,75 +139,107 @@ export function PrestateStudio() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3400);
   }, []);
 
-  const activePage = pages.find((p) => p.id === activePageId);
   const scoped = activePage ? [activePage] : [];
 
-  const persistPage = useCallback((pageId: string, sections: SectionInstance[], status?: LandingPageData["status"]) => {
-    setPages((prev) => {
-      const next = prev.map((p) =>
-        p.id === pageId ? { ...p, sections, status: status ?? p.status, updated: "Just now" } : p,
-      );
-      savePages(next);
-      return next;
-    });
-  }, []);
+  // Fires the debounced single-record save and reconciles only the
+  // server-derived display fields once it resolves, so a slow save can't
+  // clobber newer local edits made in the meantime.
+  const saveInBackground = useCallback(
+    (next: LandingPageData) => {
+      void saveTemplate(next)
+        .then((saved) => {
+          setActivePage((cur) => (cur && cur.id === saved.id ? { ...cur, updated: saved.updated, updatedAt: saved.updatedAt } : cur));
+        })
+        .catch(() => toast("Couldn't save — check your connection"));
+    },
+    [toast],
+  );
 
-  const openLocalPreview = useCallback((pageId?: string) => {
-    const id = pageId ?? activePageId;
-    const list = loadPages();
-    const page = list.find((p) => p.id === id) ?? pages.find((p) => p.id === id);
-    if (!page) return;
-    window.open(localPreviewPath(page), "_blank", "noopener,noreferrer");
-  }, [pages, activePageId]);
+  const persistPage = useCallback(
+    (pageId: string, sections: SectionInstance[], status?: LandingPageData["status"]) => {
+      setActivePage((prev) => {
+        if (!prev || prev.id !== pageId) return prev;
+        const next = { ...prev, sections, status: status ?? prev.status, updated: "Just now" };
+        saveInBackground(next);
+        return next;
+      });
+    },
+    [saveInBackground],
+  );
 
-  const assignDomain = useCallback((pageId: string, raw: string) => {
-    const host = normalizeDomain(raw);
-    if (!host || !isLikelyHostname(host)) {
-      toast("Enter a hostname like auroraresidences.com");
-      return false;
-    }
-    const clash = pages.find((p) => p.id !== pageId && normalizeDomain(p.domain) === host);
-    if (clash) {
-      toast(`“${host}” is already assigned to ${clash.name}`);
-      return false;
-    }
-    setPages((prev) =>
-      prev.map((p) => {
-        if (p.id !== pageId) return p;
-        const cfg = ensureConfig(p);
-        const prevHost = normalizeDomain(p.domain);
-        const canonical =
-          !cfg.seo.canonical ||
-          cfg.seo.canonical.includes("localhost") ||
-          (prevHost && cfg.seo.canonical.includes(prevHost))
-            ? `https://${host}`
-            : cfg.seo.canonical;
-        return {
-          ...p,
-          domain: host,
-          updated: "Just now",
-          config: { ...cfg, seo: { ...cfg.seo, canonical } },
-        };
-      }),
-    );
-    toast(`Assigned ${host} · /p/host/${host}`);
-    return true;
-  }, [pages, toast]);
+  const openLocalPreview = useCallback(
+    (pageId?: string) => {
+      const page = !pageId || pageId === activePage?.id ? activePage : null;
+      if (!page) return;
+      window.open(localPreviewPath(page), "_blank", "noopener,noreferrer");
+    },
+    [activePage],
+  );
 
-  const clearDomain = useCallback((pageId: string) => {
-    setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, domain: "", updated: "Just now" } : p)));
-    toast("Domain removed from this template");
-  }, [toast]);
+  const assignDomain = useCallback(
+    (pageId: string, raw: string) => {
+      if (!activePage || activePage.id !== pageId) return false;
+      const host = normalizeDomain(raw);
+      if (!host || !isLikelyHostname(host)) {
+        toast("Enter a hostname like auroraresidences.com");
+        return false;
+      }
+      const clash = allPages.find((p) => p.id !== pageId && normalizeDomain(p.domain) === host);
+      if (clash) {
+        toast(`“${host}” is already assigned to ${clash.name}`);
+        return false;
+      }
+      const cfg = ensureConfig(activePage);
+      const prevHost = normalizeDomain(activePage.domain);
+      const canonical =
+        !cfg.seo.canonical || cfg.seo.canonical.includes("localhost") || (prevHost && cfg.seo.canonical.includes(prevHost))
+          ? `https://${host}`
+          : cfg.seo.canonical;
+      const next = { ...activePage, domain: host, updated: "Just now", config: { ...cfg, seo: { ...cfg.seo, canonical } } };
+      setActivePage(next);
+      saveInBackground(next);
+      toast(`Assigned ${host} · /p/host/${host}`);
+      return true;
+    },
+    [activePage, allPages, toast, saveInBackground],
+  );
 
-  const patchConfig = useCallback((pageId: string, recipe: (c: SiteConfig) => SiteConfig) => {
-    setPages((prev) =>
-      prev.map((p) => (p.id === pageId ? { ...p, config: recipe(ensureConfig(p)), updated: "Just now" } : p)),
-    );
-  }, []);
+  const clearDomain = useCallback(
+    (pageId: string) => {
+      setActivePage((prev) => {
+        if (!prev || prev.id !== pageId) return prev;
+        const next = { ...prev, domain: "", updated: "Just now" };
+        saveInBackground(next);
+        return next;
+      });
+      toast("Domain removed from this template");
+    },
+    [toast, saveInBackground],
+  );
 
-  const patchPage = useCallback((pageId: string, patch: Partial<LandingPageData>) => {
-    setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, ...patch, updated: "Just now" } : p)));
-  }, []);
+  const patchConfig = useCallback(
+    (pageId: string, recipe: (c: SiteConfig) => SiteConfig) => {
+      setActivePage((prev) => {
+        if (!prev || prev.id !== pageId) return prev;
+        const next = { ...prev, config: recipe(ensureConfig(prev)), updated: "Just now" };
+        saveInBackground(next);
+        return next;
+      });
+    },
+    [saveInBackground],
+  );
+
+  const patchPage = useCallback(
+    (pageId: string, patch: Partial<LandingPageData>) => {
+      setActivePage((prev) => {
+        if (!prev || prev.id !== pageId) return prev;
+        const next = { ...prev, ...patch, updated: "Just now" };
+        saveInBackground(next);
+        return next;
+      });
+    },
+    [saveInBackground],
+  );
 
   const renderModule = () => {
     switch (module) {
@@ -200,39 +266,30 @@ export function PrestateStudio() {
         return activePage ? (
           <FormsModule
             site={activePage}
-            pages={pages}
+            pages={allPages}
             onSelectSite={() => {}}
             onPatch={(fn) => patchConfig(activePage.id, fn)}
             onToast={toast}
             onCreateThankYouPage={
-              pages.some((p) => p.pageType === "thank-you" && p.parentPageId === activePage.id)
+              allPages.some((p) => p.pageType === "thank-you" && p.parentPageId === activePage.id)
                 ? undefined
                 : () => {
-                    const id = `ty_${uid("p")}`;
-                    const slug = `${activePage.slug}-thanks`;
-                    const ty: LandingPageData = {
-                      id,
+                    void createTemplate({
                       name: `${ensureConfig(activePage).brand.name} — Thank You`,
-                      slug,
-                      status: activePage.status === "published" ? "published" : "draft",
-                      template: "Thank You Page",
-                      domain: "",
-                      views: "—",
-                      conversions: "—",
-                      updated: "Just now",
-                      thumbnail: activePage.thumbnail,
-                      sections: buildThankYouSections(),
-                      kind: "custom",
+                      slug: `${activePage.slug}-thanks`,
                       designId: "tpl-thankyou",
+                      template: "Thank You Page",
+                      status: activePage.status === "published" ? "published" : "draft",
+                      kind: "custom",
                       pageType: "thank-you",
                       parentPageId: activePage.id,
+                      thumbnail: activePage.thumbnail,
+                      sections: buildThankYouSections(),
                       config: cloneConfig(ensureConfig(activePage)),
-                    };
-                    const next = [ty, ...pages];
-                    setPages(next);
-                    savePages(next);
-                    toast("Thank You page created — opening in builder");
-                    window.location.assign(builderPath(id));
+                    }).then((created) => {
+                      toast("Thank You page created — opening in builder");
+                      window.location.assign(builderPath(created.id));
+                    });
                   }
             }
           />

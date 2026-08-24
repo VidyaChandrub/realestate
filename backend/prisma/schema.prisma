@@ -51,6 +51,21 @@ model Organisation {
   status    OrgStatus @default(active)
   createdAt DateTime  @default(now()) @map("created_at")
 
+  // Profile fields — added for the Org Admin settings screen. All nullable
+  // except the three with sensible defaults; existing orgs backfill to those.
+  timezone        String  @default("Asia/Kolkata")
+  currency        String  @default("INR")
+  defaultLanguage String  @default("en-IN") @map("default_language")
+  logoUrl         String? @map("logo_url")
+  faviconUrl      String? @map("favicon_url")
+  brandColour     String? @map("brand_colour")
+  website         String?
+  addressLine1    String? @map("address_line1")
+  addressLine2    String? @map("address_line2")
+  state           String?
+  postalCode      String? @map("postal_code")
+  country         String?
+
   users       User[]
   teams       Team[]
   auditLogs   AuditLog[]
@@ -219,4 +234,58 @@ model AuditLog {
 
   @@map("audit_logs")
   @@schema("audit")
+}
+
+// ---------------------------------------------------------------------------
+// templates — Super Admin landing-page template library (builder content
+// lives in `content`, stored as-is; the frontend owns the shape of that JSON)
+// ---------------------------------------------------------------------------
+
+enum TemplateStatus {
+  draft
+  published
+  scheduled
+  password
+  unpublished
+
+  @@schema("templates")
+}
+
+enum TemplateKind {
+  preset
+  custom
+
+  @@schema("templates")
+}
+
+enum TemplatePageType {
+  landing
+  thank_you
+
+  @@schema("templates")
+}
+
+model Template {
+  id             String            @id @default(uuid())
+  name           String
+  slug           String            @unique
+  status         TemplateStatus    @default(draft)
+  isPaid         Boolean           @default(false) @map("is_paid")
+  thumbnail      String?
+  designId       String            @map("design_id")
+  baseDesignName String            @map("base_design_name")
+  category       String?
+  kind           TemplateKind      @default(custom)
+  pageType       TemplatePageType  @default(landing) @map("page_type")
+  parentId       String?           @map("parent_id")
+  domain         String            @default("")
+  content        Json
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  parent     Template?  @relation("TemplatePages", fields: [parentId], references: [id], onDelete: SetNull)
+  childPages Template[] @relation("TemplatePages")
+
+  @@map("templates")
+  @@schema("templates")
 }

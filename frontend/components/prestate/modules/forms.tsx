@@ -45,8 +45,6 @@ import type { FormDefinition } from "@/lib/prestate/forms-store";
 import type { FieldLogicOp, FormLeadField, LandingPageData, SiteConfig, FormThankYouPage } from "@/lib/prestate/types";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
 import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
-import { loadPages, savePage } from "@/lib/prestate/persist";
-import { embedSnippet } from "@/lib/prestate/forms-store";
 import { ModuleHeader, SiteScopeBar } from "./shared";
 import { Btn, Chip, Collapse, FieldRow, SelectField, TextField, Toggle, ColorField, LengthInput } from "@/components/prestate/ui";
 
@@ -700,7 +698,7 @@ export function FormsModule({
                           <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>Redirects to</div>
                           <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{localPreviewPath(selectedP)}</div>
                         </div>
-                        <Btn size="sm" variant="outline" onClick={() => { savePage(loadPages(), { ...site, updated: new Date().toISOString() }); window.location.assign(builderPath(selectedP.id)); }}>Edit page</Btn>
+                        <Btn size="sm" variant="outline" onClick={() => window.location.assign(builderPath(selected.id))}>Edit page</Btn>
                       </div>
                     );
                   })()}

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { dashboardPathFor } from "@/lib/mock/sessions";
 import { mapApiFieldErrors } from "@/lib/form-errors";
 import { slugify } from "@/lib/slug";
 import { Button } from "@/components/ui/button";
@@ -57,8 +58,8 @@ export default function RegisterPage() {
     setFieldErrors({});
     setIsSubmitting(true);
     try {
-      await signup(form);
-      router.push("/superadmin");
+      const session = await signup(form);
+      router.push(dashboardPathFor(session.role));
       router.refresh();
     } catch (err) {
       const { fieldErrors: fe, general } = mapApiFieldErrors(err, FIELD_KEYS);
