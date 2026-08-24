@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import type { Device, SectionInstance } from "@/lib/prestate/types";
-import { DYNAMIC_VARS, SLUG_ICONS } from "@/lib/prestate/data";
+import { SLUG_ICONS } from "@/lib/prestate/data";
 import { FOOTER_DESIGNS, HEADER_DESIGNS } from "@/lib/prestate/chrome-presets";
 import type { TemplateTypography, TypeKey } from "@/lib/prestate/design-system";
 import { fontOptions, loadFonts } from "@/lib/prestate/design-system";
@@ -340,33 +340,7 @@ function ObjectList({ label, widgetType, value, onChange, seedKeys }: { label: s
   );
 }
 
-// ---------------------------------------------------------------------------
-// Variable chips
-// ---------------------------------------------------------------------------
 
-function VarChips() {
-  const [copied, setCopied] = useState<string | null>(null);
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-      {DYNAMIC_VARS.map((v) => (
-        <button
-          key={v.token}
-          type="button"
-          onClick={() => {
-            navigator.clipboard?.writeText(v.token).catch(() => {});
-            setCopied(v.token);
-            setTimeout(() => setCopied(null), 1200);
-          }}
-          title={v.value}
-          style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 7, border: "1px solid var(--ps-line-strong)", background: copied === v.token ? "var(--ps-success-soft)" : "var(--ps-primary-mist)", color: copied === v.token ? "var(--ps-success)" : "var(--ps-primary)", fontSize: 10.5, fontWeight: 700, fontFamily: "monospace", cursor: "pointer" }}
-        >
-          {copied === v.token ? <Copy size={11} /> : null}
-          {v.token}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Main settings panel
@@ -387,7 +361,6 @@ export function SettingsPanel({
   typographyTokens?: TemplateTypography;
 }) {
   const [tab, setTab] = useState<"content" | "style" | "advanced">("content");
-  const [varOpen, setVarOpen] = useState(false);
 
   if (!section) {
     return (
@@ -506,23 +479,6 @@ export function SettingsPanel({
       <div className="ps-inspector-body">
         {tab === "content" ? (
           <>
-            <div style={{ marginBottom: 6, marginTop: 8 }}>
-              <button type="button" onClick={() => setVarOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 7, background: "linear-gradient(135deg,var(--ps-primary-mist),var(--ps-secondary-soft))", border: "1px solid #e4e0ff", borderRadius: 10, padding: "9px 11px", width: "100%", cursor: "pointer", color: "var(--ps-primary)" }}>
-                <span style={{ display: "inline-flex" }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" /><circle cx="12" cy="12" r="3" /></svg>
-                </span>
-                <span style={{ fontSize: 12, fontWeight: 800, flex: 1, textAlign: "left" }}>Dynamic property variables</span>
-                <ChevronDown size={14} style={{ transform: varOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
-              </button>
-              {varOpen ? (
-                <div className="ps-fade-in" style={{ marginTop: 8 }}>
-                  <div style={{ fontSize: 11, color: "var(--ps-muted)", marginBottom: 7, lineHeight: 1.5 }}>
-                    Insert a variable into any text field. It auto-fills from your property data and updates across every page instantly.
-                  </div>
-                  <VarChips />
-                </div>
-              ) : null}
-            </div>
             {section.type === "row" && !("columns" in section.settings) ? (
               <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
                 <FieldRow label="Columns">

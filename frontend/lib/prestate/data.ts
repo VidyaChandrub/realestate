@@ -225,8 +225,10 @@ export const WIDGETS: WidgetDef[] = [
   // MEDIA
   { id: "video", label: "Video", category: "Media", group: "Media", icon: Play, desc: "Video embed — YouTube link or any embed URL", make: () => sec("video", "Video", "Play", { eyebrow: "Experience", heading: "Project Film", text: "A cinematic look at the campus.", url: "", videoTitle: "Project walkthrough", duration: "2:14" }) },
 
-  // FORMS — one configurable Form widget (single or multi-step, WhatsApp delivery)
-  { id: "lead-form", label: "Form", category: "Forms", group: "Forms", icon: Send, desc: "Lead form — single or multi-step, WhatsApp delivery & success actions", make: () => sec("lead-form", "Form", "Send", { heading: "Request a Callback", fields: ["name", "phone"], button: "Submit", pdfUrl: "", pdfLabel: "" }) },
+  // FORMS — single universal Form widget. All configuration (fields, validation,
+  // conditions, PDF, thank-you, embed) lives in the Forms module. This widget
+  // renders only the form itself — no heading or surrounding copy.
+  { id: "lead-form", label: "Form", category: "Forms", group: "Forms", icon: Send, desc: "Universal form — configure fields, conditions, PDF & thank-you in Forms module", make: () => sec("lead-form", "Form", "Send", {}) },
 
   // MARKETING
   { id: "countdown", label: "Countdown Timer", category: "Marketing", group: "Marketing", icon: Timer, desc: "Launch countdown", make: () => sec("countdown", "Countdown Timer", "Timer", { date: "2026-12-31", heading: "Launching Soon", items: [{ value: "12", label: "Days" }, { value: "08", label: "Hours" }, { value: "24", label: "Mins" }, { value: "11", label: "Secs" }] }, { colors: { bg: "#111827", text: "#ffffff" } }) },
@@ -329,16 +331,7 @@ export const PROPERTY: PropertyData = {
   units: "312",
 };
 
-export const DYNAMIC_VARS = [
-  { token: "{{property_name}}", value: "Aurora Residences" },
-  { token: "{{builder_name}}", value: "Prestige Estates Group" },
-  { token: "{{starting_price}}", value: "₹1.25 Cr" },
-  { token: "{{location}}", value: "Sarjapur Road, Bangalore" },
-  { token: "{{rera_number}}", value: "PRM/KA/RERA/1251/446" },
-  { token: "{{possession_date}}", value: "Dec 2027" },
-  { token: "{{carpet_area}}", value: "1,650 – 2,450 sq.ft" },
-  { token: "{{property_type}}", value: "Luxury Apartments" },
-];
+
 
 // ---------------------------------------------------------------------------
 // Default landing page sections
@@ -487,12 +480,18 @@ export const PAGES: LandingPageData[] = [
   },
 ];
 
+/**
+ * Generic starter chips for the universal Form Builder.
+ * NOT business-specific form types — just quick field presets the user
+ * can apply then fully reconfigure (rename, add/remove fields, PDF,
+ * thank-you, embed). Do not add Contact/Booking/Brochure widgets here.
+ */
 export const FORM_TEMPLATES: FormTemplateData[] = [
-  { id: "f1", name: "Contact Form", icon: "Send", steps: 1, fields: 4, description: "Name, email, phone & message" },
-  { id: "f2", name: "Book Site Visit", icon: "CalendarClock", steps: 3, fields: 6, description: "Multi-step tour booking" },
-  { id: "f3", name: "Download Brochure", icon: "Download", steps: 1, fields: 3, description: "Lead magnet gate" },
-  { id: "f4", name: "Price Enquiry", icon: "Wallet", steps: 1, fields: 5, description: "Budget & configuration" },
-  { id: "f5", name: "Callback Request", icon: "PhoneCall", steps: 1, fields: 3, description: "Best time to call" },
+  { id: "f1", name: "Starter — Simple", icon: "Send", steps: 1, fields: 4, description: "Text + phone + email + textarea" },
+  { id: "f2", name: "Starter — Multi-step", icon: "CalendarClock", steps: 3, fields: 6, description: "Date, choices & consent" },
+  { id: "f3", name: "Starter — Minimal", icon: "Download", steps: 1, fields: 3, description: "3-field gate (use with PDF)" },
+  { id: "f4", name: "Starter — Choices", icon: "Wallet", steps: 1, fields: 5, description: "Dropdown + number" },
+  { id: "f5", name: "Starter — Schedule", icon: "PhoneCall", steps: 1, fields: 4, description: "Time + slot picker" },
 ];
 
 export const DOMAINS: DomainRow[] = [
@@ -584,18 +583,9 @@ export const SLUG_ICONS: Record<string, LucideIcon> = {
   Share2,
 };
 
-// Dynamic variable resolvers for the live canvas preview
 export function resolveVars(text: unknown): string {
   if (typeof text !== "string") return "";
-  return text
-    .replaceAll("{{property_name}}", PROPERTY.name)
-    .replaceAll("{{builder_name}}", PROPERTY.builder)
-    .replaceAll("{{starting_price}}", PROPERTY.startingPrice)
-    .replaceAll("{{location}}", PROPERTY.location)
-    .replaceAll("{{rera_number}}", PROPERTY.reraNumber)
-    .replaceAll("{{possession_date}}", PROPERTY.possession)
-    .replaceAll("{{carpet_area}}", PROPERTY.carpetArea)
-    .replaceAll("{{property_type}}", PROPERTY.type);
+  return text;
 }
 
 export function cx(...parts: unknown[]): string {

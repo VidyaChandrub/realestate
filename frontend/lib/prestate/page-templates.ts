@@ -259,13 +259,7 @@ function premiumSections(): SectionInstance[] {
         { name: "Amit & Neha Joshi", role: "Booked 3 BHK + Study", quote: "From virtual tour to booking, every step was seamless.", rating: 5 },
       ],
     }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("lead-form", "Enquiry Form", "Send", {
-      eyebrow: "Private Tour",
-      heading: "Book Your Site Visit",
-      sub: "Reserve a guided walkthrough in under a minute.",
-      button: "Request Callback",
-      fields: ["name", "phone", "email"],
-    }, { colors: { bg: "#f4f2ff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("lead-form", "Form", "Send", {}, { colors: { bg: "#f4f2ff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
     sec("brochure", "Brochure Download", "FileText", {
       heading: "Download Project Brochure",
       title: "Download Brochure",
@@ -332,7 +326,7 @@ function leadGenSections(): SectionInstance[] {
                 spacing: { padding: { top: 8, right: 8, bottom: 8, left: 8 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 },
               }),
               children: [
-                sec("lead-form", "Inline Lead Form", "Send", { heading: "Get Pricing on WhatsApp", sub: "", button: "Get Instant Pricing", fields: ["name", "phone"], pdfUrl: "", pdfLabel: "" }, { colors: { bg: "#ffffff", text: "#111827" }, border: { radius: 16 }, effects: { shadow: "0 24px 60px rgba(2,6,23,.5)" }, spacing: { padding: { top: 22, right: 22, bottom: 22, left: 22 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 } }),
+                sec("lead-form", "Form", "Send", {}, { colors: { bg: "#ffffff", text: "#111827" }, border: { radius: 16 }, effects: { shadow: "0 24px 60px rgba(2,6,23,.5)" }, spacing: { padding: { top: 22, right: 22, bottom: 22, left: 22 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 } }),
               ],
             },
           ],
@@ -542,13 +536,7 @@ function luxeSections(): SectionInstance[] {
         { name: "Arjun Khanna", role: "5 BHK Signature · Penthouse", quote: "Materials you'd expect in Europe, delivered here on schedule.", rating: 5 },
       ],
     }, { colors: { bg: "#faf7f1", text: "#171310" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("lead-form", "Private Enquiry", "Send", {
-      eyebrow: "Invitation",
-      heading: "Request a Private Preview",
-      sub: "Our client relations team arranges viewings by appointment only.",
-      button: "Request Invitation",
-      fields: ["name", "phone", "email", "message"],
-    }, { colors: { bg: "#171310", overlay: "", gradient: "linear-gradient(140deg,#171310 0%,#33261a 100%)", text: "#fdfbf7" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("lead-form", "Form", "Send", {}, { colors: { bg: "#171310", overlay: "", gradient: "linear-gradient(140deg,#171310 0%,#33261a 100%)", text: "#fdfbf7" }, layout: { width: "boxed", height: "auto", align: "center" } }),
     sec("call-cta", "WhatsApp Concierge", "MessageCircle", { mode: "whatsapp",  text: "Prefer to chat? Message the concierge desk", number: "+91 90000 55555", ctaLabel: "Chat on WhatsApp" }, { spacing: { padding: { top: 0, right: 24, bottom: 56, left: 24 }, margin: { top: -36, right: 0, bottom: 0, left: 0 }, gap: 12 }, layout: { width: "full", height: "auto", align: "center", direction: "column" }, colors: { bg: "#171310", text: "#fdfbf7" } }),
     sec("popup", "Preview Popup", "PartyPopper", { popupId: "preview-invite", heading: "Private previews are filling", text: "Leave your number and the concierge will confirm a slot this week.", cta: "", link: "", showForm: true, trigger: "delay", delaySeconds: 12, scrollPercent: 55, urlParam: "invite", oncePerSession: true }),
     sec("sticky-cta", "Sticky CTA", "Compass", { text: "SKY RESIDENCES FROM ₹4.80 CR · WHITEFIELD", ctaLabel: "Request Preview", phone: "+91 90000 55555" }, { colors: { bg: "#171310", text: "#fdfbf7" } }),
@@ -666,13 +654,7 @@ function adCampaignSections(): SectionInstance[] {
         { q: "Is the project RERA registered?", a: "Yes — RERA details are on the brochure cover page." },
       ],
     }, { colors: { bg: "#ffffff", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
-    sec("lead-form", "Campaign Lead Form", "Send", {
-      eyebrow: "Step 1 of 2",
-      heading: "Lock Your Campaign Price",
-      sub: "Takes 30 seconds. We call back within 10 minutes with your personalised cost sheet.",
-      button: "Get My Cost Sheet",
-      fields: ["name", "phone", "email"],
-    }, { colors: { bg: "#fff1f2", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
+    sec("lead-form", "Form", "Send", {}, { colors: { bg: "#fff1f2", text: "#111827" }, layout: { width: "boxed", height: "auto", align: "center" } }),
     sec("downloads", "Brochure Downloads", "Download", {
       heading: "Campaign Kit",
       text: "Brochure, cost sheets and floor plans — gated so we know where to send updates.",

@@ -1554,7 +1554,6 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
   const cfg = useContext(SiteFormContext);
   const pageId = useContext(SitePageIdContext);
   const live = useContext(SiteLiveContext);
-  const T = typoCss(s, device);
   const [step, setStep] = useState(0);
   const [sent, setSent] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -1581,8 +1580,13 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
   const submitLabel = cfg?.submitLabel || String(st.button || "Submit");
   const last = step >= steps - 1;
 
-  const deliverableUrl = String(st.pdfUrl || cfg?.deliverableUrl || "").trim();
-  const deliverableLabel = String(st.pdfLabel || cfg?.deliverableLabel || "Download brochure").trim() || "Download brochure";
+  // Universal Dynamic Form: deliverable may come from canvas widget prop, legacy field, or new pdf config per form.
+  const pdfCfg = (cfg as unknown as { pdf?: { enabled?: boolean; url?: string; filename?: string; autoDownload?: boolean } })?.pdf;
+  const deliverableUrl = String(pdfCfg?.url || st.pdfUrl || cfg?.deliverableUrl || "").trim();
+  const pdfEnabled = pdfCfg ? pdfCfg.enabled !== false : true;
+  const pdfAuto = pdfCfg?.autoDownload ?? true;
+  const pdfFilename = String(pdfCfg?.filename ?? "").trim() || "brochure.pdf";
+  const deliverableLabel = String(st.pdfLabel || cfg?.deliverableLabel || pdfFilename.replace(/\.pdf$/i, "") || "Download brochure").trim() || "Download brochure";
   // Success actions: inline message · Thank You page redirect · custom URL.
   const legacyRedirect = Boolean(cfg?.redirectThankYou);
   const successAction = String(cfg?.successAction ?? (legacyRedirect ? "thankyou" : "message"));
@@ -1590,18 +1594,36 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
   const customUrl = String(cfg?.successUrl ?? "").trim();
   const redirectTarget = successAction === "thankyou" ? thankYouTarget : successAction === "url" ? customUrl : "";
   const doRedirect = live && /^(https?:\/\/|\/)/.test(redirectTarget);
-  const successMsg = String(cfg?.successTitle || cfg?.thankYou || "Thanks — our team will call you shortly.");
+  const thankYouPage = (cfg as unknown as { thankYouPage?: { heading?: string; successMessage?: string; showPdfConfirmation?: boolean; enabled?: boolean } })?.thankYouPage;
+  const successMsg = String(thankYouPage?.successMessage || thankYouPage?.heading || cfg?.successTitle || cfg?.thankYou || "Thanks — our team will call you shortly.");
   const errorMsg = String(cfg?.errorMessage || "Please fill in the highlighted required fields.");
   const [error, setError] = useState("");
   // Note: answers for fields hidden by conditional logic simply stop being read
-  // (validation, WhatsApp summary and submit all iterate the visible list), so
-  // no cleanup pass is needed here.
 
-  const validateField = (f: { type?: string; label: string; required?: boolean }, v: string): string | null => {
-    if ((f.required ?? false) && !v.trim() && f.type !== "checkbox") return `${f.label} is required`;
-    if (!v.trim()) return null;
-    if (f.type === "email" && !isValidEmail(v)) return "Enter a valid email address";
-    if (f.type === "phone" && !isValidPhone(v)) return "Enter a valid phone number";
+  const validateField = (f: { type?: string; label: string; required?: boolean; validation?: { pattern?: string; minLength?: number; maxLength?: number; min?: number; max?: number; customMessage?: string } }, v: string): string | null => {
+    const trim = v.trim();
+    if ((f.required ?? false) && !trim && f.type !== "checkbox") return f.validation?.customMessage || `${f.label} is required`;
+    if (!trim) return null;
+    if (f.type === "email" && !isValidEmail(v)) return f.validation?.customMessage || "Enter a valid email address";
+    if (f.type === "phone" && !isValidPhone(v)) return f.validation?.customMessage || "Enter a valid phone number";
+    const pat = String(f.validation?.pattern ?? "").trim();
+    if (pat) {
+      const low = pat.toLowerCase();
+      if (low !== "email" && low !== "phone") {
+        try {
+          const re = new RegExp(pat);
+          if (!re.test(trim)) return f.validation?.customMessage || `${f.label} is invalid`;
+        } catch { /* ignore bad regex */ }
+      }
+    }
+    if (f.validation?.minLength != null && trim.length < f.validation.minLength) return f.validation?.customMessage || `${f.label} must be at least ${f.validation.minLength} characters`;
+    if (f.validation?.maxLength != null && trim.length > f.validation.maxLength) return f.validation?.customMessage || `${f.label} must be at most ${f.validation.maxLength} characters`;
+    if (f.type === "number" && trim) {
+      const num = Number(trim);
+      if (Number.isNaN(num)) return f.validation?.customMessage || `${f.label} must be a number`;
+      if (f.validation?.min != null && num < f.validation.min) return f.validation?.customMessage || `${f.label} must be ≥ ${f.validation.min}`;
+      if (f.validation?.max != null && num > f.validation.max) return f.validation?.customMessage || `${f.label} must be ≤ ${f.validation.max}`;
+    }
     return null;
   };
 
@@ -1637,20 +1659,36 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
       window.location.assign(redirectTarget);
       return;
     }
-    // Inline-success deliverable: auto-download after a validated submission.
-    if (deliverableUrl) window.setTimeout(() => downloadFile(deliverableUrl), 800);
+    // Inline-success deliverable: auto-download after validated submission when enabled.
+    // Priority: form.pdf.autoDownload else legacy deliverableUrl.
+    const shouldDownload = pdfEnabled && pdfAuto && deliverableUrl;
+    if (shouldDownload) window.setTimeout(() => downloadFile(deliverableUrl), 800);
   };
 
   if (sent) {
+    const ty = (cfg as unknown as { thankYouPage?: { heading?: string; description?: string; text?: string; image?: string; icon?: string; buttons?: { label: string; href: string; variant: string }[]; html?: string; showPdfConfirmation?: boolean; enabled?: boolean; alignment?: string; background?: string; typography?: { fontFamily?: string; fontSize?: string | number; textColor?: string }; colors?: { bg?: string; text?: string; accent?: string } } })?.thankYouPage;
+    const useCustomThankYou = Boolean(ty?.enabled !== false && (ty?.heading || ty?.description));
     return (
-      <div id="lead-form" style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", padding: device === "mobile" ? "32px 16px" : "48px 24px" }}>
-        <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 10 }}>{successMsg}</h2>
-        {cfg?.notifyEmail ? <p style={{ color: "var(--ps-slate)", fontSize: 14 }}>A copy can be sent to {cfg.notifyEmail}.</p> : null}
+      <div id="lead-form" style={{ maxWidth: 640, margin: "0 auto", textAlign: (ty?.alignment as never) ?? "center", padding: device === "mobile" ? "32px 16px" : "48px 24px", background: ty?.background ?? undefined, borderRadius: 16 }}>
+        {useCustomThankYou ? (
+          <>
+            {ty?.image ? <img src={ty.image} alt="" style={{ width: "100%", maxWidth: 420, borderRadius: 14, margin: "0 auto 14px", display: "block" }} /> : null}
+            <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 8, color: ty?.typography?.textColor ?? ty?.colors?.text ?? "var(--ps-ink)", fontFamily: ty?.typography?.fontFamily ? `"${ty.typography.fontFamily}"` : undefined }}>{ty?.heading ?? successMsg}</h2>
+            {ty?.description ? <p style={{ color: "var(--ps-slate)", fontSize: 14.5, lineHeight: 1.6, margin: "0 auto", maxWidth: 520 }}>{ty.description}</p> : null}
+            {ty?.text ? <p style={{ color: "var(--ps-slate)", fontSize: 13.5, lineHeight: 1.65, margin: "10px auto 0", maxWidth: 520 }}>{ty.text}</p> : null}
+            {ty?.html ? <div className="ps-rich" style={{ marginTop: 12, fontSize: 13.5 }} dangerouslySetInnerHTML={{ __html: ty.html }} /> : null}
+          </>
+        ) : (
+          <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 10 }}>{successMsg}</h2>
+        )}
+        {!useCustomThankYou && cfg?.notifyEmail ? <p style={{ color: "var(--ps-slate)", fontSize: 14 }}>A copy can be sent to {cfg.notifyEmail}.</p> : null}
         {deliverableUrl ? (
           <div>
             <a
               href={live ? deliverableUrl : undefined}
-              {...(live ? { download: "", target: "_blank", rel: "noopener noreferrer" } : {})}
+              download={live && pdfFilename ? pdfFilename : undefined}
+              target={live ? "_blank" : undefined}
+              rel={live ? "noopener noreferrer" : undefined}
               onClick={(e) => {
                 if (!live) {
                   e.preventDefault();
@@ -1662,6 +1700,14 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
             >
               <Download size={16} /> {deliverableLabel}
             </a>
+            {ty?.showPdfConfirmation !== false ? <div style={{ marginTop: 8, fontSize: 12, color: "var(--ps-muted)" }}>Your PDF “{pdfFilename}” {pdfAuto ? "downloaded automatically" : "is ready"}.</div> : null}
+          </div>
+        ) : null}
+        {useCustomThankYou && (ty?.buttons?.length ?? 0) > 0 ? (
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 18 }}>
+            {ty!.buttons!.map((b, i) => (
+              <a key={i} href={live ? b.href : undefined} onClick={(e) => { if (!live) e.preventDefault(); }} style={{ padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: "none", background: b.variant === "primary" ? "var(--ps-grad-primary)" : b.variant === "outline" ? "#fff" : "#111827", color: b.variant === "outline" ? "var(--ps-ink)" : "#fff", border: b.variant === "outline" ? "1px solid var(--ps-line-strong)" : "none", cursor: live ? "pointer" : "default" }}>{b.label}</a>
+            ))}
           </div>
         ) : null}
         <div>
@@ -1673,16 +1719,9 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
     );
   }
 
-  const cardMode = String(st.layout ?? "") === "card";
+  // Pure form widget — no heading/eyebrow/copy. All copy is managed in Forms module (form.name/description).
   return (
-    <div id="lead-form" style={cardMode ? { maxWidth: 480, margin: "0 auto", width: "100%" } : { display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1.1fr" : "1fr", gap: 32, alignItems: "center" }}>
-      {!cardMode ? (
-      <div>
-        <Eyebrow gold>★ {String(st.eyebrow || "Enquire")}</Eyebrow>
-        <h2 style={{ fontSize: device === "mobile" ? 26 : 32, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 10px" }}>{String(st.heading || "Book a site visit")}</h2>
-        <p style={{ fontSize: 14, color: "var(--ps-slate)", lineHeight: 1.7, marginBottom: 26 }}>{String(st.sub || "Share your details and our team will get in touch.")}</p>
-      </div>
-      ) : null}
+    <div id="lead-form" style={{ maxWidth: 520, margin: "0 auto", width: "100%" }}>
       <form
         className="ps-card"
         style={{ borderRadius: 20, padding: 28, boxShadow: "var(--ps-shadow-md)" }}
@@ -1702,14 +1741,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
               ))}
             </div>
           </>
-        ) : cardMode ? (
-          <div style={{ marginBottom: 14 }}>
-            <h3 style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.4, margin: 0, ...T }}>{String(st.heading || "Book a site visit")}</h3>
-            {st.sub ? <p style={{ fontSize: 13, color: "var(--ps-slate)", lineHeight: 1.6, margin: "6px 0 0" }}>{String(st.sub)}</p> : null}
-          </div>
-        ) : (
-          <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 16 }}>Lead capture</div>
-        )}
+        ) : null}
         <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
           {visible.map((f, i) => {
             const key = (f as { id?: string }).id || f.label;
@@ -1763,6 +1795,25 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
                     <input type="checkbox" required={"required" in f ? f.required : false} checked={val === "yes"} onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.checked ? "yes" : ""))} />
                     {f.label}
                   </label>
+                ) : f.type === "number" ? (
+                  <input
+                    className="ps-input"
+                    type="number"
+                    required={"required" in f ? f.required : false}
+                    placeholder={f.placeholder}
+                    value={val}
+                    onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
+                    style={{ padding: "11px 12px" }}
+                  />
+                ) : f.type === "time" ? (
+                  <input
+                    className="ps-input"
+                    type="time"
+                    required={"required" in f ? f.required : false}
+                    value={val}
+                    onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
+                    style={{ padding: "11px 12px" }}
+                  />
                 ) : (
                   <input
                     className="ps-input"
