@@ -4,11 +4,20 @@ function f(partial: FormLeadField): FormLeadField {
   return partial;
 }
 
+/**
+ * Generic starter templates for the universal Dynamic Form Builder.
+ * These are NOT fixed business types — they are simply pre-filled field
+ * sets the user can load, then freely rename, add/remove fields, and
+ * reconfigure as any form (contact, booking, brochure gate, etc.).
+ * The builder does NOT hard-code business-specific widgets.
+ */
 export const FORM_PRESETS: Record<
   string,
-  { multiStep: boolean; submitLabel: string; fields: FormLeadField[] }
+  { multiStep: boolean; submitLabel: string; fields: FormLeadField[]; name: string; description: string }
 > = {
   f1: {
+    name: "Starter — Simple capture",
+    description: "Name + phone + email + message (customize freely)",
     multiStep: false,
     submitLabel: "Send enquiry",
     fields: [
@@ -19,20 +28,24 @@ export const FORM_PRESETS: Record<
     ],
   },
   f2: {
+    name: "Starter — Multi-step",
+    description: "Multi-step with date & choices (split into steps automatically)",
     multiStep: true,
-    submitLabel: "Book site visit",
+    submitLabel: "Continue",
     fields: [
       f({ id: "f1", type: "text", label: "Full name", placeholder: "e.g. Rohan Kapoor", required: true }),
       f({ id: "f2", type: "phone", label: "Phone number", placeholder: "+91 98765 43210", required: true }),
       f({ id: "f3", type: "email", label: "Email address", placeholder: "you@email.com", required: true }),
-      f({ id: "f4", type: "date", label: "Preferred visit date", placeholder: "", required: true }),
-      f({ id: "f5", type: "select", label: "Configuration", placeholder: "Choose", required: true, options: ["3 BHK", "4 BHK", "Penthouse"] }),
-      f({ id: "f6", type: "checkbox", label: "I agree to be contacted about this visit", placeholder: "", required: true }),
+      f({ id: "f4", type: "date", label: "Preferred date", placeholder: "", required: true }),
+      f({ id: "f5", type: "select", label: "Configuration", placeholder: "Choose", required: true, options: ["Option A", "Option B", "Option C"] }),
+      f({ id: "f6", type: "checkbox", label: "I agree to be contacted", placeholder: "", required: true }),
     ],
   },
   f3: {
+    name: "Starter — Minimal gate",
+    description: "3-field gate (name + email + phone) — enable PDF download for brochure use",
     multiStep: false,
-    submitLabel: "Download brochure",
+    submitLabel: "Submit & Continue",
     fields: [
       f({ id: "f1", type: "text", label: "Full name", placeholder: "Your name", required: true }),
       f({ id: "f2", type: "email", label: "Email address", placeholder: "you@email.com", required: true }),
@@ -40,23 +53,28 @@ export const FORM_PRESETS: Record<
     ],
   },
   f4: {
+    name: "Starter — With choices & number",
+    description: "Includes dropdown + number — adapt for any enquiry",
     multiStep: false,
-    submitLabel: "Get pricing",
+    submitLabel: "Submit",
     fields: [
       f({ id: "f1", type: "text", label: "Full name", placeholder: "e.g. Rohan Kapoor", required: true }),
       f({ id: "f2", type: "phone", label: "Phone number", placeholder: "+91 98765 43210", required: true }),
       f({ id: "f3", type: "email", label: "Email address", placeholder: "you@email.com", required: false }),
-      f({ id: "f4", type: "select", label: "Budget", placeholder: "Select budget", required: true, options: ["₹1–1.5 Cr", "₹1.5–2 Cr", "₹2 Cr+"] }),
-      f({ id: "f5", type: "select", label: "Configuration", placeholder: "Choose", required: true, options: ["3 BHK", "4 BHK", "Penthouse"] }),
+      f({ id: "f4", type: "select", label: "Budget", placeholder: "Select", required: true, options: ["Option 1", "Option 2", "Option 3"] }),
+      f({ id: "f5", type: "number", label: "Quantity", placeholder: "1", required: false }),
     ],
   },
   f5: {
+    name: "Starter — Time & selection",
+    description: "Time + dropdown — customize for scheduling or callback",
     multiStep: false,
-    submitLabel: "Request callback",
+    submitLabel: "Request",
     fields: [
       f({ id: "f1", type: "text", label: "Full name", placeholder: "Your name", required: true }),
       f({ id: "f2", type: "phone", label: "Phone number", placeholder: "+91 98765 43210", required: true }),
-      f({ id: "f3", type: "select", label: "Best time to call", placeholder: "Choose a slot", required: true, options: ["Morning", "Afternoon", "Evening"] }),
+      f({ id: "f3", type: "time", label: "Preferred time", placeholder: "", required: true }),
+      f({ id: "f4", type: "select", label: "Best slot", placeholder: "Choose a slot", required: true, options: ["Morning", "Afternoon", "Evening"] }),
     ],
   },
 };

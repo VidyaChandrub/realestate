@@ -17,9 +17,22 @@ import { buildTemplateSections, WIDGETS } from "@/lib/prestate/data";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
 import type { DesignBundle } from "./canvas";
 import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts } from "@/lib/prestate/design-system";
-import { findSection, insertChild, isStructural, patchSection, placeColumn } from "@/lib/prestate/tree";
+import {
+  cloneWithFreshIds,
+  findSection,
+  insertChild,
+  isStructural,
+  patchSection,
+  placeColumn,
+} from "@/lib/prestate/tree";
 import { ensureConfig } from "@/lib/prestate/site-config";
-import { WidgetsPanel } from "./widgets-panel";
+import {
+  loadSectionTemplates,
+  migrateSections,
+  saveSectionTemplates,
+  type SavedSectionTemplate,
+} from "@/lib/prestate/persist";
+import { SAVED_WIDGET_PREFIX, savedWidgetStorageId, WidgetsPanel } from "./widgets-panel";
 import { Canvas } from "./canvas";
 import { SettingsPanel } from "./settings-panel";
 
@@ -41,7 +54,8 @@ interface EditorState {
 
 function seedSections(page: LandingPageData): SectionInstance[] {
   if (page.sections.length > 0) {
-    return JSON.parse(JSON.stringify(page.sections)) as SectionInstance[];
+    // Migrate legacy widget ids (merged library) so old pages keep editing.
+    return migrateSections(JSON.parse(JSON.stringify(page.sections)) as SectionInstance[]);
   }
   return page.pageType === "thank-you" ? buildThankYouSections() : buildTemplateSections(page.template);
 }
@@ -77,6 +91,7 @@ export function BuilderWorkspace({
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [quickOpen, setQuickOpen] = useState(false);
   const [vp, setVp] = useState(1400);
+  const [savedTemplates, setSavedTemplates] = useState<SavedSectionTemplate[]>(() => loadSectionTemplates());
 
   // Design system: typography tokens + uploaded fonts → stylesheet for canvas.
   const design = useMemo<{ css: string; bundle: DesignBundle }>(() => {
@@ -144,7 +159,25 @@ export function BuilderWorkspace({
     if (w < 1180) setInspectorOpen(false);
   }, []);
 
+  // Refs for flushing pending autosaves at any time (page switch, tab close).
+  const sectionsRef = useRef(sections);
+  const persistTimer = useRef<number | null>(null);
+  const onPersistRef = useRef(onPersist);
+
   useEffect(() => {
+    sectionsRef.current = sections;
+  }, [sections]);
+  useEffect(() => {
+    onPersistRef.current = onPersist;
+  }, [onPersist]);
+
+  useEffect(() => {
+    // Switching pages: flush any pending autosave for the outgoing page first.
+    if (persistTimer.current) {
+      window.clearTimeout(persistTimer.current);
+      persistTimer.current = null;
+      onPersistRef.current(sectionsRef.current);
+    }
     setState({
       sections: seedSections(page),
       history: [],
@@ -153,25 +186,40 @@ export function BuilderWorkspace({
     });
   }, [page.id]);
 
-  const persistTimer = useRef<number | null>(null);
-
   useEffect(() => () => {
     if (persistTimer.current) window.clearTimeout(persistTimer.current);
   }, []);
 
+  // Close/refresh mid-edit: flush synchronously so nothing is ever lost.
+  useEffect(() => {
+    const flush = () => {
+      if (persistTimer.current && onPersistRef.current) {
+        window.clearTimeout(persistTimer.current);
+        persistTimer.current = null;
+        onPersistRef.current(sectionsRef.current);
+      }
+    };
+    window.addEventListener("beforeunload", flush);
+    return () => window.removeEventListener("beforeunload", flush);
+  }, []);
+
   const mutate = useCallback((patch: (prev: SectionInstance[]) => SectionInstance[]) => {
     setState((prev) => {
-      const sections = patch(prev.sections);
+      const nextSections = patch(prev.sections);
+      const flush = () => {
+        persistTimer.current = null;
+        onPersistRef.current(nextSections);
+      };
       if (persistTimer.current) window.clearTimeout(persistTimer.current);
-      persistTimer.current = window.setTimeout(() => onPersist(sections), 350);
+      persistTimer.current = window.setTimeout(flush, 350);
       return {
-        sections,
+        sections: nextSections,
         history: [...prev.history.slice(-49), prev.sections],
         future: [],
         selectedId: prev.selectedId,
       };
     });
-  }, [onPersist]);
+  }, []);
 
   const undo = useCallback(() => {
     setState((prev) => {
@@ -222,15 +270,13 @@ export function BuilderWorkspace({
 
   const handleSelect = useCallback(
     (id: string) => {
-      if (id.startsWith("__template_")) {
-        setState((prev) => ({ ...prev, selectedId: id.slice("__template_".length) }));
-        onToast("Section saved as a reusable template");
-        return;
-      }
-      setState((prev) => ({ ...prev, selectedId: id }));
+      // Legacy pseudo-ids from older "save as template" buttons — select the
+      // real section instead of showing a dead toast.
+      const realId = id.startsWith("__template_") ? id.slice("__template_".length) : id;
+      setState((prev) => ({ ...prev, selectedId: realId }));
       if (!dockInspector) setInspectorOpen(true);
     },
-    [onToast, dockInspector],
+    [dockInspector],
   );
 
   useEffect(() => {
@@ -266,6 +312,21 @@ export function BuilderWorkspace({
 
   const addWidget = useCallback(
     (widgetId: string) => {
+      if (widgetId.startsWith(SAVED_WIDGET_PREFIX)) {
+        const tpl = loadSectionTemplates().find((t) => t.id === savedWidgetStorageId(widgetId));
+        if (!tpl) return;
+        const node = cloneWithFreshIds(tpl.data);
+        mutate((prev) => {
+          if (selected && isStructural(selected.type)) return insertChild(prev, selected.id, node);
+          if (selectedId) {
+            const ref = findSection(prev, selectedId);
+            if (ref) return insertChild(prev, ref.parentId, node, ref.index + 1);
+          }
+          return insertChild(prev, null, node);
+        });
+        setTimeout(() => setState((prev) => ({ ...prev, selectedId: node.id })), 40);
+        return;
+      }
       const def = WIDGETS.find((w) => w.id === widgetId);
       if (!def) return;
       if (widgetId === "column") {
@@ -291,6 +352,41 @@ export function BuilderWorkspace({
     },
     [mutate, selected, selectedId],
   );
+
+  // Toolbar "Save as template" → store the section for reuse across pages.
+  const saveSectionTemplate = useCallback(
+    (node: SectionInstance) => {
+      const entry: SavedSectionTemplate = {
+        id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+        name: node.label || node.type,
+        type: node.type,
+        savedAt: new Date().toISOString(),
+        data: JSON.parse(JSON.stringify(node)) as SectionInstance,
+      };
+      setSavedTemplates((prev) => {
+        const next = [entry, ...prev];
+        saveSectionTemplates(next);
+        return next;
+      });
+      onToast(`“${entry.name}” saved to Widgets → Saved`);
+    },
+    [onToast],
+  );
+
+  const deleteSectionTemplate = useCallback((id: string) => {
+    setSavedTemplates((prev) => {
+      const next = prev.filter((t) => t.id !== id);
+      saveSectionTemplates(next);
+      return next;
+    });
+  }, []);
+
+  // Canvas drag-drop of a saved template resolves through localStorage.
+  const resolveWidget = useCallback((id: string): SectionInstance | null => {
+    if (!id.startsWith(SAVED_WIDGET_PREFIX)) return null;
+    const tpl = loadSectionTemplates().find((t) => t.id === savedWidgetStorageId(id));
+    return tpl ? cloneWithFreshIds(tpl.data) : null;
+  }, []);
 
   const patchSelected = useCallback(
     (patch: Partial<SectionInstance>) => {
@@ -347,7 +443,13 @@ export function BuilderWorkspace({
         <>
           {!dockWidgets ? <button type="button" className="ps-drawer-backdrop" aria-label="Close widgets" onClick={() => setWidgetsOpen(false)} /> : null}
           <div className={dockWidgets ? "ps-sidebar-col" : "ps-drawer-left"} style={{ width: dockWidgets ? (widgetsOpen ? 296 : 48) : 296, flexShrink: 0, transition: dockWidgets ? "width .18s ease" : undefined, zIndex: dockWidgets ? 1 : 420 }}>
-            <WidgetsPanel open={dockWidgets ? widgetsOpen : true} onToggle={() => setWidgetsOpen((v) => !v)} onAddWidget={addWidget} />
+            <WidgetsPanel
+              open={dockWidgets ? widgetsOpen : true}
+              onToggle={() => setWidgetsOpen((v) => !v)}
+              onAddWidget={addWidget}
+              templates={savedTemplates}
+              onDeleteTemplate={deleteSectionTemplate}
+            />
           </div>
         </>
       ) : null}
@@ -375,13 +477,15 @@ export function BuilderWorkspace({
           brand: ensureConfig(page).brand,
         }}
         pageId={page.id}
+        onSaveSectionTemplate={saveSectionTemplate}
+        resolveWidget={resolveWidget}
       />
 
       {dockInspector || inspectorOpen ? (
         <>
           {!dockInspector ? <button type="button" className="ps-drawer-backdrop" aria-label="Close settings" onClick={() => setInspectorOpen(false)} /> : null}
           <div className={dockInspector ? "ps-sidebar-col" : "ps-drawer-right"} style={{ zIndex: dockInspector ? 1 : 430 }}>
-            <SettingsPanel section={selected} device={device} setDevice={setDevice} onChange={patchSelected} typographyTokens={design.bundle.tokens} />
+            <SettingsPanel section={selected} device={device} setDevice={setDevice} onChange={patchSelected} typographyTokens={design.bundle.tokens} page={page} onPatchConfig={onPatchConfig} />
           </div>
         </>
       ) : null}
@@ -424,7 +528,7 @@ function QuickAdd({
   const [active, setActive] = useState(0);
 
   const q = query.trim().toLowerCase();
-  const results = WIDGETS.filter(
+  const results = WIDGETS.filter((w) => !w.hidden).filter(
     (w) => !q || w.label.toLowerCase().includes(q) || w.desc.toLowerCase().includes(q) || w.group.toLowerCase().includes(q) || w.category.toLowerCase().includes(q),
   ).slice(0, 12);
   const safeActive = Math.min(active, Math.max(0, results.length - 1));

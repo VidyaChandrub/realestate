@@ -112,12 +112,22 @@ export function reorderSection(list: SectionInstance[], fromId: string, toId: st
   return t;
 }
 
+/** Deep-clone a node and give every descendant a fresh id (keeps settings/style). */
+export function cloneWithFreshIds(node: SectionInstance): SectionInstance {
+  const copy = JSON.parse(JSON.stringify(node)) as SectionInstance;
+  const walk = (n: SectionInstance): SectionInstance => ({
+    ...n,
+    id: newSectionId(n.type === "column" ? "col" : n.type === "row" ? "row" : "sec"),
+    children: n.children?.length ? n.children.map(walk) : n.children,
+  });
+  return walk(copy);
+}
+
 export function duplicateSection(list: SectionInstance[], id: string): { list: SectionInstance[]; copy: SectionInstance | null } {
   const t = cloneTree(list);
   const found = findInPlace(t, id);
   if (!found) return { list, copy: null };
-  const copy = JSON.parse(JSON.stringify(found.parentList[found.index])) as SectionInstance;
-  copy.id = newSectionId();
+  const copy = cloneWithFreshIds(found.parentList[found.index]);
   found.parentList.splice(found.index + 1, 0, copy);
   return { list: t, copy };
 }

@@ -36,6 +36,17 @@ export type FooterDesignId = "columns" | "centered" | "newsletter" | "slimbar" |
 /** Length value: a plain number is treated as px; strings pass through as-is ("10px", "1rem", "50%"). */
 export type CssLength = number | string;
 
+/**
+ * Per-device (tablet / mobile) overrides stored under style.responsive.
+ * Only spacing, layout and typography are overridable — colors/borders/effects
+ * stay shared so a device tweak can never silently re-theme a section.
+ */
+export interface ResponsiveOverrides {
+  spacing?: Partial<SectionStyle["spacing"]>;
+  layout?: Partial<SectionStyle["layout"]>;
+  typography?: Partial<SectionStyle["typography"]>;
+}
+
 export interface SectionStyle {
   colors?: {
     bg?: string;
@@ -88,6 +99,9 @@ export interface SectionStyle {
     hideDesktop?: boolean;
     hideTablet?: boolean;
     hideMobile?: boolean;
+    /** Per-device overrides — merged over the desktop values when previewing/publishing. */
+    tablet?: ResponsiveOverrides;
+    mobile?: ResponsiveOverrides;
   };
   advanced?: {
     classes?: string;
@@ -137,13 +151,122 @@ export interface PropertyData {
   units: string;
 }
 
+export type FieldLogicOp =
+  | "eq"
+  | "neq"
+  | "contains"
+  | "notcontains"
+  | "gt"
+  | "lt"
+  | "empty"
+  | "notempty";
+
+export interface FieldLogicRule {
+  /** id of the controlling field (see FormLeadField.id). */
+  field: string;
+  op: FieldLogicOp;
+  value: string;
+}
+
+export interface FieldLogic {
+  enabled: boolean;
+  /** AND = all rules must match; OR = any rule must match. */
+  match: "any" | "all";
+  rules: FieldLogicRule[];
+}
+
+export type FormFieldType =
+  | "text"
+  | "email"
+  | "phone"
+  | "number"
+  | "select"
+  | "radio"
+  | "checkbox"
+  | "date"
+  | "time"
+  | "textarea"
+  | "file"
+  | "hidden";
+
+export interface FieldValidation {
+  /** Regex or preset name */
+  pattern?: string;
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  customMessage?: string;
+}
+
 export interface FormLeadField {
   id: string;
-  type: string;
+  type: FormFieldType | string;
   label: string;
   placeholder: string;
   required: boolean;
   options?: string[];
+  /** Conditional logic — show this field only when rules match. */
+  logic?: FieldLogic;
+  validation?: FieldValidation;
+  /** Optional help text under field */
+  helpText?: string;
+}
+
+export interface FormPdfConfig {
+  enabled: boolean;
+  url: string;
+  filename: string;
+  autoDownload: boolean;
+}
+
+export interface FormThankYouButton {
+  label: string;
+  href: string;
+  variant: "primary" | "secondary" | "outline";
+}
+
+export interface FormThankYouPage {
+  enabled: boolean;
+  heading: string;
+  description: string;
+  text: string;
+  image: string;
+  icon: string;
+  buttons: FormThankYouButton[];
+  html: string;
+  successMessage: string;
+  showPdfConfirmation: boolean;
+  typography: {
+    fontFamily: string;
+    fontSize: number | string;
+    fontWeight?: number;
+    lineHeight?: number;
+    letterSpacing?: number;
+    textTransform?: string;
+    textColor?: string;
+  };
+  colors: { bg: string; text: string; accent?: string };
+  background: string;
+  spacing: { padding: number | string; margin: number | string; gap: number | string };
+  alignment: "left" | "center" | "right";
+  /** Per-device responsive overrides */
+  responsive?: { hideOnMobile?: boolean };
+}
+
+export interface FormEmbedConfig {
+  id: string;
+  allowExternal: boolean;
+}
+
+export type FormSubmissionAction = "save" | "email" | "whatsapp" | "webhook" | "redirect" | "pdf" | "thankyou";
+
+export interface FormCustomAction {
+  id: string;
+  type: FormSubmissionAction;
+  label: string;
+  config: Record<string, unknown>;
+  enabled: boolean;
 }
 
 export interface SiteConfig {
@@ -227,6 +350,12 @@ export interface SiteConfig {
     goalBrochure: boolean;
   };
   form: {
+    /** User-defined form identity */
+    name: string;
+    description: string;
+    embed: FormEmbedConfig;
+    pdf: FormPdfConfig;
+    thankYouPage: FormThankYouPage;
     notifyEmail: string;
     whatsapp: string;
     thankYou: string;
@@ -250,6 +379,8 @@ export interface SiteConfig {
     errorMessage: string;
     /** Conditional action: open this popup (by id) after a successful submit. */
     openPopupId: string;
+    /** Extensible submission pipeline */
+    customActions?: FormCustomAction[];
   };
   media: {
     notes: string;
