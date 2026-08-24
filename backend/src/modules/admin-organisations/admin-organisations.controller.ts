@@ -21,6 +21,9 @@ import { ActivateOrganisationDto } from './dto/activate-organisation.dto';
 import { ListOrganisationsQueryDto } from './dto/list-organisations-query.dto';
 import { UpdateOrganisationDto } from './dto/update-organisation.dto';
 import { UpdateOrganisationStatusDto } from './dto/update-organisation-status.dto';
+import { CreateOrgUserDto } from '../org-users/dto/create-org-user.dto';
+import { UpdateOrgUserStatusDto } from '../org-users/dto/update-org-user-status.dto';
+import { ListOrgUsersQueryDto } from '../org-users/dto/list-org-users-query.dto';
 
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 @Controller('admin/organisations')
@@ -45,8 +48,22 @@ export class AdminOrganisationsController {
   }
 
   @Get(':id/users')
-  listUsers(@Param('id') id: string) {
-    return this.adminOrganisationsService.listUsers(id);
+  listUsers(@Param('id') id: string, @Query() query: ListOrgUsersQueryDto) {
+    return this.adminOrganisationsService.listUsers(id, query);
+  }
+
+  @Post(':id/users')
+  createUser(@Param('id') id: string, @Body() dto: CreateOrgUserDto) {
+    return this.adminOrganisationsService.createUser(id, dto);
+  }
+
+  @Patch(':id/users/:userId/status')
+  updateUserStatus(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() dto: UpdateOrgUserStatusDto,
+  ) {
+    return this.adminOrganisationsService.updateUserStatus(id, userId, dto);
   }
 
   @Get(':id/activity')

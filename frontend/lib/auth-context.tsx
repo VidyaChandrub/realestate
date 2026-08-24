@@ -45,8 +45,8 @@ interface AuthContextValue {
   accessToken: string | null;
   isLoading: boolean;
   isMock: boolean;
-  login: (input: LoginInput) => Promise<void>;
-  signup: (input: SignupInput) => Promise<void>;
+  login: (input: LoginInput) => Promise<SessionUser>;
+  signup: (input: SignupInput) => Promise<SessionUser>;
   logout: () => Promise<void>;
   mockLogin: (
     role: UserRole,
@@ -155,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         settings: { view: true, edit: true },
       });
       persist(session, response.access_token, response.refresh_token);
+      return session;
     },
     [persist, toSessionUser],
   );
@@ -167,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       const session = toSessionUser(response.user, {});
       persist(session, response.access_token, response.refresh_token);
+      return session;
     },
     [persist, toSessionUser],
   );
@@ -290,6 +292,6 @@ export function useAuth(): AuthContextValue {
 
 export function useDashboardPath() {
   const { user, isLoading } = useAuth();
-  const path = user ? dashboardPathFor() : "/login";
+  const path = user ? dashboardPathFor(user.role) : "/login";
   return { path, user, isLoading };
 }

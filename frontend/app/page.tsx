@@ -34,7 +34,7 @@ export default function Home() {
               </span>{" "}
               ({user.roleLabel})
             </p>
-            <LinkButton href={dashboardPathFor()} size="lg">
+            <LinkButton href={dashboardPathFor(user.role)} size="lg">
               Go to your dashboard
             </LinkButton>
           </div>

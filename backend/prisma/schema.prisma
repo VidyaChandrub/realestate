@@ -51,6 +51,21 @@ model Organisation {
   status    OrgStatus @default(active)
   createdAt DateTime  @default(now()) @map("created_at")
 
+  // Profile fields — added for the Org Admin settings screen. All nullable
+  // except the three with sensible defaults; existing orgs backfill to those.
+  timezone        String  @default("Asia/Kolkata")
+  currency        String  @default("INR")
+  defaultLanguage String  @default("en-IN") @map("default_language")
+  logoUrl         String? @map("logo_url")
+  faviconUrl      String? @map("favicon_url")
+  brandColour     String? @map("brand_colour")
+  website         String?
+  addressLine1    String? @map("address_line1")
+  addressLine2    String? @map("address_line2")
+  state           String?
+  postalCode      String? @map("postal_code")
+  country         String?
+
   users       User[]
   teams       Team[]
   auditLogs   AuditLog[]

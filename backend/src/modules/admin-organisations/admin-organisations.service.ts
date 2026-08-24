@@ -10,15 +10,24 @@ import { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { generateUniqueOrgSlug } from '../../common/utils/slug.util';
 import { generateTempPassword } from '../../common/utils/tokens.util';
 import {
+  buildOrganisationUpdateData,
   toSafeOrganisation,
   toSafeUser,
 } from '../../common/utils/mappers.util';
+import {
+  listOrgUsers,
+  provisionInvitedUser,
+  setOrgUserStatus,
+} from '../../common/utils/org-users.util';
 import { OnboardCompanyDto } from './dto/onboard-company.dto';
 import { OnboardAdminDto } from './dto/onboard-admin.dto';
 import { ActivateOrganisationDto } from './dto/activate-organisation.dto';
 import { ListOrganisationsQueryDto } from './dto/list-organisations-query.dto';
 import { UpdateOrganisationDto } from './dto/update-organisation.dto';
 import { UpdateOrganisationStatusDto } from './dto/update-organisation-status.dto';
+import { CreateOrgUserDto } from '../org-users/dto/create-org-user.dto';
+import { UpdateOrgUserStatusDto } from '../org-users/dto/update-org-user-status.dto';
+import { ListOrgUsersQueryDto } from '../org-users/dto/list-org-users-query.dto';
 import type { Prisma } from '@prisma/client';
 
 const BCRYPT_COST_FACTOR = 12;
@@ -242,6 +251,18 @@ export class AdminOrganisationsService {
       city: organisation.city,
       status: organisation.status,
       createdAt: organisation.createdAt,
+      timezone: organisation.timezone,
+      currency: organisation.currency,
+      defaultLanguage: organisation.defaultLanguage,
+      logoUrl: organisation.logoUrl,
+      faviconUrl: organisation.faviconUrl,
+      brandColour: organisation.brandColour,
+      website: organisation.website,
+      addressLine1: organisation.addressLine1,
+      addressLine2: organisation.addressLine2,
+      state: organisation.state,
+      postalCode: organisation.postalCode,
+      country: organisation.country,
       admin: admin
         ? {
             firstName: admin.firstName,
@@ -258,25 +279,23 @@ export class AdminOrganisationsService {
     };
   }
 
-  async listUsers(id: string) {
+  async listUsers(id: string, query: ListOrgUsersQueryDto) {
     await this.getRealOrganisation(id);
+    return listOrgUsers(this.prisma, id, query);
+  }
 
-    const users = await this.prisma.user.findMany({
-      where: { orgId: id },
-      include: {
-        userRoles: { include: { role: true } },
-        teamMembers: { include: { team: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+  async createUser(id: string, dto: CreateOrgUserDto) {
+    await this.getRealOrganisation(id);
+    return provisionInvitedUser(this.prisma, id, dto);
+  }
 
-    return users.map((user) => ({
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.userRoles[0]?.role.key ?? null,
-      teams: user.teamMembers.map((membership) => membership.team.name),
-    }));
+  async updateUserStatus(
+    id: string,
+    userId: string,
+    dto: UpdateOrgUserStatusDto,
+  ) {
+    await this.getRealOrganisation(id);
+    return setOrgUserStatus(this.prisma, id, userId, dto.status);
   }
 
   async listActivity(id: string) {
@@ -301,10 +320,7 @@ export class AdminOrganisationsService {
 
     const updated = await this.prisma.organisation.update({
       where: { id },
-      data: {
-        ...(dto.name !== undefined ? { name: dto.name } : {}),
-        ...(dto.city !== undefined ? { city: dto.city } : {}),
-      },
+      data: buildOrganisationUpdateData(dto),
     });
 
     return toSafeOrganisation(updated);

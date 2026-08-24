@@ -36,8 +36,8 @@ export default function LoginPage() {
     setFieldErrors({});
     setIsSubmitting(true);
     try {
-      await login({ email, password });
-      router.push(dashboardPathFor());
+      const session = await login({ email, password });
+      router.push(dashboardPathFor(session.role));
       router.refresh();
     } catch (err) {
       const { fieldErrors: fe, general } = mapApiFieldErrors(err, FIELD_KEYS);

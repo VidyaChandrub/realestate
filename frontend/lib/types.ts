@@ -17,6 +17,35 @@ export interface SafeOrganisation {
   city: string;
   status: string;
   created_at: string;
+  timezone: string;
+  currency: string;
+  default_language: string;
+  logo_url: string | null;
+  favicon_url: string | null;
+  brand_colour: string | null;
+  website: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
+}
+
+export interface UpdateOrganisationSettingsInput {
+  name?: string;
+  city?: string;
+  timezone?: string;
+  currency?: string;
+  defaultLanguage?: string;
+  logoUrl?: string;
+  faviconUrl?: string;
+  brandColour?: string;
+  website?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
 }
 
 export interface AuthTokens {
@@ -139,6 +168,18 @@ export interface OrganisationDetail {
   city: string;
   status: "active" | "disabled";
   createdAt: string;
+  timezone: string;
+  currency: string;
+  defaultLanguage: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  brandColour: string | null;
+  website: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  state: string | null;
+  postalCode: string | null;
+  country: string | null;
   admin: {
     firstName: string | null;
     lastName: string | null;
@@ -152,12 +193,48 @@ export interface OrganisationDetail {
   subscriptionRenewsAt: null;
 }
 
-export interface OrganisationUserRow {
+export type OrgUserAssignableRole = "admin" | "manager" | "sales";
+export type OrgUserStatus = "active" | "disabled";
+
+export interface OrgUserRole {
+  key: OrgUserAssignableRole;
+  name: string;
+}
+
+export interface OrgUser {
+  id: string;
   firstName: string | null;
   lastName: string | null;
   email: string;
-  role: string | null;
-  teams: string[];
+  phoneNumber: string | null;
+  role: OrgUserRole | null;
+  status: OrgUserStatus;
+  createdAt: string;
+  mustChangePassword: boolean;
+  // Always false today — Teams have no creation/membership UI yet.
+  hasTeam: boolean;
+}
+
+export interface OrgUsersListResponse {
+  data: OrgUser[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CreateOrgUserInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  role: OrgUserAssignableRole;
+}
+
+export interface UpdateOrgUserInput {
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  role?: OrgUserAssignableRole;
 }
 
 export interface OrganisationActivityRow {

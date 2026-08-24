@@ -7,13 +7,78 @@ import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import type {
+  CreateOrgUserInput,
   OrganisationActivityRow,
   OrganisationDetail,
-  OrganisationUserRow,
+  OrgUser,
+  OrgUserAssignableRole,
+  OrgUsersListResponse,
 } from "@/lib/types";
 
 const TABS = ["Overview", "Users & Teams", "Subscription", "Activity"] as const;
 type Tab = (typeof TABS)[number];
+
+const ROLE_OPTIONS: { value: OrgUserAssignableRole; label: string }[] = [
+  { value: "admin", label: "Admin" },
+  { value: "manager", label: "Manager" },
+  { value: "sales", label: "Sales" },
+];
+
+const ROLE_BADGE_CLASS: Record<OrgUserAssignableRole, string> = {
+  admin: "b-indigo",
+  manager: "b-violet",
+  sales: "b-teal",
+};
+
+interface UserFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  role: OrgUserAssignableRole;
+}
+
+const EMPTY_USER_FORM: UserFormData = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phoneNumber: "",
+  role: "sales",
+};
+
+interface EditForm {
+  name: string;
+  city: string;
+  timezone: string;
+  currency: string;
+  defaultLanguage: string;
+  website: string;
+  addressLine1: string;
+  addressLine2: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  logoUrl: string;
+  faviconUrl: string;
+  brandColour: string;
+}
+
+const EMPTY_EDIT_FORM: EditForm = {
+  name: "",
+  city: "",
+  timezone: "",
+  currency: "",
+  defaultLanguage: "",
+  website: "",
+  addressLine1: "",
+  addressLine2: "",
+  state: "",
+  postalCode: "",
+  country: "",
+  logoUrl: "",
+  faviconUrl: "",
+  brandColour: "",
+};
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -56,14 +121,21 @@ export default function SuperAdminOrganisationDetailPage() {
 
   const [tab, setTab] = useState<Tab>("Overview");
   const [org, setOrg] = useState<OrganisationDetail | null>(null);
-  const [users, setUsers] = useState<OrganisationUserRow[] | null>(null);
+  const [users, setUsers] = useState<OrgUser[] | null>(null);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersReloadTick, setUsersReloadTick] = useState(0);
   const [activity, setActivity] = useState<OrganisationActivityRow[] | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const [userFormOpen, setUserFormOpen] = useState(false);
+  const [userForm, setUserForm] = useState<UserFormData>(EMPTY_USER_FORM);
+  const [userFormError, setUserFormError] = useState<string | null>(null);
+  const [userFormSubmitting, setUserFormSubmitting] = useState(false);
+  const [userStatusBusyId, setUserStatusBusyId] = useState<string | null>(null);
+
   const [editing, setEditing] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editCity, setEditCity] = useState("");
+  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT_FORM);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
@@ -90,22 +162,97 @@ export default function SuperAdminOrganisationDetailPage() {
 
     Promise.all([
       apiFetch<OrganisationDetail>(`/admin/organisations/${params.id}`, { headers }),
-      apiFetch<OrganisationUserRow[]>(`/admin/organisations/${params.id}/users`, { headers }),
       apiFetch<OrganisationActivityRow[]>(`/admin/organisations/${params.id}/activity`, { headers }),
     ])
-      .then(([orgRes, usersRes, activityRes]) => {
+      .then(([orgRes, activityRes]) => {
         setOrg(orgRes);
-        setUsers(usersRes);
         setActivity(activityRes);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [accessToken, params.id]);
 
+  useEffect(() => {
+    if (!accessToken || !params.id) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setUsersLoading(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    apiFetch<OrgUsersListResponse>(`/admin/organisations/${params.id}/users?limit=100`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((res) => setUsers(res.data))
+      .catch(() => setUsers(null))
+      .finally(() => setUsersLoading(false));
+  }, [accessToken, params.id, usersReloadTick]);
+
+  function openCreateUser() {
+    setUserForm(EMPTY_USER_FORM);
+    setUserFormError(null);
+    setUserFormOpen(true);
+  }
+
+  async function submitCreateUser() {
+    if (!accessToken || !params.id) return;
+    setUserFormSubmitting(true);
+    setUserFormError(null);
+    try {
+      const body: CreateOrgUserInput = {
+        firstName: userForm.firstName,
+        lastName: userForm.lastName,
+        email: userForm.email,
+        phoneNumber: userForm.phoneNumber || undefined,
+        role: userForm.role,
+      };
+      await apiFetch(`/admin/organisations/${params.id}/users`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify(body),
+      });
+      setUserFormOpen(false);
+      setUsersReloadTick((t) => t + 1);
+    } catch (err) {
+      setUserFormError(err instanceof Error ? err.message : "Failed to create user.");
+    } finally {
+      setUserFormSubmitting(false);
+    }
+  }
+
+  async function toggleUserStatus(user: OrgUser) {
+    if (!accessToken || !params.id) return;
+    const nextStatus = user.status === "active" ? "disabled" : "active";
+    setUserStatusBusyId(user.id);
+    try {
+      await apiFetch(`/admin/organisations/${params.id}/users/${user.id}/status`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      setUsersReloadTick((t) => t + 1);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to update user status.");
+    } finally {
+      setUserStatusBusyId(null);
+    }
+  }
+
   function startEdit() {
     if (!org) return;
-    setEditName(org.name);
-    setEditCity(org.city);
+    setEditForm({
+      name: org.name,
+      city: org.city,
+      timezone: org.timezone,
+      currency: org.currency,
+      defaultLanguage: org.defaultLanguage,
+      website: org.website ?? "",
+      addressLine1: org.addressLine1 ?? "",
+      addressLine2: org.addressLine2 ?? "",
+      state: org.state ?? "",
+      postalCode: org.postalCode ?? "",
+      country: org.country ?? "",
+      logoUrl: org.logoUrl ?? "",
+      faviconUrl: org.faviconUrl ?? "",
+      brandColour: org.brandColour ?? "",
+    });
     setEditError(null);
     setEditing(true);
   }
@@ -119,9 +266,9 @@ export default function SuperAdminOrganisationDetailPage() {
       await apiFetch(`/admin/organisations/${org.id}`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ name: editName, city: editCity }),
+        body: JSON.stringify(editForm),
       });
-      setOrg((prev) => (prev ? { ...prev, name: editName, city: editCity } : prev));
+      setOrg((prev) => (prev ? { ...prev, ...editForm } : prev));
       setEditing(false);
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "Failed to save changes.");
@@ -286,23 +433,137 @@ export default function SuperAdminOrganisationDetailPage() {
                 <div className="card-b">
                   {editing ? (
                     <form onSubmit={handleEditSubmit}>
-                      <div className="field">
-                        <label>Organisation name</label>
-                        <input
-                          className="inp"
-                          required
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                        />
+                      <div className="row2">
+                        <div className="field">
+                          <label>Organisation name</label>
+                          <input
+                            className="inp"
+                            required
+                            value={editForm.name}
+                            onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>City</label>
+                          <input
+                            className="inp"
+                            required
+                            value={editForm.city}
+                            onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))}
+                          />
+                        </div>
                       </div>
-                      <div className="field">
-                        <label>City</label>
-                        <input
-                          className="inp"
-                          required
-                          value={editCity}
-                          onChange={(e) => setEditCity(e.target.value)}
-                        />
+                      <div className="row2">
+                        <div className="field">
+                          <label>Timezone</label>
+                          <input
+                            className="inp"
+                            value={editForm.timezone}
+                            onChange={(e) => setEditForm((f) => ({ ...f, timezone: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Currency</label>
+                          <input
+                            className="inp"
+                            value={editForm.currency}
+                            onChange={(e) => setEditForm((f) => ({ ...f, currency: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>Default language</label>
+                          <input
+                            className="inp"
+                            value={editForm.defaultLanguage}
+                            onChange={(e) => setEditForm((f) => ({ ...f, defaultLanguage: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Website</label>
+                          <input
+                            className="inp"
+                            placeholder="https://…"
+                            value={editForm.website}
+                            onChange={(e) => setEditForm((f) => ({ ...f, website: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>Address line 1</label>
+                          <input
+                            className="inp"
+                            value={editForm.addressLine1}
+                            onChange={(e) => setEditForm((f) => ({ ...f, addressLine1: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Address line 2</label>
+                          <input
+                            className="inp"
+                            value={editForm.addressLine2}
+                            onChange={(e) => setEditForm((f) => ({ ...f, addressLine2: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>State</label>
+                          <input
+                            className="inp"
+                            value={editForm.state}
+                            onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Postal code</label>
+                          <input
+                            className="inp"
+                            value={editForm.postalCode}
+                            onChange={(e) => setEditForm((f) => ({ ...f, postalCode: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>Country</label>
+                          <input
+                            className="inp"
+                            value={editForm.country}
+                            onChange={(e) => setEditForm((f) => ({ ...f, country: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Brand colour</label>
+                          <input
+                            className="inp mono"
+                            placeholder="#4f46e5"
+                            value={editForm.brandColour}
+                            onChange={(e) => setEditForm((f) => ({ ...f, brandColour: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>Logo URL</label>
+                          <input
+                            className="inp"
+                            placeholder="https://…"
+                            value={editForm.logoUrl}
+                            onChange={(e) => setEditForm((f) => ({ ...f, logoUrl: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Favicon URL</label>
+                          <input
+                            className="inp"
+                            placeholder="https://…"
+                            value={editForm.faviconUrl}
+                            onChange={(e) => setEditForm((f) => ({ ...f, faviconUrl: e.target.value }))}
+                          />
+                        </div>
                       </div>
                       {editError ? <div className="form-alert">{editError}</div> : null}
                       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -348,6 +609,61 @@ export default function SuperAdminOrganisationDetailPage() {
                       </div>
                       <div>
                         <div className="muted" style={{ fontSize: 12 }}>
+                          Timezone
+                        </div>
+                        <b>{org.timezone}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Currency
+                        </div>
+                        <b>{org.currency}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Default language
+                        </div>
+                        <b>{org.defaultLanguage}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Website
+                        </div>
+                        <b>{org.website ?? "—"}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Address
+                        </div>
+                        <b>
+                          {[org.addressLine1, org.addressLine2, org.state, org.postalCode, org.country]
+                            .filter(Boolean)
+                            .join(", ") || "—"}
+                        </b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Brand colour
+                        </div>
+                        {org.brandColour ? (
+                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span
+                              style={{
+                                width: 16,
+                                height: 16,
+                                borderRadius: 4,
+                                background: org.brandColour,
+                                display: "inline-block",
+                              }}
+                            />
+                            <b className="mono">{org.brandColour}</b>
+                          </span>
+                        ) : (
+                          <b>—</b>
+                        )}
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
                           Plan
                         </div>
                         <b>—</b>
@@ -369,46 +685,163 @@ export default function SuperAdminOrganisationDetailPage() {
 
           {tab === "Users & Teams" ? (
             <Reveal delay={2}>
+              {userFormOpen ? (
+                <div className="card" style={{ marginBottom: 18 }}>
+                  <div className="card-h">
+                    <span className="t">Create user</span>
+                  </div>
+                  <div className="card-b">
+                    {userFormError ? <div className="form-alert">{userFormError}</div> : null}
+                    <div className="row2">
+                      <div className="field">
+                        <label>First name</label>
+                        <input
+                          className="inp"
+                          value={userForm.firstName}
+                          onChange={(e) => setUserForm((f) => ({ ...f, firstName: e.target.value }))}
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Last name</label>
+                        <input
+                          className="inp"
+                          value={userForm.lastName}
+                          onChange={(e) => setUserForm((f) => ({ ...f, lastName: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="row2">
+                      <div className="field">
+                        <label>Email</label>
+                        <input
+                          className="inp"
+                          type="email"
+                          value={userForm.email}
+                          onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
+                        />
+                      </div>
+                      <div className="field">
+                        <label>Phone (optional)</label>
+                        <input
+                          className="inp"
+                          value={userForm.phoneNumber}
+                          onChange={(e) => setUserForm((f) => ({ ...f, phoneNumber: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="field" style={{ marginBottom: 0 }}>
+                      <label>Role</label>
+                      <select
+                        value={userForm.role}
+                        onChange={(e) =>
+                          setUserForm((f) => ({ ...f, role: e.target.value as OrgUserAssignableRole }))
+                        }
+                      >
+                        {ROLE_OPTIONS.map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>
+                        Role determines what this person can do. They&apos;ll get access to modules (Leads, Call
+                        Centre, Landing Pages, Reports) once they&apos;re added to a team.
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+                      <button
+                        className="btn btn-primary"
+                        type="button"
+                        disabled={userFormSubmitting}
+                        onClick={() => void submitCreateUser()}
+                      >
+                        {userFormSubmitting ? "Saving…" : "Create user"}
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        type="button"
+                        disabled={userFormSubmitting}
+                        onClick={() => setUserFormOpen(false)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="card">
                 <div className="card-h">
                   <span className="t">Users</span>
-                  <span className="x">
+                  <span className="x" style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     {org.userCount} users · {org.teamCount} teams
+                    {!userFormOpen ? (
+                      <button className="btn btn-primary btn-sm" type="button" onClick={openCreateUser}>
+                        ＋ Create user
+                      </button>
+                    ) : null}
                   </span>
                 </div>
                 <div className="tbl-wrap">
                   <table className="tbl">
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Email</th>
+                        <th>User</th>
                         <th>Role</th>
-                        <th>Teams</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {!users || users.length === 0 ? (
+                      {usersLoading && !users ? (
                         <tr>
-                          <td colSpan={4} className="muted">
+                          <td colSpan={5} className="muted">
+                            Loading…
+                          </td>
+                        </tr>
+                      ) : !users || users.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="muted">
                             No users found.
                           </td>
                         </tr>
                       ) : (
                         users.map((u) => (
-                          <tr key={u.email}>
+                          <tr key={u.id}>
                             <td>
-                              <b>{[u.firstName, u.lastName].filter(Boolean).join(" ") || "—"}</b>
+                              <span className="u">
+                                <span className="av">{initials([u.firstName, u.lastName].filter(Boolean).join(" "))}</span>
+                                <span>
+                                  <span className="nm">{[u.firstName, u.lastName].filter(Boolean).join(" ") || "—"}</span>
+                                  <br />
+                                  <span className="sm">{u.email}</span>
+                                </span>
+                              </span>
                             </td>
-                            <td>{u.email}</td>
-                            <td className="mono">{u.role ?? "—"}</td>
                             <td>
-                              {u.teams.length === 0
-                                ? "—"
-                                : u.teams.map((team) => (
-                                    <span className="chip" key={team}>
-                                      {team}
-                                    </span>
-                                  ))}
+                              {u.role ? (
+                                <span className={`badge ${ROLE_BADGE_CLASS[u.role.key]}`}>{u.role.name}</span>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                            <td>
+                              <span className={`badge ${u.status === "active" ? "b-green" : "b-rose"}`}>
+                                <span className="dot" style={{ background: "currentColor" }} />
+                                {u.status === "active" ? "Active" : "Disabled"}
+                              </span>
+                            </td>
+                            <td>{formatDate(u.createdAt)}</td>
+                            <td>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                type="button"
+                                disabled={userStatusBusyId === u.id}
+                                onClick={() => void toggleUserStatus(u)}
+                              >
+                                {u.status === "active" ? "Deactivate" : "Activate"}
+                              </button>
                             </td>
                           </tr>
                         ))
