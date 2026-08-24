@@ -5,6 +5,8 @@ export const ORG_LIST_STATUS_VALUES = [
   'active',
   'disabled',
   'all',
+  'pending',
+  'draft',
   'trial',
   'suspended',
 ] as const;

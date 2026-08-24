@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Inter, Space_Grotesk } from "next/font/google";
 import { OrgAdminShell } from "@/components/org/shell";
-import "../superadmin/superadmin.css";
+import "../admin-console/superadmin.css";
 
 const inter = Inter({
   subsets: ["latin"],

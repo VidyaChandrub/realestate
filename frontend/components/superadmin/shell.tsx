@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { Icon } from "@/components/icons";
 
 type NavItem = {
   href: string;
@@ -23,62 +24,60 @@ const NAV_GROUPS: NavGroup[] = [
   {
     grp: "Overview",
     items: [
-      { href: "/superadmin", icon: "📊", label: "Dashboard", tip: "Dashboard", activeMatch: ["/superadmin"] },
-      { href: "/superadmin/analytics", icon: "📈", label: "Analytics", tip: "Analytics", activeMatch: ["/superadmin/analytics"] },
+      { href: "/admin-console", icon: "dashboard", label: "Dashboard", tip: "Dashboard", activeMatch: ["/admin-console"] },
+      { href: "/admin-console/analytics", icon: "reports", label: "Analytics", tip: "Analytics", activeMatch: ["/admin-console/analytics"] },
     ],
   },
   {
     grp: "Manage",
     items: [
       {
-        href: "/superadmin/organisations",
-        icon: "🏢",
+        href: "/admin-console/organisations",
+        icon: "building",
         label: "Organisations",
         tip: "Organisations",
         badge: "142",
-        activeMatch: ["/superadmin/organisations", "/superadmin/organisation-detail"],
+        activeMatch: ["/admin-console/organisations", "/admin-console/organisation-detail"],
       },
-      { href: "/superadmin/onboarding", icon: "✨", label: "Onboard Org", tip: "Onboard org", activeMatch: ["/superadmin/onboarding"] },
-      { href: "/superadmin/admins", icon: "👥", label: "Platform Team", tip: "Platform Team", activeMatch: ["/superadmin/admins"] },
+      { href: "/admin-console/admins", icon: "users", label: "Platform Team", tip: "Platform Team", activeMatch: ["/admin-console/admins"] },
     ],
   },
   {
     grp: "Product",
     items: [
       {
-        href: "/superadmin/templates",
-        icon: "🧩",
+        href: "/admin-console/templates",
+        icon: "puzzle",
         label: "Templates",
         tip: "Template Management",
-        activeMatch: ["/superadmin/templates", "/superadmin/template-detail"],
+        activeMatch: ["/admin-console/templates", "/admin-console/template-detail"],
       },
-      { href: "/superadmin/approvals", icon: "✅", label: "Approvals", tip: "Approvals", badge: "6", activeMatch: ["/superadmin/approvals"] },
+      { href: "/admin-console/approvals", icon: "check", label: "Approvals", tip: "Approvals", badge: "6", activeMatch: ["/admin-console/approvals"] },
     ],
   },
   {
     grp: "Billing & System",
     items: [
-      { href: "/superadmin/subscriptions", icon: "💳", label: "Subscriptions", tip: "Subscriptions", activeMatch: ["/superadmin/subscriptions"] },
-      { href: "/superadmin/audit-logs", icon: "🛡️", label: "Audit Logs", tip: "Audit Logs", activeMatch: ["/superadmin/audit-logs"] },
-      { href: "/superadmin/settings", icon: "⚙️", label: "Settings", tip: "Settings", activeMatch: ["/superadmin/settings"] },
+      { href: "/admin-console/subscriptions", icon: "billing", label: "Subscriptions", tip: "Subscriptions", activeMatch: ["/admin-console/subscriptions"] },
+      { href: "/admin-console/audit-logs", icon: "shield", label: "Audit Logs", tip: "Audit Logs", activeMatch: ["/admin-console/audit-logs"] },
+      { href: "/admin-console/settings", icon: "settings", label: "Settings", tip: "Settings", activeMatch: ["/admin-console/settings"] },
     ],
   },
 ];
 
 const CRUMB_MAP: Record<string, string> = {
-  "/superadmin": "Dashboard",
-  "/superadmin/analytics": "Analytics",
-  "/superadmin/organisations": "Organisations",
-  "/superadmin/organisation-detail": "Organisation",
-  "/superadmin/onboarding": "Onboard",
-  "/superadmin/admins": "Platform Team",
-  "/superadmin/templates": "Templates",
-  "/superadmin/template-detail": "Template",
+  "/admin-console": "Dashboard",
+  "/admin-console/analytics": "Analytics",
+  "/admin-console/organisations": "Organisations",
+  "/admin-console/organisation-detail": "Organisation",
+  "/admin-console/admins": "Platform Team",
+  "/admin-console/templates": "Templates",
+  "/admin-console/template-detail": "Template",
   "/prestate": "Builder",
-  "/superadmin/approvals": "Approvals",
-  "/superadmin/subscriptions": "Subscriptions",
-  "/superadmin/audit-logs": "Audit Logs",
-  "/superadmin/settings": "Settings",
+  "/admin-console/approvals": "Approvals",
+  "/admin-console/subscriptions": "Subscriptions",
+  "/admin-console/audit-logs": "Audit Logs",
+  "/admin-console/settings": "Settings",
 };
 
 export function SuperAdminShell({ children }: { children: ReactNode }) {
@@ -95,7 +94,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
       await logout();
     } finally {
       setIsSigningOut(false);
-      router.push("/login");
+      router.push("/admin-login");
       router.refresh();
     }
   }
@@ -151,7 +150,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
                         data-tip={item.tip}
                         className={isActive ? "active" : ""}
                       >
-                        <span className="ic">{item.icon}</span>
+                        <span className="ic"><Icon name={item.icon as any} size={16} /></span>
                         <span className="lbl">{item.label}</span>
                         {item.badge ? <span className="badge-n">{item.badge}</span> : null}
                       </Link>
@@ -195,15 +194,15 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="tb-search">
-            <span className="si">🔎</span>
+            <span className="si"><Icon name="search" size={14} /></span>
             <input placeholder="Search organisations, templates, admins…" />
             <span className="kbd">⌘K</span>
           </div>
           <div className="tb-right">
             <button className="icon-btn">
-              🔔<span className="dot" />
+              <Icon name="bell" size={16} /><span className="dot" />
             </button>
-            <button className="icon-btn">❔</button>
+            <button className="icon-btn"><Icon name="alert" size={16} /></button>
             <div className="tb-avatar">PP</div>
           </div>
         </header>

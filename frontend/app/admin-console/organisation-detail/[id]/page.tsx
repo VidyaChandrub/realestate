@@ -1,0 +1,1163 @@
+"use client";
+
+import { useEffect, useState, type FormEvent } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api";
+import { Reveal } from "@/components/superadmin/reveal";
+import { CountUp } from "@/components/superadmin/count-up";
+import { Icon } from "@/components/icons";
+import type {
+  CreateOrgUserInput,
+  OrganisationActivityRow,
+  OrganisationDetail,
+  OrgUser,
+  OrgUserAssignableRole,
+  OrgUsersListResponse,
+  Plan,
+} from "@/lib/types";
+
+const TABS = ["Overview", "Subscription", "Templates", "Activity"] as const;
+type Tab = (typeof TABS)[number];
+
+const ROLE_OPTIONS: { value: OrgUserAssignableRole; label: string }[] = [
+  { value: "admin", label: "Admin" },
+  { value: "manager", label: "Manager" },
+  { value: "sales", label: "Sales" },
+];
+
+const ROLE_BADGE_CLASS: Record<OrgUserAssignableRole, string> = {
+  admin: "b-indigo",
+  manager: "b-violet",
+  sales: "b-teal",
+};
+
+interface UserFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  role: OrgUserAssignableRole;
+}
+
+const EMPTY_USER_FORM: UserFormData = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phoneNumber: "",
+  role: "sales",
+};
+
+interface EditForm {
+  name: string;
+  city: string;
+  timezone: string;
+  currency: string;
+  defaultLanguage: string;
+  website: string;
+  addressLine1: string;
+  addressLine2: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  logoUrl: string;
+  faviconUrl: string;
+  brandColour: string;
+}
+
+const EMPTY_EDIT_FORM: EditForm = {
+  name: "",
+  city: "",
+  timezone: "",
+  currency: "",
+  defaultLanguage: "",
+  website: "",
+  addressLine1: "",
+  addressLine2: "",
+  state: "",
+  postalCode: "",
+  country: "",
+  logoUrl: "",
+  faviconUrl: "",
+  brandColour: "",
+};
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "—";
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatActionLabel(action: string): string {
+  return action
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+export default function SuperAdminOrganisationDetailPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const { accessToken, isLoading: authLoading } = useAuth();
+
+  const [tab, setTab] = useState<Tab>("Overview");
+  const [org, setOrg] = useState<OrganisationDetail | null>(null);
+  const [users, setUsers] = useState<OrgUser[] | null>(null);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersReloadTick, setUsersReloadTick] = useState(0);
+  const [activity, setActivity] = useState<OrganisationActivityRow[] | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [userFormOpen, setUserFormOpen] = useState(false);
+  const [userForm, setUserForm] = useState<UserFormData>(EMPTY_USER_FORM);
+  const [userFormError, setUserFormError] = useState<string | null>(null);
+  const [userFormSubmitting, setUserFormSubmitting] = useState(false);
+  const [userStatusBusyId, setUserStatusBusyId] = useState<string | null>(null);
+
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT_FORM);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const [statusSubmitting, setStatusSubmitting] = useState(false);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [assignedTemplates, setAssignedTemplates] = useState<any[]>([]);
+  const [allTemplates, setAllTemplates] = useState<any[]>([]);
+  const [upgradePlanId, setUpgradePlanId] = useState<string>("");
+  const [upgradeBillingCycle, setUpgradeBillingCycle] = useState<"monthly" | "yearly">("monthly");
+  const [upgrading, setUpgrading] = useState(false);
+  const [addTemplateOpen, setAddTemplateOpen] = useState(false);
+  const [selectedNewTemplateIds, setSelectedNewTemplateIds] = useState<string[]>([]);
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [previewTpl, setPreviewTpl] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !accessToken) {
+      router.replace("/login");
+    }
+  }, [authLoading, accessToken, router]);
+
+  useEffect(() => {
+    if (!accessToken || !params.id) return;
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setLoading(true);
+    setNotFound(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
+
+    Promise.all([
+      apiFetch<OrganisationDetail>(`/admin/organisations/${params.id}`, { headers }),
+      apiFetch<OrganisationActivityRow[]>(`/admin/organisations/${params.id}/activity`, { headers }),
+    ])
+      .then(([orgRes, activityRes]) => {
+        setOrg(orgRes);
+        setActivity(activityRes);
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+  }, [accessToken, params.id]);
+
+  useEffect(() => {
+    if (!accessToken || !params.id) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setUsersLoading(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    apiFetch<OrgUsersListResponse>(`/admin/organisations/${params.id}/users?limit=100`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((res) => setUsers(res.data))
+      .catch(() => setUsers(null))
+      .finally(() => setUsersLoading(false));
+  }, [accessToken, params.id, usersReloadTick]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    apiFetch<Plan[]>("/admin/plans", { headers: { Authorization: `Bearer ${accessToken}` } }).then(setPlans).catch(()=>{});
+    apiFetch<any[]>("/admin/templates", { headers: { Authorization: `Bearer ${accessToken}` } }).then(d=> setAllTemplates(Array.isArray(d)?d:(d as any).data??[])).catch(()=>{});
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken || !params.id) return;
+    apiFetch<any[]>(`/admin/organisations/${params.id}/templates`, { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then(setAssignedTemplates).catch(()=>setAssignedTemplates([]));
+  }, [accessToken, params.id, tab, org?.assignedTemplates]);
+
+  function openCreateUser() {
+    setUserForm(EMPTY_USER_FORM);
+    setUserFormError(null);
+    setUserFormOpen(true);
+  }
+
+  async function submitCreateUser() {
+    if (!accessToken || !params.id) return;
+    setUserFormSubmitting(true);
+    setUserFormError(null);
+    try {
+      const body: CreateOrgUserInput = {
+        firstName: userForm.firstName,
+        lastName: userForm.lastName,
+        email: userForm.email,
+        phoneNumber: userForm.phoneNumber || undefined,
+        role: userForm.role,
+      };
+      await apiFetch(`/admin/organisations/${params.id}/users`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify(body),
+      });
+      setUserFormOpen(false);
+      setUsersReloadTick((t) => t + 1);
+    } catch (err) {
+      setUserFormError(err instanceof Error ? err.message : "Failed to create user.");
+    } finally {
+      setUserFormSubmitting(false);
+    }
+  }
+
+  async function toggleUserStatus(user: OrgUser) {
+    if (!accessToken || !params.id) return;
+    const nextStatus = user.status === "active" ? "disabled" : "active";
+    setUserStatusBusyId(user.id);
+    try {
+      await apiFetch(`/admin/organisations/${params.id}/users/${user.id}/status`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      setUsersReloadTick((t) => t + 1);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to update user status.");
+    } finally {
+      setUserStatusBusyId(null);
+    }
+  }
+
+  function startEdit() {
+    if (!org) return;
+    setEditForm({
+      name: org.name,
+      city: org.city,
+      timezone: org.timezone,
+      currency: org.currency,
+      defaultLanguage: org.defaultLanguage,
+      website: org.website ?? "",
+      addressLine1: org.addressLine1 ?? "",
+      addressLine2: org.addressLine2 ?? "",
+      state: org.state ?? "",
+      postalCode: org.postalCode ?? "",
+      country: org.country ?? "",
+      logoUrl: org.logoUrl ?? "",
+      faviconUrl: org.faviconUrl ?? "",
+      brandColour: org.brandColour ?? "",
+    });
+    setEditError(null);
+    setEditing(true);
+  }
+
+  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!org || !accessToken) return;
+    setEditError(null);
+    setEditSubmitting(true);
+    try {
+      await apiFetch(`/admin/organisations/${org.id}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify(editForm),
+      });
+      setOrg((prev) => (prev ? { ...prev, ...editForm } : prev));
+      setEditing(false);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Failed to save changes.");
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
+
+  async function confirmToggleStatus() {
+    if (!org || !accessToken) return;
+    const next = org.status === "active" ? "disabled" : "active";
+
+    setStatusSubmitting(true);
+    try {
+      await apiFetch(`/admin/organisations/${org.id}/status`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ status: next }),
+      });
+      setOrg((prev) => (prev ? { ...prev, status: next } : prev));
+      setStatusModalOpen(false);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to update status.");
+    } finally {
+      setStatusSubmitting(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!org || !accessToken) return;
+    setDeleteError(null);
+    setDeleting(true);
+    try {
+      await apiFetch(`/admin/organisations/${org.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      router.push("/admin-console/organisations");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete organisation.");
+      setDeleting(false);
+    }
+  }
+
+  if (authLoading || !accessToken || loading) {
+    return null;
+  }
+
+  if (notFound || !org) {
+    return (
+      <div className="card">
+        <div className="card-b">
+          <p className="muted">Organisation not found.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const adminName = org.admin
+    ? [org.admin.firstName, org.admin.lastName].filter(Boolean).join(" ") || "—"
+    : "—";
+
+  return (
+    <>
+      <div className="page-head reveal in">
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <span className="av" style={{ width: 58, height: 58, borderRadius: 16, fontSize: 20 }}>
+            {initials(org.name)}
+          </span>
+          <div>
+            <h1 style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {org.name}{" "}
+              <span className={`badge ${org.status === "active" ? "b-green" : "b-rose"}`}>
+                <span className="dot" style={{ background: "currentColor" }} />
+                {org.status === "active" ? "Active" : "Disabled"}
+              </span>
+            </h1>
+            <div className="sub" style={{ marginTop: 4 }}>
+              {org.city} · <span className="mono">{org.slug}</span> · onboarded {formatDate(org.createdAt)}
+            </div>
+          </div>
+        </div>
+        <div className="actions">
+          <span className={`badge ${org.status === "active" ? "b-green" : org.status === "pending" ? "b-amber" : "b-rose"}`}>
+            {org.status}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid g4" style={{ marginBottom: 20 }}>
+        <Reveal delay={1}>
+          <div className="stat">
+            <div className="top">
+              <span className="label">Users</span>
+              <span className="ic ic-indigo"><Icon name="profile" size={16} /></span>
+            </div>
+            <div className="value">
+              <CountUp value={org.userCount} />
+            </div>
+            <div className="delta">{org.teamCount} teams</div>
+          </div>
+        </Reveal>
+        <Reveal delay={2}>
+          <div className="stat">
+            <div className="top">
+              <span className="label">Sites</span>
+              <span className="ic ic-sky"><Icon name="document" size={16} /></span>
+            </div>
+            <div className="value">—</div>
+            <div className="delta">—</div>
+          </div>
+        </Reveal>
+        <Reveal delay={3}>
+          <div className="stat">
+            <div className="top">
+              <span className="label">Leads captured</span>
+              <span className="ic ic-green"><Icon name="target" size={16} /></span>
+            </div>
+            <div className="value">—</div>
+            <div className="delta">—</div>
+          </div>
+        </Reveal>
+        <Reveal delay={4}>
+          <div className="stat">
+            <div className="top">
+              <span className="label">Plan value</span>
+              <span className="ic ic-violet"><Icon name="billing" size={16} /></span>
+            </div>
+            <div className="value">—</div>
+            <div className="delta">—</div>
+          </div>
+        </Reveal>
+      </div>
+
+      <div className="tabs reveal in">
+        {TABS.map((t) => (
+          <a key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
+            {t}
+          </a>
+        ))}
+      </div>
+
+      <div className="grid g-2-1">
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {tab === "Overview" ? (
+            <Reveal delay={2}>
+              <div className="card">
+                <div className="card-h">
+                  <span className="t">Organisation details</span>
+                  {!editing ? (
+                    <button className="btn btn-ghost btn-sm" onClick={startEdit}>
+                      Edit
+                    </button>
+                  ) : null}
+                </div>
+                <div className="card-b">
+                  {editing ? (
+                    <form onSubmit={handleEditSubmit}>
+                      <div className="row2">
+                        <div className="field">
+                          <label>Organisation name</label>
+                          <input
+                            className="inp"
+                            required
+                            value={editForm.name}
+                            onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>City</label>
+                          <input
+                            className="inp"
+                            required
+                            value={editForm.city}
+                            onChange={(e) => setEditForm((f) => ({ ...f, city: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>Timezone</label>
+                          <input
+                            className="inp"
+                            value={editForm.timezone}
+                            onChange={(e) => setEditForm((f) => ({ ...f, timezone: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Currency</label>
+                          <input
+                            className="inp"
+                            value={editForm.currency}
+                            onChange={(e) => setEditForm((f) => ({ ...f, currency: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>Default language</label>
+                          <input
+                            className="inp"
+                            value={editForm.defaultLanguage}
+                            onChange={(e) => setEditForm((f) => ({ ...f, defaultLanguage: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Website</label>
+                          <input
+                            className="inp"
+                            placeholder="https://…"
+                            value={editForm.website}
+                            onChange={(e) => setEditForm((f) => ({ ...f, website: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>Address line 1</label>
+                          <input
+                            className="inp"
+                            value={editForm.addressLine1}
+                            onChange={(e) => setEditForm((f) => ({ ...f, addressLine1: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Address line 2</label>
+                          <input
+                            className="inp"
+                            value={editForm.addressLine2}
+                            onChange={(e) => setEditForm((f) => ({ ...f, addressLine2: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>State</label>
+                          <input
+                            className="inp"
+                            value={editForm.state}
+                            onChange={(e) => setEditForm((f) => ({ ...f, state: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Postal code</label>
+                          <input
+                            className="inp"
+                            value={editForm.postalCode}
+                            onChange={(e) => setEditForm((f) => ({ ...f, postalCode: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>Country</label>
+                          <input
+                            className="inp"
+                            value={editForm.country}
+                            onChange={(e) => setEditForm((f) => ({ ...f, country: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Brand colour</label>
+                          <input
+                            className="inp mono"
+                            placeholder="#4f46e5"
+                            value={editForm.brandColour}
+                            onChange={(e) => setEditForm((f) => ({ ...f, brandColour: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="row2">
+                        <div className="field">
+                          <label>Logo URL</label>
+                          <input
+                            className="inp"
+                            placeholder="https://…"
+                            value={editForm.logoUrl}
+                            onChange={(e) => setEditForm((f) => ({ ...f, logoUrl: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Favicon URL</label>
+                          <input
+                            className="inp"
+                            placeholder="https://…"
+                            value={editForm.faviconUrl}
+                            onChange={(e) => setEditForm((f) => ({ ...f, faviconUrl: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      {editError ? <div className="form-alert">{editError}</div> : null}
+                      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setEditing(false)}
+                          disabled={editSubmitting}
+                        >
+                          Cancel
+                        </button>
+                        <button type="submit" className="btn btn-primary btn-sm" disabled={editSubmitting}>
+                          {editSubmitting ? "Saving…" : "Save"}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="grid g2" style={{ gap: 14 }}>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Admin
+                        </div>
+                        <b>{adminName}</b>
+                        <div className="sm muted">{org.admin?.email ?? "—"}</div>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Phone
+                        </div>
+                        <b>{org.admin?.phoneNumber ?? "—"}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          City
+                        </div>
+                        <b>{org.city}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Subdomain root
+                        </div>
+                        <b className="mono">{org.slug}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Timezone
+                        </div>
+                        <b>{org.timezone}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Currency
+                        </div>
+                        <b>{org.currency}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Default language
+                        </div>
+                        <b>{org.defaultLanguage}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Website
+                        </div>
+                        <b>{org.website ?? "—"}</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Address
+                        </div>
+                        <b>
+                          {[org.addressLine1, org.addressLine2, org.state, org.postalCode, org.country]
+                            .filter(Boolean)
+                            .join(", ") || "—"}
+                        </b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Brand colour
+                        </div>
+                        {org.brandColour ? (
+                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span
+                              style={{
+                                width: 16,
+                                height: 16,
+                                borderRadius: 4,
+                                background: org.brandColour,
+                                display: "inline-block",
+                              }}
+                            />
+                            <b className="mono">{org.brandColour}</b>
+                          </span>
+                        ) : (
+                          <b>—</b>
+                        )}
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Plan
+                        </div>
+                        <b>—</b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Status
+                        </div>
+                        <span className={`badge ${org.status === "active" ? "b-green" : "b-rose"}`}>
+                          {org.status === "active" ? "Active" : "Disabled"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Reveal>
+          ) : null}
+
+          {tab === "Subscription" ? (
+            <Reveal delay={2}>
+              <div className="card">
+                <div className="card-h">
+                  <span className="t">Subscription</span>
+                  {org.subscription ? <span className={`badge ${(org.subscription as any).status==="active"?"b-green":"b-amber"}`}>{(org.subscription as any).status}</span> : <span className="badge b-gray">No subscription</span>}
+                </div>
+                <div className="card-b" style={{ display:"grid", gap:16 }}>
+                  {org.subscription ? (
+                    <div style={{ display:"grid", gap:10, padding:14, border:"1px solid var(--line)", borderRadius:12, background:"var(--surface-2)" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                        <span className={`badge ${(org as any).plan?.badge || "b-indigo"}`}>{(org as any).plan?.name ?? (org.subscription as any).plan?.name ?? "—"}</span>
+                        <span className="chip">{(org.subscription as any).billingCycle}</span>
+                        <span className="chip">₹{((org.subscription as any).amount ?? 0).toLocaleString("en-IN")}</span>
+                        {(org.subscription as any).mrr ? <span className="chip">MRR ₹{(org.subscription as any).mrr.toLocaleString("en-IN")}</span> : null}
+                      </div>
+                      <div className="grid g2" style={{ gap:10, fontSize:13 }}>
+                        <div><span className="muted" style={{ fontSize:11 }}>Plan value</span><br/><b>₹{((org as any).planValue ?? (org.subscription as any).amount ?? 0).toLocaleString("en-IN")}</b></div>
+                        <div><span className="muted" style={{ fontSize:11 }}>Renews</span><br/><b>{(org as any).subscriptionRenewsAt || (org.subscription as any).renewsAt ? new Date((org as any).subscriptionRenewsAt || (org.subscription as any).renewsAt).toLocaleDateString("en-GB") : "—"}</b></div>
+                        <div><span className="muted" style={{ fontSize:11 }}>Templates</span><br/><b>{assignedTemplates.length} assigned</b></div>
+                        <div><span className="muted" style={{ fontSize:11 }}>Status</span><br/><b>{(org.subscription as any).status}</b></div>
+                      </div>
+                    </div>
+                  ) : <div className="help">No subscription yet — approvals created one after package selection.</div>}
+
+                  <div>
+                    <div style={{ fontWeight:700, marginBottom:8 }}>Upgrade package</div>
+                    <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:10 }}>
+                      <span style={{ fontSize:12, fontWeight:600 }}>Billing:</span>
+                      <div style={{ display:"flex", gap:4, background:"#eef1f6", borderRadius:999, padding:3 }}>
+                        {(["monthly","yearly"] as const).map(c=>(
+                          <button key={c} type="button" onClick={()=>setUpgradeBillingCycle(c)} style={{ padding:"6px 12px", borderRadius:999, border:"none", background: upgradeBillingCycle===c?"#fff":"transparent", fontWeight:600, fontSize:12, cursor:"pointer", textTransform:"capitalize", boxShadow: upgradeBillingCycle===c?"0 1px 4px rgba(0,0,0,.1)":"none" }}>{c}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid" style={{ gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:10 }}>
+                      {plans.map(p=>{
+                        const isCurrent = (org as any).plan?.id===p.id || (org.subscription as any)?.planId===p.id;
+                        const isSelected = upgradePlanId===p.id;
+                        const price = upgradeBillingCycle==="monthly"? p.priceMonthly : p.priceYearly;
+                        return (
+                          <div key={p.id} onClick={()=> setUpgradePlanId(p.id)} style={{ border:"2px solid", borderColor: isSelected? "var(--brand)": isCurrent? "var(--green)":"var(--line)", borderRadius:14, padding:12, cursor:"pointer", background: isSelected? "var(--brand-050)" : "#fff" }}>
+                            <div className={`badge ${p.badge}`}>{p.name}</div>
+                            <div style={{ fontWeight:800, marginTop:6 }}>₹{price.toLocaleString("en-IN")}<span style={{ fontSize:11, color:"var(--muted)"}}>{upgradeBillingCycle==="monthly"?"/mo":"/yr"}</span></div>
+                            <div style={{ fontSize:11, color:"var(--muted)"}}>{(p.limits as any)?.templates} templates · {p.limits?.projects} projects</div>
+                            <div style={{ fontSize:11, fontWeight:700, color: isCurrent? "var(--green)": isSelected? "var(--brand)":"var(--muted)", marginTop:6 }}>{isCurrent?"Current": isSelected?"Selected":"Select"}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ marginTop:12, display:"flex", gap:10 }}>
+                      <button className="btn btn-primary btn-sm" disabled={upgrading || !upgradePlanId} onClick={async()=>{
+                        if(!upgradePlanId) return;
+                        setUpgrading(true);
+                        try{
+                          if(org.subscription){
+                            await apiFetch(`/admin/subscriptions/${(org.subscription as any).id}`, { method:"PATCH", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ planId: upgradePlanId, billingCycle: upgradeBillingCycle }) });
+                          } else {
+                            await apiFetch(`/admin/subscriptions`, { method:"POST", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ orgId: org.id, planId: upgradePlanId, billingCycle: upgradeBillingCycle }) });
+                          }
+                          const fresh = await apiFetch<OrganisationDetail>(`/admin/organisations/${org.id}`, { headers:{ Authorization:`Bearer ${accessToken}` }});
+                          setOrg(fresh);
+                          setUpgradePlanId("");
+                          window.alert("Subscription upgraded");
+                        } catch(e:any){ window.alert(e.message||"Upgrade failed"); }
+                        finally{ setUpgrading(false); }
+                      }}>
+                        {upgrading?"Upgrading…":"Upgrade subscription"}
+                      </button>
+                      <span className="muted" style={{ fontSize:12, alignSelf:"center"}}>Upgrade increases template limit — then add more in Templates tab.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          ) : null}
+
+          {tab === "Templates" ? (
+            <Reveal delay={2}>
+              <div className="card">
+                <div className="card-h">
+                  <span className="t">Assigned templates</span>
+                  <span className="chip">{assignedTemplates.length} selected</span>
+                  <button className="btn btn-primary btn-sm" onClick={()=> setAddTemplateOpen(true)}>+ Add template</button>
+                </div>
+                <div className="card-b">
+                  {assignedTemplates.length===0 ? <p className="muted">No templates assigned — add from available templates (limit depends on package).</p> : (
+                    <div className="grid" style={{ gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12 }}>
+                      {assignedTemplates.map((at:any)=>(
+                        <div key={at.templateId} style={{ border:"1px solid var(--line)", borderRadius:12, overflow:"hidden"}}>
+                          <div style={{ height:100, background: at.template.thumbnail? `url(${at.template.thumbnail}) center/cover`:"#eef1f6", position:"relative"}}>
+                            <button type="button" onClick={()=> setPreviewTpl(at.template)} className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 shadow" title="Preview"><Icon name="eye" size={14}/></button>
+                          </div>
+                          <div style={{ padding:10}}>
+                            <div style={{ fontWeight:700, fontSize:12}}>{at.template.name}</div>
+                            <div style={{ fontSize:11, color:"var(--muted)"}}>{at.template.slug}</div>
+                            <button className="btn btn-ghost btn-sm" style={{ marginTop:6, color:"var(--rose)" }} onClick={async()=>{
+                              const nextIds = assignedTemplates.filter(x=>x.templateId!==at.templateId).map(x=>x.templateId);
+                              setTemplateSaving(true);
+                              try{
+                                await apiFetch(`/admin/organisations/${org.id}/templates`, { method:"PUT", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ templateIds: nextIds })});
+                                setAssignedTemplates(prev=> prev.filter(x=>x.templateId!==at.templateId));
+                              } catch(e:any){ window.alert(e.message||"Failed"); }
+                              finally{ setTemplateSaving(false); }
+                            }} disabled={templateSaving}>Remove</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="muted" style={{ fontSize:12, marginTop:10}}>Starter allows 1 template, Pro 2, Pro Max All — upgrade subscription to increase limit, then add more here.</p>
+                </div>
+              </div>
+
+              {addTemplateOpen ? (
+                <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:400, padding:20}} onClick={()=>setAddTemplateOpen(false)}>
+                  <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:16, padding:16, width:720, maxWidth:"100%", maxHeight:"85vh", overflow:"auto"}}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10}}>
+                      <b>Add templates</b>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>setAddTemplateOpen(false)}>✕</button>
+                    </div>
+                    <div style={{ fontSize:12, color:"var(--muted)", marginBottom:10}}>
+                      Current plan allows {(()=>{
+                        const plan = plans.find(p=> p.id===((org as any).plan?.id || (org.subscription as any)?.planId));
+                        const raw=(plan?.limits as any)?.templates;
+                        if(!raw || raw==="All") return "All";
+                        return raw;
+                      })()} templates — {assignedTemplates.length} already assigned.
+                    </div>
+                    <div className="grid" style={{ gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:10, maxHeight:360, overflow:"auto"}}>
+                      {allTemplates.filter((t:any)=> !assignedTemplates.some((a:any)=>a.templateId===t.id)).map((tpl:any)=> {
+                        const sel = selectedNewTemplateIds.includes(tpl.id);
+                        const plan = plans.find(p=> p.id===((org as any).plan?.id || (org.subscription as any)?.planId));
+                        const raw=(plan?.limits as any)?.templates;
+                        const max = !raw || raw==="All"||raw==="Unlimited" ? Infinity : parseInt(String(raw),10);
+                        const dis = !sel && (assignedTemplates.length + selectedNewTemplateIds.length) >= max;
+                        return (
+                          <div key={tpl.id} onClick={()=> !dis && setSelectedNewTemplateIds(prev=> sel? prev.filter(x=>x!==tpl.id): [...prev, tpl.id])} style={{ border:"1px solid", borderColor: sel?"var(--brand)":"var(--line)", borderRadius:12, overflow:"hidden", cursor: dis?"not-allowed":"pointer", opacity: dis?0.5:1}}>
+                            <div style={{ height:90, background: tpl.thumbnail? `url(${tpl.thumbnail}) center/cover`:"#eef1f6", position:"relative"}}>
+                              <span className={`m-1 inline-block rounded-full px-2 py-1 text-[10px] font-bold text-white ${sel?"bg-indigo-600":"bg-black/60"}`}>{sel?"✓":"Select"}</span>
+                              <button type="button" onClick={(e)=>{ e.stopPropagation(); setPreviewTpl(tpl); }} className="absolute right-1 top-1 rounded-full bg-white/90 p-1"><Icon name="eye" size={12}/></button>
+                            </div>
+                            <div style={{ padding:8}}>
+                              <div style={{ fontWeight:700, fontSize:12}}>{tpl.name}</div>
+                              <div style={{ fontSize:11, color:"var(--muted)"}}>{tpl.slug}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display:"flex", justifyContent:"flex-end", gap:10, marginTop:12}}>
+                      <button className="btn btn-ghost btn-sm" onClick={()=>{ setSelectedNewTemplateIds([]); setAddTemplateOpen(false); }}>Cancel</button>
+                      <button className="btn btn-primary btn-sm" disabled={templateSaving || selectedNewTemplateIds.length===0} onClick={async()=>{
+                        setTemplateSaving(true);
+                        try{
+                          const nextIds = [...assignedTemplates.map((a:any)=>a.templateId), ...selectedNewTemplateIds];
+                          await apiFetch(`/admin/organisations/${org.id}/templates`, { method:"PUT", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ templateIds: nextIds })});
+                          setAssignedTemplates(prev=> [...prev, ...selectedNewTemplateIds.map(id=> {
+                            const t=allTemplates.find((x:any)=>x.id===id);
+                            return { templateId:id, template:{ id: t.id, name:t.name, slug:t.slug, thumbnail:t.thumbnail, category:t.category }};
+                          })]);
+                          setSelectedNewTemplateIds([]); setAddTemplateOpen(false);
+                        } catch(e:any){ window.alert(e.message||"Failed to add"); }
+                        finally{ setTemplateSaving(false); }
+                      }}>
+                        {templateSaving?"Saving…":`Add ${selectedNewTemplateIds.length} template(s)`}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {previewTpl ? (
+                <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:500, padding:20}} onClick={()=>setPreviewTpl(null)}>
+                  <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:16, overflow:"hidden", width:720, maxWidth:"100%"}}>
+                    <div style={{ height:260, background: previewTpl.thumbnail? `url(${previewTpl.thumbnail}) center/cover`: "#eef1f6", position:"relative"}}>
+                      <button onClick={()=>setPreviewTpl(null)} className="absolute right-3 top-3 rounded-full bg-black/60 p-2 text-white"><Icon name="close" size={14}/></button>
+                    </div>
+                    <div style={{ padding:16}}>
+                      <b>{previewTpl.name}</b><div className="muted" style={{ fontSize:12}}>{previewTpl.slug} · {previewTpl.category}</div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </Reveal>
+          ) : null}
+
+          {tab === "Activity" ? (
+            <Reveal delay={2}>
+              <div className="card">
+                <div className="card-h">
+                  <span className="t">All activity</span>
+                </div>
+                <div className="card-b">
+                  {!activity || activity.length === 0 ? (
+                    <p className="muted">No activity yet.</p>
+                  ) : (
+                    <ul className="timeline">
+                      {activity.map((entry) => (
+                        <li key={entry.id}>
+                          <span className="td" />
+                          <b style={{ fontSize: 13 }}>{formatActionLabel(entry.action)}</b>
+                          <div className="tt">
+                            {entry.entity ?? "—"} · {formatDateTime(entry.createdAt)}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </Reveal>
+          ) : null}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <Reveal delay={2}>
+            <div className="card">
+              <div className="card-h">
+                <span className="t">Activity</span>
+              </div>
+              <div className="card-b">
+                {!activity || activity.length === 0 ? (
+                  <p className="muted">No activity yet.</p>
+                ) : (
+                  <ul className="timeline">
+                    {activity.slice(0, 5).map((entry) => (
+                      <li key={entry.id}>
+                        <span className="td" />
+                        <b style={{ fontSize: 13 }}>{formatActionLabel(entry.action)}</b>
+                        <div className="tt">
+                          {entry.entity ?? "—"} · {formatDateTime(entry.createdAt)}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </Reveal>
+          <Reveal delay={3}>
+            <div className="card">
+              <div className="card-h">
+                <span className="t">Danger zone</span>
+              </div>
+              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <button
+                  className="btn btn-ghost btn-block"
+                  onClick={() => setStatusModalOpen(true)}
+                  disabled={statusSubmitting}
+                >
+                  {org.status === "active" ? "<Icon name="close" size={14} /> Suspend organisation" : "<Icon name="chevron-right" size={14} /> Reactivate organisation"}
+                </button>
+                <button
+                  className="btn btn-ghost btn-block"
+                  style={{ color: "var(--rose)", borderColor: "var(--rose-050)" }}
+                  onClick={() => setDeleteModalOpen(true)}
+                >
+                  <Icon name="trash" size={14} /> Delete organisation
+                </button>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </div>
+
+      {statusModalOpen ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 400,
+            padding: 20,
+          }}
+          onClick={() => {
+            if (!statusSubmitting) setStatusModalOpen(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              padding: 32,
+              width: 440,
+              maxWidth: "100%",
+              boxShadow: "0 24px 80px rgba(15,23,42,.2)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+              <span
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  background: "var(--amber-050)",
+                  color: "var(--amber)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  fontSize: 18,
+                }}
+              >
+                {org.status === "active" ? "<Icon name="close" size={14} />" : "<Icon name="chevron-right" size={14} />"}
+              </span>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>
+                {org.status === "active" ? "Suspend organisation?" : "Reactivate organisation?"}
+              </h2>
+            </div>
+            <p style={{ margin: "0 0 6px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
+              {org.status === "active" ? (
+                <>
+                  <strong>&quot;{org.name}&quot;</strong> will be marked disabled. No data is deleted — you
+                  can reactivate any time.
+                </>
+              ) : (
+                <>
+                  <strong>&quot;{org.name}&quot;</strong> will be marked active again.
+                </>
+              )}
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                marginTop: 24,
+                paddingTop: 20,
+                borderTop: "1px solid var(--line)",
+              }}
+            >
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => setStatusModalOpen(false)}
+                disabled={statusSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={() => void confirmToggleStatus()}
+                disabled={statusSubmitting}
+              >
+                {statusSubmitting
+                  ? "Saving…"
+                  : org.status === "active"
+                    ? "Suspend organisation"
+                    : "Reactivate organisation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteModalOpen ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 400,
+            padding: 20,
+          }}
+          onClick={() => {
+            if (!deleting) setDeleteModalOpen(false);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              padding: 32,
+              width: 440,
+              maxWidth: "100%",
+              boxShadow: "0 24px 80px rgba(15,23,42,.2)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+              <span
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  background: "var(--rose-050)",
+                  color: "var(--rose)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  fontSize: 18,
+                }}
+              >
+                <Icon name="trash" size={14} />
+              </span>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>
+                Delete organisation?
+              </h2>
+            </div>
+            <p style={{ margin: "0 0 6px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
+              <strong>&quot;{org.name}&quot;</strong> and its {org.userCount} user
+              {org.userCount === 1 ? "" : "s"} will be permanently deleted.
+            </p>
+            <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>This action cannot be undone.</p>
+
+            {deleteError ? (
+              <div
+                style={{
+                  color: "var(--rose)",
+                  fontSize: 13,
+                  marginTop: 12,
+                  background: "var(--rose-050)",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                }}
+              >
+                {deleteError}
+              </div>
+            ) : null}
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                marginTop: 24,
+                paddingTop: 20,
+                borderTop: "1px solid var(--line)",
+              }}
+            >
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-danger" type="button" onClick={() => void handleDelete()} disabled={deleting}>
+                {deleting ? "Deleting…" : "Delete organisation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}

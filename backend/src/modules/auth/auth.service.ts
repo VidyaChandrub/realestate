@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -41,6 +43,29 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
+    // Validate plan + template selection if provided at registration
+    let plan: any = null;
+    if (dto.planId) {
+      plan = await this.prisma.plan.findUnique({ where: { id: dto.planId } });
+      if (!plan || !plan.isActive) throw new NotFoundException('Plan not found');
+      const templateIds = dto.templateIds ?? [];
+      if (templateIds.length > 0) {
+        const templates = await this.prisma.template.findMany({ where: { id: { in: templateIds } } });
+        if (templates.length !== templateIds.length) throw new BadRequestException('One or more templates not found');
+        const limits = plan.limits as any;
+        const rawLimit = limits?.templates;
+        if (rawLimit && rawLimit !== 'All' && rawLimit !== 'Unlimited') {
+          const max = parseInt(String(rawLimit), 10);
+          if (!Number.isNaN(max) && templateIds.length > max) {
+            throw new BadRequestException(`Plan "${plan.name}" allows max ${max} template(s), got ${templateIds.length}`);
+          }
+        }
+      }
+    } else if (dto.templateIds && dto.templateIds.length > 0) {
+      const templates = await this.prisma.template.findMany({ where: { id: { in: dto.templateIds } } });
+      if (templates.length !== dto.templateIds.length) throw new BadRequestException('One or more templates not found');
+    }
+
     const slug = await generateUniqueOrgSlug(this.prisma, dto.company_name);
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
     const adminRole = await this.prisma.role.findUniqueOrThrow({
@@ -50,7 +75,7 @@ export class AuthService {
     const { user, organisation } = await this.prisma.$transaction(
       async (tx) => {
         const organisation = await tx.organisation.create({
-          data: { name: dto.company_name, slug, city: dto.city },
+          data: { name: dto.company_name, slug, city: dto.city, status: 'pending' },
         });
 
         const user = await tx.user.create({
@@ -69,16 +94,56 @@ export class AuthService {
           data: { userId: user.id, roleId: adminRole.id },
         });
 
+        // Create subscription if plan selected at registration
+        if (dto.planId && plan) {
+          const billingCycle = dto.billingCycle ?? 'monthly';
+          const isYearly = billingCycle === 'yearly';
+          const amount = isYearly ? plan.priceYearly : plan.priceMonthly;
+          const mrr = isYearly ? Math.round(amount / 12) : amount;
+          const renewsAt = isYearly
+            ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          await tx.subscription.create({
+            data: {
+              orgId: organisation.id,
+              planId: plan.id,
+              billingCycle: billingCycle as any,
+              status: 'active',
+              amount,
+              mrr,
+              currency: 'INR',
+              renewsAt,
+            },
+          });
+        }
+
+        if (dto.templateIds && dto.templateIds.length > 0) {
+          await tx.organisationTemplate.createMany({
+            data: dto.templateIds.map((tid) => ({ orgId: organisation.id, templateId: tid, assignedBy: user.id })),
+          });
+        }
+
+        await tx.auditLog.create({
+          data: {
+            orgId: organisation.id,
+            actorId: user.id,
+            action: 'org_registered_pending',
+            entity: 'Organisation',
+            entityId: organisation.id,
+            metadata: { planId: dto.planId ?? null, templateIds: dto.templateIds ?? [], billingCycle: dto.billingCycle ?? null } as any,
+          },
+        });
+
         return { user, organisation };
       },
     );
 
-    const tokens = await this.issueTokens(user.id, organisation.id, ['admin']);
-
+    // Do NOT issue tokens — organisation is pending approval, user cannot log in yet
     return {
       organisation: toSafeOrganisation(organisation),
       user: toSafeUser(user),
-      ...tokens,
+      pending: true,
+      message: 'Organisation created — pending super admin approval. You will be able to log in after approval.',
     };
   }
 
@@ -98,6 +163,20 @@ export class AuthService {
     );
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Org approval check — pending organisations cannot log in until super admin approves
+    if (user.orgId) {
+      const org = await this.prisma.organisation.findUnique({ where: { id: user.orgId } });
+      if (org && org.status === 'pending') {
+        throw new UnauthorizedException('Organisation pending approval — please wait for super admin approval');
+      }
+      if (org && org.status === 'disabled') {
+        throw new UnauthorizedException('Organisation is disabled');
+      }
+      if (org && org.status === 'draft') {
+        throw new UnauthorizedException('Organisation not yet activated');
+      }
     }
 
     const roles = user.userRoles.map((userRole) => userRole.role.key);

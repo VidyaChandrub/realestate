@@ -109,7 +109,7 @@ export function PrestateStudio() {
           return;
         }
       }
-      if (!cancelled) window.location.replace("/superadmin/templates");
+      if (!cancelled) window.location.replace("/admin-console/templates");
     })();
 
     return () => {
@@ -390,7 +390,7 @@ export function PrestateStudio() {
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         {/* Workspace rail */}
         <nav className="ps-rail" data-open={navOpen ? "true" : "false"}>
-          <Link href="/superadmin/templates" title="Templates" className="ps-rail-btn">
+          <Link href="/admin-console/templates" title="Templates" className="ps-rail-btn">
             <LayoutTemplate size={19} />
             <span className="ps-rail-label">Templates</span>
           </Link>

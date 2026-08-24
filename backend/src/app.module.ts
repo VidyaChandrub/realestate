@@ -9,6 +9,8 @@ import { OrgSettingsModule } from './modules/org-settings/org-settings.module';
 import { OrgUsersModule } from './modules/org-users/org-users.module';
 import { AdminTemplatesModule } from './modules/admin-templates/admin-templates.module';
 import { OrgTemplatesModule } from './modules/org-templates/org-templates.module';
+import { PlansModule } from './modules/plans/plans.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { OrgTemplatesModule } from './modules/org-templates/org-templates.module
     OrgUsersModule,
     AdminTemplatesModule,
     OrgTemplatesModule,
+    PlansModule,
+    SubscriptionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

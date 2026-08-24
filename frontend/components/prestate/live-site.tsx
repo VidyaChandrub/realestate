@@ -63,7 +63,7 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
           <p style={{ color: "#8b92a5", lineHeight: 1.6, margin: "0 0 18px" }}>
             No landing page is mapped to this local preview{host ? ` or domain (${host})` : slug ? ` /${slug}` : ""}. Assign a domain from Pages or Domains in the builder.
           </p>
-          <Link href="/superadmin/templates" style={{ color: "#7a6bff", fontWeight: 700 }}>Open Templates</Link>
+          <Link href="/admin-console/templates" style={{ color: "#7a6bff", fontWeight: 700 }}>Open Templates</Link>
         </div>
       </div>
     );

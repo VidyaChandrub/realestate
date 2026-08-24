@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -107,5 +108,40 @@ export class AdminOrganisationsController {
     @Body() dto: ActivateOrganisationDto,
   ) {
     return this.adminOrganisationsService.activate(orgId, actor, dto);
+  }
+
+  @Get(':id/templates')
+  getTemplates(@Param('id') id: string) {
+    return this.adminOrganisationsService.getOrgTemplates(id);
+  }
+
+  @Put(':id/templates')
+  @HttpCode(200)
+  setTemplates(
+    @Param('id') id: string,
+    @CurrentUser() actor: JwtPayload,
+    @Body() dto: { templateIds: string[] },
+  ) {
+    return this.adminOrganisationsService.setOrgTemplates(id, actor, dto.templateIds);
+  }
+
+  @Post(':id/approve')
+  @HttpCode(200)
+  approve(
+    @Param('id') id: string,
+    @CurrentUser() actor: JwtPayload,
+    @Body() dto: { planId?: string; billingCycle?: 'monthly' | 'yearly'; templateIds?: string[] },
+  ) {
+    return this.adminOrganisationsService.approvePending(id, actor, dto);
+  }
+
+  @Post(':id/reject')
+  @HttpCode(200)
+  reject(
+    @Param('id') id: string,
+    @CurrentUser() actor: JwtPayload,
+    @Body() dto: { reason?: string },
+  ) {
+    return this.adminOrganisationsService.rejectPending(id, actor, dto?.reason);
   }
 }

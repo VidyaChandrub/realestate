@@ -9,8 +9,8 @@ import type { LandingPageData } from "@/lib/prestate/types";
 
 /* ------------------------------------------------------------------ *
  * Shared, reusable Template Management primitives.
- * Both the listing (/superadmin/templates) and the manage screen
- * (/superadmin/template-detail/[id]) render from these so every
+ * Both the listing (/admin-console/templates) and the manage screen
+ * (/admin-console/template-detail/[id]) render from these so every
  * template follows one identical, standardized structure.
  * ------------------------------------------------------------------ */
 
@@ -175,5 +175,5 @@ export function TemplateCover({
 
 /** Path to the manage screen for a given template page. */
 export function manageHref(pageId: string): string {
-  return `/superadmin/template-detail/${encodeURIComponent(pageId)}`;
+  return `/admin-console/template-detail/${encodeURIComponent(pageId)}`;
 }

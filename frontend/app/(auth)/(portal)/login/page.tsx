@@ -119,43 +119,19 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      <div className="mt-5 rounded-xl border border-dashed border-slate-300 p-4 dark:border-slate-700">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Demo accounts
-        </p>
-        <p className="mt-1 text-xs text-slate-400">
-          Click to fill the form — you still need a real account to sign in. Each role sees a
-          different menu once signed in.
-        </p>
-        <div className="mt-3 space-y-2">
-          {MOCK_ACCOUNTS.map((account) => (
-            <button
-              key={account.email}
-              type="button"
-              onClick={() => fillDemo(account.email, account.password)}
-              className="flex w-full items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-left transition-colors hover:bg-slate-100 dark:bg-slate-800/50 dark:hover:bg-slate-800"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
-                  {account.email}
-                </p>
-                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {account.label} · {account.description}
-                </p>
-              </div>
-              <span className="shrink-0 rounded-md bg-white px-2 py-0.5 text-[11px] font-medium text-slate-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:ring-slate-700">
-                password: {account.password}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
 
       <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
         New here?{" "}
         <Link href="/register" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
           Create an organisation
         </Link>
+      </p>
+      <p className="mt-3 text-center text-xs text-slate-400">
+        Super Admin?{" "}
+        <Link href="/admin-login" className="font-mono font-bold text-slate-700 hover:underline">
+          Sign in at /admin-login
+        </Link>{" "}
+        — different URL from organisation login.
       </p>
     </div>
   );

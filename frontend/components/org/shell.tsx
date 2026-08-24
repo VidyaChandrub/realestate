@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { dashboardPathFor } from "@/lib/mock/sessions";
+import { Icon } from "@/components/icons";
 
 type NavItem = {
   href: string;
@@ -23,46 +24,46 @@ type NavGroup = {
 const NAV_GROUPS: NavGroup[] = [
   {
     grp: "Overview",
-    items: [{ href: "/org", icon: "📊", label: "Dashboard", tip: "Dashboard" }],
+    items: [{ href: "/org", icon: "dashboard", label: "Dashboard", tip: "Dashboard" }],
   },
   {
     grp: "Sales",
     items: [
-      { href: "/org/leads", icon: "📇", label: "Lead Center", tip: "Lead Center" },
-      { href: "/org/projects", icon: "🏗️", label: "Projects", tip: "Projects" },
+      { href: "/org/leads", icon: "target", label: "Lead Center", tip: "Lead Center" },
+      { href: "/org/projects", icon: "building", label: "Projects", tip: "Projects" },
     ],
   },
   {
     grp: "Communication",
     items: [
-      { href: "/org/calling", icon: "📞", label: "Calling", tip: "Calling" },
-      { href: "/org/whatsapp", icon: "💬", label: "WhatsApp", tip: "WhatsApp" },
+      { href: "/org/calling", icon: "phone", label: "Calling", tip: "Calling" },
+      { href: "/org/whatsapp", icon: "mail", label: "WhatsApp", tip: "WhatsApp" },
     ],
   },
   {
     grp: "Website",
     items: [
-      { href: "/org/websites", icon: "🌐", label: "Websites", tip: "Websites" },
-      { href: "/org/landing-pages", icon: "📄", label: "Landing Pages", tip: "Landing Pages" },
-      { href: "/org/templates", icon: "🧩", label: "Templates", tip: "Templates" },
-      { href: "/org/integrations", icon: "🔌", label: "Integrations", tip: "Integrations" },
+      { href: "/org/websites", icon: "globe", label: "Websites", tip: "Websites" },
+      { href: "/org/landing-pages", icon: "document", label: "Landing Pages", tip: "Landing Pages" },
+      { href: "/org/templates", icon: "puzzle", label: "Templates", tip: "Templates" },
+      { href: "/org/integrations", icon: "link", label: "Integrations", tip: "Integrations" },
     ],
   },
   {
     grp: "Team",
     items: [
-      { href: "/org/sales-agents", icon: "🧑‍💼", label: "Sales Agents", tip: "Sales Agents" },
-      { href: "/org/teams", icon: "👥", label: "Teams", tip: "Teams" },
-      { href: "/org/users", icon: "👤", label: "Users", tip: "Users" },
-      { href: "/org/roles-permissions", icon: "🔐", label: "Roles & Permissions", tip: "Roles & Permissions" },
+      { href: "/org/sales-agents", icon: "users", label: "Sales Agents", tip: "Sales Agents" },
+      { href: "/org/teams", icon: "users", label: "Teams", tip: "Teams" },
+      { href: "/org/users", icon: "profile", label: "Users", tip: "Users" },
+      { href: "/org/roles-permissions", icon: "lock", label: "Roles & Permissions", tip: "Roles & Permissions" },
     ],
   },
   {
     grp: "More",
     items: [
-      { href: "/org/publish-approvals", icon: "🚀", label: "Publish & Approvals", tip: "Publish & Approvals" },
-      { href: "/org/settings", icon: "⚙️", label: "Settings", tip: "Settings" },
-      { href: "/org/support", icon: "🛟", label: "Support", tip: "Support" },
+      { href: "/org/publish-approvals", icon: "sparkles", label: "Publish & Approvals", tip: "Publish & Approvals" },
+      { href: "/org/settings", icon: "settings", label: "Settings", tip: "Settings" },
+      { href: "/org/support", icon: "flag", label: "Support", tip: "Support" },
     ],
   },
 ];
@@ -223,15 +224,15 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="tb-search">
-            <span className="si">🔎</span>
+            <span className="si"><Icon name="search" size={14} /></span>
             <input placeholder="Search leads, pages, agents…" />
             <span className="kbd">⌘K</span>
           </div>
           <div className="tb-right">
             <button className="icon-btn">
-              🔔<span className="dot" />
+              <Icon name="bell" size={14} /><span className="dot" />
             </button>
-            <button className="icon-btn">❔</button>
+            <button className="icon-btn"><Icon name="alert" size={14} /></button>
             <div className="tb-avatar">{avatarInitials}</div>
           </div>
         </header>

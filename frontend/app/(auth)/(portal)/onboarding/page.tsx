@@ -44,7 +44,7 @@ export default function OnboardingPage() {
   function next() {
     if (isLast) {
       completeOnboarding();
-      router.push("/superadmin");
+      router.push("/admin-console");
       router.refresh();
       return;
     }
@@ -224,7 +224,7 @@ export default function OnboardingPage() {
                   )}
                 >
                   <div className={cn("flex h-20 items-center justify-center bg-gradient-to-br text-2xl", template.accent)}>
-                    🏠
+                    <Icon name="home" size={14} />
                   </div>
                   <div className="flex items-center justify-between p-3">
                     <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
