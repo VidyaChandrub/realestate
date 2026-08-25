@@ -1,6 +1,6 @@
 import type { LandingPageData, SectionInstance, SiteConfig } from "./types";
 import { PAGES } from "./data";
-import { buildTemplateSections, buildThankYouSections, inferDesignId } from "./page-templates";
+import { BLANK_TEMPLATE, buildTemplateSections, buildThankYouSections, inferDesignId } from "./page-templates";
 import { ensureConfig } from "./site-config";
 import { apiFetch } from "../api";
 
@@ -129,6 +129,12 @@ export function savePage(pages: LandingPageData[], updated: LandingPageData) {
 // ---------------------------------------------------------------------------
 
 const TEMPLATES_PATH = "/admin/templates";
+const LANDING_PAGES_PATH = "/org/landing-pages";
+
+// Which REST resource the builder is editing. Defaults to "template"
+// everywhere so every existing admin-console caller is unaffected — only
+// the org builder (`resource="landing-page"`) opts into the org-scoped path.
+export type Resource = "template" | "landing-page";
 
 // Raw shape returned by the backend — same field names/casing as
 // LandingPageData except sections/config are only present when content was
@@ -197,6 +203,66 @@ function toContentBody(page: Pick<LandingPageData, "sections" | "config">) {
   return { sections: page.sections, config: page.config ?? {} };
 }
 
+// Raw shape returned by /org/landing-pages — an org's own copy, not a
+// Template row. Deliberately has no domain/isPaid/kind: those are
+// Template-only concepts that don't exist on LandingPage.
+interface ApiLandingPage {
+  id: string;
+  name: string;
+  slug: string;
+  status: "draft" | "pending_approval" | "approved" | "rejected" | "published" | "unpublished";
+  thumbnail: string | null;
+  pageType: "landing" | "thank_you";
+  parentId: string | null;
+  sourceTemplateId: string | null;
+  sourceTemplate?: { id: string; name: string } | null;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  content?: { sections: SectionInstance[]; config: SiteConfig };
+}
+
+// Maps a LandingPage row onto the same LandingPageData shape the builder
+// already knows how to render — so BuilderWorkspace/Canvas/the widget
+// modules need no changes to serve either resource.
+function fromApiLandingPage(raw: ApiLandingPage): LandingPageData {
+  return {
+    id: raw.id,
+    name: raw.name,
+    slug: raw.slug,
+    // LandingPageStatus has values (pending_approval/approved/rejected) that
+    // LandingPageData's status union doesn't include. The builder only ever
+    // compares this against "published" (see TopNav), which still resolves
+    // correctly for every other value — so this cast doesn't lie, it just
+    // widens past a union that predates approval statuses.
+    status: raw.status as LandingPageData["status"],
+    // A from-scratch page (no sourceTemplate) has genuinely empty sections
+    // in storage — BuilderWorkspace's seedSections() re-derives starter
+    // content from `template` whenever sections is empty, and only
+    // buildTemplateSections("tpl-blank"/"...scratch"/"blank") short-circuits
+    // to []. Any other fallback (e.g. the previous "Custom") falls through
+    // to the default design's real starter content instead of staying blank.
+    template: raw.sourceTemplate?.name ?? BLANK_TEMPLATE.name,
+    domain: "",
+    views: "—",
+    conversions: "—",
+    updated: formatRelativeTime(raw.updatedAt),
+    updatedAt: raw.updatedAt,
+    thumbnail: raw.thumbnail ?? "",
+    sections: raw.content?.sections ?? [],
+    config: raw.content?.config,
+    kind: "custom",
+    designId: inferDesignId(raw.sourceTemplate?.name ?? BLANK_TEMPLATE.name),
+    pageType: raw.pageType === "thank_you" ? "thank-you" : "landing",
+    parentPageId: raw.parentId ?? undefined,
+    isPaid: false,
+    category: null,
+  };
+}
+
 /** List persisted templates. Includes content by default so
  *  buildTemplateRows()'s existing brand/font reads on custom rows keep
  *  working unchanged — pass includeContent: false for lightweight reads
@@ -205,8 +271,18 @@ function toContentBody(page: Pick<LandingPageData, "sections" | "config">) {
  *  through their parent, not browsable in their own right) — pass
  *  pageType: "thank-you" for the few callers that genuinely need those. */
 export async function loadTemplates(
-  options: { includeContent?: boolean; pageType?: "landing" | "thank-you" } = {},
+  options: {
+    includeContent?: boolean;
+    pageType?: "landing" | "thank-you";
+    resource?: Resource;
+  } = {},
 ): Promise<LandingPageData[]> {
+  if (options.resource === "landing-page") {
+    // The org's own pages — always lightweight (no content), matching the
+    // includeContent:false use case this is called with (allPages index).
+    const res = await apiFetch<{ data: ApiLandingPage[] }>(`${LANDING_PAGES_PATH}?limit=100`);
+    return res.data.map(fromApiLandingPage);
+  }
   const includeContent = options.includeContent ?? true;
   const params = new URLSearchParams({ includeContent: String(includeContent) });
   if (options.pageType) params.set("pageType", options.pageType);
@@ -214,8 +290,12 @@ export async function loadTemplates(
   return rows.map(fromApiTemplate);
 }
 
-export async function loadTemplate(id: string): Promise<LandingPageData | null> {
+export async function loadTemplate(id: string, resource: Resource = "template"): Promise<LandingPageData | null> {
   try {
+    if (resource === "landing-page") {
+      const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}`);
+      return fromApiLandingPage(raw);
+    }
     const raw = await apiFetch<ApiTemplate>(`${TEMPLATES_PATH}/${encodeURIComponent(id)}`);
     return fromApiTemplate(raw);
   } catch {
@@ -277,6 +357,24 @@ async function patchTemplate(id: string, record: LandingPageData): Promise<Landi
   return fromApiTemplate(raw);
 }
 
+// LandingPageUpdateDto only accepts name/slug/thumbnail/content — status,
+// domain, isPaid and category don't exist on LandingPage, and the backend's
+// ValidationPipe (forbidNonWhitelisted) would 400 the whole request if we
+// sent them. Status changes only ever happen through submit/approve/
+// reject/publish, never a plain content save.
+async function patchLandingPage(id: string, record: LandingPageData): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      name: record.name,
+      slug: record.slug,
+      thumbnail: record.thumbnail,
+      content: toContentBody(record),
+    }),
+  });
+  return fromApiLandingPage(raw);
+}
+
 const SAVE_DEBOUNCE_MS = 500;
 interface PendingSave {
   timer: ReturnType<typeof setTimeout>;
@@ -287,11 +385,13 @@ interface PendingSave {
 const pendingSaves = new Map<string, PendingSave>();
 
 /** Debounced single-record save — replaces the old bulk "save the whole
- *  array" pattern. Multiple calls for the same template id within the
- *  debounce window collapse into one PATCH using the latest record. */
-export function saveTemplate(record: LandingPageData): Promise<LandingPageData> {
+ *  array" pattern. Multiple calls for the same record id (within the same
+ *  resource) within the debounce window collapse into one PATCH using the
+ *  latest record. */
+export function saveTemplate(record: LandingPageData, resource: Resource = "template"): Promise<LandingPageData> {
   return new Promise((resolve, reject) => {
-    const existing = pendingSaves.get(record.id);
+    const key = `${resource}:${record.id}`;
+    const existing = pendingSaves.get(key);
     const entry: PendingSave = existing ?? {
       timer: null as unknown as ReturnType<typeof setTimeout>,
       latest: record,
@@ -304,13 +404,14 @@ export function saveTemplate(record: LandingPageData): Promise<LandingPageData> 
     if (existing) clearTimeout(existing.timer);
 
     entry.timer = setTimeout(() => {
-      pendingSaves.delete(record.id);
-      patchTemplate(record.id, entry.latest)
+      pendingSaves.delete(key);
+      const patcher = resource === "landing-page" ? patchLandingPage : patchTemplate;
+      patcher(record.id, entry.latest)
         .then((updated) => entry.resolvers.forEach((r) => r(updated)))
         .catch((err) => entry.rejecters.forEach((r) => r(err)));
     }, SAVE_DEBOUNCE_MS);
 
-    pendingSaves.set(record.id, entry);
+    pendingSaves.set(key, entry);
   });
 }
 
@@ -334,6 +435,14 @@ export async function resetTemplate(
     body: JSON.stringify({ content }),
   });
   return fromApiTemplate(raw);
+}
+
+/** draft/rejected -> pending_approval. Only ever called for resource: "landing-page". */
+export async function submitLandingPage(id: string): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}/submit`, {
+    method: "POST",
+  });
+  return fromApiLandingPage(raw);
 }
 
 // ---------------------------------------------------------------------------

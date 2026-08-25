@@ -9,8 +9,9 @@ export {
   deleteTemplate,
   duplicateTemplate,
   resetTemplate,
+  submitLandingPage,
 } from "./persist";
-export type { CreateTemplateInput } from "./persist";
+export type { CreateTemplateInput, Resource } from "./persist";
 
 export async function findPageBySlug(slug: string, pages?: LandingPageData[]): Promise<LandingPageData | undefined> {
   const list = pages ?? (typeof window === "undefined" ? [] : await loadTemplates());

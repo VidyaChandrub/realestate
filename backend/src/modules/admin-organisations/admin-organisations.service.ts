@@ -19,6 +19,8 @@ import {
   provisionInvitedUser,
   setOrgUserStatus,
 } from '../../common/utils/org-users.util';
+import { assertTemplateQuota } from '../../common/utils/plan-quota.util';
+import { assertEligibleTemplateIds } from '../../common/utils/template-eligibility.util';
 import { OnboardCompanyDto } from './dto/onboard-company.dto';
 import { OnboardAdminDto } from './dto/onboard-admin.dto';
 import { ActivateOrganisationDto } from './dto/activate-organisation.dto';
@@ -122,26 +124,17 @@ export class AdminOrganisationsService {
 
     // --- Validate plan + template assignment if provided ---
     let plan: any = null;
+    const templateIds = dto.templateIds ?? [];
     if (dto.planId) {
       plan = await this.prisma.plan.findUnique({ where: { id: dto.planId } });
       if (!plan || !plan.isActive) throw new NotFoundException('Plan not found');
-      const templateIds = dto.templateIds ?? [];
       if (templateIds.length > 0) {
-        const templates = await this.prisma.template.findMany({ where: { id: { in: templateIds } } });
-        if (templates.length !== templateIds.length) throw new BadRequestException('One or more templates not found');
-        const limits = plan.limits as any;
-        const rawLimit = limits?.templates;
-        if (rawLimit && rawLimit !== 'All' && rawLimit !== 'Unlimited') {
-          const max = parseInt(String(rawLimit), 10);
-          if (!Number.isNaN(max) && templateIds.length > max) {
-            throw new BadRequestException(`Plan "${plan.name}" allows max ${max} template(s), got ${templateIds.length}`);
-          }
-        }
+        await assertEligibleTemplateIds(this.prisma, templateIds);
+        assertTemplateQuota(plan, templateIds.length);
       }
-    } else if (dto.templateIds && dto.templateIds.length > 0) {
-      // template assignment without plan — just validate templates exist
-      const templates = await this.prisma.template.findMany({ where: { id: { in: dto.templateIds } } });
-      if (templates.length !== dto.templateIds.length) throw new BadRequestException('One or more templates not found');
+    } else if (templateIds.length > 0) {
+      // template assignment without plan — eligibility still applies
+      await assertEligibleTemplateIds(this.prisma, templateIds);
     }
 
     // Transactionally activate, create subscription and assignments
@@ -446,25 +439,16 @@ export class AdminOrganisationsService {
     if (organisation.status !== 'pending') throw new BadRequestException('Only pending organisations can be approved');
 
     let plan: any = null;
+    const templateIds = dto.templateIds ?? [];
     if (dto.planId) {
       plan = await this.prisma.plan.findUnique({ where: { id: dto.planId } });
       if (!plan || !plan.isActive) throw new NotFoundException('Plan not found');
-      const templateIds = dto.templateIds ?? [];
       if (templateIds.length > 0) {
-        const templates = await this.prisma.template.findMany({ where: { id: { in: templateIds } } });
-        if (templates.length !== templateIds.length) throw new BadRequestException('One or more templates not found');
-        const limits = plan.limits as any;
-        const rawLimit = limits?.templates;
-        if (rawLimit && rawLimit !== 'All' && rawLimit !== 'Unlimited') {
-          const max = parseInt(String(rawLimit), 10);
-          if (!Number.isNaN(max) && templateIds.length > max) {
-            throw new BadRequestException(`Plan "${plan.name}" allows max ${max} template(s), got ${templateIds.length}`);
-          }
-        }
+        await assertEligibleTemplateIds(this.prisma, templateIds);
+        assertTemplateQuota(plan, templateIds.length);
       }
-    } else if (dto.templateIds && dto.templateIds.length > 0) {
-      const templates = await this.prisma.template.findMany({ where: { id: { in: dto.templateIds } } });
-      if (templates.length !== dto.templateIds.length) throw new BadRequestException('One or more templates not found');
+    } else if (templateIds.length > 0) {
+      await assertEligibleTemplateIds(this.prisma, templateIds);
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -538,18 +522,10 @@ export class AdminOrganisationsService {
       include: { plan: true },
     });
     if (sub) {
-      const limits = sub.plan.limits as any;
-      const raw = limits?.templates;
-      if (raw && raw !== 'All' && raw !== 'Unlimited') {
-        const max = parseInt(String(raw), 10);
-        if (!Number.isNaN(max) && templateIds.length > max) {
-          throw new BadRequestException(`Plan "${sub.plan.name}" allows max ${max} template(s), got ${templateIds.length}`);
-        }
-      }
+      assertTemplateQuota(sub.plan, templateIds.length);
     }
     if (templateIds.length > 0) {
-      const found = await this.prisma.template.findMany({ where: { id: { in: templateIds } } });
-      if (found.length !== templateIds.length) throw new BadRequestException('One or more templates not found');
+      await assertEligibleTemplateIds(this.prisma, templateIds);
     }
     await this.prisma.$transaction(async (tx) => {
       await tx.organisationTemplate.deleteMany({ where: { orgId: id } });

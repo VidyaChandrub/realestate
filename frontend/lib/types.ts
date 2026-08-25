@@ -363,3 +363,52 @@ export interface UpdateSubscriptionInput {
   currency?: string;
   renewsAt?: string;
 }
+
+// --- Landing pages: org-owned copies made from an assigned template ---
+export type LandingPageStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'approved'
+  | 'rejected'
+  | 'published'
+  | 'unpublished';
+
+export interface LandingPageRow {
+  id: string;
+  name: string;
+  slug: string;
+  status: LandingPageStatus;
+  thumbnail: string | null;
+  pageType: 'landing' | 'thank_you';
+  parentId?: string | null;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sourceTemplate: { id: string; name: string } | null;
+}
+
+export interface OrgLandingPagesListResponse {
+  data: LandingPageRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CreateLandingPageInput {
+  templateId: string;
+  name: string;
+}
+
+export interface AdminLandingPageRow extends LandingPageRow {
+  organisation: { id: string; name: string; slug: string };
+}
+
+export interface AdminLandingPagesListResponse {
+  data: AdminLandingPageRow[];
+  total: number;
+  page: number;
+  limit: number;
+}

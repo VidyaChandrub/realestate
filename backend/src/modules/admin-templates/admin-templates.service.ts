@@ -62,6 +62,18 @@ export class AdminTemplatesService {
     return toLandingPageData(template, { includeContent: true });
   }
 
+  // Unauthenticated callers (registration) must never fetch a draft or
+  // thank-you page by id — same eligibility filter as the public list.
+  async getPublicById(id: string) {
+    const template = await this.prisma.template.findFirst({
+      where: { id, status: 'published', pageType: 'landing' },
+    });
+    if (!template) {
+      throw new NotFoundException('Template not found');
+    }
+    return toLandingPageData(template, { includeContent: true });
+  }
+
   async create(dto: CreateTemplateDto) {
     const slug = dto.slug
       ? dto.slug
