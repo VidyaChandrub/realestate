@@ -149,11 +149,13 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
 
   const crumb =
     CRUMB_MAP[pathname] ??
-    CRUMB_MAP[
-      Object.keys(CRUMB_MAP)
-        .filter((base) => pathname.startsWith(`${base}/`))
-        .sort((a, b) => b.length - a.length)[0]
-    ] ??
+    (pathname.startsWith("/org/projects/palm-residency")
+      ? "Projects · Palm Residency"
+      : CRUMB_MAP[
+          Object.keys(CRUMB_MAP)
+            .filter((base) => pathname.startsWith(`${base}/`))
+            .sort((a, b) => b.length - a.length)[0]
+        ]) ??
     "Dashboard";
 
   const userName = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email;
