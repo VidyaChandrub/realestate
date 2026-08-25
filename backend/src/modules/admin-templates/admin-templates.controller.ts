@@ -23,6 +23,7 @@ export class AdminTemplatesController {
   constructor(private readonly adminTemplatesService: AdminTemplatesService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   list(@Query() query: ListTemplatesQueryDto) {
     return this.adminTemplatesService.list(query);
   }
@@ -73,12 +74,22 @@ export class PublicTemplatesController {
 
   @Get()
   listPublic(@Query() query: ListTemplatesQueryDto) {
-    // Public for registration — only published landing templates, limited fields
-    return this.adminTemplatesService.list({ ...query, status: 'published', pageType: 'landing' } as any);
+    // Public for registration — only published landing templates, display
+    // fields only. status/pageType/includeContent are forced, never taken
+    // from the client: this is an unauthenticated endpoint and must never
+    // expose drafts, thank-you pages, or full section/config content.
+    return this.adminTemplatesService.list({
+      ...query,
+      status: 'published',
+      pageType: 'landing',
+      includeContent: false,
+    } as any);
   }
 
   @Get(':id')
   getPublicById(@Param('id') id: string) {
-    return this.adminTemplatesService.getById(id);
+    // Same eligibility filter as the list — an unauthenticated caller must
+    // never be able to fetch a draft or thank-you page by guessing its id.
+    return this.adminTemplatesService.getPublicById(id);
   }
 }

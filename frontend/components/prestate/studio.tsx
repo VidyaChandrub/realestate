@@ -24,12 +24,13 @@ import {
   X,
 } from "lucide-react";
 import type { Device, LandingPageData, ModuleKey, SectionInstance, SiteConfig } from "@/lib/prestate/types";
-import { loadTemplate, loadTemplates, saveTemplate, createTemplate, normalizeDomain, isLikelyHostname } from "@/lib/prestate/store";
+import { loadTemplate, loadTemplates, saveTemplate, createTemplate, submitLandingPage, normalizeDomain, isLikelyHostname, type Resource } from "@/lib/prestate/store";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
 import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
 import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
 import { TopNav, MODULE_LABELS } from "@/components/prestate/topnav";
 import { BuilderWorkspace, type BuilderApi } from "@/components/prestate/builder/workspace";
+import { Canvas } from "@/components/prestate/builder/canvas";
 import { FormsModule } from "@/components/prestate/modules/forms";
 import { BrandModule } from "@/components/prestate/modules/brand";
 import { HeaderFooterModule } from "@/components/prestate/modules/headerfooter";
@@ -54,7 +55,17 @@ interface Toast {
   text: string;
 }
 
-export function PrestateStudio() {
+// Which backend resource this session edits — a Super Admin Template
+// (default) or an org's own LandingPage. Threading this through is the
+// entire org-builder integration: BuilderWorkspace/Canvas/the widget
+// modules are untouched, they just render whatever LandingPageData they're
+// handed, regardless of which REST resource it came from.
+const HOME_PATH: Record<Resource, string> = {
+  template: "/admin-console/templates",
+  "landing-page": "/org/landing-pages",
+};
+
+export function PrestateStudio({ resource = "template" }: { resource?: Resource }) {
   const searchParams = useSearchParams();
   const [module, setModule] = useState<ModuleKey>("builder");
   const [device, setDevice] = useState<Device>("desktop");
@@ -82,7 +93,7 @@ export function PrestateStudio() {
 
     (async () => {
       if (id) {
-        const page = await loadTemplate(id);
+        const page = await loadTemplate(id, resource);
         if (cancelled) return;
         if (page) {
           setActivePage(page);
@@ -90,7 +101,10 @@ export function PrestateStudio() {
           return;
         }
       }
-      if (design) {
+      // ?design= lookup-by-design-id is a Template-only concept (org pages
+      // are opened by their own id, never by a shared design id) — skip it
+      // entirely for the org resource.
+      if (design && resource === "template") {
         // Unreachable in practice today (nothing sets ?design=; builderPath()
         // only ever produces ?id=) but kept correct: a design could in theory
         // be a thank-you one, so search both pageTypes, not just landing.
@@ -109,16 +123,26 @@ export function PrestateStudio() {
           return;
         }
       }
-      if (!cancelled) window.location.replace("/admin-console/templates");
+      if (!cancelled) window.location.replace(HOME_PATH[resource]);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [searchParams]);
+  }, [searchParams, resource]);
 
   useEffect(() => {
     let cancelled = false;
+    if (resource === "landing-page") {
+      // The org's own pages already come back as one list (both pageTypes
+      // together) — no separate landing/thank-you calls needed.
+      loadTemplates({ resource: "landing-page" }).then((pages) => {
+        if (!cancelled) setAllPages(pages);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
     // FormsModule needs both: its thank-you picker lists every thank-you
     // page in the workspace (not just this page's own companion), and the
     // scope bar / domain-collision check need every landing page.
@@ -131,7 +155,7 @@ export function PrestateStudio() {
     return () => {
       cancelled = true;
     };
-  }, [activePage?.id]);
+  }, [activePage?.id, resource]);
 
   const toast = useCallback((text: string) => {
     const id = ++toastId.current;
@@ -141,39 +165,121 @@ export function PrestateStudio() {
 
   const scoped = activePage ? [activePage] : [];
 
-  // Fires the debounced single-record save and reconciles only the
-  // server-derived display fields once it resolves, so a slow save can't
-  // clobber newer local edits made in the meantime.
+  // Domains (subdomains/custom domains) is a Template-only concept —
+  // LandingPage has no domain field, and wiring one up is explicitly out of
+  // scope for org landing pages. Hide the tab rather than ship a control
+  // that silently does nothing.
+  const railItems = resource === "landing-page" ? NAV_ITEMS.filter((item) => item.key !== "domains") : NAV_ITEMS;
+
+  // Fires the debounced single-record save and reconciles the server-derived
+  // fields once it resolves, so a slow save can't clobber newer local edits
+  // made in the meantime. Also syncs `status` from the response — for
+  // landing pages the backend is the sole authority on whether this save
+  // reverted an approved/published page to draft (deep-equality diff
+  // against stored content; see OrgLandingPagesService.update), so the
+  // client must reflect whatever it actually decided, not guess ahead of it.
   const saveInBackground = useCallback(
     (next: LandingPageData) => {
-      void saveTemplate(next)
+      void saveTemplate(next, resource)
         .then((saved) => {
-          setActivePage((cur) => (cur && cur.id === saved.id ? { ...cur, updated: saved.updated, updatedAt: saved.updatedAt } : cur));
+          setActivePage((cur) =>
+            cur && cur.id === saved.id ? { ...cur, status: saved.status, updated: saved.updated, updatedAt: saved.updatedAt } : cur,
+          );
         })
         .catch(() => toast("Couldn't save — check your connection"));
     },
-    [toast],
+    [toast, resource],
   );
 
   const persistPage = useCallback(
     (pageId: string, sections: SectionInstance[], status?: LandingPageData["status"]) => {
       setActivePage((prev) => {
         if (!prev || prev.id !== pageId) return prev;
-        const next = { ...prev, sections, status: status ?? prev.status, updated: "Just now" };
+        // `status` is only passed by the explicit Publish/Unpublish buttons.
+        // For templates: a plain content edit (autosave, no status passed)
+        // on something already live or about to go live reverts it to
+        // draft, guessed client-side — the Admin backend has no diff logic
+        // of its own, so this is the only place that decision gets made.
+        // For landing pages: never guess here. The backend does its own
+        // deep-equality diff against stored content and decides for real;
+        // saveInBackground syncs whatever it decides back into `status`
+        // once the save resolves. Guessing "draft" here too would make an
+        // unopened, unedited page flash to draft the instant any autosave
+        // fires (e.g. from the legacy-widget migration on load), even when
+        // the backend correctly leaves it published.
+        const nextStatus =
+          status ??
+          (resource === "landing-page"
+            ? prev.status
+            : prev.status === "published" || prev.status === "scheduled"
+              ? "draft"
+              : prev.status);
+        const next = { ...prev, sections, status: nextStatus, updated: "Just now" };
         saveInBackground(next);
         return next;
       });
     },
-    [saveInBackground],
+    [saveInBackground, resource],
   );
+
+  // The org builder's "Submit for approval" action — real submit, not a
+  // toast. Only meaningful for resource: "landing-page" (see topNavPublish
+  // below, which is the only caller).
+  const submitForApproval = useCallback(() => {
+    if (!activePage) return;
+    submitLandingPage(activePage.id)
+      .then((updated) => {
+        setActivePage((cur) => (cur && cur.id === updated.id ? { ...cur, status: updated.status } : cur));
+        toast("Submitted for approval");
+      })
+      .catch((err) => toast(err instanceof Error ? err.message : "Couldn't submit — try again"));
+  }, [activePage, toast]);
+
+  // What the Publish/Unpublish slot in TopNav shows and does, per resource.
+  // Templates keep their existing direct publish/unpublish. An org session
+  // can never publish directly — the label and action reflect wherever the
+  // page actually is in the review cycle instead.
+  const topNavPublish =
+    resource === "landing-page"
+      ? (() => {
+          // LandingPageData["status"] predates approval statuses (see the
+          // cast in fromApiLandingPage) — switch on the real string, not
+          // the narrowed type, so this actually matches at runtime.
+          switch (activePage?.status as string | undefined) {
+            case "pending_approval":
+              return { label: "Pending approval", run: () => toast("Already submitted — waiting for Super Admin review.") };
+            case "approved":
+              return { label: "Approved · awaiting publish", run: () => toast("Approved — a Super Admin will publish it.") };
+            case "published":
+              return { label: "Live", run: () => toast("Published pages are taken down by a Super Admin, not from here.") };
+            default:
+              return { label: "Submit for approval", run: submitForApproval };
+          }
+        })()
+      : { label: "Publish", run: () => apiRef.current?.publish() };
+  const topNavUnpublish =
+    resource === "landing-page"
+      ? { label: "Live", run: () => toast("Published pages are taken down by a Super Admin, not from here.") }
+      : { label: "Unpublish", run: () => apiRef.current?.unpublish() };
+
+  const [inAppPreviewOpen, setInAppPreviewOpen] = useState(false);
 
   const openLocalPreview = useCallback(
     (pageId?: string) => {
       const page = !pageId || pageId === activePage?.id ? activePage : null;
       if (!page) return;
+      // /p/[slug] only works for Templates — slugs there are globally
+      // unique. A LandingPage's slug is only unique per-org, and public
+      // serving of org pages is out of scope, so there's no route that
+      // could resolve one anyway. Preview in-app instead of opening a tab
+      // that would 403/404.
+      if (resource === "landing-page") {
+        setInAppPreviewOpen(true);
+        return;
+      }
       window.open(localPreviewPath(page), "_blank", "noopener,noreferrer");
     },
-    [activePage],
+    [activePage, resource],
   );
 
   const assignDomain = useCallback(
@@ -271,6 +377,11 @@ export function PrestateStudio() {
             onPatch={(fn) => patchConfig(activePage.id, fn)}
             onToast={toast}
             onCreateThankYouPage={
+              // Ad-hoc thank-you creation writes a new platform Template row
+              // — never available for an org's own landing pages. An org
+              // page's companion (if any) was copied alongside it at
+              // creation time; there's no "add one later" flow here.
+              resource === "landing-page" ||
               allPages.some((p) => p.pageType === "thank-you" && p.parentPageId === activePage.id)
                 ? undefined
                 : () => {
@@ -374,8 +485,10 @@ export function PrestateStudio() {
         onRedo={() => apiRef.current?.redo()}
         onSave={() => apiRef.current?.save()}
         onPreview={() => apiRef.current?.preview()}
-        onPublish={() => apiRef.current?.publish()}
-        onUnpublish={() => apiRef.current?.unpublish()}
+        onPublish={topNavPublish.run}
+        publishLabel={topNavPublish.label}
+        onUnpublish={topNavUnpublish.run}
+        unpublishLabel={topNavUnpublish.label}
         onNotify={() => setNotifOpen(true)}
         onActivity={() => setActivityOpen(true)}
         onHelp={() => setHelpOpen(true)}
@@ -390,11 +503,11 @@ export function PrestateStudio() {
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         {/* Workspace rail */}
         <nav className="ps-rail" data-open={navOpen ? "true" : "false"}>
-          <Link href="/admin-console/templates" title="Templates" className="ps-rail-btn">
+          <Link href={HOME_PATH[resource]} title="Back" className="ps-rail-btn">
             <LayoutTemplate size={19} />
-            <span className="ps-rail-label">Templates</span>
+            <span className="ps-rail-label">{resource === "landing-page" ? "My Pages" : "Templates"}</span>
           </Link>
-          {NAV_ITEMS.map((item) => {
+          {railItems.map((item) => {
             const Icon = item.icon;
             const active = module === item.key;
             return (
@@ -472,15 +585,81 @@ export function PrestateStudio() {
 
       <SlidePanel open={helpOpen} onClose={() => setHelpOpen(false)} title="Help center" icon={<Sparkles size={16} />}>
         <div style={{ fontSize: 13, color: "var(--ps-slate)", lineHeight: 1.7, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div><strong style={{ color: "var(--ps-ink)" }}>Builder</strong> — drag widgets, then Save Draft, Preview, Publish or Unpublish from the top bar.</div>
-          <div><strong style={{ color: "var(--ps-ink)" }}>Preview</strong> — opens a real local page at /p/your-slug. Resize the window for mobile/tablet.</div>
-          <div><strong style={{ color: "var(--ps-ink)" }}>Domains</strong> — assign auroraresidences.com (or any hostname) to a page, then open /p/host/auroraresidences.com.</div>
-          <div><strong style={{ color: "var(--ps-ink)" }}>Pages</strong> — edit, duplicate, publish, unpublish, assign domain, or delete. Use the ⋯ menu on desktop or the action row on mobile.</div>
-          <div><strong style={{ color: "var(--ps-ink)" }}>Templates</strong> — pick a template from the Templates page in Super Admin. Clicking one opens this builder.</div>
-          <div><strong style={{ color: "var(--ps-ink)" }}>Settings</strong> — Brand, Header, SEO, Tracking, Forms and Domains apply only to the template selected in the scope bar.</div>
-          <div><strong style={{ color: "var(--ps-ink)" }}>Shortcuts</strong> — Ctrl+S save, Ctrl+Z undo, Ctrl+Shift+Z redo.</div>
+          {resource === "landing-page" ? (
+            <>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Builder</strong> — drag widgets, then Save Draft or Preview from the top bar.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Preview</strong> — opens a real local page at /p/your-slug. Resize the window for mobile/tablet.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Submitting</strong> — from My Pages, click Submit for approval. A Super Admin reviews it and approves, rejects with feedback, or publishes it live.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Pages</strong> — this page came from a template your organisation was assigned. Editing it never changes the shared template or any other organisation&apos;s copy.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Settings</strong> — Brand, Header, SEO, Tracking and Forms apply only to this page.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Shortcuts</strong> — Ctrl+S save, Ctrl+Z undo, Ctrl+Shift+Z redo.</div>
+            </>
+          ) : (
+            <>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Builder</strong> — drag widgets, then Save Draft, Preview, Publish or Unpublish from the top bar.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Preview</strong> — opens a real local page at /p/your-slug. Resize the window for mobile/tablet.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Domains</strong> — assign auroraresidences.com (or any hostname) to a page, then open /p/host/auroraresidences.com.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Pages</strong> — edit, duplicate, publish, unpublish, assign domain, or delete. Use the ⋯ menu on desktop or the action row on mobile.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Templates</strong> — pick a template from the Templates page in Super Admin. Clicking one opens this builder.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Settings</strong> — Brand, Header, SEO, Tracking, Forms and Domains apply only to the template selected in the scope bar.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Shortcuts</strong> — Ctrl+S save, Ctrl+Z undo, Ctrl+Shift+Z redo.</div>
+            </>
+          )}
         </div>
       </SlidePanel>
+
+      {inAppPreviewOpen && activePage ? (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600, padding: 20 }}
+          onClick={() => setInAppPreviewOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, width: "min(1180px, 100%)", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(15,23,42,.35)" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderBottom: "1px solid var(--ps-border, #e5e7eb)", flexShrink: 0 }}>
+              <span style={{ fontWeight: 700, fontSize: 14 }}>{activePage.name}</span>
+              <button
+                type="button"
+                onClick={() => setInAppPreviewOpen(false)}
+                style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--ps-muted, #64748b)", cursor: "pointer", display: "inline-flex", padding: 4 }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", background: "#f4f5f8" }}>
+              {(() => {
+                const cfg = ensureConfig(activePage);
+                return (
+                  <div className="ps-app">
+                    <Canvas
+                      sections={activePage.sections}
+                      selectedId={null}
+                      device="desktop"
+                      readOnly
+                      live
+                      pageId={activePage.id}
+                      theme={{
+                        primary: cfg.brand.primary,
+                        accent: cfg.brand.accent,
+                        font: cfg.brand.bodyFont,
+                        headingFont: cfg.brand.headingFont,
+                        name: cfg.brand.name,
+                        phone: cfg.brand.phone,
+                        logo: cfg.brand.logo,
+                      }}
+                      form={cfg.form}
+                      chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}
+                      onSelect={() => {}}
+                      onMutate={() => {}}
+                    />
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

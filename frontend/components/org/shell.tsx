@@ -33,20 +33,21 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/org/projects", icon: "building", label: "Projects", tip: "Projects" },
     ],
   },
-  {
-    grp: "Communication",
-    items: [
-      { href: "/org/calling", icon: "phone", label: "Calling", tip: "Calling" },
-      { href: "/org/whatsapp", icon: "mail", label: "WhatsApp", tip: "WhatsApp" },
-    ],
-  },
+  // Will enable these once we have the backend for them - phase 2.
+  // {
+  //   grp: "Communication",
+  //   items: [
+  //     { href: "/org/calling", icon: "phone", label: "Calling", tip: "Calling" },
+  //     { href: "/org/whatsapp", icon: "mail", label: "WhatsApp", tip: "WhatsApp" },
+  //   ],
+  // },
   {
     grp: "Website",
     items: [
       { href: "/org/websites", icon: "globe", label: "Websites", tip: "Websites" },
       { href: "/org/landing-pages", icon: "document", label: "Landing Pages", tip: "Landing Pages" },
       { href: "/org/templates", icon: "puzzle", label: "Templates", tip: "Templates" },
-      { href: "/org/integrations", icon: "link", label: "Integrations", tip: "Integrations" },
+      // { href: "/org/integrations", icon: "link", label: "Integrations", tip: "Integrations" },
     ],
   },
   {
@@ -181,7 +182,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                         data-tip={item.tip}
                         className={isActive ? "active" : ""}
                       >
-                        <span className="ic">{item.icon}</span>
+                        <span className="ic"><Icon name={item.icon as any} size={16} /></span>
                         <span className="lbl">{item.label}</span>
                       </Link>
                     </li>

@@ -77,6 +77,12 @@ export function TopNav({
   onPreview,
   onPublish,
   onUnpublish,
+  // Text only — an org session isn't allowed to publish directly, so
+  // studio.tsx passes "Submit for approval" / a review-status label here
+  // instead of the Super Admin's "Publish" / "Unpublish". The click handlers
+  // and branching (which slot renders) are unchanged.
+  publishLabel = "Publish",
+  unpublishLabel = "Unpublish",
   onNotify,
   onActivity,
   onHelp,
@@ -96,6 +102,8 @@ export function TopNav({
   onPreview: () => void;
   onPublish: () => void;
   onUnpublish: () => void;
+  publishLabel?: string;
+  unpublishLabel?: string;
   onNotify: () => void;
   onActivity: () => void;
   onHelp: () => void;
@@ -171,11 +179,11 @@ export function TopNav({
               </button>
               {published ? (
                 <button type="button" onClick={onUnpublish} className="ps-topnav-btn">
-                  Unpublish
+                  {unpublishLabel}
                 </button>
               ) : (
                 <button type="button" onClick={onPublish} className="ps-topnav-btn ps-topnav-btn--publish">
-                  <Rocket size={14} /> <span className="ps-btn-label">Publish</span>
+                  <Rocket size={14} /> <span className="ps-btn-label">{publishLabel}</span>
                 </button>
               )}
             </div>
@@ -264,7 +272,7 @@ export function TopNav({
                 ? [
                     { label: "Save Draft", run: onSave },
                     { label: "Preview", run: onPreview },
-                    { label: published ? "Unpublish" : "Publish", run: published ? onUnpublish : onPublish },
+                    { label: published ? unpublishLabel : publishLabel, run: published ? onUnpublish : onPublish },
                     { label: "Help", run: onHelp },
                   ].map((item) => (
                     <button

@@ -11,6 +11,8 @@ import { AdminTemplatesModule } from './modules/admin-templates/admin-templates.
 import { OrgTemplatesModule } from './modules/org-templates/org-templates.module';
 import { PlansModule } from './modules/plans/plans.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { OrgLandingPagesModule } from './modules/org-landing-pages/org-landing-pages.module';
+import { AdminLandingPagesModule } from './modules/admin-landing-pages/admin-landing-pages.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
     OrgTemplatesModule,
     PlansModule,
     SubscriptionsModule,
+    OrgLandingPagesModule,
+    AdminLandingPagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

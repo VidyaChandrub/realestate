@@ -422,8 +422,8 @@ export default function SuperAdminOrganisationDetailPage() {
               <span className="label">Plan value</span>
               <span className="ic ic-violet"><Icon name="billing" size={16} /></span>
             </div>
-            <div className="value">—</div>
-            <div className="delta">—</div>
+            <div className="value">{org.plan?.name ?? "—"}</div>
+            <div className="delta">{org.planValue != null ? `₹${org.planValue.toLocaleString("en-IN")}` : "—"}</div>
           </div>
         </Reveal>
       </div>
@@ -685,7 +685,10 @@ export default function SuperAdminOrganisationDetailPage() {
                         <div className="muted" style={{ fontSize: 12 }}>
                           Plan
                         </div>
-                        <b>—</b>
+                        <b>{org.plan?.name ?? "—"}</b>
+                        {org.plan && org.planValue != null ? (
+                          <div className="sm muted">₹{org.planValue.toLocaleString("en-IN")}</div>
+                        ) : null}
                       </div>
                       <div>
                         <div className="muted" style={{ fontSize: 12 }}>

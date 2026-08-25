@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -21,6 +20,8 @@ import {
   toSafeOrganisation,
   toSafeUser,
 } from '../../common/utils/mappers.util';
+import { assertTemplateQuota } from '../../common/utils/plan-quota.util';
+import { assertEligibleTemplateIds } from '../../common/utils/template-eligibility.util';
 
 const BCRYPT_COST_FACTOR = 12;
 
@@ -45,25 +46,18 @@ export class AuthService {
 
     // Validate plan + template selection if provided at registration
     let plan: any = null;
+    const templateIds = dto.templateIds ?? [];
     if (dto.planId) {
       plan = await this.prisma.plan.findUnique({ where: { id: dto.planId } });
       if (!plan || !plan.isActive) throw new NotFoundException('Plan not found');
-      const templateIds = dto.templateIds ?? [];
       if (templateIds.length > 0) {
-        const templates = await this.prisma.template.findMany({ where: { id: { in: templateIds } } });
-        if (templates.length !== templateIds.length) throw new BadRequestException('One or more templates not found');
-        const limits = plan.limits as any;
-        const rawLimit = limits?.templates;
-        if (rawLimit && rawLimit !== 'All' && rawLimit !== 'Unlimited') {
-          const max = parseInt(String(rawLimit), 10);
-          if (!Number.isNaN(max) && templateIds.length > max) {
-            throw new BadRequestException(`Plan "${plan.name}" allows max ${max} template(s), got ${templateIds.length}`);
-          }
-        }
+        await assertEligibleTemplateIds(this.prisma, templateIds);
+        assertTemplateQuota(plan, templateIds.length);
       }
-    } else if (dto.templateIds && dto.templateIds.length > 0) {
-      const templates = await this.prisma.template.findMany({ where: { id: { in: dto.templateIds } } });
-      if (templates.length !== dto.templateIds.length) throw new BadRequestException('One or more templates not found');
+    } else if (templateIds.length > 0) {
+      // Template assignment without a plan — plan-based quota doesn't apply,
+      // but eligibility (published, landing) still does.
+      await assertEligibleTemplateIds(this.prisma, templateIds);
     }
 
     const slug = await generateUniqueOrgSlug(this.prisma, dto.company_name);

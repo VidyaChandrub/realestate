@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api";
 import { Icon } from "@/components/icons";
 
 type NavItem = {
@@ -52,7 +53,7 @@ const NAV_GROUPS: NavGroup[] = [
         tip: "Template Management",
         activeMatch: ["/admin-console/templates", "/admin-console/template-detail"],
       },
-      { href: "/admin-console/approvals", icon: "check", label: "Approvals", tip: "Approvals", badge: "6", activeMatch: ["/admin-console/approvals"] },
+      { href: "/admin-console/approvals", icon: "check", label: "Approvals", tip: "Approvals", activeMatch: ["/admin-console/approvals"] },
     ],
   },
   {
@@ -83,10 +84,36 @@ const CRUMB_MAP: Record<string, string> = {
 export function SuperAdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, accessToken } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [approvalsBadge, setApprovalsBadge] = useState<number | null>(null);
+
+  // Approvals still covers two queues today — pending organisation
+  // registrations and pending landing-page submissions — so the badge is
+  // their combined count. The org-approval queue is slated for retirement
+  // (the Organisations list already has inline Approve/Reject); once it's
+  // actually removed, drop the organisations half here and this becomes a
+  // landing-pages-only count with no other change needed.
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    Promise.all([
+      apiFetch<{ pending?: number }>("/admin/organisations/summary", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).catch(() => null),
+      apiFetch<{ total: number }>("/admin/landing-pages?status=pending_approval&limit=1", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).catch(() => null),
+    ]).then(([orgSummary, lpList]) => {
+      if (cancelled) return;
+      setApprovalsBadge((orgSummary?.pending ?? 0) + (lpList?.total ?? 0));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -143,6 +170,10 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
                     item.activeMatch?.some(
                       (base) => pathname === base || pathname.startsWith(`${base}/`),
                     ) ?? false;
+                  const badge =
+                    item.href === "/admin-console/approvals"
+                      ? (approvalsBadge ? String(approvalsBadge) : undefined)
+                      : item.badge;
                   return (
                     <li key={item.href}>
                       <Link
@@ -152,7 +183,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
                       >
                         <span className="ic"><Icon name={item.icon as any} size={16} /></span>
                         <span className="lbl">{item.label}</span>
-                        {item.badge ? <span className="badge-n">{item.badge}</span> : null}
+                        {badge ? <span className="badge-n">{badge}</span> : null}
                       </Link>
                     </li>
                   );

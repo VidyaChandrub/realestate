@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { LayoutTemplate, Search, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -8,8 +9,9 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { TemplateCover } from "@/components/superadmin/templates/shared";
 import { Canvas } from "@/components/prestate/builder/canvas";
 import { ensureConfig } from "@/lib/prestate/site-config";
+import { orgBuilderPath } from "@/lib/prestate/paths";
 import type { LandingPageData } from "@/lib/prestate/types";
-import type { OrgTemplateSummary, OrgTemplatesListResponse } from "@/lib/types";
+import type { LandingPageRow, OrgTemplateSummary, OrgTemplatesListResponse } from "@/lib/types";
 // Canvas renders using the prestate design system's ps-* classes, which only
 // this route needs — every rule in prestate.css is ps-prefixed, so importing
 // it here can't leak into the rest of the org shell (same pattern app/org/*
@@ -20,6 +22,39 @@ const LIMIT = 12;
 
 export default function OrgTemplatesPage() {
   const { accessToken } = useAuth();
+  const router = useRouter();
+
+  const [useTemplate, setUseTemplate] = useState<{ id: string; name: string } | null>(null);
+  const [useName, setUseName] = useState("");
+  const [useSubmitting, setUseSubmitting] = useState(false);
+  const [useError, setUseError] = useState<string | null>(null);
+
+  function openUseTemplate(id: string, defaultName: string) {
+    setUseTemplate({ id, name: defaultName });
+    setUseName(defaultName);
+    setUseError(null);
+  }
+
+  async function confirmUseTemplate() {
+    if (!useTemplate || !accessToken) return;
+    if (!useName.trim()) {
+      setUseError("Give the page a name");
+      return;
+    }
+    setUseSubmitting(true);
+    setUseError(null);
+    try {
+      const created = await apiFetch<LandingPageRow>("/org/landing-pages", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ templateId: useTemplate.id, name: useName.trim() }),
+      });
+      router.push(orgBuilderPath(created.id));
+    } catch (err) {
+      setUseError(err instanceof Error ? err.message : "Failed to create page from this template.");
+      setUseSubmitting(false);
+    }
+  }
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -166,7 +201,13 @@ export default function OrgTemplatesPage() {
       ) : (
         <div className="grid g3">
           {rows.map((row, i) => (
-            <OrgTemplateCard key={row.id} row={row} delay={i % 6} onPreview={() => openPreview(row.id)} />
+            <OrgTemplateCard
+              key={row.id}
+              row={row}
+              delay={i % 6}
+              onPreview={() => openPreview(row.id)}
+              onUse={() => openUseTemplate(row.id, row.name)}
+            />
           ))}
         </div>
       )}
@@ -236,11 +277,11 @@ export default function OrgTemplatesPage() {
               <button
                 className="btn btn-primary btn-sm"
                 type="button"
-                disabled
-                title="Coming soon"
-                style={{ marginLeft: "auto", opacity: 0.55, cursor: "not-allowed" }}
+                disabled={!previewData}
+                style={{ marginLeft: "auto" }}
+                onClick={() => previewData && openUseTemplate(previewData.id, previewData.name)}
               >
-                Use this template · Coming soon
+                Use this template
               </button>
               <button
                 type="button"
@@ -284,6 +325,45 @@ export default function OrgTemplatesPage() {
           </div>
         </div>
       ) : null}
+
+      {useTemplate ? (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }}
+          onClick={() => !useSubmitting && setUseTemplate(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, padding: 24, width: 420, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.35)" }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Use “{useTemplate.name}”</div>
+            <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
+              This creates your own editable copy — the shared template is never changed, and other organisations using it are unaffected.
+            </div>
+            <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+              Page name
+            </label>
+            <input
+              className="inp"
+              autoFocus
+              value={useName}
+              onChange={(e) => setUseName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && confirmUseTemplate()}
+              disabled={useSubmitting}
+            />
+            {useError ? (
+              <div style={{ color: "var(--rose)", fontSize: 12.5, marginTop: 8 }}>{useError}</div>
+            ) : null}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+              <button className="btn btn-ghost btn-sm" type="button" onClick={() => setUseTemplate(null)} disabled={useSubmitting}>
+                Cancel
+              </button>
+              <button className="btn btn-primary btn-sm" type="button" onClick={confirmUseTemplate} disabled={useSubmitting}>
+                {useSubmitting ? "Creating…" : "Create page"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -292,10 +372,12 @@ function OrgTemplateCard({
   row,
   delay,
   onPreview,
+  onUse,
 }: {
   row: OrgTemplateSummary;
   delay: number;
   onPreview: () => void;
+  onUse: () => void;
 }) {
   return (
     <Reveal delay={delay}>
@@ -322,13 +404,7 @@ function OrgTemplateCard({
             <button className="btn btn-ghost btn-sm" type="button" onClick={onPreview}>
               Preview
             </button>
-            <button
-              className="btn btn-primary btn-sm"
-              type="button"
-              disabled
-              title="Coming soon"
-              style={{ opacity: 0.55, cursor: "not-allowed" }}
-            >
+            <button className="btn btn-primary btn-sm" type="button" onClick={onUse}>
               Use this template
             </button>
           </div>

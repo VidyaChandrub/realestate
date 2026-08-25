@@ -4,14 +4,13 @@ import { PrismaService } from '../../database/prisma.service';
 import { toLandingPageData } from '../admin-templates/template.mapper';
 import { ListOrgTemplatesQueryDto } from './dto/list-org-templates-query.dto';
 
-// Free templates are visible to every organisation automatically — no
-// per-org assignment record exists or should exist. Eligibility is entirely
-// this filter: published, a real landing page (not a thank-you companion),
-// and not paid (no billing/plan system exists yet to unlock paid ones).
+// Templates are plan-quota based, not per-template priced — access is
+// entirely determined by the OrganisationTemplate assignment made at
+// signup or by a super admin, never by isPaid. Eligibility beyond that is
+// just published + a real landing page (not a thank-you companion).
 const ELIGIBLE_WHERE: Prisma.TemplateWhereInput = {
   status: 'published',
   pageType: 'landing',
-  isPaid: false,
 };
 
 @Injectable()
@@ -33,17 +32,18 @@ export class OrgTemplatesService {
       ];
     }
 
-    // If org has explicit package assignments, restrict to those templates
-    if (orgId) {
-      const assigned = await this.prisma.organisationTemplate.findMany({
-        where: { orgId },
-        select: { templateId: true },
-      });
-      if (assigned.length > 0) {
-        const ids = assigned.map((a) => a.templateId);
-        where.id = { in: ids };
-      }
-    }
+    // Org sees only its assigned templates — no assignments means no
+    // templates, not "all templates" (that fallback was the old
+    // globally-visible-free-templates rule, superseded by plan quotas).
+    // OrgAdminGuard guarantees orgId is always present on this route, but
+    // guard against a missing one resolving to "no filter" (= every org).
+    const assigned = orgId
+      ? await this.prisma.organisationTemplate.findMany({
+          where: { orgId },
+          select: { templateId: true },
+        })
+      : [];
+    where.id = { in: assigned.map((a) => a.templateId) };
 
     const [templates, total] = await Promise.all([
       this.prisma.template.findMany({
@@ -83,15 +83,15 @@ export class OrgTemplatesService {
     if (!template) {
       throw new NotFoundException('Template not found');
     }
-    // Enforce package assignment if org has assignments
-    if (orgId) {
-      const assigned = await this.prisma.organisationTemplate.findMany({
-        where: { orgId },
-        select: { templateId: true },
-      });
-      if (assigned.length > 0 && !assigned.some((a) => a.templateId === id)) {
-        throw new NotFoundException('Template not assigned to your organisation');
-      }
+    // Must be assigned to this org — no assignment record means no access,
+    // regardless of how many (if any) other templates are assigned.
+    const assignment = orgId
+      ? await this.prisma.organisationTemplate.findUnique({
+          where: { orgId_templateId: { orgId, templateId: id } },
+        })
+      : null;
+    if (!assignment) {
+      throw new NotFoundException('Template not assigned to your organisation');
     }
     return toLandingPageData(template, { includeContent: true });
   }

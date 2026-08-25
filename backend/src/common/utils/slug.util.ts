@@ -44,3 +44,26 @@ export async function generateUniqueTemplateSlug(
 
   return candidate;
 }
+
+// Same collision-suffix scheme, but scoped per-org — LandingPage.slug is only
+// unique within [orgId, slug], so two different orgs may both have "palm-residency".
+export async function generateUniqueLandingPageSlug(
+  prisma: Pick<PrismaService, 'landingPage'>,
+  orgId: string,
+  name: string,
+): Promise<string> {
+  const base = slugify(name);
+  let candidate = base;
+  let suffix = 1;
+
+  while (
+    await prisma.landingPage.findUnique({
+      where: { orgId_slug: { orgId, slug: candidate } },
+    })
+  ) {
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+
+  return candidate;
+}
