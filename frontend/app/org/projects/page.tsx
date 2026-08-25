@@ -239,15 +239,15 @@ const EMPTY_UNIT_TYPE: UnitType = {
 };
 
 const AMENITY_OPTIONS: Amenity[] = [
-  { name: "🏊 Swimming pool" },
-  { name: "🏋️ Clubhouse & gym" },
-  { name: "🌳 Landscaped garden" },
-  { name: "🅿️ 2-level parking" },
-  { name: "🛝 Kids play area" },
-  { name: "🔒 24×7 security" },
-  { name: "⚡ Power backup" },
-  { name: "🏸 Sports court" },
-  { name: "🧘 Yoga deck" },
+  { name: "Swimming pool" },
+  { name: "Clubhouse & gym" },
+  { name: "Landscaped garden" },
+  { name: "2-level parking" },
+  { name: "Kids play area" },
+  { name: "24×7 security" },
+  { name: "Power backup" },
+  { name: "Sports court" },
+  { name: "Yoga deck" },
 ];
 
 type ProjectForm = {
@@ -289,13 +289,26 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <div
       className="muted"
       style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
         fontSize: 11.5,
-        fontWeight: 600,
+        fontWeight: 700,
         textTransform: "uppercase",
-        letterSpacing: "0.05em",
+        letterSpacing: "0.08em",
         margin: "18px 0 12px",
+        color: "var(--muted, #64748b)",
       }}
     >
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 999,
+          background: "linear-gradient(135deg, #6d28d9, #db2777)",
+          boxShadow: "0 0 0 4px rgba(109, 40, 217, 0.12)",
+        }}
+      />
       {children}
     </div>
   );
@@ -332,12 +345,6 @@ export default function OrgProjectsPage() {
       ),
     [form.unitTypes],
   );
-
-  function openAdd() {
-    setForm(EMPTY_FORM);
-    setFormError(null);
-    setAddOpen(true);
-  }
 
   function closeAdd() {
     setAddOpen(false);
@@ -511,20 +518,20 @@ export default function OrgProjectsPage() {
           </div>
         </div>
         <div className="actions">
-          <button className="btn btn-primary" type="button" onClick={openAdd}>
+          <Link href="/org/projects/add-new-project" className="btn btn-primary">
             ＋ New project
-          </button>
+          </Link>
         </div>
       </div>
 
       {addOpen ? (
         <div
           style={{
-            background:
-              "linear-gradient(135deg, #6d28d9 0%, #db2777 45%, #f59e0b 100%)",
-            borderRadius: 18,
+            background: "linear-gradient(180deg, rgba(15, 23, 42, 0.02), rgba(15, 23, 42, 0.01))",
+            borderRadius: 22,
             overflow: "hidden",
-            border: "1px solid var(--line)",
+            border: "1px solid rgba(148, 163, 184, 0.22)",
+            boxShadow: "0 20px 60px rgba(15, 23, 42, 0.08)",
           }}
         >
           <div
@@ -532,53 +539,71 @@ export default function OrgProjectsPage() {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              gap: 12,
-              padding: "22px 26px",
+              gap: 14,
+              padding: "22px 24px 18px",
+              background: "linear-gradient(135deg, #1f2937 0%, #3b0a5c 35%, #8b1b5d 70%, #f59e0b 100%)",
               color: "#fff",
             }}
           >
             <div>
               <div
                 style={{
-                  fontSize: 12,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 11,
                   fontWeight: 700,
-                  letterSpacing: "0.08em",
+                  letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  opacity: 0.85,
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.12)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  backdropFilter: "blur(4px)",
                 }}
               >
-                ✦ New
+                ✦ New project
               </div>
-              <h1 style={{ margin: "4px 0 0", fontSize: 24, color: "#fff" }}>
+              <h1 style={{ margin: "12px 0 0", fontSize: 28, lineHeight: 1.2, color: "#fff" }}>
                 Create a project
               </h1>
-              <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
-                Add a property with configurations, unit types, media &amp; amenities.
+              <div style={{ fontSize: 13, opacity: 0.9, marginTop: 6 }}>
+                Add your property details, unit mix, media, and amenities in one workspace.
               </div>
             </div>
-            <button
-              className="btn"
-              type="button"
-              onClick={closeAdd}
+            <div
               style={{
-                background: "rgba(255,255,255,.18)",
-                color: "#fff",
-                border: "1px solid rgba(255,255,255,.35)",
-                backdropFilter: "blur(4px)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 12px",
+                borderRadius: 999,
+                background: "rgba(255,255,255,0.1)",
+                border: "1px solid rgba(255,255,255,0.16)",
+                fontSize: 12,
+                fontWeight: 600,
               }}
             >
-              ✕ Close
-            </button>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#34d399", display: "inline-block" }} />
+              Draft
+            </div>
           </div>
           <div
             style={{
-              background: "var(--surface)",
-              borderTopLeftRadius: 18,
-              borderTopRightRadius: 18,
+              background: "linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)",
               padding: 22,
             }}
           >
-          <SectionLabel>Basics</SectionLabel>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1.8fr) minmax(260px, 0.95fr)",
+                gap: 20,
+                alignItems: "start",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <SectionLabel>Basics</SectionLabel>
               <div className="grid g3">
                 <div className="field">
                   <label>Project name *</label>
@@ -1280,37 +1305,175 @@ export default function OrgProjectsPage() {
                 </>
               ) : null}
 
+              </div>
+
+              <aside
+               style={{
+                 position: "sticky",
+                 top: 16,
+                 display: "flex",
+                 flexDirection: "column",
+                 gap: 12,
+               }}
+              >
+               <div
+                 style={{
+                   border: "1px solid rgba(109, 40, 217, 0.14)",
+                   borderRadius: 18,
+                   padding: 18,
+                   background: "linear-gradient(180deg, rgba(109,40,217,0.08), rgba(219,39,119,0.04))",
+                   boxShadow: "0 16px 32px rgba(89, 28, 116, 0.06)",
+                 }}
+               >
+                 <div
+                   className="eyebrow"
+                   style={{
+                     marginBottom: 8,
+                     fontSize: 11,
+                     letterSpacing: "0.08em",
+                   }}
+                 >
+                   Project snapshot
+                 </div>
+                 <h3 style={{ margin: 0, fontSize: 22, lineHeight: 1.2, color: "var(--fg)" }}>
+                   {form.name.trim() || "Untitled project"}
+                 </h3>
+                 <div
+                   className="muted"
+                   style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5 }}
+                 >
+                   {form.location.trim() || "Location not added yet"}
+                 </div>
+                 <div
+                   style={{
+                     display: "flex",
+                     flexWrap: "wrap",
+                     gap: 8,
+                     marginTop: 12,
+                   }}
+                 >
+                   <span className="chip" style={{ borderColor: "var(--line)" }}>
+                     {form.status === "active" ? "Active" : "Inactive"}
+                   </span>
+                   {derivedConfigs.length > 0 ? (
+                     derivedConfigs.slice(0, 2).map((item) => (
+                       <span className="chip" key={item} style={{ borderColor: "var(--line)" }}>
+                         {item}
+                       </span>
+                     ))
+                   ) : (
+                     <span className="chip" style={{ borderColor: "var(--line)" }}>
+                       No configs yet
+                     </span>
+                   )}
+                 </div>
+
+                 <div
+                   style={{
+                     display: "grid",
+                     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                     gap: 10,
+                     marginTop: 16,
+                   }}
+                 >
+                   <div>
+                     <div className="muted" style={{ fontSize: 11, textTransform: "uppercase" }}>
+                       Manager
+                     </div>
+                     <div style={{ marginTop: 4, fontWeight: 600 }}>
+                       {form.manager.trim() || "Unassigned"}
+                     </div>
+                   </div>
+                   <div>
+                     <div className="muted" style={{ fontSize: 11, textTransform: "uppercase" }}>
+                       Units
+                     </div>
+                     <div style={{ marginTop: 4, fontWeight: 600 }}>
+                       {unitRollup.total > 0 ? `${unitRollup.total}` : "0"}
+                     </div>
+                   </div>
+                   <div>
+                     <div className="muted" style={{ fontSize: 11, textTransform: "uppercase" }}>
+                       Price from
+                     </div>
+                     <div style={{ marginTop: 4, fontWeight: 600 }}>
+                       {form.priceMin || "—"}
+                     </div>
+                   </div>
+                   <div>
+                     <div className="muted" style={{ fontSize: 11, textTransform: "uppercase" }}>
+                       Available
+                     </div>
+                     <div style={{ marginTop: 4, fontWeight: 600 }}>
+                       {unitRollup.available > 0 ? `${unitRollup.available}` : "0"}
+                     </div>
+                   </div>
+                 </div>
+               </div>
+
+               <div
+                 style={{
+                   border: "1px solid rgba(148, 163, 184, 0.2)",
+                   borderRadius: 18,
+                   padding: 18,
+                   background: "rgba(15, 23, 42, 0.02)",
+                 }}
+               >
+                 <div
+                   className="muted"
+                   style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em" }}
+                 >
+                   Quick checklist
+                 </div>
+                 <ul style={{ margin: "10px 0 0", paddingLeft: 18, display: "grid", gap: 8, color: "var(--fg)" }}>
+                   <li>{form.name.trim() ? "✓ Name captured" : "• Add project name"}</li>
+                   <li>{form.location.trim() ? "✓ Location captured" : "• Add location"}</li>
+                   <li>{form.manager.trim() ? "✓ Manager assigned" : "• Assign manager"}</li>
+                   <li>{form.unitTypes.length > 0 ? "✓ Unit types added" : "• Add at least one unit"}</li>
+                 </ul>
+               </div>
+              </aside>
+            </div>
+
               <div
                 style={{
                   display: "flex",
                   gap: 10,
                   alignItems: "center",
-                  marginTop: 6,
+                  justifyContent: "space-between",
+                  marginTop: 18,
+                  paddingTop: 18,
+                  borderTop: "1px solid rgba(148, 163, 184, 0.18)",
                 }}
               >
-                {formError ? (
-                  <div className="help" style={{ margin: 0, flex: 1 }}>
-                    ⚠️ {formError}
-                  </div>
-                ) : (
-                  <span className="muted" style={{ fontSize: 12.5, flex: 1 }}>
-                    Configurations &amp; inventory roll up from unit types automatically.
-                  </span>
-                )}
-                <button className="btn btn-ghost" type="button" onClick={closeAdd}>
-                  Cancel
-                </button>
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  onClick={submitAdd}
-                  style={{
-                    background: "linear-gradient(135deg,#6d28d9,#db2777)",
-                    border: "none",
-                  }}
-                >
-                  Create project
-                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {formError ? (
+                    <div className="help" style={{ margin: 0 }}>
+                      ⚠️ {formError}
+                    </div>
+                  ) : (
+                    <span className="muted" style={{ fontSize: 12.5 }}>
+                      Configurations &amp; inventory roll up from unit types automatically.
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <button className="btn btn-ghost" type="button" onClick={closeAdd}>
+                    Cancel
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    onClick={submitAdd}
+                    style={{
+                      background: "linear-gradient(135deg,#6d28d9,#db2777)",
+                      border: "none",
+                      boxShadow: "0 12px 24px rgba(109, 40, 217, 0.25)",
+                    }}
+                  >
+                    Create project
+                  </button>
+                </div>
               </div>
             </div>
           </div>
