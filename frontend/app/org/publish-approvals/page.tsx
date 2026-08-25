@@ -4,7 +4,7 @@ export default function OrgPublishApprovalsPage() {
   return (
     <ComingSoon
       title="Publish & Approvals"
-      icon="🚀"
+      icon="flag"
       description="Review and approve content before it goes live."
     />
   );

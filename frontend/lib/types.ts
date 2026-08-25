@@ -57,9 +57,11 @@ export interface LoginResponse extends AuthTokens {
   user: SafeUser;
 }
 
-export interface SignupResponse extends AuthTokens {
+export interface SignupResponse extends Partial<AuthTokens> {
   organisation: SafeOrganisation;
   user: SafeUser;
+  pending?: boolean;
+  message?: string;
 }
 
 export interface ApiErrorBody {
@@ -76,6 +78,9 @@ export interface SignupInput {
   phone_number: string;
   city: string;
   password: string;
+  planId?: string;
+  billingCycle?: 'monthly' | 'yearly';
+  templateIds?: string[];
 }
 
 export interface LoginInput {
@@ -139,12 +144,16 @@ export interface OrganisationListRow {
   name: string;
   slug: string;
   city: string;
+  adminName: string | null;
   adminEmail: string | null;
-  status: "active" | "disabled";
+  adminPhone: string | null;
+  status: "active" | "disabled" | "pending";
   createdAt: string;
   userCount: number;
-  plan: null;
-  mrr: null;
+  teamCount: number;
+  templatesCount: number;
+  plan: { id: string; name: string; slug: string; badge: string; billingCycle?: string; amount?: number } | null;
+  mrr: number | null;
 }
 
 export interface OrganisationListResponse {
@@ -157,6 +166,7 @@ export interface OrganisationListResponse {
 export interface OrganisationSummary {
   total: number;
   active: number;
+  pending?: number;
   onTrial: null;
   suspended: null;
 }
@@ -166,7 +176,7 @@ export interface OrganisationDetail {
   name: string;
   slug: string;
   city: string;
-  status: "active" | "disabled";
+  status: "active" | "disabled" | "pending";
   createdAt: string;
   timezone: string;
   currency: string;
@@ -188,9 +198,11 @@ export interface OrganisationDetail {
   } | null;
   userCount: number;
   teamCount: number;
-  plan: null;
-  planValue: null;
-  subscriptionRenewsAt: null;
+  plan: { id: string; name: string; slug: string; badge: string } | null;
+  planValue: number | null;
+  subscriptionRenewsAt: string | null;
+  assignedTemplates?: number;
+  subscription?: Subscription | null;
 }
 
 export type OrgUserAssignableRole = "admin" | "manager" | "sales";
@@ -262,4 +274,92 @@ export interface OrgTemplatesListResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+// --- Billing: Plans & Subscriptions ---
+export interface Plan {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  priceMonthly: number;
+  priceYearly: number;
+  features: string[];
+  limits: { projects: string; users: string; templates: string } | null;
+  color: string;
+  badge: string;
+  isPopular: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Subscription {
+  id: string;
+  orgId: string;
+  planId: string;
+  billingCycle: 'monthly' | 'yearly';
+  status: 'active' | 'past_due' | 'trial' | 'cancelled' | 'paused';
+  amount: number;
+  currency: string;
+  mrr: number | null;
+  renewsAt: string | null;
+  startedAt: string;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  organisation: { id: string; name: string; city: string; slug: string } | null;
+  plan: { id: string; name: string; slug: string; priceMonthly: number; priceYearly: number; color: string; badge: string; isPopular: boolean } | null;
+}
+
+export interface SubscriptionsListResponse {
+  data: Subscription[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface BillingOverview {
+  mrr: number;
+  arr: number;
+  activePlans: number;
+  activeSubscriptions: number;
+  totalSubscriptions: number;
+  churnRate: number;
+  distribution: { planId: string; planName: string; badge: string; count: number; pct: number }[];
+  mrrHistory: { month: string; mrr: number }[];
+}
+
+export interface CreatePlanInput {
+  name: string;
+  slug?: string;
+  description?: string;
+  priceMonthly: number;
+  priceYearly: number;
+  features?: string[];
+  limits?: { projects: string; users: string; templates: string };
+  color?: string;
+  badge?: string;
+  isPopular?: boolean;
+}
+
+export interface UpdatePlanInput extends Partial<CreatePlanInput> {
+  isActive?: boolean;
+}
+
+export interface CreateSubscriptionInput {
+  orgId: string;
+  planId: string;
+  billingCycle?: 'monthly' | 'yearly';
+  status?: string;
+  currency?: string;
+  renewsAt?: string;
+}
+
+export interface UpdateSubscriptionInput {
+  planId?: string;
+  billingCycle?: 'monthly' | 'yearly';
+  status?: 'active' | 'past_due' | 'trial' | 'cancelled' | 'paused';
+  currency?: string;
+  renewsAt?: string;
 }

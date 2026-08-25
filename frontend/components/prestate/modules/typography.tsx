@@ -24,6 +24,7 @@ import { uid } from "@/lib/prestate/data";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import { ModuleHeader, SiteScopeBar } from "./shared";
 import { Btn, Chip, Collapse, ColorField, FieldRow, LengthInput, SelectField, SliderField, TabBar, TextField, Toggle } from "@/components/prestate/ui";
+import { Icon } from "@/components/icons";
 
 const TYPE_META: { key: TypeKey; label: string; hint: string; isParagraph?: boolean }[] = [
   { key: "h1", label: "H1", hint: "Hero / page titles" },
@@ -220,9 +221,9 @@ export function TypographyModule({
         <div style={{ maxWidth: 420 }}>
           <TabBar
             tabs={[
-              { key: "desktop", label: "🖥 Desktop" },
-              { key: "tablet", label: "📱 Tablet" },
-              { key: "mobile", label: "📞 Mobile" },
+              { key: "desktop", label: " Desktop" },
+              { key: "tablet", label: <><Icon name="phone" size={14} /> Tablet</> },
+              { key: "mobile", label: <><Icon name="phone" size={14} /> Mobile</> },
             ]}
             active={deviceTab}
             onChange={(k) => setDeviceTab(k as Breakpoint)}

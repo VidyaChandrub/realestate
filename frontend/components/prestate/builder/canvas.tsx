@@ -572,7 +572,7 @@ function GateForm({
                 </div>
               ))}
             </div>
-            {error ? <div style={{ marginTop: 12, padding: "9px 12px", borderRadius: 10, background: "var(--ps-danger-soft, #fee2e2)", color: "#dc2626", fontSize: 12.5, fontWeight: 600 }}>⚠ {error}</div> : null}
+            {error ? <div style={{ marginTop: 12, padding: "9px 12px", borderRadius: 10, background: "var(--ps-danger-soft, #fee2e2)", color: "#dc2626", fontSize: 12.5, fontWeight: 600 }}> {error}</div> : null}
             <button type="button" onClick={submit} style={{ width: "100%", marginTop: 16, padding: "13px", border: "none", borderRadius: 11, background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", boxShadow: "0 10px 26px rgba(109,93,252,.35)" }}>
               {submitLabel || "Submit & Download"}
             </button>
@@ -821,7 +821,7 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(8,10,20,.78) 0%, rgba(8,10,20,.35) 55%, transparent 100%)", zIndex: 1 }} />
       <Inner section={s} align={isCentered ? "center" : "left"}>
         <div style={{ maxWidth: isCentered ? 760 : device === "mobile" ? "100%" : 640, margin: isCentered ? "0 auto" : undefined, textAlign: isCentered ? "center" : "left" }}>
-          <Eyebrow gold>★ {String(resolveVars(st.eyebrow))}</Eyebrow>
+          <Eyebrow gold> {String(resolveVars(st.eyebrow))}</Eyebrow>
           <h1 className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 32 : device === "tablet" ? 42 : 56, lineHeight: 1.08, fontWeight: 700, color: "#fff", letterSpacing: -0.5, margin: "16px 0 10px", textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.heading))}</h1>
           <p style={{ fontSize: device === "mobile" ? 16 : device === "tablet" ? 18 : 21, color: "#c9a56a", fontWeight: 600, letterSpacing: 0.3, marginBottom: 20, textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.subheading))}</p>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, justifyContent: isCentered ? "center" : "flex-start" }}>
@@ -1343,7 +1343,7 @@ function VirtualTourSection({ s, device }: { s: SectionInstance; device: Device 
   return (
     <>
       <Inner section={s}>
-        <Eyebrow gold>★ {String(st.eyebrow)}</Eyebrow>
+        <Eyebrow gold> {String(st.eyebrow)}</Eyebrow>
         <h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", color: "#fff", ...T }}>{String(st.heading)}</h2>
         <p style={{ fontSize: 14, color: "rgba(255,255,255,.7)", maxWidth: 520, lineHeight: 1.65, ...T }}>{String(st.text)}</p>
       </Inner>
@@ -1827,7 +1827,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
                 ) : f.type === "file" ? (
                   val ? (
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", border: "1px solid var(--ps-line)", borderRadius: 9, background: "var(--ps-bg)" }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📎 {val}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}> {val}</span>
                       <button type="button" onClick={() => setValues((p) => withFieldValue(p, f, ""))} style={{ background: "none", border: "none", color: "#e5484d", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Remove</button>
                     </div>
                   ) : (
@@ -1886,7 +1886,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
         </div>
         {error ? (
           <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 10, background: "var(--ps-danger-soft, #fee2e2)", color: "#dc2626", fontSize: 12.5, fontWeight: 600 }}>
-            ⚠ {/required/i.test(error) ? errorMsg : error}
+             {/required/i.test(error) ? errorMsg : error}
           </div>
         ) : null}
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
@@ -1951,7 +1951,7 @@ function CtaBanner({ s, device }: { s: SectionInstance; device: Device }) {
     <div style={{ position: "relative", textAlign: "center", padding: device === "mobile" ? "48px 22px" : "72px 24px" }}>
       <Overlay section={s} />
       <Inner section={s}>
-        <Eyebrow gold>★ {String(resolveVars(st.eyebrow))}</Eyebrow>
+        <Eyebrow gold> {String(resolveVars(st.eyebrow))}</Eyebrow>
         <h2 style={{ fontSize: device === "mobile" ? 26 : 38, fontWeight: 800, letterSpacing: -0.6, margin: "16px 0 12px", color: "#fff", maxWidth: 760, lineHeight: 1.2, ...T }}>{String(resolveVars(st.heading))}</h2>
         <p style={{ fontSize: 15, color: "rgba(255,255,255,.78)", maxWidth: 620, lineHeight: 1.7, ...T }}>{String(resolveVars(st.sub))}</p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 28, flexWrap: "wrap" }}>
@@ -3032,7 +3032,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                     )}
                   </div>
                 ))}
-                {formError ? <div style={{ padding: "9px 12px", borderRadius: 10, background: "var(--ps-danger-soft, #fee2e2)", color: "#dc2626", fontSize: 12.5, fontWeight: 600 }}>⚠ {formError}</div> : null}
+                {formError ? <div style={{ padding: "9px 12px", borderRadius: 10, background: "var(--ps-danger-soft, #fee2e2)", color: "#dc2626", fontSize: 12.5, fontWeight: 600 }}> {formError}</div> : null}
                 <button type="button" onClick={submitPopupForm} style={{ marginTop: 4, padding: "13px", border: "none", borderRadius: 11, background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", boxShadow: "0 10px 26px rgba(109,93,252,.35)" }}>
                   {String(st.formButton || "Submit")}
                 </button>

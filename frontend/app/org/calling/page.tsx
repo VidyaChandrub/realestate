@@ -4,7 +4,7 @@ export default function OrgCallingPage() {
   return (
     <ComingSoon
       title="Calling"
-      icon="📞"
+      icon="phone"
       description="AI-assisted calling for your sales team."
     />
   );

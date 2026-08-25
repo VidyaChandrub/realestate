@@ -4,7 +4,7 @@ export default function OrgSupportPage() {
   return (
     <ComingSoon
       title="Support"
-      icon="🛟"
+      icon="flag"
       description="Get help from the iPixxel Realty team."
     />
   );

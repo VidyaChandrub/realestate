@@ -6,7 +6,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["identity", "access", "templates", "audit"]
+  schemas  = ["identity", "access", "templates", "audit", "billing"]
 }
 
 // ---------------------------------------------------------------------------
@@ -19,6 +19,7 @@ enum OrgStatus {
   draft
   active
   disabled
+  pending
 
   @@schema("identity")
 }
@@ -66,9 +67,11 @@ model Organisation {
   postalCode      String? @map("postal_code")
   country         String?
 
-  users       User[]
-  teams       Team[]
-  auditLogs   AuditLog[]
+  users                  User[]
+  teams                  Team[]
+  auditLogs              AuditLog[]
+  subscriptions          Subscription[]
+  organisationTemplates  OrganisationTemplate[]
 
   @@map("organisations")
   @@schema("identity")
@@ -283,9 +286,93 @@ model Template {
   createdAt      DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
-  parent     Template?  @relation("TemplatePages", fields: [parentId], references: [id], onDelete: SetNull)
-  childPages Template[] @relation("TemplatePages")
+  parent                 Template?              @relation("TemplatePages", fields: [parentId], references: [id], onDelete: SetNull)
+  childPages             Template[]             @relation("TemplatePages")
+  organisationTemplates  OrganisationTemplate[]
 
   @@map("templates")
+  @@schema("templates")
+}
+
+// ---------------------------------------------------------------------------
+// billing — plans & subscriptions
+// ---------------------------------------------------------------------------
+
+enum BillingCycle {
+  monthly
+  yearly
+
+  @@schema("billing")
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  trial
+  cancelled
+  paused
+
+  @@schema("billing")
+}
+
+model Plan {
+  id           String   @id @default(uuid())
+  name         String
+  slug         String   @unique
+  description  String?  @default("")
+  priceMonthly Int      @map("price_monthly")
+  priceYearly  Int      @map("price_yearly")
+  features     Json     @default("[]")
+  limits       Json?    // { projects, users, templates }
+  color        String   @default("#eef0fe")
+  badge        String   @default("b-indigo")
+  isPopular    Boolean  @default(false) @map("is_popular")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+  @@schema("billing")
+}
+
+model Subscription {
+  id           String             @id @default(uuid())
+  orgId        String             @map("org_id")
+  planId       String             @map("plan_id")
+  billingCycle BillingCycle       @default(monthly) @map("billing_cycle")
+  status       SubscriptionStatus @default(active)
+  amount       Int
+  currency     String             @default("INR")
+  renewsAt     DateTime?          @map("renews_at")
+  mrr          Int?               // monthly recurring normalized value
+  startedAt    DateTime           @default(now()) @map("started_at")
+  cancelledAt  DateTime?          @map("cancelled_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  plan         Plan         @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([orgId])
+  @@index([planId])
+  @@index([status])
+  @@map("subscriptions")
+  @@schema("billing")
+}
+
+model OrganisationTemplate {
+  orgId      String   @map("org_id")
+  templateId String   @map("template_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  assignedBy String?  @map("assigned_by")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  template     Template     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@id([orgId, templateId])
+  @@index([templateId])
+  @@map("organisation_templates")
   @@schema("templates")
 }

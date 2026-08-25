@@ -183,7 +183,7 @@ export function FormsModule({
     onToast("Cleared fields — add any field from the library");
   };
 
-  const embedCode = embedSnippet(form.embed?.id ?? "", typeof window !== "undefined" ? window.location.origin : "");
+  const embedCode = libEmbedSnippet(form.embed?.id ?? "", typeof window !== "undefined" ? window.location.origin : "");
   const iframeCode = `<iframe src="${typeof window !== "undefined" ? window.location.origin : ""}/p/${site.slug}#lead-form" title="${site.name} lead form" style="width:100%;min-height:720px;border:0"></iframe>`;
 
   const copyText = async (text: string, msg: string) => {
@@ -698,7 +698,7 @@ export function FormsModule({
                           <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>Redirects to</div>
                           <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{localPreviewPath(selectedP)}</div>
                         </div>
-                        <Btn size="sm" variant="outline" onClick={() => window.location.assign(builderPath(selected.id))}>Edit page</Btn>
+                        <Btn size="sm" variant="outline" onClick={() => window.location.assign(builderPath(selectedP.id))}>Edit page</Btn>
                       </div>
                     );
                   })()}

@@ -1,7 +1,11 @@
 import {
+  IsArray,
   IsEmail,
+  IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -39,4 +43,17 @@ export class SignupDto {
   @MinLength(8)
   @MaxLength(72)
   password: string;
+
+  @IsOptional()
+  @IsUUID()
+  planId?: string;
+
+  @IsOptional()
+  @IsEnum(['monthly', 'yearly'] as const)
+  billingCycle?: 'monthly' | 'yearly';
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('all', { each: true })
+  templateIds?: string[];
 }

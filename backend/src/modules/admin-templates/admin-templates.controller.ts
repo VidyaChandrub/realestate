@@ -18,7 +18,6 @@ import { UpdateTemplateDto } from './dto/update-template.dto';
 import { ListTemplatesQueryDto } from './dto/list-templates-query.dto';
 import { ResetTemplateDto } from './dto/reset-template.dto';
 
-@UseGuards(JwtAuthGuard, SuperAdminGuard)
 @Controller('admin/templates')
 export class AdminTemplatesController {
   constructor(private readonly adminTemplatesService: AdminTemplatesService) {}
@@ -29,35 +28,57 @@ export class AdminTemplatesController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   getById(@Param('id') id: string) {
     return this.adminTemplatesService.getById(id);
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   create(@Body() dto: CreateTemplateDto) {
     return this.adminTemplatesService.create(dto);
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   update(@Param('id') id: string, @Body() dto: UpdateTemplateDto) {
     return this.adminTemplatesService.update(id, dto);
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @HttpCode(204)
   remove(@Param('id') id: string) {
     return this.adminTemplatesService.remove(id);
   }
 
   @Post(':id/reset')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @HttpCode(200)
   reset(@Param('id') id: string, @Body() dto: ResetTemplateDto) {
     return this.adminTemplatesService.reset(id, dto);
   }
 
   @Post(':id/duplicate')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @HttpCode(201)
   duplicate(@Param('id') id: string) {
     return this.adminTemplatesService.duplicate(id);
+  }
+}
+
+@Controller('templates')
+export class PublicTemplatesController {
+  constructor(private readonly adminTemplatesService: AdminTemplatesService) {}
+
+  @Get()
+  listPublic(@Query() query: ListTemplatesQueryDto) {
+    // Public for registration — only published landing templates, limited fields
+    return this.adminTemplatesService.list({ ...query, status: 'published', pageType: 'landing' } as any);
+  }
+
+  @Get(':id')
+  getPublicById(@Param('id') id: string) {
+    return this.adminTemplatesService.getById(id);
   }
 }

@@ -4,7 +4,7 @@ export default function OrgLeadsPage() {
   return (
     <ComingSoon
       title="Lead Center"
-      icon="📇"
+      icon="target"
       description="Every enquiry from every channel, in one pipeline."
     />
   );

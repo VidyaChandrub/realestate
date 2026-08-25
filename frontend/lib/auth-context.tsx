@@ -166,6 +166,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         body: JSON.stringify(input),
       });
+      // Pending approval — no tokens, do not persist session
+      if (response.pending || !response.access_token || !response.refresh_token) {
+        // Return a session-like value but without persisting; caller should handle pending
+        const session = toSessionUser(response.user, {});
+        // Attach pending flag for UI handling by throwing a special error shape is not needed; just return with pending flag
+        (session as any).pending = true;
+        return session;
+      }
       const session = toSessionUser(response.user, {});
       persist(session, response.access_token, response.refresh_token);
       return session;

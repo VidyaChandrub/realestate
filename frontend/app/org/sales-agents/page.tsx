@@ -4,7 +4,7 @@ export default function OrgSalesAgentsPage() {
   return (
     <ComingSoon
       title="Sales Agents"
-      icon="🧑‍💼"
+      icon="users"
       description="Manage your sales agents and their assignments."
     />
   );

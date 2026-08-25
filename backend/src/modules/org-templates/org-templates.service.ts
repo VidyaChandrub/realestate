@@ -18,7 +18,7 @@ const ELIGIBLE_WHERE: Prisma.TemplateWhereInput = {
 export class OrgTemplatesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(query: ListOrgTemplatesQueryDto) {
+  async list(query: ListOrgTemplatesQueryDto, orgId?: string | null) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
@@ -31,6 +31,18 @@ export class OrgTemplatesService {
         { name: { contains: query.search, mode: 'insensitive' } },
         { baseDesignName: { contains: query.search, mode: 'insensitive' } },
       ];
+    }
+
+    // If org has explicit package assignments, restrict to those templates
+    if (orgId) {
+      const assigned = await this.prisma.organisationTemplate.findMany({
+        where: { orgId },
+        select: { templateId: true },
+      });
+      if (assigned.length > 0) {
+        const ids = assigned.map((a) => a.templateId);
+        where.id = { in: ids };
+      }
     }
 
     const [templates, total] = await Promise.all([
@@ -62,7 +74,7 @@ export class OrgTemplatesService {
     };
   }
 
-  async getById(id: string) {
+  async getById(id: string, orgId?: string | null) {
     // Same eligibility filter as the list — a draft/paid/thank-you id must
     // 404 here, not just be hidden by the UI.
     const template = await this.prisma.template.findFirst({
@@ -70,6 +82,16 @@ export class OrgTemplatesService {
     });
     if (!template) {
       throw new NotFoundException('Template not found');
+    }
+    // Enforce package assignment if org has assignments
+    if (orgId) {
+      const assigned = await this.prisma.organisationTemplate.findMany({
+        where: { orgId },
+        select: { templateId: true },
+      });
+      if (assigned.length > 0 && !assigned.some((a) => a.templateId === id)) {
+        throw new NotFoundException('Template not assigned to your organisation');
+      }
     }
     return toLandingPageData(template, { includeContent: true });
   }

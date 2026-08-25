@@ -4,7 +4,7 @@ export default function OrgWebsitesPage() {
   return (
     <ComingSoon
       title="Websites"
-      icon="🌐"
+      icon="globe"
       description="Your organisation's live websites and domains."
     />
   );

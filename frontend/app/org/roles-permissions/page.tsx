@@ -4,7 +4,7 @@ export default function OrgRolesPermissionsPage() {
   return (
     <ComingSoon
       title="Roles & Permissions"
-      icon="🔐"
+      icon="lock"
       description="Control what each role can view, add, edit and delete."
     />
   );
