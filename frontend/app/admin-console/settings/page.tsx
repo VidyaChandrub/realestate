@@ -8,12 +8,12 @@ export const metadata: Metadata = {
 };
 
 const INTEGRATIONS = [
-  { ic: "ic-indigo", emoji: "<Icon name="billing" size={14} />", name: "Razorpay", desc: "Collect template & subscription payments in INR.", badge: "b-green", badgeTxt: "Connected", on: true },
-  { ic: "ic-green", emoji: "<Icon name="mail" size={14} />", name: "WhatsApp Business API", desc: "Lead alerts & buyer conversations for orgs.", badge: "b-green", badgeTxt: "Connected", on: true },
+  { ic: "ic-indigo", emoji: <Icon name="billing" size={14} />, name: "Razorpay", desc: "Collect template & subscription payments in INR.", badge: "b-green", badgeTxt: "Connected", on: true },
+  { ic: "ic-green", emoji: <Icon name="mail" size={14} />, name: "WhatsApp Business API", desc: "Lead alerts & buyer conversations for orgs.", badge: "b-green", badgeTxt: "Connected", on: true },
   { ic: "ic-sky", emoji: "", name: "Meta", desc: "Lead ads & pixel sync for property campaigns.", badge: "b-green", badgeTxt: "Connected", on: true },
-  { ic: "ic-amber", emoji: "<Icon name="dashboard" size={14} />", name: "Google Ads / GTM", desc: "Tag manager & conversion tracking container.", badge: "b-gray", badgeTxt: "Not connected", on: false },
-  { ic: "ic-violet", emoji: "<Icon name="mail" size={14} />", name: "SMTP Email", desc: "Transactional email for invites & receipts.", badge: "b-green", badgeTxt: "Connected", on: true },
-  { ic: "ic-rose", emoji: "<Icon name="reports" size={14} />", name: "Google Analytics", desc: "GA4 property traffic for org landing pages.", badge: "b-gray", badgeTxt: "Not connected", on: false },
+  { ic: "ic-amber", emoji: <Icon name="dashboard" size={14} />, name: "Google Ads / GTM", desc: "Tag manager & conversion tracking container.", badge: "b-gray", badgeTxt: "Not connected", on: false },
+  { ic: "ic-violet", emoji: <Icon name="mail" size={14} />, name: "SMTP Email", desc: "Transactional email for invites & receipts.", badge: "b-green", badgeTxt: "Connected", on: true },
+  { ic: "ic-rose", emoji: <Icon name="reports" size={14} />, name: "Google Analytics", desc: "GA4 property traffic for org landing pages.", badge: "b-gray", badgeTxt: "Not connected", on: false },
 ];
 
 const SECURITY = [

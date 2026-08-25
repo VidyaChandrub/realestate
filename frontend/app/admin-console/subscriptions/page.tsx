@@ -6,6 +6,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
 import { apiFetch } from "@/lib/api";
+import { Icon } from "@/components/icons";
 import type { Plan, Subscription, BillingOverview, OrganisationListResponse } from "@/lib/types";
 
 const ALL_FEATURES = [

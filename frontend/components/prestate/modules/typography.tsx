@@ -222,8 +222,8 @@ export function TypographyModule({
           <TabBar
             tabs={[
               { key: "desktop", label: " Desktop" },
-              { key: "tablet", label: "<Icon name="phone" size={14} /> Tablet" },
-              { key: "mobile", label: "<Icon name="phone" size={14} /> Mobile" },
+              { key: "tablet", label: <><Icon name="phone" size={14} /> Tablet</> },
+              { key: "mobile", label: <><Icon name="phone" size={14} /> Mobile</> },
             ]}
             active={deviceTab}
             onChange={(k) => setDeviceTab(k as Breakpoint)}

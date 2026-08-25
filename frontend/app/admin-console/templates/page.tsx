@@ -221,10 +221,10 @@ export default function SuperAdminTemplatesPage() {
   };
 
   const STAT_TILES = [
-    { label: "Total templates", value: stats.total, ic: "ic-indigo", emoji: "<Icon name="puzzle" size={14} />" },
+    { label: "Total templates", value: stats.total, ic: "ic-indigo", emoji: <Icon name="puzzle" size={14} /> },
     { label: "Predefined", value: stats.predefined, ic: "ic-violet", emoji: "" },
-    { label: "Custom", value: stats.custom, ic: "ic-sky", emoji: "<Icon name="sparkles" size={14} />" },
-    { label: "Published", value: stats.published, ic: "ic-green", emoji: "<Icon name="sparkles" size={14} />" },
+    { label: "Custom", value: stats.custom, ic: "ic-sky", emoji: <Icon name="sparkles" size={14} /> },
+    { label: "Published", value: stats.published, ic: "ic-green", emoji: <Icon name="sparkles" size={14} /> },
   ];
 
   return (
