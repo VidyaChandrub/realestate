@@ -381,9 +381,6 @@ export interface LandingPageRow {
   thumbnail: string | null;
   pageType: 'landing' | 'thank_you';
   parentId?: string | null;
-  submittedAt: string | null;
-  reviewedAt: string | null;
-  rejectionReason: string | null;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -411,4 +408,41 @@ export interface AdminLandingPagesListResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+// GET /org/billing — read-only view over the subscriptions module for the
+// org settings screen. No invoices/payment methods exist in the schema, so
+// this is deliberately just plan + usage.
+export interface OrgBillingPlan {
+  id: string;
+  name: string;
+  slug: string;
+  priceMonthly: number;
+  priceYearly: number;
+  color: string;
+  badge: string;
+  isPopular: boolean;
+  limits: { projects?: string; users?: string; templates?: string } | null;
+}
+
+export interface OrgBillingSubscription {
+  status: 'active' | 'past_due' | 'trial' | 'cancelled' | 'paused';
+  billingCycle: 'monthly' | 'yearly';
+  amount: number;
+  currency: string;
+  startedAt: string;
+  renewsAt: string | null;
+  cancelledAt: string | null;
+}
+
+export interface OrgBillingSummary {
+  plan: OrgBillingPlan | null;
+  subscription: OrgBillingSubscription | null;
+  usage: {
+    templatesUsed: number;
+    /** null = unlimited when a plan exists; also null when there's no plan
+     *  at all — callers branch on `plan === null` first, so this is never
+     *  ambiguous in practice. */
+    templatesLimit: number | null;
+  };
 }

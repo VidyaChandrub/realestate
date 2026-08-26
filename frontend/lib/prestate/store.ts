@@ -9,7 +9,8 @@ export {
   deleteTemplate,
   duplicateTemplate,
   resetTemplate,
-  submitLandingPage,
+  publishLandingPage,
+  unpublishLandingPage,
 } from "./persist";
 export type { CreateTemplateInput, Resource } from "./persist";
 

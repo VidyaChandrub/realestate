@@ -709,9 +709,15 @@ export function SettingsPanel({
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                   {hasTypographyOverride(badgeTypo) ? <Chip tone="warn">{isDeviceTab ? `${deviceKey} custom` : "Custom"}</Chip> : <Chip tone="primary">Global</Chip>}
                   {hasTypographyOverride(badgeTypo) ? (
-                    <button
-                      type="button"
-                      onClick={() => {
+                    // Not a <button> — this renders inside Collapse's `badge` slot, which
+                    // sits inside Collapse's own <button> trigger; a nested <button> is
+                    // invalid HTML and causes a hydration mismatch. stopPropagation keeps
+                    // the click from also toggling the Collapse open/closed.
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (isDeviceTab) {
                           const prevResp = { ...(style.responsive ?? {}) };
                           const prevDev = { ...(prevResp[deviceKey] ?? {}) };
@@ -722,11 +728,17 @@ export function SettingsPanel({
                           setStyle({ typography: {} });
                         }
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key !== "Enter" && e.key !== " ") return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.currentTarget.click();
+                      }}
                       title={isDeviceTab ? `Reset ${deviceKey} typography to desktop values` : "Reset to template/global typography"}
-                      style={{ border: "none", background: "var(--ps-bg)", color: "var(--ps-primary)", borderRadius: 7, fontSize: 10.5, fontWeight: 800, padding: "3px 8px", cursor: "pointer" }}
+                      style={{ display: "inline-flex", border: "none", background: "var(--ps-bg)", color: "var(--ps-primary)", borderRadius: 7, fontSize: 10.5, fontWeight: 800, padding: "3px 8px", cursor: "pointer" }}
                     >
                       ↺ Reset
-                    </button>
+                    </span>
                   ) : null}
                 </span>
               }

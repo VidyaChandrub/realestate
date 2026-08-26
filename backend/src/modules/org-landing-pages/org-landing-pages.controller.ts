@@ -50,10 +50,16 @@ export class OrgLandingPagesController {
     return this.service.update(user.orgId as string, id, dto);
   }
 
-  @Post(':id/submit')
+  @Post(':id/publish')
   @HttpCode(200)
-  submit(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
-    return this.service.submit(user.orgId as string, id);
+  publish(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.service.publish(user.orgId as string, id);
+  }
+
+  @Post(':id/unpublish')
+  @HttpCode(200)
+  unpublish(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.service.unpublish(user.orgId as string, id);
   }
 
   @Delete(':id')

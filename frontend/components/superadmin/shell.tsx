@@ -90,26 +90,22 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [approvalsBadge, setApprovalsBadge] = useState<number | null>(null);
 
-  // Approvals still covers two queues today — pending organisation
-  // registrations and pending landing-page submissions — so the badge is
-  // their combined count. The org-approval queue is slated for retirement
-  // (the Organisations list already has inline Approve/Reject); once it's
-  // actually removed, drop the organisations half here and this becomes a
-  // landing-pages-only count with no other change needed.
+  // Approvals covers pending organisation registrations only — landing-page
+  // approval was removed (orgs publish their own pages directly now). The
+  // org-approval queue is slated for retirement too (the Organisations list
+  // already has inline Approve/Reject); once it's actually removed, this
+  // badge goes away entirely.
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
-    Promise.all([
-      apiFetch<{ pending?: number }>("/admin/organisations/summary", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }).catch(() => null),
-      apiFetch<{ total: number }>("/admin/landing-pages?status=pending_approval&limit=1", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }).catch(() => null),
-    ]).then(([orgSummary, lpList]) => {
-      if (cancelled) return;
-      setApprovalsBadge((orgSummary?.pending ?? 0) + (lpList?.total ?? 0));
-    });
+    apiFetch<{ pending?: number }>("/admin/organisations/summary", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .catch(() => null)
+      .then((orgSummary) => {
+        if (cancelled) return;
+        setApprovalsBadge(orgSummary?.pending ?? 0);
+      });
     return () => {
       cancelled = true;
     };

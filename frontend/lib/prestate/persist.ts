@@ -216,9 +216,6 @@ interface ApiLandingPage {
   parentId: string | null;
   sourceTemplateId: string | null;
   sourceTemplate?: { id: string; name: string } | null;
-  submittedAt: string | null;
-  reviewedAt: string | null;
-  rejectionReason: string | null;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -437,9 +434,17 @@ export async function resetTemplate(
   return fromApiTemplate(raw);
 }
 
-/** draft/rejected -> pending_approval. Only ever called for resource: "landing-page". */
-export async function submitLandingPage(id: string): Promise<LandingPageData> {
-  const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}/submit`, {
+/** Publishes an org's own landing page directly — no approval gate. Only
+ *  ever called for resource: "landing-page". */
+export async function publishLandingPage(id: string): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}/publish`, {
+    method: "POST",
+  });
+  return fromApiLandingPage(raw);
+}
+
+export async function unpublishLandingPage(id: string): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}/unpublish`, {
     method: "POST",
   });
   return fromApiLandingPage(raw);

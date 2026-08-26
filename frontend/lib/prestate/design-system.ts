@@ -1,4 +1,6 @@
 import type { SiteConfig } from "./types";
+import type { Resource } from "./persist";
+import { apiFetch } from "../api";
 
 // ---------------------------------------------------------------------------
 // Design system — per-template typography + optional shared global set +
@@ -119,39 +121,139 @@ export function hydrateTypography(raw: unknown): TemplateTypography {
 }
 
 // ---------------------------------------------------------------------------
-// Global design-system sets (shared across templates, stored separately)
+// Global design-system sets — server-persisted (GET/POST/PATCH/DELETE
+// against /org/typography-sets or /admin/typography-sets, chosen by
+// `resource` the same way persist.ts picks between org/admin paths).
+//
+// Two-level scoping, enforced server-side, not just here:
+//  - "platform" sets (orgId: null) — Super Admin owned, usable by every org.
+//  - "org" sets — owned by one org, visible only to that org.
+// An org session's list already comes back as platform + that org's own
+// sets combined; an admin session's list is platform sets only.
 // ---------------------------------------------------------------------------
+
+export type TypographySetScope = "platform" | "org";
 
 export interface GlobalStyleSet {
   id: string;
   name: string;
   typography: TemplateTypography;
+  /** Display-formatted last-updated date. */
   updated?: string;
+  /** Which level this set belongs to — platform sets render read-only for
+   *  an org session (not editable/deletable, enforced server-side too). */
+  scope: TypographySetScope;
 }
 
-const GLOBAL_KEY = "prestate.design-system.v1";
 const FONT_KEY = "prestate.fonts.v1";
 
-export function loadGlobalSets(): GlobalStyleSet[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(GLOBAL_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as GlobalStyleSet[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((s) => ({ ...s, typography: hydrateTypography(s.typography) }));
-  } catch {
-    return [];
-  }
+interface ApiTypographySet {
+  id: string;
+  orgId: string | null;
+  name: string;
+  tokens: unknown;
+  createdAt: string;
+  updatedAt: string;
+  /** Present on the org endpoint's list response; absent on the admin
+   *  endpoint's, where every row is implicitly a platform set. */
+  scope?: TypographySetScope;
 }
 
-export function saveGlobalSets(sets: GlobalStyleSet[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(GLOBAL_KEY, JSON.stringify(sets));
-  } catch {
-    /* quota */
-  }
+function fromApiTypographySet(raw: ApiTypographySet): GlobalStyleSet {
+  return {
+    id: raw.id,
+    name: raw.name,
+    typography: hydrateTypography(raw.tokens),
+    updated: new Date(raw.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+    scope: raw.scope ?? (raw.orgId === null ? "platform" : "org"),
+  };
+}
+
+function typographySetsPath(resource: Resource): string {
+  return resource === "landing-page" ? "/org/typography-sets" : "/admin/typography-sets";
+}
+
+export async function loadGlobalSets(resource: Resource = "template"): Promise<GlobalStyleSet[]> {
+  const rows = await apiFetch<ApiTypographySet[]>(typographySetsPath(resource));
+  return rows.map(fromApiTypographySet);
+}
+
+/** Platform sets only, via the unauthenticated GET /typography-sets — for
+ *  the public local-preview surface (live-site.tsx), which has no session
+ *  and can't hit the Super-Admin-guarded /admin/typography-sets. */
+export async function loadPublicGlobalSets(): Promise<GlobalStyleSet[]> {
+  const rows = await apiFetch<ApiTypographySet[]>("/typography-sets");
+  return rows.map(fromApiTypographySet);
+}
+
+/** Creates a set owned by the caller's org (org session) or a platform set
+ *  (Super Admin session) — which one is entirely determined by `resource`. */
+export async function createGlobalSet(
+  resource: Resource,
+  input: { name: string; typography: TemplateTypography },
+): Promise<GlobalStyleSet> {
+  const raw = await apiFetch<ApiTypographySet>(typographySetsPath(resource), {
+    method: "POST",
+    body: JSON.stringify({ name: input.name, tokens: input.typography }),
+  });
+  return fromApiTypographySet(raw);
+}
+
+const SET_SAVE_DEBOUNCE_MS = 500;
+interface PendingSetSave {
+  timer: ReturnType<typeof setTimeout>;
+  latest: { name?: string; typography?: TemplateTypography };
+  resolvers: ((value: GlobalStyleSet) => void)[];
+  rejecters: ((reason: unknown) => void)[];
+}
+const pendingSetSaves = new Map<string, PendingSetSave>();
+
+/** Rename and/or update tokens — debounced per (resource, id), same pattern
+ *  persist.ts's saveTemplate uses. Necessary here in a way it wasn't for
+ *  the old localStorage version: a slider drag fires onChange continuously,
+ *  and each one used to be a free local write — now it's a network PATCH,
+ *  so rapid calls collapse into one request using the latest values.
+ *  The API rejects this for a platform set from an org session (403) —
+ *  this function doesn't pre-check scope, callers should simply not offer
+ *  the action for a read-only set. */
+export function updateGlobalSet(
+  resource: Resource,
+  id: string,
+  patch: { name?: string; typography?: TemplateTypography },
+): Promise<GlobalStyleSet> {
+  return new Promise((resolve, reject) => {
+    const key = `${resource}:${id}`;
+    const existing = pendingSetSaves.get(key);
+    const entry: PendingSetSave = existing ?? {
+      timer: null as unknown as ReturnType<typeof setTimeout>,
+      latest: {},
+      resolvers: [],
+      rejecters: [],
+    };
+    entry.latest = { ...entry.latest, ...patch };
+    entry.resolvers.push(resolve);
+    entry.rejecters.push(reject);
+    if (existing) clearTimeout(existing.timer);
+
+    entry.timer = setTimeout(() => {
+      pendingSetSaves.delete(key);
+      apiFetch<ApiTypographySet>(`${typographySetsPath(resource)}/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: entry.latest.name, tokens: entry.latest.typography }),
+      })
+        .then((raw) => {
+          const mapped = fromApiTypographySet(raw);
+          entry.resolvers.forEach((r) => r(mapped));
+        })
+        .catch((err) => entry.rejecters.forEach((r) => r(err)));
+    }, SET_SAVE_DEBOUNCE_MS);
+
+    pendingSetSaves.set(key, entry);
+  });
+}
+
+export async function deleteGlobalSet(resource: Resource, id: string): Promise<void> {
+  await apiFetch(`${typographySetsPath(resource)}/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export function ensureDesignSystem(config: SiteConfig): DesignSystemState {
@@ -163,11 +265,18 @@ export function ensureDesignSystem(config: SiteConfig): DesignSystemState {
   };
 }
 
-/** Effective tokens for a template — honours the template/global scope. */
-export function effectiveTypography(config: SiteConfig): { state: DesignSystemState; typography: TemplateTypography; isGlobal: boolean; set?: GlobalStyleSet } {
+/** Effective tokens for a template — honours the template/global scope.
+ *  `sets` must be pre-fetched by the caller (loadGlobalSets is async now
+ *  that it's a network call; this stays synchronous for the render-path
+ *  callers — builder/workspace.tsx's canvas CSS and live-site.tsx — that
+ *  can't await mid-render). Pass [] while a fetch is still in flight; the
+ *  page just renders with template-scoped typography until it resolves. */
+export function effectiveTypography(
+  config: SiteConfig,
+  sets: GlobalStyleSet[] = [],
+): { state: DesignSystemState; typography: TemplateTypography; isGlobal: boolean; set?: GlobalStyleSet } {
   const state = ensureDesignSystem(config);
   if (state.scope === "global" && state.globalSetId) {
-    const sets = loadGlobalSets();
     const set = sets.find((x) => x.id === state.globalSetId);
     if (set) return { state, typography: set.typography, isGlobal: true, set };
   }

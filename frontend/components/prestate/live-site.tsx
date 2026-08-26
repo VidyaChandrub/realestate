@@ -6,7 +6,7 @@ import { ExternalLink, Globe, PencilRuler } from "lucide-react";
 import type { Device, LandingPageData } from "@/lib/prestate/types";
 import { Canvas, type DesignBundle } from "@/components/prestate/builder/canvas";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
-import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts } from "@/lib/prestate/design-system";
+import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts, loadPublicGlobalSets, type GlobalStyleSet } from "@/lib/prestate/design-system";
 import { applyDocumentSeo } from "@/lib/prestate/seo";
 import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
 import { bumpTracking } from "@/lib/prestate/tracking";
@@ -24,12 +24,27 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
   const [device, setDevice] = useState<Device>("desktop");
   const [gate, setGate] = useState("");
   const [unlocked, setUnlocked] = useState(false);
+  const [globalSets, setGlobalSets] = useState<GlobalStyleSet[]>([]);
 
   useEffect(() => {
     const sync = () => setDevice(deviceFromWidth(window.innerWidth));
     sync();
     window.addEventListener("resize", sync);
     return () => window.removeEventListener("resize", sync);
+  }, []);
+
+  // Public/unauthenticated — this route has no session, so only platform
+  // sets are ever reachable here (see loadPublicGlobalSets). Fetched once;
+  // empty while loading just means template-scoped typography renders
+  // until this resolves.
+  useEffect(() => {
+    let cancelled = false;
+    loadPublicGlobalSets().then((sets) => {
+      if (!cancelled) setGlobalSets(sets);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -73,7 +88,7 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
   const hostHref = assigned ? localDomainPreviewPath(assigned) : "";
   const cfg = ensureConfig(page);
   void ensureDesignSystem(cfg);
-  const { typography } = effectiveTypography(cfg);
+  const { typography } = effectiveTypography(cfg, globalSets);
   const fonts = loadFonts();
   const design: { css: string; bundle: DesignBundle } = {
     css: buildDesignCss({ scopeClass: "ps-typo-scope", typography, fonts }),

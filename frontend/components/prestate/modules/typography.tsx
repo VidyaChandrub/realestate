@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type * as React from "react";import { Copy, Globe, Trash2, Type as TypeIcon, Upload } from "lucide-react";
 import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
 import type {
@@ -11,15 +11,18 @@ import type {
   TypeToken,
 } from "@/lib/prestate/design-system";
 import {
+  createGlobalSet,
   defaultTypography,
+  deleteGlobalSet,
   effectiveTypography,
   ensureDesignSystem,
   fontOptions,
   loadFonts,
   loadGlobalSets,
   saveFonts,
-  saveGlobalSets,
+  updateGlobalSet,
 } from "@/lib/prestate/design-system";
+import type { Resource } from "@/lib/prestate/store";
 import { uid } from "@/lib/prestate/data";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import { ModuleHeader, SiteScopeBar } from "./shared";
@@ -42,33 +45,69 @@ export function TypographyModule({
   site,
   onPatch,
   onToast,
+  resource,
 }: {
   site: LandingPageData;
   pages: LandingPageData[];
   onSelectSite: (id: string) => void;
   onPatch: (fn: (c: SiteConfig) => SiteConfig) => void;
   onToast: (m: string) => void;
+  /** Which typography-sets endpoint this session hits — org sees platform +
+   *  its own sets; Super Admin sees platform sets only, and can edit them
+   *  (an org can't — platform sets render read-only there). */
+  resource: Resource;
 }) {
   const cfg = ensureConfig(site);
-  const eff = effectiveTypography(cfg);
   const [deviceTab, setDeviceTab] = useState<Breakpoint>("desktop");
   const [fontsVersion, setFontsVersion] = useState(0);
   const fonts = useMemo(() => {
     void fontsVersion;
     return loadFonts();
   }, [fontsVersion]);
-  const [globalSets, setGlobalSets] = useState<GlobalStyleSet[]>(() => loadGlobalSets());
 
+  // Global sets are server-persisted now — fetched once per session/resource,
+  // not read synchronously the way localStorage was. See design-system.ts's
+  // effectiveTypography for why it now takes this as a parameter instead of
+  // loading it internally.
+  const [globalSets, setGlobalSets] = useState<GlobalStyleSet[]>([]);
+  const [globalSetsLoaded, setGlobalSetsLoaded] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    loadGlobalSets(resource)
+      .then((sets) => {
+        if (cancelled) return;
+        setGlobalSets(sets);
+        setGlobalSetsLoaded(true);
+      })
+      .catch(() => {
+        if (!cancelled) setGlobalSetsLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resource]);
+
+  const eff = effectiveTypography(cfg, globalSets);
   const isGlobal = eff.isGlobal && !!eff.set;
+  // An org session can view and apply a platform set, but never edit or
+  // delete it — enforced here for the UI and again server-side (PATCH/DELETE
+  // reject it regardless of what this renders).
+  const isReadOnlySet = isGlobal && eff.set?.scope === "platform" && resource === "landing-page";
 
   /** Persist typography — to the shared global set or this template's config. */
   const writeTypography = (next: TemplateTypography) => {
     if (isGlobal && eff.set) {
-      const sets = loadGlobalSets().map((s) => (s.id === eff.set?.id ? { ...s, typography: next, updated: "Just now" } : s));
-      saveGlobalSets(sets);
-      setGlobalSets(sets);
+      if (isReadOnlySet) return;
+      const setId = eff.set.id;
+      // Optimistic: reflect immediately so sliders/inputs feel instant; the
+      // debounced PATCH (see updateGlobalSet) catches up in the background.
+      setGlobalSets((prev) => prev.map((s) => (s.id === setId ? { ...s, typography: next } : s)));
       onPatch((c) => ({ ...c }));
-      onToast(`Saved to global set “${eff.set.name}” — all linked templates update`);
+      updateGlobalSet(resource, setId, { typography: next })
+        .then((updated) => {
+          setGlobalSets((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+        })
+        .catch((err) => onToast(err instanceof Error ? err.message : "Couldn't save the shared set"));
       return;
     }
     onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope: c.designSystem?.scope === "global" ? "global" : "template", globalSetId: c.designSystem?.globalSetId, typography: next } }));
@@ -76,33 +115,64 @@ export function TypographyModule({
 
   const bump = () => onPatch((c) => ({ ...c }));
 
-  const switchScope = (scope: "template" | "global") => {
+  const switchScope = async (scope: "template" | "global") => {
     if (scope === eff.state.scope) return;
-    let sets = loadGlobalSets();
     let gid: string | undefined = eff.state.globalSetId;
     if (scope === "global") {
-      if (!gid || !sets.some((s) => s.id === gid)) {
-        if (!sets.length) {
-          const fresh: GlobalStyleSet = { id: uid("gset"), name: "Shared Set 1", typography: defaultTypography(), updated: "Just now" };
-          sets = [fresh];
-          saveGlobalSets(sets);
-          setGlobalSets(sets);
+      if (!gid || !globalSets.some((s) => s.id === gid)) {
+        if (!globalSets.length) {
+          try {
+            const fresh = await createGlobalSet(resource, { name: "Shared Set 1", typography: defaultTypography() });
+            setGlobalSets((prev) => [...prev, fresh]);
+            gid = fresh.id;
+          } catch (err) {
+            onToast(err instanceof Error ? err.message : "Couldn't create a shared set");
+            return;
+          }
+        } else {
+          gid = globalSets[0].id;
         }
-        gid = sets[0].id;
       }
     }
     onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope, globalSetId: gid } }));
     onToast(scope === "global" ? "Now editing the shared global set" : "Now editing template-specific typography");
   };
 
-  const createGlobalSetFromTemplate = () => {
-    const sets = loadGlobalSets();
-    const fresh: GlobalStyleSet = { id: uid("gset"), name: `Shared Set ${sets.length + 1}`, typography: eff.typography, updated: "Just now" };
-    const next = [...sets, fresh];
-    saveGlobalSets(next);
-    setGlobalSets(next);
-    onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope: "global", globalSetId: fresh.id } }));
-    onToast(`Created “${fresh.name}” from this template's typography`);
+  const createGlobalSetFromTemplate = async () => {
+    try {
+      const fresh = await createGlobalSet(resource, { name: `Shared Set ${globalSets.length + 1}`, typography: eff.typography });
+      setGlobalSets((prev) => [...prev, fresh]);
+      onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope: "global", globalSetId: fresh.id } }));
+      onToast(`Created “${fresh.name}” from this template's typography`);
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Couldn't create the shared set");
+    }
+  };
+
+  const renameGlobalSet = async (set: GlobalStyleSet) => {
+    const name = window.prompt("Rename shared set", set.name);
+    if (!name || !name.trim() || name.trim() === set.name) return;
+    try {
+      const updated = await updateGlobalSet(resource, set.id, { name: name.trim() });
+      setGlobalSets((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      onToast(`Renamed to “${updated.name}”`);
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Couldn't rename the set");
+    }
+  };
+
+  const deleteGlobalSetHere = async (set: GlobalStyleSet) => {
+    if (!window.confirm(`Delete “${set.name}”? Templates using it will fall back to their own template-specific typography.`)) return;
+    try {
+      await deleteGlobalSet(resource, set.id);
+      setGlobalSets((prev) => prev.filter((s) => s.id !== set.id));
+      if (eff.state.globalSetId === set.id) {
+        onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope: "template" } }));
+      }
+      onToast(`Deleted “${set.name}”`);
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Couldn't delete the set");
+    }
   };
 
   // ------------------------------ Font manager ------------------------------
@@ -179,7 +249,8 @@ export function TypographyModule({
             <button
               key={s.key}
               type="button"
-              onClick={() => switchScope(s.key)}
+              disabled={s.key === "global" && !globalSetsLoaded}
+              onClick={() => void switchScope(s.key)}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -187,7 +258,8 @@ export function TypographyModule({
                 padding: "7px 14px",
                 border: "none",
                 borderRadius: 8,
-                cursor: "pointer",
+                cursor: s.key === "global" && !globalSetsLoaded ? "not-allowed" : "pointer",
+                opacity: s.key === "global" && !globalSetsLoaded ? 0.5 : 1,
                 fontSize: 12.5,
                 fontWeight: 700,
                 background: eff.state.scope === s.key ? "var(--ps-panel-raised)" : "transparent",
@@ -205,19 +277,35 @@ export function TypographyModule({
               <SelectField
                 value={eff.state.globalSetId ?? ""}
                 onChange={(id) => onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope: "global", globalSetId: id || undefined } }))}
-                options={globalSets.map((s) => ({ value: s.id, label: s.name }))}
+                options={globalSets.map((s) => ({ value: s.id, label: s.scope === "platform" ? `${s.name} (Platform)` : s.name }))}
                 placeholder="Choose a set"
               />
             </div>
             <Chip tone="primary">{globalSets.length} shared set{globalSets.length === 1 ? "" : "s"}</Chip>
+            {eff.set ? (
+              isReadOnlySet ? (
+                <Chip tone="info">Platform set — read-only</Chip>
+              ) : (
+                <>
+                  <Btn variant="outline" size="sm" onClick={() => void renameGlobalSet(eff.set!)}>Rename</Btn>
+                  <Btn variant="danger" size="sm" icon={<Trash2 size={13} />} onClick={() => void deleteGlobalSetHere(eff.set!)}>Delete</Btn>
+                </>
+              )
+            ) : null}
           </>
         ) : (
           <span style={{ fontSize: 12, color: "var(--ps-muted)" }}>Changes apply only to “{cfg.brand.name}”.</span>
         )}
       </div>
 
+      {isReadOnlySet ? (
+        <div style={{ margin: "0 28px 16px", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--ps-line)", background: "var(--ps-panel-raised)", fontSize: 12.5, color: "var(--ps-muted)" }}>
+          This is a platform set created by Super Admin — it&apos;s applied here but can&apos;t be edited or deleted from an organisation. Switch to template-specific typography, or create your own shared set, to make changes.
+        </div>
+      ) : null}
+
       {/* Type scale editor */}
-      <div style={{ padding: "0 28px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ padding: "0 28px 20px", display: "flex", flexDirection: "column", gap: 12, opacity: isReadOnlySet ? 0.6 : 1, pointerEvents: isReadOnlySet ? "none" : "auto" }}>
         <div style={{ maxWidth: 420 }}>
           <TabBar
             tabs={[
@@ -253,6 +341,15 @@ export function TypographyModule({
                 </span>
               </div>
               <div className="ps-typo-grid">
+                {/* KNOWN ISSUE: `opts` includes uploaded custom fonts (fontOptions()
+                    below), and picking one here writes its family NAME into this
+                    token — but the font FILE stays in prestate.fonts.v1
+                    (browser-local, see design-system.ts). A global/platform set
+                    is now shared across users, while fonts aren't: anyone
+                    without that exact font uploaded in their own browser gets
+                    a silent fallback font, no error. Resolves once fonts move
+                    to object storage (out of scope here) — tracked as a known
+                    issue, not fixed in this pass. */}
                 <FieldRow label="Font family">
                   <SelectField value={bpToken.fontFamily ?? ""} onChange={(v) => setToken({ fontFamily: v || undefined })} options={[{ value: "", label: "Inherit theme" }, ...opts]} />
                 </FieldRow>
