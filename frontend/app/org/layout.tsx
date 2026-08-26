@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Inter, Space_Grotesk } from "next/font/google";
 import { OrgAdminShell } from "@/components/org/shell";
 import "../admin-console/superadmin.css";
+import "./crm.css";
 
 const inter = Inter({
   subsets: ["latin"],
