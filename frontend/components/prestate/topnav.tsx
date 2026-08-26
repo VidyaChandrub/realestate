@@ -2,7 +2,8 @@
 
 import type { ReactNode } from "react";
 import type * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Bell,
   ChevronDown,
@@ -12,7 +13,6 @@ import {
   Menu,
   Monitor,
   Moon,
-  MoreHorizontal,
   Redo2,
   Rocket,
   Save,
@@ -88,6 +88,9 @@ export function TopNav({
   onHelp,
   onMenu,
   actions,
+  user,
+  onSignOut,
+  settingsHref,
 }: {
   module: ModuleKey;
   pageName?: string;
@@ -109,11 +112,29 @@ export function TopNav({
   onHelp: () => void;
   onMenu: () => void;
   actions?: ReactNode;
+  // The logged-in user, for the profile dropdown. Undefined/null renders a
+  // "—" placeholder instead of guessing.
+  user?: { name: string; email: string; initials: string } | null;
+  onSignOut: () => void;
+  // Real destination for the "Settings" menu item — differs by session
+  // (org vs Super Admin). No fallback: pass it or the item stays inert.
+  settingsHref?: string;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [dark, setDark] = useState(true);
-  const [moreOpen, setMoreOpen] = useState(false);
   const published = pageStatus === "published";
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-profile-menu]")) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [profileOpen]);
 
   return (
     <header className="ps-topnav ps-glass">
@@ -207,7 +228,7 @@ export function TopNav({
         </button>
 
         {/* Profile */}
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative" }} data-profile-menu>
           <button type="button" onClick={() => setProfileOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 10, border: "none", background: "transparent", cursor: "pointer" }} onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)")} onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}>
             <span
               style={{
@@ -223,87 +244,84 @@ export function TopNav({
                 fontWeight: 800,
               }}
             >
-              AR
+              {user?.initials ?? "—"}
             </span>
             <ChevronDown size={13} style={{ color: "var(--ps-muted)" }} />
           </button>
           {profileOpen ? (
             <div className="ps-card ps-fade-in" style={{ position: "absolute", top: 42, right: 0, width: 230, padding: 6, zIndex: 500, boxShadow: "var(--ps-shadow-lg)" }}>
               <div style={{ padding: "10px 10px 8px", borderBottom: "1px solid var(--ps-line)" }}>
-                <div style={{ fontSize: 13, fontWeight: 800 }}>Aarav Reddy</div>
-                <div style={{ fontSize: 11.5, color: "var(--ps-muted)", marginTop: 1 }}>aarav@prestate.io</div>
-                <span className="ps-chip" style={{ background: "var(--ps-secondary-soft)", color: "var(--ps-secondary-dark)", marginTop: 6 }}>Pro · Enterprise</span>
+                <div style={{ fontSize: 13, fontWeight: 800 }}>{user?.name ?? "—"}</div>
+                <div style={{ fontSize: 11.5, color: "var(--ps-muted)", marginTop: 1 }}>{user?.email ?? "—"}</div>
               </div>
-              {[
-                { icon: <User size={15} />, label: "Profile" },
-                { icon: <Users size={15} />, label: "Team & Roles" },
-                { icon: <Settings size={15} />, label: "Settings" },
-                { icon: dark ? <Sun size={15} /> : <Moon size={15} />, label: dark ? "Light mode" : "Dark mode", toggle: true },
-              ].map((item) => (
+              {/* Profile and Team & Roles have no destination page yet — left
+                  as inert (menu just closes), same as the dark-mode toggle
+                  below which doesn't apply a theme anywhere in the app. */}
+              <button
+                type="button"
+                onClick={() => setProfileOpen(false)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontSize: 12.5, color: "var(--ps-slate)", textAlign: "left" }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)")}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
+              >
+                <User size={15} /> Profile
+              </button>
+              {/* <button
+                type="button"
+                onClick={() => setProfileOpen(false)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontSize: 12.5, color: "var(--ps-slate)", textAlign: "left" }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)")}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
+              >
+                <Users size={15} /> Team & Roles
+              </button> */}
+              {settingsHref ? (
+                <Link
+                  href={settingsHref}
+                  onClick={() => setProfileOpen(false)}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontSize: 12.5, color: "var(--ps-slate)", textAlign: "left", textDecoration: "none" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.05)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.background = "transparent")}
+                >
+                  <Settings size={15} /> Settings
+                </Link>
+              ) : (
                 <button
-                  key={item.label}
                   type="button"
-                  onClick={() => {
-                    if (item.toggle) setDark((v) => !v);
-                    setProfileOpen(false);
-                  }}
+                  onClick={() => setProfileOpen(false)}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontSize: 12.5, color: "var(--ps-slate)", textAlign: "left" }}
                   onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)")}
                   onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
                 >
-                  {item.icon} {item.label}
+                  <Settings size={15} /> Settings
                 </button>
-              ))}
+              )}
+              {/* <button
+                type="button"
+                onClick={() => {
+                  setDark((v) => !v);
+                  setProfileOpen(false);
+                }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontSize: 12.5, color: "var(--ps-slate)", textAlign: "left" }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)")}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
+              >
+                {dark ? <Sun size={15} /> : <Moon size={15} />} {dark ? "Light mode" : "Dark mode"}
+              </button> */}
               <div style={{ borderTop: "1px solid var(--ps-line)", marginTop: 4, paddingTop: 4 }}>
-                <button type="button" onClick={() => setProfileOpen(false)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontSize: 12.5, color: "var(--ps-danger)", textAlign: "left" }} onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "var(--ps-danger-soft)")} onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    onSignOut();
+                  }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", fontSize: 12.5, color: "var(--ps-danger)", textAlign: "left" }}
+                  onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "var(--ps-danger-soft)")}
+                  onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "transparent")}
+                >
                   <LogOut size={15} /> Sign out
                 </button>
               </div>
-            </div>
-          ) : null}
-        </div>
-        <div style={{ position: "relative" }}>
-          <button type="button" title="More" className="ps-topnav-icon-btn" onClick={() => setMoreOpen((v) => !v)}>
-            <MoreHorizontal size={16} />
-          </button>
-          {moreOpen ? (
-            <div className="ps-card ps-fade-in" style={{ position: "absolute", top: 42, right: 0, width: 210, padding: 6, zIndex: 500, boxShadow: "var(--ps-shadow-lg)" }}>
-              {module === "builder"
-                ? [
-                    { label: "Save Draft", run: onSave },
-                    { label: "Preview", run: onPreview },
-                    { label: published ? unpublishLabel : publishLabel, run: published ? onUnpublish : onPublish },
-                    { label: "Help", run: onHelp },
-                  ].map((item) => (
-                    <button
-                      key={item.label}
-                      type="button"
-                      onClick={() => {
-                        setMoreOpen(false);
-                        item.run();
-                      }}
-                      style={{ width: "100%", textAlign: "left", padding: "8px 10px", border: "none", borderRadius: 8, background: "transparent", color: "var(--ps-ink)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
-                    >
-                      {item.label}
-                    </button>
-                  ))
-                : [
-                    { label: "Help", run: onHelp },
-                    { label: "Notifications", run: onNotify },
-                    { label: "Activity", run: onActivity },
-                  ].map((item) => (
-                    <button
-                      key={item.label}
-                      type="button"
-                      onClick={() => {
-                        setMoreOpen(false);
-                        item.run();
-                      }}
-                      style={{ width: "100%", textAlign: "left", padding: "8px 10px", border: "none", borderRadius: 8, background: "transparent", color: "var(--ps-ink)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
             </div>
           ) : null}
         </div>

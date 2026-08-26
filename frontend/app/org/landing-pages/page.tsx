@@ -24,15 +24,13 @@ interface LandingPageDetail extends LandingPageRow {
 }
 
 const LIMIT = 20;
-const STATUS_TABS = ["All", "Draft", "Pending", "Approved", "Rejected", "Published"] as const;
+const STATUS_TABS = ["All", "Draft", "Published", "Unpublished"] as const;
 
 function statusParamFor(tabIndex: number): LandingPageStatus | undefined {
   switch (tabIndex) {
     case 1: return "draft";
-    case 2: return "pending_approval";
-    case 3: return "approved";
-    case 4: return "rejected";
-    case 5: return "published";
+    case 2: return "published";
+    case 3: return "unpublished";
     default: return undefined;
   }
 }
@@ -73,11 +71,6 @@ export default function OrgLandingPagesPage() {
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState<string | null>(null);
 
-  // Editing a published/approved page silently reverts it to draft (see
-  // OrgLandingPagesService.update) — this warns before that happens instead
-  // of letting Edit navigate straight into the builder.
-  const [editWarnTarget, setEditWarnTarget] = useState<{ id: string; name: string } | null>(null);
-
   const [tabIndex, setTabIndex] = useState(0);
   const [page, setPage] = useState(1);
   const [result, setResult] = useState<OrgLandingPagesListResponse | null>(null);
@@ -113,15 +106,29 @@ export default function OrgLandingPagesPage() {
     fetchList();
   }, [fetchList]);
 
-  async function submitForApproval(id: string) {
+  async function publishPage(id: string) {
     if (!accessToken) return;
     setBusyId(id);
     try {
-      await apiFetch(`/org/landing-pages/${id}/submit`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } });
-      notify("Submitted for approval");
+      await apiFetch(`/org/landing-pages/${id}/publish`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } });
+      notify("Published");
       fetchList();
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Failed to submit.");
+      notify(err instanceof Error ? err.message : "Failed to publish.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function unpublishPage(id: string) {
+    if (!accessToken) return;
+    setBusyId(id);
+    try {
+      await apiFetch(`/org/landing-pages/${id}/unpublish`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } });
+      notify("Unpublished");
+      fetchList();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Failed to unpublish.");
     } finally {
       setBusyId(null);
     }
@@ -198,10 +205,6 @@ export default function OrgLandingPagesPage() {
   }
 
   function startEdit(row: LandingPageRow) {
-    if (row.status === "published" || row.status === "approved") {
-      setEditWarnTarget({ id: row.id, name: row.name });
-      return;
-    }
     router.push(orgBuilderPath(row.id));
   }
 
@@ -217,7 +220,7 @@ export default function OrgLandingPagesPage() {
         <div>
           <div className="eyebrow"><Icon name="document" size={14} /> Website</div>
           <h1>My Landing Pages</h1>
-          <div className="sub">Pages you&apos;ve created from your assigned templates — edit, submit for approval, and track review status.</div>
+          <div className="sub">Pages you&apos;ve created from your assigned templates — edit and publish whenever you&apos;re ready.</div>
         </div>
         <div className="actions" style={{ display: "flex", gap: 10 }}>
           <button
@@ -277,11 +280,6 @@ export default function OrgLandingPagesPage() {
                         <span className="nm" style={{ fontWeight: 600 }}>{row.name}</span>
                         <br />
                         <span className="sm muted" style={{ fontSize: 11 }}>{row.slug}</span>
-                        {row.status === "rejected" && row.rejectionReason ? (
-                          <div style={{ marginTop: 6, fontSize: 12, color: "var(--rose)", background: "var(--rose-050)", padding: "6px 10px", borderRadius: 8, maxWidth: 340 }}>
-                            <strong>Rejected:</strong> {row.rejectionReason}
-                          </div>
-                        ) : null}
                       </td>
                       <td style={{ fontSize: 12.5 }}>
                         {row.sourceTemplate ? (
@@ -302,25 +300,31 @@ export default function OrgLandingPagesPage() {
                           <button className="btn btn-ghost btn-sm" type="button" onClick={() => startEdit(row)}>
                             Edit
                           </button>
-                          {row.status === "draft" || row.status === "rejected" ? (
+                          {row.status === "published" ? (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              disabled={busyId === row.id}
+                              onClick={() => unpublishPage(row.id)}
+                            >
+                              Unpublish
+                            </button>
+                          ) : (
                             <button
                               className="btn btn-success btn-sm"
                               disabled={busyId === row.id}
-                              onClick={() => submitForApproval(row.id)}
+                              onClick={() => publishPage(row.id)}
                             >
-                              Submit for approval
+                              Publish
                             </button>
-                          ) : null}
-                          {row.status !== "pending_approval" ? (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              style={{ color: "var(--rose)" }}
-                              disabled={busyId === row.id}
-                              onClick={() => setDeleteTarget({ id: row.id, name: row.name })}
-                            >
-                              Delete
-                            </button>
-                          ) : null}
+                          )}
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            style={{ color: "var(--rose)" }}
+                            disabled={busyId === row.id}
+                            onClick={() => setDeleteTarget({ id: row.id, name: row.name })}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -398,60 +402,6 @@ export default function OrgLandingPagesPage() {
         </div>
       ) : null}
 
-      {editWarnTarget ? (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }}
-          onClick={() => setEditWarnTarget(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 20, padding: 32, width: 440, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.2)" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <span
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 12,
-                  background: "var(--amber-050)",
-                  color: "var(--amber)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  fontSize: 18,
-                }}
-              >
-                <Icon name="alert" size={16} />
-              </span>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>Edit &quot;{editWarnTarget.name}&quot;?</h2>
-            </div>
-            <p style={{ margin: "0 0 6px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
-              Any changes you save will return this page to draft and it will need approval again — opening it to look is fine.
-            </p>
-            <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>
-              If you only want to look at it, use View instead — it&apos;s read-only.
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--line)" }}>
-              <button className="btn btn-ghost" type="button" onClick={() => setEditWarnTarget(null)}>
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={() => {
-                  const target = editWarnTarget;
-                  setEditWarnTarget(null);
-                  if (target) router.push(orgBuilderPath(target.id));
-                }}
-              >
-                Continue to edit
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       {scratchOpen ? (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }}
@@ -463,7 +413,7 @@ export default function OrgLandingPagesPage() {
           >
             <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Create a blank page</div>
             <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-              Starts with an empty canvas — no template involved. Build it in the builder, then submit it for approval like any other page.
+              Starts with an empty canvas — no template involved. Build it in the builder, then publish it like any other page.
             </div>
             <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
               Page name

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api";
 import {
   Bell,
   CheckCircle2,
@@ -24,7 +26,7 @@ import {
   X,
 } from "lucide-react";
 import type { Device, LandingPageData, ModuleKey, SectionInstance, SiteConfig } from "@/lib/prestate/types";
-import { loadTemplate, loadTemplates, saveTemplate, createTemplate, submitLandingPage, normalizeDomain, isLikelyHostname, type Resource } from "@/lib/prestate/store";
+import { loadTemplate, loadTemplates, saveTemplate, createTemplate, publishLandingPage, unpublishLandingPage, normalizeDomain, isLikelyHostname, type Resource } from "@/lib/prestate/store";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
 import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
 import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
@@ -55,6 +57,32 @@ interface Toast {
   text: string;
 }
 
+// GET /org/activity row — real AuditLog entries scoped to the caller's own
+// org. Only wired up for resource: "landing-page" (the org session); the
+// Super Admin builder keeps its illustrative ACTIVITY feed below since
+// there's no single "org" to scope a real feed to there.
+interface OrgActivityEntry {
+  id: string;
+  action: string;
+  entity: string | null;
+  entityId: string | null;
+  createdAt: string;
+}
+
+const ACTIVITY_LABELS: Record<string, string> = {
+  landing_page_created: "Page created",
+  landing_page_published: "Page published",
+  landing_page_unpublished: "Page unpublished",
+  org_onboarded: "Organisation onboarded",
+  org_templates_updated: "Assigned templates updated",
+  subscription_created: "Subscription started",
+  subscription_updated: "Subscription updated",
+};
+
+function activityLabel(action: string): string {
+  return ACTIVITY_LABELS[action] ?? action.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+}
+
 // Which backend resource this session edits — a Super Admin Template
 // (default) or an org's own LandingPage. Threading this through is the
 // entire org-builder integration: BuilderWorkspace/Canvas/the widget
@@ -65,8 +93,23 @@ const HOME_PATH: Record<Resource, string> = {
   "landing-page": "/org/landing-pages",
 };
 
+// Real destination for the TopNav profile menu's "Settings" item — differs
+// by session, same split as HOME_PATH.
+const SETTINGS_PATH: Record<Resource, string> = {
+  template: "/admin-console/settings",
+  "landing-page": "/org/settings",
+};
+
+function initialsFor(firstName: string | null | undefined, lastName: string | null | undefined): string {
+  const parts = [firstName, lastName].filter(Boolean) as string[];
+  if (parts.length === 0) return "—";
+  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase()).join("");
+}
+
 export function PrestateStudio({ resource = "template" }: { resource?: Resource }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { user: authUser, logout } = useAuth();
   const [module, setModule] = useState<ModuleKey>("builder");
   const [device, setDevice] = useState<Device>("desktop");
   const [canUndo, setCanUndo] = useState(false);
@@ -74,6 +117,8 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [orgActivity, setOrgActivity] = useState<OrgActivityEntry[] | null>(null);
+  const [orgActivityLoading, setOrgActivityLoading] = useState(false);
   const [activePage, setActivePage] = useState<LandingPageData | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -157,6 +202,29 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
     };
   }, [activePage?.id, resource]);
 
+  // Scoped to the page currently open in the builder — not the whole org's
+  // feed, which would mix in every other page's history (including old
+  // entries unrelated to what you're looking at right now). Fetches on
+  // each open rather than once, so the feed is fresh.
+  useEffect(() => {
+    if (!activityOpen || resource !== "landing-page" || !activePage) return;
+    let cancelled = false;
+    setOrgActivityLoading(true);
+    apiFetch<OrgActivityEntry[]>(`/org/activity?entityId=${encodeURIComponent(activePage.id)}`)
+      .then((rows) => {
+        if (!cancelled) setOrgActivity(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setOrgActivity([]);
+      })
+      .finally(() => {
+        if (!cancelled) setOrgActivityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activityOpen, resource, activePage?.id]);
+
   const toast = useCallback((text: string) => {
     const id = ++toastId.current;
     setToasts((t) => [...t, { id, text }]);
@@ -165,19 +233,22 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
 
   const scoped = activePage ? [activePage] : [];
 
-  // Domains (subdomains/custom domains) is a Template-only concept —
-  // LandingPage has no domain field, and wiring one up is explicitly out of
-  // scope for org landing pages. Hide the tab rather than ship a control
-  // that silently does nothing.
-  const railItems = resource === "landing-page" ? NAV_ITEMS.filter((item) => item.key !== "domains") : NAV_ITEMS;
+  // Domains is shown for both sessions for UI parity. LandingPage has no
+  // domain column server-side yet (deliberately — real domain
+  // assignment/verification is a separate, not-yet-designed piece), so for
+  // an org session this is view/session-only: assignDomain/clearDomain
+  // below update local state same as templates, but patchLandingPage never
+  // sends `domain` to the backend, and a reload resets it (fromApiLandingPage
+  // always returns ""). Revisit once that backend piece exists.
+  const railItems = NAV_ITEMS;
 
   // Fires the debounced single-record save and reconciles the server-derived
   // fields once it resolves, so a slow save can't clobber newer local edits
   // made in the meantime. Also syncs `status` from the response — for
   // landing pages the backend is the sole authority on whether this save
-  // reverted an approved/published page to draft (deep-equality diff
-  // against stored content; see OrgLandingPagesService.update), so the
-  // client must reflect whatever it actually decided, not guess ahead of it.
+  // reverted a published page to draft (deep-equality diff against stored
+  // content; see OrgLandingPagesService.update), so the client must reflect
+  // whatever it actually decided, not guess ahead of it.
   const saveInBackground = useCallback(
     (next: LandingPageData) => {
       void saveTemplate(next, resource)
@@ -222,45 +293,59 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
     [saveInBackground, resource],
   );
 
-  // The org builder's "Submit for approval" action — real submit, not a
-  // toast. Only meaningful for resource: "landing-page" (see topNavPublish
-  // below, which is the only caller).
-  const submitForApproval = useCallback(() => {
+  // The org builder's direct Publish/Unpublish actions — real API calls,
+  // not routed through BuilderApi.publish()/unpublish() like templates.
+  // Those go through onPersist -> patchTemplate, which accepts a `status`
+  // field; patchLandingPage deliberately doesn't (see its comment in
+  // persist.ts), so landing pages need their own status-changing calls.
+  // Only meaningful for resource: "landing-page" (see topNavPublish below,
+  // the only caller).
+  const publishPage = useCallback(() => {
     if (!activePage) return;
-    submitLandingPage(activePage.id)
+    publishLandingPage(activePage.id)
       .then((updated) => {
         setActivePage((cur) => (cur && cur.id === updated.id ? { ...cur, status: updated.status } : cur));
-        toast("Submitted for approval");
+        toast("Published");
       })
-      .catch((err) => toast(err instanceof Error ? err.message : "Couldn't submit — try again"));
+      .catch((err) => toast(err instanceof Error ? err.message : "Couldn't publish — try again"));
+  }, [activePage, toast]);
+
+  const unpublishPage = useCallback(() => {
+    if (!activePage) return;
+    unpublishLandingPage(activePage.id)
+      .then((updated) => {
+        setActivePage((cur) => (cur && cur.id === updated.id ? { ...cur, status: updated.status } : cur));
+        toast("Unpublished — page is no longer live");
+      })
+      .catch((err) => toast(err instanceof Error ? err.message : "Couldn't unpublish — try again"));
   }, [activePage, toast]);
 
   // What the Publish/Unpublish slot in TopNav shows and does, per resource.
-  // Templates keep their existing direct publish/unpublish. An org session
-  // can never publish directly — the label and action reflect wherever the
-  // page actually is in the review cycle instead.
+  // Both resources now publish/unpublish directly — org pages just go
+  // through their own endpoint instead of BuilderApi.
   const topNavPublish =
     resource === "landing-page"
-      ? (() => {
-          // LandingPageData["status"] predates approval statuses (see the
-          // cast in fromApiLandingPage) — switch on the real string, not
-          // the narrowed type, so this actually matches at runtime.
-          switch (activePage?.status as string | undefined) {
-            case "pending_approval":
-              return { label: "Pending approval", run: () => toast("Already submitted — waiting for Super Admin review.") };
-            case "approved":
-              return { label: "Approved · awaiting publish", run: () => toast("Approved — a Super Admin will publish it.") };
-            case "published":
-              return { label: "Live", run: () => toast("Published pages are taken down by a Super Admin, not from here.") };
-            default:
-              return { label: "Submit for approval", run: submitForApproval };
-          }
-        })()
+      ? { label: "Publish", run: publishPage }
       : { label: "Publish", run: () => apiRef.current?.publish() };
   const topNavUnpublish =
     resource === "landing-page"
-      ? { label: "Live", run: () => toast("Published pages are taken down by a Super Admin, not from here.") }
+      ? { label: "Unpublish", run: unpublishPage }
       : { label: "Unpublish", run: () => apiRef.current?.unpublish() };
+
+  const topNavUser = authUser
+    ? {
+        name: [authUser.first_name, authUser.last_name].filter(Boolean).join(" ") || authUser.email,
+        email: authUser.email,
+        initials: initialsFor(authUser.first_name, authUser.last_name),
+      }
+    : null;
+
+  const handleSignOut = useCallback(() => {
+    void logout().then(() => {
+      router.push("/login");
+      router.refresh();
+    });
+  }, [logout, router]);
 
   const [inAppPreviewOpen, setInAppPreviewOpen] = useState(false);
 
@@ -356,6 +441,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
             device={device}
             setDevice={setDevice}
             apiRef={apiRef}
+            resource={resource}
             onCapabilities={({ canUndo: u, canRedo: r }) => {
               setCanUndo(u);
               setCanRedo(r);
@@ -413,6 +499,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
             onSelectSite={() => {}}
             onPatch={(fn) => patchConfig(activePage.id, fn)}
             onToast={toast}
+            resource={resource}
           />
         ) : null;
       case "brand":
@@ -493,6 +580,9 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
         onActivity={() => setActivityOpen(true)}
         onHelp={() => setHelpOpen(true)}
         onMenu={() => setNavOpen((v) => !v)}
+        user={topNavUser}
+        onSignOut={handleSignOut}
+        settingsHref={SETTINGS_PATH[resource]}
         actions={
           <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", gap: 7 }}>
             <Sparkles size={15} /> {MODULE_LABELS[module]}
@@ -561,16 +651,36 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
 
       {/* Activity panel */}
       <SlidePanel open={activityOpen} onClose={() => setActivityOpen(false)} title="Activity feed" icon={<Clock size={16} />}>
-        {ACTIVITY.map((a, i) => (
-          <div key={i} style={{ display: "flex", gap: 11, padding: "10px 0", borderBottom: "1px solid var(--ps-line)", alignItems: "flex-start" }}>
-            <span style={{ width: 30, height: 30, borderRadius: 9, background: a.bg, color: a.color, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{a.icon}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)" }}>{a.text}</div>
-              <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 1 }}>{a.time}</div>
+        {resource === "landing-page" ? (
+          orgActivityLoading && !orgActivity ? (
+            <div style={{ padding: "24px 0", textAlign: "center", color: "var(--ps-muted)", fontSize: 12.5 }}>Loading…</div>
+          ) : !orgActivity || orgActivity.length === 0 ? (
+            <div style={{ padding: "24px 0", textAlign: "center", color: "var(--ps-muted)", fontSize: 12.5 }}>No activity yet.</div>
+          ) : (
+            orgActivity.map((entry) => (
+              <div key={entry.id} style={{ display: "flex", gap: 11, padding: "10px 0", borderBottom: "1px solid var(--ps-line)", alignItems: "flex-start" }}>
+                <span style={{ width: 30, height: 30, borderRadius: 9, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <PencilRuler size={14} />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)" }}>{activityLabel(entry.action)}</div>
+                  <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 1 }}>{new Date(entry.createdAt).toLocaleString()}</div>
+                </div>
+              </div>
+            ))
+          )
+        ) : (
+          ACTIVITY.map((a, i) => (
+            <div key={i} style={{ display: "flex", gap: 11, padding: "10px 0", borderBottom: "1px solid var(--ps-line)", alignItems: "flex-start" }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, background: a.bg, color: a.color, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{a.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)" }}>{a.text}</div>
+                <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 1 }}>{a.time}</div>
+              </div>
+              {a.mention ? <span className="ps-chip" style={{ background: "var(--ps-primary-soft)", color: "var(--ps-primary)" }}>{a.mention}</span> : null}
             </div>
-            {a.mention ? <span className="ps-chip" style={{ background: "var(--ps-primary-soft)", color: "var(--ps-primary)" }}>{a.mention}</span> : null}
-          </div>
-        ))}
+          ))
+        )}
       </SlidePanel>
 
       {/* AI panel */}
@@ -587,9 +697,9 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
         <div style={{ fontSize: 13, color: "var(--ps-slate)", lineHeight: 1.7, display: "flex", flexDirection: "column", gap: 12 }}>
           {resource === "landing-page" ? (
             <>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Builder</strong> — drag widgets, then Save Draft or Preview from the top bar.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Builder</strong> — drag widgets, then Save Draft, Preview, Publish or Unpublish from the top bar.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Preview</strong> — opens a real local page at /p/your-slug. Resize the window for mobile/tablet.</div>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Submitting</strong> — from My Pages, click Submit for approval. A Super Admin reviews it and approves, rejects with feedback, or publishes it live.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Publishing</strong> — click Publish to make this page live, and Unpublish to take it down. No review step — you&apos;re in control.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Pages</strong> — this page came from a template your organisation was assigned. Editing it never changes the shared template or any other organisation&apos;s copy.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Settings</strong> — Brand, Header, SEO, Tracking and Forms apply only to this page.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Shortcuts</strong> — Ctrl+S save, Ctrl+Z undo, Ctrl+Shift+Z redo.</div>

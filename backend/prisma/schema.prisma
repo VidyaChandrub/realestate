@@ -67,37 +67,38 @@ model Organisation {
   postalCode      String? @map("postal_code")
   country         String?
 
-  users                  User[]
-  teams                  Team[]
-  auditLogs              AuditLog[]
-  subscriptions          Subscription[]
-  organisationTemplates  OrganisationTemplate[]
-  landingPages           LandingPage[]
+  users                 User[]
+  teams                 Team[]
+  auditLogs             AuditLog[]
+  subscriptions         Subscription[]
+  organisationTemplates OrganisationTemplate[]
+  landingPages          LandingPage[]
+  typographySets        TypographySet[]
 
   @@map("organisations")
   @@schema("identity")
 }
 
 model User {
-  id                   String     @id @default(uuid())
-  orgId                String?    @map("org_id")
-  firstName            String?    @map("first_name")
-  lastName             String?    @map("last_name")
-  email                String     @unique
-  phoneNumber          String?    @map("phone_number")
-  passwordHash         String     @map("password_hash")
-  status               UserStatus @default(active)
-  mustChangePassword   Boolean    @default(false) @map("must_change_password")
-  failedLoginAttempts  Int        @default(0) @map("failed_login_attempts")
-  lockedUntil          DateTime?  @map("locked_until")
-  createdAt            DateTime   @default(now()) @map("created_at")
+  id                  String     @id @default(uuid())
+  orgId               String?    @map("org_id")
+  firstName           String?    @map("first_name")
+  lastName            String?    @map("last_name")
+  email               String     @unique
+  phoneNumber         String?    @map("phone_number")
+  passwordHash        String     @map("password_hash")
+  status              UserStatus @default(active)
+  mustChangePassword  Boolean    @default(false) @map("must_change_password")
+  failedLoginAttempts Int        @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?  @map("locked_until")
+  createdAt           DateTime   @default(now()) @map("created_at")
 
-  organisation   Organisation?        @relation(fields: [orgId], references: [id])
-  userRoles      UserRole[]
-  teamMembers    TeamMember[]
-  refreshTokens  RefreshToken[]
-  resetTokens    PasswordResetToken[]
-  auditLogs      AuditLog[]
+  organisation  Organisation?        @relation(fields: [orgId], references: [id])
+  userRoles     UserRole[]
+  teamMembers   TeamMember[]
+  refreshTokens RefreshToken[]
+  resetTokens   PasswordResetToken[]
+  auditLogs     AuditLog[]
 
   @@map("users")
   @@schema("identity")
@@ -270,27 +271,27 @@ enum TemplatePageType {
 }
 
 model Template {
-  id             String            @id @default(uuid())
+  id             String           @id @default(uuid())
   name           String
-  slug           String            @unique
-  status         TemplateStatus    @default(draft)
-  isPaid         Boolean           @default(false) @map("is_paid")
+  slug           String           @unique
+  status         TemplateStatus   @default(draft)
+  isPaid         Boolean          @default(false) @map("is_paid")
   thumbnail      String?
-  designId       String            @map("design_id")
-  baseDesignName String            @map("base_design_name")
+  designId       String           @map("design_id")
+  baseDesignName String           @map("base_design_name")
   category       String?
-  kind           TemplateKind      @default(custom)
-  pageType       TemplatePageType  @default(landing) @map("page_type")
-  parentId       String?           @map("parent_id")
-  domain         String            @default("")
+  kind           TemplateKind     @default(custom)
+  pageType       TemplatePageType @default(landing) @map("page_type")
+  parentId       String?          @map("parent_id")
+  domain         String           @default("")
   content        Json
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
 
-  parent                 Template?              @relation("TemplatePages", fields: [parentId], references: [id], onDelete: SetNull)
-  childPages             Template[]             @relation("TemplatePages")
-  organisationTemplates  OrganisationTemplate[]
-  landingPages           LandingPage[]
+  parent                Template?              @relation("TemplatePages", fields: [parentId], references: [id], onDelete: SetNull)
+  childPages            Template[]             @relation("TemplatePages")
+  organisationTemplates OrganisationTemplate[]
+  landingPages          LandingPage[]
 
   @@map("templates")
   @@schema("templates")
@@ -325,7 +326,7 @@ model Plan {
   priceMonthly Int      @map("price_monthly")
   priceYearly  Int      @map("price_yearly")
   features     Json     @default("[]")
-  limits       Json?    // { projects, users, templates }
+  limits       Json? // { projects, users, templates }
   color        String   @default("#eef0fe")
   badge        String   @default("b-indigo")
   isPopular    Boolean  @default(false) @map("is_popular")
@@ -348,7 +349,7 @@ model Subscription {
   amount       Int
   currency     String             @default("INR")
   renewsAt     DateTime?          @map("renews_at")
-  mrr          Int?               // monthly recurring normalized value
+  mrr          Int? // monthly recurring normalized value
   startedAt    DateTime           @default(now()) @map("started_at")
   cancelledAt  DateTime?          @map("cancelled_at")
   createdAt    DateTime           @default(now()) @map("created_at")
@@ -425,5 +426,26 @@ model LandingPage {
   @@index([orgId])
   @@index([status])
   @@map("landing_pages")
+  @@schema("templates")
+}
+
+model TypographySet {
+  id        String   @id @default(uuid())
+  orgId     String?  @map("org_id") // null = platform-wide set (Super Admin owned)
+  name      String
+  tokens    Json // the design-system token payload (TemplateTypography), stored as-is
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organisation Organisation? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // NOTE: Postgres never treats two NULLs as equal for uniqueness, so this
+  // does NOT stop two platform sets (orgId: null) from sharing a name — it
+  // only blocks duplicate names within one real org. Accepted deliberately:
+  // platform sets are Super-Admin-only, a single trusted role that can just
+  // not do that, and a real DB-level fix needs a partial unique index
+  // (WHERE org_id IS NULL) outside what this schema DSL can express.
+  @@unique([orgId, name])
+  @@map("typography_sets")
   @@schema("templates")
 }

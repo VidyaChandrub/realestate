@@ -163,9 +163,6 @@ export class OrgLandingPagesService {
           thumbnail: true,
           pageType: true,
           parentId: true,
-          submittedAt: true,
-          reviewedAt: true,
-          rejectionReason: true,
           publishedAt: true,
           createdAt: true,
           updatedAt: true,
@@ -185,13 +182,6 @@ export class OrgLandingPagesService {
   async update(orgId: string, id: string, dto: UpdateLandingPageDto) {
     const page = await this.getOwned(orgId, id);
 
-    // A page under review must not change beneath the reviewer.
-    if (page.status === 'pending_approval') {
-      throw new BadRequestException(
-        'This page is pending approval and cannot be edited until it is reviewed',
-      );
-    }
-
     const data: Prisma.LandingPageUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.slug !== undefined) data.slug = dto.slug;
@@ -201,27 +191,16 @@ export class OrgLandingPagesService {
       const nextContent = { sections: dto.content.sections, config: dto.content.config };
       data.content = nextContent as Prisma.InputJsonValue;
 
-      // Editing an approved/published page reverts it to draft — but only
-      // when the content actually changed. The builder's debounced autosave
-      // fires on every real edit, but also re-hydrates stored sections
-      // through migrateSections() on load (see BuilderWorkspace.seedSections)
-      // to remap retired widget ids for old pages — merely opening a page
-      // must not revert it, so we compare against what's actually stored
-      // (deep equality, not reference/timestamp) rather than trusting that
-      // a content-carrying PATCH implies a real change.
-      // NOTE: if a page does use a retired widget type, migrateSections()
-      // legitimately produces different content than what's stored, and
-      // this *will* revert it on the very first save after opening — that's
-      // a known, accepted consequence (the content genuinely changed, just
-      // not by the user's hand), not a bug to chase here.
-      // NOTE: this whole revert-on-change rule is only correct because
-      // approved/published pages aren't publicly served yet. Once public
-      // serving of published pages exists, this needs a working-content vs.
-      // published-snapshot split — otherwise editing a live page would take
-      // it offline the instant a save fires. Don't build that split now;
-      // just don't regress this comment away when that day comes.
+      // Editing a published page reverts it to draft — only when the
+      // content actually changed (deep equality against what's stored, not
+      // just "a content-carrying PATCH arrived") so merely opening a page
+      // doesn't flip it, and republishing is an explicit, visible action
+      // rather than a silent no-op. See OrgLandingPagesController comment
+      // history for why this was tried without the revert and reverted:
+      // the Publish/Unpublish button looked stuck on "Unpublish" after an
+      // edit, giving no signal the live page hadn't picked up the change.
       const contentChanged = !deepEqual(page.content, nextContent);
-      if (contentChanged && (page.status === 'approved' || page.status === 'published')) {
+      if (contentChanged && page.status === 'published') {
         data.status = 'draft';
       }
     }
@@ -236,24 +215,47 @@ export class OrgLandingPagesService {
     }
   }
 
-  async submit(orgId: string, id: string) {
+  async publish(orgId: string, id: string) {
     const page = await this.getOwned(orgId, id);
-    if (page.status !== 'draft' && page.status !== 'rejected') {
-      throw new BadRequestException('Only draft or rejected pages can be submitted for approval');
-    }
-    return this.prisma.landingPage.update({
+    const updated = await this.prisma.landingPage.update({
       where: { id },
-      data: { status: 'pending_approval', submittedAt: new Date(), rejectionReason: null },
+      data: { status: 'published', publishedAt: new Date() },
     });
+    await this.prisma.auditLog.create({
+      data: {
+        orgId,
+        action: 'landing_page_published',
+        entity: 'LandingPage',
+        entityId: page.id,
+        metadata: {},
+      },
+    });
+    return updated;
+  }
+
+  async unpublish(orgId: string, id: string) {
+    const page = await this.getOwned(orgId, id);
+    if (page.status !== 'published') {
+      throw new BadRequestException('Only published pages can be unpublished');
+    }
+    const updated = await this.prisma.landingPage.update({
+      where: { id },
+      data: { status: 'unpublished' },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        orgId,
+        action: 'landing_page_unpublished',
+        entity: 'LandingPage',
+        entityId: page.id,
+        metadata: {},
+      },
+    });
+    return updated;
   }
 
   async remove(orgId: string, id: string) {
-    const page = await this.getOwned(orgId, id);
-    if (page.status === 'pending_approval') {
-      throw new BadRequestException(
-        'This page is pending approval — wait for the review outcome before deleting it',
-      );
-    }
+    await this.getOwned(orgId, id);
     await this.prisma.landingPage.delete({ where: { id } });
     return { success: true };
   }

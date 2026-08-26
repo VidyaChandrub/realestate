@@ -16,7 +16,8 @@ import {
 import { buildTemplateSections, WIDGETS } from "@/lib/prestate/data";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
 import type { DesignBundle } from "./canvas";
-import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts } from "@/lib/prestate/design-system";
+import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts, loadGlobalSets, type GlobalStyleSet } from "@/lib/prestate/design-system";
+import type { Resource } from "@/lib/prestate/store";
 import {
   cloneWithFreshIds,
   findSection,
@@ -70,6 +71,7 @@ export function BuilderWorkspace({
   onPersist,
   onPatchConfig,
   onOpenLocalPreview,
+  resource = "template",
 }: {
   page: LandingPageData;
   device: Device;
@@ -80,7 +82,25 @@ export function BuilderWorkspace({
   onPersist: (sections: SectionInstance[], status?: LandingPageData["status"]) => void;
   onPatchConfig: (recipe: (c: SiteConfig) => SiteConfig) => void;
   onOpenLocalPreview: () => void;
+  /** Which typography-sets endpoint to fetch from — org vs platform sets. */
+  resource?: Resource;
 }) {
+  // Global typography sets are server-persisted now — fetched once here
+  // (not inside effectiveTypography, which must stay synchronous for the
+  // canvas CSS useMemo below) and passed in. Empty while loading is fine:
+  // the canvas just renders with template-scoped typography until this
+  // resolves, same as any other async-data gap elsewhere in the builder.
+  const [globalSets, setGlobalSets] = useState<GlobalStyleSet[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    loadGlobalSets(resource).then((sets) => {
+      if (!cancelled) setGlobalSets(sets);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [resource]);
+
   const [state, setState] = useState<EditorState>(() => ({
     sections: seedSections(page),
     history: [],
@@ -97,13 +117,13 @@ export function BuilderWorkspace({
   const design = useMemo<{ css: string; bundle: DesignBundle }>(() => {
     const cfg = ensureConfig(page);
     void ensureDesignSystem(cfg); // normalises stored state
-    const { typography } = effectiveTypography(cfg);
+    const { typography } = effectiveTypography(cfg, globalSets);
     const fonts = loadFonts();
     return {
       css: buildDesignCss({ scopeClass: "ps-typo-scope", typography, fonts }),
       bundle: { tokens: typography, fonts },
     };
-  }, [page]);
+  }, [page, globalSets]);
 
   const { sections, history, future, selectedId } = state;
 

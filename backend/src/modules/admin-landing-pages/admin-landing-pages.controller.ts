@@ -1,21 +1,12 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { AdminLandingPagesService } from './admin-landing-pages.service';
 import { ListAdminLandingPagesQueryDto } from './dto/list-admin-landing-pages-query.dto';
-import { RejectLandingPageDto } from './dto/reject-landing-page.dto';
 
+// Read-only visibility into org landing pages — orgs publish their own
+// pages directly (see OrgLandingPagesController), there is no approval gate
+// here anymore. Kept so Super Admin can still see what's out there.
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 @Controller('admin/landing-pages')
 export class AdminLandingPagesController {
@@ -29,27 +20,5 @@ export class AdminLandingPagesController {
   @Get(':id')
   getById(@Param('id') id: string) {
     return this.service.getById(id);
-  }
-
-  @Post(':id/approve')
-  @HttpCode(200)
-  approve(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
-    return this.service.approve(id, actor);
-  }
-
-  @Post(':id/reject')
-  @HttpCode(200)
-  reject(
-    @Param('id') id: string,
-    @CurrentUser() actor: JwtPayload,
-    @Body() dto: RejectLandingPageDto,
-  ) {
-    return this.service.reject(id, actor, dto.reason);
-  }
-
-  @Post(':id/publish')
-  @HttpCode(200)
-  publish(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
-    return this.service.publish(id, actor);
   }
 }

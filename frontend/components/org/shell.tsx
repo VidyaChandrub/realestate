@@ -44,7 +44,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     grp: "Website",
     items: [
-      { href: "/org/websites", icon: "globe", label: "Websites", tip: "Websites" },
+      // { href: "/org/websites", icon: "globe", label: "Websites", tip: "Websites" },
       { href: "/org/landing-pages", icon: "document", label: "Landing Pages", tip: "Landing Pages" },
       { href: "/org/templates", icon: "puzzle", label: "Templates", tip: "Templates" },
       // { href: "/org/integrations", icon: "link", label: "Integrations", tip: "Integrations" },
@@ -148,9 +148,6 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
         ]) ??
     "Dashboard";
 
-  const userName = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email;
-  const avatarInitials = initials(user.first_name, user.last_name);
-
   const notifications = [
     {
       id: 1,
@@ -201,6 +198,9 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
   if (authLoading || !accessToken || !user || user.role !== "organisation_admin") {
     return null;
   }
+
+  const userName = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email;
+  const avatarInitials = initials(user.first_name, user.last_name);
 
   return (
     <div className={appClass}>

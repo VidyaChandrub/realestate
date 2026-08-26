@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
-import type { SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
+import type { OrgBillingSummary, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
 
 const TABS = ["General", "Branding", "Notifications", "Billing", "Security"] as const;
 type Tab = (typeof TABS)[number];
@@ -55,6 +55,31 @@ function formToOrg(org: SafeOrganisation): GeneralBrandingForm {
   };
 }
 
+function formatMoney(amount: number, currency: string): string {
+  const symbol = currency === "INR" ? "₹" : `${currency} `;
+  return `${symbol}${amount.toLocaleString("en-IN")}`;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+const SUBSCRIPTION_STATUS_BADGE: Record<string, string> = {
+  active: "b-green",
+  trial: "b-amber",
+  past_due: "b-rose",
+  paused: "b-gray",
+  cancelled: "b-gray",
+};
+
+const SUBSCRIPTION_STATUS_LABEL: Record<string, string> = {
+  active: "Active",
+  trial: "Trial",
+  past_due: "Past due",
+  paused: "Paused",
+  cancelled: "Cancelled",
+};
+
 export default function OrgSettingsPage() {
   const { accessToken } = useAuth();
 
@@ -65,6 +90,9 @@ export default function OrgSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [billing, setBilling] = useState<OrgBillingSummary | null>(null);
+  const [billingLoading, setBillingLoading] = useState(true);
+  const [billingError, setBillingError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -80,6 +108,16 @@ export default function OrgSettingsPage() {
       })
       .catch((err) => setSaveError(err instanceof Error ? err.message : "Failed to load settings."))
       .finally(() => setLoading(false));
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    apiFetch<OrgBillingSummary>("/org/billing", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then(setBilling)
+      .catch((err) => setBillingError(err instanceof Error ? err.message : "Failed to load billing details."))
+      .finally(() => setBillingLoading(false));
   }, [accessToken]);
 
   function updateForm(patch: Partial<GeneralBrandingForm>) {
@@ -387,9 +425,87 @@ export default function OrgSettingsPage() {
           <div className="card">
             <div className="card-h">
               <span className="t">Billing</span>
+              {billing?.subscription ? (
+                <span className={`badge ${SUBSCRIPTION_STATUS_BADGE[billing.subscription.status] ?? "b-gray"}`}>
+                  {SUBSCRIPTION_STATUS_LABEL[billing.subscription.status] ?? billing.subscription.status}
+                </span>
+              ) : null}
             </div>
             <div className="card-b">
-              <p className="muted">Coming soon — billing and plans aren&apos;t built yet.</p>
+              {billingLoading ? (
+                <p className="muted">Loading billing details…</p>
+              ) : billingError ? (
+                <p className="muted">{billingError}</p>
+              ) : !billing?.plan || !billing.subscription ? (
+                <div>
+                  <p className="muted" style={{ marginTop: 0 }}>No active subscription on this organisation yet.</p>
+                  <p className="muted" style={{ fontSize: 12.5 }}>Contact your account manager to get started with a plan.</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                  <div className="row2">
+                    <div className="field" style={{ marginBottom: 0 }}>
+                      <label>Current plan</label>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span className={`badge ${billing.plan.badge}`} style={{ fontSize: 13, padding: "6px 12px" }}>{billing.plan.name}</span>
+                        {billing.plan.isPopular ? <span className="chip">Popular</span> : null}
+                      </div>
+                    </div>
+                    <div className="field" style={{ marginBottom: 0 }}>
+                      <label>Price</label>
+                      <div style={{ fontWeight: 700, fontSize: 15 }}>
+                        {formatMoney(
+                          billing.subscription.billingCycle === "yearly" ? billing.plan.priceYearly : billing.plan.priceMonthly,
+                          billing.subscription.currency,
+                        )}
+                        <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>
+                          {" "}/ {billing.subscription.billingCycle === "yearly" ? "year" : "month"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {billing.subscription.renewsAt ? (
+                    <div className="field" style={{ marginBottom: 0 }}>
+                      <label>{billing.subscription.status === "trial" ? "Trial ends" : "Renews on"}</label>
+                      <div>{formatDate(billing.subscription.renewsAt)}</div>
+                    </div>
+                  ) : null}
+
+                  <div className="field" style={{ marginBottom: 0 }}>
+                    <label>Templates</label>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6 }}>
+                      <span>
+                        {billing.usage.templatesUsed} of {billing.usage.templatesLimit ?? "unlimited"} used
+                      </span>
+                      {billing.usage.templatesLimit != null && billing.usage.templatesUsed >= billing.usage.templatesLimit ? (
+                        <span style={{ color: "var(--rose)", fontWeight: 700 }}>Limit reached</span>
+                      ) : null}
+                    </div>
+                    {billing.usage.templatesLimit != null ? (
+                      <div style={{ height: 8, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden" }}>
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${Math.min(100, (billing.usage.templatesUsed / Math.max(1, billing.usage.templatesLimit)) * 100)}%`,
+                            background: billing.usage.templatesUsed >= billing.usage.templatesLimit ? "var(--rose)" : "var(--brand)",
+                            borderRadius: 999,
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="muted" style={{ fontSize: 12 }}>Unlimited on this plan.</div>
+                    )}
+                  </div>
+
+                  <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                    <button className="btn btn-primary" disabled title="Plan upgrades aren't available yet" style={{ opacity: 0.5, cursor: "not-allowed" }}>
+                      Upgrade plan
+                    </button>
+                    <span className="muted" style={{ fontSize: 12 }}>Coming soon — contact your account manager to change plans.</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </Reveal>
