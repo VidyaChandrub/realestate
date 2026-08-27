@@ -17,6 +17,7 @@ import { OrgActivityModule } from './modules/org-activity/org-activity.module';
 import { OrgTypographySetsModule } from './modules/org-typography-sets/org-typography-sets.module';
 import { AdminTypographySetsModule } from './modules/admin-typography-sets/admin-typography-sets.module';
 import { OrgBillingModule } from './modules/org-billing/org-billing.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { OrgBillingModule } from './modules/org-billing/org-billing.module';
     OrgTypographySetsModule,
     AdminTypographySetsModule,
     OrgBillingModule,
+    ProjectsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

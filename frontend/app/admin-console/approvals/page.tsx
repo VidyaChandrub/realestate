@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Icon } from "@/components/icons";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { Plan, OrganisationListResponse, OrganisationDetail } from "@/lib/types";
 
 function initials(name: string) {
@@ -60,6 +61,7 @@ function OrganisationApprovalsTab({ accessToken }: { accessToken: string }) {
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
 
   const notify = (m:string)=>{ setToast(m); setTimeout(()=>setToast(null),2800); };
 
@@ -137,7 +139,7 @@ function OrganisationApprovalsTab({ accessToken }: { accessToken: string }) {
   };
   const handleReject = async ()=>{
     if(!selectedId) return;
-    if(!confirm(`Reject ${detail?.name}? This will disable the organisation.`)) return;
+    setRejectOpen(false);
     setActionLoading(true);
     try {
       await apiFetch(`/admin/organisations/${selectedId}/reject`, {
@@ -263,7 +265,7 @@ function OrganisationApprovalsTab({ accessToken }: { accessToken: string }) {
                   <button className="btn btn-success" style={{ flex:1, justifyContent:"center"}} disabled={actionLoading || !selectedPlanId || selectedTemplateIds.length===0} onClick={handleApprove}>
                     {actionLoading?"Approving…":<><Icon name="check" size={14} /> Approve & activate</>}
                   </button>
-                  <button className="btn btn-danger" style={{ flex:1, justifyContent:"center"}} disabled={actionLoading} onClick={handleReject}>
+                  <button className="btn btn-danger" style={{ flex:1, justifyContent:"center"}} disabled={actionLoading} onClick={() => setRejectOpen(true)}>
                     <Icon name="close" size={14} /> Reject
                   </button>
                 </div>
@@ -276,6 +278,20 @@ function OrganisationApprovalsTab({ accessToken }: { accessToken: string }) {
         </div>
       </div>
       {toast? <div style={{ position:"fixed", right:20, bottom:20, zIndex:500}}><div className="card" style={{ padding:"12px 16px", boxShadow:"var(--sh-lg)"}}>{toast}</div></div>:null}
+      <ConfirmModal
+        open={rejectOpen}
+        title="Reject this organisation?"
+        message={
+          detail
+            ? `“${detail.name}” will be disabled. You can reactivate it later from the Organisations list.`
+            : "The organisation will be disabled."
+        }
+        confirmLabel="Reject"
+        destructive
+        busy={actionLoading}
+        onConfirm={() => void handleReject()}
+        onClose={() => setRejectOpen(false)}
+      />
     </>
   );
 }

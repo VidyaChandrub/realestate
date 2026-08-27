@@ -1,13 +1,16 @@
+"use client";
+
+// Static mockup carried over from the previous hardcoded project folder.
+// AI Calling is out of scope for this build — nothing here is wired to the
+// backend. It exists so the project tab bar doesn't 404.
+
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { ProgressBar } from "@/components/superadmin/progress-bar";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-
-export const metadata = {
-  title: "Palm Residency · AI Calling",
-};
 
 const CALLS = [
   {
@@ -61,6 +64,9 @@ const CALLS = [
 ];
 
 export default function OrgProjectAiCallingPage() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id ?? "";
+
   return (
     <>
       <ProjectPageHead
@@ -72,6 +78,13 @@ export default function OrgProjectAiCallingPage() {
           </>
         }
       />
+
+      <Reveal delay={1}>
+        <div className="help" style={{ marginBottom: 18 }}>
+          AI calling isn&apos;t wired up yet — this is a preview of the agent
+          workspace.
+        </div>
+      </Reveal>
 
       {/* AI AGENT ASSIGNED */}
       <Reveal delay={1}>
@@ -91,14 +104,14 @@ export default function OrgProjectAiCallingPage() {
             <div style={{ flex: "1 1 320px", minWidth: 280, display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 <span className="chip">🗣️ Hindi / English</span>
-                <span className="chip">📚 Knowledge: Palm Residency</span>
+                <span className="chip">📚 Project knowledge</span>
                 <span className="chip">📞 Outbound</span>
               </div>
               <p className="muted" style={{ fontSize: 13.5, margin: 0, lineHeight: 1.6 }}>
-                <b style={{ color: "var(--ink)" }}>Goal:</b> Qualify inbound Palm Residency leads,
-                confirm budget &amp; configuration (2/3/4 BHK), and book a weekend site visit on SG
-                Highway. Pitches ₹68 L–₹2.4 Cr pricing, Dec 2027 possession and RERA-approved status;
-                hands warm leads to Priya Sharma and logs the visit slot to the CRM.
+                <b style={{ color: "var(--ink)" }}>Goal:</b> Qualify inbound leads,
+                confirm budget &amp; configuration (2/3/4 BHK), and book a weekend site
+                visit. Pitches project pricing, possession and RERA-approved status;
+                hands warm leads to the sales team and logs the visit slot to the CRM.
               </p>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: "0 0 auto" }}>
@@ -157,7 +170,7 @@ export default function OrgProjectAiCallingPage() {
       <Reveal delay={2}>
         <div className="card" style={{ marginTop: 18 }}>
           <div className="card-h">
-            <span className="t">Active campaign — Palm Residency Weekend Visits</span>
+            <span className="t">Active campaign — Weekend Visits</span>
             <span className="badge b-green">● Running</span>
           </div>
           <div className="card-b">
@@ -222,12 +235,12 @@ export default function OrgProjectAiCallingPage() {
         <div className="help" style={{ marginTop: 18 }}>
           💡 Aarohi&apos;s call scripts, pricing lines and FAQ answers are pulled live from the{" "}
           <Link
-            href="/org/projects/palm-residency/knowledge"
+            href={`/org/projects/${id}/knowledge`}
             style={{ color: "var(--brand)", fontWeight: 600 }}
           >
             Knowledge tab
           </Link>{" "}
-          for Palm Residency. Update project details there and the AI agent speaks the latest.
+          for this project. Update project details there and the AI agent speaks the latest.
         </div>
       </Reveal>
     </>

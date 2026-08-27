@@ -1,9 +1,12 @@
+"use client";
+
+// Static mockup carried over from the previous hardcoded project folder.
+// Lead-source integrations / distribution rules are out of scope for this
+// build — nothing here is wired to the backend. It exists so the project
+// tab bar doesn't 404.
+
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-
-export const metadata = {
-  title: "Palm Residency · Integrations",
-};
 
 type SourceCard = {
   icon: string;
@@ -34,7 +37,7 @@ const SOURCES: SourceCard[] = [
   {
     icon: "🌐",
     name: "Website / landing form",
-    desc: "Enquiry form on palm-residency.in landing page.",
+    desc: "Enquiry form on the project's landing page.",
     connected: true,
   },
   {
@@ -89,6 +92,12 @@ export default function OrgProjectIntegrationsPage() {
       />
 
       <Reveal delay={1}>
+        <div className="help" style={{ marginBottom: 14 }}>
+          Lead-source integrations aren&apos;t wired up yet — this is a preview.
+        </div>
+      </Reveal>
+
+      <Reveal delay={1}>
         <div
           style={{
             display: "flex",
@@ -102,7 +111,7 @@ export default function OrgProjectIntegrationsPage() {
             letterSpacing: "0.05em",
           }}
         >
-          <span>INCOMING · Lead sources for Palm Residency</span>
+          <span>INCOMING · Lead sources for this project</span>
           <button className="btn btn-ghost" style={{ textTransform: "none", letterSpacing: 0 }}>
             ＋ Add custom source
           </button>
@@ -138,7 +147,7 @@ export default function OrgProjectIntegrationsPage() {
       <Reveal delay={2}>
         <div className="card" style={{ marginTop: 20 }}>
           <div className="card-h">
-            <span className="t">Distribution — Palm Residency</span>
+            <span className="t">Distribution rules</span>
             <span className="badge b-sky">3 rules</span>
           </div>
           <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 14 }}>

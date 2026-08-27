@@ -446,3 +446,154 @@ export interface OrgBillingSummary {
     templatesLimit: number | null;
   };
 }
+
+// --- Projects & inventory (org-scoped) ---
+// All money fields are integer rupees. `landArea` is acres. `possession` is
+// deliberately free text ("Dec 2027"); `manager` is a free-text name, not a
+// user id.
+export type ProjectStatus = "active" | "inactive";
+export type UnitStatus = "available" | "booked" | "held";
+
+export interface Amenity {
+  name: string;
+  /** Always null for now — amenity-icon upload is out of scope (S3). */
+  iconUrl: string | null;
+}
+
+/** The project's manager, expanded onto every project response so the UI
+ *  can show a name without a second request. */
+export interface ProjectManager {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  /** "First Last", or the email if no name is set. */
+  name: string;
+}
+
+export interface Project {
+  id: string;
+  orgId: string;
+  name: string;
+  location: string | null;
+  reraId: string | null;
+  possession: string | null;
+  managerId: string | null;
+  manager: ProjectManager | null;
+  status: ProjectStatus;
+  priceMin: number | null;
+  priceMax: number | null;
+  baseRate: number | null;
+  landArea: number | null;
+  towerCount: number | null;
+  floorsDescription: string | null;
+  amenities: Amenity[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectListRow extends Project {
+  unitTypeCount: number;
+}
+
+export interface UnitType {
+  id: string;
+  projectId: string;
+  name: string;
+  carpetSqft: number | null;
+  builtupSqft: number | null;
+  price: number | null;
+  totalUnits: number;
+  floorPlanUrl: string | null;
+  brochureUrl: string | null;
+  videoUrl: string | null;
+  galleryUrls: string[];
+  /** Derived live from Unit rows — never stored, so it can't drift. */
+  unitCount: number;
+  availableUnits: number;
+  bookedUnits: number;
+  heldUnits: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Unit {
+  id: string;
+  unitTypeId: string;
+  unitType: { id: string; name: string };
+  unitNo: string;
+  /** Optional — null for projects with no tower concept (villas, plots). */
+  tower: string | null;
+  floor: number | null;
+  facing: string | null;
+  price: number | null;
+  status: UnitStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectDetail extends Project {
+  unitTypes: UnitType[];
+  rollup: {
+    totalUnitsPlanned: number;
+    unitsCreated: number;
+    unitsAvailable: number;
+    unitsBooked: number;
+    unitsHeld: number;
+  };
+}
+
+export interface ProjectsListResponse {
+  data: ProjectListRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface CreateProjectInput {
+  name: string;
+  location?: string;
+  reraId?: string;
+  possession?: string;
+  managerId?: string;
+  status?: ProjectStatus;
+  priceMin?: number;
+  priceMax?: number;
+  baseRate?: number;
+  landArea?: number;
+  towerCount?: number;
+  floorsDescription?: string;
+  amenities?: Amenity[];
+}
+
+export type UpdateProjectInput = Partial<
+  Omit<CreateProjectInput, "managerId">
+> & {
+  /** id to (re)assign, or explicit null to unassign. */
+  managerId?: string | null;
+};
+
+export interface CreateUnitTypeInput {
+  name: string;
+  carpetSqft?: number;
+  builtupSqft?: number;
+  price?: number;
+  totalUnits?: number;
+}
+
+export type UpdateUnitTypeInput = Partial<CreateUnitTypeInput>;
+
+export interface CreateUnitInput {
+  unitTypeId: string;
+  unitNo: string;
+  tower?: string;
+  floor?: number;
+  facing?: string;
+  price?: number;
+  status?: UnitStatus;
+}
+
+export type UpdateUnitInput = Partial<Omit<CreateUnitInput, "tower">> & {
+  /** value to set, or explicit null to clear. */
+  tower?: string | null;
+};

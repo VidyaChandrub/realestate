@@ -10,6 +10,7 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
 import type { OrganisationListResponse, OrganisationSummary } from "@/lib/types";
 import { Icon } from "@/components/icons";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 const STATUS_TABS = ["All", "Active", "Pending", "Disabled"] as const;
 const LIMIT = 20;
@@ -53,6 +54,12 @@ export default function SuperAdminOrganisationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    title: string;
+    message: string;
+    run: () => Promise<void>;
+  } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const notify = (m:string)=>{ setToast(m); setTimeout(()=>setToast(null),2500); };
 
@@ -106,15 +113,21 @@ export default function SuperAdminOrganisationsPage() {
     } catch(e:any){ notify(e.message||"Approve failed"); }
     finally{ setActionBusy(null); }
   };
-  const handleReject = async (id:string) => {
-    if (!accessToken || !confirm("Reject this organisation? It will be disabled.")) return;
-    setActionBusy(id);
-    try{
-      await apiFetch(`/admin/organisations/${id}/reject`, { method:"POST", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({}) });
-      notify("Rejected");
-      fetchList(); fetchSummary();
-    } catch(e:any){ notify(e.message||"Reject failed"); }
-    finally{ setActionBusy(null); }
+  const handleReject = (id:string) => {
+    if (!accessToken) return;
+    setConfirmState({
+      title: "Reject organisation?",
+      message: "The organisation will be disabled.",
+      run: async () => {
+        setActionBusy(id);
+        try{
+          await apiFetch(`/admin/organisations/${id}/reject`, { method:"POST", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({}) });
+          notify("Rejected");
+          fetchList(); fetchSummary();
+        } catch(e:any){ notify(e.message||"Reject failed"); }
+        finally{ setActionBusy(null); }
+      },
+    });
   };
   const handleActivate = async (id:string) => {
     if (!accessToken) return;
@@ -126,25 +139,37 @@ export default function SuperAdminOrganisationsPage() {
     } catch(e:any){ notify(e.message||"Activate failed");}
     finally{ setActionBusy(null);}
   };
-  const handleDeactivate = async (id:string) => {
-    if (!accessToken || !confirm("Deactivate this organisation?")) return;
-    setActionBusy(id);
-    try{
-      await apiFetch(`/admin/organisations/${id}/status`, { method:"PATCH", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ status:"disabled"}) });
-      notify("Deactivated");
-      fetchList(); fetchSummary();
-    } catch(e:any){ notify(e.message||"Deactivate failed");}
-    finally{ setActionBusy(null);}
+  const handleDeactivate = (id:string) => {
+    if (!accessToken) return;
+    setConfirmState({
+      title: "Deactivate organisation?",
+      message: "The organisation will be marked disabled. You can reactivate it later.",
+      run: async () => {
+        setActionBusy(id);
+        try{
+          await apiFetch(`/admin/organisations/${id}/status`, { method:"PATCH", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ status:"disabled"}) });
+          notify("Deactivated");
+          fetchList(); fetchSummary();
+        } catch(e:any){ notify(e.message||"Deactivate failed");}
+        finally{ setActionBusy(null);}
+      },
+    });
   };
-  const handleDelete = async (id:string) => {
-    if (!accessToken || !confirm("Delete this organisation permanently?")) return;
-    setActionBusy(id);
-    try{
-      await apiFetch(`/admin/organisations/${id}`, { method:"DELETE", headers:{ Authorization:`Bearer ${accessToken}` } });
-      notify("Deleted");
-      fetchList(); fetchSummary();
-    } catch(e:any){ notify(e.message||"Delete failed");}
-    finally{ setActionBusy(null);}
+  const handleDelete = (id:string) => {
+    if (!accessToken) return;
+    setConfirmState({
+      title: "Delete organisation permanently?",
+      message: "This cannot be undone.",
+      run: async () => {
+        setActionBusy(id);
+        try{
+          await apiFetch(`/admin/organisations/${id}`, { method:"DELETE", headers:{ Authorization:`Bearer ${accessToken}` } });
+          notify("Deleted");
+          fetchList(); fetchSummary();
+        } catch(e:any){ notify(e.message||"Delete failed");}
+        finally{ setActionBusy(null);}
+      },
+    });
   };
 
   if (authLoading || !accessToken) {
@@ -362,6 +387,25 @@ export default function SuperAdminOrganisationsPage() {
         </div>
       </Reveal>
       {toast ? <div style={{ position:"fixed", right:20, bottom:20, zIndex:500}}><div className="card" style={{ padding:"12px 16px", boxShadow:"var(--sh-lg)"}}>{toast}</div></div> : null}
+      <ConfirmModal
+        open={confirmState !== null}
+        title={confirmState?.title ?? ""}
+        message={confirmState?.message}
+        confirmLabel="Confirm"
+        destructive
+        busy={confirmBusy}
+        onConfirm={async () => {
+          if (!confirmState) return;
+          setConfirmBusy(true);
+          try {
+            await confirmState.run();
+          } finally {
+            setConfirmBusy(false);
+            setConfirmState(null);
+          }
+        }}
+        onClose={() => setConfirmState(null)}
+      />
     </>
   );
 }
