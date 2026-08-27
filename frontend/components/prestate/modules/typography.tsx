@@ -27,6 +27,7 @@ import { uid } from "@/lib/prestate/data";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import { ModuleHeader, SiteScopeBar } from "./shared";
 import { Btn, Chip, Collapse, ColorField, FieldRow, LengthInput, SelectField, SliderField, TabBar, TextField, Toggle } from "@/components/prestate/ui";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Icon } from "@/components/icons";
 
 const TYPE_META: { key: TypeKey; label: string; hint: string; isParagraph?: boolean }[] = [
@@ -161,8 +162,12 @@ export function TypographyModule({
     }
   };
 
-  const deleteGlobalSetHere = async (set: GlobalStyleSet) => {
-    if (!window.confirm(`Delete “${set.name}”? Templates using it will fall back to their own template-specific typography.`)) return;
+  const [deleteSet, setDeleteSet] = useState<GlobalStyleSet | null>(null);
+  const [deletingSet, setDeletingSet] = useState(false);
+  const confirmDeleteGlobalSet = async () => {
+    const set = deleteSet;
+    if (!set) return;
+    setDeletingSet(true);
     try {
       await deleteGlobalSet(resource, set.id);
       setGlobalSets((prev) => prev.filter((s) => s.id !== set.id));
@@ -172,6 +177,9 @@ export function TypographyModule({
       onToast(`Deleted “${set.name}”`);
     } catch (err) {
       onToast(err instanceof Error ? err.message : "Couldn't delete the set");
+    } finally {
+      setDeletingSet(false);
+      setDeleteSet(null);
     }
   };
 
@@ -288,7 +296,7 @@ export function TypographyModule({
               ) : (
                 <>
                   <Btn variant="outline" size="sm" onClick={() => void renameGlobalSet(eff.set!)}>Rename</Btn>
-                  <Btn variant="danger" size="sm" icon={<Trash2 size={13} />} onClick={() => void deleteGlobalSetHere(eff.set!)}>Delete</Btn>
+                  <Btn variant="danger" size="sm" icon={<Trash2 size={13} />} onClick={() => setDeleteSet(eff.set!)}>Delete</Btn>
                 </>
               )
             ) : null}
@@ -468,6 +476,20 @@ export function TypographyModule({
           </div>
         </Collapse>
       </div>
+      <ConfirmModal
+        open={deleteSet !== null}
+        title="Delete shared typography set?"
+        message={
+          deleteSet
+            ? `Templates using “${deleteSet.name}” will fall back to their own template-specific typography.`
+            : undefined
+        }
+        confirmLabel="Delete set"
+        destructive
+        busy={deletingSet}
+        onConfirm={() => void confirmDeleteGlobalSet()}
+        onClose={() => setDeleteSet(null)}
+      />
     </div>
   );
 }

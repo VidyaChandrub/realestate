@@ -21,6 +21,7 @@ import { OrgDomainRequestsModule } from './modules/org-domain-requests/org-domai
 import { AdminDomainRequestsModule } from './modules/admin-domain-requests/admin-domain-requests.module';
 import { OrgTrackingModule } from './modules/org-tracking/org-tracking.module';
 import { PublicSiteModule } from './modules/public-site/public-site.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 
 @Module({
   imports: [
@@ -40,10 +41,7 @@ import { PublicSiteModule } from './modules/public-site/public-site.module';
     OrgTypographySetsModule,
     AdminTypographySetsModule,
     OrgBillingModule,
-    OrgDomainRequestsModule,
-    AdminDomainRequestsModule,
-    OrgTrackingModule,
-    PublicSiteModule,
+    ProjectsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

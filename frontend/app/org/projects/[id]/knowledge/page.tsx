@@ -1,15 +1,18 @@
+"use client";
+
+// Static mockup carried over from the previous hardcoded project folder.
+// project_knowledge (AI/RAG) is out of scope for this build — nothing here
+// is wired to the backend. It exists so the project tab bar doesn't 404.
+
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-
-export const metadata = {
-  title: "Palm Residency · Knowledge",
-};
 
 type Doc = { name: string; type: string; typeBadge: string; updated: string };
 
 const DOCS: Doc[] = [
-  { name: "Palm Residency — Brochure", type: "PDF", typeBadge: "b-rose", updated: "12 Aug 2026" },
+  { name: "Project brochure", type: "PDF", typeBadge: "b-rose", updated: "12 Aug 2026" },
   { name: "Price list — Aug 2026", type: "Sheet", typeBadge: "b-green", updated: "05 Aug 2026" },
   { name: "Floor plans — all types", type: "PDF", typeBadge: "b-rose", updated: "28 Jul 2026" },
   { name: "RERA certificate", type: "PDF", typeBadge: "b-rose", updated: "02 Jun 2026" },
@@ -50,6 +53,9 @@ const PRICING = [
 ];
 
 export default function OrgProjectKnowledgePage() {
+  const params = useParams<{ id: string }>();
+  const id = params?.id ?? "";
+
   return (
     <>
       <ProjectPageHead
@@ -59,8 +65,8 @@ export default function OrgProjectKnowledgePage() {
 
       <Reveal delay={1}>
         <div className="help" style={{ marginBottom: 18 }}>
-          ✨ Your AI voice &amp; WhatsApp agents answer leads using this project knowledge. Keep
-          documents, FAQs and pricing current so replies stay accurate.
+          The project knowledge base (documents, FAQs, pricing for the AI
+          agents) isn&apos;t wired up yet — this is a preview.
         </div>
       </Reveal>
 
@@ -165,7 +171,7 @@ export default function OrgProjectKnowledgePage() {
                 </div>
                 <Link
                   className="btn btn-ghost btn-block"
-                  href="/org/projects/palm-residency/ai-calling"
+                  href={`/org/projects/${id}/ai-calling`}
                   style={{ marginTop: 4 }}
                 >
                   Manage AI agents →

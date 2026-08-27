@@ -6,7 +6,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["identity", "access", "templates", "audit", "billing"]
+  schemas  = ["identity", "access", "templates", "audit", "billing", "projects"]
 }
 
 // ---------------------------------------------------------------------------
@@ -76,6 +76,7 @@ model Organisation {
   typographySets        TypographySet[]
   domainRequests        DomainRequest[]
   trackingEvents        TrackingEvent[]
+  projects              Project[]
 
   @@map("organisations")
   @@schema("identity")
@@ -95,12 +96,13 @@ model User {
   lockedUntil         DateTime?  @map("locked_until")
   createdAt           DateTime   @default(now()) @map("created_at")
 
-  organisation  Organisation?        @relation(fields: [orgId], references: [id])
-  userRoles     UserRole[]
-  teamMembers   TeamMember[]
-  refreshTokens RefreshToken[]
-  resetTokens   PasswordResetToken[]
-  auditLogs     AuditLog[]
+  organisation    Organisation?        @relation(fields: [orgId], references: [id])
+  userRoles       UserRole[]
+  teamMembers     TeamMember[]
+  refreshTokens   RefreshToken[]
+  resetTokens     PasswordResetToken[]
+  auditLogs       AuditLog[]
+  managedProjects Project[]
 
   @@map("users")
   @@schema("identity")
@@ -560,4 +562,113 @@ model TrackingEvent {
   @@index([eventType])
   @@map("tracking_events")
   @@schema("templates")
+// projects — real-estate developments, their unit-type product mix, and the
+// individual unit inventory beneath each type.
+//   org 1─* projects 1─* unit_types 1─* units
+// Every row is ultimately org-scoped: Project carries org_id directly;
+// UnitType/Unit are scoped through their parent (the service always loads
+// the owning Project by org_id first — see ProjectsService). No soft-delete
+// anywhere, matching the rest of the codebase: deletes are hard deletes,
+// paired with an audit_logs row.
+// ---------------------------------------------------------------------------
+
+enum ProjectStatus {
+  active
+  inactive
+
+  @@schema("projects")
+}
+
+enum UnitStatus {
+  available
+  booked
+  held
+
+  @@schema("projects")
+}
+
+model Project {
+  id                String        @id @default(uuid())
+  orgId             String        @map("org_id")
+  name              String
+  location          String?
+  reraId            String?       @map("rera_id")
+  // Deliberately free text ("Dec 2027"), not a Date — see the build brief.
+  possession        String?
+  // FK to the org user who runs this project. Nullable — a project can be
+  // unassigned. ON DELETE SET NULL: removing the user leaves the project.
+  managerId         String?       @map("manager_id")
+  status            ProjectStatus @default(active)
+  priceMin          Int?          @map("price_min") // rupees
+  priceMax          Int?          @map("price_max") // rupees
+  baseRate          Int?          @map("base_rate") // rupees per sqft
+  landArea          Decimal?      @map("land_area") @db.Decimal(8, 2) // acres
+  towerCount        Int?          @map("tower_count")
+  floorsDescription String?       @map("floors_description") // e.g. "G+22"
+  // Array of { name: string, iconUrl: string | null }. iconUrl is always
+  // null for now — amenity-icon upload is out of scope (blocked on S3).
+  amenities         Json          @default("[]")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  manager      User?        @relation(fields: [managerId], references: [id], onDelete: SetNull)
+  unitTypes    UnitType[]
+
+  @@index([orgId])
+  @@index([managerId])
+  @@map("projects")
+  @@schema("projects")
+}
+
+model UnitType {
+  id          String @id @default(uuid())
+  projectId   String @map("project_id")
+  name        String
+  carpetSqft  Int?   @map("carpet_sqft")
+  builtupSqft Int?   @map("builtup_sqft")
+  price       Int? // rupees — the type's base price
+  // Planned/marketed unit count for this type, entered on the form. The
+  // *available* count is NOT stored here — it's derived at read time from
+  // the actual Unit rows' status so the two can never drift apart.
+  totalUnits  Int    @default(0) @map("total_units")
+
+  // Media — nullable, populated by no endpoint. Upload/object-storage is
+  // out of scope; these columns exist so the schema is complete and the
+  // future upload feature has somewhere to write.
+  floorPlanUrl String?  @map("floor_plan_url")
+  brochureUrl  String?  @map("brochure_url")
+  videoUrl     String?  @map("video_url")
+  galleryUrls  String[] @map("gallery_urls")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  units   Unit[]
+
+  @@index([projectId])
+  @@map("unit_types")
+  @@schema("projects")
+}
+
+model Unit {
+  id         String     @id @default(uuid())
+  unitTypeId String     @map("unit_type_id")
+  unitNo     String     @map("unit_no") // e.g. "A-301"
+  // Optional — villas / plots / single-building projects have no tower.
+  // Drives the availability-grid grouping (no unitNo parsing).
+  tower      String?
+  floor      Int?
+  facing     String? // e.g. "North-East"
+  price      Int? // rupees — a unit may be priced apart from its type
+  status     UnitStatus @default(available)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  unitType UnitType @relation(fields: [unitTypeId], references: [id], onDelete: Cascade)
+
+  @@index([unitTypeId])
+  @@map("units")
+  @@schema("projects")
 }

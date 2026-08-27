@@ -7,6 +7,7 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
 import { apiFetch } from "@/lib/api";
 import { Icon } from "@/components/icons";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { Plan, Subscription, BillingOverview, OrganisationListResponse } from "@/lib/types";
 
 const ALL_FEATURES = [
@@ -35,6 +36,8 @@ export default function SuperAdminSubscriptionsPage() {
   const [filter, setFilter] = useState(0);
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
+  const [deletingPlan, setDeletingPlan] = useState(false);
 
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
@@ -170,14 +173,17 @@ export default function SuperAdminSubscriptionsPage() {
     } catch (e: any) { notify(e.message || "Save failed"); }
     finally { setSavingPlan(false); }
   };
-  const deletePlan = async (id: string) => {
-    if (!confirm("Delete this plan?")) return;
+  const deletePlan = (id: string) => setDeletePlanId(id);
+  const confirmDeletePlan = async () => {
+    if (!deletePlanId) return;
+    setDeletingPlan(true);
     try {
-      await apiFetch(`/admin/plans/${id}`, { method: "DELETE" });
-      setPlans(prev => prev.filter(p => p.id !== id));
+      await apiFetch(`/admin/plans/${deletePlanId}`, { method: "DELETE" });
+      setPlans(prev => prev.filter(p => p.id !== deletePlanId));
       notify("Plan deleted");
       fetchOverview();
     } catch (e: any) { notify(e.message || "Delete failed"); }
+    finally { setDeletingPlan(false); setDeletePlanId(null); }
   };
 
   const addFeature = () => {
@@ -615,6 +621,16 @@ export default function SuperAdminSubscriptionsPage() {
       ) : null}
 
       {toast ? <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}><div className="card" style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, boxShadow: "var(--sh-lg)", border: "1px solid var(--line)" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--green)" }} />{toast}</div></div> : null}
+      <ConfirmModal
+        open={deletePlanId !== null}
+        title="Delete this plan?"
+        message="Organisations already on this plan keep their subscription; the plan just stops being offered."
+        confirmLabel="Delete plan"
+        destructive
+        busy={deletingPlan}
+        onConfirm={() => void confirmDeletePlan()}
+        onClose={() => setDeletePlanId(null)}
+      />
     </>
   );
 }

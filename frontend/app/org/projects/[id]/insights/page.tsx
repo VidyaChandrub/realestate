@@ -1,12 +1,14 @@
+"use client";
+
+// Static mockup carried over from the previous hardcoded project folder.
+// Analytics/Insights is out of scope for this build — nothing here is wired
+// to the backend. It exists so the project tab bar doesn't 404.
+
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { ProgressBar } from "@/components/superadmin/progress-bar";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-
-export const metadata = {
-  title: "Palm Residency · Insights",
-};
 
 const SPEND = [
   { m: "Mar", val: "₹1.9L", h: "52%" },
@@ -51,6 +53,12 @@ export default function OrgProjectInsightsPage() {
           </>
         }
       />
+
+      <Reveal delay={1}>
+        <div className="help" style={{ marginBottom: 18 }}>
+          Insights aren&apos;t wired up yet — figures below are placeholder data.
+        </div>
+      </Reveal>
 
       <div className="grid g4" style={{ marginBottom: 20 }}>
         <Reveal delay={1}>

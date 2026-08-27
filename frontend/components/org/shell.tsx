@@ -150,8 +150,8 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
 
   const crumb =
     CRUMB_MAP[pathname] ??
-    (pathname.startsWith("/org/projects/palm-residency")
-      ? "Projects · Palm Residency"
+    (/^\/org\/projects\/(?!add-new-project$)[^/]+/.test(pathname)
+      ? "Projects · Detail"
       : CRUMB_MAP[
           Object.keys(CRUMB_MAP)
             .filter((base) => pathname.startsWith(`${base}/`))
