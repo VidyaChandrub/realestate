@@ -52,7 +52,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative w-full rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900",
+          "relative flex max-h-[90vh] w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900",
           sizes[size],
         )}
       >
@@ -76,7 +76,7 @@ export function Modal({
             <Icon name="close" size={18} />
           </button>
         </div>
-        <div className="p-6 pt-4">{children}</div>
+        <div className="overflow-y-auto p-6 pt-4">{children}</div>
       </div>
     </div>,
     document.body,

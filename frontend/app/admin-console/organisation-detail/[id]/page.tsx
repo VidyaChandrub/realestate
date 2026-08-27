@@ -148,6 +148,13 @@ export default function SuperAdminOrganisationDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Non-blocking notice — replaces window.alert (no native dialogs in this app).
+  const [toast, setToast] = useState<string | null>(null);
+  const notify = (m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(null), 3000);
+  };
+
   const [plans, setPlans] = useState<Plan[]>([]);
   const [assignedTemplates, setAssignedTemplates] = useState<any[]>([]);
   const [allTemplates, setAllTemplates] = useState<any[]>([]);
@@ -254,7 +261,7 @@ export default function SuperAdminOrganisationDetailPage() {
       });
       setUsersReloadTick((t) => t + 1);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to update user status.");
+      notify(err instanceof Error ? err.message : "Failed to update user status.");
     } finally {
       setUserStatusBusyId(null);
     }
@@ -316,7 +323,7 @@ export default function SuperAdminOrganisationDetailPage() {
       setOrg((prev) => (prev ? { ...prev, status: next } : prev));
       setStatusModalOpen(false);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to update status.");
+      notify(err instanceof Error ? err.message : "Failed to update status.");
     } finally {
       setStatusSubmitting(false);
     }
@@ -768,8 +775,8 @@ export default function SuperAdminOrganisationDetailPage() {
                           const fresh = await apiFetch<OrganisationDetail>(`/admin/organisations/${org.id}`, { headers:{ Authorization:`Bearer ${accessToken}` }});
                           setOrg(fresh);
                           setUpgradePlanId("");
-                          window.alert("Subscription upgraded");
-                        } catch(e:any){ window.alert(e.message||"Upgrade failed"); }
+                          notify("Subscription upgraded");
+                        } catch(e:any){ notify(e.message||"Upgrade failed"); }
                         finally{ setUpgrading(false); }
                       }}>
                         {upgrading?"Upgrading…":"Upgrade subscription"}
@@ -807,7 +814,7 @@ export default function SuperAdminOrganisationDetailPage() {
                               try{
                                 await apiFetch(`/admin/organisations/${org.id}/templates`, { method:"PUT", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ templateIds: nextIds })});
                                 setAssignedTemplates(prev=> prev.filter(x=>x.templateId!==at.templateId));
-                              } catch(e:any){ window.alert(e.message||"Failed"); }
+                              } catch(e:any){ notify(e.message||"Failed"); }
                               finally{ setTemplateSaving(false); }
                             }} disabled={templateSaving}>Remove</button>
                           </div>
@@ -867,7 +874,7 @@ export default function SuperAdminOrganisationDetailPage() {
                             return { templateId:id, template:{ id: t.id, name:t.name, slug:t.slug, thumbnail:t.thumbnail, category:t.category }};
                           })]);
                           setSelectedNewTemplateIds([]); setAddTemplateOpen(false);
-                        } catch(e:any){ window.alert(e.message||"Failed to add"); }
+                        } catch(e:any){ notify(e.message||"Failed to add"); }
                         finally{ setTemplateSaving(false); }
                       }}>
                         {templateSaving?"Saving…":`Add ${selectedNewTemplateIds.length} template(s)`}
@@ -1158,6 +1165,17 @@ export default function SuperAdminOrganisationDetailPage() {
                 {deleting ? "Deleting…" : "Delete organisation"}
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}>
+          <div
+            className="card"
+            style={{ padding: "12px 16px", boxShadow: "var(--sh-lg)" }}
+          >
+            {toast}
           </div>
         </div>
       ) : null}

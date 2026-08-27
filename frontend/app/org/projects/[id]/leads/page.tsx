@@ -1,13 +1,15 @@
+"use client";
+
+// Static mockup carried over from the previous hardcoded project folder.
+// The Leads domain is out of scope for this build — nothing here is wired
+// to the backend. It exists so the project tab bar doesn't 404.
+
 import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-
-export const metadata = {
-  title: "Palm Residency · Leads",
-};
 
 type Lead = {
   name: string;
@@ -110,6 +112,13 @@ export default function OrgProjectLeadsPage() {
           </>
         }
       />
+
+      <Reveal delay={1}>
+        <div className="help" style={{ marginBottom: 18 }}>
+          Lead management isn&apos;t wired up yet — this is a preview of the
+          project Leads workspace.
+        </div>
+      </Reveal>
 
       <Reveal delay={1}>
         <div style={{ marginBottom: 20 }}>
