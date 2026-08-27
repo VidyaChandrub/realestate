@@ -1257,135 +1257,6 @@ function AmenitiesSection({ s, device }: { s: SectionInstance; device: Device })
   );
 }
 
-function FloorPlansSection({ s, device }: { s: SectionInstance; device: Device }) {
-  const st = s.settings;
-  const live = useContext(SiteLiveContext);
-  const plans = (st.plans ?? []) as { name: string; beds: string; area: string; price: string }[];
-  const [active, setActive] = useState(0);
-  const plan = plans[active];
-  const requestLink = textOf(st.requestLink ?? "#lead-form");
-  const requestPopupId = textOf(st.requestPopupId ?? "").trim();
-  const T = typoCss(s, device);
-  const design = textOf(st.design ?? "cards");
-
-  const handleCta = (e: React.MouseEvent) => {
-    if (!live) { e.preventDefault(); return; }
-    if (requestPopupId) { e.preventDefault(); openPopupById(requestPopupId); return; }
-    anchorNav(requestLink, live).onClick(e);
-  };
-
-  // Card Grid — new default layout requested by user
-  if (design === "cards") {
-    return (
-      <>
-        <Inner section={s}>
-          <Eyebrow>{textOf(st.eyebrow)}</Eyebrow>
-          <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, margin: "14px 0 8px", ...T }}>{textOf(st.heading)}</h2>
-          <p style={{ ...wtSectionLede(), maxWidth: 600, ...T }}>{textOf(st.text)}</p>
-        </Inner>
-        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "repeat(2,1fr)" : "repeat(3,1fr)", gap: 20, marginTop: 30, width: "100%" }}>
-          {plans.map((p) => (
-            <div key={p.name} style={{ ...wtCard({ padding: 0 }), overflow: "hidden", display: "flex", flexDirection: "column", textAlign: "left" }}>
-              <div style={{ position: "relative", height: 200, overflow: "hidden", background: WT.surfaceMuted }}>
-                <SceneImage art="plan" beds={p.beds} />
-                <span style={{ position: "absolute", top: 12, left: 12, background: WT.ink, color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: 0.6, padding: "5px 10px", borderRadius: 999 }}>{p.beds} BHK</span>
-                <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(255,255,255,.92)", color: WT.ink, fontSize: 11, fontWeight: 800, padding: "5px 10px", borderRadius: 999, border: `1px solid ${WT.border}` }}>{p.area}</span>
-              </div>
-              <div style={{ padding: "18px 18px 16px", display: "flex", flexDirection: "column", flex: 1, gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: WT.ink, ...T }}>{p.name}</div>
-                  <div style={{ fontSize: 12.5, color: WT.muted, marginTop: 3 }}>Vastu-compliant · Ready for site visit</div>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {[
-                    { label: "Area", value: p.area },
-                    { label: "Beds", value: `${p.beds} BHK` },
-                    { label: "Price", value: p.price },
-                    { label: "Possession", value: "Dec 2027" },
-                  ].map((f) => (
-                    <div key={f.label} style={{ background: WT.surfaceMuted, borderRadius: 10, padding: "10px 11px" }}>
-                      <div style={{ fontSize: 10, color: WT.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</div>
-                      <div style={{ fontSize: 13.5, fontWeight: 800, color: WT.ink, marginTop: 2 }}>{f.value}</div>
-                    </div>
-                  ))}
-                </div>
-                <a {...anchorNav(requestLink, live)} onClick={handleCta} style={{ ...wtButton({ accent: st.accent }), width: "100%", justifyContent: "center", marginTop: "auto" }}>
-                  Request {p.name} Details <ArrowRight size={14} />
-                </a>
-              </div>
-            </div>
-          ))}
-          {plans.length === 0 ? (
-            <div style={{ gridColumn: "1 / -1", padding: 40, textAlign: "center", border: `1.5px dashed ${WT.borderStrong}`, borderRadius: 16, color: WT.muted, fontSize: 13 }}>No plans yet — add items in Settings → Content</div>
-          ) : null}
-        </div>
-        {textOf(st.note ?? "").trim() ? <div style={{ textAlign: "center", fontSize: 12.5, color: WT.muted, marginTop: 22 }}>{textOf(st.note)}</div> : null}
-      </>
-    );
-  }
-
-  // Tabs Premium — legacy layout kept for existing pages
-  return (
-    <>
-      <Inner section={s}>
-        <Eyebrow>{textOf(st.eyebrow)}</Eyebrow>
-        <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, margin: "14px 0 8px", ...T }}>{textOf(st.heading)}</h2>
-        <p style={{ ...wtSectionLede(), maxWidth: 600, ...T }}>{textOf(st.text)}</p>
-      </Inner>
-      <div style={{ width: "100%", margin: "30px 0 0" }}>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 26 }}>
-          {plans.map((p, i) => (
-            <button
-              key={p.name}
-              type="button"
-              onClick={() => setActive(i)}
-               style={{
-                 ...wtPill(active === i ? WT.primarySoft : "#fff", active === i ? WT.primary : WT.slate),
-                 padding: "9px 18px",
-                 borderRadius: 999,
-                 border: active === i ? `1.5px solid ${WT.primary}` : WT.borderStrong,
-                 fontSize: 12.5,
-                 fontWeight: 700,
-                 cursor: "pointer",
-               }}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-        {plan ? (
-          <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1.4fr 1fr", gap: 28, alignItems: "center" }}>
-            <div style={{ borderRadius: 18, overflow: "hidden", border: "1px solid var(--ps-line)", boxShadow: "var(--ps-shadow-md)" }}>
-              <SceneImage art="plan" beds={plan.beds} />
-            </div>
-            <div style={{ padding: device === "mobile" ? 0 : 10 }}>
-               <div style={{ fontSize: 22, fontWeight: 800, color: WT.ink, ...T }}>{plan.name}</div>
-               <div style={{ fontSize: 13, color: WT.muted, marginTop: 4 }}>Vastu-compliant · Corner & regular units available</div>
-               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, margin: "20px 0" }}>
-                 {[
-                   { label: "Carpet Area", value: plan.area },
-                   { label: "Bedrooms", value: `${plan.beds} BHK` },
-                   { label: "Price", value: plan.price },
-                   { label: "Possession", value: "Dec 2027" },
-                 ].map((f) => (
-                   <div key={f.label} style={{ ...wtCardMuted({ padding: "12px 14px" }) }}>
-                     <div style={{ fontSize: 10.5, color: WT.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</div>
-                     <div style={{ fontSize: 15, fontWeight: 800, color: WT.ink, marginTop: 3 }}>{f.value}</div>
-                   </div>
-                 ))}
-               </div>
-               <a {...anchorNav(requestLink, live)} onClick={handleCta} style={{ ...wtButton({ accent: st.accent }) }}>
-                 Request {plan.name} Details <ArrowRight size={14} />
-               </a>
-            </div>
-          </div>
-        ) : null}
-        <div style={{ textAlign: "center", fontSize: 12.5, color: WT.muted, marginTop: 26 }}>{textOf(st.note)}</div>
-      </div>
-    </>
-  );
-}
-
 const GALLERY_ART = ["skyline", "lobby", "pool", "tower", "garden", "interior"];
 
 function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
@@ -1467,6 +1338,273 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
           }}
         />
       ) : null}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Floor Plan Gallery — blurred images gated behind an enquiry form
+// ---------------------------------------------------------------------------
+function FloorPlanGallerySection({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const live = useContext(SiteLiveContext);
+  const pageId = useContext(SitePageIdContext);
+  const T = typoCss(s, device);
+
+  type Plan = { name: string; beds: string; area: string; price: string; image: string };
+  const plans = (st.plans ?? []) as Plan[];
+  const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 3;
+
+  const formHeading = textOf(st.formHeading ?? "Unlock Floor Plan");
+  const formButton = textOf(st.formButton ?? "View Floor Plan");
+
+  // Track which plans have been unlocked (by index)
+  const [unlocked, setUnlocked] = useState<Set<number>>(() => new Set());
+  // Which plan popup is currently open (index or null)
+  const [popupIndex, setPopupIndex] = useState<number | null>(null);
+
+  // Form field state
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const openPopup = (i: number) => {
+    if (unlocked.has(i)) return;
+    if (!live) return; // in builder preview just show as-is
+    setPopupIndex(i);
+    setName(""); setPhone(""); setEmail(""); setFormError(""); setSubmitting(false);
+  };
+
+  const closePopup = () => setPopupIndex(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = name.trim();
+    const p = phone.trim();
+    const em = email.trim();
+    if (!n) { setFormError("Please enter your name."); return; }
+    if (!p) { setFormError("Please enter your phone number."); return; }
+    if (!isValidPhone(p)) { setFormError("Enter a valid phone number."); return; }
+    if (em && !isValidEmail(em)) { setFormError("Enter a valid email address."); return; }
+    setFormError("");
+    setSubmitting(true);
+    if (live) {
+      firePrestateLead();
+      if (pageId) bumpTracking(pageId, "form");
+      window.dispatchEvent(new CustomEvent(LEAD_SUCCESS_EVENT));
+    }
+    // Unlock the selected plan
+    setUnlocked((prev) => new Set([...prev, popupIndex!]));
+    setPopupIndex(null);
+    setSubmitting(false);
+  };
+
+  const activePlan = popupIndex !== null ? plans[popupIndex] : null;
+
+  return (
+    <>
+      <Inner section={s}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <span style={{ width: 28, height: 2, background: WT.primary, borderRadius: 999 }} />
+          <Eyebrow>{textOf(st.eyebrow)}</Eyebrow>
+        </div>
+        <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "0 0 8px", ...T }}>{textOf(st.heading)}</h2>
+        <p style={{ ...wtSectionLede(), fontSize: 14.5, maxWidth: 560, lineHeight: 1.65, ...T }}>{textOf(st.text)}</p>
+      </Inner>
+
+      {/* Gallery grid */}
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 20, marginTop: 32, width: "100%" }}>
+        {plans.map((plan, i) => {
+          const isUnlocked = unlocked.has(i);
+          const img = textOf(plan.image ?? "");
+          return (
+            <div
+              key={i}
+              style={{ ...wtCard({ padding: 0 }), overflow: "hidden", display: "flex", flexDirection: "column", textAlign: "left", cursor: isUnlocked ? "default" : "pointer", position: "relative" }}
+              onClick={() => openPopup(i)}
+              className="ps-fpg-card"
+            >
+              {/* Image area */}
+              <div style={{ position: "relative", height: 220, overflow: "hidden", background: WT.surfaceMuted }}>
+                {/* The image — blurred when locked */}
+                <div style={{ width: "100%", height: "100%", filter: isUnlocked ? "none" : "blur(14px)", transform: isUnlocked ? "none" : "scale(1.05)", transition: "filter .4s ease, transform .4s ease" }}>
+                  {isMediaSrc(img) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={img} alt={plan.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  ) : (
+                    <SceneImage art="plan" beds={plan.beds} />
+                  )}
+                </div>
+                {/* Lock overlay — shown only when locked */}
+                {!isUnlocked && (
+                  <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(17,24,39,0.38)", backdropFilter: "blur(2px)", gap: 8 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" }}>
+                      <Lock size={20} color="#fff" />
+                    </div>
+                    <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.25)", backdropFilter: "blur(8px)", padding: "5px 12px", borderRadius: 999, letterSpacing: 0.3 }}>
+                      Click to unlock
+                    </span>
+                  </div>
+                )}
+                {/* Unlocked badge */}
+                {isUnlocked && (
+                  <span style={{ position: "absolute", top: 10, right: 10, background: WT.primary, color: "#fff", fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 999, display: "flex", alignItems: "center", gap: 4 }}>
+                    <LockOpen size={11} /> Unlocked
+                  </span>
+                )}
+                <span style={{ position: "absolute", top: 10, left: 10, background: WT.ink, color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px", borderRadius: 999 }}>{plan.beds} BHK</span>
+              </div>
+              {/* Card body */}
+              <div style={{ padding: "16px 18px 18px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: WT.ink }}>{plan.name}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {[{ label: "Area", value: plan.area }, { label: "Beds", value: `${plan.beds} BHK` }, { label: "Price", value: plan.price }].map((f) =>
+                    f.value ? (
+                      <div key={f.label} style={{ background: WT.surfaceMuted, borderRadius: 10, padding: "9px 11px" }}>
+                        <div style={{ fontSize: 10, color: WT.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: WT.ink, marginTop: 2 }}>{f.value}</div>
+                      </div>
+                    ) : null
+                  )}
+                </div>
+                {!isUnlocked && (
+                  <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 6, color: WT.primary, fontSize: 13, fontWeight: 700, paddingTop: 4 }}>
+                    <Lock size={13} /> Submit details to view floor plan
+                  </div>
+                )}
+                {isUnlocked && (
+                  <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 6, color: "#16a34a", fontSize: 13, fontWeight: 700, paddingTop: 4 }}>
+                    <LockOpen size={13} /> Floor plan unlocked
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {plans.length === 0 && (
+          <div style={{ gridColumn: "1 / -1", padding: 40, textAlign: "center", border: `1.5px dashed ${WT.borderStrong}`, borderRadius: 16, color: WT.muted, fontSize: 13 }}>No plans yet — add items in Settings → Content</div>
+        )}
+      </div>
+
+      <style>{`
+        .ps-fpg-card { transition: ${WT.transition}; }
+        .ps-fpg-card:hover { transform: translateY(-2px); box-shadow: ${WT.shadowHover} !important; }
+      `}</style>
+
+      {/* Unlock popup — portal-style fixed overlay */}
+      {popupIndex !== null && activePlan && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(8,10,20,.68)", backdropFilter: "blur(6px)", padding: 20 }}
+          onClick={(e) => { if (e.target === e.currentTarget) closePopup(); }}
+        >
+          <div style={{ background: "#fff", borderRadius: 20, boxShadow: "0 32px 80px rgba(0,0,0,.28)", width: "100%", maxWidth: 460, overflow: "hidden", position: "relative" }}>
+            {/* Modal header */}
+            <div style={{ background: `linear-gradient(135deg, ${WT.primary} 0%, #4f46e5 100%)`, padding: "24px 28px 20px", color: "#fff", position: "relative" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", opacity: 0.82, marginBottom: 6 }}>Floor Plan Gallery</div>
+              <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, lineHeight: 1.3 }}>{formHeading}</h3>
+              <p style={{ margin: "6px 0 0", fontSize: 13, opacity: 0.82, lineHeight: 1.5 }}>
+                Enter your details to unlock the <strong>{activePlan.name}</strong> floor plan
+              </p>
+              <button
+                type="button"
+                onClick={closePopup}
+                style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,.15)", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff" }}
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Plan summary pill */}
+            <div style={{ padding: "14px 28px 0" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 12, background: WT.surfaceMuted, borderRadius: 12, padding: "10px 14px", border: WT.border }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, overflow: "hidden", background: WT.surface, flexShrink: 0 }}>
+                  {isMediaSrc(textOf(activePlan.image ?? "")) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={textOf(activePlan.image)} alt={activePlan.name} style={{ width: "100%", height: "100%", objectFit: "cover", filter: "blur(4px)", transform: "scale(1.1)" }} />
+                  ) : (
+                    <SceneImage art="plan" beds={activePlan.beds} />
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: WT.ink }}>{activePlan.name}</div>
+                  <div style={{ fontSize: 11.5, color: WT.muted, marginTop: 1 }}>{activePlan.area} · {activePlan.price}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} style={{ padding: "16px 28px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Name */}
+              <div>
+                <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: WT.slate, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Full Name <span style={{ color: "#e11d48" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your full name"
+                  required
+                  style={{ width: "100%", boxSizing: "border-box", border: `1.5px solid ${WT.border}`, borderRadius: 10, padding: "11px 14px", fontSize: 14, color: WT.ink, outline: "none", background: WT.surfaceMuted, transition: "border-color .15s" }}
+                  onFocus={(e) => { e.target.style.borderColor = WT.primary; e.target.style.background = "#fff"; }}
+                  onBlur={(e) => { e.target.style.borderColor = WT.border; e.target.style.background = WT.surfaceMuted; }}
+                />
+              </div>
+              {/* Phone */}
+              <div>
+                <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: WT.slate, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Phone Number <span style={{ color: "#e11d48" }}>*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  required
+                  style={{ width: "100%", boxSizing: "border-box", border: `1.5px solid ${WT.border}`, borderRadius: 10, padding: "11px 14px", fontSize: 14, color: WT.ink, outline: "none", background: WT.surfaceMuted, transition: "border-color .15s" }}
+                  onFocus={(e) => { e.target.style.borderColor = WT.primary; e.target.style.background = "#fff"; }}
+                  onBlur={(e) => { e.target.style.borderColor = WT.border; e.target.style.background = WT.surfaceMuted; }}
+                />
+              </div>
+              {/* Email */}
+              <div>
+                <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: WT.slate, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com (optional)"
+                  style={{ width: "100%", boxSizing: "border-box", border: `1.5px solid ${WT.border}`, borderRadius: 10, padding: "11px 14px", fontSize: 14, color: WT.ink, outline: "none", background: WT.surfaceMuted, transition: "border-color .15s" }}
+                  onFocus={(e) => { e.target.style.borderColor = WT.primary; e.target.style.background = "#fff"; }}
+                  onBlur={(e) => { e.target.style.borderColor = WT.border; e.target.style.background = WT.surfaceMuted; }}
+                />
+              </div>
+              {/* Error */}
+              {formError && (
+                <div style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 8, padding: "9px 12px", color: "#e11d48", fontSize: 13, fontWeight: 600 }}>
+                  {formError}
+                </div>
+              )}
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={submitting}
+                style={{ ...wtButton({ accent: st.accent }), width: "100%", justifyContent: "center", fontSize: 14.5, padding: "13px 20px", marginTop: 2, opacity: submitting ? 0.7 : 1 }}
+              >
+                <LockOpen size={15} /> {formButton}
+              </button>
+              <p style={{ margin: 0, fontSize: 11.5, color: WT.muted, textAlign: "center", lineHeight: 1.5 }}>
+                🔒 Your details are safe. We respect your privacy.
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -3614,7 +3752,8 @@ function SectionBody({ s, device }: { s: SectionInstance; device: Device }) {
     case "amenities":
       return <AmenitiesSection s={s} device={device} />;
     case "floorplans":
-      return <FloorPlansSection s={s} device={device} />;
+    case "floor-plan-gallery":
+      return <FloorPlanGallerySection s={s} device={device} />;
     case "gallery":
       return <GallerySection s={s} device={device} />;
     case "video":
