@@ -17,6 +17,10 @@ import { OrgActivityModule } from './modules/org-activity/org-activity.module';
 import { OrgTypographySetsModule } from './modules/org-typography-sets/org-typography-sets.module';
 import { AdminTypographySetsModule } from './modules/admin-typography-sets/admin-typography-sets.module';
 import { OrgBillingModule } from './modules/org-billing/org-billing.module';
+import { OrgDomainRequestsModule } from './modules/org-domain-requests/org-domain-requests.module';
+import { AdminDomainRequestsModule } from './modules/admin-domain-requests/admin-domain-requests.module';
+import { OrgTrackingModule } from './modules/org-tracking/org-tracking.module';
+import { PublicSiteModule } from './modules/public-site/public-site.module';
 
 @Module({
   imports: [
@@ -36,6 +40,10 @@ import { OrgBillingModule } from './modules/org-billing/org-billing.module';
     OrgTypographySetsModule,
     AdminTypographySetsModule,
     OrgBillingModule,
+    OrgDomainRequestsModule,
+    AdminDomainRequestsModule,
+    OrgTrackingModule,
+    PublicSiteModule,
   ],
   controllers: [AppController],
   providers: [AppService],

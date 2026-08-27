@@ -35,56 +35,17 @@ const sec = (
 
 export const PAGE_TEMPLATES: TemplateData[] = [
   {
-    id: "tpl-premium",
-    name: "Premium Property",
+    id: "tpl-estatepro",
+    name: "EstatePro Premium",
     category: "Premium",
     icon: "Building2",
-    pages: 26,
-    conversions: "12.8%",
-    accent: "#6D5DFC",
-    accent2: "#101322",
+    pages: 24,
+    conversions: "14.6%",
+    accent: "#c99a45",
+    accent2: "#0b1220",
     thumbnail: "hero",
     description:
-      "Classic premium funnel — hero with proof stats, overview, gallery, amenities, pricing, location, testimonials, enquiry and a gated brochure.",
-  },
-  {
-    id: "tpl-leads",
-    name: "Lead Generation",
-    category: "Lead Gen",
-    icon: "Rocket",
-    pages: 21,
-    conversions: "16.9%",
-    accent: "#2563EB",
-    accent2: "#0b1220",
-    thumbnail: "tour",
-    description:
-      "Above-the-fold lead form beside the hero, benefits, pricing, features, gallery, location, countdown offer, FAQ and a final CTA wall.",
-  },
-  {
-    id: "tpl-luxe",
-    name: "Luxury Property",
-    category: "Luxury",
-    icon: "Crown",
-    pages: 17,
-    conversions: "11.4%",
-    accent: "#B08D57",
-    accent2: "#171310",
-    thumbnail: "lobby",
-    description:
-      "Cinematic full-screen visuals, champagne-gold detailing, property details, lightboxed gallery, floor plans, developer story and enquiry.",
-  },
-  {
-    id: "tpl-adcamp",
-    name: "Ad Campaign Landing Page",
-    category: "Campaign",
-    icon: "Megaphone",
-    pages: 23,
-    conversions: "18.2%",
-    accent: "#E11D48",
-    accent2: "#2a0a12",
-    thumbnail: "commercial",
-    description:
-      "Built for Google/Meta traffic — urgency countdown, statistics, configurations, lifestyle benefits, connectivity, FAQ, lead form and gated brochure.",
+      "Conversion-focused luxury real-estate ads page — hero with inline enquiry, live EMI calculator, amenities, gallery, location, floor plans, trust and FAQ sections.",
   },
 ];
 
@@ -101,45 +62,17 @@ export const BLANK_TEMPLATE: TemplateData = {
   description: "Empty canvas. Add any layout, hero, form or media widget and build your own section pattern.",
 };
 
-/** Map any legacy/template name onto the current four-template catalog. */
+/** Map any legacy/template name onto the current catalog. */
 export function inferDesignId(template: string): string {
   const key = template.trim().toLowerCase();
   if (key === "tpl-blank" || key.includes("scratch") || key === "blank" || key === "custom") return "tpl-blank";
-  if (
-    key.includes("premium") ||
-    key === "tpl-premium" ||
-    key.includes("villa") ||
-    key === "tpl-villas"
-  )
-    return "tpl-premium";
-  if (key.includes("luxe") || key === "tpl-luxe" || key.includes("luxury")) return "tpl-luxe";
-  if (
-    key.includes("adcamp") ||
-    key.includes("campaign") ||
-    key.includes("launch") ||
-    key.includes("commercial") ||
-    key === "tpl-launch" ||
-    key === "tpl-commercial"
-  )
-    return "tpl-adcamp";
-  if (key.includes("lead") || key === "tpl-leads") return "tpl-leads";
-  return "tpl-premium";
+  return "tpl-estatepro";
 }
 
 export function buildTemplateSections(idOrName: string): SectionInstance[] {
   const key = idOrName.trim().toLowerCase();
   if (key === "tpl-blank" || key.includes("scratch") || key === "blank") return [];
-  const design = inferDesignId(key);
-  switch (design) {
-    case "tpl-leads":
-      return leadGenSections();
-    case "tpl-luxe":
-      return luxeSections();
-    case "tpl-adcamp":
-      return adCampaignSections();
-    default:
-      return premiumSections();
-  }
+  return estateProSections();
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +113,7 @@ function premiumSections(): SectionInstance[] {
       },
       {
         colors: { bg: "#101322", overlay: "rgba(10,13,28,0.52)", text: "#ffffff" },
-        layout: { width: "full", height: "vh", fixedHeight: 760, align: "left", direction: "column", justify: "center", alignItems: "flex-start" },
+        layout: { width: "full", height: "vh", fixedHeight: 760, align: "center", direction: "column", justify: "center", alignItems: "center" },
         spacing: { padding: { top: 150, right: 0, bottom: 110, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
       },
     ),
@@ -450,7 +383,7 @@ function luxeSections(): SectionInstance[] {
       },
       {
         colors: { bg: "#171310", overlay: "rgba(23,19,16,0.42)", text: "#fdfbf7" },
-        layout: { width: "full", height: "vh", fixedHeight: 860, align: "left", direction: "column", justify: "center", alignItems: "flex-start" },
+        layout: { width: "full", height: "vh", fixedHeight: 860, align: "center", direction: "column", justify: "center", alignItems: "center" },
         spacing: { padding: { top: 170, right: 0, bottom: 130, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
       },
     ),
@@ -584,7 +517,7 @@ function adCampaignSections(): SectionInstance[] {
       },
       {
         colors: { bg: "#1f0a12", overlay: "rgba(31,10,18,0.5)", text: "#fff1f2" },
-        layout: { width: "full", height: "vh", fixedHeight: 700, align: "left", direction: "column", justify: "center", alignItems: "flex-start" },
+        layout: { width: "full", height: "vh", fixedHeight: 700, align: "center", direction: "column", justify: "center", alignItems: "center" },
         spacing: { padding: { top: 140, right: 0, bottom: 90, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
       },
     ),
@@ -672,6 +605,260 @@ function adCampaignSections(): SectionInstance[] {
     sec("popup", "Campaign Popup", "PartyPopper", { popupId: "campaign-offer", heading: "₹7.77 L discount expires soon", text: "Drop your number and lock this week's campaign price before it resets.", cta: "", link: "", showForm: true, trigger: "scroll", delaySeconds: 0, scrollPercent: 45, urlParam: "promo", oncePerSession: true }),
     sec("floating-icons", "Floating Icons", "PhoneCall", { side: "right", whatsapp: true, call: true, enquire: true, email: false, phone: "+91 90000 42042", number: "+91 90000 42042" }),
     sec("sticky-cta", "Sticky CTA", "Compass", { text: "⚡ Campaign price ₹62 L — resets to ₹69 L when the timer ends", ctaLabel: "Claim Discount", link: "#lead-form" }),
+  ];
+}
+
+function estateProSections(): SectionInstance[] {
+  const sstyle = (bg: string, text: string) => ({
+    colors: { bg, overlay: "", gradient: "", text },
+    layout: { width: "boxed" as const, height: "auto" as const, align: "center" as const },
+  });
+  const nstyle = (bg: string, text: string) => ({
+    colors: { bg, overlay: "", gradient: "", text },
+    layout: { width: "full" as const, height: "auto" as const, align: "left" as const },
+    spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 },
+  });
+  const col = (width: number, children: SectionInstance[]): SectionInstance => ({
+    ...sec("column", "Column", "Columns", { width }, { colors: { bg: "transparent", overlay: "", gradient: "", text: "" }, spacing: { padding: { top: 0, right: 8, bottom: 0, left: 8 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 }, layout: { width: "full", height: "auto", align: "left", direction: "column" } }),
+    children,
+  });
+  const row = (widths: number[], children: SectionInstance[]): SectionInstance => ({
+    ...sec("row", "Row", "Rows", { gap: 20, columns: widths.length }, { colors: { bg: "transparent", overlay: "", gradient: "", text: "" }, spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 20 }, layout: { width: "full", height: "auto", align: "left", direction: "row" } }),
+    children,
+  });
+  const container = (children: SectionInstance[]): SectionInstance => ({
+    ...sec("container", "Container", "Box", { width: "1180px", align: "center" }, { spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 24 } }),
+    children,
+  });
+
+  return [
+    sec("announcement", "Announcement Bar", "Megaphone", { text: "Premium Residential Project • RERA Registered • Call: +91 98765 43210" }, { colors: { bg: "#0b1219", text: "#dce2e7" }, spacing: { padding: { top: 10, right: 24, bottom: 10, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+
+    sec("hero", "Hero Banner", "LayoutPanelTop", {
+      eyebrow: "EARLY-BIRD LAUNCH OFFER",
+      heading: "Luxury Living. Prime Location. Smarter Investment.",
+      subheading: "Premium 2, 3 & 4 BHK residences designed for modern families, with world-class amenities and excellent connectivity.",
+      price: "{{starting_price}}",
+      priceLabel: "STARTING FROM",
+      heroArt: "hero",
+      accent: "#c99a45",
+      priceNote: "",
+      primaryAction: "link",
+      primaryLink: "#contact",
+      ctaPrimary: "Get Price List",
+      secondaryAction: "link",
+      secondaryLink: "#video",
+      ctaSecondary: "Watch Walkthrough",
+      highlights: ["RERA Registered", "Metro Connected", "World-Class Amenities"],
+      heroStats: [{ value: "2–4 BHK", label: "Premium Residences" }, { value: "₹89L*", label: "Starting Price" }, { value: "2027", label: "Possession" }],
+      gateHeading: "",
+      gateText: "",
+    }, { colors: { bg: "#0b1220", overlay: "rgba(4,9,16,.55)", text: "#ffffff" },     layout: { width: "full", height: "vh", fixedHeight: 760, align: "center", direction: "column", justify: "center", alignItems: "center" }, spacing: { padding: { top: 120, right: 0, bottom: 90, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 } }),
+
+    sec("lead-form", "Enquiry Form", "Send", { fields: ["name", "phone", "email"] }, sstyle("#f7f8fa", "#111827")),
+
+    sec("pricing", "Pricing Table", "Wallet", {
+      design: "cards",
+      eyebrow: "Explore Homes",
+      heading: "Choose Your Perfect Residence",
+      text: "Flexible configurations with thoughtful layouts, premium finishes and strong investment potential.",
+      plans: [
+        { name: "2 BHK Premium", area: "1,250 sq.ft.", price: "₹89 Lakh*", per: "", features: ["1,250 sq.ft.", "2 Bath", "Balcony"], cta: "View Details", featured: false },
+        { name: "3 BHK Luxury", area: "1,750 sq.ft.", price: "₹1.25 Cr*", per: "", features: ["1,750 sq.ft.", "3 Bath", "Study"], cta: "View Details", featured: true },
+        { name: "4 BHK Signature", area: "2,450 sq.ft.", price: "₹1.85 Cr*", per: "", features: ["2,450 sq.ft.", "4 Bath", "Private Terrace"], cta: "View Details", featured: false },
+      ],
+    }, sstyle("#ffffff", "#111827")),
+
+    sec("stats", "Property Statistics", "Gauge", {
+      design: "cards",
+      heading: "",
+      items: [
+        { icon: "Building2", value: "500+", label: "Homes Delivered" },
+        { icon: "LandPlot", value: "25+", label: "Prime Locations" },
+        { icon: "CalendarClock", value: "12+", label: "Years Experience" },
+        { icon: "Star", value: "4.9/5", label: "Customer Rating" },
+      ],
+      style: "cards",
+    }, sstyle("#111b24", "#ffffff")),
+
+    sec("amenities", "Amenities", "Dumbbell", {
+      design: "grid",
+      eyebrow: "World-Class Lifestyle",
+      heading: "Everything You Need, Right Here",
+      items: [
+        { icon: "Waves", title: "Infinity Pool", desc: "Resort-style swimming and relaxation zone." },
+        { icon: "Dumbbell", title: "Fitness Centre", desc: "Fully equipped gym and wellness studio." },
+        { icon: "Leaf", title: "Landscaped Greens", desc: "Beautiful gardens and walking paths." },
+        { icon: "Trophy", title: "Sports Arena", desc: "Indoor and outdoor sports facilities." },
+        { icon: "HeartHandshake", title: "Kids Zone", desc: "Safe, engaging spaces for children." },
+        { icon: "ShieldCheck", title: "24×7 Security", desc: "Controlled access and modern surveillance." },
+        { icon: "Plug", title: "Power Backup", desc: "Reliable essential-services backup." },
+        { icon: "Car", title: "Smart Parking", desc: "Convenient resident and visitor parking." },
+      ],
+    }, sstyle("#f5f2ea", "#111827")),
+
+    sec("gallery", "Property Gallery", "Images", {
+      design: "masonry",
+      eyebrow: "Project Gallery",
+      heading: "See the Lifestyle Before You Visit",
+      text: "A look inside the development.",
+      images: ["skyline", "lobby", "pool", "tower", "garden", "interior"],
+      columns: 3,
+      lightbox: true,
+      captions: [],
+    }, sstyle("#ffffff", "#111827")),
+
+    sec("location-advantages", "Location & Map", "Navigation", {
+      design: "split",
+      address: "Premium Project Location",
+      zoom: 14,
+      eyebrow: "Prime Connectivity",
+      heading: "Everything Close. Everything Connected.",
+      text: "Replace the sample landmarks below with your actual project location and travel times.",
+      items: [
+        { icon: "School", title: "International School", meta: "5 min" },
+        { icon: "TrainFront", title: "Metro Station", meta: "8 min" },
+        { icon: "Building2", title: "Business District", meta: "12 min" },
+        { icon: "Navigation", title: "International Airport", meta: "15 min" },
+      ],
+    }, sstyle("#f5f2ea", "#111827")),
+
+    sec("emi-calculator", "EMI Calculator", "Gauge", {
+      heading: "Estimate Your Monthly EMI",
+      price: 125,
+      downPayment: 25,
+      rate: 8.5,
+      tenure: 20,
+      currency: "₹",
+      note: "Indicative calculation only. Final EMI depends on lender terms, tenure and eligibility.",
+    }, sstyle("#ffffff", "#111827")),
+
+    sec("floorplans", "Floor Plans", "Grid", {
+      design: "tabs",
+      eyebrow: "Floor Plans",
+      heading: "Layouts Designed Around You",
+      text: "Choose a configuration.",
+      plans: [
+        { name: "2 BHK Premium", beds: "2", area: "1,250 sq.ft.", price: "₹89 Lakh*" },
+        { name: "3 BHK Luxury", beds: "3", area: "1,750 sq.ft.", price: "₹1.25 Cr*" },
+        { name: "4 BHK Signature", beds: "4", area: "2,450 sq.ft.", price: "₹1.85 Cr*" },
+      ],
+    }, sstyle("#f5f2ea", "#111827")),
+
+    sec("video", "Video", "Play", {
+      eyebrow: "Project Walkthrough",
+      heading: "Experience the Project",
+      text: "A cinematic look at the campus.",
+      url: "",
+      videoTitle: "Project walkthrough",
+      duration: "2:14",
+    }, sstyle("#ffffff", "#111827")),
+
+    sec("testimonials", "Testimonials", "Quote", {
+      design: "cards",
+      eyebrow: "Happy Homeowners",
+      heading: "What Our Buyers Say",
+      items: [
+        { name: "Rahul & Priya", role: "Homeowner", quote: "The location, amenities and overall planning were exactly what our family wanted. The buying process was smooth.", rating: 5 },
+        { name: "Amit S.", role: "Investor", quote: "We shortlisted several projects and chose this one because of the connectivity and quality of construction.", rating: 5 },
+        { name: "Neha K.", role: "Buyer", quote: "The team explained everything clearly and helped us compare the floor plans and payment options.", rating: 5 },
+      ],
+    }, sstyle("#f5f2ea", "#111827")),
+
+    container([
+      row([50, 50], [
+        col(50, [sec("text", "Why Choose EstatePro", "BadgeCheck", { text: "Why Choose EstatePro?", html: "<h3>Why Choose EstatePro?</h3><ul><li>✓ Transparent pricing and documentation</li><li>✓ Verified project information</li><li>✓ Dedicated property advisor</li><li>✓ Site visit assistance</li><li>✓ Home-loan assistance through partners</li></ul>" }, nstyle("#ffffff", "#111827"))]),
+        col(50, [sec("text", "Developer Promise", "Building2", { text: "Developer Promise", html: "<h3>Developer Promise</h3><p>Use this section for developer credentials, completed projects, awards, RERA information and delivery track record.</p><p><b>10+ Projects Delivered</b><br><b>15+ Years of Experience</b><br><b>Customer-First Approach</b></p>" }, nstyle("#ffffff", "#111827"))]),
+      ]),
+    ]),
+
+    sec("countdown", "Countdown Timer", "Timer", {
+      date: "2026-12-31",
+      heading: "Early-Bird Benefits End Soon",
+      items: [{ value: "03", label: "Days" }, { value: "12", label: "Hours" }, { value: "45", label: "Min" }, { value: "20", label: "Sec" }],
+    }, { colors: { bg: "#111b24", text: "#ffffff" }, spacing: { padding: { top: 40, right: 24, bottom: 40, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+
+    container([
+      row([50, 25, 25], [
+        col(50, [
+          sec("image", "Image", "Images", { src: "skyline", alt: "4 BHK", title: "", link: "", width: 800, align: "center", radius: 14 }, { colors: { bg: "transparent", overlay: "", gradient: "", text: "" }, spacing: { padding: { top: 0, right: 0, bottom: 8, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 }, layout: { width: "full", height: "auto", align: "center" } }),
+          sec("text", "Card Text", "Type", { text: "The Grand 4 BHK Residence", html: "<div style=\"display:inline-block;background:#f1eadc;color:#72531c;padding:5px 9px;border-radius:4px;font-size:11px;font-weight:800;margin-bottom:8px\">SIGNATURE COLLECTION</div><h3 style=\"font-size:20px;margin:6px 0\">The Grand 4 BHK Residence</h3><div style=\"color:#667085;font-size:13px;margin-bottom:6px\">Spacious interiors, private terrace and panoramic views.</div><b style=\"font-size:16px\">From ₹1.85 Cr*</b>" }, nstyle("#ffffff", "#111827")),
+        ]),
+        col(25, [
+          sec("image", "Image", "Images", { src: "tower", alt: "3 BHK", title: "", link: "", width: 800, align: "center", radius: 14 }, { colors: { bg: "transparent", overlay: "", gradient: "", text: "" }, spacing: { padding: { top: 0, right: 0, bottom: 8, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 }, layout: { width: "full", height: "auto", align: "center" } }),
+          sec("text", "Card Text", "Type", { text: "3 BHK Luxury", html: "<div style=\"display:inline-block;background:#f1eadc;color:#72531c;padding:5px 9px;border-radius:4px;font-size:11px;font-weight:800;margin-bottom:8px\">FAMILY CHOICE</div><h3 style=\"font-size:18px;margin:6px 0\">3 BHK Luxury</h3><div style=\"color:#667085;font-size:13px;margin-bottom:6px\">1,750 sq.ft. • Balcony • Study</div><b style=\"font-size:15px\">₹1.25 Cr*</b>" }, nstyle("#ffffff", "#111827")),
+        ]),
+        col(25, [
+          sec("image", "Image", "Images", { src: "interior", alt: "2 BHK", title: "", link: "", width: 800, align: "center", radius: 14 }, { colors: { bg: "transparent", overlay: "", gradient: "", text: "" }, spacing: { padding: { top: 0, right: 0, bottom: 8, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 12 }, layout: { width: "full", height: "auto", align: "center" } }),
+          sec("text", "Card Text", "Type", { text: "2 BHK Premium", html: "<div style=\"display:inline-block;background:#f1eadc;color:#72531c;padding:5px 9px;border-radius:4px;font-size:11px;font-weight:800;margin-bottom:8px\">SMART VALUE</div><h3 style=\"font-size:18px;margin:6px 0\">2 BHK Premium</h3><div style=\"color:#667085;font-size:13px;margin-bottom:6px\">1,250 sq.ft. • Balcony • 2 Bath</div><b style=\"font-size:15px\">₹89 Lakh*</b>" }, nstyle("#ffffff", "#111827")),
+        ]),
+      ]),
+    ]),
+
+    sec("features", "Property Features", "BadgeCheck", {
+      design: "checklist",
+      heading: "From First Enquiry to New Home",
+      items: [
+        { title: "01 / Enquire — Share Your Requirement", text: "Tell us your preferred configuration, budget and location." },
+        { title: "02 / Discover — Get Project Details", text: "Receive pricing, floor plans, availability and brochure." },
+        { title: "03 / Visit — Experience It", text: "Schedule a guided site visit at your convenience." },
+        { title: "04 / Book — Reserve Your Home", text: "Complete documentation and booking with expert support." },
+      ],
+    }, sstyle("#ffffff", "#111827")),
+
+    sec("timeline", "Property Timeline", "CalendarClock", {
+      design: "vertical",
+      heading: "Designed for Better Everyday Living",
+      items: [
+        { title: "Morning", text: "Wake up to green views — landscaped spaces, natural light and peaceful surroundings." },
+        { title: "Evening", text: "Relax & reconnect — pool, clubhouse, fitness and social spaces within the community." },
+        { title: "Weekend", text: "Everything within reach — easy access to schools, retail, offices and entertainment." },
+      ],
+    }, sstyle("#f5f2ea", "#111827")),
+
+    sec("features", "Property Features", "BadgeCheck", {
+      design: "checklist",
+      heading: "Modern Details That Make a Difference",
+      items: [
+        { title: "☀️ Natural Light", text: "Thoughtful orientation and large windows." },
+        { title: "🌬️ Ventilated Homes", text: "Layouts planned for airflow and comfort." },
+        { title: "🔋 Energy Conscious", text: "Efficient lighting and sustainable design options." },
+        { title: "📱 Smart Living", text: "Add smart-home features and app controls here." },
+        { title: "🛗 High-Speed Lifts", text: "Convenient access for residents and guests." },
+        { title: "🛡️ Secure Community", text: "Controlled entry and security infrastructure." },
+      ],
+    }, sstyle("#ffffff", "#111827")),
+
+    sec("text", "Social Proof", "Star", { text: "★★★★★ 4.9/5 Customer Rating", html: "<div style='text-align:center;font-size:20px'><b>★★★★★ 4.9/5</b> Customer Rating &nbsp;•&nbsp; <b>500+</b> Families &nbsp;•&nbsp; <b>25+</b> Locations &nbsp;•&nbsp; <b>12+</b> Years Experience</div>" }, { colors: { bg: "#f5f2ea", text: "#111827" }, spacing: { padding: { top: 24, right: 24, bottom: 24, left: 24 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 } }),
+
+    container([
+      row([60, 40], [
+        col(60, [sec("text", "Exclusive Lead Offer", "Sparkles", { text: "Get the Complete Property Kit", html: "<div style=\"color:#c99a45;font-weight:900;font-size:12px;letter-spacing:1.3px;text-transform:uppercase\">EXCLUSIVE LEAD OFFER</div><h2 style=\"font-size:34px;margin:8px 0\">Get the Complete Property Kit</h2><div style=\"color:#667085;font-size:14px\">Receive brochure, floor plans, price list, payment plan and current availability in one conversation.</div><div style=\"display:flex;flex-wrap:wrap;gap:8px;margin-top:14px\"><span style=\"background:#f1f4f8;border-radius:999px;font-size:11px;font-weight:800;color:#475467;padding:7px 11px\">✓ Price List</span><span style=\"background:#f1f4f8;border-radius:999px;font-size:11px;font-weight:800;color:#475467;padding:7px 11px\">✓ Floor Plans</span><span style=\"background:#f1f4f8;border-radius:999px;font-size:11px;font-weight:800;color:#475467;padding:7px 11px\">✓ Brochure</span><span style=\"background:#f1f4f8;border-radius:999px;font-size:11px;font-weight:800;color:#475467;padding:7px 11px\">✓ Site Visit</span></div>" }, nstyle("#ffffff", "#111827"))]),
+        col(40, [sec("lead-form", "Request Details", "Send", { fields: ["name", "phone"] }, { colors: { bg: "#ffffff", overlay: "", gradient: "", text: "#111827" }, spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 }, layout: { width: "full", height: "auto", align: "left" } })]),
+      ]),
+    ]),
+
+    sec("faq", "FAQ", "Tabs", {
+      design: "accordion",
+      eyebrow: "FAQ",
+      heading: "Frequently Asked Questions",
+      items: [
+        { q: "What is the starting price?", a: "Sample pricing starts from ₹89 Lakh*. Replace this with your current official pricing." },
+        { q: "Can I schedule a site visit?", a: "Yes. Submit the enquiry form and a property advisor can coordinate your preferred date and time." },
+        { q: "Is home-loan assistance available?", a: "You can add your preferred banks and financing partners here." },
+        { q: "What configurations are available?", a: "Sample configurations include 2, 3 and 4 BHK residences." },
+        { q: "Where can I get the brochure?", a: "Use the brochure CTA below to collect the lead and provide the brochure link after submission." },
+      ],
+    }, sstyle("#ffffff", "#111827")),
+
+    container([
+      row([50, 50], [
+        col(50, [sec("contact", "Contact Details", "Phone", { heading: "Take the Next Step", phone: "+91 98765 43210", email: "sales@estatepro.example", address: "Premium Project Location" }, nstyle("#ffffff", "#111827"))]),
+        col(50, [sec("lead-form", "Request a Callback", "Send", { fields: ["name", "phone", "email"] }, nstyle("#ffffff", "#111827"))]),
+      ]),
+    ]),
+
+    sec("floating-icons", "Floating Icons", "PhoneCall", { side: "right", whatsapp: true, call: true, enquire: true, email: false, phone: "+91 98765 43210", number: "+91 98765 43210" }, { colors: { bg: "transparent", overlay: "", gradient: "", text: "" }, spacing: { padding: { top: 0, right: 0, bottom: 0, left: 0 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 0 }, layout: { width: "full", height: "auto", align: "left" } }),
   ];
 }
 

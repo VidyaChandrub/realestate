@@ -70,6 +70,23 @@ import {
   hydrateHeader,
 } from "@/lib/prestate/chrome-presets";
 import { ChromeFooter, ChromeHeader } from "./chrome-renderers";
+import {
+  WT,
+  hexToSoft,
+  wtBadge,
+  wtButton,
+  wtButtonLight,
+  wtCard,
+  wtCardGlass,
+  wtCardMuted,
+  wtEyebrow,
+  wtIconBadge,
+  wtIconBadgeGlass,
+  wtPill,
+  wtSectionLede,
+  wtSectionTitle,
+  wtStatValue,
+} from "@/lib/prestate/widget-theme";
 import { bumpTracking } from "@/lib/prestate/tracking";
 import { firePrestateLead } from "@/components/prestate/tracking-scripts";
 
@@ -306,26 +323,7 @@ function Inner({ section, children, align }: { section: SectionInstance; childre
 }
 
 function Eyebrow({ children, gold }: { children: ReactNode; gold?: boolean }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        fontSize: 10.5,
-        fontWeight: 800,
-        letterSpacing: 1.6,
-        textTransform: "uppercase",
-        color: gold ? "var(--ps-gold)" : "var(--ps-primary)",
-        background: gold ? "rgba(201,165,106,.12)" : "rgba(109,93,252,.14)",
-        padding: "5px 12px",
-        borderRadius: 999,
-        border: gold ? "1px solid rgba(201,165,106,.35)" : "1px solid rgba(109,93,252,.25)",
-      }}
-    >
-      {children}
-    </span>
-  );
+  return <span style={wtEyebrow({ gold })}>{children}</span>;
 }
 
 // ---------------------------------------------------------------------------
@@ -529,19 +527,19 @@ function GateForm({
   };
 
   return (
-    <div onClick={(e) => e.stopPropagation()} className="ps-fade-in" style={{ position: "relative", width: 460, maxWidth: "100%", background: "#fff", borderRadius: 18, padding: "34px 30px 30px", boxShadow: "0 30px 80px rgba(8,10,20,.45)" }}>
-      <button type="button" aria-label="Close" onClick={onClose} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", border: "none", background: "#f1f4f9", color: "var(--ps-slate)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+    <div onClick={(e) => e.stopPropagation()} className="ps-fade-in" style={{ position: "relative", width: 460, maxWidth: "100%", ...wtCard({ padding: "34px 30px 30px", boxShadow: "0 30px 80px rgba(8,10,20,.45)" }) }}>
+      <button type="button" aria-label="Close" onClick={onClose} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", border: "none", background: WT.surfaceMuted, color: WT.slate, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
         <X size={16} />
       </button>
         {!done ? (
           <>
-            <div style={{ fontSize: 21, fontWeight: 800, color: "var(--ps-ink)", letterSpacing: -0.3 }}>{heading}</div>
-            {text ? <p style={{ fontSize: 13.5, color: "var(--ps-slate)", lineHeight: 1.6, margin: "8px 0 18px" }}>{text}</p> : <div style={{ height: 14 }} />}
+            <div style={{ fontSize: 21, fontWeight: 800, color: WT.ink, letterSpacing: -0.3 }}>{heading}</div>
+            {text ? <p style={{ fontSize: 13.5, color: WT.slate, lineHeight: 1.6, margin: "8px 0 18px" }}>{text}</p> : <div style={{ height: 14 }} />}
             <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
               {(fields.length ? fields : [{ label: "Full Name", type: "text", required: true } as GateField]).map((f, i) => (
                 <div key={f.id || f.label || i}>
                   {f.type !== "checkbox" ? (
-                    <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", marginBottom: 5, display: "block" }}>
+                    <label style={{ fontSize: 11.5, fontWeight: 700, color: WT.slate, marginBottom: 5, display: "block" }}>
                       {f.label} {f.required !== false ? "*" : ""}
                     </label>
                   ) : null}
@@ -572,18 +570,18 @@ function GateForm({
                 </div>
               ))}
             </div>
-            {error ? <div style={{ marginTop: 12, padding: "9px 12px", borderRadius: 10, background: "var(--ps-danger-soft, #fee2e2)", color: "#dc2626", fontSize: 12.5, fontWeight: 600 }}> {error}</div> : null}
-            <button type="button" onClick={submit} style={{ width: "100%", marginTop: 16, padding: "13px", border: "none", borderRadius: 11, background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", boxShadow: "0 10px 26px rgba(109,93,252,.35)" }}>
+            {error ? <div style={{ marginTop: 12, padding: "9px 12px", borderRadius: 10, background: WT.dangerSoft, color: WT.danger, fontSize: 12.5, fontWeight: 600 }}> {error}</div> : null}
+            <button type="button" onClick={submit} style={{ ...wtButton({ block: true }), marginTop: 16 }}>
               {submitLabel || "Submit & Download"}
             </button>
-            <div style={{ textAlign: "center", fontSize: 11, color: "var(--ps-muted)", marginTop: 10 }}>The download starts only after a successful submission.</div>
+            <div style={{ textAlign: "center", fontSize: 11, color: WT.muted, marginTop: 10 }}>The download starts only after a successful submission.</div>
           </>
         ) : (
           <div style={{ textAlign: "center", padding: "22px 4px" }}>
-            <span style={{ width: 58, height: 58, borderRadius: "50%", background: "var(--ps-success-soft, #dcfce7)", color: "#16a34a", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+            <span style={{ width: 58, height: 58, borderRadius: "50%", background: WT.successSoft, color: WT.success, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
               <CheckCircle2 size={28} />
             </span>
-            <div style={{ fontSize: 19, fontWeight: 800, color: "var(--ps-ink)" }}>{successMessage || "Success — your brochure is downloading."}</div>
+            <div style={{ fontSize: 19, fontWeight: 800, color: WT.ink }}>{successMessage || "Success — your brochure is downloading."}</div>
           </div>
         )}
     </div>
@@ -723,8 +721,8 @@ function FloatingContactDock({
 function FloatingIconsHint({ s }: { s: SectionInstance }) {
   const st = s.settings;
   return (
-    <div style={{ border: "1.5px dashed var(--ps-line-strong)", borderRadius: 14, padding: "16px 18px", background: "var(--ps-primary-mist)", color: "var(--ps-slate)", fontSize: 13, lineHeight: 1.55 }}>
-      <strong style={{ color: "var(--ps-ink)" }}>Floating icons</strong> — WhatsApp, Call, Enquire and Email stay on the {String(st.side || "right")} edge of the page (builder and live preview).
+    <div style={{ border: `1.5px dashed ${WT.borderStrong}`, borderRadius: WT.radiusSm, padding: "16px 18px", background: hexToSoft(WT.primary, 0.08), color: WT.slate, fontSize: 13, lineHeight: 1.55 }}>
+      <strong style={{ color: WT.ink }}>Floating icons</strong> — WhatsApp, Call, Enquire and Email stay on the {String(st.side || "right")} edge of the page (builder and live preview).
     </div>
   );
 }
@@ -797,6 +795,8 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
   const primaryLink = String(st.primaryLink ?? "#enquiry");
   const secondaryLink = String(st.secondaryLink ?? "");
   const gateFile = String(st.file ?? "").trim();
+  const heroStats = Array.isArray(st.heroStats) ? (st.heroStats as { value: string; label: string }[]) : [];
+  const highlights = Array.isArray(st.highlights) ? (st.highlights as string[]) : [];
   const [gateOpen, setGateOpen] = useState(false);
   const handle = useCtaHandlers(live);
   const gateFields = Array.isArray(st.gateFields) && st.gateFields.length
@@ -807,6 +807,9 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
       ];
   const isCentered = design === "centered";
   const isSplit = design === "split";
+  const sideCardStats = heroStats.slice(0, isSplit ? 3 : 4);
+  const contentWidth = isCentered ? 820 : isSplit ? 620 : 680;
+  const sideCardColumns = device === "mobile" ? "1fr" : device === "tablet" ? "repeat(2,1fr)" : `repeat(${Math.min(sideCardStats.length || 1, isSplit ? 3 : 2)},1fr)`;
   return (
     <div style={{ position: "relative", minHeight: device === "mobile" ? 560 : device === "tablet" ? 680 : 780, display: "flex", alignItems: "center" }}>
       <div style={{ position: "absolute", inset: 0 }}>
@@ -818,59 +821,101 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
         )}
       </div>
       <Overlay section={s} />
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(8,10,20,.78) 0%, rgba(8,10,20,.35) 55%, transparent 100%)", zIndex: 1 }} />
+      <div style={{ position: "absolute", inset: 0, background: isCentered ? "linear-gradient(180deg, rgba(8,10,20,.64) 0%, rgba(8,10,20,.36) 58%, rgba(8,10,20,.46) 100%)" : "linear-gradient(90deg, rgba(8,10,20,.82) 0%, rgba(8,10,20,.52) 48%, rgba(8,10,20,.18) 100%)", zIndex: 1 }} />
       <Inner section={s} align={isCentered ? "center" : "left"}>
-        <div style={{ maxWidth: isCentered ? 760 : device === "mobile" ? "100%" : 640, margin: isCentered ? "0 auto" : undefined, textAlign: isCentered ? "center" : "left" }}>
-          <Eyebrow gold> {String(resolveVars(st.eyebrow))}</Eyebrow>
-          <h1 className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 32 : device === "tablet" ? 42 : 56, lineHeight: 1.08, fontWeight: 700, color: "#fff", letterSpacing: -0.5, margin: "16px 0 10px", textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.heading))}</h1>
-          <p style={{ fontSize: device === "mobile" ? 16 : device === "tablet" ? 18 : 21, color: "#c9a56a", fontWeight: 600, letterSpacing: 0.3, marginBottom: 20, textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.subheading))}</p>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, justifyContent: isCentered ? "center" : "flex-start" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, textTransform: "uppercase", color: "rgba(255,255,255,.55)" }}>{String(st.priceLabel ?? "STARTING FROM")}</span>
-          </div>
-          <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 28 : 36, fontWeight: 700, color: "#fff", textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.price)).replace(/^Starting From\s*/i, "")}</div>
-          <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.6)", margin: "4px 0 26px", textAlign: isCentered ? "center" : "left" }}>{String(st.priceNote)}</div>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: isCentered ? "center" : "flex-start" }}>
-            <a
-              href={resolveCtaHref(primaryAction, primaryLink)}
-              {...handle(primaryAction, primaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
-              style={{ background: String(st.accent || "#cda45e"), color: "#0a0c10", fontWeight: 700, fontSize: 13.5, padding: "13px 24px", borderRadius: 11, cursor: live ? "pointer" : "pointer", boxShadow: "0 10px 28px rgba(0,0,0,.25)", display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none" }}
-            >
-              {String(resolveVars(st.ctaPrimary))} <ArrowRight size={15} />
-            </a>
-            {!isCentered ? (
-              <a
-                href={resolveCtaHref(secondaryAction, secondaryLink || (gateFile ? "#" : ""))}
-                {...handle(secondaryAction, secondaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
-                style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.35)", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "13px 24px", borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, backdropFilter: "blur(8px)", textDecoration: "none" }}
-              >
-                <Download size={15} /> {String(resolveVars(st.ctaSecondary))}
-              </a>
-            ) : null}
-          </div>
-          {!isCentered ? (
-            <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginTop: 28, justifyContent: isSplit ? "flex-start" : "flex-start" }}>
-              {((st.highlights as string[] | undefined) ?? []).map((h) => (
-                <span key={h} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.18)", color: "#fff", fontSize: 11.5, fontWeight: 600, padding: "7px 13px", borderRadius: 999, backdropFilter: "blur(8px)" }}>
-                  <CheckCircle2 size={13} style={{ color: "#cda45e" }} /> {h}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        {!isCentered ? (
-          <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "repeat(4,1fr)" : "1fr 1fr", gap: 12, width: "100%", marginTop: 44 }}>
-            {((st.heroStats as { value: string; label: string }[] | undefined) ?? []).map((x) => (
-              <div key={x.label} style={{ background: "rgba(255,255,255,.09)", border: "1px solid rgba(255,255,255,.16)", borderRadius: 14, padding: "16px 18px", backdropFilter: "blur(12px)" }}>
-                <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{x.value}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", marginTop: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>{x.label}</div>
+       <div
+         style={{
+           width: "100%",
+           display: "grid",
+           gridTemplateColumns: isCentered ? "1fr" : device === "desktop" ? (isSplit ? "minmax(0, 1.08fr) minmax(320px, .92fr)" : "minmax(0, 1.15fr) minmax(300px, .85fr)") : "1fr",
+           gap: device === "mobile" ? 18 : 24,
+           alignItems: "center",
+         }}
+       >
+         <div style={{ maxWidth: contentWidth, margin: isCentered ? "0 auto" : undefined, textAlign: isCentered ? "center" : "left" }}>
+           <Eyebrow gold> {String(resolveVars(st.eyebrow))}</Eyebrow>
+           <h1 className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 32 : device === "tablet" ? 42 : 56, lineHeight: 1.08, fontWeight: 700, color: "#fff", letterSpacing: -0.5, margin: "16px 0 10px", textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.heading))}</h1>
+           <p style={{ fontSize: device === "mobile" ? 16 : device === "tablet" ? 18 : 21, color: "#c9a56a", fontWeight: 600, letterSpacing: 0.3, marginBottom: 20, textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.subheading))}</p>
+           <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8, justifyContent: isCentered ? "center" : "flex-start" }}>
+             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.6, textTransform: "uppercase", color: "rgba(255,255,255,.55)" }}>{String(st.priceLabel ?? "STARTING FROM")}</span>
+           </div>
+           <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 28 : 36, fontWeight: 700, color: "#fff", textAlign: isCentered ? "center" : "left", ...T }}>{String(resolveVars(st.price)).replace(/^Starting From\s*/i, "")}</div>
+           {String(st.priceNote ?? "").trim() ? (
+             <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.6)", margin: "4px 0 26px", textAlign: isCentered ? "center" : "left" }}>{String(st.priceNote)}</div>
+           ) : null}
+           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: isCentered ? "center" : "flex-start" }}>
+             <a
+               href={resolveCtaHref(primaryAction, primaryLink)}
+               {...handle(primaryAction, primaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
+               style={{ ...wtButton({ accent: st.accent, size: "lg" }) }}
+             >
+               {String(resolveVars(st.ctaPrimary))} <ArrowRight size={15} />
+             </a>
+             {!isCentered ? (
+               <a
+                 href={resolveCtaHref(secondaryAction, secondaryLink || (gateFile ? "#" : ""))}
+                 {...handle(secondaryAction, secondaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
+                 style={{ ...wtButtonLight({ size: "lg" }) }}
+               >
+                 <Download size={15} /> {String(resolveVars(st.ctaSecondary))}
+               </a>
+             ) : null}
+           </div>
+           {!isCentered && highlights.length ? (
+             <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginTop: 28, justifyContent: "flex-start" }}>
+               {highlights.map((h) => (
+                 <span key={h} style={{ ...wtPill("rgba(255,255,255,.10)", "#fff"), border: "1px solid rgba(255,255,255,.18)", backdropFilter: "blur(8px)" }}>
+                    <CheckCircle2 size={13} style={{ color: "#cda45e" }} /> {h}
+                  </span>
+               ))}
               </div>
-            ))}
+           ) : null}
           </div>
-        ) : null}
+
+         {!isCentered ? (
+           <div style={{ display: "grid", gap: 14 }}>
+             <div style={{ ...wtCardGlass({ padding: device === "mobile" ? "18px" : "22px" }), background: "rgba(11,18,32,.42)", backdropFilter: "blur(16px)" }}>
+               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", color: "rgba(255,255,255,.56)", marginBottom: 12 }}>
+                 {isSplit ? "Project at a glance" : "Quick facts"}
+               </div>
+               <div style={{ display: "grid", gridTemplateColumns: sideCardColumns, gap: 12 }}>
+                 {sideCardStats.map((x) => (
+                   <div key={x.label} style={{ ...wtCardGlass({ padding: "15px 16px" }), background: "rgba(255,255,255,.08)" }}>
+                     <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{x.value}</div>
+                     <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", marginTop: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>{x.label}</div>
+                   </div>
+                 ))}
+               </div>
+             </div>
+             {isSplit ? (
+               <div style={{ ...wtCardGlass({ padding: device === "mobile" ? "18px" : "22px" }), background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.15)" }}>
+                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.1, textTransform: "uppercase", color: "#fff", marginBottom: 8 }}>
+                   Standard premium layout
+                 </div>
+                 <div style={{ fontSize: 14.5, lineHeight: 1.7, color: "rgba(255,255,255,.78)" }}>
+                   {String(st.priceNote || "Designed for strong enquiry conversion with a clean CTA-first layout.")}
+                 </div>
+               </div>
+             ) : null}
+           </div>
+         ) : null}
+       </div>
+       {isCentered ? (
+         <div style={{ width: "100%", maxWidth: 920, margin: "34px auto 0" }}>
+           <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "repeat(2,1fr)" : `repeat(${Math.min(heroStats.length || 1, 4)},1fr)`, gap: 12 }}>
+             {heroStats.map((x) => (
+               <div key={x.label} style={{ ...wtCardGlass({ padding: "16px 18px" }), textAlign: "center" }}>
+                 <div style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{x.value}</div>
+                 <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", marginTop: 2, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.6 }}>{x.label}</div>
+               </div>
+             ))}
+           </div>
+         </div>
+       ) : null}
       </Inner>
       {(secondaryAction === "brochure" || primaryAction === "brochure") ? (
-        <GatedDownloadModal
-          open={gateOpen}
+       <GatedDownloadModal
+         open={gateOpen}
           onClose={() => setGateOpen(false)}
           live={!!live}
           pageId={pageId}
@@ -906,12 +951,12 @@ function HighlightsSection({ s, device }: { s: SectionInstance; device: Device }
             borderBottom: device !== "desktop" && i < items.length - 1 ? "1px solid var(--ps-line)" : "none",
           }}
         >
-          <span style={{ width: 42, height: 42, borderRadius: 12, background: txt ? "rgba(255,255,255,.14)" : "var(--ps-primary-soft)", color: txt ?? "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            {iconFor(it.icon, 20)}
-          </span>
-          <div>
-            <div style={{ fontSize: 19, fontWeight: 800, color: txt ?? "var(--ps-ink)", ...T }}>{it.value}</div>
-            <div style={{ fontSize: 11, color: txt ?? "var(--ps-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, opacity: txt ? 0.72 : 1, ...T }}>{it.label}</div>
+          <span style={{ ...(txt ? wtIconBadgeGlass(42) : wtIconBadge()) }}>
+             {iconFor(it.icon, 20)}
+           </span>
+           <div>
+             <div style={{ fontSize: 19, fontWeight: 800, color: txt ?? WT.ink, ...T }}>{it.value}</div>
+             <div style={{ fontSize: 11, color: txt ? "rgba(255,255,255,.72)" : WT.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, ...T }}>{it.label}</div>
           </div>
         </div>
       ))}
@@ -932,15 +977,15 @@ function StatsSection({ s, device }: { s: SectionInstance; device: Device }) {
       <>
         {st.heading ? (
           <Inner section={s}>
-            <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, margin: 0, ...T }}>{String(resolveVars(st.heading))}</h2>
+            <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, margin: 0, ...T }}>{String(resolveVars(st.heading))}</h2>
           </Inner>
         ) : null}
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: device === "mobile" ? 18 : 24, marginTop: st.heading ? 28 : 0 }}>
           {items.map((it, i) => (
             <div key={i} style={{ textAlign: "center", padding: "10px 8px", color: txt ?? undefined }}>
-              <span style={{ display: "inline-flex", marginBottom: 10, color: txt ?? "var(--ps-primary)" }}>{iconFor(it.icon, 22)}</span>
-              <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 700, letterSpacing: -0.5, ...T }}>{it.value}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, opacity: 0.65, marginTop: 4, ...T }}>{it.label}</div>
+               <span style={{ display: "inline-flex", marginBottom: 10, color: txt ?? WT.primary }}>{iconFor(it.icon, 22)}</span>
+               <div className="ps-canvas-serif" style={{ ...wtStatValue(), fontSize: device === "mobile" ? 26 : 34, ...T }}>{it.value}</div>
+               <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: WT.muted, opacity: 0.85, marginTop: 4, ...T }}>{it.label}</div>
             </div>
           ))}
         </div>
@@ -951,17 +996,17 @@ function StatsSection({ s, device }: { s: SectionInstance; device: Device }) {
     <>
       {st.heading ? (
         <Inner section={s}>
-          <h2 style={{ fontSize: device === "mobile" ? 24 : 30, fontWeight: 800, letterSpacing: -0.4, margin: 0, ...T }}>{String(resolveVars(st.heading))}</h2>
+           <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 24 : 30, fontWeight: 800, margin: 0, ...T }}>{String(resolveVars(st.heading))}</h2>
         </Inner>
       ) : null}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14, marginTop: st.heading ? 30 : 0 }}>
         {items.map((it, i) => (
-          <div key={i} style={{ background: txt ? "rgba(255,255,255,.08)" : "var(--ps-panel-raised)", border: txt ? "1px solid rgba(255,255,255,.18)" : "1px solid var(--ps-line)", borderRadius: 16, padding: device === "mobile" ? "18px 14px" : "24px 20px", textAlign: "center", color: txt ?? undefined, boxShadow: txt ? undefined : "var(--ps-shadow-sm)" }}>
-            <span style={{ width: 42, height: 42, borderRadius: 12, background: txt ? "rgba(255,255,255,.16)" : "var(--ps-grad-primary)", color: txt ?? "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-              {iconFor(it.icon, 19)}
-            </span>
-            <div style={{ fontSize: device === "mobile" ? 21 : 27, fontWeight: 800, letterSpacing: -0.5, ...T }}>{it.value}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, opacity: 0.72, marginTop: 5, ...T }}>{it.label}</div>
+           <div key={i} style={{ ...(txt ? wtCardGlass() : wtCard()), padding: device === "mobile" ? "18px 14px" : "24px 20px", textAlign: "center", color: txt ?? undefined }}>
+             <span style={{ ...(txt ? wtIconBadgeGlass(42) : wtIconBadge()), marginBottom: 12 }}>
+               {iconFor(it.icon, 19)}
+             </span>
+             <div style={{ ...wtStatValue(), fontSize: device === "mobile" ? 21 : 27, ...T }}>{it.value}</div>
+             <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7, color: WT.muted, opacity: 0.85, marginTop: 5, ...T }}>{it.label}</div>
           </div>
         ))}
       </div>
@@ -993,7 +1038,7 @@ function LinkSection({ s }: { s: SectionInstance }) {
             }
           }
         }}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 700, color: "var(--ps-primary)", textDecoration: "underline", textDecorationColor: "rgba(109,93,252,.35)", textUnderlineOffset: 4, cursor: "pointer" }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 700, color: WT.primary, textDecoration: "underline", textDecorationColor: hexToSoft(WT.primary, 0.35), textUnderlineOffset: 4, cursor: "pointer" }}
       >
         {text} <ArrowRight size={14} />
       </a>
@@ -1020,7 +1065,7 @@ function SocialShareSection({ s }: { s: SectionInstance }) {
         onClick();
       }}
       title={label}
-      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: "50%", background: bg, color: "#fff", cursor: "pointer", textDecoration: "none", boxShadow: "var(--ps-shadow-sm)" }}
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 44, height: 44, borderRadius: 999, background: bg, color: "#fff", cursor: "pointer", textDecoration: "none", boxShadow: WT.shadowSm }}
     >
       {icon}
     </a>
@@ -1053,7 +1098,7 @@ function SocialShareSection({ s }: { s: SectionInstance }) {
     );
   return (
     <div style={{ textAlign: "center", width: "100%" }}>
-      {heading ? <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ps-slate)", marginBottom: 14, display: "inline-flex", alignItems: "center", gap: 7 }}><Share2 size={15} /> {heading}</div> : null}
+      {heading ? <div style={{ fontSize: 13.5, fontWeight: 700, color: WT.slate, marginBottom: 14, display: "inline-flex", alignItems: "center", gap: 7 }}><Share2 size={15} /> {heading}</div> : null}
       <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>{items}</div>
     </div>
   );
@@ -1073,35 +1118,35 @@ function OverviewSection({ s, device }: { s: SectionInstance; device: Device }) 
             <SceneImage art={String(st.image || "lobby")} />
           )}
         </div>
-        <div style={{ position: "absolute", bottom: -22, right: 28, background: "#fff", border: "1px solid var(--ps-line)", borderRadius: 16, padding: "14px 18px", boxShadow: "var(--ps-shadow-md)", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ width: 40, height: 40, borderRadius: 11, background: "var(--ps-grad-primary)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-            <ShieldCheck size={20} />
-          </span>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>RERA Approved</div>
-            <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>{PROPERTY.reraNumber}</div>
+         <div style={{ ...wtCard({ position: "absolute", bottom: -22, right: 28, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12 }) }}>
+           <span style={{ ...wtIconBadge({ size: 40 }) }}>
+             <ShieldCheck size={20} />
+           </span>
+           <div>
+             <div style={{ fontSize: 13, fontWeight: 800, color: WT.ink }}>RERA Approved</div>
+             <div style={{ fontSize: 11, color: WT.muted }}>{PROPERTY.reraNumber}</div>
           </div>
         </div>
       </div>
       <div>
         <Eyebrow>{String(st.eyebrow)}</Eyebrow>
-        <h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 14px", lineHeight: 1.15, ...T }}>{String(st.heading)}</h2>
-        <p style={{ fontSize: 14.5, lineHeight: 1.75, color: "var(--ps-slate)", marginBottom: 18, ...T }}>{String(st.text)}</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 26 }}>
-          {((st.bullets as string[] | undefined) ?? []).map((b) => (
-            <div key={b} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ width: 20, height: 20, borderRadius: 7, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Check size={12} strokeWidth={3} />
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ps-slate)" }}>{b}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
-          {((st.stats as { value: string; label: string }[] | undefined) ?? []).map((x) => (
-            <div key={x.label} style={{ background: "#f8fafc", border: "1px solid var(--ps-line)", borderRadius: 13, padding: "14px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: 17, fontWeight: 800, color: "var(--ps-primary)" }}>{x.value}</div>
-              <div style={{ fontSize: 10.5, color: "var(--ps-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{x.label}</div>
+         <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, margin: "14px 0 14px", lineHeight: 1.15, ...T }}>{String(st.heading)}</h2>
+         <p style={{ ...wtSectionLede(), lineHeight: 1.75, marginBottom: 18, ...T }}>{String(st.text)}</p>
+         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 26 }}>
+           {((st.bullets as string[] | undefined) ?? []).map((b) => (
+             <div key={b} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+               <span style={{ ...wtIconBadge({ size: 20 }) }}>
+                 <Check size={12} strokeWidth={3} />
+               </span>
+               <span style={{ fontSize: 13, fontWeight: 600, color: WT.slate }}>{b}</span>
+             </div>
+           ))}
+         </div>
+         <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
+           {((st.stats as { value: string; label: string }[] | undefined) ?? []).map((x) => (
+             <div key={x.label} style={{ ...wtCardMuted({ padding: "14px 12px", textAlign: "center", borderRadius: 13 }) }}>
+               <div style={{ fontSize: 17, fontWeight: 800, color: WT.primary }}>{x.value}</div>
+               <div style={{ fontSize: 10.5, color: WT.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>{x.label}</div>
             </div>
           ))}
         </div>
@@ -1119,12 +1164,12 @@ function AmenitiesSection({ s, device }: { s: SectionInstance; device: Device })
   if (design === "list") {
     return (
       <>
-        <Inner section={s}><Eyebrow>{String(st.eyebrow)}</Eyebrow><h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2><p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 560, lineHeight: 1.65, ...T }}>{String(st.text)}</p></Inner>
-        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, width: "100%", margin: "34px 0 0" }}>
-          {items.map((it, i) => (
-            <div key={i} className="ps-card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", borderRadius: 14 }}>
-              <span style={{ width: 44, height: 44, borderRadius: 12, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{iconFor(it.icon, 20)}</span>
-              <div><div style={{ fontSize: 14, fontWeight: 800, color: "var(--ps-ink)", ...T }}>{it.title}</div><div style={{ fontSize: 12.5, color: "var(--ps-slate)", lineHeight: 1.5, ...T }}>{it.desc}</div></div>
+         <Inner section={s}><Eyebrow>{String(st.eyebrow)}</Eyebrow><h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2><p style={{ fontSize: 14, color: WT.slate, maxWidth: 560, lineHeight: 1.65, ...T }}>{String(st.text)}</p></Inner>
+         <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, width: "100%", margin: "34px 0 0" }}>
+           {items.map((it, i) => (
+             <div key={i} className="ps-card" style={{ ...wtCard({ padding: "16px 18px" }), display: "flex", alignItems: "center", gap: 14 }}>
+               <span style={{ ...wtIconBadge({ size: 44 }) }}>{iconFor(it.icon, 20)}</span>
+               <div><div style={{ fontSize: 14, fontWeight: 800, color: WT.ink, ...T }}>{it.title}</div><div style={{ fontSize: 12.5, color: WT.slate, lineHeight: 1.5, ...T }}>{it.desc}</div></div>
             </div>
           ))}
         </div>
@@ -1134,10 +1179,10 @@ function AmenitiesSection({ s, device }: { s: SectionInstance; device: Device })
   if (design === "compact") {
     return (
       <>
-        <Inner section={s}><Eyebrow>{String(st.eyebrow)}</Eyebrow><h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2><p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 560, lineHeight: 1.65, ...T }}>{String(st.text)}</p></Inner>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, width: "100%", margin: "34px 0 0", justifyContent: device === "mobile" ? "flex-start" : "center" }}>
-          {items.map((it, i) => (
-            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 999, background: "#fff", border: "1px solid var(--ps-line)", boxShadow: "var(--ps-shadow-sm)", fontSize: 13, fontWeight: 700, color: "var(--ps-ink)" }}><span style={{ color: "var(--ps-primary)", display: "inline-flex" }}>{iconFor(it.icon, 16)}</span> {it.title}</span>
+         <Inner section={s}><Eyebrow>{String(st.eyebrow)}</Eyebrow><h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2><p style={{ fontSize: 14, color: WT.slate, maxWidth: 560, lineHeight: 1.65, ...T }}>{String(st.text)}</p></Inner>
+         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, width: "100%", margin: "34px 0 0", justifyContent: device === "mobile" ? "flex-start" : "center" }}>
+           {items.map((it, i) => (
+             <span key={i} style={{ ...wtPill("#fff", WT.ink), padding: "10px 16px", border: WT.border, boxShadow: WT.shadowSm }}><span style={{ color: WT.primary, display: "inline-flex" }}>{iconFor(it.icon, 16)}</span> {it.title}</span>
           ))}
         </div>
       </>
@@ -1145,19 +1190,19 @@ function AmenitiesSection({ s, device }: { s: SectionInstance; device: Device })
   }
   return (
     <>
-      <Inner section={s}>
-        <Eyebrow>{String(st.eyebrow)}</Eyebrow>
-        <h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
-        <p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 560, lineHeight: 1.65, ...T }}>{String(st.text)}</p>
-      </Inner>
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 16, width: "100%", margin: "34px 0 0" }}>
-        {items.map((it, i) => (
-          <div key={i} className="ps-card" style={{ padding: "22px 18px", borderRadius: 15, transition: "all .2s", cursor: "default" }}>
-            <span style={{ width: 44, height: 44, borderRadius: 12, background: "var(--ps-grad-primary)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14, boxShadow: "0 8px 20px rgba(109,93,252,.28)" }}>
-              {iconFor(it.icon, 21)}
-            </span>
-            <div style={{ fontSize: 14.5, fontWeight: 800, color: "var(--ps-ink)", ...T }}>{it.title}</div>
-            <div style={{ fontSize: 12.5, color: "var(--ps-slate)", marginTop: 5, lineHeight: 1.6, ...T }}>{it.desc}</div>
+       <Inner section={s}>
+         <Eyebrow>{String(st.eyebrow)}</Eyebrow>
+         <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
+         <p style={{ fontSize: 14, color: WT.slate, maxWidth: 560, lineHeight: 1.65, ...T }}>{String(st.text)}</p>
+       </Inner>
+       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 16, width: "100%", margin: "34px 0 0" }}>
+         {items.map((it, i) => (
+           <div key={i} className="ps-card" style={{ ...wtCard({ padding: "22px 18px", transition: "all .2s", cursor: "default" }) }}>
+             <span style={{ ...wtIconBadge({ size: 44 }), marginBottom: 14 }}>
+               {iconFor(it.icon, 21)}
+             </span>
+             <div style={{ fontSize: 14.5, fontWeight: 800, color: WT.ink, ...T }}>{it.title}</div>
+             <div style={{ fontSize: 12.5, color: WT.slate, marginTop: 5, lineHeight: 1.6, ...T }}>{it.desc}</div>
           </div>
         ))}
       </div>
@@ -1178,8 +1223,8 @@ function FloorPlansSection({ s, device }: { s: SectionInstance; device: Device }
     <>
       <Inner section={s}>
         <Eyebrow>{String(st.eyebrow)}</Eyebrow>
-        <h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
-        <p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 600, lineHeight: 1.65, ...T }}>{String(st.text)}</p>
+        <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
+        <p style={{ ...wtSectionLede(), maxWidth: 600, ...T }}>{String(st.text)}</p>
       </Inner>
       <div style={{ width: "100%", margin: "30px 0 0" }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 26 }}>
@@ -1188,16 +1233,15 @@ function FloorPlansSection({ s, device }: { s: SectionInstance; device: Device }
               key={p.name}
               type="button"
               onClick={() => setActive(i)}
-              style={{
-                padding: "9px 18px",
-                borderRadius: 999,
-                border: active === i ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)",
-                background: active === i ? "var(--ps-primary-soft)" : "#fff",
-                color: active === i ? "var(--ps-primary)" : "var(--ps-slate)",
-                fontSize: 12.5,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
+               style={{
+                 ...wtPill(active === i ? WT.primarySoft : "#fff", active === i ? WT.primary : WT.slate),
+                 padding: "9px 18px",
+                 borderRadius: 999,
+                 border: active === i ? `1.5px solid ${WT.primary}` : WT.borderStrong,
+                 fontSize: 12.5,
+                 fontWeight: 700,
+                 cursor: "pointer",
+               }}
             >
               {p.name}
             </button>
@@ -1209,43 +1253,43 @@ function FloorPlansSection({ s, device }: { s: SectionInstance; device: Device }
               <SceneImage art="plan" beds={plan.beds} />
             </div>
             <div style={{ padding: device === "mobile" ? 0 : 10 }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "var(--ps-ink)", ...T }}>{plan.name}</div>
-              <div style={{ fontSize: 13, color: "var(--ps-muted)", marginTop: 4 }}>Vastu-compliant · Corner & regular units available</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, margin: "20px 0" }}>
-                {[
-                  { label: "Carpet Area", value: plan.area },
-                  { label: "Bedrooms", value: `${plan.beds} BHK` },
-                  { label: "Price", value: plan.price },
-                  { label: "Possession", value: "Dec 2027" },
-                ].map((f) => (
-                  <div key={f.label} style={{ background: "#f8fafc", border: "1px solid var(--ps-line)", borderRadius: 11, padding: "12px 14px" }}>
-                    <div style={{ fontSize: 10.5, color: "var(--ps-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "var(--ps-ink)", marginTop: 3 }}>{f.value}</div>
-                  </div>
-                ))}
-              </div>
-              <a
-                {...anchorNav(requestLink, live)}
-                onClick={(e) => {
-                  if (!live) {
-                    e.preventDefault();
-                    return;
-                  }
-                  if (requestPopupId) {
-                    e.preventDefault();
-                    openPopupById(requestPopupId);
-                    return;
-                  }
-                  anchorNav(requestLink, live).onClick(e);
-                }}
-                style={{ background: "var(--ps-grad-primary)", color: "#fff", fontSize: 13, fontWeight: 700, padding: "12px 22px", borderRadius: 10, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", boxShadow: "0 8px 22px rgba(109,93,252,.3)", textDecoration: "none" }}
-              >
-                Request {plan.name} Details <ArrowRight size={14} />
-              </a>
+               <div style={{ fontSize: 22, fontWeight: 800, color: WT.ink, ...T }}>{plan.name}</div>
+               <div style={{ fontSize: 13, color: WT.muted, marginTop: 4 }}>Vastu-compliant · Corner & regular units available</div>
+               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, margin: "20px 0" }}>
+                 {[
+                   { label: "Carpet Area", value: plan.area },
+                   { label: "Bedrooms", value: `${plan.beds} BHK` },
+                   { label: "Price", value: plan.price },
+                   { label: "Possession", value: "Dec 2027" },
+                 ].map((f) => (
+                   <div key={f.label} style={{ ...wtCardMuted({ padding: "12px 14px" }) }}>
+                     <div style={{ fontSize: 10.5, color: WT.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</div>
+                     <div style={{ fontSize: 15, fontWeight: 800, color: WT.ink, marginTop: 3 }}>{f.value}</div>
+                   </div>
+                 ))}
+               </div>
+               <a
+                 {...anchorNav(requestLink, live)}
+                 onClick={(e) => {
+                   if (!live) {
+                     e.preventDefault();
+                     return;
+                   }
+                   if (requestPopupId) {
+                     e.preventDefault();
+                     openPopupById(requestPopupId);
+                     return;
+                   }
+                   anchorNav(requestLink, live).onClick(e);
+                 }}
+                 style={{ ...wtButton({ accent: st.accent }) }}
+               >
+                 Request {plan.name} Details <ArrowRight size={14} />
+               </a>
             </div>
           </div>
         ) : null}
-        <div style={{ textAlign: "center", fontSize: 12.5, color: "var(--ps-muted)", marginTop: 26 }}>{String(st.note)}</div>
+        <div style={{ textAlign: "center", fontSize: 12.5, color: WT.muted, marginTop: 26 }}>{String(st.note)}</div>
       </div>
     </>
   );
@@ -1276,15 +1320,15 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
     <>
       <Inner section={s}>
         <Eyebrow>{String(st.eyebrow)}</Eyebrow>
-        <h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
-        <p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 520, lineHeight: 1.65, ...T }}>{String(st.text)}</p>
+        <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
+        <p style={{ ...wtSectionLede(), fontSize: 14, maxWidth: 520, lineHeight: 1.65, ...T }}>{String(st.text)}</p>
       </Inner>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14, margin: "30px 0 0", width: "100%" }}>
         {images.map((img, i) => (
           <div
             key={i}
             onClick={canOpen ? (e) => { e.stopPropagation(); setOpenIndex(i); } : undefined}
-            style={{ borderRadius: 16, overflow: "hidden", position: "relative", aspectRatio: "4/3", cursor: canOpen ? "zoom-in" : "pointer", boxShadow: "var(--ps-shadow-sm)" }}
+            style={{ borderRadius: WT.radius, overflow: "hidden", position: "relative", aspectRatio: "4/3", cursor: canOpen ? "zoom-in" : "pointer", boxShadow: WT.shadowSm }}
           >
             {isMediaSrc(img) ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -1312,7 +1356,7 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
               const sl = slide as { art?: string };
               if (sl.art) {
                 return (
-                  <div style={{ width: "min(92vw, 1100px)", aspectRatio: "4/3", maxHeight: "84vh", borderRadius: 12, overflow: "hidden" }}>
+                  <div style={{ width: "min(92vw, 1100px)", aspectRatio: "4/3", maxHeight: "84vh", borderRadius: WT.radiusSm, overflow: "hidden" }}>
                     <SceneImage art={sl.art} />
                   </div>
                 );
@@ -1390,17 +1434,17 @@ function LocationSection({ s, device }: { s: SectionInstance; device: Device }) 
     <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1.05fr" : "1fr", gap: 32, alignItems: "stretch" }}>
       <div>
         <Eyebrow>{String(st.eyebrow)}</Eyebrow>
-        <h2 style={{ fontSize: device === "mobile" ? 26 : 32, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 10px", lineHeight: 1.2, ...T }}>{String(st.heading)}</h2>
-        <p style={{ fontSize: 14, color: "var(--ps-slate)", lineHeight: 1.7, marginBottom: 24, ...T }}>{String(st.text)}</p>
+        <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 32, letterSpacing: -0.5, margin: "14px 0 10px", lineHeight: 1.2, ...T }}>{String(st.heading)}</h2>
+        <p style={{ ...wtSectionLede(), fontSize: 14, lineHeight: 1.7, marginBottom: 24, ...T }}>{String(st.text)}</p>
         <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12 }}>
           {items.map((it, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: "#f8fafc", border: "1px solid var(--ps-line)", borderRadius: 12, padding: "13px 14px" }}>
-              <span style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div key={i} style={{ ...wtCard({ padding: "13px 14px" }), display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ width: 36, height: 36, borderRadius: 10, background: WT.primarySoft, color: WT.primary, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 {iconFor(it.icon, 17)}
               </span>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.title}</div>
-                <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 1 }}>{it.meta}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: WT.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.title}</div>
+                <div style={{ fontSize: 11, color: WT.muted, marginTop: 1 }}>{it.meta}</div>
               </div>
             </div>
           ))}
@@ -1410,17 +1454,17 @@ function LocationSection({ s, device }: { s: SectionInstance; device: Device }) 
             href={dirHref}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 20, fontSize: 13, fontWeight: 600, color: "var(--ps-primary)", textDecoration: "none" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 10, marginTop: 20, fontSize: 13, fontWeight: 600, color: WT.primary, textDecoration: "none" }}
           >
             <Navigation size={15} /> Get Directions to {PROPERTY.location}
           </a>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 20, fontSize: 13, fontWeight: 600, color: "var(--ps-primary)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 20, fontSize: 13, fontWeight: 600, color: WT.primary }}>
             <Navigation size={15} /> Get Directions to {PROPERTY.location}
           </div>
         )}
       </div>
-      <div style={{ borderRadius: 18, overflow: "hidden", border: "1px solid var(--ps-line)", boxShadow: "var(--ps-shadow-md)", minHeight: 360 }}>
+      <div style={{ borderRadius: WT.radius, overflow: "hidden", border: "1px solid var(--ps-line)", boxShadow: "var(--ps-shadow-md)", minHeight: 360 }}>
         {live && address ? (
           <iframe
             title={`Map — ${address}`}
@@ -1468,11 +1512,9 @@ function PricingSection({ s, device }: { s: SectionInstance; device: Device }) {
           <div
             key={p.name}
             style={{
-              borderRadius: 18,
-              border: p.featured ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line)",
-              background: p.featured ? "linear-gradient(180deg, var(--ps-primary-mist), #fff 42%)" : "#fff",
-              boxShadow: p.featured ? "0 22px 50px rgba(109,93,252,.18)" : "var(--ps-shadow-sm)",
-              padding: 26,
+              ...(p.featured
+                ? { ...wtCardGlass({ padding: 26 }), background: "linear-gradient(160deg, rgba(79,70,229,.96), rgba(99,91,255,.82))", border: "1px solid rgba(255,255,255,.25)" }
+                : wtCard({ padding: 26 })),
               position: "relative",
             }}
           >
@@ -1481,18 +1523,18 @@ function PricingSection({ s, device }: { s: SectionInstance; device: Device }) {
                 Most Popular
               </span>
             ) : null}
-            <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-primary)", textTransform: "uppercase", letterSpacing: 0.8, ...T }}>{p.name}</div>
-            <div style={{ fontSize: 12.5, color: "var(--ps-muted)", margin: "4px 0 14px", ...T }}>{p.area}</div>
-            <div style={{ fontSize: 30, fontWeight: 800, color: "var(--ps-ink)", letterSpacing: -0.5, ...T }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: p.featured ? "#fff" : WT.primary, textTransform: "uppercase", letterSpacing: 0.8, ...T }}>{p.name}</div>
+            <div style={{ fontSize: 12.5, color: p.featured ? "rgba(255,255,255,.72)" : WT.muted, margin: "4px 0 14px", ...T }}>{p.area}</div>
+            <div style={{ ...wtStatValue(), fontSize: 30, color: p.featured ? "#fff" : WT.ink, letterSpacing: -0.5, ...T }}>
               {p.price}
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ps-muted)" }}> {p.per}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: p.featured ? "rgba(255,255,255,.72)" : WT.muted }}> {p.per}</span>
             </div>
-            <div style={{ height: 1, background: "var(--ps-line)", margin: "18px 0" }} />
+            <div style={{ height: 1, background: p.featured ? "rgba(255,255,255,.2)" : "var(--ps-line)", margin: "18px 0" }} />
             <div style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 150 }}>
               {(p.features ?? []).map((f) => (
                 <div key={f} style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                  <CheckCircle2 size={15} style={{ color: p.featured ? "var(--ps-primary)" : "#94a3b8", flexShrink: 0 }} />
-                  <span style={{ fontSize: 12.5, color: "var(--ps-slate)" }}>{f}</span>
+                  <CheckCircle2 size={15} style={{ color: p.featured ? "rgba(255,255,255,.9)" : WT.muted, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12.5, color: p.featured ? "rgba(255,255,255,.85)" : WT.slate }}>{f}</span>
                 </div>
               ))}
             </div>
@@ -1500,18 +1542,8 @@ function PricingSection({ s, device }: { s: SectionInstance; device: Device }) {
               href={resolveCtaHref("link", planLink)}
               onClick={planClick}
               style={{
-                display: "block",
-                textAlign: "center",
                 marginTop: 18,
-                padding: "12px",
-                borderRadius: 10,
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: "pointer",
-                textDecoration: "none",
-                background: p.featured ? "var(--ps-grad-primary)" : "#f1f4f9",
-                color: p.featured ? "#fff" : "var(--ps-ink)",
-                boxShadow: p.featured ? "0 8px 22px rgba(109,93,252,.3)" : "none",
+                ...(p.featured ? wtButtonLight({ block: true }) : wtButton({ accent: st.accent, block: true })),
               }}
             >
               {p.cta}
@@ -1531,20 +1563,20 @@ function TestimonialsSection({ s, device }: { s: SectionInstance; device: Device
     <>
       <Inner section={s}>
         <Eyebrow>{String(st.eyebrow)}</Eyebrow>
-        <h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
+        <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
       </Inner>
       <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "repeat(3,1fr)" : device === "tablet" ? "1fr 1fr" : "1fr", gap: 18, margin: "30px 0 0", width: "100%" }}>
         {items.map((t, i) => (
-          <div key={i} className="ps-card" style={{ padding: 26, borderRadius: 16, display: "flex", flexDirection: "column", position: "relative" }}>
-            <Quote size={30} style={{ color: "var(--ps-secondary)", opacity: 0.6, marginBottom: 12 }} />
+          <div key={i} className="ps-card" style={{ ...wtCard({ padding: 26 }), display: "flex", flexDirection: "column", position: "relative" }}>
+            <Quote size={30} style={{ color: WT.gold, opacity: 0.5, marginBottom: 12 }} />
             <div style={{ display: "flex", gap: 3, marginBottom: 12 }}>
               {Array.from({ length: 5 }).map((_, j) => (
-                <Star key={j} size={14} fill={j < t.rating ? "#cda45e" : "none"} color="#cda45e" />
+                <Star key={j} size={14} fill={j < t.rating ? WT.gold : "none"} color={WT.gold} />
               ))}
             </div>
-            <p style={{ fontSize: 13.5, lineHeight: 1.7, color: "var(--ps-slate)", flex: 1, ...T }}>“{t.quote}”</p>
+            <p style={{ fontSize: 13.5, lineHeight: 1.7, color: WT.slate, flex: 1, ...T }}>“{t.quote}”</p>
             <div style={{ display: "flex", alignItems: "center", gap: 11, marginTop: 18 }}>
-              <span style={{ width: 38, height: 38, borderRadius: 12, background: "var(--ps-grad-brand)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
+              <span style={{ width: 38, height: 38, borderRadius: 12, background: WT.primary, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
                 {t.name
                   .split(" ")
                   .map((w) => w[0])
@@ -1552,8 +1584,8 @@ function TestimonialsSection({ s, device }: { s: SectionInstance; device: Device
                   .join("")}
               </span>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>{t.name}</div>
-                <div style={{ fontSize: 11.5, color: "var(--ps-muted)" }}>{t.role}</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: WT.ink }}>{t.name}</div>
+                <div style={{ fontSize: 11.5, color: WT.muted }}>{t.role}</div>
               </div>
             </div>
           </div>
@@ -1572,18 +1604,18 @@ function FaqSection({ s, device }: { s: SectionInstance; device: Device }) {
     <>
       <Inner section={s}>
         <Eyebrow>{String(st.eyebrow)}</Eyebrow>
-        <h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
+        <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
       </Inner>
       <div style={{ maxWidth: 820, margin: "30px auto 0", width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
         {items.map((it, i) => (
-          <div key={i} style={{ border: open === i ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line)", borderRadius: 14, background: "#fff", overflow: "hidden", boxShadow: open === i ? "0 10px 30px rgba(109,93,252,.1)" : "none", transition: "all .18s" }}>
+          <div key={i} style={{ ...wtCard({ padding: 0 }), borderRadius: 14, border: open === i ? `1.5px solid ${WT.primary}` : undefined, boxShadow: open === i ? "0 10px 30px rgba(79,70,229,.12)" : undefined, overflow: "hidden", transition: "all .18s" }}>
             <button type="button" onClick={() => setOpen(open === i ? null : i)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "17px 20px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
-              <span style={{ width: 24, height: 24, borderRadius: 8, background: open === i ? "var(--ps-primary-soft)" : "#f1f4f9", color: open === i ? "var(--ps-primary)" : "var(--ps-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <span style={{ width: 24, height: 24, borderRadius: 8, background: open === i ? WT.primarySoft : WT.surfaceMuted, color: open === i ? WT.primary : WT.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <ChevronDown size={14} style={{ transform: open === i ? "rotate(180deg)" : "none", transition: "transform .18s" }} />
               </span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ps-ink)", flex: 1, ...T }}>{it.q ?? (it as { title?: string }).title}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: WT.ink, flex: 1, ...T }}>{it.q ?? (it as { title?: string }).title}</span>
             </button>
-            {open === i ? <div style={{ padding: "0 20px 18px 56px", fontSize: 13, lineHeight: 1.7, color: "var(--ps-slate)", ...T }}>{it.a ?? (it as { body?: string }).body}</div> : null}
+            {open === i ? <div style={{ padding: "0 20px 18px 56px", fontSize: 13, lineHeight: 1.7, color: WT.slate, ...T }}>{it.a ?? (it as { body?: string }).body}</div> : null}
           </div>
         ))}
       </div>
@@ -1734,9 +1766,9 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
             {ty?.html ? <div className="ps-rich" style={{ marginTop: 12, fontSize: 13.5 }} dangerouslySetInnerHTML={{ __html: ty.html }} /> : null}
           </>
         ) : (
-          <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 10 }}>{successMsg}</h2>
+          <h2 style={{ fontSize: 28, fontWeight: 800, marginBottom: 10, color: WT.ink }}>{successMsg}</h2>
         )}
-        {!useCustomThankYou && effectiveForm?.notifyEmail ? <p style={{ color: "var(--ps-slate)", fontSize: 14 }}>A copy can be sent to {effectiveForm.notifyEmail}.</p> : null}
+        {!useCustomThankYou && effectiveForm?.notifyEmail ? <p style={{ color: WT.slate, fontSize: 14 }}>A copy can be sent to {effectiveForm.notifyEmail}.</p> : null}
         {deliverableUrl ? (
           <div>
             <a
@@ -1751,22 +1783,22 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
                 }
                 if (pageId) bumpTracking(pageId, "brochure");
               }}
-              style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 16, padding: "12px 22px", borderRadius: 11, background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 13.5, textDecoration: "none", boxShadow: "0 10px 26px rgba(109,93,252,.32)", cursor: live ? "pointer" : "default" }}
+              style={{ ...wtButton({ accent: st.accent }), marginTop: 16 }}
             >
               <Download size={16} /> {deliverableLabel}
             </a>
-            {ty?.showPdfConfirmation !== false ? <div style={{ marginTop: 8, fontSize: 12, color: "var(--ps-muted)" }}>Your PDF “{pdfFilename}” {pdfAuto ? "downloaded automatically" : "is ready"}.</div> : null}
+            {ty?.showPdfConfirmation !== false ?             <div style={{ marginTop: 8, fontSize: 12, color: WT.muted }}>Your PDF “{pdfFilename}” {pdfAuto ? "downloaded automatically" : "is ready"}.</div> : null}
           </div>
         ) : null}
         {useCustomThankYou && (ty?.buttons?.length ?? 0) > 0 ? (
           <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 18 }}>
             {ty!.buttons!.map((b, i) => (
-              <a key={i} href={live ? b.href : undefined} onClick={(e) => { if (!live) e.preventDefault(); }} style={{ padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: "none", background: b.variant === "primary" ? "var(--ps-grad-primary)" : b.variant === "outline" ? "#fff" : "#111827", color: b.variant === "outline" ? "var(--ps-ink)" : "#fff", border: b.variant === "outline" ? "1px solid var(--ps-line-strong)" : "none", cursor: live ? "pointer" : "default" }}>{b.label}</a>
+              <a key={i} href={live ? b.href : undefined} onClick={(e) => { if (!live) e.preventDefault(); }}               style={{ padding: "10px 16px", borderRadius: WT.radiusSm, fontSize: 13, fontWeight: 700, textDecoration: "none", background: b.variant === "primary" ? WT.primary : b.variant === "outline" ? WT.surface : "#111827", color: b.variant === "outline" ? WT.ink : "#fff", border: b.variant === "outline" ? `1px solid ${WT.borderStrong}` : "none", cursor: live ? "pointer" : "default" }}>{b.label}</a>
             ))}
           </div>
         ) : null}
         <div>
-          <button type="button" onClick={() => { setSent(false); setStep(0); setValues({}); }} style={{ marginTop: 16, padding: "10px 16px", borderRadius: 10, border: "1px solid var(--ps-line-strong)", background: "#fff", cursor: "pointer", fontWeight: 700 }}>
+            <button type="button" onClick={() => { setSent(false); setStep(0); setValues({}); }} style={{ marginTop: 16, padding: "10px 16px", borderRadius: WT.radiusSm, border: `1px solid ${WT.borderStrong}`, background: WT.surface, cursor: "pointer", fontWeight: 700 }}>
             Send another
           </button>
         </div>
@@ -1779,7 +1811,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
     <div id="lead-form" style={{ maxWidth: 520, margin: "0 auto", width: "100%" }}>
       <form
         className="ps-card"
-        style={{ borderRadius: 20, padding: 28, boxShadow: "var(--ps-shadow-md)" }}
+        style={{ ...wtCard({ padding: 28 }) }}
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -1788,11 +1820,11 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
         {multi ? (
           <>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>Step {step + 1} of {steps}</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: WT.ink }}>Step {step + 1} of {steps}</span>
             </div>
             <div style={{ display: "flex", gap: 5, marginBottom: 22 }}>
               {Array.from({ length: steps }).map((_, i) => (
-                <span key={i} style={{ flex: 1, height: 5, borderRadius: 999, background: i <= step ? "var(--ps-grad-primary)" : "#e8eaf1" }} />
+                <span key={i} style={{ flex: 1, height: 5, borderRadius: 999, background: i <= step ? WT.primary : WT.surfaceMuted }} />
               ))}
             </div>
           </>
@@ -1804,7 +1836,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
             return (
               <div key={f.id || key || i}>
                 {f.type !== "checkbox" ? (
-                  <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", marginBottom: 5, display: "block" }}>
+                  <label style={{ fontSize: 11.5, fontWeight: 700, color: WT.slate, marginBottom: 5, display: "block" }}>
                     {f.label} {"required" in f && f.required ? " *" : ""}
                   </label>
                 ) : null}
@@ -1818,7 +1850,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
                 ) : f.type === "radio" ? (
                   <div role="radiogroup" aria-label={f.label} style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
                     {(f.options ?? []).map((o) => (
-                      <label key={o} style={{ display: "inline-flex", gap: 7, alignItems: "center", fontSize: 12.5, color: "var(--ps-slate)", cursor: "pointer" }}>
+                      <label key={o} style={{ display: "inline-flex", gap: 7, alignItems: "center", fontSize: 12.5, color: WT.slate, cursor: "pointer" }}>
                         <input type="radio" name={`fld-${f.id || key}`} checked={val === o} onChange={() => setValues((p) => withFieldValue(p, f, o))} />
                         {o}
                       </label>
@@ -1826,12 +1858,12 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
                   </div>
                 ) : f.type === "file" ? (
                   val ? (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", border: "1px solid var(--ps-line)", borderRadius: 9, background: "var(--ps-bg)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", border: `1px solid ${WT.border}`, borderRadius: WT.radiusSm, background: WT.surfaceMuted }}>
                       <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}> {val}</span>
-                      <button type="button" onClick={() => setValues((p) => withFieldValue(p, f, ""))} style={{ background: "none", border: "none", color: "#e5484d", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Remove</button>
+                      <button type="button" onClick={() => setValues((p) => withFieldValue(p, f, ""))} style={{ background: "none", border: "none", color: WT.danger, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Remove</button>
                     </div>
                   ) : (
-                    <label className="ps-input" style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 12px", cursor: "pointer", color: "var(--ps-muted)", fontSize: 12.5 }}>
+                    <label className="ps-input" style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 12px", cursor: "pointer", color: WT.muted, fontSize: 12.5 }}>
                       <Upload size={15} /> Choose file…
                       <input
                         type="file"
@@ -1885,17 +1917,17 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
           })}
         </div>
         {error ? (
-          <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 10, background: "var(--ps-danger-soft, #fee2e2)", color: "#dc2626", fontSize: 12.5, fontWeight: 600 }}>
+          <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: WT.radiusSm, background: WT.dangerSoft, color: WT.danger, fontSize: 12.5, fontWeight: 600 }}>
              {/required/i.test(error) ? errorMsg : error}
           </div>
         ) : null}
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           {step > 0 ? (
-            <button type="button" onClick={() => setStep((v) => Math.max(0, v - 1))} style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1px solid var(--ps-line-strong)", background: "#fff", color: "var(--ps-slate)", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            <button type="button" onClick={() => setStep((v) => Math.max(0, v - 1))} style={{ flex: 1, padding: "12px", borderRadius: WT.radiusSm, border: `1px solid ${WT.borderStrong}`, background: WT.surface, color: WT.slate, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
               Back
             </button>
           ) : null}
-          <button type="submit" style={{ flex: 2, padding: "12px", borderRadius: 10, border: "none", background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+          <button type="submit" style={{ ...wtButton({ accent: st.accent, block: true }), flex: 2 }}>
             {last ? submitLabel : "Continue"}
           </button>
         </div>
@@ -1935,7 +1967,7 @@ function CtaBanner({ s, device }: { s: SectionInstance; device: Device }) {
             }
             anchorNav(link, live).onClick(e);
           }}
-          style={{ background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.35)", color: "inherit", fontWeight: 700, fontSize: 13, padding: "11px 18px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 7 }}
+          style={{ ...wtButtonLight(), whiteSpace: "nowrap" }}
         >
           {String(st.cta ?? st.ctaPrimary ?? "Learn more")} <ArrowRight size={14} />
         </a>
@@ -1959,7 +1991,7 @@ function CtaBanner({ s, device }: { s: SectionInstance; device: Device }) {
             {...anchorNav(primaryLink, live)}
             {...handle(primaryAction, primaryLink)}
             href={resolveCtaHref(primaryAction === "call" ? "call" : "link", primaryLink, phone)}
-            style={{ background: "linear-gradient(135deg,#cda45e,#b08a3e)", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "13px 26px", borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 10px 28px rgba(205,164,94,.4)", textDecoration: "none" }}
+            style={{ ...wtButton({ gold: true }) }}
           >
             {String(resolveVars(st.ctaPrimary))} <ArrowRight size={15} />
           </a>
@@ -1969,7 +2001,7 @@ function CtaBanner({ s, device }: { s: SectionInstance; device: Device }) {
               onClick={(e) => {
                 if (!live) e.preventDefault();
               }}
-              style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.35)", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "13px 26px", borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none" }}
+              style={{ ...wtButtonLight() }}
             >
               <PhoneCall size={15} /> {String(st.ctaSecondary)}
             </a>
@@ -1977,7 +2009,7 @@ function CtaBanner({ s, device }: { s: SectionInstance; device: Device }) {
             <a
               href={resolveCtaHref("link", secondaryLink)}
               {...handle(secondaryAction, secondaryLink)}
-              style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.35)", color: "#fff", fontWeight: 700, fontSize: 13.5, padding: "13px 26px", borderRadius: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none" }}
+              style={{ ...wtButtonLight() }}
             >
               {String(st.ctaSecondary)}
             </a>
@@ -2030,11 +2062,80 @@ function CountdownSection({ s, device }: { s: SectionInstance; device: Device })
       <div style={{ fontSize: device === "mobile" ? 16 : 18, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", marginBottom: 18, ...T }}>{String(st.heading)}</div>
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(cells.length || 4, 4)},1fr)`, gap: device === "mobile" ? 8 : 14 }}>
         {cells.map((it, i) => (
-          <div key={i} style={{ background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.16)", borderRadius: 14, padding: device === "mobile" ? "12px 6px" : "16px 10px" }}>
-            <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 26 : 36, fontWeight: 700, ...T }}>{it.value}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", opacity: 0.7, marginTop: 4, ...T }}>{it.label}</div>
+          <div key={i} style={{ ...wtCardMuted({ padding: device === "mobile" ? "12px 6px" : "16px 10px" }) }}>
+            <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 26 : 36, fontWeight: 700, color: WT.ink, ...T }}>{it.value}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: WT.muted, marginTop: 4, ...T }}>{it.label}</div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function EmiCalculator({ s, device }: { s: SectionInstance; device: Device }) {
+  const st = s.settings;
+  const T = typoCss(s, device);
+  const cur = String(st.currency ?? "₹");
+  const [price, setPrice] = useState<number>(Number(st.price ?? 125));
+  const [down, setDown] = useState<number>(Number(st.downPayment ?? 25));
+  const [rate, setRate] = useState<number>(Number(st.rate ?? 8.5));
+  const [tenure, setTenure] = useState<number>(Number(st.tenure ?? 20));
+
+  useEffect(() => setPrice(Number(st.price ?? 125)), [st.price]);
+  useEffect(() => setDown(Number(st.downPayment ?? 25)), [st.downPayment]);
+  useEffect(() => setRate(Number(st.rate ?? 8.5)), [st.rate]);
+  useEffect(() => setTenure(Number(st.tenure ?? 20)), [st.tenure]);
+
+  const loan = price * 100000 * (1 - down / 100);
+  const r = rate / 100 / 12;
+  const n = tenure * 12;
+  const emi = r === 0 ? loan / n : (loan * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+
+  const stop = (e: import("react").MouseEvent) => e.stopPropagation();
+  const slider = (value: number, min: number, max: number, step: number, onChange: (v: number) => void) => (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onMouseDown={stop}
+      onPointerDown={stop}
+      onChange={(e) => onChange(Number(e.target.value))}
+      style={{ width: "100%", accentColor: WT.gold }}
+    />
+  );
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1.2fr .8fr", gap: 24, maxWidth: 980, margin: "0 auto", width: "100%" }}>
+      <div style={{ ...wtCard({ padding: 24 }) }}>
+        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 14, ...T }}>{String(st.heading)}</div>
+        <div style={{ marginBottom: 18 }}>
+            <label style={{ fontSize: 12.5, color: WT.slate, display: "flex", justifyContent: "space-between" }}>
+            <span>Property Price</span>
+            <b>{cur} {price} Lakh</b>
+          </label>
+          {slider(price, 50, 300, 1, setPrice)}
+        </div>
+        <div style={{ marginBottom: 18 }}>
+            <label style={{ fontSize: 12.5, color: WT.slate, display: "flex", justifyContent: "space-between" }}>
+            <span>Down Payment</span>
+            <b>{down}%</b>
+          </label>
+          {slider(down, 10, 60, 1, setDown)}
+        </div>
+        <div style={{ marginBottom: 6 }}>
+            <label style={{ fontSize: 12.5, color: WT.slate, display: "flex", justifyContent: "space-between" }}>
+            <span>Interest Rate</span>
+            <b>{rate}%</b>
+          </label>
+          {slider(rate, 6, 12, 0.1, setRate)}
+        </div>
+      </div>
+      <div style={{ ...wtCard({ padding: 28 }), display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: WT.slate }}>Estimated Monthly EMI</span>
+        <strong style={{ fontSize: 32, color: WT.ink, marginTop: 8 }}>{cur} {Math.round(emi).toLocaleString("en-IN")}</strong>
+        <p style={{ marginTop: 12, fontSize: 12.5, color: WT.slate }}>{String(st.note ?? "")}</p>
       </div>
     </div>
   );
@@ -2057,11 +2158,7 @@ function StickyCta({ s, device }: { s: SectionInstance; device: Device }) {
           left: "50%",
           transform: "translateX(-50%)",
           width: "min(720px, calc(100% - 24px))",
-          background: "rgba(255,255,255,.94)",
-          backdropFilter: "blur(16px)",
-          border: "1px solid rgba(17,24,39,.1)",
-          borderRadius: 16,
-          padding: device === "mobile" ? "12px 12px" : "12px 18px",
+          ...wtCard({ padding: device === "mobile" ? "12px 12px" : "12px 18px" }),
           display: "flex",
           alignItems: "center",
           gap: 10,
@@ -2071,15 +2168,15 @@ function StickyCta({ s, device }: { s: SectionInstance; device: Device }) {
         }}
       >
         <div style={{ flex: "1 1 160px", minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...T }}>{text}</div>
-          <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 1 }}>{PROPERTY.location}</div>
+          <div style={{ fontSize: 13.5, fontWeight: 800, color: WT.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...T }}>{text}</div>
+          <div style={{ fontSize: 11, color: WT.muted, marginTop: 1 }}>{PROPERTY.location}</div>
         </div>
         {device !== "mobile" && String(st.phone ?? "").trim() ? (
-          <a href={`tel:${String(st.phone ?? "").replace(/[^+0-9]/g, "")}`} onClick={(e) => { if (!live) e.preventDefault(); else if (pageId) bumpTracking(pageId, "call"); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "var(--ps-slate)", textDecoration: "none" }}>
+            <a href={`tel:${String(st.phone ?? "").replace(/[^+0-9]/g, "")}`} onClick={(e) => { if (!live) e.preventDefault(); else if (pageId) bumpTracking(pageId, "call"); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: WT.slate, textDecoration: "none" }}>
             <Phone size={13} /> {String(st.phone)}
           </a>
         ) : null}
-        <a {...anchorNav(link, live)} style={{ background: "linear-gradient(135deg,#c9a56a,#a8844a)", color: "#0a0c10", fontSize: 12.5, fontWeight: 700, padding: "10px 16px", borderRadius: 10, cursor: "pointer", whiteSpace: "nowrap", textDecoration: "none", flex: device === "mobile" ? "1 1 auto" : undefined, textAlign: "center" }}>{String(st.ctaLabel)}</a>
+        <a {...anchorNav(link, live)} style={{ ...wtButton({ accent: st.accent }), flex: device === "mobile" ? "1 1 auto" : undefined, textAlign: "center" }}>{String(st.ctaLabel)}</a>
         {waNumber ? (
           <a
             href={`https://wa.me/${waNumber}`}
@@ -2172,16 +2269,16 @@ function ProgressBarSection({ s }: { s: SectionInstance }) {
   const value = Math.max(0, Math.min(100, Number(st.value ?? 50) || 0));
   const height = Math.max(4, Number(st.height ?? 14));
   const radius = st.radius === "" || st.radius == null ? 999 : Number(st.radius);
-  const barColor = String(st.color ?? "") || "var(--ps-grad-primary)";
-  const trackColor = String(st.track ?? "") || "#e8eaf1";
+  const barColor = String(st.color ?? "") || WT.primary;
+  const trackColor = String(st.track ?? "") || WT.surfaceMuted;
   const showValue = st.showValue !== false;
   const T = typoCss(s, "desktop");
   return (
     <div style={{ width: "100%" }}>
       {label || showValue ? (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
-          {label ? <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-slate)", ...T }}>{label}</span> : <span />}
-          {showValue ? <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--ps-primary)", ...T }}>{value}%</span> : null}
+          {label ? <span style={{ fontSize: 13, fontWeight: 700, color: WT.slate, ...T }}>{label}</span> : <span />}
+          {showValue ? <span style={{ fontSize: 12.5, fontWeight: 800, color: WT.primary, ...T }}>{value}%</span> : null}
         </div>
       ) : null}
       <div
@@ -2225,7 +2322,7 @@ function HeadingSection({ s, device }: { s: SectionInstance; device: Device }) {
   const elementId = s.style.advanced?.elementId?.trim();
   return (
     <div style={{ textAlign: align }}>
-      <Tag id={elementId} style={{ ...style, margin: 0 }}>{text}</Tag>
+      <Tag id={elementId} style={{ ...wtSectionTitle(), ...style, margin: 0 }}>{text}</Tag>
     </div>
   );
 }
@@ -2292,18 +2389,14 @@ function ButtonSection({ s }: { s: SectionInstance }) {
           }
         }}
         style={{
+          ...(solid ? wtButton({ accent: st.accent }) : wtButton({ accent: st.accent, outline: true })),
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
           padding: pad,
-          borderRadius: 11,
-          fontWeight: 700,
+          borderRadius: WT.radiusSm,
           fontSize: font,
-          background: solid ? "var(--ps-primary)" : "transparent",
-          color: solid ? "#fff" : "var(--ps-primary)",
-          border: variant === "outline" ? "1.5px solid var(--ps-primary)" : "none",
-          boxShadow: solid ? "0 10px 26px rgba(109,93,252,.35)" : "none",
           textDecoration: "none",
           cursor: "pointer",
           ...typoCss(s, "desktop"),
@@ -2335,21 +2428,20 @@ function ImageSection({ s }: { s: SectionInstance }) {
   const src = String(st.src ?? "");
   const alt = String(st.alt ?? "Image");
   const title = String(st.title ?? "");
-  const radius = Number(st.radius ?? 12);
   const width = Math.max(80, Number(st.width ?? 800) || 800);
   const align = (s.style.layout?.align as "left" | "center" | "right" | undefined) ?? (String(st.align ?? "center") as "left" | "center" | "right");
   const link = String(st.link ?? "").trim();
   const img = isMediaSrc(src) ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} title={title || undefined} style={{ maxWidth: "100%", width: `min(${width}px,100%)`, borderRadius: radius, objectFit: "cover", display: "block" }} />
+    <img src={src} alt={alt} title={title || undefined} style={{ maxWidth: "100%", width: `min(${width}px,100%)`, borderRadius: WT.radius, boxShadow: WT.shadowSm, objectFit: "cover", display: "block" }} />
   ) : src ? (
     // Named art scenes (e.g. "interior", "skyline") render the built-in artwork
     // until a real image is uploaded — same behaviour as the gallery widget.
-    <div title={title || undefined} style={{ width: `min(${width}px,100%)`, aspectRatio: "16/9", borderRadius: radius, overflow: "hidden", display: "block" }}>
+    <div title={title || undefined} style={{ width: `min(${width}px,100%)`, aspectRatio: "16/9", borderRadius: WT.radius, boxShadow: WT.shadowSm, overflow: "hidden", display: "block" }}>
       <SceneImage art={src} />
     </div>
   ) : (
-    <div style={{ width: `min(${width}px,100%)`, aspectRatio: "16/9", borderRadius: radius, border: "1.5px dashed var(--ps-line-strong)", background: "var(--ps-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ps-muted)", fontSize: 13, fontWeight: 600, textAlign: "center", padding: "0 20px" }}>
+    <div style={{ width: `min(${width}px,100%)`, aspectRatio: "16/9", borderRadius: WT.radius, border: "1.5px dashed var(--ps-line-strong)", background: "var(--ps-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ps-muted)", fontSize: 13, fontWeight: 600, textAlign: "center", padding: "0 20px" }}>
       Image — upload a file or paste a URL in Content
     </div>
   );
@@ -2370,7 +2462,7 @@ function IconSection({ s }: { s: SectionInstance }) {
   const st = s.settings;
   const name = String(st.name ?? st.icon ?? "Sparkles");
   const size = Number(st.size ?? 48);
-  const color = String(st.color ?? "var(--ps-primary)");
+  const color = String(st.color ?? WT.primary);
   if (isMediaSrc(name)) {
     return (
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: size + 16 }}>
@@ -2396,21 +2488,18 @@ function IconBoxSection({ s, device }: { s: SectionInstance; device: Device }) {
   return (
     <div
       style={{
+        ...wtCard({ padding: device === "mobile" ? "20px 16px" : "28px 22px" }),
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         textAlign: "center",
         gap: 12,
-        padding: device === "mobile" ? "20px 16px" : "28px 22px",
-        borderRadius: 16,
-        border: "1px solid var(--ps-line)",
-        background: "var(--ps-panel-raised)",
         maxWidth: 360,
         margin: "0 auto",
         width: "100%",
       }}
     >
-      <span style={{ width: 48, height: 48, borderRadius: 13, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <span style={{ ...wtIconBadge({ size: 48 }) }}>
         {isMediaSrc(icon) ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={icon} alt="" style={{ width: 24, height: 24, objectFit: "contain" }} />
@@ -2418,8 +2507,8 @@ function IconBoxSection({ s, device }: { s: SectionInstance; device: Device }) {
           <Icon size={24} />
         )}
       </span>
-      {title ? <div style={{ fontSize: 16, fontWeight: 800, color: "var(--ps-ink)", letterSpacing: -0.2, ...typoCss(s, device) }}>{title}</div> : null}
-      {text ? <div style={{ fontSize: 13, color: "var(--ps-slate)", lineHeight: 1.6, ...typoCss(s, device) }}>{text}</div> : null}
+      {title ? <div style={{ fontSize: 16, fontWeight: 800, color: WT.ink, letterSpacing: -0.2, ...typoCss(s, device) }}>{title}</div> : null}
+      {text ? <div style={{ fontSize: 13, color: WT.slate, lineHeight: 1.6, ...typoCss(s, device) }}>{text}</div> : null}
     </div>
   );
 }
@@ -2473,16 +2562,16 @@ function ContactSection({ s, device }: { s: SectionInstance; device: Device }) {
   ].filter((r) => r.value);
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
-      {heading ? <h3 style={{ fontSize: device === "mobile" ? 22 : 26, fontWeight: 800, letterSpacing: -0.4, margin: "0 0 18px", textAlign: "center", ...typoCss(s, device) }}>{heading}</h3> : null}
+      {heading ? <h3 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 22 : 26, fontWeight: 800, letterSpacing: -0.4, margin: "0 0 18px", textAlign: "center", ...typoCss(s, device) }}>{heading}</h3> : null}
       <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "repeat(3,1fr)", gap: 12 }}>
         {rows.map((r, i) => (
-          <div key={i} style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line)", borderRadius: 14, padding: "16px 18px", display: "flex", gap: 12, alignItems: "center" }}>
-            <span style={{ width: 38, height: 38, borderRadius: 11, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <div key={i} style={{ ...wtCard({ padding: "16px 18px" }), display: "flex", gap: 12, alignItems: "center" }}>
+            <span style={{ ...wtIconBadge({ size: 38 }) }}>
               <r.icon size={17} />
             </span>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)" }}>{r.label}</div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ps-ink)", marginTop: 2, overflowWrap: "anywhere", ...typoCss(s, device) }}>{r.value}</div>
+              <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: WT.muted }}>{r.label}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: WT.ink, marginTop: 2, overflowWrap: "anywhere", ...typoCss(s, device) }}>{r.value}</div>
             </div>
           </div>
         ))}
@@ -2498,9 +2587,9 @@ function PropertyDetailsSection({ s, device }: { s: SectionInstance; device: Dev
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 12 }}>
       {items.map((it, i) => (
-        <div key={i} style={{ background: "var(--ps-bg)", border: "1px solid var(--ps-line)", borderRadius: 13, padding: "16px 18px" }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--ps-muted)" }}>{it.label}</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: "var(--ps-ink)", marginTop: 5, ...typoCss(s, device) }}>{String(resolveVars(it.value ?? ""))}</div>
+        <div key={i} style={{ ...wtCard({ padding: "16px 18px" }) }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: WT.muted }}>{it.label}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: WT.ink, marginTop: 5, ...typoCss(s, device) }}>{String(resolveVars(it.value ?? ""))}</div>
         </div>
       ))}
     </div>
@@ -2514,13 +2603,13 @@ function UnitTypesSection({ s, device }: { s: SectionInstance; device: Device })
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14 }}>
       {items.map((it, i) => (
-        <div key={i} style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line)", borderRadius: 15, padding: "20px 20px 18px", position: "relative" }}>
-          <span style={{ position: "absolute", top: 14, right: 14, fontSize: 11, fontWeight: 700, color: "var(--ps-primary)", background: "var(--ps-primary-soft)", padding: "3px 9px", borderRadius: 999 }}>
+        <div key={i} style={{ ...wtCard({ padding: "20px 20px 18px" }), position: "relative" }}>
+          <span style={{ ...wtPill(WT.primarySoft, WT.primary), position: "absolute", top: 14, right: 14, fontSize: 11, padding: "3px 9px" }}>
             {it.beds} BHK
           </span>
-          <div style={{ fontSize: 17, fontWeight: 800, color: "var(--ps-ink)", letterSpacing: -0.3, ...T }}>{it.name}</div>
-          <div style={{ fontSize: 13, color: "var(--ps-slate)", marginTop: 8, ...T }}>Area: {it.area}</div>
-          {it.price ? <div style={{ fontSize: 18, fontWeight: 800, color: "var(--ps-primary)", marginTop: 10, ...T }}>{it.price}</div> : null}
+          <div style={{ fontSize: 17, fontWeight: 800, color: WT.ink, letterSpacing: -0.3, ...T }}>{it.name}</div>
+          <div style={{ fontSize: 13, color: WT.slate, marginTop: 8, ...T }}>Area: {it.area}</div>
+          {it.price ? <div style={{ fontSize: 18, fontWeight: 800, color: WT.primary, marginTop: 10, ...T }}>{it.price}</div> : null}
         </div>
       ))}
     </div>
@@ -2535,13 +2624,13 @@ function PaymentPlansSection({ s, device }: { s: SectionInstance; device: Device
   const T = typoCss(s, device);
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
-      {heading ? <h3 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, margin: "0 0 20px", textAlign: "center", ...T }}>{heading}</h3> : null}
+      {heading ? <h3 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, margin: "0 0 20px", textAlign: "center", ...T }}>{heading}</h3> : null}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14 }}>
         {items.map((it, i) => (
-          <div key={i} style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line)", borderTop: "3px solid var(--ps-primary)", borderRadius: 14, padding: "20px 20px 18px" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)" }}>{it.plan}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "var(--ps-ink)", marginTop: 6 }}>{it.amount}</div>
-            {it.details ? <div style={{ fontSize: 12.5, color: "var(--ps-slate)", marginTop: 8, lineHeight: 1.6 }}>{it.details}</div> : null}
+          <div key={i} style={{ ...wtCardMuted({ padding: "20px 20px 18px", borderTop: `3px solid ${st.accent ?? WT.primary}` }) }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: WT.muted }}>{it.plan}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: WT.ink, marginTop: 6 }}>{it.amount}</div>
+            {it.details ? <div style={{ fontSize: 12.5, color: WT.slate, marginTop: 8, lineHeight: 1.6 }}>{it.details}</div> : null}
           </div>
         ))}
       </div>
@@ -2562,7 +2651,7 @@ function CallCtaSection({ s, device }: { s: SectionInstance; device: Device }) {
   const T = typoCss(s, device);
   if (mode === "whatsapp") {
     return (
-      <div style={{ display: "flex", flexDirection: device === "mobile" ? "column" : "row", alignItems: "center", justifyContent: "space-between", gap: 14, background: "linear-gradient(135deg,#25d366,#128c7e)", borderRadius: 16, padding: device === "mobile" ? "18px 18px" : "22px 28px", color: "#fff" }}>
+      <div style={{ ...wtCardGlass({ padding: device === "mobile" ? "18px 18px" : "22px 28px", background: "linear-gradient(135deg,#25d366,#128c7e)" }), display: "flex", flexDirection: device === "mobile" ? "column" : "row", alignItems: "center", justifyContent: "space-between", gap: 14, color: "#fff" }}>
         <div style={{ fontSize: device === "mobile" ? 15 : 17, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.4, ...T }}>{text}</div>
         <a
           href={`https://wa.me/${number.replace(/[^0-9]/g, "")}`}
@@ -2575,7 +2664,7 @@ function CallCtaSection({ s, device }: { s: SectionInstance; device: Device }) {
             }
             if (pageId) bumpTracking(pageId, "whatsapp");
           }}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 22px", borderRadius: 11, background: "#fff", color: "#128c7e", fontWeight: 800, fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}
+          style={{ ...wtButtonLight({ whiteSpace: "nowrap" }) }}
         >
           <MessageCircle size={16} /> {ctaLabel}
         </a>
@@ -2583,7 +2672,7 @@ function CallCtaSection({ s, device }: { s: SectionInstance; device: Device }) {
     );
   }
   return (
-    <div style={{ display: "flex", flexDirection: device === "mobile" ? "column" : "row", alignItems: "center", justifyContent: "space-between", gap: 14, background: "linear-gradient(135deg,var(--ps-primary),#8a7bff)", borderRadius: 16, padding: device === "mobile" ? "18px 18px" : "22px 28px", color: "#fff" }}>
+    <div style={{ ...wtCardGlass({ padding: device === "mobile" ? "18px 18px" : "22px 28px", background: "linear-gradient(135deg,var(--ps-primary),#8a7bff)" }), display: "flex", flexDirection: device === "mobile" ? "column" : "row", alignItems: "center", justifyContent: "space-between", gap: 14, color: "#fff" }}>
       <div style={{ fontSize: device === "mobile" ? 15 : 17, fontWeight: 800, letterSpacing: -0.2, lineHeight: 1.4, ...T }}>{text}</div>
       <a
         href={`tel:${phone.replace(/[^+0-9]/g, "")}`}
@@ -2594,7 +2683,7 @@ function CallCtaSection({ s, device }: { s: SectionInstance; device: Device }) {
           }
           if (pageId) bumpTracking(pageId, "call");
         }}
-        style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 22px", borderRadius: 11, background: "#fff", color: "var(--ps-primary)", fontWeight: 800, fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}
+        style={{ ...wtButtonLight({ whiteSpace: "nowrap" }) }}
       >
         <PhoneCall size={16} /> {ctaLabel}
       </a>
@@ -2619,7 +2708,7 @@ function TabsSection({ s, device }: { s: SectionInstance; device: Device }) {
   const T = typoCss(s, device);
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
-      {st.heading ? <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center", marginBottom: 18, ...T }}>{String(st.heading)}</h2> : null}
+       {st.heading ? <h2 style={{ ...wtSectionTitle({ marginBottom: 18 }), textAlign: "center", letterSpacing: -0.4, ...T }}>{String(st.heading)}</h2> : null}
       <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 20 }}>
         {items.map((t, i) => (
           <button
@@ -2627,14 +2716,7 @@ function TabsSection({ s, device }: { s: SectionInstance; device: Device }) {
             type="button"
             onClick={(e) => { e.stopPropagation(); setActive(i); }}
             style={{
-              padding: "9px 18px",
-              borderRadius: 999,
-              border: i === idx ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)",
-              background: i === idx ? "var(--ps-primary-soft)" : "#fff",
-              color: i === idx ? "var(--ps-primary)" : "var(--ps-slate)",
-              fontSize: 12.5,
-              fontWeight: 700,
-              cursor: "pointer",
+              ...wtPill(i === idx ? WT.primarySoft : "#fff", i === idx ? WT.primary : WT.slate, { padding: "9px 18px", border: i === idx ? `1.5px solid ${WT.primary}` : WT.borderStrong, fontSize: 12.5, cursor: "pointer" }),
             }}
           >
             {t.label || `Tab ${i + 1}`}
@@ -2642,11 +2724,11 @@ function TabsSection({ s, device }: { s: SectionInstance; device: Device }) {
         ))}
       </div>
       {cur ? (
-        <div style={{ border: "1px solid var(--ps-line)", borderRadius: 16, background: "#fff", padding: device === "mobile" ? "18px 16px" : "26px 28px", fontSize: 14, lineHeight: 1.7, color: "var(--ps-slate)", boxShadow: "var(--ps-shadow-sm)", ...T }}>
+        <div style={{ ...wtCard({ padding: device === "mobile" ? "18px 16px" : "26px 28px", fontSize: 14, lineHeight: 1.7, color: WT.slate }), ...T }}>
           {String(resolveVars(cur.body || "")) || "Add tab content in Settings."}
         </div>
       ) : (
-        <div style={{ padding: "18px 16px", border: "1.5px dashed var(--ps-line-strong)", borderRadius: 12, textAlign: "center", color: "var(--ps-muted)", fontSize: 13 }}>Add tabs in Settings</div>
+        <div style={{ padding: "18px 16px", border: `1.5px dashed ${WT.borderStrong}`, borderRadius: WT.radiusSm, textAlign: "center", color: WT.muted, fontSize: 13 }}>Add tabs in Settings</div>
       )}
     </div>
   );
@@ -2675,7 +2757,7 @@ function CarouselSection({ s, device }: { s: SectionInstance; device: Device }) 
 
   if (!count) {
     return (
-      <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%", padding: "18px 16px", border: "1.5px dashed var(--ps-line-strong)", borderRadius: 12, textAlign: "center", color: "var(--ps-muted)", fontSize: 13 }}>Add slides in Settings</div>
+      <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%", padding: "18px 16px", border: `1.5px dashed ${WT.borderStrong}`, borderRadius: WT.radiusSm, textAlign: "center", color: WT.muted, fontSize: 13 }}>Add slides in Settings</div>
     );
   }
   const idx = Math.min(index, count - 1);
@@ -2687,19 +2769,19 @@ function CarouselSection({ s, device }: { s: SectionInstance; device: Device }) 
     transform: "translateY(-50%)",
     width: 40,
     height: 40,
-    borderRadius: "50%",
-    border: "none",
-    background: "rgba(8,10,20,.5)",
-    color: "#fff",
+    borderRadius: WT.radiusPill,
+    border: `1px solid ${WT.border}`,
+    background: WT.surface,
+    color: WT.primary,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
-    backdropFilter: "blur(6px)",
+    boxShadow: WT.shadowSm,
   });
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
-      {st.heading ? <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center", marginBottom: 18, ...typoCss(s, device) }}>{String(st.heading)}</h2> : null}
+       {st.heading ? <h2 style={{ ...wtSectionTitle({ marginBottom: 18 }), textAlign: "center", letterSpacing: -0.4, ...typoCss(s, device) }}>{String(st.heading)}</h2> : null}
       <div style={{ position: "relative", borderRadius: 18, overflow: "hidden", aspectRatio: "16/9", boxShadow: "var(--ps-shadow-md)", border: "1px solid var(--ps-line)" }}>
         {cur.image && isMediaSrc(cur.image) ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -2729,7 +2811,7 @@ function CarouselSection({ s, device }: { s: SectionInstance; device: Device }) 
               type="button"
               aria-label={`Go to slide ${i + 1}`}
               onClick={(e) => { e.stopPropagation(); setIndex(i); }}
-              style={{ width: i === idx ? 22 : 8, height: 8, borderRadius: 999, border: "none", background: i === idx ? "var(--ps-primary)" : "var(--ps-line-strong)", cursor: "pointer", transition: "width .2s", padding: 0 }}
+              style={{ width: i === idx ? 22 : 8, height: 8, borderRadius: 999, border: "none", background: i === idx ? WT.primary : WT.borderStrong, cursor: "pointer", transition: "width .2s", padding: 0 }}
             />
           ))}
         </div>
@@ -2971,17 +3053,17 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
       ? ` · ${conditionMatch === "all" ? "ALL" : "ANY"} of: ${conditions.map((c) => (c.type === "scroll" ? `scroll ≥ ${c.value ?? 40}%` : c.type === "delay" ? `${c.value ?? 3}s on page` : c.type === "device" ? String(c.value ?? "") : c.type)).join(", ")}`
       : "";
     return (
-      <div style={{ maxWidth: 460, margin: "0 auto", width: "100%", border: "1.5px dashed var(--ps-line-strong)", borderRadius: 16, padding: "30px 22px 24px", textAlign: "center", background: "var(--ps-panel-raised)", position: "relative" }}>
-        <div style={{ position: "absolute", top: 10, left: 14, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--ps-muted)" }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", width: "100%", border: `1.5px dashed ${WT.borderStrong}`, borderRadius: WT.radius, padding: "30px 22px 24px", textAlign: "center", background: WT.surfaceMuted, position: "relative" }}>
+         <div style={{ position: "absolute", top: 10, left: 14, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: WT.muted }}>
           Conditional popup · {trigger}{popupId ? ` · id: ${popupId}` : ""} · shows {frequency === "always" ? "every visit" : frequency === "once" ? "once ever" : "once per visit"}
         </div>
         {conditions.length ? (
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--ps-primary)", marginTop: 26 }}>{condSummary}</div>
+           <div style={{ fontSize: 10.5, fontWeight: 700, color: WT.primary, marginTop: 26 }}>{condSummary}</div>
         ) : null}
-        {heading ? <div style={{ fontSize: 20, fontWeight: 800, color: "var(--ps-ink)", marginTop: conditions.length ? 6 : 14 }}>{heading}</div> : null}
-        {text ? <p style={{ fontSize: 13.5, color: "var(--ps-slate)", lineHeight: 1.6, margin: "8px 0 16px" }}>{text}</p> : null}
-        {showForm ? <div style={{ fontSize: 12, color: "var(--ps-muted)" }}>Embedded lead form renders here on the live page.</div> : null}
-        {!showForm && cta ? <span style={{ display: "inline-flex", background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 13, padding: "11px 22px", borderRadius: 10 }}>{cta}</span> : null}
+         {heading ? <div style={{ fontSize: 20, fontWeight: 800, color: WT.ink, marginTop: conditions.length ? 6 : 14 }}>{heading}</div> : null}
+         {text ? <p style={{ fontSize: 13.5, color: WT.slate, lineHeight: 1.6, margin: "8px 0 16px" }}>{text}</p> : null}
+         {showForm ? <div style={{ fontSize: 12, color: WT.muted }}>Embedded lead form renders here on the live page.</div> : null}
+         {!showForm && cta ? <span style={{ display: "inline-flex", background: st.accent || WT.primary, color: "#fff", fontWeight: 700, fontSize: 13, padding: "11px 22px", borderRadius: WT.radiusSm }}>{cta}</span> : null}
       </div>
     );
   }
@@ -2989,34 +3071,34 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
   if (!open) return null;
   return (
     <div onClick={dismiss} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(8,10,20,.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} className="ps-fade-in" style={{ position: "relative", width: showForm ? 480 : 440, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto", background: "#fff", borderRadius: 18, padding: device === "mobile" ? "34px 22px 30px" : "40px 34px", textAlign: "center", boxShadow: "0 30px 80px rgba(8,10,20,.4)" }}>
-        <button type="button" aria-label="Close" onClick={dismiss} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", border: "none", background: "#f1f4f9", color: "var(--ps-slate)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+      <div onClick={(e) => e.stopPropagation()} className="ps-fade-in" style={{ ...wtCard({ width: showForm ? 480 : 440, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto", padding: device === "mobile" ? "34px 22px 30px" : "40px 34px", textAlign: "center", borderRadius: 20, boxShadow: "0 30px 80px rgba(8,10,20,.4)" }) }}>
+         <button type="button" aria-label="Close" onClick={dismiss} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", border: "none", background: WT.surfaceMuted, color: WT.slate, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
           <X size={16} />
         </button>
         {formDone ? (
           <>
-            <span style={{ width: 58, height: 58, borderRadius: "50%", background: "var(--ps-success-soft, #dcfce7)", color: "#16a34a", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+             <span style={{ width: 58, height: 58, borderRadius: "50%", background: WT.successSoft, color: WT.success, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
               <CheckCircle2 size={28} />
             </span>
-            <div style={{ fontSize: 20, fontWeight: 800, color: "var(--ps-ink)" }}>{String(st.successMessage || "Thanks! We'll be in touch shortly.")}</div>
+             <div style={{ fontSize: 20, fontWeight: 800, color: WT.ink }}>{String(st.successMessage || "Thanks! We'll be in touch shortly.")}</div>
           </>
         ) : (
           <>
-            {heading ? <div style={{ fontSize: 24, fontWeight: 800, color: "var(--ps-ink)", letterSpacing: -0.4 }}>{heading}</div> : null}
-            {text ? <p style={{ fontSize: 14, color: "var(--ps-slate)", lineHeight: 1.65, margin: "10px 0 22px" }}>{text}</p> : null}
+             {heading ? <div style={{ fontSize: 24, fontWeight: 800, color: WT.ink, letterSpacing: -0.4 }}>{heading}</div> : null}
+             {text ? <p style={{ fontSize: 14, color: WT.slate, lineHeight: 1.65, margin: "10px 0 22px" }}>{text}</p> : null}
             {showForm ? (
               <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 11 }}>
                 {popupFields.map((f, i) => (
                   <div key={f.id || f.label || i}>
                     {f.type !== "checkbox" ? (
-                      <label style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", marginBottom: 5, display: "block" }}>
+                      <label style={{ fontSize: 11.5, fontWeight: 700, color: WT.slate, marginBottom: 5, display: "block" }}>
                         {f.label} {f.required !== false ? "*" : ""}
                       </label>
                     ) : null}
                     {f.type === "textarea" ? (
                       <textarea className="ps-input" placeholder={f.placeholder} value={values[f.label] ?? ""} onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))} style={{ minHeight: 74, padding: "11px 12px" }} />
                     ) : f.type === "checkbox" ? (
-                      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "var(--ps-slate)" }}>
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: WT.slate }}>
                         <input type="checkbox" checked={(values[f.label] ?? "") === "yes"} onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.checked ? "yes" : ""))} />
                         {f.label}
                       </label>
@@ -3032,8 +3114,8 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                     )}
                   </div>
                 ))}
-                {formError ? <div style={{ padding: "9px 12px", borderRadius: 10, background: "var(--ps-danger-soft, #fee2e2)", color: "#dc2626", fontSize: 12.5, fontWeight: 600 }}> {formError}</div> : null}
-                <button type="button" onClick={submitPopupForm} style={{ marginTop: 4, padding: "13px", border: "none", borderRadius: 11, background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", boxShadow: "0 10px 26px rgba(109,93,252,.35)" }}>
+                 {formError ? <div style={{ padding: "9px 12px", borderRadius: 10, background: WT.dangerSoft, color: WT.danger, fontSize: 12.5, fontWeight: 600 }}> {formError}</div> : null}
+                 <button type="button" onClick={submitPopupForm} style={{ ...wtButton({ accent: st.accent }), marginTop: 4, padding: "13px 20px", borderRadius: WT.radiusSm, cursor: "pointer" }}>
                   {String(st.formButton || "Submit")}
                 </button>
               </div>
@@ -3044,7 +3126,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                   anchorNav(link, live).onClick(e);
                   dismiss();
                 }}
-                style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, background: "var(--ps-grad-primary)", color: "#fff", fontWeight: 700, fontSize: 14, padding: "13px 28px", borderRadius: 11, textDecoration: "none", boxShadow: "0 10px 26px rgba(109,93,252,.35)" }}
+                 style={{ ...wtButton({ accent: st.accent }), padding: "13px 28px", borderRadius: WT.radiusSm, textDecoration: "none" }}
               >
                 {cta} <ArrowRight size={15} />
               </a>
@@ -3070,20 +3152,20 @@ function VideoGallerySection({ s, device }: { s: SectionInstance; device: Device
   const T = typoCss(s, device);
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
-      {heading ? <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center", ...T }}>{heading}</h2> : null}
-      {text ? <p style={{ fontSize: 14.5, color: "var(--ps-slate)", textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7, ...T }}>{String(resolveVars(text))}</p> : null}
-      <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, marginTop: 22 }}>
-        {videos.map((v, i) => {
-          const clickable = live && !!v.url;
-          return (
-            <div
-              key={i}
-              onClick={clickable ? (e) => { e.stopPropagation(); setActive(i); } : undefined}
-              style={{ borderRadius: 14, overflow: "hidden", border: "1px solid var(--ps-line)", position: "relative", aspectRatio: "16/9", cursor: clickable ? "pointer" : "default" }}
-            >
+       {heading ? <h2 style={{ ...wtSectionTitle(), textAlign: "center", letterSpacing: -0.4, ...T }}>{heading}</h2> : null}
+       {text ? <p style={{ fontSize: 14.5, color: WT.slate, textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7, ...T }}>{String(resolveVars(text))}</p> : null}
+       <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, marginTop: 22 }}>
+         {videos.map((v, i) => {
+           const clickable = live && !!v.url;
+           return (
+             <div
+               key={i}
+               onClick={clickable ? (e) => { e.stopPropagation(); setActive(i); } : undefined}
+               style={{ borderRadius: WT.radiusSm, overflow: "hidden", border: WT.border, position: "relative", aspectRatio: "16/9", cursor: clickable ? "pointer" : "default" }}
+             >
               <SceneImage art="tour" />
               <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, color: "#fff", background: "rgba(8,10,20,.28)" }}>
-                <span style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(255,255,255,.18)", border: "1.5px solid rgba(255,255,255,.4)", display: "inline-flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)" }}>
+                 <span style={{ ...wtIconBadgeGlass(52) }}>
                   <Play size={22} style={{ marginLeft: 3 }} />
                 </span>
                 <span style={{ fontWeight: 700, fontSize: 13 }}>{v.title || `Video ${i + 1}`}</span>
@@ -3124,9 +3206,9 @@ function DownloadsSection({ s, device }: { s: SectionInstance; device: Device })
   const T = typoCss(s, device);
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", width: "100%" }}>
-      {heading ? <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center", ...T }}>{heading}</h2> : null}
-      {text ? <p style={{ fontSize: 14.5, color: "var(--ps-slate)", textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7, ...T }}>{String(resolveVars(text))}</p> : null}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 22 }}>
+      {heading ? <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 22 : 28, letterSpacing: -0.4, textAlign: "center", ...T }}>{heading}</h2> : null}
+      {text ? <p style={{ ...wtSectionLede(), textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7, ...T }}>{String(resolveVars(text))}</p> : null}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 22 }}>
         {files.map((f, i) => {
           const name = f.name || f.title || `File ${i + 1}`;
           const url = String(f.url ?? "");
@@ -3143,12 +3225,15 @@ function DownloadsSection({ s, device }: { s: SectionInstance; device: Device })
                 }
                 if (pageId) bumpTracking(pageId, "brochure");
               }}
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", border: "1px solid var(--ps-line)", borderRadius: 12, textDecoration: "none", background: "#fff", cursor: active ? "pointer" : "default" }}
+              style={{ ...wtCardMuted({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", gap: 12, borderRadius: WT.radius }), textDecoration: "none", cursor: active ? "pointer" : "default" }}
             >
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 10, fontWeight: 700, fontSize: 13, color: "var(--ps-ink)" }}>
-                <FileText size={16} style={{ color: "var(--ps-primary)" }} /> {name}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 12, fontWeight: 700, fontSize: 13, color: WT.ink }}>
+                <span style={{ ...wtIconBadge({ size: 36 }) }}>
+                  <FileText size={16} style={{ color: WT.primary }} />
+                </span>
+                {name}
               </span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "var(--ps-primary)" }}>
+              <span style={{ ...wtButton({ accent: st.accent }), ...(active ? {} : { background: WT.surfaceMuted, color: WT.muted, boxShadow: "none", borderColor: "transparent", cursor: "default" }) }}>
                 <Download size={14} /> Download
               </span>
             </a>
@@ -3179,12 +3264,12 @@ function BrochureSection({ s, device }: { s: SectionInstance; device: Device }) 
         { label: "Email Address", type: "email", required: false },
       ];
   return (
-    <div style={{ maxWidth: 640, margin: "0 auto", width: "100%", textAlign: "center", border: "1px solid var(--ps-line)", borderRadius: 18, padding: device === "mobile" ? "26px 20px" : "36px 32px", background: "#fff", boxShadow: "var(--ps-shadow-sm)" }}>
-      <span style={{ width: 54, height: 54, borderRadius: 14, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+    <div style={{ maxWidth: 640, margin: "0 auto", width: "100%", textAlign: "center", ...wtCard({ padding: device === "mobile" ? "26px 20px" : "36px 32px" }) }}>
+      <span style={{ ...wtIconBadge({ size: 54 }), marginBottom: 14 }}>
         <FileText size={26} />
       </span>
-      <div style={{ fontSize: device === "mobile" ? 20 : 22, fontWeight: 800, color: "var(--ps-ink)", ...typoCss(s, device) }}>{heading}</div>
-      {text ? <p style={{ fontSize: 14, color: "var(--ps-slate)", lineHeight: 1.65, margin: "10px auto 20px", maxWidth: 440 }}>{text}</p> : <div style={{ height: 18 }} />}
+      <div style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 20 : 22, ...typoCss(s, device) }}>{heading}</div>
+      {text ? <p style={{ ...wtSectionLede(), lineHeight: 1.65, margin: "10px auto 20px", maxWidth: 440 }}>{text}</p> : <div style={{ height: 18 }} />}
       {gateEnabled && !popupId ? (
         <button
           type="button"
@@ -3192,7 +3277,7 @@ function BrochureSection({ s, device }: { s: SectionInstance; device: Device }) 
             if (!active) return;
             setGateOpen(true);
           }}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, background: active ? "var(--ps-grad-primary)" : "#e5e7eb", color: active ? "#fff" : "var(--ps-muted)", fontWeight: 700, fontSize: 14, padding: "13px 28px", borderRadius: 11, border: "none", boxShadow: active ? "0 10px 26px rgba(109,93,252,.35)" : "none", cursor: active ? "pointer" : "not-allowed" }}
+          style={{ ...wtButton({ accent: st.accent }), ...(active ? {} : { background: WT.surfaceMuted, color: WT.muted, boxShadow: "none", borderColor: "transparent", cursor: "not-allowed" }) }}
         >
           <Download size={16} /> {btnLabel}
         </button>
@@ -3211,12 +3296,12 @@ function BrochureSection({ s, device }: { s: SectionInstance; device: Device }) 
             downloadFile(file);
             if (pageId) bumpTracking(pageId, "brochure");
           }}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, background: active ? "var(--ps-grad-primary)" : "#e5e7eb", color: active ? "#fff" : "var(--ps-muted)", fontWeight: 700, fontSize: 14, padding: "13px 28px", borderRadius: 11, textDecoration: "none", boxShadow: active ? "0 10px 26px rgba(109,93,252,.35)" : "none", cursor: active ? "pointer" : "not-allowed" }}
+          style={{ ...wtButton({ accent: st.accent }), textDecoration: "none", ...(active ? {} : { background: WT.surfaceMuted, color: WT.muted, boxShadow: "none", borderColor: "transparent", cursor: "not-allowed" }) }}
         >
           <Download size={16} /> {btnLabel}
         </a>
       )}
-      {!active ? <div style={{ fontSize: 11.5, color: "var(--ps-muted)", marginTop: 12 }}>Set a brochure file in Content to enable downloads.</div> : null}
+      {!active ? <div style={{ fontSize: 11.5, color: WT.muted, marginTop: 12 }}>Set a brochure file in Content to enable downloads.</div> : null}
       {gateEnabled && !popupId ? (
         <GatedDownloadModal
           open={gateOpen}
@@ -3251,19 +3336,19 @@ function CatalogSection({ s, device }: { s: SectionInstance; device: Device }) {
   const T = typoCss(s, device);
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
-      <h2 style={{ fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, color: "var(--ps-ink)", textAlign: "center", ...T }}>{heading}</h2>
-      {text ? <p style={{ fontSize: 14.5, color: "var(--ps-slate)", textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7, ...T }}>{String(resolveVars(text))}</p> : null}
+      <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 22 : 28, letterSpacing: -0.4, textAlign: "center", ...T }}>{heading}</h2>
+      {text ? <p style={{ ...wtSectionLede(), textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7, ...T }}>{String(resolveVars(text))}</p> : null}
       {tabs.length ? (
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 22 }}>
           {tabs.map((t, i) => (
-            <span key={t} style={{ padding: "8px 16px", borderRadius: 999, fontSize: 12.5, fontWeight: 700, background: i === 0 ? "var(--ps-primary-soft)" : "#f1f4f9", color: i === 0 ? "var(--ps-primary)" : "var(--ps-slate)", border: "1px solid var(--ps-line)" }}>{t}</span>
+            <span key={t} style={i === 0 ? wtPill(hexToSoft(WT.primary, 0.12), WT.primary) : wtPill(WT.surfaceMuted, WT.slate)}>{t}</span>
           ))}
         </div>
       ) : null}
       {slides > 0 ? (
         <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : `repeat(${Math.min(slides, 3)},1fr)`, gap: 12, marginTop: 22 }}>
           {Array.from({ length: Math.min(slides, 6) }).map((_, i) => (
-            <div key={i} style={{ aspectRatio: "16/9", borderRadius: 14, overflow: "hidden", border: "1px solid var(--ps-line)" }}>
+            <div key={i} style={{ aspectRatio: "16/9", borderRadius: WT.radius, overflow: "hidden", border: WT.border }}>
               <SceneImage art={GALLERY_ART[i % GALLERY_ART.length]} />
             </div>
           ))}
@@ -3272,7 +3357,7 @@ function CatalogSection({ s, device }: { s: SectionInstance; device: Device }) {
       {videos.length ? (
         <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, marginTop: 22 }}>
           {videos.map((v, i) => (
-            <div key={i} style={{ borderRadius: 14, overflow: "hidden", border: "1px solid var(--ps-line)", position: "relative", aspectRatio: "16/9" }}>
+            <div key={i} style={{ borderRadius: WT.radius, overflow: "hidden", border: WT.border, position: "relative", aspectRatio: "16/9" }}>
               <SceneImage art="tour" />
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700 }}>{v.title || "Video"}</div>
             </div>
@@ -3280,40 +3365,41 @@ function CatalogSection({ s, device }: { s: SectionInstance; device: Device }) {
         </div>
       ) : null}
       {rows.length ? (
-        <div style={{ marginTop: 22, border: "1px solid var(--ps-line)", borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ marginTop: 22, ...wtCard({ padding: 0, overflow: "hidden", borderRadius: WT.radius }) }}>
           {rows.map((r, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "12px 16px", background: i % 2 ? "#f8fafc" : "#fff", borderTop: i ? "1px solid var(--ps-line)" : "none" }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-muted)" }}>{r.label}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-ink)" }}>{String(resolveVars(r.value ?? ""))}</span>
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "12px 16px", background: i % 2 ? WT.surfaceMuted : WT.surface, borderTop: i ? WT.border : "none" }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: WT.muted }}>{r.label}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: WT.ink }}>{String(resolveVars(r.value ?? ""))}</span>
             </div>
           ))}
         </div>
       ) : null}
       {files.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 22 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 22 }}>
           {files.map((f, i) => {
             const url = String(f.url ?? "").trim();
+            const active = live && !!url;
             return (
               <a
                 key={i}
-                href={live && url ? url : undefined}
-                download={live && url ? "" : undefined}
-                target={live && url ? "_blank" : undefined}
+                href={active ? url : undefined}
+                download={active ? "" : undefined}
+                target={active ? "_blank" : undefined}
                 rel="noopener noreferrer"
                 onClick={(e) => {
-                  if (!live || !url) {
+                  if (!active) {
                     e.preventDefault();
                     return;
                   }
                   if (pageIdCtx) bumpTracking(pageIdCtx, "brochure");
                 }}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", border: "1px solid var(--ps-line)", borderRadius: 12, textDecoration: "none", cursor: url ? "pointer" : "default", opacity: url ? 1 : 0.75 }}
+                style={{ ...wtCardMuted({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", gap: 12, borderRadius: WT.radius }), textDecoration: "none", cursor: active ? "pointer" : "default" }}
               >
-                <span style={{ fontWeight: 700, fontSize: 13 }}>{f.name || f.title || `File ${i + 1}`}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: url ? "var(--ps-primary)" : "var(--ps-muted)", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  {url ? (
+                <span style={{ fontWeight: 700, fontSize: 13, color: WT.ink }}>{f.name || f.title || `File ${i + 1}`}</span>
+                <span style={{ ...wtButton({ accent: st.accent }), ...(active ? {} : { background: WT.surfaceMuted, color: WT.muted, boxShadow: "none", borderColor: "transparent", cursor: "default" }) }}>
+                  {active ? (
                     <>
-                      Download <Download size={13} />
+                      <Download size={13} /> Download
                     </>
                   ) : (
                     "Set file URL in Settings"
@@ -3327,9 +3413,9 @@ function CatalogSection({ s, device }: { s: SectionInstance; device: Device }) {
       {items.length ? (
         <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "1fr 1fr" : "repeat(3,1fr)", gap: 14, marginTop: 22 }}>
           {items.map((it, i) => (
-            <div key={i} className="ps-card" style={{ padding: 18, borderRadius: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", ...T }}>{it.title ?? it.name ?? it.label ?? it.value ?? `Item ${i + 1}`}</div>
-              {it.text || it.body || it.meta ? <div style={{ fontSize: 12.5, color: "var(--ps-slate)", marginTop: 5, lineHeight: 1.6, ...T }}>{it.text ?? it.body ?? it.meta}</div> : null}
+            <div key={i} className="ps-card" style={{ ...wtCard({ padding: 18 }) }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: WT.ink, ...T }}>{it.title ?? it.name ?? it.label ?? it.value ?? `Item ${i + 1}`}</div>
+              {it.text || it.body || it.meta ? <div style={{ fontSize: 12.5, color: WT.slate, marginTop: 5, lineHeight: 1.6, ...T }}>{it.text ?? it.body ?? it.meta}</div> : null}
             </div>
           ))}
         </div>
@@ -3417,6 +3503,8 @@ function SectionBody({ s, device }: { s: SectionInstance; device: Device }) {
       return <SpacerSection s={s} />;
     case "divider":
       return <DividerSection s={s} />;
+    case "emi-calculator":
+      return <EmiCalculator s={s} device={device} />;
     case "contact":
       return <ContactSection s={s} device={device} />;
     case "property-details":

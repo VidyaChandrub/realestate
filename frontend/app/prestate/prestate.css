@@ -1,12 +1,12 @@
 .ps-app {
-  --ps-primary: #6d5dfc;
-  --ps-primary-dark: #5a4be0;
-  --ps-primary-soft: rgba(109, 93, 252, 0.14);
-  --ps-primary-mist: rgba(109, 93, 252, 0.08);
-  --ps-primary-glow: rgba(109, 93, 252, 0.32);
-  --ps-secondary: #c9a56a;
-  --ps-secondary-soft: rgba(201, 165, 106, 0.12);
-  --ps-secondary-dark: #c9a56a;
+  --ps-primary: #4f46e5;
+  --ps-primary-dark: #4338ca;
+  --ps-primary-soft: rgba(79, 70, 229, 0.14);
+  --ps-primary-mist: rgba(79, 70, 229, 0.08);
+  --ps-primary-glow: rgba(79, 70, 229, 0.32);
+  --ps-secondary: #b8893b;
+  --ps-secondary-soft: rgba(184, 137, 59, 0.14);
+  --ps-secondary-dark: #b8893b;
   --ps-ink: #f4f1ea;
   --ps-slate: #c4c8d4;
   --ps-muted: #8b92a5;
@@ -22,16 +22,16 @@
   --ps-warn-soft: rgba(251, 191, 36, 0.12);
   --ps-danger: #f87171;
   --ps-danger-soft: rgba(248, 113, 113, 0.12);
-  --ps-radius: 12px;
-  --ps-radius-sm: 9px;
-  --ps-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.2);
+  --ps-radius: 14px;
+  --ps-radius-sm: 11px;
+  --ps-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.18);
   --ps-shadow-md: 0 4px 18px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
   --ps-shadow-lg: 0 18px 46px rgba(0, 0, 0, 0.45);
-  --ps-grad-primary: linear-gradient(135deg, #7a6bff 0%, #5a4be0 55%, #4a3ec9 100%);
-  --ps-grad-brand: linear-gradient(135deg, #6d5dfc 0%, #c9a56a 100%);
+  --ps-grad-primary: linear-gradient(135deg, #5b54e6 0%, #4f46e5 55%, #322e9e 100%);
+  --ps-grad-brand: linear-gradient(135deg, #4f46e5 0%, #b8893b 100%);
   --ps-canvas-bg: #080a10;
   --ps-canvas-ink: #0a0c10;
-  --ps-gold: #c9a56a;
+  --ps-gold: #b8893b;
 
   min-height: 100vh;
   font-family: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;

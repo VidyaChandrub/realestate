@@ -131,6 +131,18 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   // synchronously, so this has to be state read at call time, not a fetch).
   const [allPages, setAllPages] = useState<LandingPageData[]>([]);
 
+  const [hasUnsaved, setHasUnsaved] = useState(false);
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasUnsaved) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsaved]);
+
   useEffect(() => {
     let cancelled = false;
     const id = searchParams.get("id");
@@ -251,13 +263,15 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   // whatever it actually decided, not guess ahead of it.
   const saveInBackground = useCallback(
     (next: LandingPageData) => {
+      setHasUnsaved(true);
       void saveTemplate(next, resource)
         .then((saved) => {
           setActivePage((cur) =>
             cur && cur.id === saved.id ? { ...cur, status: saved.status, updated: saved.updated, updatedAt: saved.updatedAt } : cur,
           );
+          setHasUnsaved(false);
         })
-        .catch(() => toast("Couldn't save — check your connection"));
+        .catch(() => { setHasUnsaved(false); toast("Couldn't save — check your connection"); });
     },
     [toast, resource],
   );

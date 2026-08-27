@@ -43,10 +43,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     grp: "Website",
     items: [
-      // { href: "/org/websites", icon: "globe", label: "Websites", tip: "Websites" },
       { href: "/org/landing-pages", icon: "document", label: "Landing Pages", tip: "Landing Pages" },
       { href: "/org/templates", icon: "puzzle", label: "Templates", tip: "Templates" },
-      // { href: "/org/integrations", icon: "link", label: "Integrations", tip: "Integrations" },
+      { href: "/org/domains", icon: "globe", label: "Domains & DNS", tip: "Domains & DNS" },
     ],
   },
   {
@@ -81,6 +80,7 @@ const CRUMB_MAP: Record<string, string> = {
   "/org/websites": "Websites",
   "/org/landing-pages": "Landing Pages",
   "/org/templates": "Templates",
+  "/org/domains": "Domains & DNS",
   "/org/integrations": "Integrations",
   "/org/sales-agents": "Sales Agents",
   "/org/teams": "Teams",
