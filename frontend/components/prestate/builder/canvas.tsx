@@ -5,6 +5,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronUp,
   Copy,
   Download,
   Eye,
@@ -34,6 +35,7 @@ import {
   Upload,
   X,
   FileText,
+  Plus,
 } from "lucide-react";
 import { Lightbox } from "yet-another-react-lightbox";
 import { Captions, Counter, Zoom, Fullscreen, Download as LightboxDownload } from "yet-another-react-lightbox/plugins";
@@ -1219,6 +1221,65 @@ function FloorPlansSection({ s, device }: { s: SectionInstance; device: Device }
   const requestLink = String(st.requestLink ?? "#lead-form");
   const requestPopupId = String(st.requestPopupId ?? "").trim();
   const T = typoCss(s, device);
+  const design = String(st.design ?? "cards");
+
+  const handleCta = (e: React.MouseEvent) => {
+    if (!live) { e.preventDefault(); return; }
+    if (requestPopupId) { e.preventDefault(); openPopupById(requestPopupId); return; }
+    anchorNav(requestLink, live).onClick(e);
+  };
+
+  // Card Grid — new default layout requested by user
+  if (design === "cards") {
+    return (
+      <>
+        <Inner section={s}>
+          <Eyebrow>{String(st.eyebrow)}</Eyebrow>
+          <h2 style={{ ...wtSectionTitle(), fontSize: device === "mobile" ? 26 : 34, margin: "14px 0 8px", ...T }}>{String(st.heading)}</h2>
+          <p style={{ ...wtSectionLede(), maxWidth: 600, ...T }}>{String(st.text)}</p>
+        </Inner>
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "repeat(2,1fr)" : "repeat(3,1fr)", gap: 20, marginTop: 30, width: "100%" }}>
+          {plans.map((p) => (
+            <div key={p.name} style={{ ...wtCard({ padding: 0 }), overflow: "hidden", display: "flex", flexDirection: "column", textAlign: "left" }}>
+              <div style={{ position: "relative", height: 200, overflow: "hidden", background: WT.surfaceMuted }}>
+                <SceneImage art="plan" beds={p.beds} />
+                <span style={{ position: "absolute", top: 12, left: 12, background: WT.ink, color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: 0.6, padding: "5px 10px", borderRadius: 999 }}>{p.beds} BHK</span>
+                <span style={{ position: "absolute", top: 12, right: 12, background: "rgba(255,255,255,.92)", color: WT.ink, fontSize: 11, fontWeight: 800, padding: "5px 10px", borderRadius: 999, border: `1px solid ${WT.border}` }}>{p.area}</span>
+              </div>
+              <div style={{ padding: "18px 18px 16px", display: "flex", flexDirection: "column", flex: 1, gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: WT.ink, ...T }}>{p.name}</div>
+                  <div style={{ fontSize: 12.5, color: WT.muted, marginTop: 3 }}>Vastu-compliant · Ready for site visit</div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {[
+                    { label: "Area", value: p.area },
+                    { label: "Beds", value: `${p.beds} BHK` },
+                    { label: "Price", value: p.price },
+                    { label: "Possession", value: "Dec 2027" },
+                  ].map((f) => (
+                    <div key={f.label} style={{ background: WT.surfaceMuted, borderRadius: 10, padding: "10px 11px" }}>
+                      <div style={{ fontSize: 10, color: WT.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: WT.ink, marginTop: 2 }}>{f.value}</div>
+                    </div>
+                  ))}
+                </div>
+                <a {...anchorNav(requestLink, live)} onClick={handleCta} style={{ ...wtButton({ accent: st.accent }), width: "100%", justifyContent: "center", marginTop: "auto" }}>
+                  Request {p.name} Details <ArrowRight size={14} />
+                </a>
+              </div>
+            </div>
+          ))}
+          {plans.length === 0 ? (
+            <div style={{ gridColumn: "1 / -1", padding: 40, textAlign: "center", border: `1.5px dashed ${WT.borderStrong}`, borderRadius: 16, color: WT.muted, fontSize: 13 }}>No plans yet — add items in Settings → Content</div>
+          ) : null}
+        </div>
+        {String(st.note ?? "").trim() ? <div style={{ textAlign: "center", fontSize: 12.5, color: WT.muted, marginTop: 22 }}>{String(st.note)}</div> : null}
+      </>
+    );
+  }
+
+  // Tabs Premium — legacy layout kept for existing pages
   return (
     <>
       <Inner section={s}>
@@ -1268,22 +1329,7 @@ function FloorPlansSection({ s, device }: { s: SectionInstance; device: Device }
                    </div>
                  ))}
                </div>
-               <a
-                 {...anchorNav(requestLink, live)}
-                 onClick={(e) => {
-                   if (!live) {
-                     e.preventDefault();
-                     return;
-                   }
-                   if (requestPopupId) {
-                     e.preventDefault();
-                     openPopupById(requestPopupId);
-                     return;
-                   }
-                   anchorNav(requestLink, live).onClick(e);
-                 }}
-                 style={{ ...wtButton({ accent: st.accent }) }}
-               >
+               <a {...anchorNav(requestLink, live)} onClick={handleCta} style={{ ...wtButton({ accent: st.accent }) }}>
                  Request {plan.name} Details <ArrowRight size={14} />
                </a>
             </div>
@@ -3570,6 +3616,8 @@ function SectionWrap({
   onToggleLock,
   onSaveTemplate,
   onMakeGlobal,
+  onMoveUp,
+  onMoveDown,
   children,
 }: {
   s: SectionInstance;
@@ -3592,6 +3640,8 @@ function SectionWrap({
   onToggleLock: () => void;
   onSaveTemplate: () => void;
   onMakeGlobal: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   children?: ReactNode;
 }) {
   const [dropPos, setDropPos] = useState<"before" | "after" | "inside" | null>(null);
@@ -3682,45 +3732,50 @@ function SectionWrap({
             {hidden ? <span style={{ background: "#e5484d", color: "#fff", fontSize: 9, fontWeight: 800, padding: "2px 7px", borderRadius: 5 }}>HIDDEN</span> : null}
           </div>
 
-          {/* chrome toolbar */}
+          {/* chrome toolbar — consistent: drag · index · up/down · edit · duplicate · hide · delete */}
           <div
             className="ps-sec-toolbar"
             data-selected={selected ? "true" : "false"}
             style={{
               position: "absolute",
-              top: -16,
+              top: -14,
               right: 10,
               zIndex: 60,
               display: "flex",
               alignItems: "center",
-              gap: 1,
+              gap: 2,
               borderRadius: 9,
-              padding: 2,
+              padding: 3,
               opacity: selected ? 1 : 0,
               transition: "opacity .15s",
+              boxShadow: selected ? "0 6px 18px rgba(0,0,0,.2)" : undefined,
             }}
           >
-            <span style={{ color: selected ? "#fff" : "var(--ps-muted)", display: "inline-flex", cursor: "grab", padding: "3px 5px" }} title="Drag to reorder">
-              <GripVertical size={13} />
+            <span style={{ color: selected ? "#fff" : "var(--ps-muted)", display: "inline-flex", cursor: "grab", padding: "3px 5px", background: selected ? "rgba(255,255,255,.18)" : "transparent", borderRadius: 6 }} title="Drag to reorder — also in Layers panel">
+              <GripVertical size={12} />
             </span>
             <span style={{ fontSize: 9.5, fontWeight: 800, color: selected ? "#fff" : "var(--ps-muted)", padding: "0 4px", letterSpacing: 0.4 }}>{index + 1}/{total}</span>
-            <ChromeBtn selected={selected} title="Duplicate" onClick={onDuplicate}>
-              <Copy size={13} />
+            <ChromeBtn selected={selected} title="Move up" onClick={onMoveUp}>
+              <ChevronUp size={12} />
+            </ChromeBtn>
+            <ChromeBtn selected={selected} title="Move down" onClick={onMoveDown}>
+              <ChevronDown size={12} />
+            </ChromeBtn>
+            <span style={{ width: 1, height: 14, background: selected ? "rgba(255,255,255,.2)" : "var(--ps-line)", margin: "0 2px" }} />
+            <ChromeBtn selected={selected} title="Edit section — also click to select" onClick={onSelect}>
+              <SquareStack size={12} />
+            </ChromeBtn>
+            <ChromeBtn selected={selected} title="Duplicate — creates copy right below" onClick={onDuplicate}>
+              <Copy size={12} />
             </ChromeBtn>
             <ChromeBtn selected={selected} title="Save as template" onClick={onSaveTemplate}>
-              <Save size={13} />
+              <Save size={12} />
             </ChromeBtn>
-            <ChromeBtn selected={selected} title={s.global ? "Unglobal" : "Make global section"} onClick={onMakeGlobal}>
-              <Globe size={13} />
+            <ChromeBtn selected={selected} title={hidden ? "Show" : "Hide from visitors"} onClick={onToggleHidden}>
+              {hidden ? <Eye size={12} /> : <EyeOff size={12} />}
             </ChromeBtn>
-            <ChromeBtn selected={selected} title={hidden ? "Show" : "Hide"} onClick={onToggleHidden}>
-              {hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-            </ChromeBtn>
-            <ChromeBtn selected={selected} title={locked ? "Unlock" : "Lock"} onClick={onToggleLock}>
-              {locked ? <Lock size={13} /> : <LockOpen size={13} />}
-            </ChromeBtn>
-            <ChromeBtn selected={selected} danger title="Delete" onClick={onDelete}>
-              <Trash2 size={13} />
+            <ChromeBtn selected={selected} danger title="Delete section" onClick={onDelete}>
+              <Trash2 size={12} />
             </ChromeBtn>
           </div>
         </>
@@ -3895,6 +3950,7 @@ export function Canvas({
   design,
   onSaveSectionTemplate,
   resolveWidget,
+  onAddAt,
 }: {
   sections: SectionInstance[];
   selectedId: string | null;
@@ -3914,6 +3970,8 @@ export function Canvas({
   onSaveSectionTemplate?: (node: SectionInstance) => void;
   /** Resolve non-library widget ids (e.g. saved templates "saved:<id>"). */
   resolveWidget?: (id: string) => SectionInstance | null;
+  /** Insert new section at index — used by between-section + buttons */
+  onAddAt?: (index: number) => void;
 }) {
   const [dragOverBg, setDragOverBg] = useState(false);
   const width = live ? "100%" : device === "desktop" ? 1280 : device === "tablet" ? 768 : 390;
@@ -3930,6 +3988,21 @@ export function Canvas({
     mutate((prev) => {
       const next = reorderSection(prev, fromId, toId, after);
       return next ?? prev;
+    });
+  };
+
+  const handleMoveUp = (id: string) => {
+    mutate((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx <= 0) return prev;
+      return reorderSection(prev, id, prev[idx - 1].id, false) ?? prev;
+    });
+  };
+  const handleMoveDown = (id: string) => {
+    mutate((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      return reorderSection(prev, id, prev[idx + 1].id, true) ?? prev;
     });
   };
 
@@ -3955,6 +4028,29 @@ export function Canvas({
       const next = ref ? insertChild(prev, ref.parentId, node, ref.index + (after ? 1 : 0)) : insertChild(prev, null, node);
       setTimeout(() => onSelect(node.id), 30);
       return next;
+    });
+  };
+
+  const handleWidgetDropAt = (widgetId: string, index: number) => {
+    mutate((prev) => {
+      const copy = widgetFromId(widgetId);
+      if (!copy) return prev;
+      const node = { ...copy, id: newSectionId() };
+      const next = insertChild(prev, null, node, index);
+      setTimeout(() => onSelect(node.id), 30);
+      return next;
+    });
+  };
+
+  const handleSectionDropAt = (fromId: string, index: number) => {
+    mutate((prev) => {
+      const idx = prev.findIndex((s) => s.id === fromId);
+      if (idx < 0) return prev;
+      // Remove then reinsert at target index (adjust for removal shift)
+      const { list, removed } = removeSection(prev, fromId);
+      if (!removed) return prev;
+      const target = index > idx ? index - 1 : index;
+      return insertChild(list, null, removed, target);
     });
   };
 
@@ -4053,6 +4149,8 @@ export function Canvas({
         else onSelect("__template_" + s.id);
       },
       onMakeGlobal: () => mutate((prev) => toggleSectionFlag(prev, s.id, "global")),
+      onMoveUp: () => handleMoveUp(s.id),
+      onMoveDown: () => handleMoveDown(s.id),
     };
     return (
       <SectionWrap key={s.id} s={s} {...common}>
@@ -4259,7 +4357,15 @@ export function Canvas({
                 </div>
               </div>
             ) : (
-              content.map((s, i) => renderItem(s, i, content.length))
+              <>
+                {content.map((s, i) => (
+                  <div key={s.id}>
+                    <SectionAddStrip index={i} onAdd={onAddAt} onDropWidget={handleWidgetDropAt} onDropSection={handleSectionDropAt} />
+                    {renderItem(s, i, content.length)}
+                  </div>
+                ))}
+                <SectionAddStrip index={content.length} onAdd={onAddAt} onDropWidget={handleWidgetDropAt} onDropSection={handleSectionDropAt} />
+              </>
             )}
 
             {!live ? (
@@ -4392,6 +4498,62 @@ function NestedDropZone({ empty, onNest }: { empty: boolean; onNest: (fromId: st
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
         <span style={{ fontSize: 15, lineHeight: 1 }}>＋</span> Drop widget or section here
       </span>
+    </div>
+  );
+}
+
+function SectionAddStrip({ index, onAdd, onDropWidget, onDropSection }: { index: number; onAdd?: (idx: number) => void; onDropWidget: (wid: string, idx: number) => void; onDropSection: (fromId: string, idx: number) => void }) {
+  const [over, setOver] = useState(false);
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setOver(true); }}
+      onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(false); }}
+      onDrop={(e) => {
+        e.preventDefault(); e.stopPropagation(); setOver(false);
+        const wid = readWidgetId(e);
+        if (wid) { onDropWidget(wid, index); return; }
+        const fromId = e.dataTransfer.getData("text/x-prestate-section");
+        if (fromId) onDropSection(fromId, index);
+      }}
+      style={{
+        height: over ? 44 : 18,
+        margin: "2px 0",
+        borderRadius: 9,
+        border: over ? "1.5px dashed var(--ps-primary)" : "1px dashed transparent",
+        background: over ? "var(--ps-primary-mist)" : "transparent",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        transition: "all .12s",
+        cursor: onAdd ? "pointer" : "default",
+      }}
+      className="ps-insert-strip"
+      onClick={() => onAdd?.(index)}
+      title={onAdd ? `Add section at position ${index + 1}` : undefined}
+    >
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 11,
+          fontWeight: 800,
+          color: over ? "var(--ps-primary)" : "var(--ps-muted)",
+          background: over ? "#fff" : "var(--ps-bg)",
+          border: over ? "1px solid var(--ps-primary)" : "1px solid var(--ps-line)",
+          borderRadius: 999,
+          padding: "4px 10px",
+          boxShadow: over ? "0 2px 10px rgba(109,93,252,.2)" : "none",
+          opacity: over ? 1 : 0,
+          transform: over ? "scale(1)" : "scale(0.95)",
+          transition: "all .12s",
+        }}
+        className="ps-insert-label"
+      >
+        <Plus size={11} /> Add section here · {index + 1}
+      </span>
+      <style>{`.ps-insert-strip:hover .ps-insert-label { opacity: 1 !important; transform: scale(1) !important; } .ps-insert-strip:hover { background: var(--ps-primary-mist); border-color: var(--ps-line-strong); height: 28px !important; }`}</style>
     </div>
   );
 }

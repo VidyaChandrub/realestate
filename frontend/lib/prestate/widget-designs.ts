@@ -39,8 +39,8 @@ export const REAL_ESTATE_DESIGNS: Record<string, WidgetDesignMeta[]> = {
     { id: "feature", name: "Feature + List", desc: "Large feature + side list" },
   ],
   floorplans: [
+    { id: "cards", name: "Card Grid", desc: "2-3 col cards · image top, specs & CTA" },
     { id: "tabs", name: "Tabs Premium", desc: "Pill tabs + side details + image" },
-    { id: "cards", name: "Cards", desc: "3-col plan cards" },
   ],
   "master-plan": [
     { id: "image", name: "Image Focus", desc: "Large image, text overlay subtle" },

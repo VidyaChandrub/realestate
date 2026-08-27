@@ -194,23 +194,9 @@ export default function OrgLandingPagesPage() {
     }
   }
 
-  // Read-only content preview — reuses the exact same "fetch the full
-  // record, render it read-only in Canvas inside a modal" mechanism as the
-  // Preview button on /org/templates. This is NOT the live public URL:
-  // public serving of published pages doesn't exist yet (no subdomains).
-  // Once it does, a "View live site" link belongs here alongside this.
+  // View opens the landing page alone in a new tab — no dashboard shell.
   function openView(id: string) {
-    if (!accessToken) return;
-    setViewId(id);
-    setViewData(null);
-    setViewError(null);
-    setViewLoading(true);
-    apiFetch<LandingPageDetail>(`/org/landing-pages/${id}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then(setViewData)
-      .catch((err) => setViewError(err instanceof Error ? err.message : "Failed to load preview."))
-      .finally(() => setViewLoading(false));
+    window.open(`/preview/${encodeURIComponent(id)}`, "_blank", "noopener,noreferrer");
   }
   function closeView() {
     setViewId(null);

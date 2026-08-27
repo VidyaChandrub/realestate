@@ -7,10 +7,12 @@ import {
   AlignRight,
   Box,
   ChevronDown,
+  ChevronUp,
   Code2,
   Copy,
   Eye,
   EyeOff,
+  GripVertical,
   LayoutPanelTop,
   Monitor,
   Move,
@@ -28,7 +30,7 @@ import { SLUG_ICONS } from "@/lib/prestate/data";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import { FIELD_LOGIC_OPS } from "@/lib/prestate/form-logic";
 import type { FieldLogicOp, FormLeadField } from "@/lib/prestate/types";
-import { GitBranch, Copy as CopyIcon, ChevronDown as ChevronDownIcon, ChevronUp } from "lucide-react";
+import { GitBranch, Copy as CopyIcon, ChevronDown as ChevronDownIcon } from "lucide-react";
 import { loadFormLibrary, saveFormLibrary } from "@/lib/prestate/forms-store";
 import type { FormDefinition } from "@/lib/prestate/forms-store";
 import { FOOTER_DESIGNS, HEADER_DESIGNS } from "@/lib/prestate/chrome-presets";
@@ -332,35 +334,70 @@ function ContentField({
 }
 
 function StringList({ value, onChange, media }: { value: string[]; onChange: (v: string[]) => void; media?: boolean }) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const move = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...value];
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m);
+    onChange(next);
+  };
   return (
     <div>
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, color: "var(--ps-muted)", textTransform: "uppercase", marginBottom: 6 }}>Items · {value.length} · drag to reorder</div>
       {value.map((item, i) => (
-        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: media ? "flex-start" : "center" }}>
+        <div
+          key={i}
+          draggable
+          onDragStart={() => setDragIndex(i)}
+          onDragEnd={() => setDragIndex(null)}
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDrop={() => { if (dragIndex != null) move(dragIndex, i); setDragIndex(null); }}
+          style={{ display: "flex", gap: 6, marginBottom: 7, alignItems: media ? "flex-start" : "center", padding: 6, borderRadius: 9, border: dragIndex === i ? "1.5px dashed var(--ps-primary)" : "1px solid var(--ps-line)", background: dragIndex === i ? "var(--ps-primary-mist)" : "var(--ps-bg)", opacity: dragIndex === i ? 0.6 : 1 }}
+        >
+          <span title="Drag to reorder" style={{ color: "var(--ps-muted)", display: "inline-flex", cursor: "grab", padding: "6px 2px", flexShrink: 0 }}>
+            <GripVertical size={12} />
+          </span>
+          <span style={{ width: 18, height: 18, borderRadius: 6, background: "var(--ps-panel-raised)", color: "var(--ps-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{i + 1}</span>
           {media ? (
             <div style={{ flex: 1, minWidth: 0 }}>
               <MediaPicker kind="image" compact value={item} onChange={(v) => onChange(value.map((x, j) => (j === i ? v : x)))} />
             </div>
           ) : (
-            <TextField value={item} onChange={(v) => onChange(value.map((x, j) => (j === i ? v : x)))} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <TextField value={item} onChange={(v) => onChange(value.map((x, j) => (j === i ? v : x)))} />
+            </div>
           )}
-          <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} style={{ background: "var(--ps-danger-soft)", color: "var(--ps-danger)", border: "none", borderRadius: 9, padding: "0 10px", cursor: "pointer" }}>
-            <X size={14} />
+          <button type="button" title="Move up" disabled={i === 0} onClick={() => move(i, i - 1)} style={{ background: "none", border: "none", color: i === 0 ? "var(--ps-line-strong)" : "var(--ps-muted)", cursor: i === 0 ? "not-allowed" : "pointer", padding: 4, display: "inline-flex" }}>
+            <ChevronUp size={12} />
+          </button>
+          <button type="button" title="Move down" disabled={i === value.length - 1} onClick={() => move(i, i + 1)} style={{ background: "none", border: "none", color: i === value.length - 1 ? "var(--ps-line-strong)" : "var(--ps-muted)", cursor: i === value.length - 1 ? "not-allowed" : "pointer", padding: 4, display: "inline-flex" }}>
+            <ChevronDown size={12} />
+          </button>
+          <button type="button" title="Duplicate" onClick={() => { const next = [...value]; next.splice(i + 1, 0, item); onChange(next); }} style={{ background: "var(--ps-bg)", color: "var(--ps-muted)", border: "1px solid var(--ps-line)", borderRadius: 7, padding: "0 6px", cursor: "pointer", display: "inline-flex", alignItems: "center", height: 28 }}>
+            <Copy size={12} />
+          </button>
+          <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} style={{ background: "var(--ps-danger-soft)", color: "var(--ps-danger)", border: "none", borderRadius: 7, padding: "0 7px", cursor: "pointer", display: "inline-flex", alignItems: "center", height: 28 }}>
+            <X size={12} />
           </button>
         </div>
       ))}
       <button
         type="button"
         onClick={() => onChange([...value, ""])}
-        style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "7px", borderRadius: 9, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+        style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", borderRadius: 9, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 800, cursor: "pointer", marginTop: 4 }}
       >
-        <Plus size={13} /> Add item
+        <Plus size={13} /> Add item — {value.length + 1}
       </button>
+      <div style={{ fontSize: 10.5, color: "var(--ps-muted)", marginTop: 6, textAlign: "center" }}>Unlimited · drag handle to reorder · duplicate keeps content</div>
     </div>
   );
 }
 
 function ObjectList({ label, fieldKey, widgetType, value, onChange, seedKeys }: { label: string; fieldKey?: string; widgetType?: string; value: Record<string, unknown>[]; onChange: (v: Record<string, unknown>[]) => void; seedKeys?: string[] }) {
   const [open, setOpen] = useState<number | null>(0);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
   let keys = Object.keys(value[0] ?? {});
   if (!keys.length && seedKeys?.length) keys = seedKeys;
   if (!keys.length && widgetType && fieldKey && WIDGET_OBJECT_SEEDS[widgetType]?.[fieldKey]) keys = WIDGET_OBJECT_SEEDS[widgetType][fieldKey];
@@ -370,25 +407,75 @@ function ObjectList({ label, fieldKey, widgetType, value, onChange, seedKeys }: 
   }
   if (!keys.length) keys = ["title"];
   const titleKey = keys.find((k) => ["title", "name", "label", "value", "q", "heading"].includes(k)) ?? keys[0];
+
+  const move = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...value];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onChange(next);
+    if (open === from) setOpen(to);
+    else if (open != null && ((from < open && to >= open) || (from > open && to <= open))) {
+      setOpen(open + (from < open ? -1 : 1));
+    }
+  };
+
   return (
     <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, color: "var(--ps-muted)", textTransform: "uppercase" }}>{label} · {value.length}</span>
+        <span style={{ fontSize: 10, color: "var(--ps-muted)" }}>Page → Section → {label}</span>
+      </div>
       {value.map((item, i) => {
         const title = String(item[titleKey] ?? `${label} ${i + 1}`);
+        const isOpen = open === i;
+        const isDragging = dragIndex === i;
+        const isDropTarget = dropIndex === i;
         return (
-          <div key={i} style={{ border: open === i ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line)", borderRadius: 11, marginBottom: 7, background: "var(--ps-panel-raised)", overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: open === i ? "var(--ps-primary-mist)" : "var(--ps-bg)" }}>
-              <button type="button" onClick={() => setOpen(open === i ? null : i)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div
+            key={i}
+            draggable={!isOpen}
+            onDragStart={(e) => { setDragIndex(i); e.dataTransfer.effectAllowed = "move"; }}
+            onDragEnd={() => { setDragIndex(null); setDropIndex(null); }}
+            onDragOver={(e) => { e.preventDefault(); if (dragIndex != null && dragIndex !== i) setDropIndex(i); }}
+            onDrop={(e) => { e.preventDefault(); if (dragIndex != null) move(dragIndex, i); setDragIndex(null); setDropIndex(null); }}
+            style={{
+              border: isOpen ? "1.5px solid var(--ps-primary)" : isDropTarget ? "1.5px dashed var(--ps-primary)" : "1px solid var(--ps-line)",
+              borderRadius: 11,
+              marginBottom: 7,
+              background: isOpen ? "var(--ps-panel-raised)" : isDragging ? "rgba(109,93,252,0.06)" : "var(--ps-panel-raised)",
+              overflow: "hidden",
+              opacity: isDragging ? 0.5 : 1,
+              boxShadow: isOpen ? "0 0 0 3px rgba(109,93,252,0.12)" : isDropTarget ? "0 0 0 3px var(--ps-primary-mist)" : undefined,
+              transition: "all .12s",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 10px", background: isOpen ? "var(--ps-primary-mist)" : "var(--ps-bg)", cursor: isOpen ? "default" : "grab" }}>
+              <span title="Drag to reorder" style={{ color: "var(--ps-muted)", display: "inline-flex", cursor: "grab", padding: 2, opacity: isOpen ? 0.35 : 1 }} onMouseDown={(e) => e.stopPropagation()}>
+                <GripVertical size={12} />
+              </span>
+              <span style={{ width: 18, height: 18, borderRadius: 6, background: isOpen ? "var(--ps-primary)" : "var(--ps-panel-raised)", color: isOpen ? "#fff" : "var(--ps-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>{i + 1}</span>
+              <button type="button" onClick={() => setOpen(isOpen ? null : i)} style={{ flex: 1, textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 12.5, fontWeight: 700, color: isOpen ? "var(--ps-primary)" : "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {title}
               </button>
-              <button type="button" title="Duplicate" onClick={() => { const next = [...value]; next.splice(i + 1, 0, { ...item }); onChange(next); }} style={{ background: "none", border: "none", color: "var(--ps-muted)", cursor: "pointer", padding: 2, display: "inline-flex" }}>
-                <Copy size={13} />
-              </button>
-              <button type="button" title="Delete" onClick={() => onChange(value.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: "#e5484d", cursor: "pointer", padding: 2, display: "inline-flex" }}>
-                <Trash2 size={13} />
-              </button>
+              <span style={{ display: "inline-flex", gap: 2, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                <button type="button" title="Move up" disabled={i === 0} onClick={() => move(i, i - 1)} style={{ background: "none", border: "none", color: i === 0 ? "var(--ps-line-strong)" : "var(--ps-muted)", cursor: i === 0 ? "not-allowed" : "pointer", padding: 2, display: "inline-flex" }}>
+                  <ChevronUp size={12} />
+                </button>
+                <button type="button" title="Move down" disabled={i === value.length - 1} onClick={() => move(i, i + 1)} style={{ background: "none", border: "none", color: i === value.length - 1 ? "var(--ps-line-strong)" : "var(--ps-muted)", cursor: i === value.length - 1 ? "not-allowed" : "pointer", padding: 2, display: "inline-flex" }}>
+                  <ChevronDown size={12} />
+                </button>
+                <button type="button" title="Duplicate" onClick={() => { const next = [...value]; next.splice(i + 1, 0, { ...item }); onChange(next); setOpen(i + 1); }} style={{ background: "none", border: "none", color: "var(--ps-muted)", cursor: "pointer", padding: 2, display: "inline-flex" }}>
+                  <Copy size={12} />
+                </button>
+                <button type="button" title="Delete" onClick={() => onChange(value.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: "#e5484d", cursor: "pointer", padding: 2, display: "inline-flex" }}>
+                  <Trash2 size={12} />
+                </button>
+              </span>
             </div>
-            {open === i ? (
-              <div style={{ padding: "10px 12px 12px", borderTop: "1px solid var(--ps-line)" }}>
+            <div style={{ fontSize: 10, color: isOpen ? "var(--ps-primary)" : "var(--ps-muted)", padding: isOpen ? "0 10px 6px" : "0 10px 0", fontWeight: 600 }}>{isOpen ? "Editing — changes save automatically" : `Item ${i + 1} · drag to reorder · click to edit`}</div>
+            {isOpen ? (
+              <div style={{ padding: "8px 12px 12px", borderTop: "1px solid var(--ps-line)", background: "var(--ps-panel-raised)" }}>
                 {keys.map((k) => (
                   <ContentField key={k} fieldKey={k} widgetType={widgetType} label={k} value={item[k]} onChange={(v) => onChange(value.map((x, j) => (j === i ? { ...x, [k]: v } : x)))} />
                 ))}
@@ -403,11 +490,13 @@ function ObjectList({ label, fieldKey, widgetType, value, onChange, seedKeys }: 
           const empty: Record<string, unknown> = {};
           for (const k of keys) empty[k] = "";
           onChange([...value, empty]);
+          setOpen(value.length);
         }}
-        style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "7px", borderRadius: 9, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+        style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px", borderRadius: 9, border: "1px dashed var(--ps-primary)", background: "var(--ps-primary-mist)", color: "var(--ps-primary)", fontSize: 12, fontWeight: 800, cursor: "pointer", marginTop: 4 }}
       >
-        <Plus size={13} /> Add {label.toLowerCase()}
+        <Plus size={13} /> Add {label} — item {value.length + 1}
       </button>
+      <div style={{ fontSize: 10.5, color: "var(--ps-muted)", marginTop: 6, lineHeight: 1.5, textAlign: "center" }}>Unlimited items · drag to reorder · duplicate keeps content</div>
     </div>
   );
 }

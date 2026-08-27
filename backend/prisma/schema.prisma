@@ -557,11 +557,13 @@ model TrackingEvent {
   organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
   landingPage  LandingPage  @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
 
-  @@index([orgId])
+   @@index([orgId])
   @@index([landingPageId])
   @@index([eventType])
   @@map("tracking_events")
   @@schema("templates")
+}
+
 // projects — real-estate developments, their unit-type product mix, and the
 // individual unit inventory beneath each type.
 //   org 1─* projects 1─* unit_types 1─* units
