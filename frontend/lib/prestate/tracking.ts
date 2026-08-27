@@ -58,7 +58,9 @@ export function buildTrackingSnippet(t: SiteConfig["tracking"]): string {
 
 export function buildUtmUrl(page: LandingPageData, t: SiteConfig["tracking"]): string {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const url = new URL(`${origin}${localPreviewPath(page)}`);
+  const isLandingPage = page.kind === "custom" || (page.pageType === "landing" && page.id.includes("-"));
+  const path = isLandingPage && page.id ? `/preview/${encodeURIComponent(page.id)}` : localPreviewPath(page);
+  const url = new URL(`${origin}${path}`);
   if (t.utmSource.trim()) url.searchParams.set("utm_source", t.utmSource.trim());
   if (t.utmMedium.trim()) url.searchParams.set("utm_medium", t.utmMedium.trim());
   if (t.utmCampaign.trim()) url.searchParams.set("utm_campaign", t.utmCampaign.trim());

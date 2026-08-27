@@ -13,52 +13,70 @@
 import type { CSSProperties } from "react";
 
 export const WT = {
-  // Radii
+  // Radii — consistent, premium
   radius: 16,
   radiusSm: 12,
   radiusXs: 10,
+  radiusLg: 20,
+  radiusXl: 24,
   radiusPill: 999,
 
-  // Surfaces (light, premium)
+  // Surfaces — light, premium, real-estate trust
   surface: "#ffffff",
   surfaceMuted: "#f7f8fb",
   surfaceTint: "#f3f5fb",
+  surfaceElevated: "#ffffff",
+  // Lines / borders — subtle, consistent
+  border: "1px solid rgba(16,24,40,.08)",
+  borderStrong: "1px solid rgba(16,24,40,.12)",
+  borderFaint: "1px solid rgba(16,24,40,.05)",
+  borderHover: "1px solid rgba(79,70,229,.18)",
 
-  // Lines / borders
-  border: "1px solid rgba(16,24,40,.09)",
-  borderStrong: "1px solid rgba(16,24,40,.14)",
-  borderFaint: "1px solid rgba(16,24,40,.06)",
-
-  // Text
+  // Text — hierarchy
   ink: "#0f172a",
+  inkSoft: "#1e293b",
   slate: "#475569",
   muted: "#94a3b8",
+  faint: "#cbd5e1",
 
-  // Brand accents — one primary + one warm secondary for real-estate trust
+  // Brand — primary indigo + warm gold for trust + premium
   primary: "#4f46e5",
   primaryHover: "#4338ca",
-  primarySoft: "rgba(79,70,229,.12)",
-  primarySoft2: "rgba(79,70,229,.07)",
-  gold: "#b8893b",
-  goldSoft: "rgba(184,137,59,.14)",
-  goldSoft2: "rgba(184,137,59,.08)",
+  primarySoft: "rgba(79,70,229,.10)",
+  primarySoft2: "rgba(79,70,229,.06)",
+  primaryGlow: "rgba(79,70,229,.22)",
+  gold: "#c4a46a",
+  goldHover: "#b8893b",
+  goldSoft: "rgba(196,164,106,.12)",
+  goldSoft2: "rgba(196,164,106,.07)",
 
   // Status
-  success: "#15a34a",
-  successSoft: "rgba(21,163,74,.12)",
-  warn: "#b45309",
-  warnSoft: "rgba(180,83,9,.12)",
+  success: "#0f9d58",
+  successSoft: "rgba(15,157,88,.10)",
+  warn: "#d97706",
+  warnSoft: "rgba(217,119,6,.10)",
   danger: "#dc2626",
-  dangerSoft: "rgba(220,38,38,.10)",
+  dangerSoft: "rgba(220,38,38,.08)",
 
-  // Shadows — soft, layered, modern
-  shadow: "0 1px 2px rgba(16,24,40,.04), 0 12px 30px rgba(16,24,40,.08)",
-  shadowSm: "0 1px 2px rgba(16,24,40,.05), 0 4px 14px rgba(16,24,40,.06)",
-  shadowMd: "0 2px 6px rgba(16,24,40,.06), 0 18px 44px rgba(16,24,40,.10)",
-
-  // Typography stacks
+  // Shadows — soft, premium, layered
+  shadow: "0 1px 3px rgba(16,24,40,.04), 0 8px 24px rgba(16,24,40,.06)",
+  shadowSm: "0 1px 2px rgba(16,24,40,.04), 0 4px 12px rgba(16,24,40,.05)",
+  shadowMd: "0 4px 12px rgba(16,24,40,.05), 0 16px 32px rgba(16,24,40,.08)",
+  shadowLg: "0 8px 24px rgba(16,24,40,.06), 0 24px 48px rgba(16,24,40,.10)",
+  shadowHover: "0 8px 24px rgba(16,24,40,.08), 0 16px 40px rgba(16,24,40,.12)",
+  // Typography stacks — premium
   font: 'var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
   serif: 'var(--font-playfair), "Playfair Display", Georgia, "Times New Roman", serif',
+  mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  // Spacing — consistent scale
+  spaceXs: 8,
+  spaceSm: 12,
+  spaceMd: 20,
+  spaceLg: 32,
+  spaceXl: 48,
+  // Animation
+  transition: "all .2s cubic-bezier(.4,0,.2,1)",
+  transitionSlow: "all .3s cubic-bezier(.4,0,.2,1)",
 } as const;
 
 type AccentOpts = { accent?: string; gold?: boolean };
@@ -119,6 +137,46 @@ export function wtCardGlass(extra?: CSSProperties): CSSProperties {
     boxShadow: "0 12px 34px rgba(8,10,20,.30)",
     backdropFilter: "blur(12px)",
     WebkitBackdropFilter: "blur(12px)",
+    ...extra,
+  };
+}
+
+/** Premium elevated card with hover lift — conversion focused. */
+export function wtCardPremium(extra?: CSSProperties): CSSProperties {
+  return {
+    background: WT.surface,
+    border: WT.border,
+    borderRadius: WT.radiusLg,
+    boxShadow: WT.shadowMd,
+    transition: WT.transition,
+    ...extra,
+  };
+}
+
+export function wtCardHover(): CSSProperties {
+  return {
+    transform: "translateY(-2px)",
+    boxShadow: WT.shadowHover,
+    border: WT.borderHover,
+  };
+}
+
+/** Image treatment — consistent radius + shadow */
+export function wtImage(extra?: CSSProperties): CSSProperties {
+  return {
+    borderRadius: WT.radius,
+    overflow: "hidden",
+    boxShadow: WT.shadowSm,
+    ...extra,
+  };
+}
+
+/** Premium section wrapper — generous whitespace, max-width */
+export function wtSection(extra?: CSSProperties): CSSProperties {
+  return {
+    maxWidth: 1200,
+    margin: "0 auto",
+    padding: "0 24px",
     ...extra,
   };
 }

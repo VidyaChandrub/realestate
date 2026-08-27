@@ -693,6 +693,7 @@ export function SettingsPanel({
               <FormWidgetConditionalEditor section={section} onChange={set} page={page} onPatchConfig={onPatchConfig} />
             ) : null}
             {section.type !== "lead-form" && Object.entries(section.settings)
+              .filter(([key]) => key !== "eyebrow")
               .filter(([key]) => !(section.type === "text" && (key === "text" || key === "html")))
               .filter(([key]) => !(section.type === "popup" && POPUP_MANAGED_KEYS.includes(key)))
               .filter(([key]) => !(section.type === "html" && key === "code"))

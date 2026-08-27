@@ -49,33 +49,7 @@ export const PAGE_TEMPLATES: TemplateData[] = [
     accent2: "#0b1220",
     thumbnail: "hero",
     description:
-      "Builder-standard launch page — hero classic, overview, highlights, amenities, gallery, floor plans (card grid), pricing, location, testimonials, enquiry and brochure. Clean alternating sections, fully editable in the new Layers navigator.",
-  },
-  {
-    id: "tpl-lead",
-    name: "Lead Magnet Standard",
-    category: "Lead",
-    icon: "Rocket",
-    pages: 18,
-    conversions: "16.2%",
-    accent: "#2563eb",
-    accent2: "#0ea5e9",
-    thumbnail: "tour",
-    description:
-      "Lead-focused standard — split hero with trust chips, key benefits, founders pricing, lookbook, location and offer countdown. Built entirely from standard widgets with card-grid floorplans.",
-  },
-  {
-    id: "tpl-luxe",
-    name: "Luxe Minimal Standard",
-    category: "Luxury",
-    icon: "Crown",
-    pages: 16,
-    conversions: "12.8%",
-    accent: "#171310",
-    accent2: "#d4af6a",
-    thumbnail: "skyline",
-    description:
-      "Luxury minimal standard — centered hero, minimal stats, property details, gallery, card-grid floor plans, builder profile and concierge. Minimal styling, maximum editability.",
+      "Builder-standard premium launch page — hero classic, overview, highlights, amenities, gallery, floor plans (card grid), pricing, location, testimonials, enquiry and brochure. Single premium template, fully editable in the new Builder with Layers navigator.",
   },
 ];
 

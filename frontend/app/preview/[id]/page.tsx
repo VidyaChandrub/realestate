@@ -6,7 +6,11 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Canvas } from "@/components/prestate/builder/canvas";
 import type { LandingPageRow } from "@/lib/types";
+import type { LandingPageData } from "@/lib/prestate/types";
 import type { SectionInstance, SiteConfig } from "@/lib/prestate/types";
+import { applyDocumentSeo } from "@/lib/prestate/seo";
+import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
+import { bumpTracking } from "@/lib/prestate/tracking";
 import "@/app/prestate/prestate.css";
 
 interface LandingPageDetail extends LandingPageRow {
@@ -34,6 +38,30 @@ export default function PreviewLandingPage() {
       .finally(() => setLoading(false));
   }, [id, accessToken]);
 
+  // Apply SEO per individual landing page — document title/meta/OG/canonical
+  useEffect(() => {
+    if (!data) return;
+    const pageForSeo: LandingPageData = {
+      id: data.id,
+      name: data.name,
+      slug: data.slug,
+      status: data.status as LandingPageData["status"],
+      template: "",
+      domain: "",
+      views: "—",
+      conversions: "—",
+      updated: "",
+      updatedAt: data.updatedAt,
+      thumbnail: data.thumbnail ?? "",
+      sections: data.content.sections,
+      config: data.content.config,
+      kind: "custom",
+      pageType: "landing",
+    };
+    applyDocumentSeo(pageForSeo);
+    bumpTracking(data.id, "view");
+  }, [data]);
+
   if (loading) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f4f5f8", color: "var(--muted, #64748b)" }}>
@@ -59,6 +87,7 @@ export default function PreviewLandingPage() {
   }
 
   // Render ONLY the landing page — no dashboard shell, no extra header.
+  // SEO and Tracking are per-page via data.content.config
   return (
     <div className="ps-app" style={{ minHeight: "100vh", background: "#fff" }}>
       <Canvas
@@ -82,6 +111,7 @@ export default function PreviewLandingPage() {
         onSelect={() => {}}
         onMutate={() => {}}
       />
+      <PrestateTrackingScripts tracking={data.content.config.tracking} />
     </div>
   );
 }
