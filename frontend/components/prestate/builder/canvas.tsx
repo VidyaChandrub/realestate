@@ -42,9 +42,12 @@ import {
 import { Lightbox } from "yet-another-react-lightbox";
 import { Captions, Counter, Zoom, Fullscreen, Download as LightboxDownload } from "yet-another-react-lightbox/plugins";
 import "yet-another-react-lightbox/styles.css";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS as DndCSS } from "@dnd-kit/utilities";
 import type { Device, FormLeadField, SectionInstance, SiteConfig } from "@/lib/prestate/types";
 import { isFieldVisible, withFieldValue } from "@/lib/prestate/form-logic";
-import { PROPERTY, SLUG_ICONS, resolveVars, WIDGETS } from "@/lib/prestate/data";
+import { PROPERTY, SLUG_ICONS, resolveVars } from "@/lib/prestate/data";
 import { loadFormLibrary } from "@/lib/prestate/forms-store";
 import type { FontDef, TemplateTypography, TypeKey, TypeToken } from "@/lib/prestate/design-system";
 import { cssUrl, isMediaSrc } from "@/lib/media";
@@ -67,14 +70,10 @@ function hasText(v: unknown): boolean {
 }
 import {
   cloneTree,
-  dropColumnOn,
   duplicateSection,
   findParentNode,
   findSection,
-  insertChild,
-  isDescendant,
   isStructural,
-  newSectionId,
   patchSection,
   removeSection,
   reorderSection,
@@ -172,7 +171,6 @@ export function tokenForDevice(key: TypeKey, bundle: DesignBundle | null, device
   return resp.desktop;
 }
 import { SceneImage } from "@/components/prestate/art";
-import { isWidgetDrag, readWidgetId } from "./widgets-panel";
 
 // ---------------------------------------------------------------------------
 // section style → css
@@ -3912,9 +3910,6 @@ function SectionWrap({
   wrapStyle,
   resizable,
   onSelect,
-  onReorder,
-  onWidgetDrop,
-  onNest,
   onResizeColumn,
   onDuplicate,
   onDelete,
@@ -3936,9 +3931,6 @@ function SectionWrap({
   wrapStyle?: CSSProperties;
   resizable?: boolean;
   onSelect: () => void;
-  onReorder: (fromId: string, toId: string, after: boolean) => void;
-  onWidgetDrop: (widgetId: string, afterId?: string, after?: boolean) => void;
-  onNest: (fromId: string, isWidget: boolean) => void;
   onResizeColumn: (delta: number) => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -3950,7 +3942,11 @@ function SectionWrap({
   onMoveDown: () => void;
   children?: ReactNode;
 }) {
-  const [dropPos, setDropPos] = useState<"before" | "after" | "inside" | null>(null);
+  const { attributes: sortAttributes, listeners: sortListeners, setNodeRef: setSortRef, transform, transition, isDragging } = useSortable({
+    id: s.id,
+    data: { type: "section" },
+    disabled: !!readOnly,
+  });
   const live = useContext(SiteLiveContext);
   const hidden = s.hidden === true;
   const locked = s.locked === true;
@@ -3972,50 +3968,11 @@ function SectionWrap({
 
   return (
     <div
+      ref={setSortRef}
       className="ps-sec-holder"
       data-sec-id={s.id}
       data-selected={selected && !readOnly ? "true" : "false"}
       data-structural={structural ? "true" : "false"}
-      draggable={!readOnly}
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/x-prestate-section", s.id);
-        e.dataTransfer.effectAllowed = "move";
-      }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (readOnly) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-        if (structural && y > rect.height * 0.28 && y < rect.height * 0.72) setDropPos("inside");
-        else setDropPos(y < rect.height / 2 ? "before" : "after");
-      }}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropPos(null);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const pos = dropPos ?? "after";
-        setDropPos(null);
-        if (readOnly) return;
-        const widgetId = readWidgetId(e);
-        if (pos === "inside" && structural) {
-          if (widgetId) onNest(widgetId, true);
-          else {
-            const fromId = e.dataTransfer.getData("text/x-prestate-section");
-            if (fromId) onNest(fromId, false);
-          }
-          return;
-        }
-        if (widgetId) {
-          onWidgetDrop(widgetId, s.id, pos === "after");
-          return;
-        }
-        const fromId = e.dataTransfer.getData("text/x-prestate-section");
-        if (fromId && fromId !== s.id) onReorder(fromId, s.id, pos === "after");
-      }}
-      onDragEnd={() => setDropPos(null)}
       onClick={readOnly ? undefined : (e) => {
         e.stopPropagation();
         onSelect();
@@ -4025,6 +3982,10 @@ function SectionWrap({
         margin: readOnly ? 0 : "18px 0",
         borderRadius: 14,
         ...wrapStyle,
+        transform: DndCSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 40 : undefined,
       }}
     >
       {!readOnly ? (
@@ -4057,7 +4018,12 @@ function SectionWrap({
               boxShadow: selected ? "0 6px 18px rgba(0,0,0,.2)" : undefined,
             }}
           >
-            <span style={{ color: selected ? "#fff" : "var(--ps-muted)", display: "inline-flex", cursor: "grab", padding: "3px 5px", background: selected ? "rgba(255,255,255,.18)" : "transparent", borderRadius: 6 }} title="Drag to reorder — also in Layers panel">
+            <span
+              {...sortAttributes}
+              {...sortListeners}
+              style={{ color: selected ? "#fff" : "var(--ps-muted)", display: "inline-flex", cursor: "grab", padding: "3px 5px", background: selected ? "rgba(255,255,255,.18)" : "transparent", borderRadius: 6 }}
+              title="Drag to reorder — also in Layers panel"
+            >
               <GripVertical size={12} />
             </span>
             <span style={{ fontSize: 9.5, fontWeight: 800, color: selected ? "#fff" : "var(--ps-muted)", padding: "0 4px", letterSpacing: 0.4 }}>{index + 1}/{total}</span>
@@ -4109,39 +4075,6 @@ function SectionWrap({
 
       {/* column resize handle */}
       {resizable ? <ColumnResizeHandle onResize={onResizeColumn} /> : null}
-
-      {/* insertion indicator */}
-      {!readOnly && dropPos ? (
-        dropPos === "inside" ? (
-          <div
-            style={{
-              position: "absolute",
-              inset: -3,
-              borderRadius: 16,
-              border: "2px dashed var(--ps-primary)",
-              background: "rgba(109,93,252,.08)",
-              zIndex: 70,
-              pointerEvents: "none",
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              position: "absolute",
-              left: -6,
-              right: -6,
-              top: dropPos === "before" ? -10 : undefined,
-              bottom: dropPos === "after" ? -10 : undefined,
-              height: 4,
-              borderRadius: 999,
-              background: "var(--ps-primary)",
-              boxShadow: "0 0 0 3px var(--ps-primary-mist), 0 2px 8px rgba(109,93,252,.5)",
-              zIndex: 70,
-              pointerEvents: "none",
-            }}
-          />
-        )
-      ) : null}
 
       {/* hidden placeholder */}
       {hidden ? (
@@ -4255,7 +4188,6 @@ export function Canvas({
   pageId,
   design,
   onSaveSectionTemplate,
-  resolveWidget,
   onAddAt,
 }: {
   sections: SectionInstance[];
@@ -4274,12 +4206,9 @@ export function Canvas({
   design?: { css?: string; bundle?: DesignBundle | null };
   /** Toolbar "Save as template" — persists the section for reuse. */
   onSaveSectionTemplate?: (node: SectionInstance) => void;
-  /** Resolve non-library widget ids (e.g. saved templates "saved:<id>"). */
-  resolveWidget?: (id: string) => SectionInstance | null;
   /** Insert new section at index — used by between-section + buttons */
   onAddAt?: (index: number) => void;
 }) {
-  const [dragOverBg, setDragOverBg] = useState(false);
   const width = live ? "100%" : device === "desktop" ? 1280 : device === "tablet" ? 768 : 390;
 
   const mutate = (patch: (prev: SectionInstance[]) => SectionInstance[]) => onMutate(patch);
@@ -4289,13 +4218,6 @@ export function Canvas({
     const el = document.querySelector(`[data-sec-id="${CSS.escape(selectedId)}"]`);
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [selectedId, readOnly]);
-
-  const handleReorder = (fromId: string, toId: string, after: boolean) => {
-    mutate((prev) => {
-      const next = reorderSection(prev, fromId, toId, after);
-      return next ?? prev;
-    });
-  };
 
   const handleMoveUp = (id: string) => {
     mutate((prev) => {
@@ -4309,80 +4231,6 @@ export function Canvas({
       const idx = prev.findIndex((s) => s.id === id);
       if (idx < 0 || idx >= prev.length - 1) return prev;
       return reorderSection(prev, id, prev[idx + 1].id, true) ?? prev;
-    });
-  };
-
-  /** Look up a widget factory by library id, falling back to saved templates. */
-  const widgetFromId = (id: string): SectionInstance | null => {
-    const def = WIDGETS.find((w) => w.id === id);
-    if (def) return def.make();
-    if (resolveWidget) return resolveWidget(id);
-    return null;
-  };
-
-  const handleWidgetDrop = (widgetId: string, afterId?: string, after = true) => {
-    mutate((prev) => {
-      if (widgetId === "column" && afterId) {
-        const placed = dropColumnOn(prev, afterId, false);
-        setTimeout(() => onSelect(placed.selectId), 30);
-        return placed.list;
-      }
-      const copy = widgetFromId(widgetId);
-      if (!copy) return prev;
-      const node = { ...copy, id: newSectionId() };
-      const ref = afterId ? findSection(prev, afterId) : null;
-      const next = ref ? insertChild(prev, ref.parentId, node, ref.index + (after ? 1 : 0)) : insertChild(prev, null, node);
-      setTimeout(() => onSelect(node.id), 30);
-      return next;
-    });
-  };
-
-  const handleWidgetDropAt = (widgetId: string, index: number) => {
-    mutate((prev) => {
-      const copy = widgetFromId(widgetId);
-      if (!copy) return prev;
-      const node = { ...copy, id: newSectionId() };
-      const next = insertChild(prev, null, node, index);
-      setTimeout(() => onSelect(node.id), 30);
-      return next;
-    });
-  };
-
-  const handleSectionDropAt = (fromId: string, index: number) => {
-    mutate((prev) => {
-      const idx = prev.findIndex((s) => s.id === fromId);
-      if (idx < 0) return prev;
-      // Remove then reinsert at target index (adjust for removal shift)
-      const { list, removed } = removeSection(prev, fromId);
-      if (!removed) return prev;
-      const target = index > idx ? index - 1 : index;
-      return insertChild(list, null, removed, target);
-    });
-  };
-
-  // Drop a widget or existing section into the children of a structural node.
-  const nestFrom = (fromId: string, isWidget: boolean, targetId: string) => {
-    if (!isWidget) {
-      mutate((prev) => {
-        if (isDescendant(prev, targetId, fromId)) return prev;
-        const { list, removed } = removeSection(prev, fromId);
-        if (!removed) return prev;
-        return insertChild(list, targetId, removed);
-      });
-      return;
-    }
-    mutate((prev) => {
-      if (fromId === "column") {
-        const placed = dropColumnOn(prev, targetId, true);
-        setTimeout(() => onSelect(placed.selectId), 30);
-        return placed.list;
-      }
-      const copy = widgetFromId(fromId);
-      if (!copy) return prev;
-      const node = { ...copy, id: newSectionId() };
-      const next = insertChild(prev, targetId, node);
-      setTimeout(() => onSelect(node.id), 30);
-      return next;
     });
   };
 
@@ -4437,9 +4285,6 @@ export function Canvas({
       resizable,
       selected: selectedId === s.id,
       onSelect: () => onSelect(s.id),
-      onReorder: handleReorder,
-      onWidgetDrop: handleWidgetDrop,
-      onNest: (fromId: string, isWidget: boolean) => nestFrom(fromId, isWidget, s.id),
       onResizeColumn: (delta: number) => handleResizeColumn(s.id, delta),
       onDuplicate: () =>
         mutate((prev) => {
@@ -4501,7 +4346,7 @@ export function Canvas({
           })}
           {!readOnly ? (
             <div style={{ gridColumn: "1 / -1" }}>
-              <NestedDropZone empty={kids.length === 0} onNest={(fromId, isWidget) => nestFrom(fromId, isWidget, s.id)} />
+              <NestedDropZone empty={kids.length === 0} id={s.id} />
             </div>
           ) : null}
         </div>
@@ -4523,7 +4368,7 @@ export function Canvas({
           {kids.map((child, i) => renderItem(child, i, kids.length, { minWidth: 0, width: "100%", boxSizing: "border-box" }))}
           {!readOnly ? (
             <div style={{ gridColumn: "1 / -1" }}>
-              <NestedDropZone empty={kids.length === 0} onNest={(fromId, isWidget) => nestFrom(fromId, isWidget, s.id)} />
+              <NestedDropZone empty={kids.length === 0} id={s.id} />
             </div>
           ) : null}
         </div>
@@ -4534,7 +4379,7 @@ export function Canvas({
     return (
       <div style={{ display: "flex", flexDirection: "column", gap, minWidth: 0, width: "100%" }}>
         {kids.map((child, i) => renderItem(child, i, kids.length, { minWidth: 0, width: "100%" }))}
-        {!readOnly ? <NestedDropZone key="__nested_drop" empty={kids.length === 0} onNest={(fromId, isWidget) => nestFrom(fromId, isWidget, s.id)} /> : null}
+        {!readOnly ? <NestedDropZone key="__nested_drop" empty={kids.length === 0} id={s.id} /> : null}
       </div>
     );
   };
@@ -4583,32 +4428,6 @@ export function Canvas({
             })
           : {}),
       }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = isWidgetDrag(e) ? "copy" : "move";
-        if (isWidgetDrag(e)) setDragOverBg(true);
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget === e.target) setDragOverBg(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragOverBg(false);
-        if (readOnly) return;
-        const widgetId = readWidgetId(e);
-        if (widgetId) {
-          handleWidgetDrop(widgetId);
-          return;
-        }
-        const fromId = e.dataTransfer.getData("text/x-prestate-section");
-        if (fromId) {
-          mutate((prev) => {
-            const { list, removed } = removeSection(prev, fromId);
-            if (!removed) return prev;
-            return insertChild(list, null, removed);
-          });
-        }
-      }}
     >
       {theme && googleFontsHref(theme.headingFont || "", theme.font) ? (
         <link rel="stylesheet" href={googleFontsHref(theme.headingFont || "", theme.font)} />
@@ -4626,7 +4445,7 @@ export function Canvas({
             borderRadius: live ? 0 : 18,
             overflow: "visible",
             boxShadow: live ? "none" : device === "desktop" ? "0 10px 50px rgba(17,24,39,.16)" : "0 30px 90px rgba(17,24,39,.4)",
-            outline: dragOverBg && !readOnly ? "3px dashed var(--ps-primary)" : "none",
+            outline: "none",
             outlineOffset: 4,
             position: "relative",
           }}
@@ -4667,25 +4486,16 @@ export function Canvas({
               <>
                 {content.map((s, i) => (
                   <div key={s.id}>
-                    <SectionAddStrip index={i} onAdd={onAddAt} onDropWidget={handleWidgetDropAt} onDropSection={handleSectionDropAt} />
+                    <SectionAddStrip index={i} onAdd={onAddAt} />
                     {renderItem(s, i, content.length)}
                   </div>
                 ))}
-                <SectionAddStrip index={content.length} onAdd={onAddAt} onDropWidget={handleWidgetDropAt} onDropSection={handleSectionDropAt} />
+                <SectionAddStrip index={content.length} onAdd={onAddAt} />
               </>
             )}
 
             {!live ? (
-              <DropZone
-                onWidgetDrop={(wid) => handleWidgetDrop(wid)}
-                onSectionDrop={(fromId) =>
-                  mutate((prev) => {
-                    const { list, removed } = removeSection(prev, fromId);
-                    if (!removed) return prev;
-                    return insertChild(list, null, removed);
-                  })
-                }
-              />
+              <DropZone index={content.length} />
             ) : null}
 
             <PageFooter
@@ -4710,47 +4520,22 @@ export function Canvas({
   );
 }
 
-function DropZone({
-  onWidgetDrop,
-  onSectionDrop,
-}: {
-  onWidgetDrop: (widgetId: string) => void;
-  onSectionDrop: (fromId: string) => void;
-}) {
-  const [over, setOver] = useState(false);
+function DropZone({ index }: { index: number }) {
+  const { setNodeRef, isOver } = useDroppable({ id: "strip-end", data: { type: "strip", index } });
   return (
     <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setOver(true);
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget === e.target) setOver(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setOver(false);
-        const widgetId = readWidgetId(e);
-        if (widgetId) {
-          onWidgetDrop(widgetId);
-          return;
-        }
-        const fromId = e.dataTransfer.getData("text/x-prestate-section");
-        if (fromId) onSectionDrop(fromId);
-      }}
+      ref={setNodeRef}
       style={{
         height: 46,
         margin: "10px 0",
         borderRadius: 12,
-        border: over ? "2px dashed var(--ps-primary)" : "2px dashed #c4c9d8",
-        background: over ? "var(--ps-primary-mist)" : "rgba(244,245,250,.6)",
+        border: isOver ? "2px dashed var(--ps-primary)" : "2px dashed #c4c9d8",
+        background: isOver ? "var(--ps-primary-mist)" : "rgba(244,245,250,.6)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         gap: 8,
-        color: over ? "var(--ps-primary)" : "var(--ps-muted)",
+        color: isOver ? "var(--ps-primary)" : "var(--ps-muted)",
         fontSize: 12,
         fontWeight: 700,
         transition: "border-color .12s, background .12s, color .12s",
@@ -4763,40 +4548,21 @@ function DropZone({
   );
 }
 
-function NestedDropZone({ empty, onNest }: { empty: boolean; onNest: (fromId: string, isWidget: boolean) => void }) {
-  const [over, setOver] = useState(false);
+function NestedDropZone({ id, empty }: { id: string; empty: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `container-${id}`, data: { type: "container", id } });
   return (
     <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setOver(true);
-      }}
-      onDragLeave={(e) => {
-        if (e.currentTarget === e.target) setOver(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setOver(false);
-        const widgetId = readWidgetId(e);
-        if (widgetId) {
-          onNest(widgetId, true);
-          return;
-        }
-        const fromId = e.dataTransfer.getData("text/x-prestate-section");
-        if (fromId) onNest(fromId, false);
-      }}
+      ref={setNodeRef}
       style={{
         height: empty ? 64 : 38,
         borderRadius: 11,
-        border: over ? "2px dashed var(--ps-primary)" : "2px dashed #c4c9d8",
-        background: over ? "var(--ps-primary-mist)" : "rgba(244,245,250,.6)",
+        border: isOver ? "2px dashed var(--ps-primary)" : "2px dashed #c4c9d8",
+        background: isOver ? "var(--ps-primary-mist)" : "rgba(244,245,250,.6)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         gap: 7,
-        color: over ? "var(--ps-primary)" : "var(--ps-muted)",
+        color: isOver ? "var(--ps-primary)" : "var(--ps-muted)",
         fontSize: empty ? 12.5 : 11.5,
         fontWeight: 700,
         transition: "border-color .12s, background .12s, color .12s",
@@ -4810,19 +4576,12 @@ function NestedDropZone({ empty, onNest }: { empty: boolean; onNest: (fromId: st
   );
 }
 
-function SectionAddStrip({ index, onAdd, onDropWidget, onDropSection }: { index: number; onAdd?: (idx: number) => void; onDropWidget: (wid: string, idx: number) => void; onDropSection: (fromId: string, idx: number) => void }) {
-  const [over, setOver] = useState(false);
+function SectionAddStrip({ index, onAdd }: { index: number; onAdd?: (idx: number) => void }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `strip-${index}`, data: { type: "strip", index } });
+  const over = isOver;
   return (
     <div
-      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setOver(true); }}
-      onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(false); }}
-      onDrop={(e) => {
-        e.preventDefault(); e.stopPropagation(); setOver(false);
-        const wid = readWidgetId(e);
-        if (wid) { onDropWidget(wid, index); return; }
-        const fromId = e.dataTransfer.getData("text/x-prestate-section");
-        if (fromId) onDropSection(fromId, index);
-      }}
+      ref={setNodeRef}
       style={{
         height: over ? 44 : 18,
         margin: "2px 0",

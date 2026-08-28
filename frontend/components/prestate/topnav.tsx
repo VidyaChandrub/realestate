@@ -112,7 +112,7 @@ export function TopNav({
   onNotify: () => void;
   onActivity: () => void;
   onHelp: () => void;
-  onMenu: () => void;
+  onMenu?: () => void;
   actions?: ReactNode;
   // The logged-in user, for the profile dropdown. Undefined/null renders a
   // "—" placeholder instead of guessing.
@@ -145,9 +145,11 @@ export function TopNav({
   return (
     <header className="ps-topnav ps-glass">
       {/* Logo */}
-      <button type="button" className="ps-nav-toggle" title="Modules" onClick={onMenu}>
-        <Menu size={18} />
-      </button>
+      {onMenu ? (
+        <button type="button" className="ps-nav-toggle" title="Modules" onClick={onMenu}>
+          <Menu size={18} />
+        </button>
+      ) : null}
       {homeHref ? (
         <Link href={homeHref} title="Back to pages" className="ps-topnav-icon-btn" style={iconBtn(true)}>
           <ArrowLeft size={16} />

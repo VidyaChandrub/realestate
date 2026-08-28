@@ -352,6 +352,37 @@
   background: var(--ps-gold);
 }
 
+/* ---- fixed bottom module bar ---- */
+.ps-bottombar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: #080a10;
+  border-top: 1px solid var(--ps-line);
+  overflow-x: auto;
+  overscroll-behavior: contain;
+}
+.ps-bb-item {
+  width: auto;
+  flex-shrink: 0;
+  height: 38px;
+  justify-content: center;
+}
+.ps-bb-item[data-active="true"]::before {
+  display: none;
+}
+.ps-bb-item[data-active="true"] {
+  background: rgba(109, 93, 252, 0.22);
+  color: var(--ps-primary);
+  box-shadow: inset 0 0 0 1px rgba(109, 93, 252, 0.4);
+}
+
 /* ---- widgets panel ---- */
 .ps-widgets {
   display: flex;
@@ -531,6 +562,7 @@
   flex: 1;
   overflow: auto;
   background: var(--ps-bg);
+  padding-bottom: 64px;
 }
 .ps-module-inner {
   max-width: 1280px;
