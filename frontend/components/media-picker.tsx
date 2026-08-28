@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Link2, Sparkles, Trash2, Upload } from "lucide-react";
 import { isMediaSrc, readMediaFile } from "@/lib/media";
+import { useBuilderImageUpload } from "@/components/prestate/builder/upload-context";
 
 export function MediaPicker({
   kind,
@@ -21,17 +22,35 @@ export function MediaPicker({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const uploadImage = useBuilderImageUpload();
   const src = value.trim();
   const showImg = isMediaSrc(src);
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
+    setError("");
+
+    // In the builder: upload straight to R2 and store the URL (no base64).
+    if (uploadImage) {
+      setUploading(true);
+      try {
+        const url = await uploadImage(file);
+        onChange(url);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+
+    // Fallback (no active page / outside a builder session): inline data URI.
     const result = await readMediaFile(file);
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    setError("");
     onChange(result.data);
   };
 
@@ -54,6 +73,7 @@ export function MediaPicker({
           type="button"
           title={kind === "icon" ? "Upload icon" : "Upload image"}
           onClick={() => inputRef.current?.click()}
+          disabled={uploading}
           style={{
             width: compact ? 40 : 56,
             height: compact ? 40 : 56,
@@ -63,14 +83,18 @@ export function MediaPicker({
             overflow: "hidden",
             flexShrink: 0,
             padding: 0,
-            cursor: "pointer",
+            cursor: uploading ? "default" : "pointer",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             color: "var(--ps-muted, #64748b)",
+            fontSize: 9,
+            fontWeight: 700,
           }}
         >
-          {showImg ? (
+          {uploading ? (
+            "…"
+          ) : showImg ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
           ) : (
@@ -82,6 +106,7 @@ export function MediaPicker({
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
+              disabled={uploading}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -93,10 +118,11 @@ export function MediaPicker({
                 color: "var(--ps-ink, #0f172a)",
                 fontSize: 11.5,
                 fontWeight: 700,
-                cursor: "pointer",
+                cursor: uploading ? "default" : "pointer",
+                opacity: uploading ? 0.6 : 1,
               }}
             >
-              <Upload size={12} /> Upload
+              <Upload size={12} /> {uploading ? "Uploading…" : "Upload"}
             </button>
             {src ? (
               <button

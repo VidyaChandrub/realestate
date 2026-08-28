@@ -6,7 +6,10 @@ export type UploadField =
   | 'floorPlan'
   | 'gallery'
   | 'brochure'
-  | 'video';
+  | 'video'
+  // Images placed into a template / landing-page's builder `content` JSON —
+  // replaces the old base64-data-URI-in-JSON approach that caused 413s.
+  | 'builderImage';
 
 export const UPLOAD_FIELDS: readonly UploadField[] = [
   'amenityIcon',
@@ -14,6 +17,7 @@ export const UPLOAD_FIELDS: readonly UploadField[] = [
   'gallery',
   'brochure',
   'video',
+  'builderImage',
 ] as const;
 
 export interface FieldRule {
@@ -60,11 +64,18 @@ export const FIELD_RULES: Record<UploadField, FieldRule> = {
     maxBytes: 100 * MB,
     label: 'video',
   },
+  builderImage: {
+    mimeTypes: [...IMAGE_MIMES, 'image/svg+xml'],
+    maxBytes: 5 * MB,
+    label: 'image',
+  },
 };
 
 export interface CreateUploadUrlInput {
-  /** Always the caller's own org (from the JWT) — never client-supplied. */
-  orgId: string;
+  /** The caller's own org (from the JWT) — never client-supplied. Absent
+   *  only for a platform-level upload (e.g. the Super Admin template
+   *  builder), which is keyed under `platform/` instead of `org/{orgId}/`. */
+  orgId?: string;
   field: UploadField;
   filename: string;
   contentType: string;
@@ -72,6 +83,8 @@ export interface CreateUploadUrlInput {
   /** Optional scoping context — used only to build a tidy key path. */
   projectId?: string;
   unitTypeId?: string;
+  templateId?: string;
+  landingPageId?: string;
 }
 
 export interface CreateUploadUrlResult {
