@@ -502,7 +502,7 @@ export type UnitStatus = "available" | "booked" | "held";
 
 export interface Amenity {
   name: string;
-  /** Always null for now — amenity-icon upload is out of scope (S3). */
+  /** Public R2 URL from POST /org/projects/upload-url, or null. */
   iconUrl: string | null;
 }
 
@@ -625,6 +625,10 @@ export interface CreateUnitTypeInput {
   builtupSqft?: number;
   price?: number;
   totalUnits?: number;
+  floorPlanUrl?: string | null;
+  brochureUrl?: string | null;
+  videoUrl?: string | null;
+  galleryUrls?: string[];
 }
 
 export type UpdateUnitTypeInput = Partial<CreateUnitTypeInput>;

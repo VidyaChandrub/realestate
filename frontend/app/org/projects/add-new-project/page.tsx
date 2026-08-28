@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
+import { AmenityChips } from "@/components/org/amenity-chips";
 import type {
+  Amenity,
   CreateProjectInput,
   CreateUnitTypeInput,
   OrgUser,
@@ -34,18 +36,6 @@ const makeUnitType = (): UnitTypeDraft => ({
   price: "",
   totalUnits: "",
 });
-
-const AMENITY_OPTIONS = [
-  "Swimming pool",
-  "Clubhouse & gym",
-  "Landscaped garden",
-  "2-level parking",
-  "Kids play area",
-  "24×7 security",
-  "Power backup",
-  "Sports court",
-  "Yoga deck",
-];
 
 /** "" → undefined; otherwise a finite number (NaN guarded by the caller). */
 function numOrUndef(value: string): number | undefined {
@@ -103,8 +93,7 @@ export default function AddNewProjectPage() {
   const [towerCount, setTowerCount] = useState("");
   const [floorsDescription, setFloorsDescription] = useState("");
 
-  const [amenities, setAmenities] = useState<string[]>([]);
-  const [amenityDraft, setAmenityDraft] = useState("");
+  const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [unitTypes, setUnitTypes] = useState<UnitTypeDraft[]>([]);
 
   const [error, setError] = useState<string | null>(null);
@@ -128,15 +117,6 @@ export default function AddNewProjectPage() {
     );
     return { total };
   }, [unitTypes]);
-
-  function addAmenity(value: string) {
-    const v = value.trim();
-    if (!v) return;
-    setAmenities((prev) =>
-      prev.some((a) => a.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v],
-    );
-    setAmenityDraft("");
-  }
 
   function updateUnitType(key: number, patch: Partial<UnitTypeDraft>) {
     setUnitTypes((prev) =>
@@ -173,7 +153,7 @@ export default function AddNewProjectPage() {
         landArea: numOrUndef(landArea),
         towerCount: numOrUndef(towerCount),
         floorsDescription: floorsDescription.trim() || undefined,
-        amenities: amenities.map((a) => ({ name: a, iconUrl: null })),
+        amenities,
       };
 
       const project = await apiFetch<Project>("/org/projects", {
@@ -261,8 +241,7 @@ export default function AddNewProjectPage() {
               Create a project
             </h1>
             <div style={{ fontSize: 13, opacity: 0.9, marginTop: 6 }}>
-              Property details, unit mix and pricing. Media and amenity icons
-              come later.
+              Property details, unit mix, pricing and amenities.
             </div>
           </div>
         </div>
@@ -577,14 +556,10 @@ export default function AddNewProjectPage() {
                           borderTop: "1px dashed rgba(148, 163, 184, 0.22)",
                         }}
                       >
-                        <div
-                          className="muted"
-                          style={{ fontSize: 12, display: "flex", gap: 8 }}
-                        >
-                          <span>📐 Floor plan</span>
-                          <span>🎬 Video</span>
-                          <span>📄 Brochure</span>
-                          <span className="badge b-gray">Coming soon</span>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          📐 Floor plan, 🎬 video and 📄 brochure are added
+                          per unit type from the project&apos;s Units tab
+                          after it&apos;s created.
                         </div>
                       </div>
                     </div>
@@ -593,81 +568,7 @@ export default function AddNewProjectPage() {
               )}
 
               <SectionLabel>Amenities</SectionLabel>
-              {amenities.length > 0 ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {amenities.map((a) => (
-                    <span
-                      key={a}
-                      className="chip"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      {a}
-                      <button
-                        type="button"
-                        aria-label={`Remove ${a}`}
-                        onClick={() =>
-                          setAmenities((prev) => prev.filter((x) => x !== a))
-                        }
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "inherit",
-                          cursor: "pointer",
-                          fontWeight: 700,
-                          padding: 0,
-                          lineHeight: 1,
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <div className="muted" style={{ fontSize: 13 }}>
-                  No amenities yet — pick from the quick list or add your own.
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                <input
-                  className="inp"
-                  placeholder="Custom amenity — e.g. Tennis court"
-                  value={amenityDraft}
-                  onChange={(e) => setAmenityDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addAmenity(amenityDraft);
-                    }
-                  }}
-                />
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  onClick={() => addAmenity(amenityDraft)}
-                >
-                  ＋ Add
-                </button>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-                {AMENITY_OPTIONS.filter((o) => !amenities.includes(o)).map(
-                  (o) => (
-                    <button
-                      key={o}
-                      type="button"
-                      className="chip"
-                      style={{ cursor: "pointer" }}
-                      onClick={() => addAmenity(o)}
-                    >
-                      ＋ {o}
-                    </button>
-                  ),
-                )}
-              </div>
+              <AmenityChips value={amenities} onChange={setAmenities} />
             </div>
 
             <aside

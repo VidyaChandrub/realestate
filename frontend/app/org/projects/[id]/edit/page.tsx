@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
+import { AmenityChips } from "@/components/org/amenity-chips";
 import type {
   Amenity,
   OrgUser,
@@ -18,18 +19,6 @@ import type {
 function userLabel(u: OrgUser): string {
   return [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
 }
-
-const AMENITY_OPTIONS = [
-  "Swimming pool",
-  "Clubhouse & gym",
-  "Landscaped garden",
-  "2-level parking",
-  "Kids play area",
-  "24×7 security",
-  "Power backup",
-  "Sports court",
-  "Yoga deck",
-];
 
 function numOrUndef(value: string): number | undefined {
   const trimmed = value.trim();
@@ -71,8 +60,7 @@ export default function OrgProjectEditPage() {
   const [landArea, setLandArea] = useState("");
   const [towerCount, setTowerCount] = useState("");
   const [floorsDescription, setFloorsDescription] = useState("");
-  const [amenities, setAmenities] = useState<string[]>([]);
-  const [amenityDraft, setAmenityDraft] = useState("");
+  const [amenities, setAmenities] = useState<Amenity[]>([]);
 
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -101,7 +89,7 @@ export default function OrgProjectEditPage() {
         setLandArea(toField(p.landArea));
         setTowerCount(toField(p.towerCount));
         setFloorsDescription(p.floorsDescription ?? "");
-        setAmenities(p.amenities.map((a) => a.name));
+        setAmenities(p.amenities);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -116,15 +104,6 @@ export default function OrgProjectEditPage() {
       .catch(() => setManagers([]));
   }, [accessToken]);
 
-  function addAmenity(value: string) {
-    const v = value.trim();
-    if (!v) return;
-    setAmenities((prev) =>
-      prev.some((a) => a.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v],
-    );
-    setAmenityDraft("");
-  }
-
   async function save() {
     if (!accessToken) return;
     if (!name.trim()) {
@@ -134,10 +113,6 @@ export default function OrgProjectEditPage() {
     setSaving(true);
     setError(null);
     try {
-      const amenityPayload: Amenity[] = amenities.map((a) => ({
-        name: a,
-        iconUrl: null,
-      }));
       const body: UpdateProjectInput = {
         name: name.trim(),
         location: location.trim() || undefined,
@@ -151,7 +126,7 @@ export default function OrgProjectEditPage() {
         landArea: numOrUndef(landArea),
         towerCount: numOrUndef(towerCount),
         floorsDescription: floorsDescription.trim() || undefined,
-        amenities: amenityPayload,
+        amenities,
       };
       await apiFetch(`/org/projects/${id}`, {
         method: "PATCH",
@@ -370,81 +345,11 @@ export default function OrgProjectEditPage() {
 
             <div className="field" style={{ marginBottom: 0 }}>
               <label>Amenities</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {amenities.map((a) => (
-                  <span
-                    key={a}
-                    className="chip"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    {a}
-                    <button
-                      type="button"
-                      aria-label={`Remove ${a}`}
-                      onClick={() =>
-                        setAmenities((prev) => prev.filter((x) => x !== a))
-                      }
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                        padding: 0,
-                        lineHeight: 1,
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <input
-                  className="inp"
-                  placeholder="Custom amenity"
-                  value={amenityDraft}
-                  onChange={(e) => setAmenityDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addAmenity(amenityDraft);
-                    }
-                  }}
-                />
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  onClick={() => addAmenity(amenityDraft)}
-                >
-                  ＋ Add
-                </button>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  marginTop: 10,
-                }}
-              >
-                {AMENITY_OPTIONS.filter((o) => !amenities.includes(o)).map(
-                  (o) => (
-                    <button
-                      key={o}
-                      type="button"
-                      className="chip"
-                      style={{ cursor: "pointer" }}
-                      onClick={() => addAmenity(o)}
-                    >
-                      ＋ {o}
-                    </button>
-                  ),
-                )}
-              </div>
+              <AmenityChips
+                value={amenities}
+                onChange={setAmenities}
+                projectId={id}
+              />
             </div>
 
             <div

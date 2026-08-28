@@ -17,6 +17,7 @@ import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ListProjectsQueryDto } from './dto/list-projects-query.dto';
+import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { CreateUnitTypeDto } from './dto/create-unit-type.dto';
 import { UpdateUnitTypeDto } from './dto/update-unit-type.dto';
 import { CreateUnitDto } from './dto/create-unit.dto';
@@ -30,6 +31,18 @@ import { ListUnitsQueryDto } from './dto/list-units-query.dto';
 @Controller('org/projects')
 export class ProjectsController {
   constructor(private readonly service: ProjectsService) {}
+
+  // --- Media uploads ---
+  // Returns { uploadUrl, publicUrl, ... }. The browser PUTs the file to
+  // uploadUrl, then submits publicUrl as the field value through the normal
+  // create/update endpoints (plain string columns — no change there).
+  @Post('upload-url')
+  createUploadUrl(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: CreateUploadUrlDto,
+  ) {
+    return this.service.createUploadUrl(user.orgId as string, dto);
+  }
 
   // --- Projects ---
 
