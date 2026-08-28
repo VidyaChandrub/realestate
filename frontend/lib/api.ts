@@ -1,4 +1,14 @@
-import type { ApiErrorBody, AuthTokens } from "./types";
+import type {
+  ApiErrorBody,
+  AuthTokens,
+  ChangePasswordInput,
+  ChangePlanInput,
+  ChangePlanResult,
+  InvoiceRow,
+  LeadSubmission,
+  Plan,
+  UserProfile,
+} from "./types";
 
 const API_BASE = "/api";
 
@@ -110,4 +120,46 @@ export async function apiFetch<T>(
   }
 
   return body as T;
+}
+
+export async function getProfile(): Promise<UserProfile> {
+  return apiFetch<UserProfile>("/auth/me");
+}
+
+export async function changePassword(
+  input: ChangePasswordInput,
+): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getPlans(): Promise<Plan[]> {
+  return apiFetch<Plan[]>("/plans");
+}
+
+export async function getInvoices(): Promise<InvoiceRow[]> {
+  return apiFetch<InvoiceRow[]>("/org/billing/invoices");
+}
+
+export async function changePlan(
+  input: ChangePlanInput,
+): Promise<ChangePlanResult> {
+  return apiFetch<ChangePlanResult>("/org/billing/plan", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function submitLead(input: LeadSubmission): Promise<void> {
+  await apiFetch("/org/leads", {
+    method: "POST",
+    body: JSON.stringify({
+      landingPageId: input.landingPageId,
+      formName: input.formName,
+      source: input.source,
+      data: input.fields,
+    }),
+  });
 }

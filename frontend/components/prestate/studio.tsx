@@ -535,6 +535,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
         user={topNavUser}
         onSignOut={handleSignOut}
         settingsHref={SETTINGS_PATH[resource]}
+        homeHref={HOME_PATH[resource]}
         actions={
           <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", gap: 7 }}>
             <Sparkles size={15} /> {MODULE_LABELS[module]}

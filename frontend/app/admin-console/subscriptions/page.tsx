@@ -15,6 +15,17 @@ const ALL_FEATURES = [
   "Dedicated manager", "WhatsApp integration", "Custom branding", "API access", "White-label", "SSO & SLA", "Audit logs", "Advanced analytics"
 ];
 
+const PLAN_BADGE_OPTIONS = [
+  { value: "b-indigo", label: "Indigo" },
+  { value: "b-green", label: "Green" },
+  { value: "b-amber", label: "Amber" },
+  { value: "b-rose", label: "Rose" },
+  { value: "b-violet", label: "Violet" },
+  { value: "b-gray", label: "Gray" },
+  { value: "b-teal", label: "Teal" },
+  { value: "b-sky", label: "Sky" },
+];
+
 type OrgOption = { id: string; name: string; city: string };
 
 function priceFor(plan: Plan, cycle: "Monthly" | "Yearly") {
@@ -532,8 +543,37 @@ export default function SuperAdminSubscriptionsPage() {
             </div>
             <div className="field"><label>Description</label><textarea value={String(planForm.description || "")} onChange={e => setPlanForm(p => ({ ...p, description: e.target.value }))} placeholder="Who is this plan for?" /></div>
             <div className="row2">
-              <div className="field"><label>Badge</label><input className="inp" value={String((planForm as any).badge || "b-indigo")} onChange={e => setPlanForm(p => ({ ...p, badge: e.target.value }))} placeholder="b-indigo" /></div>
-              <div className="field"><label>Color</label><input className="inp" value={String((planForm as any).color || "#eef0fe")} onChange={e => setPlanForm(p => ({ ...p, color: e.target.value }))} placeholder="#eef0fe" /></div>
+              <div className="field">
+                <label>Badge</label>
+                <select
+                  className="inp"
+                  value={String((planForm as any).badge || "b-indigo")}
+                  onChange={(e) => setPlanForm(p => ({ ...p, badge: e.target.value }))}
+                >
+                  {PLAN_BADGE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Color</label>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="color"
+                    value={String((planForm as any).color || "#eef0fe")}
+                    onChange={(e) => setPlanForm(p => ({ ...p, color: e.target.value }))}
+                    style={{ width: 42, height: 38, padding: 2, border: "1px solid var(--line)", borderRadius: 8, background: "#fff", cursor: "pointer" }}
+                    aria-label="Pick plan color"
+                  />
+                  <input
+                    className="inp"
+                    value={String((planForm as any).color || "#eef0fe")}
+                    onChange={(e) => setPlanForm(p => ({ ...p, color: e.target.value }))}
+                    placeholder="#eef0fe"
+                    style={{ flex: 1 }}
+                  />
+                </div>
+              </div>
             </div>
             <label style={{ display:"flex", gap:8, alignItems:"center", fontSize:13, margin:"8px 0" }}><input type="checkbox" checked={!!(planForm as any).isPopular} onChange={e => setPlanForm(p => ({ ...p, isPopular: e.target.checked } as any))} /> Popular plan</label>
             <div className="field">

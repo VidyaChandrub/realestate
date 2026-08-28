@@ -39,8 +39,23 @@ export class SignupDto {
   @MaxLength(100)
   city: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(8)
+  @MaxLength(100)
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(12)
+  currency?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  timezone?: string;
+
+  @IsString()
+  @IsNotEmpty()
   @MaxLength(72)
   password: string;
 

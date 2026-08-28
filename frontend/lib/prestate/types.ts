@@ -120,7 +120,7 @@ export interface SectionInstance {
   global?: boolean;
   hidden?: boolean;
   locked?: boolean;
-  settings: Record<string, unknown>;
+  settings: Record<string, any>;
   style: SectionStyle;
   children?: SectionInstance[];
 }
@@ -301,6 +301,8 @@ export interface SiteConfig {
     youtube: string;
     linkedin: string;
     accentButtons: boolean;
+    /** Predefined visual design style for all real estate widgets: standard, premium, or modern. */
+    layoutTheme?: "standard" | "premium" | "modern";
   };
   header: {
     sticky: boolean;

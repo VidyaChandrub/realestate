@@ -191,3 +191,67 @@ textarea.inp { resize: vertical; }
   .wa-list, .wa-ctx { border: none; border-bottom: 1px solid var(--line); }
   .wa-msgs { max-height: 320px; }
 }
+
+/* ---- billing: plans & packages ---- */
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button {
+  border: none; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600;
+  padding: 6px 14px; border-radius: 999px; cursor: pointer; transition: .15s;
+}
+.seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
+
+.plans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.plan-card {
+  position: relative; display: flex; flex-direction: column; gap: 10px;
+  border: 1.5px solid var(--line); border-radius: 16px; padding: 18px 16px;
+  background: var(--surface); transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.plan-card:hover { transform: translateY(-2px); box-shadow: var(--sh-1); }
+.plan-card.current { border-color: var(--pc, var(--brand)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc, var(--brand)) 18%, transparent); }
+.plan-flag {
+  position: absolute; top: -10px; right: 14px; font-size: 11px; font-weight: 700;
+  background: var(--pc, var(--brand)); color: #fff; padding: 3px 10px; border-radius: 999px;
+}
+.plan-name { font-weight: 700; font-size: 15px; }
+.plan-price { font-family: var(--display); font-weight: 700; font-size: 24px; }
+.plan-price .muted { font-size: 13px; font-weight: 500; font-family: var(--font); }
+.mselect { position: relative; margin: 4px 0 6px; }
+.mselect-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 12px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.mselect-btn:hover { border-color: var(--brand-100); }
+.mselect-btn .caret { color: var(--muted); transition: transform .15s; }
+.mselect-btn .caret.up { transform: rotate(180deg); }
+.mselect-panel {
+  position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: var(--sh-1); padding: 6px; display: flex; flex-direction: column; gap: 2px;
+}
+.mselect-opt { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; font-size: 13px; cursor: pointer; }
+.mselect-opt:hover { background: var(--surface-2); }
+.mselect-opt input { width: 15px; height: 15px; accent-color: var(--pc, var(--brand)); cursor: pointer; }
+.mselect-opt .cnt {
+  min-width: 34px; height: 24px; padding: 0 9px; border-radius: 999px;
+  background: color-mix(in srgb, var(--pc, var(--brand)) 14%, #fff);
+  color: var(--pc, var(--brand));
+  font-weight: 800; font-size: 12px; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+}
+.mselect-opt > span:last-child { font-weight: 600; }
+.mselect-empty { padding: 10px; font-size: 12.5px; color: var(--muted); }
+.plan-card .btn { margin-top: auto; justify-content: center; }
+
+/* ---- billing: invoices table ---- */
+.inv-table { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.inv-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr .9fr .9fr .9fr; gap: 10px; align-items: center; padding: 12px 16px; font-size: 13px; }
+.inv-row + .inv-row { border-top: 1px solid var(--line); }
+.inv-head { background: var(--surface-2); font-weight: 700; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.inv-row .btn { padding: 6px 12px; font-size: 12.5px; }
+@media (max-width: 720px) {
+  .inv-row { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .inv-head { display: none; }
+  .inv-row > span:nth-child(5), .inv-row > span:nth-child(6) { text-align: right; }
+}

@@ -810,6 +810,21 @@
   right: 0;
   border-left: 1px solid var(--ps-line);
 }
+/* Small-screen settings panel — anchored to the top of the builder area,
+   scrollable, slides down over the canvas instead of from the right. */
+.ps-drawer-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 50vh;
+  overflow-y: auto;
+  background: var(--ps-panel);
+  box-shadow: var(--ps-shadow-lg);
+  border-bottom: 1px solid var(--ps-line);
+}
 .ps-builder-fabs {
   position: absolute;
   bottom: 16px;

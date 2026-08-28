@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getPlans, getInvoices, changePlan } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
-import type { OrgBillingSummary, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
+import type { ChangePlanInput, ChangePlanResult, InvoiceRow, OrgBillingSummary, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
 
-const TABS = ["General", "Branding", "Notifications", "Billing", "Security"] as const;
+const TABS = ["General", "Branding", "Notifications", "Billing"] as const;
 type Tab = (typeof TABS)[number];
 
 const TIMEZONES = [
@@ -39,6 +39,11 @@ const NOTIFICATION_ROWS = [
 
 interface GeneralBrandingForm {
   name: string;
+  city: string;
+  country: string;
+  addressLine1: string;
+  state: string;
+  postalCode: string;
   timezone: string;
   currency: string;
   defaultLanguage: string;
@@ -48,6 +53,11 @@ interface GeneralBrandingForm {
 function formToOrg(org: SafeOrganisation): GeneralBrandingForm {
   return {
     name: org.name,
+    city: org.city,
+    country: org.country ?? "",
+    addressLine1: org.address_line1 ?? "",
+    state: org.state ?? "",
+    postalCode: org.postal_code ?? "",
     timezone: org.timezone,
     currency: org.currency,
     defaultLanguage: org.default_language,
@@ -80,6 +90,72 @@ const SUBSCRIPTION_STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+const INVOICE_STATUS_BADGE: Record<string, string> = {
+  paid: "b-green",
+  pending: "b-amber",
+};
+
+const INVOICE_STATUS_LABEL: Record<string, string> = {
+  paid: "Paid",
+  pending: "Pending",
+};
+
+// Dynamic plan limits surfaced as counts on the plan cards (no static copy).
+const PLAN_LIMIT_ROWS: { key: "templates" | "projects" | "users"; label: string }[] = [
+  { key: "templates", label: "Templates" },
+  { key: "projects", label: "Projects" },
+  { key: "users", label: "Users" },
+];
+
+type PlanLimits = { templates?: string; projects?: string; users?: string } | null;
+
+// Dynamic multi-select: options are derived from the plan's `limits` (templates /
+// projects / users) with their counts — nothing is hardcoded.
+function PlanLimitsSelect({ limits }: { limits: PlanLimits }) {
+  const [open, setOpen] = useState(false);
+  const rows = PLAN_LIMIT_ROWS.map((r) => ({ ...r, count: limits?.[r.key] ?? null })).filter(
+    (r) => r.count != null && r.count !== "",
+  );
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(rows.map((r) => r.key)));
+
+  return (
+    <div className="mselect">
+      <button type="button" className="mselect-btn" onClick={() => setOpen((o) => !o)}>
+        <span>
+          {selected.size} included
+        </span>
+        <span className={`caret${open ? " up" : ""}`}>▾</span>
+      </button>
+      {open ? (
+        <div className="mselect-panel">
+          {rows.length === 0 ? (
+            <div className="mselect-empty">No limit details for this plan.</div>
+          ) : (
+            rows.map((r) => (
+              <label key={r.key} className="mselect-opt">
+                <input
+                  type="checkbox"
+                  checked={selected.has(r.key)}
+                  onChange={(e) =>
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(r.key);
+                      else next.delete(r.key);
+                      return next;
+                    })
+                  }
+                />
+                <span className="cnt">{r.count}</span>
+                <span>{r.label}</span>
+              </label>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function OrgSettingsPage() {
   const { accessToken } = useAuth();
 
@@ -93,6 +169,15 @@ export default function OrgSettingsPage() {
   const [billing, setBilling] = useState<OrgBillingSummary | null>(null);
   const [billingLoading, setBillingLoading] = useState(true);
   const [billingError, setBillingError] = useState<string | null>(null);
+
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(true);
+  const [plansCycle, setPlansCycle] = useState<"monthly" | "yearly">("monthly");
+  const [changeLoading, setChangeLoading] = useState(false);
+  const [changeError, setChangeError] = useState<string | null>(null);
+  const [changeOk, setChangeOk] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -120,6 +205,24 @@ export default function OrgSettingsPage() {
       .finally(() => setBillingLoading(false));
   }, [accessToken]);
 
+  useEffect(() => {
+    if (!accessToken) return;
+    setPlansLoading(true);
+    setInvoicesLoading(true);
+    Promise.all([getPlans(), getInvoices()])
+      .then(([p, inv]) => {
+        setPlans(p);
+        setInvoices(inv);
+      })
+      .catch(() => {
+        /* non-fatal — billing tab still renders the current plan */
+      })
+      .finally(() => {
+        setPlansLoading(false);
+        setInvoicesLoading(false);
+      });
+  }, [accessToken]);
+
   function updateForm(patch: Partial<GeneralBrandingForm>) {
     setForm((prev) => (prev ? { ...prev, ...patch } : prev));
     setSaved(false);
@@ -132,6 +235,11 @@ export default function OrgSettingsPage() {
     try {
       const body: UpdateOrganisationSettingsInput = {
         name: form.name,
+        city: form.city,
+        country: form.country,
+        addressLine1: form.addressLine1,
+        state: form.state,
+        postalCode: form.postalCode,
         timezone: form.timezone,
         currency: form.currency,
         defaultLanguage: form.defaultLanguage,
@@ -152,6 +260,28 @@ export default function OrgSettingsPage() {
     }
   }
 
+  async function handleChangePlan(planId: string, cycle: "monthly" | "yearly" = plansCycle) {
+    if (!accessToken) return;
+    setChangeError(null);
+    setChangeOk(null);
+    setChangeLoading(true);
+    try {
+      const res = await changePlan({ planId, billingCycle: cycle });
+      setChangeOk(
+        `Switched to the ${res.planName} plan (${cycle === "yearly" ? "billed yearly" : "billed monthly"}).`,
+      );
+      const b = await apiFetch<OrgBillingSummary>("/org/billing", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setBilling(b);
+      if (b.subscription) setPlansCycle(b.subscription.billingCycle);
+    } catch (err) {
+      setChangeError(err instanceof Error ? err.message : "Failed to change plan.");
+    } finally {
+      setChangeLoading(false);
+    }
+  }
+
   if (loading || !org || !form) {
     return (
       <div className="card">
@@ -168,7 +298,7 @@ export default function OrgSettingsPage() {
         <div>
           <div className="eyebrow"> More</div>
           <h1>Organisation Settings</h1>
-          <div className="sub">Manage your organisation profile, branding, notifications, billing and security.</div>
+          <div className="sub">Manage your organisation profile, branding, notifications and billing.</div>
         </div>
         <div className="actions">
           <button className="btn btn-primary" onClick={() => void handleSave()} disabled={saving}>
@@ -243,6 +373,50 @@ export default function OrgSettingsPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="row2">
+                <div className="field">
+                  <label>City</label>
+                  <input
+                    className="inp"
+                    value={form.city}
+                    onChange={(e) => updateForm({ city: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>Country</label>
+                  <input
+                    className="inp"
+                    value={form.country}
+                    onChange={(e) => updateForm({ country: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="field">
+                <label>Address Line 1</label>
+                <input
+                  className="inp"
+                  value={form.addressLine1}
+                  onChange={(e) => updateForm({ addressLine1: e.target.value })}
+                />
+              </div>
+              <div className="row2">
+                <div className="field">
+                  <label>State</label>
+                  <input
+                    className="inp"
+                    value={form.state}
+                    onChange={(e) => updateForm({ state: e.target.value })}
+                  />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label>Postal Code</label>
+                  <input
+                    className="inp"
+                    value={form.postalCode}
+                    onChange={(e) => updateForm({ postalCode: e.target.value })}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -422,9 +596,12 @@ export default function OrgSettingsPage() {
 
       {tab === "Billing" ? (
         <Reveal delay={2}>
+          {changeOk ? <div className="form-alert ok">{changeOk}</div> : null}
+          {changeError ? <div className="form-alert">{changeError}</div> : null}
+
           <div className="card">
             <div className="card-h">
-              <span className="t">Billing</span>
+              <span className="t">Current plan</span>
               {billing?.subscription ? (
                 <span className={`badge ${SUBSCRIPTION_STATUS_BADGE[billing.subscription.status] ?? "b-gray"}`}>
                   {SUBSCRIPTION_STATUS_LABEL[billing.subscription.status] ?? billing.subscription.status}
@@ -439,7 +616,7 @@ export default function OrgSettingsPage() {
               ) : !billing?.plan || !billing.subscription ? (
                 <div>
                   <p className="muted" style={{ marginTop: 0 }}>No active subscription on this organisation yet.</p>
-                  <p className="muted" style={{ fontSize: 12.5 }}>Contact your account manager to get started with a plan.</p>
+                  <p className="muted" style={{ fontSize: 12.5 }}>Pick a plan below to get started.</p>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -497,28 +674,95 @@ export default function OrgSettingsPage() {
                       <div className="muted" style={{ fontSize: 12 }}>Unlimited on this plan.</div>
                     )}
                   </div>
-
-                  <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                    <button className="btn btn-primary" disabled title="Plan upgrades aren't available yet" style={{ opacity: 0.5, cursor: "not-allowed" }}>
-                      Upgrade plan
-                    </button>
-                    <span className="muted" style={{ fontSize: 12 }}>Coming soon — contact your account manager to change plans.</span>
-                  </div>
                 </div>
               )}
             </div>
           </div>
-        </Reveal>
-      ) : null}
 
-      {tab === "Security" ? (
-        <Reveal delay={2}>
-          <div className="card">
+          <div className="card" style={{ marginTop: 18 }}>
             <div className="card-h">
-              <span className="t">Security</span>
+              <span className="t">Plans &amp; packages</span>
+              <div className="seg">
+                <button className={plansCycle === "monthly" ? "on" : ""} onClick={() => setPlansCycle("monthly")} type="button">
+                  Monthly
+                </button>
+                <button className={plansCycle === "yearly" ? "on" : ""} onClick={() => setPlansCycle("yearly")} type="button">
+                  Yearly
+                </button>
+              </div>
             </div>
             <div className="card-b">
-              <p className="muted">Coming soon — password and session settings aren&apos;t built yet.</p>
+              {plansLoading ? (
+                <p className="muted">Loading plans…</p>
+              ) : (
+                <div className="plans-grid">
+                  {plans.map((p) => {
+                    const isCurrent = billing?.plan?.id === p.id;
+                    const price = plansCycle === "yearly" ? p.priceYearly : p.priceMonthly;
+                    return (
+                      <div key={p.id} className={`plan-card${isCurrent ? " current" : ""}`} style={{ ["--pc" as string]: p.color }}>
+                        {p.isPopular ? <span className="plan-flag">Most popular</span> : null}
+                        <div className="plan-name">{p.name}</div>
+                        <div className="plan-price">
+                          {formatMoney(price, billing?.subscription?.currency ?? "INR")}
+                          <span className="muted"> / {plansCycle === "yearly" ? "year" : "month"}</span>
+                        </div>
+                        <PlanLimitsSelect limits={p.limits} />
+                        <button
+                          className={`btn ${isCurrent ? "" : "btn-primary"}`}
+                          disabled={isCurrent || changeLoading}
+                          onClick={() => void handleChangePlan(p.id)}
+                          style={isCurrent ? { opacity: 0.7, cursor: "default" } : undefined}
+                        >
+                          {isCurrent ? "Current plan" : `Switch to ${p.name}`}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="card" style={{ marginTop: 18 }}>
+            <div className="card-h">
+              <span className="t">Invoices</span>
+            </div>
+            <div className="card-b">
+              {invoicesLoading ? (
+                <p className="muted">Loading invoices…</p>
+              ) : invoices.length === 0 ? (
+                <p className="muted" style={{ marginTop: 0 }}>No invoices yet.</p>
+              ) : (
+                <div className="inv-table">
+                  <div className="inv-row inv-head">
+                    <span>Invoice</span>
+                    <span>Date</span>
+                    <span>Plan</span>
+                    <span>Amount</span>
+                    <span>Status</span>
+                    <span />
+                  </div>
+                  {invoices.map((inv) => (
+                    <div className="inv-row" key={inv.id}>
+                      <span className="mono">{inv.number}</span>
+                      <span>{formatDate(inv.issuedAt)}</span>
+                      <span>{inv.planName}</span>
+                      <span>{formatMoney(inv.amount, inv.currency)}</span>
+                      <span>
+                        <span className={`badge ${INVOICE_STATUS_BADGE[inv.status] ?? "b-gray"}`}>
+                          {INVOICE_STATUS_LABEL[inv.status] ?? inv.status}
+                        </span>
+                      </span>
+                      <span>
+                        <button className="btn btn-ghost" disabled title="PDF download coming soon">
+                          Download
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </Reveal>

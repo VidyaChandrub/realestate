@@ -625,6 +625,7 @@ export function BuilderWorkspace({
           name: ensureConfig(page).brand.name,
           phone: ensureConfig(page).brand.phone,
           logo: ensureConfig(page).brand.logo,
+          layoutTheme: ensureConfig(page).brand.layoutTheme,
         }}
         form={ensureConfig(page).form}
         chrome={{
@@ -641,7 +642,7 @@ export function BuilderWorkspace({
       {dockInspector || inspectorOpen ? (
         <>
           {!dockInspector ? <button type="button" className="ps-drawer-backdrop" aria-label="Close settings" onClick={() => setInspectorOpen(false)} /> : null}
-          <div className={dockInspector ? "ps-sidebar-col" : "ps-drawer-right"} style={{ zIndex: dockInspector ? 1 : 430 }}>
+          <div className={dockInspector ? "ps-sidebar-col" : "ps-drawer-top"} style={{ zIndex: dockInspector ? 1 : 430 }}>
             <SettingsPanel section={selected} device={device} setDevice={setDevice} onChange={patchSelected} typographyTokens={design.bundle.tokens} page={page} onPatchConfig={onPatchConfig} />
           </div>
         </>

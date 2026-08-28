@@ -1062,6 +1062,12 @@
   margin-bottom: 18px;
 }
 
+.superadmin .form-alert.ok {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
 .superadmin .row2 {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -9,9 +9,10 @@ import { mapApiFieldErrors } from "@/lib/form-errors";
 import { slugify } from "@/lib/slug";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Field, Input } from "@/components/ui/input";
+import { Field, Input, Select } from "@/components/ui/input";
 import { Icon } from "@/components/icons";
 import type { Plan } from "@/lib/types";
+import { COUNTRY_META, COUNTRIES } from "@/lib/countries";
 
 const FIELD_KEYS = [
   "first_name",
@@ -20,6 +21,7 @@ const FIELD_KEYS = [
   "work_email",
   "phone_number",
   "city",
+  "country",
   "password",
 ];
 
@@ -41,8 +43,11 @@ export default function RegisterPage() {
     work_email: "",
     phone_number: "",
     city: "",
+    country: "",
     password: "",
   });
+  const [currency, setCurrency] = useState("");
+  const [timezone, setTimezone] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
@@ -63,6 +68,15 @@ export default function RegisterPage() {
       setForm((prev) => ({ ...prev, [field]: e.target.value }));
       setFieldErrors((prev) => ({ ...prev, [field]: "" }));
     };
+  }
+
+  function handleCountryChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const country = e.target.value;
+    setForm((prev) => ({ ...prev, country }));
+    setFieldErrors((prev) => ({ ...prev, country: "" }));
+    const meta = COUNTRY_META[country];
+    setCurrency(meta?.currencyLabel ?? "");
+    setTimezone(meta?.timezone ?? "");
   }
 
   const [pendingOrg, setPendingOrg] = useState<{ name: string; email: string } | null>(null);
@@ -110,9 +124,9 @@ export default function RegisterPage() {
   function validateStep(n:number): boolean {
     setGeneralError(null);
     if (n===1) {
-      const required: (keyof typeof form)[] = ["first_name","last_name","company_name","work_email","phone_number","city","password"];
+      const required: (keyof typeof form)[] = ["first_name","last_name","company_name","work_email","phone_number","city","country","password"];
       for (const k of required) {
-        if (!form[k]?.trim()) { setGeneralError(`${k.replace("_"," ")} is required`); return false; }
+        if (!form[k]?.trim()) { setGeneralError(`${k.replace(/_/g," ")} is required`); return false; }
       }
       if (form.password.length < 8) { setGeneralError("Password must be at least 8 characters"); return false; }
       return true;
@@ -145,6 +159,8 @@ export default function RegisterPage() {
     try {
       const payload:any = {
         ...form,
+        currency: COUNTRY_META[form.country]?.currency ?? "",
+        timezone,
         planId: selectedPlanId,
         billingCycle,
         templateIds: selectedTemplateIds,
@@ -266,6 +282,24 @@ export default function RegisterPage() {
                 <Input required placeholder="Ahmedabad" value={form.city} onChange={update("city")} autoComplete="address-level2" />
               </Field>
             </div>
+            <Field label="Country" error={fieldErrors.country}>
+              <Select required value={form.country} onChange={handleCountryChange}>
+                <option value="">Select country…</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </Select>
+            </Field>
+            {form.country ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Currency" hint="Auto-set from country — cannot be changed here">
+                  <Input value={currency} disabled readOnly />
+                </Field>
+                <Field label="Timezone" hint="Auto-set from country — cannot be changed here">
+                  <Input value={timezone} disabled readOnly />
+                </Field>
+              </div>
+            ) : null}
             <Field label="Password" error={fieldErrors.password}>
               <Input type="password" required minLength={8} placeholder="••••••••••" value={form.password} onChange={update("password")} autoComplete="new-password" />
             </Field>

@@ -243,7 +243,7 @@ export function TypographyModule({
           ) : null
         }
       />
-      <SiteScopeBar pages={[site]} activeId={site.id} />
+      <SiteScopeBar pages={[site]} activeId={site.id} label={resource === "landing-page" ? "Editing this page" : "Editing this template"} />
 
       {/* Scope selector */}
       <div style={{ padding: "0 28px 16px", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -336,11 +336,11 @@ export function TypographyModule({
             writeTypography(next);
           };
           return (
-            <div key={key} style={{ border: "1px solid var(--ps-line)", borderRadius: 14, background: "var(--ps-panel-raised)", padding: "14px 18px 6px" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
+            <div key={key} style={{ border: "1px solid var(--ps-line)", borderRadius: 14, background: "var(--ps-panel-raised)", padding: "14px 18px 14px" }}>
+              {/* Card header */}
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
                 <span style={{ fontSize: deviceTab === "desktop" ? sizeFontSize(key) : undefined, fontWeight: 800, letterSpacing: -0.3 }}>
                   {String(bpToken.textTransform === "uppercase" ? label.toUpperCase() : label)}
-                  {!bpToken.textTransform || bpToken.textTransform === "none" ? "" : ""}
                 </span>
                 <span style={{ fontSize: 11.5, color: "var(--ps-muted)" }}>{hint}</span>
                 <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
@@ -348,68 +348,85 @@ export function TypographyModule({
                   <Chip>{sizePreview}</Chip>
                 </span>
               </div>
-              <div className="ps-typo-grid">
-                {/* KNOWN ISSUE: `opts` includes uploaded custom fonts (fontOptions()
-                    below), and picking one here writes its family NAME into this
-                    token — but the font FILE stays in prestate.fonts.v1
-                    (browser-local, see design-system.ts). A global/platform set
-                    is now shared across users, while fonts aren't: anyone
-                    without that exact font uploaded in their own browser gets
-                    a silent fallback font, no error. Resolves once fonts move
-                    to object storage (out of scope here) — tracked as a known
-                    issue, not fixed in this pass. */}
-                <FieldRow label="Font family">
-                  <SelectField value={bpToken.fontFamily ?? ""} onChange={(v) => setToken({ fontFamily: v || undefined })} options={[{ value: "", label: "Inherit theme" }, ...opts]} />
-                </FieldRow>
-                <FieldRow label="Font size" hint="px, rem or % — e.g. 3rem">
-                  <LengthInput value={bpToken.fontSize ?? ""} onChange={(v) => setToken({ fontSize: v === "" ? undefined : v })} min={8} max={140} />
-                </FieldRow>
-                <FieldRow label="Weight">
-                  <SliderField value={Number(bpToken.fontWeight ?? 400)} onChange={(v) => setToken({ fontWeight: v })} min={300} max={900} step={100} />
-                </FieldRow>
-                <FieldRow label="Line height">
-                  <SliderField value={Number(bpToken.lineHeight ?? 1.15)} onChange={(v) => setToken({ lineHeight: v })} min={0.9} max={2.4} step={0.05} />
-                </FieldRow>
-                <FieldRow label="Letter spacing">
-                  <SliderField value={Number(bpToken.letterSpacing ?? 0)} onChange={(v) => setToken({ letterSpacing: v })} min={-3} max={8} step={0.5} />
-                </FieldRow>
-                <FieldRow label="Text transform">
-                  <SelectField
-                    value={bpToken.textTransform ?? "none"}
-                    onChange={(v) => setToken({ textTransform: v })}
-                    options={[
-                      { value: "none", label: "None" },
-                      { value: "uppercase", label: "Uppercase" },
-                      { value: "capitalize", label: "Capitalize" },
-                      { value: "lowercase", label: "Lowercase" },
-                    ]}
-                  />
-                </FieldRow>
-                <FieldRow label="Text colour">
-                  <ColorField value={bpToken.textColor ?? ""} onChange={(v) => setToken({ textColor: v })} />
-                </FieldRow>
-                {key === "p" ? (
-                  <FieldRow label="Paragraph spacing">
-                    <LengthInput value={(bpToken as TypeToken & { paragraphSpacing?: number | string }).paragraphSpacing ?? ""} onChange={(v) => setToken({ paragraphSpacing: v === "" ? undefined : v })} min={0} max={64} />
+
+              {/* Two-column body: fields left, live preview right */}
+              <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+                {/* Fields column */}
+                <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                  {/* KNOWN ISSUE: `opts` includes uploaded custom fonts (fontOptions()
+                      below), and picking one here writes its family NAME into this
+                      token — but the font FILE stays in prestate.fonts.v1
+                      (browser-local, see design-system.ts). A global/platform set
+                      is now shared across users, while fonts aren't: anyone
+                      without that exact font uploaded in their own browser gets
+                      a silent fallback font, no error. Resolves once fonts move
+                      to object storage (out of scope here) — tracked as a known
+                      issue, not fixed in this pass. */}
+                  <FieldRow label="Font family">
+                    <SelectField value={bpToken.fontFamily ?? ""} onChange={(v) => setToken({ fontFamily: v || undefined })} options={[{ value: "", label: "Inherit theme" }, ...opts]} />
                   </FieldRow>
-                ) : null}
-              </div>
-              {/* Live preview line */}
-              <div style={{ borderTop: "1px dashed var(--ps-line)", margin: "4px -18px 0", padding: "12px 18px 14px", color: bpToken.textColor || "inherit" }}>
-                <span
-                  style={{
-                    fontFamily: bpToken.fontFamily || "inherit",
-                    fontSize: typeof bpToken.fontSize === "number" ? Math.min(34, bpToken.fontSize) : 22,
-                    fontWeight: Number(bpToken.fontWeight ?? (key === "p" ? 400 : 800)),
-                    lineHeight: Number(bpToken.lineHeight ?? 1.2),
-                    letterSpacing: Number(bpToken.letterSpacing ?? 0),
-                    textTransform: bpToken.textTransform || "none",
-                  }}
-                >
-                  {key === "p"
-                    ? "Premium 3 & 4 BHK residences with resort amenities."
-                    : "Where the Skyline Becomes Your Address"}
-                </span>
+                  <FieldRow label="Font size" hint="px, rem or % — e.g. 3rem">
+                    <LengthInput value={bpToken.fontSize ?? ""} onChange={(v) => setToken({ fontSize: v === "" ? undefined : v })} min={8} max={140} />
+                  </FieldRow>
+                  <FieldRow label="Weight">
+                    <SliderField value={Number(bpToken.fontWeight ?? 400)} onChange={(v) => setToken({ fontWeight: v })} min={300} max={900} step={100} />
+                  </FieldRow>
+                  <FieldRow label="Line height">
+                    <SliderField value={Number(bpToken.lineHeight ?? 1.15)} onChange={(v) => setToken({ lineHeight: v })} min={0.9} max={2.4} step={0.05} />
+                  </FieldRow>
+                  <FieldRow label="Letter spacing">
+                    <SliderField value={Number(bpToken.letterSpacing ?? 0)} onChange={(v) => setToken({ letterSpacing: v })} min={-3} max={8} step={0.5} />
+                  </FieldRow>
+                  <FieldRow label="Text transform">
+                    <SelectField
+                      value={bpToken.textTransform ?? "none"}
+                      onChange={(v) => setToken({ textTransform: v })}
+                      options={[
+                        { value: "none", label: "None" },
+                        { value: "uppercase", label: "Uppercase" },
+                        { value: "capitalize", label: "Capitalize" },
+                        { value: "lowercase", label: "Lowercase" },
+                      ]}
+                    />
+                  </FieldRow>
+                  <FieldRow label="Text colour">
+                    <ColorField value={bpToken.textColor ?? ""} onChange={(v) => setToken({ textColor: v })} />
+                  </FieldRow>
+                  {key === "p" ? (
+                    <FieldRow label="Paragraph spacing">
+                      <LengthInput value={(bpToken as TypeToken & { paragraphSpacing?: number | string }).paragraphSpacing ?? ""} onChange={(v) => setToken({ paragraphSpacing: v === "" ? undefined : v })} min={0} max={64} />
+                    </FieldRow>
+                  ) : null}
+                </div>
+
+                {/* Live preview column */}
+                <div style={{
+                  flex: "0 0 220px",
+                  minWidth: 0,
+                  alignSelf: "stretch",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderLeft: "1px dashed var(--ps-line)",
+                  paddingLeft: 20,
+                  color: bpToken.textColor || "inherit",
+                }}>
+                  <span
+                    style={{
+                      fontFamily: bpToken.fontFamily || "inherit",
+                      fontSize: typeof bpToken.fontSize === "number" ? Math.min(34, bpToken.fontSize) : 22,
+                      fontWeight: Number(bpToken.fontWeight ?? (key === "p" ? 400 : 800)),
+                      lineHeight: Number(bpToken.lineHeight ?? 1.2),
+                      letterSpacing: Number(bpToken.letterSpacing ?? 0),
+                      textTransform: bpToken.textTransform || "none",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {key === "p"
+                      ? "Premium 3 & 4 BHK residences with resort amenities."
+                      : "Where the Skyline Becomes Your Address"}
+                  </span>
+                </div>
               </div>
             </div>
           );
