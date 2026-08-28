@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { WIDGETS } from "@/lib/prestate/data";
+import { resolveVars } from "@/lib/prestate/data";
+import { designsForWidget } from "@/lib/prestate/widget-designs";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
+import { migrateSections } from "@/lib/prestate/persist";
 import type { SectionInstance } from "@/lib/prestate/types";
 
 describe("widget library integrity", () => {
@@ -48,6 +51,31 @@ describe("widget library integrity", () => {
     expect(byId["call-cta"].make().settings.mode).toBe("call");
     // CTA Banner exposes layout
     expect(byId["cta-banner"].make().settings.layout).toBe("banner");
+  });
+
+  it("hero exposes three layout presets", () => {
+    const hero = WIDGETS.find((w) => w.id === "hero");
+    expect(hero).toBeDefined();
+    expect(designsForWidget("hero").map((d) => d.id)).toEqual(["classic", "split", "centered"]);
+    expect(hero?.make().style.layout?.align).toBe("center");
+  });
+
+  it("replaces property variables in templates", () => {
+    expect(resolveVars("From {{starting_price}} at {{property_name}}")).toBe("From ₹1.25 Cr at Aurora Residences");
+  });
+
+  it("normalizes old left-aligned sections to centered defaults", () => {
+    const hero = WIDGETS.find((w) => w.id === "hero")!.make();
+    const migrated = migrateSections([
+      {
+        ...hero,
+        style: {
+          ...hero.style,
+          layout: { ...hero.style.layout, align: "left" },
+        },
+      },
+    ]);
+    expect(migrated[0].style.layout?.align).toBe("center");
   });
 });
 

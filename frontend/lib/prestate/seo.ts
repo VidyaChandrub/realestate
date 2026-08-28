@@ -4,6 +4,12 @@ import { ensureConfig } from "./site-config";
 export function suggestedCanonical(page: LandingPageData): string {
   const host = page.domain.trim();
   if (host) return `https://${host.replace(/^https?:\/\//, "")}`;
+  // Per-individual landing page: landing pages (kind custom) are previewed via /preview/:id, not /p/:slug
+  const isLandingPage = page.kind === "custom" || page.pageType === "landing" && page.id.includes("-");
+  if (isLandingPage && page.id) {
+    if (typeof window !== "undefined") return `${window.location.origin}/preview/${encodeURIComponent(page.id)}`;
+    return `/preview/${encodeURIComponent(page.id)}`;
+  }
   if (typeof window !== "undefined") return `${window.location.origin}/p/${page.slug}`;
   return `/p/${page.slug}`;
 }

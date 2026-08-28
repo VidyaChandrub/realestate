@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type * as React from "react";
-import { ArrowRight, CornerDownLeft, Search, SlidersHorizontal, LayoutGrid } from "lucide-react";
+import { ArrowRight, CornerDownLeft, Search, SlidersHorizontal, LayoutGrid, Layers, ListOrdered } from "lucide-react";
 import type { Device, FooterDesignId, HeaderDesignId, LandingPageData, MenuLink, SectionInstance, SectionStyle, SiteConfig } from "@/lib/prestate/types";
 import {
   CHROME_FOOTER_ID,
@@ -20,11 +20,15 @@ import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts, loa
 import type { Resource } from "@/lib/prestate/store";
 import {
   cloneWithFreshIds,
+  duplicateSection,
   findSection,
   insertChild,
   isStructural,
   patchSection,
   placeColumn,
+  removeSection,
+  reorderSection,
+  toggleSectionFlag,
 } from "@/lib/prestate/tree";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import {
@@ -36,6 +40,7 @@ import {
 import { SAVED_WIDGET_PREFIX, savedWidgetStorageId, WidgetsPanel } from "./widgets-panel";
 import { Canvas } from "./canvas";
 import { SettingsPanel } from "./settings-panel";
+import { SectionsNavigator } from "./sections-navigator";
 
 export interface BuilderApi {
   undo: () => void;
@@ -112,6 +117,8 @@ export function BuilderWorkspace({
   const [quickOpen, setQuickOpen] = useState(false);
   const [vp, setVp] = useState(1400);
   const [savedTemplates, setSavedTemplates] = useState<SavedSectionTemplate[]>(() => loadSectionTemplates());
+  const [leftTab, setLeftTab] = useState<"widgets" | "layers">("layers");
+  const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
 
   // Design system: typography tokens + uploaded fonts → stylesheet for canvas.
   const design = useMemo<{ css: string; bundle: DesignBundle }>(() => {
@@ -332,6 +339,36 @@ export function BuilderWorkspace({
 
   const addWidget = useCallback(
     (widgetId: string) => {
+      // If inserted via Layers → Add between, honour the pending index first.
+      if (pendingInsertIndex != null) {
+        const idx = pendingInsertIndex;
+        setPendingInsertIndex(null);
+        if (widgetId.startsWith(SAVED_WIDGET_PREFIX)) {
+          const tpl = loadSectionTemplates().find((t) => t.id === savedWidgetStorageId(widgetId));
+          if (!tpl) return;
+          const node = cloneWithFreshIds(tpl.data);
+          mutate((prev) => insertChild(prev, null, node, idx));
+          setTimeout(() => setState((prev) => ({ ...prev, selectedId: node.id })), 40);
+          return;
+        }
+        const def = WIDGETS.find((w) => w.id === widgetId);
+        if (!def) return;
+        if (widgetId === "column") {
+          let selectId = "";
+          mutate((prev) => {
+            const placed = placeColumn(prev, selectedId);
+            selectId = placed.selectId;
+            return placed.list;
+          });
+          setTimeout(() => setState((prev) => ({ ...prev, selectedId: selectId })), 40);
+          return;
+        }
+        const section = def.make();
+        mutate((prev) => insertChild(prev, null, section, idx));
+        setTimeout(() => setState((prev) => ({ ...prev, selectedId: section.id })), 40);
+        return;
+      }
+
       if (widgetId.startsWith(SAVED_WIDGET_PREFIX)) {
         const tpl = loadSectionTemplates().find((t) => t.id === savedWidgetStorageId(widgetId));
         if (!tpl) return;
@@ -370,8 +407,56 @@ export function BuilderWorkspace({
       });
       setTimeout(() => setState((prev) => ({ ...prev, selectedId: section.id })), 40);
     },
-    [mutate, selected, selectedId],
+    [mutate, selected, selectedId, pendingInsertIndex],
   );
+
+  // ---- Navigator actions: Page → Sections → Widgets → Items ----
+  const handleReorder = useCallback((fromId: string, toId: string, after: boolean) => {
+    mutate((prev) => reorderSection(prev, fromId, toId, after) ?? prev);
+  }, [mutate]);
+
+  const handleDuplicate = useCallback((id: string) => {
+    mutate((prev) => duplicateSection(prev, id).list);
+    // Select the copy right after it is inserted
+    setTimeout(() => setState((prev) => {
+      const ref = findSection(prev.sections, id);
+      if (!ref) return prev;
+      const sibling = prev.sections[ref.index + 1];
+      return sibling ? { ...prev, selectedId: sibling.id } : prev;
+    }), 40);
+  }, [mutate]);
+
+  const handleDelete = useCallback((id: string) => {
+    mutate((prev) => removeSection(prev, id).list);
+    setState((prev) => (prev.selectedId === id ? { ...prev, selectedId: null } : prev));
+  }, [mutate]);
+
+  const handleToggleHidden = useCallback((id: string) => {
+    mutate((prev) => toggleSectionFlag(prev, id, "hidden"));
+  }, [mutate]);
+
+  const handleMoveUp = useCallback((id: string) => {
+    mutate((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx <= 0) return prev;
+      return reorderSection(prev, id, prev[idx - 1].id, false) ?? prev;
+    });
+  }, [mutate]);
+
+  const handleMoveDown = useCallback((id: string) => {
+    mutate((prev) => {
+      const idx = prev.findIndex((s) => s.id === id);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      return reorderSection(prev, id, prev[idx + 1].id, true) ?? prev;
+    });
+  }, [mutate]);
+
+  const handleAddAt = useCallback((index: number) => {
+    setPendingInsertIndex(index);
+    setQuickOpen(true);
+    // Also ensure layers tab is visible so the user sees where it lands
+    setLeftTab("layers");
+  }, []);
 
   // Toolbar "Save as template" → store the section for reuse across pages.
   const saveSectionTemplate = useCallback(
@@ -462,14 +547,65 @@ export function BuilderWorkspace({
       {dockWidgets || widgetsOpen ? (
         <>
           {!dockWidgets ? <button type="button" className="ps-drawer-backdrop" aria-label="Close widgets" onClick={() => setWidgetsOpen(false)} /> : null}
-          <div className={dockWidgets ? "ps-sidebar-col" : "ps-drawer-left"} style={{ width: dockWidgets ? (widgetsOpen ? 296 : 48) : 296, flexShrink: 0, transition: dockWidgets ? "width .18s ease" : undefined, zIndex: dockWidgets ? 1 : 420 }}>
-            <WidgetsPanel
-              open={dockWidgets ? widgetsOpen : true}
-              onToggle={() => setWidgetsOpen((v) => !v)}
-              onAddWidget={addWidget}
-              templates={savedTemplates}
-              onDeleteTemplate={deleteSectionTemplate}
-            />
+          <div className={dockWidgets ? "ps-sidebar-col" : "ps-drawer-left"} style={{ width: dockWidgets ? (widgetsOpen ? 296 : 48) : 296, flexShrink: 0, transition: dockWidgets ? "width .18s ease" : undefined, zIndex: dockWidgets ? 1 : 420, display: "flex", flexDirection: "column" }}>
+            {dockWidgets && widgetsOpen ? (
+              <div style={{ display: "flex", gap: 4, padding: "8px 8px 0", flexShrink: 0, borderBottom: "1px solid var(--ps-line)" }}>
+                <button
+                  type="button"
+                  onClick={() => setLeftTab("layers")}
+                  style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 6px", borderRadius: 8, border: "none", background: leftTab === "layers" ? "var(--ps-primary)" : "var(--ps-bg)", color: leftTab === "layers" ? "#fff" : "var(--ps-muted)", fontSize: 11.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", cursor: "pointer" }}
+                >
+                  <ListOrdered size={13} /> Layers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLeftTab("widgets")}
+                  style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 6px", borderRadius: 8, border: "none", background: leftTab === "widgets" ? "var(--ps-primary)" : "var(--ps-bg)", color: leftTab === "widgets" ? "#fff" : "var(--ps-muted)", fontSize: 11.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", cursor: "pointer" }}
+                >
+                  <LayoutGrid size={13} /> Widgets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWidgetsOpen((v) => !v)}
+                  title="Collapse"
+                  style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--ps-line)", background: "var(--ps-bg)", color: "var(--ps-muted)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                >
+                  <Layers size={14} />
+                </button>
+              </div>
+            ) : null}
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              {dockWidgets && !widgetsOpen ? (
+                <WidgetsPanel
+                  open={false}
+                  onToggle={() => setWidgetsOpen((v) => !v)}
+                  onAddWidget={addWidget}
+                  templates={savedTemplates}
+                  onDeleteTemplate={deleteSectionTemplate}
+                />
+              ) : leftTab === "layers" ? (
+                <SectionsNavigator
+                  sections={sections}
+                  selectedId={selectedId}
+                  onSelect={handleSelect}
+                  onReorder={handleReorder}
+                  onDuplicate={handleDuplicate}
+                  onDelete={handleDelete}
+                  onAddAt={handleAddAt}
+                  onMoveUp={handleMoveUp}
+                  onMoveDown={handleMoveDown}
+                  onToggleHidden={handleToggleHidden}
+                />
+              ) : (
+                <WidgetsPanel
+                  open={true}
+                  onToggle={() => setWidgetsOpen((v) => !v)}
+                  onAddWidget={addWidget}
+                  templates={savedTemplates}
+                  onDeleteTemplate={deleteSectionTemplate}
+                />
+              )}
+            </div>
           </div>
         </>
       ) : null}
@@ -499,6 +635,7 @@ export function BuilderWorkspace({
         pageId={page.id}
         onSaveSectionTemplate={saveSectionTemplate}
         resolveWidget={resolveWidget}
+        onAddAt={handleAddAt}
       />
 
       {dockInspector || inspectorOpen ? (
@@ -527,7 +664,7 @@ export function BuilderWorkspace({
         ) : null}
       </div>
 
-      {quickOpen ? <QuickAdd onClose={() => setQuickOpen(false)} onInsert={addWidget} /> : null}
+      {quickOpen ? <QuickAdd onClose={() => { setQuickOpen(false); setPendingInsertIndex(null); }} onInsert={addWidget} /> : null}
     </div>
   );
 }

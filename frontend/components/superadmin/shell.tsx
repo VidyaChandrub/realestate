@@ -53,6 +53,7 @@ const NAV_GROUPS: NavGroup[] = [
         tip: "Template Management",
         activeMatch: ["/admin-console/templates", "/admin-console/template-detail"],
       },
+      { href: "/admin-console/domains", icon: "globe", label: "Domain Requests", tip: "Domain Requests", activeMatch: ["/admin-console/domains"] },
       { href: "/admin-console/approvals", icon: "check", label: "Approvals", tip: "Approvals", activeMatch: ["/admin-console/approvals"] },
     ],
   },

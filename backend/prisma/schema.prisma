@@ -74,6 +74,8 @@ model Organisation {
   organisationTemplates OrganisationTemplate[]
   landingPages          LandingPage[]
   typographySets        TypographySet[]
+  domainRequests        DomainRequest[]
+  trackingEvents        TrackingEvent[]
   projects              Project[]
 
   @@map("organisations")
@@ -423,6 +425,8 @@ model LandingPage {
   sourceTemplate Template?     @relation(fields: [sourceTemplateId], references: [id], onDelete: SetNull)
   parent         LandingPage?  @relation("LandingPageCompanion", fields: [parentId], references: [id], onDelete: SetNull)
   children       LandingPage[] @relation("LandingPageCompanion")
+  domainRequest  DomainRequest?
+  trackingEvents TrackingEvent[]
 
   @@unique([orgId, slug])
   @@index([orgId])
@@ -453,6 +457,113 @@ model TypographySet {
 }
 
 // ---------------------------------------------------------------------------
+// Template-isolated website stack — Organisation → Template → Pages → Domain
+// → DNS → SSL → Tracking → SEO → Publishing. Every LandingPage is an
+// independent website instance (see prompt §1, §30).
+// ---------------------------------------------------------------------------
+
+enum DomainRequestStatus {
+  pending
+  approved
+  rejected
+  dns_required
+  verification_pending
+  verified
+  ssl_pending
+  connected
+  verification_failed
+  connection_failed
+
+  @@schema("templates")
+}
+
+enum DnsStatus {
+  pending
+  verified
+  failed
+
+  @@schema("templates")
+}
+
+enum SslStatus {
+  pending
+  active
+  failed
+  expired
+
+  @@schema("templates")
+}
+
+model DomainRequest {
+  id              String              @id @default(uuid())
+  orgId           String              @map("org_id")
+  landingPageId   String              @unique @map("landing_page_id")
+  domain          String
+  status          DomainRequestStatus @default(pending)
+  requestedBy     String?             @map("requested_by")
+  requestedAt     DateTime            @default(now()) @map("requested_at")
+  reviewedAt      DateTime?           @map("reviewed_at")
+  reviewedBy      String?             @map("reviewed_by")
+  rejectionReason String?             @map("rejection_reason")
+  dnsStatus       DnsStatus           @default(pending) @map("dns_status")
+  sslStatus       SslStatus           @default(pending) @map("ssl_status")
+  verificationToken String            @map("verification_token")
+  dnsInstructions Json?               @map("dns_instructions")
+  expectedRecords Json?               @map("expected_records")
+  detectedRecords Json?               @map("detected_records")
+  lastVerificationAt DateTime?        @map("last_verification_at")
+  verifiedAt      DateTime?           @map("verified_at")
+  sslIssuedAt     DateTime?           @map("ssl_issued_at")
+  sslExpiresAt    DateTime?           @map("ssl_expires_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  landingPage  LandingPage  @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+  logs         DnsVerificationLog[]
+
+  @@index([orgId])
+  @@index([domain])
+  @@index([status])
+  @@map("domain_requests")
+  @@schema("templates")
+}
+
+model DnsVerificationLog {
+  id              String   @id @default(uuid())
+  domainRequestId String   @map("domain_request_id")
+  checkedAt       DateTime @default(now()) @map("checked_at")
+  success         Boolean
+  expected        Json?
+  detected        Json?
+  message         String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  domainRequest DomainRequest @relation(fields: [domainRequestId], references: [id], onDelete: Cascade)
+
+  @@index([domainRequestId])
+  @@map("dns_verification_logs")
+  @@schema("templates")
+}
+
+model TrackingEvent {
+  id            String   @id @default(uuid())
+  orgId         String   @map("org_id")
+  landingPageId String   @map("landing_page_id")
+  eventType     String   @map("event_type")
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  landingPage  LandingPage  @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+
+   @@index([orgId])
+  @@index([landingPageId])
+  @@index([eventType])
+  @@map("tracking_events")
+  @@schema("templates")
+}
+
 // projects — real-estate developments, their unit-type product mix, and the
 // individual unit inventory beneath each type.
 //   org 1─* projects 1─* unit_types 1─* units

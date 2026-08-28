@@ -339,7 +339,6 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   headerfooter: "Header & Footer",
   seo: "SEO Center",
   tracking: "Tracking Center",
-  domains: "Domains",
   typography: "Typography & Fonts",
 };
 

@@ -3,6 +3,7 @@ import { PAGES } from "./data";
 import { BLANK_TEMPLATE, buildTemplateSections, buildThankYouSections, inferDesignId } from "./page-templates";
 import { ensureConfig } from "./site-config";
 import { apiFetch } from "../api";
+import { isStructural } from "./tree";
 
 export const PAGES_STORAGE_KEY = "prestate.pages.v4";
 
@@ -52,6 +53,21 @@ function migrateSectionNode(node: SectionInstance): SectionInstance {
         ...it,
         meta: it.meta ?? it.text,
       }));
+    }
+  }
+  if (!isStructural(next.type)) {
+    const align = next.style.layout?.align;
+    if (align == null || align === "left") {
+      next = {
+        ...next,
+        style: {
+          ...next.style,
+          layout: {
+            ...next.style.layout,
+            align: "center",
+          },
+        },
+      };
     }
   }
   if (next.children?.length) next = { ...next, children: next.children.map(migrateSectionNode) };

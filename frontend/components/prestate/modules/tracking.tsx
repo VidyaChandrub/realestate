@@ -41,7 +41,21 @@ export function TrackingModule({
   const [counts, setCounts] = useState<TrackingCounts>(() => loadTrackingCounts(site.id));
   const patchTracking = (partial: Partial<SiteConfig["tracking"]>) => onPatch((c) => ({ ...c, tracking: { ...c.tracking, ...partial } }));
   const snippet = buildTrackingSnippet(tracking);
+  // Per-individual landing page: use /preview/:id for landing pages, /p/:slug for templates
+  const isLandingPage = site.kind === "custom" || (site.pageType === "landing" && site.id.includes("-"));
+  const pagePreviewPath = isLandingPage && site.id ? `/preview/${encodeURIComponent(site.id)}` : localPreviewPath(site);
   const utm = buildUtmUrl(site, tracking);
+  // Override UTM base for landing pages to keep per-page isolation
+  const utmPerPage = isLandingPage ? (() => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    try {
+      const u = new URL(`${origin}${pagePreviewPath}`);
+      if (tracking.utmSource.trim()) u.searchParams.set("utm_source", tracking.utmSource.trim());
+      if (tracking.utmMedium.trim()) u.searchParams.set("utm_medium", tracking.utmMedium.trim());
+      if (tracking.utmCampaign.trim()) u.searchParams.set("utm_campaign", tracking.utmCampaign.trim());
+      return u.toString();
+    } catch { return utm; }
+  })() : utm;
   const conv = counts.view ? Math.round((counts.form / counts.view) * 1000) / 10 : 0;
 
   useEffect(() => {
@@ -136,17 +150,17 @@ export function TrackingModule({
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-            <Collapse title="UTM builder" icon={<Link2 size={14} />} defaultOpen>
-              <FieldRow label="Page URL">
-                <TextField value={localPreviewPath(site)} onChange={() => {}} disabled />
+            <Collapse title="UTM builder (per-page)" icon={<Link2 size={14} />} defaultOpen>
+              <FieldRow label="Page URL (per-page)">
+                <TextField value={pagePreviewPath} onChange={() => {}} disabled />
               </FieldRow>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <FieldRow label="Source"><TextField value={tracking.utmSource} onChange={(v) => patchTracking({ utmSource: v })} /></FieldRow>
                 <FieldRow label="Medium"><TextField value={tracking.utmMedium} onChange={(v) => patchTracking({ utmMedium: v })} /></FieldRow>
               </div>
               <FieldRow label="Campaign"><TextField value={tracking.utmCampaign} onChange={(v) => patchTracking({ utmCampaign: v })} /></FieldRow>
-              <div style={{ fontSize: 11.5, color: "var(--ps-muted)", fontFamily: "ui-monospace, monospace", wordBreak: "break-all", margin: "4px 0 10px" }}>{utm}</div>
-              <Btn variant="primary" size="sm" style={{ width: "100%" }} onClick={() => void copyText(utm, "UTM link copied")}>
+              <div style={{ fontSize: 11.5, color: "var(--ps-muted)", fontFamily: "ui-monospace, monospace", wordBreak: "break-all", margin: "4px 0 10px" }}>{utmPerPage}</div>
+              <Btn variant="primary" size="sm" style={{ width: "100%" }} onClick={() => void copyText(utmPerPage, "UTM link copied")}>
                 <Link2 size={13} /> Copy tracking link
               </Btn>
             </Collapse>

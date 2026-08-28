@@ -37,6 +37,9 @@ export function SeoModule({
   const ogOk = Boolean(seo.ogImage);
   const schemaOk = jsonLdValid(json);
   const ogImageSrc = isMediaSrc(seo.ogImage) ? seo.ogImage : "";
+  // Per-individual landing page: landing pages (kind custom) use /preview/:id, templates use /p/:slug
+  const isLandingPage = site.kind === "custom" || site.pageType === "landing" && site.id.includes("-");
+  const previewPath = isLandingPage && site.id ? `/preview/${encodeURIComponent(site.id)}` : localPreviewPath(site);
 
   const fillMissing = () => {
     const nextTitle = title.trim() || `${brand.name} | ${site.template}`.slice(0, 60);
@@ -93,9 +96,9 @@ export function SeoModule({
       <div className="ps-brand-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, padding: "0 28px 48px", alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="ps-card" style={{ borderRadius: 14, padding: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)" }}>Local URL</span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", fontFamily: "ui-monospace, monospace" }}>{localPreviewPath(site)}</span>
-            <a href={localPreviewPath(site)} target="_blank" rel="noreferrer" style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "var(--ps-primary)", textDecoration: "none" }}>
+            <span style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)" }}>Preview URL (per-page)</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", fontFamily: "ui-monospace, monospace" }}>{previewPath}</span>
+            <a href={previewPath} target="_blank" rel="noreferrer" style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "var(--ps-primary)", textDecoration: "none" }}>
               <ExternalLink size={13} /> Open preview
             </a>
           </div>

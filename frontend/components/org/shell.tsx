@@ -33,21 +33,19 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/org/projects", icon: "building", label: "Projects", tip: "Projects" },
     ],
   },
-  // Will enable these once we have the backend for them - phase 2.
-  // {
-  //   grp: "Communication",
-  //   items: [
-  //     { href: "/org/calling", icon: "phone", label: "Calling", tip: "Calling" },
-  //     { href: "/org/whatsapp", icon: "mail", label: "WhatsApp", tip: "WhatsApp" },
-  //   ],
-  // },
+  {
+    grp: "Communication",
+    items: [
+      { href: "/org/calling", icon: "phone", label: "Calling", tip: "Calling" },
+      { href: "/org/whatsapp", icon: "mail", label: "WhatsApp", tip: "WhatsApp" },
+    ],
+  },
   {
     grp: "Website",
     items: [
-      // { href: "/org/websites", icon: "globe", label: "Websites", tip: "Websites" },
       { href: "/org/landing-pages", icon: "document", label: "Landing Pages", tip: "Landing Pages" },
       { href: "/org/templates", icon: "puzzle", label: "Templates", tip: "Templates" },
-      // { href: "/org/integrations", icon: "link", label: "Integrations", tip: "Integrations" },
+      { href: "/org/domains", icon: "globe", label: "Domains & DNS", tip: "Domains & DNS" },
     ],
   },
   {
@@ -66,10 +64,23 @@ const CRUMB_MAP: Record<string, string> = {
   "/org/leads": "Lead Center",
   "/org/projects": "Projects",
   "/org/calling": "Calling",
+  "/org/calling/ai-agents": "AI Agents",
+  "/org/calling/campaigns": "Campaigns",
+  "/org/calling/call-logs": "Call Logs",
+  "/org/calling/voice-lab": "Voice Lab",
+  "/org/calling/automations": "Automations",
+  "/org/calling/queue": "Call Queue",
+  "/org/calling/numbers": "Numbers",
+  "/org/calling/settings": "Calling Settings",
   "/org/whatsapp": "WhatsApp",
+  "/org/whatsapp/ai-agents": "WhatsApp AI Agents",
+  "/org/whatsapp/inbox": "WhatsApp Inbox",
+  "/org/whatsapp/automations": "WhatsApp Automations",
+  "/org/whatsapp/settings": "WhatsApp Settings",
   "/org/websites": "Websites",
   "/org/landing-pages": "Landing Pages",
   "/org/templates": "Templates",
+  "/org/domains": "Domains & DNS",
   "/org/integrations": "Integrations",
   "/org/sales-agents": "Sales Agents",
   "/org/teams": "Teams",

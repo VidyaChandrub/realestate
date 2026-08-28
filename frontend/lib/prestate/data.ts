@@ -105,7 +105,7 @@ const widgetDefaultStyle = (over?: Partial<SectionStyle>): SectionStyle => ({
   colors: { bg: "transparent", overlay: "", gradient: "", text: "" },
   typography: {},
   spacing: { padding: { ...WIDGET_ZERO }, margin: { ...WIDGET_ZERO }, gap: 12 },
-  layout: { width: "full", height: "auto", align: "left", direction: "column" },
+  layout: { width: "full", height: "auto", align: "center", direction: "column" },
   responsive: {},
   ...over,
 });
@@ -198,14 +198,14 @@ export const WIDGETS: WidgetDef[] = [
   { id: "contact", label: "Contact Details", category: "Basic", group: "Basic", icon: Phone, desc: "Contact information", make: () => sec("contact", "Contact Details", "Phone", { heading: "Get in Touch", phone: "+91 90000 00000", email: "sales@builder.com", address: "Bangalore" }) },
 
   // REAL ESTATE
-  { id: "hero", label: "Hero Banner", category: "Real Estate", group: "Real Estate", icon: LayoutPanelTop, desc: "Full-width hero with CTAs — 3 premium designs", make: () => sec("hero", "Hero Banner", "LayoutPanelTop", { design: "classic", eyebrow: "RERA Approved", heading: "Your New Headline", subheading: "Your subheadline", price: "{{starting_price}}", priceLabel: "STARTING FROM", ctaPrimary: "Book Site Visit", ctaSecondary: "Download Brochure", highlights: ["RERA Approved", "Metro connected", "Ready amenities"], heroStats: [{ value: "2.5 Ac", label: "Campus" }, { value: "2", label: "Towers" }, { value: "1650+", label: "Sq.ft" }, { value: "Dec 2027", label: "Possession" }] }, { colors: { bg: "#111827", overlay: "rgba(17,24,39,0.45)", text: "#ffffff" }, layout: { width: "full", height: "vh", fixedHeight: 720, align: "left", direction: "column", justify: "center", alignItems: "flex-start" } }) },
+  { id: "hero", label: "Hero Banner", category: "Real Estate", group: "Real Estate", icon: LayoutPanelTop, desc: "Full-width hero with CTAs — 3 standard layouts", make: () => sec("hero", "Hero Banner", "LayoutPanelTop", { design: "classic", eyebrow: "RERA Approved", heading: "Your New Headline", subheading: "Your subheadline", price: "{{starting_price}}", priceLabel: "STARTING FROM", ctaPrimary: "Book Site Visit", ctaSecondary: "Download Brochure", highlights: ["RERA Approved", "Metro connected", "Ready amenities"], heroStats: [{ value: "2.5 Ac", label: "Campus" }, { value: "2", label: "Towers" }, { value: "1650+", label: "Sq.ft" }, { value: "Dec 2027", label: "Possession" }] }, { colors: { bg: "#111827", overlay: "rgba(17,24,39,0.45)", text: "#ffffff" }, layout: { width: "full", height: "vh", fixedHeight: 720, align: "center", direction: "column", justify: "center", alignItems: "center" } }) },
   { id: "overview", label: "Property Overview", category: "Real Estate", group: "Real Estate", icon: Building2, desc: "Project intro with stats — 3 premium designs", make: () => sec("overview", "Property Overview", "Building2", { design: "classic", eyebrow: "About the Project", heading: "Project Overview", text: "Describe your project here.", image: "lobby", bullets: ["Prime location", "Clubhouse & amenities", "RERA registered"], stats: [{ value: "2.5 Ac", label: "Land" }, { value: "450+", label: "Homes" }, { value: "70%", label: "Open" }] }) },
   { id: "highlights", label: "Property Highlights", category: "Real Estate", group: "Real Estate", icon: Award, desc: "Key selling points strip", make: () => sec("highlights", "Property Highlights", "Award", { design: "strip", items: [{ icon: "Sparkles", value: "RERA", label: "Approved" }, { icon: "TrainFront", value: "5 min", label: "To Metro" }, { icon: "Dumbbell", value: "40+", label: "Amenities" }, { icon: "Leaf", value: "70%", label: "Open space" }] }) },
   { id: "stats", label: "Property Statistics", category: "Real Estate", group: "Real Estate", icon: Gauge, desc: "Big number counters — units, acres, floors, possession", make: () => sec("stats", "Property Statistics", "Gauge", { design: "cards", heading: "", items: [{ icon: "Building2", value: "312", label: "Residences" }, { icon: "LandPlot", value: "2.5 Ac", label: "Campus" }, { icon: "Dumbbell", value: "40+", label: "Amenities" }, { icon: "CalendarClock", value: "Dec 2027", label: "Possession" }], style: "cards" }) },
   { id: "amenities", label: "Amenities", category: "Real Estate", group: "Real Estate", icon: Dumbbell, desc: "Amenity grid", make: () => sec("amenities", "Amenities", "Dumbbell", { design: "grid", eyebrow: "Lifestyle", heading: "Amenities", items: [{ icon: "Dumbbell", title: "Gymnasium", desc: "Fully equipped" }, { icon: "SwimmingPool", title: "Pool", desc: "Temperature controlled" }, { icon: "Leaf", title: "Garden", desc: "Landscaped lawns" }, { icon: "Car", title: "Parking", desc: "Covered slots" }] }) },
   { id: "gallery", label: "Property Gallery", category: "Real Estate", group: "Real Estate", icon: Images, desc: "Image masonry", make: () => sec("gallery", "Property Gallery", "Images", { design: "masonry", eyebrow: "Gallery", heading: "Project Gallery", text: "A look inside the development.", images: ["1", "2", "3", "4", "5", "6"], columns: 3, lightbox: true, captions: [] }) },
   { id: "video-gallery", label: "Video Gallery", category: "Real Estate", group: "Real Estate", icon: Video, desc: "Collection of videos", make: () => sec("video-gallery", "Video Gallery", "Video", { design: "grid", heading: "Video Gallery", videos: [{ title: "Walkthrough" }, { title: "Amenities tour" }] }) },
-  { id: "floorplans", label: "Floor Plans", category: "Real Estate", group: "Real Estate", icon: Grid, desc: "Plan selector", make: () => sec("floorplans", "Floor Plans", "Grid", { design: "tabs", eyebrow: "Layouts", heading: "Floor Plans", text: "Choose a configuration.", plans: [{ name: "3 BHK", beds: "3", area: "1,650 sq.ft", price: "₹1.25 Cr" }, { name: "4 BHK", beds: "4", area: "2,450 sq.ft", price: "₹1.95 Cr" }] }) },
+  { id: "floor-plan-gallery", label: "Floor Plan Gallery", category: "Real Estate", group: "Real Estate", icon: Grid, desc: "Gated floor plan gallery — blurred until user submits enquiry form", make: () => sec("floor-plan-gallery", "Floor Plan Gallery", "Grid", { eyebrow: "Floor Plans", heading: "Explore Our Floor Plans", text: "Submit your details to unlock and view detailed floor plan images.", formHeading: "Unlock Floor Plan", formButton: "View Floor Plan", plans: [{ name: "3 BHK", beds: "3", area: "1,650 sq.ft", price: "₹1.25 Cr", image: "" }, { name: "4 BHK", beds: "4", area: "2,450 sq.ft", price: "₹1.95 Cr", image: "" }, { name: "2 BHK", beds: "2", area: "1,200 sq.ft", price: "₹90 L", image: "" }] }) },
   { id: "master-plan", label: "Master Plan", category: "Real Estate", group: "Real Estate", icon: Map, desc: "Campus master plan", make: () => sec("master-plan", "Master Plan", "Map", { design: "image", heading: "Master Plan", image: "", text: "Towers, clubhouse and landscape across the campus." }) },
   { id: "pricing", label: "Pricing Table", category: "Real Estate", group: "Real Estate", icon: Wallet, desc: "Configurations & price", make: () => sec("pricing", "Pricing Table", "Wallet", { design: "cards", eyebrow: "Investment", heading: "Pricing", text: "Transparent configurations.", plans: [{ name: "3 BHK", area: "1,650 sq.ft", price: "₹1.25 Cr", per: "onwards", features: ["2 baths", "2 parkings", "Club access"], cta: "Enquire", featured: false }, { name: "4 BHK", area: "2,450 sq.ft", price: "₹1.95 Cr", per: "onwards", features: ["3 baths", "2 parkings", "Corner unit"], cta: "Enquire", featured: true }] }) },
   { id: "features", label: "Property Features", category: "Real Estate", group: "Real Estate", icon: BadgeCheck, desc: "Feature checklist", make: () => sec("features", "Property Features", "BadgeCheck", { design: "checklist", heading: "Property Features", items: [{ title: "Vastu compliant", text: "All units" }, { title: "VRV air-conditioning", text: "Premium finishes" }, { title: "Italian marble", text: "Living & foyer" }] }) },
@@ -244,6 +244,9 @@ export const WIDGETS: WidgetDef[] = [
 
   // ADVANCED
   { id: "html", label: "Custom HTML", category: "Advanced", group: "Advanced", icon: Code2, desc: "Raw HTML embed", make: () => sec("html", "Custom HTML", "Code2", { code: "<div>Your custom HTML here</div>" }) },
+
+  // REAL ESTATE (continued)
+  { id: "emi-calculator", label: "EMI Calculator", category: "Real Estate", group: "Real Estate", icon: Gauge, desc: "Home-loan EMI estimator with live sliders", make: () => sec("emi-calculator", "EMI Calculator", "Gauge", { heading: "Estimate Your Monthly EMI", price: 125, downPayment: 25, rate: 8.5, tenure: 20, currency: "₹", note: "Indicative calculation only. Final EMI depends on lender terms, tenure and eligibility." }) },
 ];
 
 export const WIDGET_CATEGORY_META: { key: WidgetDef["category"]; label: string }[] = [
@@ -329,6 +332,17 @@ export const PROPERTY: PropertyData = {
   landArea: "2.5 Acres",
   metro: "500 m",
   units: "312",
+};
+
+const VARS: Record<string, string> = {
+  property_name: PROPERTY.name,
+  builder_name: PROPERTY.builder,
+  starting_price: PROPERTY.startingPrice,
+  rera_number: PROPERTY.reraNumber,
+  possession_date: PROPERTY.possession,
+  carpet_area: PROPERTY.carpetArea,
+  location: PROPERTY.location,
+  description: PROPERTY.description,
 };
 
 
@@ -585,7 +599,7 @@ export const SLUG_ICONS: Record<string, LucideIcon> = {
 
 export function resolveVars(text: unknown): string {
   if (typeof text !== "string") return "";
-  return text;
+  return text.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_match, key: string) => VARS[key] ?? `{{${key}}}`);
 }
 
 export function cx(...parts: unknown[]): string {

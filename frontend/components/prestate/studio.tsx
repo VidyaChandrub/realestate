@@ -26,7 +26,7 @@ import {
   X,
 } from "lucide-react";
 import type { Device, LandingPageData, ModuleKey, SectionInstance, SiteConfig } from "@/lib/prestate/types";
-import { loadTemplate, loadTemplates, saveTemplate, createTemplate, publishLandingPage, unpublishLandingPage, normalizeDomain, isLikelyHostname, type Resource } from "@/lib/prestate/store";
+import { loadTemplate, loadTemplates, saveTemplate, createTemplate, publishLandingPage, unpublishLandingPage, type Resource } from "@/lib/prestate/store";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
 import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
 import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
@@ -38,7 +38,6 @@ import { BrandModule } from "@/components/prestate/modules/brand";
 import { HeaderFooterModule } from "@/components/prestate/modules/headerfooter";
 import { SeoModule } from "@/components/prestate/modules/seo";
 import { TrackingModule } from "@/components/prestate/modules/tracking";
-import { DomainsModule } from "@/components/prestate/modules/domains";
 import { TypographyModule } from "@/components/prestate/modules/typography";
 
 const NAV_ITEMS: { key: ModuleKey; label: string; icon: React.ComponentType<{ size?: number | string }> }[] = [
@@ -49,7 +48,6 @@ const NAV_ITEMS: { key: ModuleKey; label: string; icon: React.ComponentType<{ si
   { key: "headerfooter", label: "Header & Footer", icon: PencilRuler },
   { key: "seo", label: "SEO", icon: Search },
   { key: "tracking", label: "Tracking", icon: Target },
-  { key: "domains", label: "Domains", icon: Globe },
 ];
 
 interface Toast {
@@ -126,10 +124,20 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   const apiRef = useRef<BuilderApi | null>(null);
   const toastId = useRef(0);
   // Lightweight (no content) index of every template — feeds FormsModule's
-  // site-scope bar/thank-you-page lookup, and the client-side domain
-  // collision check in assignDomain() (which DomainsModule calls
-  // synchronously, so this has to be state read at call time, not a fetch).
+  // site-scope bar/thank-you-page lookup.
   const [allPages, setAllPages] = useState<LandingPageData[]>([]);
+
+  const [hasUnsaved, setHasUnsaved] = useState(false);
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasUnsaved) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsaved]);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,13 +241,6 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
 
   const scoped = activePage ? [activePage] : [];
 
-  // Domains is shown for both sessions for UI parity. LandingPage has no
-  // domain column server-side yet (deliberately — real domain
-  // assignment/verification is a separate, not-yet-designed piece), so for
-  // an org session this is view/session-only: assignDomain/clearDomain
-  // below update local state same as templates, but patchLandingPage never
-  // sends `domain` to the backend, and a reload resets it (fromApiLandingPage
-  // always returns ""). Revisit once that backend piece exists.
   const railItems = NAV_ITEMS;
 
   // Fires the debounced single-record save and reconciles the server-derived
@@ -251,13 +252,15 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   // whatever it actually decided, not guess ahead of it.
   const saveInBackground = useCallback(
     (next: LandingPageData) => {
+      setHasUnsaved(true);
       void saveTemplate(next, resource)
         .then((saved) => {
           setActivePage((cur) =>
             cur && cur.id === saved.id ? { ...cur, status: saved.status, updated: saved.updated, updatedAt: saved.updatedAt } : cur,
           );
+          setHasUnsaved(false);
         })
-        .catch(() => toast("Couldn't save — check your connection"));
+        .catch(() => { setHasUnsaved(false); toast("Couldn't save — check your connection"); });
     },
     [toast, resource],
   );
@@ -365,47 +368,6 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
       window.open(localPreviewPath(page), "_blank", "noopener,noreferrer");
     },
     [activePage, resource],
-  );
-
-  const assignDomain = useCallback(
-    (pageId: string, raw: string) => {
-      if (!activePage || activePage.id !== pageId) return false;
-      const host = normalizeDomain(raw);
-      if (!host || !isLikelyHostname(host)) {
-        toast("Enter a hostname like auroraresidences.com");
-        return false;
-      }
-      const clash = allPages.find((p) => p.id !== pageId && normalizeDomain(p.domain) === host);
-      if (clash) {
-        toast(`“${host}” is already assigned to ${clash.name}`);
-        return false;
-      }
-      const cfg = ensureConfig(activePage);
-      const prevHost = normalizeDomain(activePage.domain);
-      const canonical =
-        !cfg.seo.canonical || cfg.seo.canonical.includes("localhost") || (prevHost && cfg.seo.canonical.includes(prevHost))
-          ? `https://${host}`
-          : cfg.seo.canonical;
-      const next = { ...activePage, domain: host, updated: "Just now", config: { ...cfg, seo: { ...cfg.seo, canonical } } };
-      setActivePage(next);
-      saveInBackground(next);
-      toast(`Assigned ${host} · /p/host/${host}`);
-      return true;
-    },
-    [activePage, allPages, toast, saveInBackground],
-  );
-
-  const clearDomain = useCallback(
-    (pageId: string) => {
-      setActivePage((prev) => {
-        if (!prev || prev.id !== pageId) return prev;
-        const next = { ...prev, domain: "", updated: "Just now" };
-        saveInBackground(next);
-        return next;
-      });
-      toast("Domain removed from this template");
-    },
-    [toast, saveInBackground],
   );
 
   const patchConfig = useCallback(
@@ -541,16 +503,6 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
             onSelectSite={() => {}}
             onPatch={(fn) => patchConfig(activePage.id, fn)}
             onToast={toast}
-          />
-        ) : null;
-      case "domains":
-        return activePage ? (
-          <DomainsModule
-            site={activePage}
-            onToast={toast}
-            onAssignDomain={assignDomain}
-            onClearDomain={clearDomain}
-            onPreview={(id) => openLocalPreview(id)}
           />
         ) : null;
       default:
@@ -708,10 +660,9 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
             <>
               <div><strong style={{ color: "var(--ps-ink)" }}>Builder</strong> — drag widgets, then Save Draft, Preview, Publish or Unpublish from the top bar.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Preview</strong> — opens a real local page at /p/your-slug. Resize the window for mobile/tablet.</div>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Domains</strong> — assign auroraresidences.com (or any hostname) to a page, then open /p/host/auroraresidences.com.</div>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Pages</strong> — edit, duplicate, publish, unpublish, assign domain, or delete. Use the ⋯ menu on desktop or the action row on mobile.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Pages</strong> — edit, duplicate, publish, unpublish, or delete. Use the ⋯ menu on desktop or the action row on mobile.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Templates</strong> — pick a template from the Templates page in Super Admin. Clicking one opens this builder.</div>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Settings</strong> — Brand, Header, SEO, Tracking, Forms and Domains apply only to the template selected in the scope bar.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Settings</strong> — Brand, Header, SEO, Tracking and Forms apply only to the template selected in the scope bar.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Shortcuts</strong> — Ctrl+S save, Ctrl+Z undo, Ctrl+Shift+Z redo.</div>
             </>
           )}

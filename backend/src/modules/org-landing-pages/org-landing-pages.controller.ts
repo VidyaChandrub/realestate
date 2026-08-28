@@ -36,6 +36,16 @@ export class OrgLandingPagesController {
     return this.service.list(user.orgId as string, query);
   }
 
+  @Get('seo/sitemap.xml')
+  sitemap(@CurrentUser() user: JwtPayload) {
+    return this.service.sitemap(user.orgId as string);
+  }
+
+  @Get('seo/robots.txt')
+  robots(@CurrentUser() user: JwtPayload) {
+    return this.service.robots(user.orgId as string);
+  }
+
   @Get(':id')
   getById(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.getById(user.orgId as string, id);
@@ -65,5 +75,10 @@ export class OrgLandingPagesController {
   @Delete(':id')
   remove(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.remove(user.orgId as string, id);
+  }
+
+  @Post(':id/duplicate')
+  duplicate(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.service.duplicate(user.orgId as string, id);
   }
 }

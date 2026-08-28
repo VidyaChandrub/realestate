@@ -6,9 +6,9 @@ export interface WidgetDesignMeta {
 
 export const REAL_ESTATE_DESIGNS: Record<string, WidgetDesignMeta[]> = {
   hero: [
-    { id: "classic", name: "Classic Full", desc: "Full-bleed image, price + CTAs + stats glow cards" },
-    { id: "split", name: "Split Premium", desc: "Left copy + right form/card, contained" },
-    { id: "centered", name: "Centered Minimal", desc: "Centered headline, generous whitespace, single CTA" },
+    { id: "classic", name: "Classic Full", desc: "Full-bleed premium hero with copy and quick facts" },
+    { id: "split", name: "Split Premium", desc: "Left copy with a right-side facts card" },
+    { id: "centered", name: "Centered Minimal", desc: "Centered headline with a clean stat strip" },
   ],
   overview: [
     { id: "classic", name: "Side-by-Side", desc: "Image left, content right, RERA badge" },
@@ -39,8 +39,8 @@ export const REAL_ESTATE_DESIGNS: Record<string, WidgetDesignMeta[]> = {
     { id: "feature", name: "Feature + List", desc: "Large feature + side list" },
   ],
   floorplans: [
+    { id: "cards", name: "Card Grid", desc: "2-3 col cards · image top, specs & CTA" },
     { id: "tabs", name: "Tabs Premium", desc: "Pill tabs + side details + image" },
-    { id: "cards", name: "Cards", desc: "3-col plan cards" },
   ],
   "master-plan": [
     { id: "image", name: "Image Focus", desc: "Large image, text overlay subtle" },
