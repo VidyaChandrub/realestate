@@ -18,6 +18,7 @@ import { OrgLandingPagesService } from './org-landing-pages.service';
 import { CreateLandingPageDto } from './dto/create-landing-page.dto';
 import { UpdateLandingPageDto } from './dto/update-landing-page.dto';
 import { ListLandingPagesQueryDto } from './dto/list-landing-pages-query.dto';
+import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 
 // Every route derives orgId from the JWT — never from a client-supplied
 // param — so one org can never read or touch another org's pages.
@@ -80,5 +81,16 @@ export class OrgLandingPagesController {
   @Post(':id/duplicate')
   duplicate(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.duplicate(user.orgId as string, id);
+  }
+
+  // Presigned URL for a builder image upload — the browser PUTs straight to
+  // R2, then stores the returned publicUrl in `content` (no base64).
+  @Post(':id/upload-url')
+  createUploadUrl(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: CreateUploadUrlDto,
+  ) {
+    return this.service.createUploadUrl(user.orgId as string, id, dto);
   }
 }

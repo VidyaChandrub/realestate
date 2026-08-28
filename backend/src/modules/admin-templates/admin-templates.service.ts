@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { StorageService } from '../../common/storage/storage.service';
 import { generateUniqueTemplateSlug } from '../../common/utils/slug.util';
 import { toLandingPageData } from './template.mapper';
 import { CreateTemplateDto } from './dto/create-template.dto';
@@ -13,6 +14,7 @@ import { UpdateTemplateDto } from './dto/update-template.dto';
 import { ListTemplatesQueryDto } from './dto/list-templates-query.dto';
 import { ResetTemplateDto } from './dto/reset-template.dto';
 import { TemplateContentDto } from './dto/template-content.dto';
+import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 
 const PAGE_TYPE_TO_DB = {
   landing: 'landing',
@@ -28,7 +30,24 @@ function toContentJson(content: TemplateContentDto): Prisma.InputJsonValue {
 
 @Injectable()
 export class AdminTemplatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
+
+  // Presigned PUT URL for a builder image in the Super Admin template
+  // builder. No org context (platform-level) — the key is placed under
+  // `platform/templates/{id}/images/...`.
+  async createUploadUrl(id: string, dto: CreateUploadUrlDto) {
+    await this.findOrThrow(id);
+    return this.storage.createUploadUrl({
+      field: 'builderImage',
+      templateId: id,
+      filename: dto.filename,
+      contentType: dto.contentType,
+      size: dto.size,
+    });
+  }
 
   async list(query: ListTemplatesQueryDto) {
     // Thank-you pages are companions reachable through their parent landing

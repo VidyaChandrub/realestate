@@ -20,9 +20,9 @@ const PRESIGN_TTL_SECONDS = 10 * 60;
 
 /**
  * Generic object-storage helper for the whole backend (Cloudflare R2, which
- * is S3-compatible). Only wired into Projects for now, but any module can
- * `imports: [StorageModule]` and call this — see storage.types.ts to add a
- * new field rule.
+ * is S3-compatible). Used by Projects (media) and the Templates / Landing
+ * Pages builder (content images); any module can inject StorageService —
+ * see storage.types.ts to add a new field rule.
  *
  * The bucket is public-read: everything issued here is a marketing asset
  * (icons, floor plans, brochures, walkthrough videos) meant to be visible
@@ -145,16 +145,34 @@ export class StorageService {
     };
   }
 
-  // Key layout is decided here, server-side. Everything org-scoped lives
-  // under a single top-level `org/` prefix (leaving room for a future
-  // `public/` or `system/` prefix). The orgId segment is the caller's own
-  // (from the JWT) so no org can ever get a URL that writes into another
-  // org's prefix.
+  // Key layout is decided here, server-side. Org-scoped content lives under
+  // a single top-level `org/{orgId}/` prefix; platform-level content (no
+  // orgId — e.g. the Super Admin template builder) under `platform/`. The
+  // orgId segment is the caller's own (from the JWT) so no org can ever get
+  // a URL that writes into another org's prefix.
   private buildKey(input: CreateUploadUrlInput): string {
     const safeName = sanitizeFilename(input.filename);
     const unique = `${randomUUID()}-${safeName}`;
-    const parts = ['org', input.orgId];
+    const root = input.orgId ? ['org', input.orgId] : ['platform'];
 
+    // Builder images: the `images/` folder already names the field, so the
+    // key is .../images/{uuid}-{filename} (no trailing field segment).
+    if (input.landingPageId) {
+      return [
+        ...root,
+        'landing-pages',
+        seg(input.landingPageId),
+        'images',
+        unique,
+      ].join('/');
+    }
+    if (input.templateId) {
+      return [...root, 'templates', seg(input.templateId), 'images', unique].join(
+        '/',
+      );
+    }
+
+    const parts = [...root];
     if (input.projectId) {
       parts.push('projects', input.projectId);
       if (input.unitTypeId) {
@@ -172,6 +190,12 @@ export class StorageService {
     parts.push(input.field, unique);
     return parts.join('/');
   }
+}
+
+// Defensive: context ids come from validated UUID DTO fields, but never let
+// a stray `/` or `..` into a key path.
+function seg(value: string): string {
+  return value.replace(/[^\w-]+/g, '') || 'x';
 }
 
 function formatMb(bytes: number): string {
