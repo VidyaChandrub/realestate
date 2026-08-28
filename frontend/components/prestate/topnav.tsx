@@ -5,6 +5,7 @@ import type * as React from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  ArrowLeft,
   Bell,
   ChevronDown,
   Clock,
@@ -91,6 +92,7 @@ export function TopNav({
   user,
   onSignOut,
   settingsHref,
+  homeHref,
 }: {
   module: ModuleKey;
   pageName?: string;
@@ -119,6 +121,10 @@ export function TopNav({
   // Real destination for the "Settings" menu item — differs by session
   // (org vs Super Admin). No fallback: pass it or the item stays inert.
   settingsHref?: string;
+  // Destination for the header "Back" control. For an org session this is the
+  // Landing Pages hub; for Super Admin it's the Templates hub. When omitted the
+  // header shows no back button (callers that expose back elsewhere can skip it).
+  homeHref?: string;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [dark, setDark] = useState(true);
@@ -142,6 +148,11 @@ export function TopNav({
       <button type="button" className="ps-nav-toggle" title="Modules" onClick={onMenu}>
         <Menu size={18} />
       </button>
+      {homeHref ? (
+        <Link href={homeHref} title="Back to pages" className="ps-topnav-icon-btn" style={iconBtn(true)}>
+          <ArrowLeft size={16} />
+        </Link>
+      ) : null}
       <div className="ps-topnav-brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <PrestateMark />
         <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>

@@ -77,6 +77,9 @@ export interface SignupInput {
   work_email: string;
   phone_number: string;
   city: string;
+  country: string;
+  currency: string;
+  timezone: string;
   password: string;
   planId?: string;
   billingCycle?: 'monthly' | 'yearly';
@@ -102,6 +105,17 @@ export interface SessionUser extends SafeUser {
   roleLabel: string;
   permissions: Permissions;
   organisation: SafeOrganisation | null;
+}
+
+/** Shape returned by GET /auth/me — the logged-in user plus their organisation. */
+export interface UserProfile {
+  user: SafeUser;
+  organisation: SafeOrganisation | null;
+}
+
+export interface ChangePasswordInput {
+  current_password: string;
+  new_password: string;
 }
 
 export interface OrganisationRegistrationInput {
@@ -447,6 +461,38 @@ export interface OrgBillingSummary {
   };
 }
 
+// POST /org/billing/plan — org-self-service upgrade / downgrade
+export interface ChangePlanInput {
+  planId: string;
+  billingCycle?: 'monthly' | 'yearly';
+}
+
+export interface ChangePlanResult {
+  id: string;
+  planId: string;
+  planName: string;
+  billingCycle: 'monthly' | 'yearly';
+  status: string;
+  amount: number;
+  currency: string;
+  renewsAt: string | null;
+  startedAt: string;
+}
+
+// GET /org/billing/invoices — derived from the active subscription (no payment
+// provider exists yet, so invoices are generated from the billing cycle).
+export interface InvoiceRow {
+  id: string;
+  number: string;
+  issuedAt: string;
+  dueAt: string;
+  amount: number;
+  currency: string;
+  billingCycle: 'monthly' | 'yearly';
+  status: 'paid' | 'pending';
+  planName: string;
+}
+
 // --- Projects & inventory (org-scoped) ---
 // All money fields are integer rupees. `landArea` is acres. `possession` is
 // deliberately free text ("Dec 2027"); `manager` is a free-text name, not a
@@ -597,3 +643,14 @@ export type UpdateUnitInput = Partial<Omit<CreateUnitInput, "tower">> & {
   /** value to set, or explicit null to clear. */
   tower?: string | null;
 };
+
+export interface LeadSubmission {
+  /** Landing page id the form belongs to (used server-side to attribute the org). */
+  landingPageId?: string;
+  /** Human name of the form (Form Builder "name" field). */
+  formName?: string;
+  /** Where the submission came from. */
+  source?: string;
+  /** Captured field values, keyed by field label. */
+  fields: Record<string, string>;
+}

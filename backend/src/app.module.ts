@@ -17,6 +17,7 @@ import { OrgActivityModule } from './modules/org-activity/org-activity.module';
 import { OrgTypographySetsModule } from './modules/org-typography-sets/org-typography-sets.module';
 import { AdminTypographySetsModule } from './modules/admin-typography-sets/admin-typography-sets.module';
 import { OrgBillingModule } from './modules/org-billing/org-billing.module';
+import { LeadsModule } from './modules/leads/leads.module';
 import { OrgDomainRequestsModule } from './modules/org-domain-requests/org-domain-requests.module';
 import { AdminDomainRequestsModule } from './modules/admin-domain-requests/admin-domain-requests.module';
 import { OrgTrackingModule } from './modules/org-tracking/org-tracking.module';
@@ -41,6 +42,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
     OrgTypographySetsModule,
     AdminTypographySetsModule,
     OrgBillingModule,
+    LeadsModule,
     ProjectsModule,
   ],
   controllers: [AppController],

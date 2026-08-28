@@ -186,6 +186,7 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
           name: cfg.brand.name,
           phone: cfg.brand.phone,
           logo: cfg.brand.logo,
+          layoutTheme: cfg.brand.layoutTheme,
         }}
         form={cfg.form}
         chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}

@@ -84,10 +84,6 @@ export const REAL_ESTATE_DESIGNS: Record<string, WidgetDesignMeta[]> = {
     { id: "cards", name: "Cards Overlay", desc: "Map under, cards over" },
     { id: "list", name: "List Premium", desc: "Vertical list + small map" },
   ],
-  "builder-profile": [
-    { id: "card", name: "Card Premium", desc: "Logo + stats + dark CTA" },
-    { id: "minimal", name: "Minimal", desc: "Text only, generous whitespace" },
-  ],
   brochure: [
     { id: "centered", name: "Centered CTA", desc: "Icon, text, gated button centered" },
     { id: "split", name: "Split Premium", desc: "Text left, download card right" },

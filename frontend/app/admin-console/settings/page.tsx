@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Switch } from "@/components/superadmin/switch";
 import { Icon } from "@/components/icons";
+import { CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Settings · iPixxel Realty Super Admin",
@@ -63,18 +64,22 @@ export default function SuperAdminSettingsPage() {
           <div className="row2">
             <div className="field">
               <label>Default currency</label>
-              <select>
-                <option selected>INR — Indian Rupee (₹)</option>
-                <option>AED — UAE Dirham (د.إ)</option>
-                <option>USD — US Dollar ($)</option>
+              <select defaultValue="INR">
+                {CURRENCY_OPTIONS.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="field">
               <label>Timezone</label>
-              <select>
-                <option selected>Asia/Kolkata (GMT+5:30)</option>
-                <option>Asia/Dubai (GMT+4:00)</option>
-                <option>Asia/Riyadh (GMT+3:00)</option>
+              <select defaultValue="Asia/Kolkata">
+                {TIMEZONE_OPTIONS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

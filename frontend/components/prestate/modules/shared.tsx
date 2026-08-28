@@ -221,16 +221,18 @@ export function Pills({ options, value, onChange }: { options: string[]; value: 
 export function SiteScopeBar({
   pages,
   activeId,
+  label = "Editing this template",
 }: {
   pages: LandingPageData[];
   activeId: string;
   onChange?: (id: string) => void;
+  label?: string;
 }) {
   const active = pages.find((p) => p.id === activeId) ?? pages[0];
   if (!active) return null;
   return (
     <div className="ps-scope-bar">
-      <span className="ps-scope-bar-label">Editing this template</span>
+      <span className="ps-scope-bar-label">{label}</span>
       <span className="ps-scope-bar-name">{active.name}</span>
       <span className="ps-scope-bar-meta">
         {active.domain || "No domain"} · /{active.slug}

@@ -6,6 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { dashboardPathFor } from "@/lib/mock/sessions";
 import { Icon, type IconName } from "@/components/icons";
+import { loadTemplates } from "@/lib/prestate/store";
+import { orgBuilderPath } from "@/lib/prestate/paths";
 
 type NavItem = {
   href: string;
@@ -48,15 +50,16 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/org/domains", icon: "globe", label: "Domains & DNS", tip: "Domains & DNS" },
     ],
   },
-  {
-    grp: "Team",
-    items: [
-      { href: "/org/sales-agents", icon: "users", label: "Sales Agents", tip: "Sales Agents" },
-      { href: "/org/teams", icon: "users", label: "Teams", tip: "Teams" },
-      { href: "/org/users", icon: "profile", label: "Users", tip: "Users" },
-      { href: "/org/roles-permissions", icon: "lock", label: "Roles & Permissions", tip: "Roles & Permissions" },
-    ],
-  },
+      {
+        grp: "Team",
+        items: [
+          { href: "/org/profile", icon: "profile", label: "My Profile", tip: "My Profile" },
+          { href: "/org/sales-agents", icon: "users", label: "Sales Agents", tip: "Sales Agents" },
+          { href: "/org/teams", icon: "users", label: "Teams", tip: "Teams" },
+          { href: "/org/users", icon: "profile", label: "Users", tip: "Users" },
+          { href: "/org/roles-permissions", icon: "lock", label: "Roles & Permissions", tip: "Roles & Permissions" },
+        ],
+      },
 ];
 
 const CRUMB_MAP: Record<string, string> = {
@@ -88,6 +91,7 @@ const CRUMB_MAP: Record<string, string> = {
   "/org/roles-permissions": "Roles & Permissions",
   "/org/publish-approvals": "Publish & Approvals",
   "/org/settings": "Organisation Settings",
+  "/org/profile": "My Profile",
   "/org/support": "Support",
 };
 
@@ -109,6 +113,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [builderLoading, setBuilderLoading] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -130,6 +135,22 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
       router.push("/login");
       router.refresh();
     }
+  }
+
+  async function openBuilder() {
+    setBuilderLoading(true);
+    try {
+      const pages = await loadTemplates({ resource: "landing-page" });
+      if (pages && pages.length > 0) {
+        router.push(orgBuilderPath(pages[0].id));
+        return;
+      }
+    } catch {
+      // No pages (or fetch failed) — fall through to the Landing Pages hub.
+    } finally {
+      setBuilderLoading(false);
+    }
+    router.push("/org/landing-pages");
   }
 
   const toggleSidebar = () => {
@@ -286,6 +307,28 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="tb-right" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              type="button"
+              onClick={openBuilder}
+              disabled={builderLoading}
+              title="Open the page builder"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "8px 13px",
+                borderRadius: 11,
+                border: "1px solid rgba(79,70,229,0.18)",
+                background: "rgba(79,70,229,0.08)",
+                color: "#4f46e5",
+                fontSize: 12.5,
+                fontWeight: 700,
+                cursor: builderLoading ? "wait" : "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <Icon name="puzzle" size={14} /> {builderLoading ? "Opening…" : "Open Builder"}
+            </button>
             <div style={{ position: "relative" }} data-notification-menu>
               <button
                 type="button"
@@ -457,7 +500,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                   </div>
 
                   <Link
-                    href="/org/settings"
+                    href="/org/profile"
                     onClick={() => setProfileMenuOpen(false)}
                     style={{
                       display: "flex",

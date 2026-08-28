@@ -1,5 +1,5 @@
 import type { LandingPageData } from "./types";
-import { loadTemplates } from "./persist";
+import { loadPages, loadTemplates } from "./persist";
 
 export {
   loadTemplates,
@@ -15,13 +15,13 @@ export {
 export type { CreateTemplateInput, Resource } from "./persist";
 
 export async function findPageBySlug(slug: string, pages?: LandingPageData[]): Promise<LandingPageData | undefined> {
-  const list = pages ?? (typeof window === "undefined" ? [] : await loadTemplates());
+  const list = pages ?? (typeof window === "undefined" ? [] : loadPages());
   const key = decodeURIComponent(slug).toLowerCase();
   return list.find((p) => p.slug.toLowerCase() === key);
 }
 
 export async function findPageByDomain(domain: string, pages?: LandingPageData[]): Promise<LandingPageData | undefined> {
-  const list = pages ?? (typeof window === "undefined" ? [] : await loadTemplates());
+  const list = pages ?? (typeof window === "undefined" ? [] : loadPages());
   const host = normalizeDomain(domain);
   if (!host) return undefined;
   return list.find((p) => normalizeDomain(p.domain) === host);

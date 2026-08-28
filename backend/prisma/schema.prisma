@@ -559,8 +559,31 @@ model TrackingEvent {
 
    @@index([orgId])
   @@index([landingPageId])
-  @@index([eventType])
+   @@index([eventType])
   @@map("tracking_events")
+  @@schema("templates")
+}
+
+// ---------------------------------------------------------------------------
+// Leads — captured from the builder's lead forms (public site + previews).
+// orgId is a plain scalar (no Relation field) so we don't have to thread a
+// back-relation onto Organisation/LandingPage; the landingPageId is kept for
+// filtering/grouping only.
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id             String   @id @default(uuid())
+  orgId          String   @map("org_id")
+  landingPageId  String?  @map("landing_page_id")
+  formName       String?  @map("form_name")
+  source         String?  @default("website") // website | popup | floorplan | preview
+  data           Json
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([orgId])
+  @@index([landingPageId])
+  @@index([createdAt])
+  @@map("leads")
   @@schema("templates")
 }
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Download, Palette, Save, Share2, Type } from "lucide-react";
+import { Check, Download, LayoutDashboard, Palette, Save, Share2, Type } from "lucide-react";
 import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
+import type { LayoutTheme } from "@/lib/prestate/widget-theme";
 import { ensureConfig, googleFontsHref, siteThemeStyle } from "@/lib/prestate/site-config";
 import { ModuleHeader, SiteScopeBar } from "./shared";
 import { ColorField, FieldRow, TextField, Toggle, Btn } from "@/components/prestate/ui";
@@ -33,6 +34,109 @@ const FONTS = [
   { name: "DM Serif Display", spec: "Serif · High-contrast display" },
   { name: "Plus Jakarta Sans", spec: "Sans-serif · Warm modern" },
 ];
+
+const LAYOUT_THEMES: {
+  key: LayoutTheme;
+  label: string;
+  tagline: string;
+  previewRadius: number;
+  previewShadow: string;
+  previewBorder: string;
+  accentColor: string;
+}[] = [
+  {
+    key: "standard",
+    label: "Standard",
+    tagline: "Clean · Professional · Balanced",
+    previewRadius: 12,
+    previewShadow: "0 2px 10px rgba(16,24,40,.08)",
+    previewBorder: "1px solid rgba(16,24,40,.09)",
+    accentColor: "#4f46e5",
+  },
+  {
+    key: "premium",
+    label: "Premium",
+    tagline: "Elegant · Luxury · High-end",
+    previewRadius: 18,
+    previewShadow: "0 6px 24px rgba(16,10,4,.12)",
+    previewBorder: "1px solid rgba(196,164,106,.22)",
+    accentColor: "#b8893b",
+  },
+  {
+    key: "modern",
+    label: "Modern",
+    tagline: "Minimal · Bold · Contemporary",
+    previewRadius: 5,
+    previewShadow: "none",
+    previewBorder: "1.5px solid rgba(16,24,40,.18)",
+    accentColor: "#4f46e5",
+  },
+];
+
+function LayoutThemePicker({ value, onChange }: { value: LayoutTheme; onChange: (t: LayoutTheme) => void }) {
+  return (
+    <div className="ps-card" style={{ borderRadius: 16, padding: "6px 20px 18px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 0 10px", fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>
+        <LayoutDashboard size={15} /> Widget Layout Style
+      </div>
+      <p style={{ fontSize: 12, color: "var(--ps-muted)", lineHeight: 1.55, margin: "0 0 14px" }}>
+        Sets the visual design style for all real estate widgets — radii, shadows, spacing and card style — without changing any content or functionality.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+        {LAYOUT_THEMES.map((t) => {
+          const active = value === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => onChange(t.key)}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 0,
+                padding: 0,
+                borderRadius: 12,
+                border: active ? "2px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)",
+                background: active ? "var(--ps-primary-mist)" : "var(--ps-bg)",
+                cursor: "pointer",
+                overflow: "hidden",
+                transition: "border-color .15s",
+              }}
+            >
+              {/* Mini widget preview */}
+              <div style={{ padding: "12px 12px 8px", background: active ? "rgba(79,70,229,.04)" : "var(--ps-panel-raised)", width: "100%" }}>
+                {/* Mock card */}
+                <div style={{
+                  background: "#ffffff",
+                  borderRadius: t.previewRadius,
+                  boxShadow: t.previewShadow,
+                  border: t.previewBorder,
+                  padding: "8px 10px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 5,
+                }}>
+                  <div style={{ height: 5, borderRadius: 999, background: t.accentColor, width: "60%" }} />
+                  <div style={{ height: 4, borderRadius: 999, background: "rgba(15,23,42,.10)", width: "90%" }} />
+                  <div style={{ height: 4, borderRadius: 999, background: "rgba(15,23,42,.06)", width: "75%" }} />
+                  <div style={{ marginTop: 4, height: 18, borderRadius: t.key === "modern" ? 3 : t.key === "premium" ? 10 : 6, background: t.accentColor, width: "70%", opacity: 0.9 }} />
+                </div>
+              </div>
+              {/* Label row */}
+              <div style={{ padding: "7px 12px 9px", textAlign: "left" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: active ? "var(--ps-primary)" : "var(--ps-ink)" }}>{t.label}</span>
+                  {active ? <Check size={12} style={{ color: "var(--ps-primary)", flexShrink: 0 }} /> : null}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--ps-muted)", marginTop: 1, lineHeight: 1.3 }}>{t.tagline}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function BrandModule({
   site,
@@ -230,8 +334,14 @@ export function BrandModule({
             </div>
           </div>
 
+          {/* Layout Style picker */}
+          <LayoutThemePicker
+            value={brand.layoutTheme ?? "standard"}
+            onChange={(t) => patchBrand({ layoutTheme: t as SiteConfig["brand"]["layoutTheme"] })}
+          />
+
           <div className="ps-card" style={{ borderRadius: 16, padding: "6px 20px 18px" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", padding: "12px 0 6px" }}>Social & sharing</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", padding: "12px 0 4px" }}>Social & sharing</div>
             {[
               { key: "facebook" as const, label: "Facebook" },
               { key: "instagram" as const, label: "Instagram" },
