@@ -1,12 +1,16 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUrl,
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class UpdateUnitTypeDto {
@@ -42,4 +46,29 @@ export class UpdateUnitTypeDto {
   @Min(0)
   @Max(1000000)
   totalUnits?: number;
+
+  // Pass a URL to set, or explicit null to clear.
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUrl({ require_protocol: true })
+  @MaxLength(2048)
+  floorPlanUrl?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUrl({ require_protocol: true })
+  @MaxLength(2048)
+  brochureUrl?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUrl({ require_protocol: true })
+  @MaxLength(2048)
+  videoUrl?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @IsUrl({ require_protocol: true }, { each: true })
+  galleryUrls?: string[];
 }

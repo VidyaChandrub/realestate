@@ -9,6 +9,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { MediaUpload, GalleryUpload } from "@/components/org/media-upload";
 import { ProjectPageHead } from "@/components/org/project-tabs";
 import type {
   CreateUnitInput,
@@ -74,6 +75,10 @@ interface UnitTypeForm {
   builtupSqft: string;
   price: string;
   totalUnits: string;
+  floorPlanUrl: string | null;
+  brochureUrl: string | null;
+  videoUrl: string | null;
+  galleryUrls: string[];
 }
 const EMPTY_UT_FORM: UnitTypeForm = {
   name: "",
@@ -81,6 +86,10 @@ const EMPTY_UT_FORM: UnitTypeForm = {
   builtupSqft: "",
   price: "",
   totalUnits: "",
+  floorPlanUrl: null,
+  brochureUrl: null,
+  videoUrl: null,
+  galleryUrls: [],
 };
 
 interface UnitForm {
@@ -176,6 +185,10 @@ export default function OrgProjectUnitsPage() {
       builtupSqft: ut.builtupSqft == null ? "" : String(ut.builtupSqft),
       price: ut.price == null ? "" : String(ut.price),
       totalUnits: String(ut.totalUnits),
+      floorPlanUrl: ut.floorPlanUrl,
+      brochureUrl: ut.brochureUrl,
+      videoUrl: ut.videoUrl,
+      galleryUrls: ut.galleryUrls ?? [],
     });
     setUtError(null);
   }
@@ -194,6 +207,10 @@ export default function OrgProjectUnitsPage() {
         builtupSqft: numOrUndef(utForm.builtupSqft),
         price: numOrUndef(utForm.price),
         totalUnits: numOrUndef(utForm.totalUnits),
+        floorPlanUrl: utForm.floorPlanUrl,
+        brochureUrl: utForm.brochureUrl,
+        videoUrl: utForm.videoUrl,
+        galleryUrls: utForm.galleryUrls,
       };
       if (utMode === "create") {
         await apiFetch(`/org/projects/${id}/unit-types`, {
@@ -547,14 +564,45 @@ export default function OrgProjectUnitsPage() {
                     >
                       ✏️ Edit
                     </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      type="button"
-                      disabled
-                      title="Floor plan upload is coming soon"
-                    >
-                      📐 View floor plan
-                    </button>
+                    {u.floorPlanUrl ? (
+                      <a
+                        className="btn btn-ghost btn-sm"
+                        href={u.floorPlanUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        📐 View floor plan
+                      </a>
+                    ) : (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        type="button"
+                        disabled
+                        title="No floor plan uploaded yet — add one via Edit"
+                      >
+                        📐 View floor plan
+                      </button>
+                    )}
+                    {u.videoUrl ? (
+                      <a
+                        className="btn btn-ghost btn-sm"
+                        href={u.videoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        ▶ Watch video
+                      </a>
+                    ) : null}
+                    {u.brochureUrl ? (
+                      <a
+                        className="btn btn-ghost btn-sm"
+                        href={u.brochureUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        📄 Brochure
+                      </a>
+                    ) : null}
                     <button
                       className="btn btn-ghost btn-sm"
                       type="button"
@@ -835,18 +883,52 @@ export default function OrgProjectUnitsPage() {
             />
           </div>
           <div
-            className="muted"
             style={{
-              fontSize: 12,
+              marginTop: 6,
+              paddingTop: 12,
+              borderTop: "1px dashed var(--line)",
               display: "flex",
-              gap: 8,
-              marginBottom: 14,
+              flexDirection: "column",
+              gap: 10,
+              marginBottom: 4,
             }}
           >
-            <span>📐 Floor plan</span>
-            <span>🎬 Video</span>
-            <span>📄 Brochure</span>
-            <span className="badge b-gray">Coming soon</span>
+            <div className="row2">
+              <MediaUpload
+                field="floorPlan"
+                label="Floor plan"
+                value={utForm.floorPlanUrl}
+                onChange={(url) =>
+                  setUtForm((f) => ({ ...f, floorPlanUrl: url }))
+                }
+                ctx={{ projectId: id, unitTypeId: utEditingId ?? undefined }}
+              />
+              <MediaUpload
+                field="brochure"
+                label="Brochure (PDF)"
+                value={utForm.brochureUrl}
+                onChange={(url) =>
+                  setUtForm((f) => ({ ...f, brochureUrl: url }))
+                }
+                ctx={{ projectId: id, unitTypeId: utEditingId ?? undefined }}
+              />
+            </div>
+            <MediaUpload
+              field="video"
+              label="Walkthrough video"
+              value={utForm.videoUrl}
+              onChange={(url) => setUtForm((f) => ({ ...f, videoUrl: url }))}
+              ctx={{ projectId: id, unitTypeId: utEditingId ?? undefined }}
+              allowLink
+              linkPlaceholder="Or paste a YouTube link"
+            />
+            <GalleryUpload
+              value={utForm.galleryUrls}
+              onChange={(urls) =>
+                setUtForm((f) => ({ ...f, galleryUrls: urls }))
+              }
+              ctx={{ projectId: id, unitTypeId: utEditingId ?? undefined }}
+            />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button
