@@ -2,6 +2,8 @@ import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -34,6 +36,18 @@ export class AuthController {
   @HttpCode(200)
   logout(@Body() dto: LogoutDto) {
     return this.authService.logout(dto.refresh_token);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(200)
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.new_password);
   }
 
   @UseGuards(JwtAuthGuard)

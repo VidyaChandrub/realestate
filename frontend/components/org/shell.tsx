@@ -53,7 +53,6 @@ const NAV_GROUPS: NavGroup[] = [
       {
         grp: "Team",
         items: [
-          { href: "/org/profile", icon: "profile", label: "My Profile", tip: "My Profile" },
           { href: "/org/sales-agents", icon: "users", label: "Sales Agents", tip: "Sales Agents" },
           { href: "/org/teams", icon: "users", label: "Teams", tip: "Teams" },
           { href: "/org/users", icon: "profile", label: "Users", tip: "Users" },
@@ -91,7 +90,6 @@ const CRUMB_MAP: Record<string, string> = {
   "/org/roles-permissions": "Roles & Permissions",
   "/org/publish-approvals": "Publish & Approvals",
   "/org/settings": "Organisation Settings",
-  "/org/profile": "My Profile",
   "/org/support": "Support",
 };
 
@@ -499,10 +497,10 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                     </div>
                   </div>
 
-                  <Link
-                    href="/org/profile"
-                    onClick={() => setProfileMenuOpen(false)}
-                    style={{
+                    <Link
+                      href="/org/settings?section=profile"
+                      onClick={() => setProfileMenuOpen(false)}
+                      style={{
                       display: "flex",
                       alignItems: "center",
                       gap: 10,

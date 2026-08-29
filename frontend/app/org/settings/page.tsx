@@ -3,23 +3,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getPlans, getInvoices, changePlan } from "@/lib/api";
-import { Reveal } from "@/components/superadmin/reveal";
-import type { ChangePlanInput, ChangePlanResult, InvoiceRow, OrgBillingSummary, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
-
-const TABS = ["General", "Branding", "Notifications", "Billing"] as const;
-type Tab = (typeof TABS)[number];
-
-const TIMEZONES = [
-  { value: "Asia/Kolkata", label: "Asia/Kolkata (GMT+5:30)" },
-  { value: "Asia/Dubai", label: "Asia/Dubai (GMT+4:00)" },
-  { value: "Asia/Riyadh", label: "Asia/Riyadh (GMT+3:00)" },
-];
-
-const CURRENCIES = [
-  { value: "INR", label: "INR — Indian Rupee (₹)" },
-  { value: "AED", label: "AED — UAE Dirham (د.إ)" },
-  { value: "USD", label: "USD — US Dollar ($)" },
-];
+import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
+import type { IconName } from "@/components/icons";
+import { Icon } from "@/components/icons";
+import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
+import "@/app/(auth)/(portal)/auth.css";
+import "./settings.css";
 
 const LANGUAGES = [
   { value: "en-IN", label: "English (India)" },
@@ -30,101 +19,102 @@ const LANGUAGES = [
 
 const BRAND_SWATCHES = ["#4f46e5", "#0ea5e9", "#0d9488", "#16a34a", "#d97706", "#e11d48", "#7c3aed"];
 
-const NOTIFICATION_ROWS = [
-  { label: "New lead email", description: "Email the assigned agent when a new lead arrives.", defaultOn: true },
-  { label: "WhatsApp alert", description: "Push a WhatsApp alert to agents for hot leads.", defaultOn: true },
-  { label: "Daily summary", description: "Morning digest of yesterday's leads and calls.", defaultOn: true },
-  { label: "Weekly report", description: "Monday performance report to admins.", defaultOn: false },
-];
-
-interface GeneralBrandingForm {
-  name: string;
-  city: string;
-  country: string;
-  addressLine1: string;
-  state: string;
-  postalCode: string;
-  timezone: string;
-  currency: string;
-  defaultLanguage: string;
-  brandColour: string;
-}
-
-function formToOrg(org: SafeOrganisation): GeneralBrandingForm {
-  return {
-    name: org.name,
-    city: org.city,
-    country: org.country ?? "",
-    addressLine1: org.address_line1 ?? "",
-    state: org.state ?? "",
-    postalCode: org.postal_code ?? "",
-    timezone: org.timezone,
-    currency: org.currency,
-    defaultLanguage: org.default_language,
-    brandColour: org.brand_colour ?? "#4f46e5",
-  };
-}
-
-function formatMoney(amount: number, currency: string): string {
-  const symbol = currency === "INR" ? "₹" : `${currency} `;
-  return `${symbol}${amount.toLocaleString("en-IN")}`;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-}
-
 const SUBSCRIPTION_STATUS_BADGE: Record<string, string> = {
-  active: "b-green",
-  trial: "b-amber",
-  past_due: "b-rose",
-  paused: "b-gray",
-  cancelled: "b-gray",
+  active: "b-green", trial: "b-amber", past_due: "b-rose", paused: "b-gray", cancelled: "b-gray",
 };
-
 const SUBSCRIPTION_STATUS_LABEL: Record<string, string> = {
-  active: "Active",
-  trial: "Trial",
-  past_due: "Past due",
-  paused: "Paused",
-  cancelled: "Cancelled",
+  active: "Active", trial: "Trial", past_due: "Past due", paused: "Paused", cancelled: "Cancelled",
 };
+const INVOICE_STATUS_BADGE: Record<string, string> = { paid: "b-green", pending: "b-amber" };
+const INVOICE_STATUS_LABEL: Record<string, string> = { paid: "Paid", pending: "Pending" };
 
-const INVOICE_STATUS_BADGE: Record<string, string> = {
-  paid: "b-green",
-  pending: "b-amber",
-};
-
-const INVOICE_STATUS_LABEL: Record<string, string> = {
-  paid: "Paid",
-  pending: "Pending",
-};
-
-// Dynamic plan limits surfaced as counts on the plan cards (no static copy).
 const PLAN_LIMIT_ROWS: { key: "templates" | "projects" | "users"; label: string }[] = [
   { key: "templates", label: "Templates" },
   { key: "projects", label: "Projects" },
   { key: "users", label: "Users" },
 ];
 
-type PlanLimits = { templates?: string; projects?: string; users?: string } | null;
+const NAV_GROUPS = [
+  { grp: "ORGANISATION", items: [
+    { s: "general", icon: "building" as IconName, t: "General" },
+    { s: "branding", icon: "sparkles" as IconName, t: "Branding" },
+    { s: "localization", icon: "globe" as IconName, t: "Localization" },
+  ] },
+  { grp: "SALES", items: [
+    { s: "crm", icon: "crm" as IconName, t: "CRM & Leads" },
+    { s: "fields", icon: "puzzle" as IconName, t: "Custom Attributes" },
+    { s: "pipeline", icon: "modules" as IconName, t: "Pipeline & Sources" },
+    { s: "scoring", icon: "star" as IconName, t: "Scoring & Assignment" },
+    { s: "automation", icon: "link" as IconName, t: "Automation & SLA" },
+  ] },
+  { grp: "COMMUNICATION", items: [
+    { s: "comms", icon: "phone" as IconName, t: "Calling & WhatsApp" },
+    { s: "email", icon: "mail" as IconName, t: "Email" },
+    { s: "notifications", icon: "bell" as IconName, t: "Notifications" },
+  ] },
+  { grp: "PLATFORM", items: [
+    { s: "data", icon: "document" as IconName, t: "Data & Import" },
+    { s: "api", icon: "key" as IconName, t: "API & Webhooks" },
+    { s: "audit", icon: "shield" as IconName, t: "Audit Log" },
+  ] },
+  { grp: "ACCOUNT", items: [
+    { s: "billing", icon: "billing" as IconName, t: "Billing" },
+    { s: "security", icon: "lock" as IconName, t: "Security" },
+  ] },
+] as const;
 
-// Dynamic multi-select: options are derived from the plan's `limits` (templates /
-// projects / users) with their counts — nothing is hardcoded.
-function PlanLimitsSelect({ limits }: { limits: PlanLimits }) {
+const SECTION_META: Record<string, { icon: IconName; title: string; sub: string }> = {
+  general: { icon: "building", title: "Organisation profile", sub: "Basic details, legal info and registered address" },
+  branding: { icon: "sparkles", title: "Logo & identity", sub: "Shown across the app, landing pages & emails" },
+  localization: { icon: "globe", title: "Formats & language", sub: "Regional preferences for your workspace" },
+  crm: { icon: "crm", title: "CRM & leads", sub: "How leads are captured and handled" },
+  fields: { icon: "puzzle", title: "Custom attributes", sub: "Add your own fields to leads, contacts, projects & bookings" },
+  pipeline: { icon: "modules", title: "Pipeline & sources", sub: "Stages, lost reasons and lead sources" },
+  scoring: { icon: "star", title: "Scoring & assignment", sub: "Lead scores and distribution rules" },
+  automation: { icon: "link", title: "Automation & SLA", sub: "Trigger workflows and response targets" },
+  comms: { icon: "phone", title: "Calling & WhatsApp", sub: "Dialler, AI voice and WhatsApp Business" },
+  email: { icon: "mail", title: "Email", sub: "Sending domain and defaults" },
+  notifications: { icon: "bell", title: "Notifications", sub: "Channels per event type" },
+  data: { icon: "document", title: "Data & import", sub: "Move data in and out of the platform" },
+  api: { icon: "key", title: "API & webhooks", sub: "Programmatic access and event delivery" },
+  audit: { icon: "shield", title: "Audit log", sub: "Recent admin & security events" },
+  billing: { icon: "billing", title: "Billing", sub: "Subscription, plans and invoices" },
+  security: { icon: "lock", title: "Security", sub: "Sign-in policy and danger zone" },
+};
+
+function Toggle({ on = false }: { on?: boolean }) {
+  const [s, setS] = useState(on);
+  return <div className={`switch${s ? " on" : ""}`} onClick={() => setS((v) => !v)} />;
+}
+
+interface GeneralBrandingForm {
+  name: string; city: string; country: string; addressLine1: string; state: string; postalCode: string;
+  timezone: string; currency: string; defaultLanguage: string; brandColour: string;
+}
+
+function formToOrg(org: SafeOrganisation): GeneralBrandingForm {
+  return {
+    name: org.name, city: org.city, country: org.country ?? "", addressLine1: org.address_line1 ?? "",
+    state: org.state ?? "", postalCode: org.postal_code ?? "", timezone: org.timezone, currency: org.currency,
+    defaultLanguage: org.default_language, brandColour: org.brand_colour ?? "#4f46e5",
+  };
+}
+
+function formatMoney(amount: number, currency: string) {
+  const symbol = currency === "INR" ? "₹" : `${currency} `;
+  return `${symbol}${amount.toLocaleString("en-IN")}`;
+}
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function PlanLimitsSelect({ limits }: { limits: { templates?: string; projects?: string; users?: string } | null }) {
   const [open, setOpen] = useState(false);
-  const rows = PLAN_LIMIT_ROWS.map((r) => ({ ...r, count: limits?.[r.key] ?? null })).filter(
-    (r) => r.count != null && r.count !== "",
-  );
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(rows.map((r) => r.key)));
-
+  const rows = PLAN_LIMIT_ROWS.map((r) => ({ ...r, count: limits?.[r.key] ?? null })).filter((r) => r.count != null && r.count !== "");
   return (
     <div className="mselect">
       <button type="button" className="mselect-btn" onClick={() => setOpen((o) => !o)}>
-        <span>
-          {selected.size} included
-        </span>
-        <span className={`caret${open ? " up" : ""}`}>▾</span>
+        <span>{rows.length} included</span><span className={`caret${open ? " up" : ""}`}>▾</span>
       </button>
       {open ? (
         <div className="mselect-panel">
@@ -133,18 +123,7 @@ function PlanLimitsSelect({ limits }: { limits: PlanLimits }) {
           ) : (
             rows.map((r) => (
               <label key={r.key} className="mselect-opt">
-                <input
-                  type="checkbox"
-                  checked={selected.has(r.key)}
-                  onChange={(e) =>
-                    setSelected((prev) => {
-                      const next = new Set(prev);
-                      if (e.target.checked) next.add(r.key);
-                      else next.delete(r.key);
-                      return next;
-                    })
-                  }
-                />
+                <input type="checkbox" defaultChecked readOnly />
                 <span className="cnt">{r.count}</span>
                 <span>{r.label}</span>
               </label>
@@ -156,20 +135,54 @@ function PlanLimitsSelect({ limits }: { limits: PlanLimits }) {
   );
 }
 
+function SectionHead({ section }: { section: string }) {
+  const meta = SECTION_META[section];
+  if (!meta) return null;
+  return (
+    <div className="os-sec-head">
+      <span className="os-sec-ic"><Icon name={meta.icon} size={20} /></span>
+      <div>
+        <h2>{meta.title}</h2>
+        <p>{meta.sub}</p>
+      </div>
+    </div>
+  );
+}
+
+function Card({
+  icon, title, sub, action, children,
+}: { icon: IconName; title: string; sub?: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="card" style={{ marginBottom: 18 }}>
+      <div className="os-card-top">
+        <span className="os-card-ic"><Icon name={icon} size={18} /></span>
+        <div className="os-card-htext">
+          <div className="os-card-t">{title}</div>
+          {sub ? <div className="os-card-x">{sub}</div> : null}
+        </div>
+        {action ? <div className="os-card-action">{action}</div> : null}
+      </div>
+      <div className="card-b">{children}</div>
+    </div>
+  );
+}
+
 export default function OrgSettingsPage() {
   const { accessToken } = useAuth();
-
-  const [tab, setTab] = useState<Tab>("General");
+  const [section, setSection] = useState("general");
   const [org, setOrg] = useState<SafeOrganisation | null>(null);
   const [form, setForm] = useState<GeneralBrandingForm | null>(null);
+  const [rera, setRera] = useState("");
+  const [gstin, setGstin] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [navQuery, setNavQuery] = useState("");
   const [billing, setBilling] = useState<OrgBillingSummary | null>(null);
   const [billingLoading, setBillingLoading] = useState(true);
   const [billingError, setBillingError] = useState<string | null>(null);
-
   const [plans, setPlans] = useState<Plan[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
@@ -180,521 +193,548 @@ export default function OrgSettingsPage() {
   const [changeOk, setChangeOk] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!accessToken) return;
     /* eslint-disable react-hooks/set-state-in-effect */
+    if (!accessToken) return;
     setLoading(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
-    apiFetch<SafeOrganisation>("/org/settings", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then((res) => {
-        setOrg(res);
-        setForm(formToOrg(res));
-      })
+    apiFetch<SafeOrganisation>("/org/settings", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then((res) => { setOrg(res); setForm(formToOrg(res)); })
       .catch((err) => setSaveError(err instanceof Error ? err.message : "Failed to load settings."))
       .finally(() => setLoading(false));
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken) return;
-    apiFetch<OrgBillingSummary>("/org/billing", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then(setBilling)
-      .catch((err) => setBillingError(err instanceof Error ? err.message : "Failed to load billing details."))
+    apiFetch<OrgBillingSummary>("/org/billing", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then(setBilling).catch((err) => setBillingError(err instanceof Error ? err.message : "Failed to load billing."))
       .finally(() => setBillingLoading(false));
   }, [accessToken]);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!accessToken) return;
-    setPlansLoading(true);
-    setInvoicesLoading(true);
+    setPlansLoading(true); setInvoicesLoading(true);
     Promise.all([getPlans(), getInvoices()])
-      .then(([p, inv]) => {
-        setPlans(p);
-        setInvoices(inv);
-      })
-      .catch(() => {
-        /* non-fatal — billing tab still renders the current plan */
-      })
-      .finally(() => {
-        setPlansLoading(false);
-        setInvoicesLoading(false);
-      });
+      .then(([p, inv]) => { setPlans(p); setInvoices(inv); })
+      .catch(() => {})
+      .finally(() => { setPlansLoading(false); setInvoicesLoading(false); });
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [accessToken]);
 
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    const wanted = new URLSearchParams(window.location.search).get("section");
+    const valid: string[] = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.s));
+    if (wanted && valid.includes(wanted)) setSection(wanted);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  function markDirty() { setDirty(true); setSaved(false); }
+
   function updateForm(patch: Partial<GeneralBrandingForm>) {
-    setForm((prev) => (prev ? { ...prev, ...patch } : prev));
-    setSaved(false);
+    setForm((prev) => (prev ? { ...prev, ...patch } : prev)); markDirty();
+  }
+
+  function handleCountryChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const country = e.target.value;
+    const meta = COUNTRY_META[country];
+    if (meta) {
+      updateForm({ country, currency: meta.currency, timezone: meta.timezone });
+    } else {
+      updateForm({ country });
+    }
   }
 
   async function handleSave() {
     if (!form || !accessToken) return;
-    setSaveError(null);
-    setSaving(true);
+    setSaveError(null); setSaving(true);
     try {
       const body: UpdateOrganisationSettingsInput = {
-        name: form.name,
-        city: form.city,
-        country: form.country,
-        addressLine1: form.addressLine1,
-        state: form.state,
-        postalCode: form.postalCode,
-        timezone: form.timezone,
-        currency: form.currency,
-        defaultLanguage: form.defaultLanguage,
-        brandColour: form.brandColour,
+        name: form.name, city: form.city, country: form.country, addressLine1: form.addressLine1,
+        state: form.state, postalCode: form.postalCode, timezone: form.timezone, currency: form.currency,
+        defaultLanguage: form.defaultLanguage, brandColour: form.brandColour,
       };
       const updated = await apiFetch<SafeOrganisation>("/org/settings", {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify(body),
+        method: "PATCH", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify(body),
       });
-      setOrg(updated);
-      setForm(formToOrg(updated));
-      setSaved(true);
+      setOrg(updated); setForm(formToOrg(updated)); setSaved(true); setDirty(false);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save changes.");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
+  }
+
+  function handleDiscard() {
+    if (!org) return;
+    setForm(formToOrg(org)); setRera(""); setGstin(""); setDirty(false); setSaved(false); setSaveError(null);
   }
 
   async function handleChangePlan(planId: string, cycle: "monthly" | "yearly" = plansCycle) {
     if (!accessToken) return;
-    setChangeError(null);
-    setChangeOk(null);
-    setChangeLoading(true);
+    setChangeError(null); setChangeOk(null); setChangeLoading(true);
     try {
-      const res = await changePlan({ planId, billingCycle: cycle });
-      setChangeOk(
-        `Switched to the ${res.planName} plan (${cycle === "yearly" ? "billed yearly" : "billed monthly"}).`,
-      );
-      const b = await apiFetch<OrgBillingSummary>("/org/billing", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      setBilling(b);
-      if (b.subscription) setPlansCycle(b.subscription.billingCycle);
-    } catch (err) {
-      setChangeError(err instanceof Error ? err.message : "Failed to change plan.");
-    } finally {
-      setChangeLoading(false);
-    }
+      const res: ChangePlanResult = await changePlan({ planId, billingCycle: cycle });
+      setChangeOk(`Switched to the ${res.planName} plan (${cycle === "yearly" ? "billed yearly" : "billed monthly"}).`);
+      const b = await apiFetch<OrgBillingSummary>("/org/billing", { headers: { Authorization: `Bearer ${accessToken}` } });
+      setBilling(b); if (b.subscription) setPlansCycle(b.subscription.billingCycle);
+    } catch (err) { setChangeError(err instanceof Error ? err.message : "Failed to change plan."); }
+    finally { setChangeLoading(false); }
   }
 
   if (loading || !org || !form) {
-    return (
-      <div className="card">
-        <div className="card-b">
-          <p className="muted">Loading settings…</p>
-        </div>
-      </div>
-    );
+    return <div className="card"><div className="card-b"><p className="muted">Loading settings…</p></div></div>;
   }
 
+  const q = navQuery.trim().toLowerCase();
+  const filteredGroups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((it) => (q ? it.t.toLowerCase().includes(q) : true)),
+  })).filter((g) => g.items.length > 0);
+
+  const saveButton = (
+    <div className="os-actions">
+      <button className="btn btn-ghost" onClick={handleDiscard} disabled={saving || !dirty}>Discard</button>
+      <button className="btn btn-primary" onClick={() => void handleSave()} disabled={saving}>
+        {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
+      </button>
+    </div>
+  );
+
   return (
-    <>
-      <div className="page-head reveal in">
-        <div>
-          <div className="eyebrow"> More</div>
-          <h1>Organisation Settings</h1>
-          <div className="sub">Manage your organisation profile, branding, notifications and billing.</div>
-        </div>
-        <div className="actions">
-          <button className="btn btn-primary" onClick={() => void handleSave()} disabled={saving}>
-            {saving ? "Saving…" : saved ? "Saved " : "Save changes"}
-          </button>
-        </div>
-      </div>
-
-      {saveError ? <div className="form-alert">{saveError}</div> : null}
-
-      <div className="tabs reveal in">
-        {TABS.map((t) => (
-          <a key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-            {t}
-          </a>
-        ))}
-      </div>
-
-      {tab === "General" ? (
-        <Reveal delay={2}>
-          <div className="card">
-            <div className="card-h">
-              <span className="t">General</span>
-              <span className="x">Organisation profile</span>
-            </div>
-            <div className="card-b">
-              <div className="row2">
-                <div className="field">
-                  <label>Organisation name</label>
-                  <input
-                    className="inp"
-                    value={form.name}
-                    onChange={(e) => updateForm({ name: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label>Subdomain</label>
-                  <input className="inp mono" value={org.slug} readOnly disabled />
-                </div>
-              </div>
-              <div className="row2">
-                <div className="field">
-                  <label>Timezone</label>
-                  <select value={form.timezone} onChange={(e) => updateForm({ timezone: e.target.value })}>
-                    {TIMEZONES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Currency</label>
-                  <select value={form.currency} onChange={(e) => updateForm({ currency: e.target.value })}>
-                    {CURRENCIES.map((c) => (
-                      <option key={c.value} value={c.value}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>Default language</label>
-                <select
-                  value={form.defaultLanguage}
-                  onChange={(e) => updateForm({ defaultLanguage: e.target.value })}
-                >
-                  {LANGUAGES.map((l) => (
-                    <option key={l.value} value={l.value}>
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="row2">
-                <div className="field">
-                  <label>City</label>
-                  <input
-                    className="inp"
-                    value={form.city}
-                    onChange={(e) => updateForm({ city: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label>Country</label>
-                  <input
-                    className="inp"
-                    value={form.country}
-                    onChange={(e) => updateForm({ country: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="field">
-                <label>Address Line 1</label>
-                <input
-                  className="inp"
-                  value={form.addressLine1}
-                  onChange={(e) => updateForm({ addressLine1: e.target.value })}
-                />
-              </div>
-              <div className="row2">
-                <div className="field">
-                  <label>State</label>
-                  <input
-                    className="inp"
-                    value={form.state}
-                    onChange={(e) => updateForm({ state: e.target.value })}
-                  />
-                </div>
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label>Postal Code</label>
-                  <input
-                    className="inp"
-                    value={form.postalCode}
-                    onChange={(e) => updateForm({ postalCode: e.target.value })}
-                  />
-                </div>
-              </div>
+    <div className="page os-page">
+      <div className="os-head reveal in">
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 14, minWidth: 0 }}>
+            <div className="h-text">
+              <div className="eyebrow">Workspace</div>
+              <h1>Settings</h1>
+              <div className="sub">Manage your profile, organisation, CRM &amp; custom attributes, pipeline, communication, automation, data, API and security.</div>
             </div>
           </div>
-        </Reveal>
-      ) : null}
+        {saveButton}
+      </div>
+      {saveError ? <div className="form-alert">{saveError}</div> : null}
 
-      {tab === "Branding" ? (
-        <Reveal delay={2}>
-          <div className="card">
-            <div className="card-h">
-              <span className="t">Branding</span>
-              <span className="x">Logo, favicon &amp; brand colour</span>
-            </div>
-            <div className="card-b">
+      <div className="os-grid">
+        <aside className="os-nav">
+          <div className="os-nav-search">
+            <Icon name="search" size={15} />
+            <input
+              value={navQuery}
+              onChange={(e) => setNavQuery(e.target.value)}
+              placeholder="Search settings…"
+              aria-label="Search settings"
+            />
+          </div>
+          <div className="os-nav-groups">
+            {filteredGroups.length === 0 ? (
+              <div className="os-nav-empty">No settings match “{navQuery}”.</div>
+            ) : filteredGroups.map((g) => (
+              <div className="os-nav-group" key={g.grp}>
+                <div className="os-nav-group-title">{g.grp}</div>
+                {g.items.map((it) => (
+                  <button
+                    key={it.s}
+                    className={`os-nav-item${section === it.s ? " on" : ""}`}
+                    onClick={() => setSection(it.s)}
+                  >
+                    <span className="os-nav-ic"><Icon name={it.icon} size={16} /></span>
+                    <span className="os-nav-label">{it.t}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <div className="os-content">
+          {/* GENERAL */}
+          <div className={`os-section${section === "general" ? " on" : ""}`}>
+            <SectionHead section="general" />
+            <Card icon="building" title="Organisation profile" sub="Basic details" >
+              <div className="row2">
+                <div className="field"><label>Organisation name</label><input className="inp" value={form.name} onChange={(e) => updateForm({ name: e.target.value })} /></div>
+                <div className="field"><label>Legal / registered name</label><input className="inp" placeholder="Skyline Developers Pvt. Ltd." /></div>
+              </div>
+              <div className="row2">
+                <div className="field"><label>Subdomain</label><input className="inp inp-mono" value={org.slug} readOnly disabled /></div>
+                <div className="field"><label>Industry</label><select className="inp"><option>Real Estate — Developer</option><option>Real Estate — Broker</option><option>Channel Partner</option></select></div>
+              </div>
+              <div className="row2">
+                <div className="field"><label>RERA / license no.</label><input className="inp inp-mono" value={rera} onChange={(e) => { setRera(e.target.value); markDirty(); }} placeholder="PR/GJ/AHM/2026/00842" /></div>
+                <div className="field"><label>GSTIN</label><input className="inp inp-mono" value={gstin} onChange={(e) => { setGstin(e.target.value); markDirty(); }} placeholder="24AABCS1234F1Z5" /></div>
+              </div>
+              <div className="row2">
+                <div className="field"><label>Support email</label><input className="inp" placeholder="care@skylinedev.in" /></div>
+                <div className="field"><label>Support phone</label><input className="inp inp-mono" placeholder="+91 79000 12345" /></div>
+              </div>
+              <div className="row2">
+                <div className="field">
+                  <label>Country</label>
+                  <select className="inp" value={form.country} onChange={handleCountryChange}>
+                    <option value="">Select country…</option>
+                    {COUNTRIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  {form.country && COUNTRY_META[form.country] ? (
+                    <div className="hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: "var(--green)", display: "inline-flex" }}><Icon name="check" size={13} /></span>
+                      <span>Auto-set from {form.country}: Currency <b>{COUNTRY_META[form.country].currency}</b> · Timezone <b>{COUNTRY_META[form.country].timezone}</b></span>
+                    </div>
+                  ) : null}
+                </div>
+                <div className="field"><label>City</label><input className="inp" value={form.city} onChange={(e) => updateForm({ city: e.target.value })} /></div>
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Registered address</label>
+                <textarea className="inp" rows={2} value={form.addressLine1} onChange={(e) => updateForm({ addressLine1: e.target.value })} />
+              </div>
+            </Card>
+          </div>
+
+          {/* BRANDING */}
+          <div className={`os-section${section === "branding" ? " on" : ""}`}>
+            <SectionHead section="branding" />
+            <Card icon="sparkles" title="Logo & identity" sub="Shown across the app, landing pages & emails">
               <div className="row2">
                 <div className="field">
                   <label>Logo</label>
-                  <div
-                    style={{
-                      border: "1.5px dashed var(--line-2)",
-                      borderRadius: 12,
-                      padding: 22,
-                      textAlign: "center",
-                      color: "var(--muted)",
-                      background: "var(--surface-2)",
-                      opacity: 0.7,
-                    }}
-                  >
-                    {org.logo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={org.logo_url}
-                        alt="Logo"
-                        style={{ width: 44, height: 44, borderRadius: 12, margin: "0 auto 8px", objectFit: "cover" }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 12,
-                          margin: "0 auto 8px",
-                          background: "linear-gradient(135deg, var(--brand), var(--iris), var(--sky))",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#fff",
-                          fontWeight: 800,
-                        }}
-                      >
-                        iR
-                      </div>
-                    )}
-                    Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>coming soon</span>
-                  </div>
+                  <div className="drop">🖼️ Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
                 </div>
                 <div className="field">
                   <label>Favicon</label>
-                  <div
-                    style={{
-                      border: "1.5px dashed var(--line-2)",
-                      borderRadius: 12,
-                      padding: 22,
-                      textAlign: "center",
-                      color: "var(--muted)",
-                      background: "var(--surface-2)",
-                      opacity: 0.7,
-                    }}
-                  >
-                    {org.favicon_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={org.favicon_url}
-                        alt="Favicon"
-                        style={{ width: 44, height: 44, borderRadius: 10, margin: "0 auto 8px", objectFit: "cover" }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 10,
-                          margin: "0 auto 8px",
-                          background: "var(--brand)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#fff",
-                          fontWeight: 800,
-                        }}
-                      >
-                        iR
-                      </div>
-                    )}
-                    Upload favicon · <span style={{ color: "var(--brand)", fontWeight: 600 }}>coming soon</span>
-                  </div>
+                  <div className="drop">🖼️ Upload favicon · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
                 </div>
+              </div>
+              <div className="field"><label>Brand colour</label>
+                <div className="colorset">
+                  {BRAND_SWATCHES.map((c) => (
+                    <span key={c} className={form.brandColour.toLowerCase() === c ? "on" : ""} style={{ background: c }} onClick={() => updateForm({ brandColour: c })} />
+                  ))}
+                  <span className="mono" style={{ alignSelf: "center" }}>{form.brandColour}</span>
+                </div>
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}><label>Email sender name</label><input className="inp" defaultValue="Skyline Developers" /></div>
+            </Card>
+          </div>
+
+          {/* LOCALIZATION */}
+          <div className={`os-section${section === "localization" ? " on" : ""}`}>
+            <SectionHead section="localization" />
+            <Card icon="globe" title="Formats & language" sub="Regional preferences">
+              <div className="row3">
+                <div className="field"><label>Timezone</label><select className="inp" value={form.timezone} onChange={(e) => updateForm({ timezone: e.target.value })}>{!TIMEZONE_OPTIONS.some((t) => t.value === form.timezone) && form.timezone ? <option value={form.timezone}>{form.timezone}</option> : null}{TIMEZONE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
+                <div className="field"><label>Currency</label><select className="inp" value={form.currency} onChange={(e) => updateForm({ currency: e.target.value })}>{!CURRENCY_OPTIONS.some((c) => c.value === form.currency) && form.currency ? <option value={form.currency}>{form.currency}</option> : null}{CURRENCY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
+                <div className="field"><label>Number format</label><select className="inp"><option>12,34,567 (Indian)</option><option>1,234,567 (International)</option></select></div>
+              </div>
+              <div className="row3">
+                <div className="field"><label>Date format</label><select className="inp"><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></div>
+                <div className="field"><label>Time format</label><select className="inp"><option>12-hour</option><option>24-hour</option></select></div>
+                <div className="field"><label>Week starts</label><select className="inp"><option>Monday</option><option>Sunday</option></select></div>
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
-                <label>Brand colour</label>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                  {BRAND_SWATCHES.map((colour) => (
-                    <span
-                      key={colour}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => updateForm({ brandColour: colour })}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") updateForm({ brandColour: colour });
-                      }}
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 9,
-                        background: colour,
-                        cursor: "pointer",
-                        boxShadow:
-                          form.brandColour.toLowerCase() === colour.toLowerCase()
-                            ? "0 0 0 3px var(--brand-050)"
-                            : undefined,
-                      }}
-                    />
-                  ))}
-                  <input
-                    className="inp mono"
-                    style={{ width: 110 }}
-                    value={form.brandColour}
-                    onChange={(e) => updateForm({ brandColour: e.target.value })}
-                  />
+                <label>Enabled languages</label>
+                <div className="pill-list">
+                  {LANGUAGES.map((l) => <span key={l.value} className="pill">{l.label}<span className="x">×</span></span>)}
+                  <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add</span>
                 </div>
               </div>
-            </div>
+            </Card>
           </div>
-        </Reveal>
-      ) : null}
 
-      {tab === "Notifications" ? (
-        <Reveal delay={2}>
-          <div className="card">
-            <div className="card-h">
-              <span className="t">Notifications</span>
-              <span className="x">Coming soon</span>
-            </div>
-            <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <p className="muted" style={{ marginTop: 0 }}>
-                Notification preferences aren&apos;t built yet — shown here for preview only.
-              </p>
-              {NOTIFICATION_ROWS.map((row, i) => (
-                <div
-                  key={row.label}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "12px 4px",
-                    borderBottom: i < NOTIFICATION_ROWS.length - 1 ? "1px solid var(--line)" : undefined,
-                    opacity: 0.6,
-                  }}
-                >
-                  <div>
-                    <b>{row.label}</b>
-                    <div className="muted" style={{ fontSize: 12.5 }}>
-                      {row.description}
-                    </div>
+          {/* CRM */}
+          <div className={`os-section${section === "crm" ? " on" : ""}`}>
+            <SectionHead section="crm" />
+            <Card icon="crm" title="Lead capture & behaviour" sub="How leads are created and handled">
+              <div className="card-b" style={{ padding: 0 }}>
+                {[
+                  ["Auto-create lead on form submit", "Every website / landing-page submission becomes a lead.", true],
+                  ["Capture UTM & ad attribution", "Store source, campaign, ad set and UTM on each lead.", true],
+                  ["Require phone number", "Reject leads without a valid phone.", true],
+                  ["Merge duplicate leads", "Detect duplicates by phone / email and merge automatically.", true],
+                  ["Recycle idle leads", "Return leads with no activity for 7+ days to the pool.", false],
+                ].map(([t, d, on]) => (
+                  <div className="swrow" key={t as string}>
+                    <div className="tx"><b>{t as string}</b><div className="muted">{d as string}</div></div>
+                    <Toggle on={on as boolean} />
                   </div>
-                  <div
-                    className={`switch${row.defaultOn ? " on" : ""}`}
-                    style={{ pointerEvents: "none" }}
-                    aria-disabled
-                  />
+                ))}
+              </div>
+            </Card>
+            <Card icon="puzzle" title="Required fields" sub="Fields an agent must fill before saving">
+              <div className="pill-list">
+                {["Name", "Phone", "Project", "Budget", "Source"].map((p) => <span key={p} className="pill">{p}<span className="x">×</span></span>)}
+                <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add field</span>
+              </div>
+            </Card>
+            <Card icon="star" title="Lead tags" sub="Reusable labels agents can apply">
+              <div className="pill-list">
+                {["🔥 Hot", "NRI", "Investor", "Ready buyer", "Price-sensitive", "VIP"].map((p) => <span key={p} className="pill">{p}<span className="x">×</span></span>)}
+                <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add tag</span>
+              </div>
+            </Card>
+          </div>
+
+          {/* FIELDS */}
+          <div className={`os-section${section === "fields" ? " on" : ""}`}>
+            <SectionHead section="fields" />
+            <Card icon="puzzle" title="Custom attributes" sub="Add your own fields to leads, contacts, projects & bookings">
+              <div className="tbl-wrap"><table className="tbl">
+                <thead><tr><th>Label</th><th>API key</th><th>Type</th><th>Entity</th><th>Required</th><th /></tr></thead>
+                <tbody>
+                  {[
+                    ["Preferred floor", "preferred_floor", "Dropdown", "Lead", false],
+                    ["Loan status", "loan_status", "Dropdown", "Lead", true],
+                    ["Possession timeline", "possession_timeline", "Dropdown", "Lead", false],
+                    ["Co-applicant name", "co_applicant", "Text", "Lead", false],
+                    ["Carpet area (sqft)", "carpet_area", "Number", "Project unit", true],
+                  ].map((r) => (
+                    <tr key={r[1] as string}>
+                      <td>{r[0] as string}</td><td><span className="mono">{r[1] as string}</span></td><td>{r[2] as string}</td><td>{r[3] as string}</td>
+                      <td>{r[4] ? <span className="badge b-green">Yes</span> : <span className="badge b-gray">No</span>}</td>
+                      <td><button className="btn btn-ghost btn-sm">Edit</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table></div>
+              <button className="btn btn-primary btn-sm" style={{ marginTop: 14 }}>+ Add attribute</button>
+            </Card>
+          </div>
+
+          {/* PIPELINE */}
+          <div className={`os-section${section === "pipeline" ? " on" : ""}`}>
+            <SectionHead section="pipeline" />
+            <Card icon="modules" title="Pipeline stages" sub="Drag to reorder · click to rename">
+              <div className="card-b" style={{ padding: 0 }} id="stageList">
+                {["New", "Contacted", "Follow-up", "Site Visit", "Negotiation", "Won", "Lost"].map((st, i) => (
+                  <div className="stage" key={st}>
+                    <span className="grip">⠿</span>
+                    <span className="dotc" style={{ background: ["#94a3b8", "#0ea5e9", "#f59e0b", "#6366f1", "#7c3aed", "#16a34a", "#e11d48"][i] }} />
+                    <input defaultValue={st} />
+                    <button className="btn btn-ghost btn-sm">✕</button>
+                  </div>
+                ))}
+                <button className="btn btn-soft btn-sm" style={{ marginTop: 12 }}>+ Add stage</button>
+              </div>
+            </Card>
+            <Card icon="modules" title="Lost reasons" sub="Why deals are marked lost">
+              <div className="pill-list">
+                {["Budget mismatch", "Bought elsewhere", "Not responding", "Location not suitable", "Just browsing"].map((p) => <span key={p} className="pill">{p}<span className="x">×</span></span>)}
+                <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add</span>
+              </div>
+            </Card>
+            <Card icon="modules" title="Lead sources" sub="Channels leads can come from">
+              <div className="pill-list">
+                {["Meta Ads", "Google Ads", "Website", "99acres", "MagicBricks", "Walk-in", "Referral", "Channel partner"].map((p) => <span key={p} className="pill">{p}<span className="x">×</span></span>)}
+                <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add source</span>
+              </div>
+            </Card>
+          </div>
+
+          {/* SCORING */}
+          <div className={`os-section${section === "scoring" ? " on" : ""}`}>
+            <SectionHead section="scoring" />
+            <Card icon="star" title="Lead scoring" sub="Points that make a lead Hot / Warm / Cold">
+              <div className="card-b" style={{ padding: 0 }}>
+                {[["Budget matches project", "+30"], ["Responded within 1 hour", "+20"], ["Booked a site visit", "+25"], ["Loan pre-approved", "+15"], ["No activity 7 days", "-20"]].map(([t, v]) => (
+                  <div className="swrow" key={t as string}><div className="tx"><b>{t as string}</b><div className="muted">{v as string} points</div></div><input className="inp" style={{ width: 80 }} defaultValue={v as string} /></div>
+                ))}
+                <div className="row3" style={{ marginTop: 16, padding: "4px 0 0" }}>
+                  <div className="field"><label>🔥 Hot ≥</label><input className="inp" defaultValue="75" /></div>
+                  <div className="field"><label>🌤️ Warm ≥</label><input className="inp" defaultValue="45" /></div>
+                  <div className="field" style={{ marginBottom: 0 }}><label>❄️ Cold below</label><input className="inp" defaultValue="45" /></div>
                 </div>
+              </div>
+            </Card>
+            <Card icon="modules" title="Assignment rules" sub="How new leads are distributed">
+              <div className="field" style={{ marginBottom: 16 }}><label>Method</label><select className="inp"><option>Round-robin within team</option><option>Load-balanced (fewest open leads)</option><option>By project owner</option><option>Manual</option></select></div>
+              <div className="swrow"><div className="tx"><b>Skip offline agents</b><div className="muted">Only assign to agents who are online.</div></div><Toggle on /></div>
+              <div className="swrow" style={{ borderBottom: 0 }}><div className="tx"><b>Cap leads per agent/day</b></div><input className="inp" style={{ width: 80 }} defaultValue="25" /></div>
+            </Card>
+          </div>
+
+          {/* AUTOMATION */}
+          <div className={`os-section${section === "automation" ? " on" : ""}`}>
+            <SectionHead section="automation" />
+            <Card icon="link" title="Response SLA" sub="Targets & escalation">
+              <div className="card-b" style={{ padding: 0 }}>
+                <div className="swrow"><div className="tx"><b>First-response target</b></div><select className="inp" style={{ width: "auto" }}><option>5 min</option><option>15 min</option><option>30 min</option><option>1 hour</option></select></div>
+                <div className="swrow"><div className="tx"><b>Escalate breaches to manager</b><div className="muted">Alert the team lead when SLA is missed.</div></div><Toggle on /></div>
+                <div className="swrow" style={{ borderBottom: 0 }}><div className="tx"><b>AI call new leads instantly</b><div className="muted">Auto-dial and qualify within 60 seconds.</div></div><Toggle on /></div>
+              </div>
+            </Card>
+            <Card icon="link" title="Automations" sub="Trigger-based workflows">
+              <div className="card-b" style={{ padding: 0 }}>
+                {[["WhatsApp welcome on new lead", "Send brochure + booking link automatically.", true], ["Follow-up reminder", "Nudge agent if a lead sits in Follow-up for 2 days.", true], ["Site-visit reminder", "WhatsApp the buyer 24h before a booked visit.", true], ["Re-engage cold leads", "Drip campaign to leads cold for 14 days.", false]].map(([t, d, on]) => (
+                  <div className="swrow" key={t as string}><div className="tx"><b>{t as string}</b><div className="muted">{d as string}</div></div><Toggle on={on as boolean} /></div>
+                ))}
+              </div>
+            </Card>
+          </div>
+
+          {/* COMMS */}
+          <div className={`os-section${section === "comms" ? " on" : ""}`}>
+            <SectionHead section="comms" />
+            <Card icon="phone" title="Calling" sub="Dialler & AI voice">
+              <div className="card-b" style={{ padding: 0 }}>
+                {[["Masked calling", "Hide lead numbers; route via bridge.", true], ["Record calls", "Store recordings for QA & training.", true], ["AI voice agent", "Enable automated qualifying calls.", true]].map(([t, d, on]) => (
+                  <div className="swrow" key={t as string}><div className="tx"><b>{t as string}</b><div className="muted">{d as string}</div></div><Toggle on={on as boolean} /></div>
+                ))}
+                <div className="swrow" style={{ borderBottom: 0 }}><div className="tx"><b>Monthly credits per agent</b></div><input className="inp" style={{ width: 100 }} defaultValue="1,000" /></div>
+              </div>
+            </Card>
+            <Card icon="phone" title="WhatsApp Business" sub="Shared number & templates">
+              <div className="row2">
+                <div className="field"><label>Business number</label><input className="inp inp-mono" defaultValue="+91 79000 12345" /></div>
+                <div className="field"><label>Display name</label><input className="inp" defaultValue="Skyline Developers" /></div>
+              </div>
+              <div className="swrow"><div className="tx"><b>Auto-assign chats to lead owner</b></div><Toggle on /></div>
+              <div className="swrow" style={{ borderBottom: 0 }}><div className="tx"><b>Send read receipts</b></div><Toggle on /></div>
+            </Card>
+          </div>
+
+          {/* EMAIL */}
+          <div className={`os-section${section === "email" ? " on" : ""}`}>
+            <SectionHead section="email" />
+            <Card icon="mail" title="Email delivery" sub="Sending domain & defaults">
+              <div className="row2">
+                <div className="field"><label>From name</label><input className="inp" defaultValue="Skyline Developers" /></div>
+                <div className="field"><label>From address</label><input className="inp inp-mono" defaultValue="hello@skylinedev.in" /></div>
+              </div>
+              <div className="swrow"><div className="tx"><b>DKIM / SPF verified</b><div className="muted">Domain authentication for deliverability.</div></div><span className="badge b-green">Verified</span></div>
+              <div className="swrow"><div className="tx"><b>Track opens & clicks</b></div><Toggle on /></div>
+              <div className="field" style={{ marginBottom: 0 }}><label>Default signature</label><textarea className="inp" rows={3} defaultValue={"Skyline Developers\nSG Highway, Ahmedabad · +91 79000 12345"} /></div>
+            </Card>
+          </div>
+
+          {/* NOTIFICATIONS */}
+          <div className={`os-section${section === "notifications" ? " on" : ""}`}>
+            <SectionHead section="notifications" />
+            <Card icon="bell" title="Notifications" sub="Channels per event type">
+              <div className="tbl-wrap"><table className="tbl">
+                <thead><tr><th>Event</th><th>Email</th><th>WhatsApp</th><th>In-app</th></tr></thead>
+                <tbody>
+                  {[["New lead assigned", true, true, true], ["Lead tagged to me", false, true, true], ["Follow-up due", true, false, true], ["Site visit booked", true, true, true], ["Deal won", true, false, true], ["SLA breach", true, false, true], ["Daily summary", true, false, false], ["Weekly report", true, false, false]].map(([t, e, w, a]) => (
+                    <tr key={t as string}>
+                      <td>{t as string}</td>
+                      <td><Toggle on={e as boolean} /></td><td><Toggle on={w as boolean} /></td><td><Toggle on={a as boolean} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table></div>
+            </Card>
+          </div>
+
+          {/* DATA */}
+          <div className={`os-section${section === "data" ? " on" : ""}`}>
+            <SectionHead section="data" />
+            <Card icon="document" title="Import & export" sub="Move data in and out">
+              <div className="row2">
+                <div className="field"><label>Import leads</label><div className="drop">📥 Upload CSV / Excel · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div></div>
+                <div className="field"><label>Export</label><div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <button className="btn btn-ghost btn-block">⬇️ Export all leads (CSV)</button>
+                  <button className="btn btn-ghost btn-block">⬇️ Export projects &amp; units</button>
+                  <button className="btn btn-ghost btn-block">⬇️ Export full backup</button>
+                </div></div>
+              </div>
+            </Card>
+          </div>
+
+          {/* API */}
+          <div className={`os-section${section === "api" ? " on" : ""}`}>
+            <SectionHead section="api" />
+            <Card icon="key" title="API keys" sub="Programmatic access">
+              <div className="tbl-wrap"><table className="tbl">
+                <thead><tr><th>Key</th><th>Created</th><th>Last used</th><th>Scope</th><th /></tr></thead>
+                <tbody>
+                  <tr><td><span className="mono">sk_live_••••4f2a</span></td><td className="muted">12 Jan 2026</td><td className="muted">2h ago</td><td><span className="chip">Read/Write</span></td><td><button className="btn btn-ghost btn-sm">Revoke</button></td></tr>
+                  <tr><td><span className="mono">sk_test_••••9c11</span></td><td className="muted">03 Feb 2026</td><td className="muted">Yesterday</td><td><span className="chip">Read</span></td><td><button className="btn btn-ghost btn-sm">Revoke</button></td></tr>
+                </tbody>
+              </table></div><button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}>+ Generate API key</button>
+            </Card>
+            <Card icon="link" title="Webhooks" sub="POST events to your endpoints">
+              <div className="field" style={{ marginBottom: 16 }}><label>Endpoint URL</label><input className="inp inp-mono" placeholder="https://yourapp.com/webhooks/ipixxel" /></div>
+              {[["lead.created", true], ["lead.status_changed", true], ["booking.created", true], ["call.completed", false]].map(([t, on]) => (
+                <div className="swrow" key={t as string}><div className="tx"><b>{t as string}</b></div><Toggle on={on as boolean} /></div>
               ))}
-            </div>
+            </Card>
           </div>
-        </Reveal>
-      ) : null}
 
-      {tab === "Billing" ? (
-        <Reveal delay={2}>
-          {changeOk ? <div className="form-alert ok">{changeOk}</div> : null}
-          {changeError ? <div className="form-alert">{changeError}</div> : null}
+          {/* AUDIT */}
+          <div className={`os-section${section === "audit" ? " on" : ""}`}>
+            <SectionHead section="audit" />
+            <Card icon="shield" title="Audit log" sub="Recent admin & security events">
+              <div className="tbl-wrap"><table className="tbl">
+                <thead><tr><th>Event</th><th>User</th><th>IP</th><th>When</th></tr></thead>
+                <tbody>
+                  {[["Custom attribute added", "Rohan Shah", "103.21.x.x", "2 min ago"], ["User invited — Nisha Iyer", "Rohan Shah", "103.21.x.x", "1 hr ago"], ["Pipeline stage renamed", "Priya Nair", "49.36.x.x", "3 hrs ago"], ["API key generated", "Rohan Shah", "103.21.x.x", "Yesterday"], ["2FA enabled org-wide", "Rohan Shah", "103.21.x.x", "2 days ago"]].map((r, i) => (
+                    <tr key={i}><td>{r[0] as string}</td><td>{r[1] as string}</td><td className="mono">{r[2] as string}</td><td className="muted">{r[3] as string}</td></tr>
+                  ))}
+                </tbody>
+              </table></div>
+            </Card>
+          </div>
 
-          <div className="card">
-            <div className="card-h">
-              <span className="t">Current plan</span>
-              {billing?.subscription ? (
-                <span className={`badge ${SUBSCRIPTION_STATUS_BADGE[billing.subscription.status] ?? "b-gray"}`}>
-                  {SUBSCRIPTION_STATUS_LABEL[billing.subscription.status] ?? billing.subscription.status}
-                </span>
-              ) : null}
-            </div>
-            <div className="card-b">
-              {billingLoading ? (
-                <p className="muted">Loading billing details…</p>
-              ) : billingError ? (
-                <p className="muted">{billingError}</p>
-              ) : !billing?.plan || !billing.subscription ? (
-                <div>
-                  <p className="muted" style={{ marginTop: 0 }}>No active subscription on this organisation yet.</p>
-                  <p className="muted" style={{ fontSize: 12.5 }}>Pick a plan below to get started.</p>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                  <div className="row2">
-                    <div className="field" style={{ marginBottom: 0 }}>
-                      <label>Current plan</label>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span className={`badge ${billing.plan.badge}`} style={{ fontSize: 13, padding: "6px 12px" }}>{billing.plan.name}</span>
-                        {billing.plan.isPopular ? <span className="chip">Popular</span> : null}
+          {/* BILLING */}
+          <div className={`os-section${section === "billing" ? " on" : ""}`}>
+            <SectionHead section="billing" />
+            {changeOk ? <div className="form-alert ok">{changeOk}</div> : null}
+            {changeError ? <div className="form-alert">{changeError}</div> : null}
+            <Card icon="billing" title="Plan" sub="Subscription & seats">
+              <div className="card-b" style={{ padding: 0 }}>
+                {billingLoading ? <p className="muted" style={{ padding: "4px 0 16px" }}>Loading billing details…</p> : billingError ? <p className="muted" style={{ padding: "4px 0 16px" }}>{billingError}</p> : !billing?.plan || !billing.subscription ? (
+                  <div style={{ padding: "4px 0 16px" }}><p className="muted" style={{ marginTop: 0 }}>No active subscription on this organisation yet.</p><p className="muted" style={{ fontSize: 12.5 }}>Pick a plan below to get started.</p></div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "4px 0 16px" }}>
+                    <div className="row2">
+                      <div className="field" style={{ marginBottom: 0 }}>
+                        <label>Current plan</label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span className={`badge ${billing.plan.badge}`} style={{ fontSize: 13, padding: "6px 12px" }}>{billing.plan.name}</span>
+                          {billing.plan.isPopular ? <span className="chip">Popular</span> : null}
+                          <span className={`badge ${SUBSCRIPTION_STATUS_BADGE[billing.subscription.status] ?? "b-gray"}`}>{SUBSCRIPTION_STATUS_LABEL[billing.subscription.status] ?? billing.subscription.status}</span>
+                        </div>
+                      </div>
+                      <div className="field" style={{ marginBottom: 0 }}>
+                        <label>Price</label>
+                        <div style={{ fontWeight: 700, fontSize: 15 }}>
+                          {formatMoney(billing.subscription.billingCycle === "yearly" ? billing.plan.priceYearly : billing.plan.priceMonthly, billing.subscription.currency)}
+                          <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}> / {billing.subscription.billingCycle === "yearly" ? "year" : "month"}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="field" style={{ marginBottom: 0 }}>
-                      <label>Price</label>
-                      <div style={{ fontWeight: 700, fontSize: 15 }}>
-                        {formatMoney(
-                          billing.subscription.billingCycle === "yearly" ? billing.plan.priceYearly : billing.plan.priceMonthly,
-                          billing.subscription.currency,
-                        )}
-                        <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>
-                          {" "}/ {billing.subscription.billingCycle === "yearly" ? "year" : "month"}
-                        </span>
+                    {billing.subscription.renewsAt ? (
+                      <div className="field" style={{ marginBottom: 0 }}>
+                        <label>{billing.subscription.status === "trial" ? "Trial ends" : "Renews on"}</label>
+                        <div>{formatDate(billing.subscription.renewsAt)}</div>
                       </div>
+                    ) : null}
+                    <div className="field" style={{ marginBottom: 0 }}>
+                      <label>Templates</label>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6 }}>
+                        <span>{billing.usage.templatesUsed} of {billing.usage.templatesLimit ?? "unlimited"} used</span>
+                        {billing.usage.templatesLimit != null && billing.usage.templatesUsed >= billing.usage.templatesLimit ? <span style={{ color: "var(--rose)", fontWeight: 700 }}>Limit reached</span> : null}
+                      </div>
+                      {billing.usage.templatesLimit != null ? (
+                        <div style={{ height: 8, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${Math.min(100, (billing.usage.templatesUsed / Math.max(1, billing.usage.templatesLimit)) * 100)}%`, background: billing.usage.templatesUsed >= billing.usage.templatesLimit ? "var(--rose)" : "var(--brand)", borderRadius: 999 }} />
+                        </div>
+                      ) : <div className="muted" style={{ fontSize: 12 }}>Unlimited on this plan.</div>}
                     </div>
                   </div>
-
-                  {billing.subscription.renewsAt ? (
-                    <div className="field" style={{ marginBottom: 0 }}>
-                      <label>{billing.subscription.status === "trial" ? "Trial ends" : "Renews on"}</label>
-                      <div>{formatDate(billing.subscription.renewsAt)}</div>
-                    </div>
-                  ) : null}
-
-                  <div className="field" style={{ marginBottom: 0 }}>
-                    <label>Templates</label>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6 }}>
-                      <span>
-                        {billing.usage.templatesUsed} of {billing.usage.templatesLimit ?? "unlimited"} used
-                      </span>
-                      {billing.usage.templatesLimit != null && billing.usage.templatesUsed >= billing.usage.templatesLimit ? (
-                        <span style={{ color: "var(--rose)", fontWeight: 700 }}>Limit reached</span>
-                      ) : null}
-                    </div>
-                    {billing.usage.templatesLimit != null ? (
-                      <div style={{ height: 8, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden" }}>
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${Math.min(100, (billing.usage.templatesUsed / Math.max(1, billing.usage.templatesLimit)) * 100)}%`,
-                            background: billing.usage.templatesUsed >= billing.usage.templatesLimit ? "var(--rose)" : "var(--brand)",
-                            borderRadius: 999,
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="muted" style={{ fontSize: 12 }}>Unlimited on this plan.</div>
-                    )}
-                  </div>
+                )}
+              </div>
+            </Card>
+            <Card
+              icon="billing"
+              title="Plans & packages"
+              action={(
+                <div className="seg">
+                  <span className={plansCycle === "monthly" ? "on" : ""} onClick={() => setPlansCycle("monthly")}>Monthly</span>
+                  <span className={plansCycle === "yearly" ? "on" : ""} onClick={() => setPlansCycle("yearly")}>Yearly</span>
                 </div>
               )}
-            </div>
-          </div>
-
-          <div className="card" style={{ marginTop: 18 }}>
-            <div className="card-h">
-              <span className="t">Plans &amp; packages</span>
-              <div className="seg">
-                <button className={plansCycle === "monthly" ? "on" : ""} onClick={() => setPlansCycle("monthly")} type="button">
-                  Monthly
-                </button>
-                <button className={plansCycle === "yearly" ? "on" : ""} onClick={() => setPlansCycle("yearly")} type="button">
-                  Yearly
-                </button>
-              </div>
-            </div>
-            <div className="card-b">
-              {plansLoading ? (
-                <p className="muted">Loading plans…</p>
-              ) : (
+            >
+              {plansLoading ? <p className="muted">Loading plans…</p> : (
                 <div className="plans-grid">
                   {plans.map((p) => {
                     const isCurrent = billing?.plan?.id === p.id;
@@ -703,17 +743,9 @@ export default function OrgSettingsPage() {
                       <div key={p.id} className={`plan-card${isCurrent ? " current" : ""}`} style={{ ["--pc" as string]: p.color }}>
                         {p.isPopular ? <span className="plan-flag">Most popular</span> : null}
                         <div className="plan-name">{p.name}</div>
-                        <div className="plan-price">
-                          {formatMoney(price, billing?.subscription?.currency ?? "INR")}
-                          <span className="muted"> / {plansCycle === "yearly" ? "year" : "month"}</span>
-                        </div>
+                        <div className="plan-price">{formatMoney(price, billing?.subscription?.currency ?? "INR")}<span className="muted"> / {plansCycle === "yearly" ? "year" : "month"}</span></div>
                         <PlanLimitsSelect limits={p.limits} />
-                        <button
-                          className={`btn ${isCurrent ? "" : "btn-primary"}`}
-                          disabled={isCurrent || changeLoading}
-                          onClick={() => void handleChangePlan(p.id)}
-                          style={isCurrent ? { opacity: 0.7, cursor: "default" } : undefined}
-                        >
+                        <button className={`btn ${isCurrent ? "" : "btn-primary"}`} disabled={isCurrent || changeLoading} onClick={() => void handleChangePlan(p.id)} style={isCurrent ? { opacity: 0.7, cursor: "default" } : undefined}>
                           {isCurrent ? "Current plan" : `Switch to ${p.name}`}
                         </button>
                       </div>
@@ -721,52 +753,57 @@ export default function OrgSettingsPage() {
                   })}
                 </div>
               )}
-            </div>
-          </div>
-
-          <div className="card" style={{ marginTop: 18 }}>
-            <div className="card-h">
-              <span className="t">Invoices</span>
-            </div>
-            <div className="card-b">
-              {invoicesLoading ? (
-                <p className="muted">Loading invoices…</p>
-              ) : invoices.length === 0 ? (
-                <p className="muted" style={{ marginTop: 0 }}>No invoices yet.</p>
-              ) : (
+            </Card>
+            <Card icon="document" title="Invoices">
+              {invoicesLoading ? <p className="muted">Loading invoices…</p> : invoices.length === 0 ? <p className="muted" style={{ marginTop: 0 }}>No invoices yet.</p> : (
                 <div className="inv-table">
-                  <div className="inv-row inv-head">
-                    <span>Invoice</span>
-                    <span>Date</span>
-                    <span>Plan</span>
-                    <span>Amount</span>
-                    <span>Status</span>
-                    <span />
-                  </div>
+                  <div className="inv-row inv-head"><span>Invoice</span><span>Date</span><span>Plan</span><span>Amount</span><span>Status</span><span /></div>
                   {invoices.map((inv) => (
                     <div className="inv-row" key={inv.id}>
-                      <span className="mono">{inv.number}</span>
-                      <span>{formatDate(inv.issuedAt)}</span>
-                      <span>{inv.planName}</span>
+                      <span className="mono">{inv.number}</span><span>{formatDate(inv.issuedAt)}</span><span>{inv.planName}</span>
                       <span>{formatMoney(inv.amount, inv.currency)}</span>
-                      <span>
-                        <span className={`badge ${INVOICE_STATUS_BADGE[inv.status] ?? "b-gray"}`}>
-                          {INVOICE_STATUS_LABEL[inv.status] ?? inv.status}
-                        </span>
-                      </span>
-                      <span>
-                        <button className="btn btn-ghost" disabled title="PDF download coming soon">
-                          Download
-                        </button>
-                      </span>
+                      <span><span className={`badge ${INVOICE_STATUS_BADGE[inv.status] ?? "b-gray"}`}>{INVOICE_STATUS_LABEL[inv.status] ?? inv.status}</span></span>
+                      <span><button className="btn btn-ghost" disabled title="PDF download coming soon">Download</button></span>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
           </div>
-        </Reveal>
-      ) : null}
-    </>
+
+          {/* SECURITY */}
+          <div className={`os-section${section === "security" ? " on" : ""}`}>
+            <SectionHead section="security" />
+            <Card icon="lock" title="Sign-in policy" sub="Access & authentication">
+              <div className="card-b" style={{ padding: 0 }}>
+                {[["Two-factor authentication", "Require 2FA for all admins.", true], ["Strong password policy", "Min 12 chars, mixed case, number & symbol.", true], ["Restrict to office IPs", "Block sign-in from unknown networks.", false], ["Single sign-on (Google)", "Allow SSO via Google Workspace.", false]].map(([t, d, on]) => (
+                  <div className="swrow" key={t as string}><div className="tx"><b>{t as string}</b><div className="muted">{d as string}</div></div><Toggle on={on as boolean} /></div>
+                ))}
+                <div className="swrow" style={{ borderBottom: 0 }}><div className="tx"><b>Session timeout</b></div><select className="inp" style={{ width: "auto" }}><option>30 minutes</option><option>1 hour</option><option>4 hours</option><option>8 hours</option></select></div>
+              </div>
+            </Card>
+            <Card icon="alert" title="Danger zone" sub="Irreversible actions">
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <button className="btn btn-ghost btn-block" style={{ justifyContent: "flex-start" }}>Sign out all sessions</button>
+                <button className="btn btn-danger btn-block" style={{ justifyContent: "flex-start" }}>Deactivate organisation</button>
+              </div>
+            </Card>
+          </div>
+
+          {dirty ? (
+            <div className="os-savebar">
+              <div className="os-savebar-l">
+                <span className="os-save-dot" />
+                <div>
+                  <b>You have unsaved changes</b>
+                  <div>Review and save to apply them.</div>
+                </div>
+              </div>
+              {saveButton}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }
