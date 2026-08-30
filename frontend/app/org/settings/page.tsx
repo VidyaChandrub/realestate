@@ -7,8 +7,6 @@ import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, Plan, SafeOrganis
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
-import "@/app/(auth)/(portal)/auth.css";
-import "./settings.css";
 
 const LANGUAGES = [
   { value: "en-IN", label: "English (India)" },
@@ -300,7 +298,7 @@ export default function OrgSettingsPage() {
   );
 
   return (
-    <div className="page os-page">
+    <div className="os-page">
       <div className="os-head reveal in">
           <div style={{ display: "flex", alignItems: "flex-start", gap: 14, minWidth: 0 }}>
             <div className="h-text">
@@ -398,11 +396,11 @@ export default function OrgSettingsPage() {
               <div className="row2">
                 <div className="field">
                   <label>Logo</label>
-                  <div className="drop">🖼️ Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
+                  <div className="drop"><Icon name="upload" size={16} /> Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
                 </div>
                 <div className="field">
                   <label>Favicon</label>
-                  <div className="drop">🖼️ Upload favicon · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
+                  <div className="drop"><Icon name="upload" size={16} /> Upload favicon · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
                 </div>
               </div>
               <div className="field"><label>Brand colour</label>
@@ -468,7 +466,9 @@ export default function OrgSettingsPage() {
             </Card>
             <Card icon="star" title="Lead tags" sub="Reusable labels agents can apply">
               <div className="pill-list">
-                {["🔥 Hot", "NRI", "Investor", "Ready buyer", "Price-sensitive", "VIP"].map((p) => <span key={p} className="pill">{p}<span className="x">×</span></span>)}
+                {["Hot", "NRI", "Investor", "Ready buyer", "Price-sensitive", "VIP"].map((p) => (
+                <span key={p} className="pill" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>{p === "Hot" ? <Icon name="flame" size={13} /> : null}{p}<span className="x">×</span></span>
+              ))}
                 <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add tag</span>
               </div>
             </Card>
@@ -539,9 +539,9 @@ export default function OrgSettingsPage() {
                   <div className="swrow" key={t as string}><div className="tx"><b>{t as string}</b><div className="muted">{v as string} points</div></div><input className="inp" style={{ width: 80 }} defaultValue={v as string} /></div>
                 ))}
                 <div className="row3" style={{ marginTop: 16, padding: "4px 0 0" }}>
-                  <div className="field"><label>🔥 Hot ≥</label><input className="inp" defaultValue="75" /></div>
-                  <div className="field"><label>🌤️ Warm ≥</label><input className="inp" defaultValue="45" /></div>
-                  <div className="field" style={{ marginBottom: 0 }}><label>❄️ Cold below</label><input className="inp" defaultValue="45" /></div>
+                  <div className="field"><label><Icon name="flame" size={14} style={{ verticalAlign: "-2px", marginRight: 3 }} /> Hot ≥</label><input className="inp" defaultValue="75" /></div>
+                  <div className="field"><label><Icon name="sun" size={14} style={{ verticalAlign: "-2px", marginRight: 3 }} /> Warm ≥</label><input className="inp" defaultValue="45" /></div>
+                  <div className="field" style={{ marginBottom: 0 }}><label><Icon name="snowflake" size={14} style={{ verticalAlign: "-2px", marginRight: 3 }} /> Cold below</label><input className="inp" defaultValue="45" /></div>
                 </div>
               </div>
             </Card>
@@ -629,11 +629,11 @@ export default function OrgSettingsPage() {
             <SectionHead section="data" />
             <Card icon="document" title="Import & export" sub="Move data in and out">
               <div className="row2">
-                <div className="field"><label>Import leads</label><div className="drop">📥 Upload CSV / Excel · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div></div>
+                <div className="field"><label>Import leads</label><div className="drop"><Icon name="download" size={16} /> Upload CSV / Excel · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div></div>
                 <div className="field"><label>Export</label><div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <button className="btn btn-ghost btn-block">⬇️ Export all leads (CSV)</button>
-                  <button className="btn btn-ghost btn-block">⬇️ Export projects &amp; units</button>
-                  <button className="btn btn-ghost btn-block">⬇️ Export full backup</button>
+                  <button className="btn btn-ghost btn-block"><Icon name="download" size={14} /> Export all leads (CSV)</button>
+                  <button className="btn btn-ghost btn-block"><Icon name="download" size={14} /> Export projects &amp; units</button>
+                  <button className="btn btn-ghost btn-block"><Icon name="download" size={14} /> Export full backup</button>
                 </div></div>
               </div>
             </Card>

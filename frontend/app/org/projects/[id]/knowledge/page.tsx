@@ -8,8 +8,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-import "@/app/admin-console/superadmin.css";
-import "../../projects.css";
+import "@/app/org/org.css";
 
 type Doc = { name: string; type: string; typeBadge: string; updated: string };
 
@@ -66,7 +65,7 @@ export default function OrgProjectKnowledgePage() {
       />
 
       <Reveal delay={1}>
-        <div className="help" style={{ marginBottom: 18 }}>
+        <div className="help mb-18">
           The project knowledge base (documents, FAQs, pricing for the AI
           agents) isn&apos;t wired up yet — this is a preview.
         </div>
@@ -74,7 +73,7 @@ export default function OrgProjectKnowledgePage() {
 
       <div className="grid g-2-1">
         {/* LEFT */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="col gap-18">
           <Reveal delay={1}>
             <div className="card">
               <div className="card-h">
@@ -93,9 +92,9 @@ export default function OrgProjectKnowledgePage() {
                         <td><span className={`badge ${d.typeBadge}`}>{d.type}</span></td>
                         <td>{d.updated}</td>
                         <td>
-                          <a href="#" style={{ color: "var(--brand)" }}>View</a>
+                          <a href="#" className="brand">View</a>
                           {" · "}
-                          <a href="#" style={{ color: "var(--muted)" }}>Replace</a>
+                          <a href="#" className="muted">Replace</a>
                         </td>
                       </tr>
                     ))}
@@ -111,14 +110,14 @@ export default function OrgProjectKnowledgePage() {
                 <span className="t">FAQs / Q&amp;A</span>
                 <span className="badge b-sky">6 answers</span>
               </div>
-              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div className="card-b col gap-16">
                 {FAQS.map((f) => (
                   <div key={f.q}>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <div className="row between">
                       <b>{f.q}</b>
-                      <a href="#" style={{ color: "var(--brand)", fontSize: 12.5 }}>Edit</a>
+                      <a href="#" className="brand fs-12-5">Edit</a>
                     </div>
-                    <div className="muted" style={{ fontSize: 13, marginTop: 3 }}>{f.a}</div>
+                    <div className="muted fs-13 mt-4">{f.a}</div>
                   </div>
                 ))}
               </div>
@@ -127,25 +126,25 @@ export default function OrgProjectKnowledgePage() {
         </div>
 
         {/* RIGHT */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="col gap-18">
           <Reveal delay={1}>
             <div className="card">
               <div className="card-h">
                 <span className="t">Pricing sheet</span>
                 <span className="badge b-green">Live</span>
               </div>
-              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="card-b col gap-12">
                 {PRICING.map((p) => (
-                  <div key={p.tier} style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div key={p.tier} className="row between">
                     <span>
                       <b>{p.tier}</b><br />
-                      <span className="muted" style={{ fontSize: 12 }}>{p.sqft}</span>
+                      <span className="muted fs-12">{p.sqft}</span>
                     </span>
                     <b>{p.price}</b>
                   </div>
                 ))}
                 <div className="divider" />
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div className="row between">
                   <span className="muted">Base rate</span>
                   <b>₹5,800 / sqft</b>
                 </div>
@@ -156,7 +155,7 @@ export default function OrgProjectKnowledgePage() {
           <Reveal delay={2}>
             <div className="card">
               <div className="card-h"><span className="t">Used by</span></div>
-              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="card-b col gap-12">
                 <div className="u">
                   <span className="av a3">✨</span>
                   <span>
@@ -172,9 +171,8 @@ export default function OrgProjectKnowledgePage() {
                   </span>
                 </div>
                 <Link
-                  className="btn btn-ghost btn-block"
+                  className="btn btn-ghost btn-block mt-4"
                   href={`/org/projects/${id}/ai-calling`}
-                  style={{ marginTop: 4 }}
                 >
                   Manage AI agents →
                 </Link>

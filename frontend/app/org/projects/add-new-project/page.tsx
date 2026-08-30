@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
-import "@/app/admin-console/superadmin.css";
-import "../projects.css";
+import "@/app/org/org.css";
 import type {
   CreateProjectInput,
   CreateUnitTypeInput,
@@ -248,9 +247,9 @@ export default function AddNewProjectPage() {
         <div className="wz">
           {/* RAIL */}
           <div className="wz-rail">
-            <div className="card" style={{ padding: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 600 }}>
-                <span>Setup progress</span><span style={{ color: "var(--brand)" }}>{pct}%</span>
+            <div className="card pad-16">
+              <div className="row between fw6 fs-12-5">
+                <span>Setup progress</span><span className="brand">{pct}%</span>
               </div>
               <div className="wz-prog"><i style={{ width: `${pct}%` }} /></div>
               <div className="wz-steps">
@@ -262,13 +261,13 @@ export default function AddNewProjectPage() {
                 ))}
               </div>
             </div>
-            <div className="help" style={{ marginTop: 14 }}>
+            <div className="help mt-14">
               💡 <b>Tip:</b> Fields marked <span className="req">*</span> are required to publish. You can save a draft anytime and finish later.
             </div>
           </div>
 
           {/* PANES */}
-          <div className="card" style={{ padding: 26 }}>
+          <div className="card pad-26">
 
             {/* STEP 1 — Basics */}
             {step === 0 && (
@@ -419,7 +418,7 @@ export default function AddNewProjectPage() {
                     <div className="field"><label>Doors &amp; windows</label><input className="inp" placeholder="UPVC windows, teak main door" value={doorsWindows} onChange={(e) => setDoorsWindows(e.target.value)} /></div>
                     <div className="field"><label>Fittings</label><input className="inp" placeholder="Branded CP &amp; sanitaryware" value={fittings} onChange={(e) => setFittings(e.target.value)} /></div>
                   </div>
-                  <div className="field" style={{ marginBottom: 0 }}><label>Additional notes</label><textarea className="inp" rows={2} placeholder="Green-building certified, seismic zone-III compliant structure…" value={specNotes} onChange={(e) => setSpecNotes(e.target.value)} /></div>
+                  <div className="field mb-0"><label>Additional notes</label><textarea className="inp" rows={2} placeholder="Green-building certified, seismic zone-III compliant structure…" value={specNotes} onChange={(e) => setSpecNotes(e.target.value)} /></div>
                 </div>
               </div>
             )}
@@ -542,8 +541,8 @@ export default function AddNewProjectPage() {
                       </div>
                     </div>
                   </div>
-                  {error && <div className="help" style={{ color: "var(--rose)", marginTop: 16 }}>⚠️ {error}</div>}
-                  <div className="help" style={{ marginTop: 20 }}>🚀 <b>Ready to go live.</b> Publishing creates the project, wires up the connected ad sources and starts routing new leads immediately.</div>
+                   {error && <div className="help err mt-16">⚠️ {error}</div>}
+                  <div className="help mt-20">🚀 <b>Ready to go live.</b> Publishing creates the project, wires up the connected ad sources and starts routing new leads immediately.</div>
                 </div>
               </div>
             )}
@@ -552,7 +551,7 @@ export default function AddNewProjectPage() {
             <div className="wz-foot">
               <button className="btn btn-ghost" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>← Back</button>
               <span className="save">Draft auto-saved · just now</span>
-              <div style={{ display: "flex", gap: 10 }}>
+              <div className="row gap-10">
                 {step < STEPS.length - 1 && <button className="btn btn-ghost" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Skip</button>}
                 {step < STEPS.length - 1 ? (
                   <button className="btn btn-primary" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Continue →</button>

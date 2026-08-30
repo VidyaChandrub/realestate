@@ -9,8 +9,7 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { ProgressBar } from "@/components/superadmin/progress-bar";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-import "@/app/admin-console/superadmin.css";
-import "../../projects.css";
+import "@/app/org/org.css";
 
 const SPEND = [
   { m: "Mar", val: "₹1.9L", h: "52%" },
@@ -54,12 +53,12 @@ export default function OrgProjectInsightsPage() {
       />
 
       <Reveal delay={1}>
-        <div className="help" style={{ marginBottom: 18 }}>
+        <div className="help mb-18">
           Insights aren&apos;t wired up yet — figures below are placeholder data.
         </div>
       </Reveal>
 
-      <div className="grid g4" style={{ marginBottom: 20 }}>
+      <div className="grid g4 mb-20">
         <Reveal delay={1}>
           <div className="stat">
             <div className="top">
@@ -102,7 +101,7 @@ export default function OrgProjectInsightsPage() {
         </Reveal>
       </div>
 
-      <div className="grid g2" style={{ marginBottom: 20 }}>
+      <div className="grid g2 mb-20">
         <Reveal delay={1}>
           <div className="card">
             <div className="card-h">
@@ -140,7 +139,7 @@ export default function OrgProjectInsightsPage() {
                   </div>
                 ))}
               </div>
-              <div className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>
+              <div className="muted fs-12-5 mt-10">
                 Total spend ₹15.9 L · 214 leads · blended CPL ₹298
               </div>
             </div>

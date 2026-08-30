@@ -5,8 +5,7 @@ import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
-import "@/app/admin-console/superadmin.css";
-import "../projects.css";
+import "@/app/org/org.css";
 
 type UnitRow = {
   unitNo: string;
@@ -95,22 +94,22 @@ export default function AllUnitsPage() {
 
       <div className="ustatus reveal in" data-delay="1">
         <div className="ust tot"><div className="n"><CountUp value={totalUnits} /></div><div className="l">Total units</div></div>
-        <div className="ust av"><div className="n" style={{ color: "#0f9d6f" }}><CountUp value={availableUnits} /></div><div className="l">Available</div></div>
-        <div className="ust bk"><div className="n" style={{ color: "#e11d48" }}><CountUp value={bookedUnits} /></div><div className="l">Booked</div></div>
-        <div className="ust hl"><div className="n" style={{ color: "#b45309" }}><CountUp value={heldUnits} /></div><div className="l">Held / Blocked</div></div>
-        <div className="ust sl"><div className="n" style={{ color: "#475569" }}><CountUp value={soldUnits} /></div><div className="l">Sold &amp; registered</div></div>
+        <div className="ust av"><div className="n"><CountUp value={availableUnits} /></div><div className="l">Available</div></div>
+        <div className="ust bk"><div className="n"><CountUp value={bookedUnits} /></div><div className="l">Booked</div></div>
+        <div className="ust hl"><div className="n"><CountUp value={heldUnits} /></div><div className="l">Held / Blocked</div></div>
+        <div className="ust sl"><div className="n"><CountUp value={soldUnits} /></div><div className="l">Sold &amp; registered</div></div>
       </div>
 
       <Reveal delay={1}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
-          <div className="tb-search" style={{ flex: 1, minWidth: 220, maxWidth: 320, position: "static", margin: 0 }}>
+        <div className="toolbar">
+          <div className="tb-search search-box">
             <span className="si"><Icon name="search" size={14} /></span>
-            <input className="inp" style={{ paddingLeft: 40 }} placeholder="Search unit no. / lead…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input className="inp" placeholder="Search unit no. / lead…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <select className="inp" style={{ maxWidth: 190 }} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+          <select className="inp mw-190" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
             {PROJECT_FILTERS.map((p) => <option key={p}>{p}</option>)}
           </select>
-          <select className="inp" style={{ maxWidth: 150 }} value={configFilter} onChange={(e) => setConfigFilter(e.target.value)}>
+          <select className="inp mw-150" value={configFilter} onChange={(e) => setConfigFilter(e.target.value)}>
             {CONFIG_FILTERS.map((c) => <option key={c}>{c}</option>)}
           </select>
           <div className="seg">
@@ -122,7 +121,7 @@ export default function AllUnitsPage() {
       </Reveal>
 
       <Reveal delay={2}>
-        <div className="card" style={{ marginBottom: 18 }}>
+        <div className="card mb-18">
           <div className="card-h"><span className="t">Availability — Palm Residency, Tower B</span><span className="x">Click a unit to open</span></div>
           <div className="card-b">
             <div className="avail">
@@ -131,10 +130,10 @@ export default function AllUnitsPage() {
               ))}
             </div>
             <div className="legend">
-              <span><i style={{ background: "#10b981" }} />Available</span>
-              <span><i style={{ background: "#f43f5e" }} />Booked</span>
-              <span><i style={{ background: "#f59e0b" }} />Held</span>
-              <span><i style={{ background: "#64748b" }} />Sold</span>
+              <span><i className="dot-av" />Available</span>
+              <span><i className="dot-bk" />Booked</span>
+              <span><i className="dot-hl" />Held</span>
+              <span><i className="dot-sl" />Sold</span>
             </div>
           </div>
         </div>
@@ -156,7 +155,7 @@ export default function AllUnitsPage() {
                 ) : (
                   filtered.map((u) => (
                     <tr key={u.unitNo}>
-                      <td><Link href={`/org/projects/${u.projectId}/units`} style={{ fontWeight: 600, color: "var(--brand)" }}>{u.unitNo}</Link></td>
+                      <td><Link href={`/org/projects/${u.projectId}/units`} className="brand-link">{u.unitNo}</Link></td>
                       <td>{u.project}</td>
                       <td>{u.config}</td>
                       <td>{u.carpet}</td>

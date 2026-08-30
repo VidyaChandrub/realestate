@@ -4,8 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
-import "@/app/admin-console/superadmin.css";
-import "../../projects.css";
+import "@/app/org/org.css";
 
 type Mode = "project" | "standalone";
 
@@ -37,7 +36,7 @@ export default function UnitCreatePage() {
     <>
       <div className="page-head reveal in">
         <div>
-          <div className="eyebrow"><Link href="/org/projects/all-units" style={{ color: "inherit", textDecoration: "none" }}><Icon name="building" size={14} /> Units</Link> · Add</div>
+          <div className="eyebrow"><Link href="/org/projects/all-units"><Icon name="building" size={14} /> Units</Link> · Add</div>
           <h1>Add a unit</h1>
           <div className="sub">Add a unit to an existing project, or create a standalone unit (resale / broker listing) without a full project.</div>
         </div>
@@ -49,7 +48,7 @@ export default function UnitCreatePage() {
 
       <Reveal delay={1}>
         <div className="cgrid">
-          <div className="card" style={{ padding: 26 }}>
+          <div className="card pad-26">
             <div className="sec">
               <div className="lbl">📦 How do you want to add this unit?</div>
               <div className="mode">
@@ -120,7 +119,7 @@ export default function UnitCreatePage() {
                   </select>
                 </div>
               </div>
-              <div className="field" style={{ marginBottom: 0 }}>
+              <div className="field mb-0">
                 <label>Parking</label>
                 <div className="opts">
                   {PARKING.map((p) => (
@@ -157,16 +156,16 @@ export default function UnitCreatePage() {
               <div className="g2">
                 <div className="field">
                   <label>Floor plan</label>
-                  <div className="drop"><div style={{ fontSize: 24 }}>📐</div>Upload floor plan</div>
+                  <div className="drop"><div className="em">📐</div>Upload floor plan</div>
                 </div>
                 <div className="field">
                   <label>Photos</label>
-                  <div className="drop"><div style={{ fontSize: 24 }}>📷</div>Add photos</div>
+                  <div className="drop"><div className="em">📷</div>Add photos</div>
                 </div>
               </div>
             </div>
 
-            <div className="sec" style={{ borderBottom: 0 }}>
+            <div className="sec nb">
               <div className="lbl">📋 For standalone / resale (optional)</div>
               <div className="g2">
                 <div className="field">
@@ -178,30 +177,30 @@ export default function UnitCreatePage() {
                   <input className="inp" placeholder="Resale owner" value={owner} onChange={(e) => setOwner(e.target.value)} />
                 </div>
               </div>
-              <div className="field" style={{ marginBottom: 0 }}>
+              <div className="field mb-0">
                 <label>Notes</label>
                 <textarea className="inp" rows={2} placeholder="Ready to move, semi-furnished, negotiable…" value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div className="col gap-18">
             <div className="card">
               <div className="card-h"><span className="t">Preview</span></div>
               <div className="card-b">
-                <div className="media plan" style={{ height: 120, borderRadius: 12, marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center" }}><span>📐</span></div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div className="media prev"><span>📐</span></div>
+                <div className="row between">
                   <b>{unitNo || "New unit"}</b>
                   <span className="badge b-green">{status}</span>
                 </div>
-                <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+                <div className="muted fs-12-5 mt-4">
                   {config}{tower && mode === "project" ? ` · ${tower}` : ""}{floor ? ` · Floor ${floor}` : ""}
                   <br />{carpet ? `${carpet} sqft` : "Fill the form to preview."}
                 </div>
               </div>
             </div>
             <div className="help">💡 Standalone units are great for brokers &amp; channel partners listing resale inventory without a full project.</div>
-            <Link href="/org/projects/all-units" className="btn btn-primary" style={{ display: "block", textAlign: "center" }}>💾 Save unit</Link>
+            <Link href="/org/projects/all-units" className="btn btn-primary btn-block">💾 Save unit</Link>
           </div>
         </div>
       </Reveal>

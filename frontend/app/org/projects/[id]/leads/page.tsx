@@ -10,8 +10,7 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-import "@/app/admin-console/superadmin.css";
-import "../../projects.css";
+import "@/app/org/org.css";
 
 type Lead = {
   name: string;
@@ -113,19 +112,19 @@ export default function OrgProjectLeadsPage() {
       />
 
       <Reveal delay={1}>
-        <div className="help" style={{ marginBottom: 18 }}>
+        <div className="help mb-18">
           Lead management isn&apos;t wired up yet — this is a preview of the
           project Leads workspace.
         </div>
       </Reveal>
 
       <Reveal delay={1}>
-        <div style={{ marginBottom: 20 }}>
+        <div className="mb-20">
           <Seg options={["All Leads", "Follow Ups", "Site Visits", "Closures"]} defaultIndex={0} />
         </div>
       </Reveal>
 
-      <div className="grid g4" style={{ marginBottom: 20 }}>
+      <div className="grid g4 mb-20">
         <Reveal delay={1}>
           <div className="stat">
             <div className="top">
@@ -171,21 +170,21 @@ export default function OrgProjectLeadsPage() {
       <Reveal delay={2}>
         <div className="card">
           <div className="card-h">
-            <div className="tb-search" style={{ maxWidth: 320, position: "static", margin: 0 }}>
+            <div className="tb-search search-box">
               <span className="si"><Icon name="search" size={14} /></span>
               <input placeholder="Search by name or phone…" />
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <select className="inp" style={{ width: "auto" }} defaultValue="All Sources">
+            <div className="row gap-8 wrap">
+              <select className="inp w-auto" defaultValue="All Sources">
                 <option>All Sources</option><option>Meta</option><option>Google</option>
                 <option>WhatsApp</option><option>Walk-in</option>
               </select>
-              <select className="inp" style={{ width: "auto" }} defaultValue="All Statuses">
+              <select className="inp w-auto" defaultValue="All Statuses">
                 <option>All Statuses</option><option>New</option><option>Contacted</option>
                 <option>Follow-up</option><option>Site Visit</option><option>Negotiation</option>
                 <option>Won</option><option>Lost</option>
               </select>
-              <select className="inp" style={{ width: "auto" }} defaultValue="All Agents">
+              <select className="inp w-auto" defaultValue="All Agents">
                 <option>All Agents</option><option>Priya Sharma</option><option>Aditya Verma</option>
                 <option>Rohit Menon</option><option>Sneha Kulkarni</option>
               </select>
@@ -203,7 +202,7 @@ export default function OrgProjectLeadsPage() {
                 {LEADS.map((l) => (
                   <tr key={l.phone}>
                     <td>
-                      <Link className="u" href="/org/leads" style={{ textDecoration: "none" }}>
+                       <Link className="u" href="/org/leads">
                         <span className={`av ${l.avClass ?? ""}`}>{l.initials}</span>
                         <span>
                           <span className="nm">{l.name}</span><br />

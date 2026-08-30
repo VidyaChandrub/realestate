@@ -8,8 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-import "@/app/admin-console/superadmin.css";
-import "../projects.css";
+import "@/app/org/org.css";
 import type { ProjectDetail } from "@/lib/types";
 
 function compactRupees(value: number | null): string {
@@ -109,9 +108,9 @@ export default function OrgProjectOverviewPage() {
       />
 
       <div className="grid g-2-1">
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="col gap-18">
           <Reveal delay={1}>
-            <div className="media" style={{ height: 280 }}>
+            <div className="media h-280">
               <span>🏙️</span>
               <span className="cap">{project.name} — Elevation</span>
             </div>
@@ -120,9 +119,9 @@ export default function OrgProjectOverviewPage() {
           <Reveal delay={2}>
             <div className="gallery">
               <div className="thumb media"><span>🏢</span></div>
-              <div className="thumb media" style={{ background: "linear-gradient(135deg, #86efac, #22c55e)" }}><span>🌳</span></div>
-              <div className="thumb media" style={{ background: "linear-gradient(135deg, #93c5fd, #3b82f6)" }}><span>🏊</span></div>
-              <div className="thumb media" style={{ background: "linear-gradient(135deg, #fde68a, #f59e0b)" }}><span>🛋️</span></div>
+              <div className="thumb media ph-green"><span>🌳</span></div>
+              <div className="thumb media ph-blue"><span>🏊</span></div>
+              <div className="thumb media ph-amber"><span>🛋️</span></div>
             </div>
           </Reveal>
 
@@ -151,7 +150,7 @@ export default function OrgProjectOverviewPage() {
             <div className="card">
               <div className="card-h">
                 <span className="t">Unit types</span>
-                <Link className="x" href={`/org/projects/${id}/units`} style={{ color: "var(--brand)" }}>Manage inventory →</Link>
+                <Link className="x brand-link" href={`/org/projects/${id}/units`}>Manage inventory →</Link>
               </div>
               <div className="card-b">
                 {project.unitTypes.length === 0 ? (
@@ -160,16 +159,16 @@ export default function OrgProjectOverviewPage() {
                   <div className="grid g3">
                     {project.unitTypes.map((u) => (
                       <Link key={u.id} href={`/org/projects/${id}/units`} className="utype-card">
-                        <div className="cover media plan" style={{ borderRadius: "14px 14px 0 0" }}>
+                        <div className="cover media plan">
                           <span>📐</span>
                           <span className="cap">{u.name}</span>
                         </div>
                         <div className="info">
                           <b>{u.name}</b>
-                          <div className="muted" style={{ fontSize: 12.5 }}>
+                          <div className="muted fs-12-5">
                             {[u.builtupSqft ? `${u.builtupSqft} sqft` : null, u.price != null ? compactRupees(u.price) : null].filter(Boolean).join(" · ") || "—"}
                           </div>
-                          <span className={`badge ${u.availableUnits > 0 ? "b-green" : "b-amber"}`} style={{ marginTop: 8 }}>
+                          <span className={`badge ${u.availableUnits > 0 ? "b-green" : "b-amber"} mt-8`}>
                             {u.availableUnits} available
                           </span>
                         </div>
@@ -184,7 +183,7 @@ export default function OrgProjectOverviewPage() {
           <Reveal delay={3}>
             <div className="card">
               <div className="card-h"><span className="t">Amenities</span></div>
-              <div className="card-b" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div className="card-b row wrap gap-8">
                 {project.amenities.length === 0 ? (
                   <span className="muted">None added.</span>
                 ) : (
@@ -197,7 +196,7 @@ export default function OrgProjectOverviewPage() {
           </Reveal>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="col gap-18">
           <Reveal delay={1}>
             <div className="card">
               <div className="card-h"><span className="t">Enquire / Apply</span></div>
@@ -210,7 +209,7 @@ export default function OrgProjectOverviewPage() {
                 </div>
                 <div className="field"><label>Source</label><select className="inp"><option>Walk-in</option><option>Meta Ad</option><option>Google</option><option>Reference</option></select></div>
                 <button className="btn btn-primary btn-block">Apply &amp; create lead →</button>
-                <button className="btn btn-ghost btn-block" style={{ marginTop: 8 }}>⬇ Download brochure</button>
+                <button className="btn btn-ghost btn-block mt-8">⬇ Download brochure</button>
               </div>
             </div>
           </Reveal>
@@ -218,22 +217,22 @@ export default function OrgProjectOverviewPage() {
           <Reveal delay={2}>
             <div className="card">
               <div className="card-h"><span className="t">Performance</span></div>
-              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div className="card-b col gap-14">
+                <div className="row between">
                   <span className="muted">Total leads</span>
                   <b><CountUp value={totalLeads} /></b>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div className="row between">
                   <span className="muted">Units available</span>
                   <b>{project.rollup.unitsAvailable}</b>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div className="row between">
                   <span className="muted">Units booked</span>
                   <b>{project.rollup.unitsBooked}</b>
                 </div>
                 <div className="divider" />
                 <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 5 }}>
+                  <div className="row between fs-13 mb-5">
                     <span>Inventory sold</span>
                     <b>{project.rollup.unitsCreated > 0 ? Math.round((project.rollup.unitsBooked / project.rollup.unitsCreated) * 100) : 0}%</b>
                   </div>
@@ -248,7 +247,7 @@ export default function OrgProjectOverviewPage() {
           <Reveal delay={3}>
             <div className="card">
               <div className="card-h"><span className="t">Assigned team</span></div>
-              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="card-b col gap-12">
                 {project.manager ? (
                   <div className="u">
                     <span className="av">{managerInitials(project.manager.name)}</span>
@@ -257,7 +256,7 @@ export default function OrgProjectOverviewPage() {
                 ) : (
                   <span className="muted">No manager assigned.</span>
                 )}
-                <button className="btn btn-ghost btn-block" style={{ marginTop: 4 }}>✨ AI agent</button>
+                <button className="btn btn-ghost btn-block mt-4">✨ AI agent</button>
               </div>
             </div>
           </Reveal>

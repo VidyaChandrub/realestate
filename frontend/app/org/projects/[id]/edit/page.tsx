@@ -7,8 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectTabs } from "@/components/org/project-tabs";
-import "@/app/admin-console/superadmin.css";
-import "../../projects.css";
+import "@/app/org/org.css";
 import type {
   Amenity,
   OrgUser,
@@ -373,41 +372,29 @@ export default function OrgProjectEditPage() {
               </div>
             </div>
 
-            <div className="field" style={{ marginBottom: 0 }}>
+            <div className="field mb-0">
               <label>Amenities</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div className="row gap-8 wrap">
                 {amenities.map((a) => (
                   <span
                     key={a}
                     className="chip"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
                   >
                     {a}
                     <button
                       type="button"
+                      className="x-btn"
                       aria-label={`Remove ${a}`}
                       onClick={() =>
                         setAmenities((prev) => prev.filter((x) => x !== a))
                       }
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                        padding: 0,
-                        lineHeight: 1,
-                      }}
                     >
                       ✕
                     </button>
                   </span>
                 ))}
               </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <div className="row gap-8 mt-10">
                 <input
                   className="inp"
                   placeholder="Custom amenity"
@@ -428,21 +415,13 @@ export default function OrgProjectEditPage() {
                   ＋ Add
                 </button>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  marginTop: 10,
-                }}
-              >
+              <div className="row gap-8 wrap mt-10">
                 {AMENITY_OPTIONS.filter((o) => !amenities.includes(o)).map(
                   (o) => (
                     <button
                       key={o}
                       type="button"
-                      className="chip"
-                      style={{ cursor: "pointer" }}
+                      className="chip cur-p"
                       onClick={() => addAmenity(o)}
                     >
                       ＋ {o}
@@ -452,25 +431,16 @@ export default function OrgProjectEditPage() {
               </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                marginTop: 20,
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
+            <div className="row gap-10 mt-20 between">
               <button
-                className="btn btn-ghost btn-sm"
+                className="btn btn-ghost btn-sm text-rose"
                 type="button"
-                style={{ color: "var(--rose)" }}
                 onClick={() => setDeleteOpen(true)}
                 disabled={saving || deleting}
               >
                 Delete project
               </button>
-              <div style={{ display: "flex", gap: 10 }}>
+              <div className="row gap-10">
                 <Link
                   href={`/org/projects/${id}`}
                   className="btn btn-ghost"
@@ -493,45 +463,23 @@ export default function OrgProjectEditPage() {
 
       {deleteOpen ? (
         <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15,23,42,.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 400,
-            padding: 20,
-          }}
+          className="modal-scrim"
           onClick={() => {
             if (!deleting) setDeleteOpen(false);
           }}
         >
           <div
+            className="modal-box"
             onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#fff",
-              borderRadius: 20,
-              padding: 28,
-              width: 420,
-              maxWidth: "100%",
-            }}
           >
-            <h2 style={{ margin: "0 0 8px", fontSize: 19, fontWeight: 800 }}>
-              Delete project?
-            </h2>
-            <p style={{ margin: 0, fontSize: 13.5, color: "var(--ink-2)" }}>
+              <h2 className="fw8 mb-8">
+                Delete project?
+              </h2>
+              <p className="ink-2 fs-13-5 m-0">
               <strong>&quot;{projectName}&quot;</strong> and all its unit types
               and units will be permanently deleted. This cannot be undone.
             </p>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 10,
-                marginTop: 22,
-              }}
-            >
+              <div className="row end gap-10 mt-22">
               <button
                 className="btn btn-ghost"
                 type="button"

@@ -55,7 +55,11 @@ export type IconName =
   | "link"
   | "camera"
   | "map"
-  | "star";
+  | "star"
+  | "flame"
+  | "sun"
+  | "snowflake"
+  | "upload";
 
 interface IconProps extends SVGProps<SVGSVGElement> {
   name: IconName;
@@ -364,6 +368,29 @@ const paths: Record<IconName, React.ReactNode> = {
   ),
   star: (
     <path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1Z" />
+  ),
+  flame: (
+    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+  ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+    </>
+  ),
+  snowflake: (
+    <>
+      <path d="M12 2v20M4 6l16 12M20 6 4 18" />
+      <path d="M12 2l-1.5 2M12 2l1.5 2M12 22l-1.5-2M12 22l1.5-2" />
+      <path d="m4 6-2 1M4 6 2 7M20 6l-1 1M20 6l2 1M20 18l-2-1M20 18l2-1M4 18l1-1M4 18l-2-1" />
+    </>
+  ),
+  upload: (
+    <>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="m17 8-5-5-5 5" />
+      <path d="M12 3v12" />
+    </>
   ),
 };
 

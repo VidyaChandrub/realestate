@@ -10,8 +10,7 @@ import { Seg } from "@/components/superadmin/seg";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-import "@/app/admin-console/superadmin.css";
-import "../../projects.css";
+import "@/app/org/org.css";
 import type {
   CreateUnitInput,
   CreateUnitTypeInput,
@@ -468,7 +467,7 @@ export default function OrgProjectUnitsPage() {
 
       {error ? (
         <Reveal delay={1}>
-          <div className="form-alert" style={{ marginBottom: 14 }}>
+          <div className="form-alert mb-14">
             {error}
           </div>
         </Reveal>
@@ -487,15 +486,9 @@ export default function OrgProjectUnitsPage() {
           ) : (
             unitTypes.map((u) => (
               <div className="card" key={u.id}>
-                <div style={{ padding: 18 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <b style={{ fontSize: 16 }}>{u.name}</b>
+                <div className="pad-18">
+                  <div className="row between">
+                    <b className="fs-16">{u.name}</b>
                     <span
                       className={`badge ${u.availableUnits > 0 ? "b-green" : "b-amber"}`}
                     >
@@ -537,7 +530,7 @@ export default function OrgProjectUnitsPage() {
                       <span className="badge b-gray">Planned: {u.totalUnits}</span>
                     ) : null}
                   </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <div className="row gap-8 mt-10">
                     <button
                       className="btn btn-ghost btn-sm"
                       type="button"
@@ -554,9 +547,8 @@ export default function OrgProjectUnitsPage() {
                       📐 View floor plan
                     </button>
                     <button
-                      className="btn btn-ghost btn-sm"
+                      className="btn btn-ghost btn-sm text-rose"
                       type="button"
-                      style={{ color: "var(--rose)" }}
                       onClick={() =>
                         setPendingDelete({
                           kind: "unitType",
@@ -578,14 +570,7 @@ export default function OrgProjectUnitsPage() {
 
       {units.length > 0 ? (
         <Reveal delay={2}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 18,
-              marginTop: 18,
-            }}
-          >
+          <div className="col gap-18 mt-18">
             {towers.map((t) => (
               <div className="card" key={t.key}>
                 <div className="card-h">
@@ -612,13 +597,13 @@ export default function OrgProjectUnitsPage() {
                   </div>
                   <div className="legend">
                     <span>
-                      <i style={{ background: "#10b981" }} /> Available
+                      <i className="dot-av" /> Available
                     </span>
                     <span>
-                      <i style={{ background: "#f43f5e" }} /> Booked
+                      <i className="dot-bk" /> Booked
                     </span>
                     <span>
-                      <i style={{ background: "#f59e0b" }} /> Held
+                      <i className="dot-hl" /> Held
                     </span>
                   </div>
                 </div>
@@ -629,7 +614,7 @@ export default function OrgProjectUnitsPage() {
       ) : null}
 
       <Reveal delay={2}>
-        <div style={{ margin: "18px 0" }}>
+        <div className="my-18">
           <Seg
             options={[...FILTERS]}
             value={filterIndex}
@@ -683,16 +668,9 @@ export default function OrgProjectUnitsPage() {
                           : "—"}
                       </td>
                       <td>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                          }}
-                        >
+                        <div className="row gap-6">
                           <select
-                            className={`badge ${STATUS_BADGE[row.status]}`}
-                            style={{ border: "none", cursor: "pointer" }}
+                            className={`badge ${STATUS_BADGE[row.status]} nb`}
                             value={row.status}
                             disabled={statusSavingId === row.id}
                             onChange={(e) =>
@@ -709,20 +687,18 @@ export default function OrgProjectUnitsPage() {
                             ))}
                           </select>
                           {statusSavingId === row.id ? (
-                            <span className="muted" style={{ fontSize: 11 }}>
+                            <span className="muted fs-11">
                               …
                             </span>
                           ) : statusSavedId === row.id ? (
-                            <span
-                              style={{ color: "var(--green)", fontSize: 12 }}
-                            >
+                            <span className="text-green fs-12">
                               ✓
                             </span>
                           ) : null}
                         </div>
                       </td>
                       <td>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <div className="row gap-6 wrap">
                           <button
                             className="btn btn-ghost btn-sm"
                             type="button"
@@ -731,9 +707,8 @@ export default function OrgProjectUnitsPage() {
                             Edit
                           </button>
                           <button
-                            className="btn btn-ghost btn-sm"
+                            className="btn btn-ghost btn-sm text-rose"
                             type="button"
-                            style={{ color: "var(--rose)" }}
                             onClick={() =>
                               setPendingDelete({
                                 kind: "unit",
@@ -763,9 +738,9 @@ export default function OrgProjectUnitsPage() {
         title={utMode === "create" ? "Add unit type" : "Edit unit type"}
         size="lg"
       >
-        <div className="superadmin">
+        <div className="org">
           {utError ? (
-            <div className="form-alert" style={{ marginBottom: 12 }}>
+            <div className="form-alert mb-12">
               {utError}
             </div>
           ) : null}
@@ -832,21 +807,13 @@ export default function OrgProjectUnitsPage() {
               }
             />
           </div>
-          <div
-            className="muted"
-            style={{
-              fontSize: 12,
-              display: "flex",
-              gap: 8,
-              marginBottom: 14,
-            }}
-          >
+          <div className="muted fs-12 row gap-8 mb-14">
             <span>📐 Floor plan</span>
             <span>🎬 Video</span>
             <span>📄 Brochure</span>
             <span className="badge b-gray">Coming soon</span>
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="row gap-10">
             <button
               className="btn btn-primary"
               type="button"
@@ -878,10 +845,11 @@ export default function OrgProjectUnitsPage() {
         title={unitMode === "create" ? "Add unit" : "Edit unit"}
         size="xl"
       >
+        <div className="org">
         <div className="cgrid">
           <div>
             {unitError ? (
-              <div className="form-alert" style={{ marginBottom: 12 }}>
+              <div className="form-alert mb-12">
                 {unitError}
               </div>
             ) : null}
@@ -988,7 +956,7 @@ export default function OrgProjectUnitsPage() {
               </div>
             </div>
 
-            <div className="sec" style={{ borderBottom: 0 }}>
+            <div className="sec nb">
               <div className="lbl">💰 Pricing</div>
               <div className="g2">
                 <div className="field">
@@ -1021,18 +989,18 @@ export default function OrgProjectUnitsPage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div className="col gap-18">
             <div className="card">
               <div className="card-h"><span className="t">Preview</span></div>
               <div className="card-b">
-                <div style={{ height: 80, borderRadius: 12, background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12, fontSize: 24 }}>📐</div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div className="ph-box">📐</div>
+                <div className="row between">
                   <b>{unitForm.unitNo || "New unit"}</b>
                   <span className={`badge ${unitForm.status === "available" ? "b-green" : unitForm.status === "booked" ? "b-rose" : "b-amber"}`}>
                     {unitForm.status === "available" ? "Available" : unitForm.status === "booked" ? "Booked" : "Held"}
                   </span>
                 </div>
-                <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+                <div className="muted fs-12-5 mt-4">
                   {unitTypes.find((ut) => ut.id === unitForm.unitTypeId)?.name || "Select unit type"}
                   {unitForm.tower ? ` · ${unitForm.tower}` : ""}
                   {unitForm.floor ? ` · Floor ${unitForm.floor}` : ""}
@@ -1045,7 +1013,7 @@ export default function OrgProjectUnitsPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, marginTop: 18, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
+        <div className="row gap-10 mt-18 pt-18 b-top">
           <button
             className="btn btn-primary"
             type="button"
@@ -1066,6 +1034,7 @@ export default function OrgProjectUnitsPage() {
           >
             Cancel
           </button>
+        </div>
         </div>
       </Modal>
 

@@ -7,8 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
-import "@/app/admin-console/superadmin.css";
-import "./projects.css";
+import "@/app/org/org.css";
 import type {
   ProjectListRow,
   ProjectsListResponse,
@@ -146,7 +145,7 @@ export default function OrgProjectsPage() {
         <Link href="/org/projects/all-units">All Units</Link>
       </div>
 
-      <div className="grid g4 reveal in" data-delay="1" style={{ marginBottom: 20 }}>
+      <div className="grid g4 reveal in mb-20" data-delay="1">
         <Reveal delay={1}>
           <div className="stat">
             <div className="top">
@@ -190,17 +189,17 @@ export default function OrgProjectsPage() {
       </div>
 
       <Reveal delay={1}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
-          <div className="tb-search" style={{ flex: 1, minWidth: 220, maxWidth: 340, position: "static", margin: 0 }}>
+        <div className="toolbar">
+          <div className="tb-search search-box">
             <span className="si"><Icon name="search" size={14} /></span>
-            <input className="inp" style={{ paddingLeft: 40 }} placeholder="Search projects…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+            <input className="inp" placeholder="Search projects…" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
           </div>
           <div className="seg">
             {STATUS_TABS.map((t, i) => (
               <span key={t} className={tabIndex === i ? "on" : ""} onClick={() => { setTabIndex(i); setPage(1); }}>{t}</span>
             ))}
           </div>
-          <div style={{ flex: 1 }} />
+          <div className="spacer" />
           <div className="view-toggle">
             <span className={view === "grid" ? "on" : ""} onClick={() => setView("grid")}>▦ Grid</span>
             <span className={view === "list" ? "on" : ""} onClick={() => setView("list")}>☰ List</span>
@@ -219,8 +218,8 @@ export default function OrgProjectsPage() {
               <div className="card"><div className="card-b"><p className="muted">{isFiltered ? "No projects match this filter." : "No projects yet — create one to get started."}</p></div></div>
             ) : (
               rows.map((p) => (
-                <Link key={p.id} href={`/org/projects/${p.id}`} className="pcard" style={{ textDecoration: "none", color: "inherit" }}>
-                  <div className="cover" style={{ background: getCoverGradient(p.id), display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.9)", fontSize: 34 }}>
+                <Link key={p.id} href={`/org/projects/${p.id}`} className="pcard">
+                  <div className="cover" style={{ background: getCoverGradient(p.id) }}>
                     <span>🏗️</span>
                     <span className="tag">{[p.location, p.reraId].filter(Boolean).join(" · ") || "Project"}</span>
                     <span className="st">
@@ -235,9 +234,9 @@ export default function OrgProjectsPage() {
                     <div className="pmeta">
                       <div><span className="k">Starting</span><b>{compactRupees(p.priceMin)}</b></div>
                       <div><span className="k">Unit types</span><b>{p.unitTypeCount}</b></div>
-                      <div><span className="k">Manager</span><b><span className="u"><span className="av" style={{ width: 20, height: 20, fontSize: 9 }}>{managerInitials(p.manager?.name)}</span></span></b></div>
+                      <div><span className="k">Manager</span>                      <b><span className="u"><span className="av xs">{managerInitials(p.manager?.name)}</span></span></b></div>
                     </div>
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div className="row gap-8">
                       <span className="btn btn-soft btn-sm">Open</span>
                     </div>
                   </div>
@@ -274,7 +273,7 @@ export default function OrgProjectsPage() {
                     rows.map((p) => (
                       <tr key={p.id}>
                         <td>
-                          <Link href={`/org/projects/${p.id}`} style={{ fontWeight: 600, color: "var(--brand)" }}>{p.name}</Link>
+                          <Link href={`/org/projects/${p.id}`} className="brand-link">{p.name}</Link>
                           <div className="sm muted">{[p.location, p.reraId ? `RERA ${p.reraId}` : null].filter(Boolean).join(" · ") || "—"}</div>
                         </td>
                         <td>
@@ -300,9 +299,9 @@ export default function OrgProjectsPage() {
               </table>
             </div>
             {totalPages > 1 ? (
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 18px" }}>
+              <div className="pager">
                 <button className="btn btn-ghost btn-sm" type="button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>← Prev</button>
-                <span className="muted" style={{ fontSize: 12.5, alignSelf: "center" }}>Page {page} of {totalPages}</span>
+                <span className="muted fs-12-5 self-center">Page {page} of {totalPages}</span>
                 <button className="btn btn-ghost btn-sm" type="button" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next →</button>
               </div>
             ) : null}
