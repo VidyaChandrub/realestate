@@ -125,6 +125,11 @@ export class AdminOrganisationsController {
     return this.adminOrganisationsService.setOrgTemplates(id, actor, dto.templateIds);
   }
 
+  @Get(':id/domains')
+  getDomains(@Param('id') id: string) {
+    return this.adminOrganisationsService.getOrgDomains(id);
+  }
+
   @Post(':id/approve')
   @HttpCode(200)
   approve(

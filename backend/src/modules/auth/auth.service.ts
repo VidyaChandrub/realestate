@@ -142,18 +142,8 @@ export class AuthService {
           data: { userId: user.id, roleId: adminRole.id },
         });
 
-        // Reserve the subdomain request (pending approval)
-        if (subdomain) {
-          await tx.orgDomainRequest.create({
-            data: {
-              orgId: organisation.id,
-              kind: 'subdomain',
-              subdomain,
-              status: 'pending',
-              requestedBy: user.id,
-            },
-          });
-        }
+        // Subdomain is stored directly on Organisation (subdomain, subdomainStatus: 'pending')
+        // and is auto-activated when the Super Admin approves the organisation.
         if (customDomain) {
           await tx.orgDomainRequest.create({
             data: {
