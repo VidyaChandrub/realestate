@@ -50,6 +50,7 @@ function VerifyEmailContent() {
   }
 
   return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
     <div className="text-center">
       <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
         <Icon name="mail" size={26} />
@@ -103,6 +104,7 @@ function VerifyEmailContent() {
           {resendState === "sent" ? "Code re-sent " : "Resend code"}
         </button>
       </p>
+    </div>
     </div>
   );
 }

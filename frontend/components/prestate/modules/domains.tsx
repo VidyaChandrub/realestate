@@ -49,7 +49,7 @@ export function DomainsModule({
     <div style={{ overflowY: "auto", height: "100%", ...siteThemeStyle(cfg.brand) }}>
       <ModuleHeader
         title="Domain Management"
-        description={`Hostname for “${site.name}” only. Local preview stays at ${slugPath}; an assigned domain also opens at /p/host/…`}
+        description={`Hostname for “${site.name}” only. Local preview stays at ${slugPath}; an assigned domain also opens at /__host/…`}
         actions={
           <Btn variant="primary" icon={<Globe size={14} />} onClick={save} disabled={!value.trim()}>
             Save domain
@@ -71,7 +71,7 @@ export function DomainsModule({
           <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Domain</div>
           <TextField value={value} onChange={setValue} placeholder="e.g. auroraresidences.com" />
           <p style={{ fontSize: 12.5, color: "var(--ps-muted)", lineHeight: 1.55, margin: "10px 0 16px" }}>
-            No DNS is required here. The hostname is mapped inside this app so local preview can load this template at <span style={{ fontFamily: "ui-monospace, monospace" }}>/p/host/yourdomain.com</span>.
+            No DNS is required here. The hostname is mapped inside this app so local preview can load this template at <span style={{ fontFamily: "ui-monospace, monospace" }}>/__host/yourdomain.com</span>.
           </p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Btn variant="primary" icon={<Globe size={14} />} onClick={save} disabled={!value.trim()}>

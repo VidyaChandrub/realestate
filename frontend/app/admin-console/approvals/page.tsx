@@ -199,6 +199,14 @@ function OrganisationApprovalsTab({ accessToken }: { accessToken: string }) {
                   <div style={{ fontWeight:700 }}>{detail.name} <span style={{ fontWeight:400, color:"var(--muted)"}}>— {detail.city} · slug {detail.slug}</span></div>
                   <div style={{ fontSize:13, color:"var(--muted)"}}>Admin: {detail.admin?.firstName} {detail.admin?.lastName} · {detail.admin?.email} · {detail.admin?.phoneNumber ?? "—"}</div>
                   <div style={{ fontSize:12, color:"var(--muted)"}}>Created: {new Date(detail.createdAt).toLocaleString("en-IN")} · Users: {detail.userCount}</div>
+                  {detail.subdomain ? (
+                    <div style={{ fontSize:12 }}>
+                      <span style={{ color:"var(--muted)"}}>Requested subdomain:</span>{" "}
+                      <b>{detail.subdomainHost ?? detail.subdomain}</b>{" "}
+                      <span className={`badge ${detail.subdomainStatus === "pending" ? "b-amber" : "b-gray"}`}>{detail.subdomainStatus}</span>
+                      <div style={{ fontSize:11, color:"var(--muted)"}}>Approving the organisation also activates this subdomain automatically.</div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div style={{ display:"grid", gap:10 }}>

@@ -122,7 +122,6 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   const [activePage, setActivePage] = useState<LandingPageData | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [navOpen, setNavOpen] = useState(false);
   const apiRef = useRef<BuilderApi | null>(null);
   const toastId = useRef(0);
   // Lightweight (no content) index of every template — feeds FormsModule's
@@ -147,15 +146,16 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
     const design = searchParams.get("design");
 
     (async () => {
-      if (id) {
-        const page = await loadTemplate(id, resource);
-        if (cancelled) return;
-        if (page) {
-          setActivePage(page);
-          setModule("builder");
-          return;
+      try {
+        if (id) {
+          const page = await loadTemplate(id, resource);
+          if (cancelled) return;
+          if (page) {
+            setActivePage(page);
+            setModule("builder");
+            return;
+          }
         }
-      }
       // ?design= lookup-by-design-id is a Template-only concept (org pages
       // are opened by their own id, never by a shared design id) — skip it
       // entirely for the org resource.
@@ -179,6 +179,9 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
         }
       }
       if (!cancelled) window.location.replace(HOME_PATH[resource]);
+      } catch {
+        if (!cancelled) window.location.replace(HOME_PATH[resource]);
+      }
     })();
 
     return () => {
@@ -193,6 +196,8 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
       // together) — no separate landing/thank-you calls needed.
       loadTemplates({ resource: "landing-page" }).then((pages) => {
         if (!cancelled) setAllPages(pages);
+      }).catch(() => {
+        if (!cancelled) setAllPages([]);
       });
       return () => {
         cancelled = true;
@@ -206,6 +211,8 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
       loadTemplates({ includeContent: false, pageType: "thank-you" }),
     ]).then(([landing, thankYou]) => {
       if (!cancelled) setAllPages([...landing, ...thankYou]);
+    }).catch(() => {
+      if (!cancelled) setAllPages([]);
     });
     return () => {
       cancelled = true;
@@ -542,7 +549,6 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
         onNotify={() => setNotifOpen(true)}
         onActivity={() => setActivityOpen(true)}
         onHelp={() => setHelpOpen(true)}
-        onMenu={() => setNavOpen((v) => !v)}
         user={topNavUser}
         onSignOut={handleSignOut}
         settingsHref={SETTINGS_PATH[resource]}
@@ -555,43 +561,39 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
       />
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        {/* Workspace rail */}
-        <nav className="ps-rail" data-open={navOpen ? "true" : "false"}>
-          <Link href={HOME_PATH[resource]} title="Back" className="ps-rail-btn">
-            <LayoutTemplate size={19} />
-            <span className="ps-rail-label">{resource === "landing-page" ? "My Pages" : "Templates"}</span>
-          </Link>
-          {railItems.map((item) => {
-            const Icon = item.icon;
-            const active = module === item.key;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                title={item.label}
-                onClick={() => {
-                  setModule(item.key);
-                  setNavOpen(false);
-                }}
-                className="ps-rail-btn"
-                data-active={active ? "true" : "false"}
-              >
-                <Icon size={19} />
-                <span className="ps-rail-label">{item.label}</span>
-              </button>
-            );
-          })}
-          <div style={{ flex: 1 }} />
-          <button type="button" title="Settings" className="ps-rail-btn" onClick={() => { setSettingsOpen(true); setNavOpen(false); }}>
-            <Settings size={18} />
-            <span className="ps-rail-label">Settings</span>
-          </button>
-        </nav>
-        {navOpen ? <button type="button" className="ps-drawer-backdrop ps-nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} /> : null}
-
         {/* Module content */}
         <main className="ps-module-shell" style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>{renderModule()}</main>
       </div>
+
+      {/* Fixed bottom navigation */}
+      <nav className="ps-bottombar" aria-label="Studio modules">
+        <Link href={HOME_PATH[resource]} title="Back" className="ps-rail-btn ps-bb-item">
+          <LayoutTemplate size={18} />
+          <span className="ps-rail-label">{resource === "landing-page" ? "My Pages" : "Templates"}</span>
+        </Link>
+        {railItems.map((item) => {
+          const Icon = item.icon;
+          const active = module === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              title={item.label}
+              onClick={() => setModule(item.key)}
+              className="ps-rail-btn ps-bb-item"
+              data-active={active ? "true" : "false"}
+            >
+              <Icon size={18} />
+              <span className="ps-rail-label">{item.label}</span>
+            </button>
+          );
+        })}
+        <div style={{ flex: 1 }} />
+        <button type="button" title="Settings" className="ps-rail-btn ps-bb-item" onClick={() => setSettingsOpen(true)}>
+          <Settings size={18} />
+          <span className="ps-rail-label">Settings</span>
+        </button>
+      </nav>
 
       {/* Toasts */}
       <div className="ps-toast-stack">
@@ -683,12 +685,12 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
 
       {inAppPreviewOpen && activePage ? (
         <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600, padding: 20 }}
+          style={{ position: "fixed", inset: 0, background: "#0f172a", display: "flex", flexDirection: "column", zIndex: 600 }}
           onClick={() => setInAppPreviewOpen(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 16, width: "min(1180px, 100%)", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(15,23,42,.35)" }}
+            style={{ background: "#fff", width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderBottom: "1px solid var(--ps-border, #e5e7eb)", flexShrink: 0 }}>
               <span style={{ fontWeight: 700, fontSize: 14 }}>{activePage.name}</span>

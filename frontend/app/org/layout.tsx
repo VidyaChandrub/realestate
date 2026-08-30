@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Inter, Space_Grotesk } from "next/font/google";
 import { OrgAdminShell } from "@/components/org/shell";
-import "../admin-console/superadmin.css";
-import "./crm.css";
+import "./org.css";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,7 +21,7 @@ export const metadata: Metadata = {
 
 export default function OrgLayout({ children }: { children: ReactNode }) {
   return (
-    <div className={`superadmin ${inter.variable} ${spaceGrotesk.variable}`}>
+    <div className={`org ${inter.variable} ${spaceGrotesk.variable}`}>
       <OrgAdminShell>{children}</OrgAdminShell>
     </div>
   );

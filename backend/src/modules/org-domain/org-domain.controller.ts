@@ -1,0 +1,27 @@
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { JwtPayload } from '../../common/types/jwt-payload.interface';
+import { OrgDomainService } from './org-domain.service';
+import { RequestCustomDomainDto } from './dto/request-custom-domain.dto';
+
+@UseGuards(JwtAuthGuard, OrgAdminGuard)
+@Controller('org/domain')
+export class OrgDomainController {
+  constructor(private readonly service: OrgDomainService) {}
+
+  @Get()
+  getInfo(@CurrentUser() user: JwtPayload) {
+    return this.service.getInfo(user.orgId as string);
+  }
+
+  @Post('custom-domain')
+  requestCustomDomain(@CurrentUser() user: JwtPayload, @Body() dto: RequestCustomDomainDto) {
+    return this.service.requestCustomDomain(
+      user.orgId as string,
+      user.sub as string,
+      dto.domain,
+    );
+  }
+}

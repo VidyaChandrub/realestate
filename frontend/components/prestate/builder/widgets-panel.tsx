@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type * as React from "react";
+import { useDraggable } from "@dnd-kit/core";
 import { ChevronDown, Layers, PanelLeftClose, PanelLeftOpen, Search, Trash2 } from "lucide-react";
 import { WIDGETS, WIDGET_CATEGORY_META, SLUG_ICONS } from "@/lib/prestate/data";
 import type { SavedSectionTemplate } from "@/lib/prestate/persist";
@@ -280,35 +281,29 @@ function DraggableCard({
   highlight: boolean;
   onAdd: () => void;
 }) {
-  const origin = useRef<{ x: number; y: number } | null>(null);
-  const dragging = useRef(false);
   const active = hovered || highlight;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `widget:${id}`,
+    data: { type: "widget", widgetId: id },
+  });
   return (
     <button
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
       type="button"
-      draggable
-      onPointerDown={(e) => {
-        origin.current = { x: e.clientX, y: e.clientY };
-        dragging.current = false;
-      }}
-      onDragStart={(e) => {
-        dragging.current = true;
-        e.dataTransfer.setData(WIDGET_MIME, id);
-        e.dataTransfer.setData("text/plain", id);
-        e.dataTransfer.effectAllowed = "copy";
-      }}
-      onPointerUp={(e) => {
-        if (!origin.current) return;
-        const dx = Math.abs(e.clientX - origin.current.x);
-        const dy = Math.abs(e.clientY - origin.current.y);
-        origin.current = null;
-        if (!dragging.current && dx < 8 && dy < 8) onAdd();
-      }}
+      onClick={onAdd}
       onMouseEnter={() => onHover(id)}
       onMouseLeave={() => onHover(null)}
       title={desc}
       className="ps-widget-card"
       data-selected={active ? "true" : "false"}
+      style={{
+        opacity: isDragging ? 0.4 : 1,
+        cursor: "grab",
+        width: "100%",
+        textAlign: "left",
+      }}
     >
       <span style={{ width: 26, height: 26, borderRadius: 8, background: active ? "var(--ps-primary-soft)" : "rgba(255,255,255,0.04)", color: active ? "var(--ps-primary)" : "var(--ps-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         {icon}

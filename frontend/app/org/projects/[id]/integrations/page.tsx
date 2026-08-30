@@ -7,6 +7,7 @@
 
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import "@/app/org/org.css";
 
 type SourceCard = {
   icon: string;
@@ -48,7 +49,7 @@ const SOURCES: SourceCard[] = [
   },
   {
     icon: "🎪",
-    name: <>Property Expo <span className="badge b-gray" style={{ marginLeft: 4 }}>Custom</span></>,
+    name: <>Property Expo <span className="badge b-gray">Custom</span></>,
     desc: "Walk-in leads captured at the Ahmedabad Property Expo 2026 stall.",
     connected: true,
   },
@@ -84,35 +85,20 @@ export default function OrgProjectIntegrationsPage() {
       <ProjectPageHead
         active="integrations"
         actions={
-          <>
-            <button className="btn btn-ghost">🔗 Public page</button>
-            <button className="btn btn-primary">＋ Add lead</button>
-          </>
+          <button className="btn btn-primary">＋ Add lead</button>
         }
       />
 
       <Reveal delay={1}>
-        <div className="help" style={{ marginBottom: 14 }}>
+        <div className="help mb-14">
           Lead-source integrations aren&apos;t wired up yet — this is a preview.
         </div>
       </Reveal>
 
       <Reveal delay={1}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            margin: "6px 0 14px",
-            color: "var(--muted)",
-            fontSize: 11.5,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-          }}
-        >
+        <div className="sec-title">
           <span>INCOMING · Lead sources for this project</span>
-          <button className="btn btn-ghost" style={{ textTransform: "none", letterSpacing: 0 }}>
+          <button className="btn btn-ghost">
             ＋ Add custom source
           </button>
         </div>
@@ -122,9 +108,9 @@ export default function OrgProjectIntegrationsPage() {
         {SOURCES.map((s, i) => (
           <Reveal delay={(i % 3) + 1} key={typeof s.name === "string" ? s.name : "expo"}>
             <div className="card hover">
-              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: 26 }}>{s.icon}</span>
+              <div className="card-b col gap-10">
+                <div className="row between top">
+                  <span className="fs-26">{s.icon}</span>
                   {s.connected ? (
                     <span className="badge b-green">Connected</span>
                   ) : (
@@ -132,11 +118,11 @@ export default function OrgProjectIntegrationsPage() {
                   )}
                 </div>
                 <b>{s.name}</b>
-                <div className="muted" style={{ fontSize: 12.5 }}>{s.desc}</div>
+                <div className="muted fs-12-5">{s.desc}</div>
                 {s.connected ? (
-                  <button className="btn btn-ghost btn-block" style={{ marginTop: 4 }}>Configure</button>
+                  <button className="btn btn-ghost btn-block mt-4">Configure</button>
                 ) : (
-                  <button className="btn btn-primary btn-block" style={{ marginTop: 4 }}>Connect</button>
+                  <button className="btn btn-primary btn-block mt-4">Connect</button>
                 )}
               </div>
             </div>
@@ -145,28 +131,18 @@ export default function OrgProjectIntegrationsPage() {
       </div>
 
       <Reveal delay={2}>
-        <div className="card" style={{ marginTop: 20 }}>
+        <div className="card mt-20">
           <div className="card-h">
             <span className="t">Distribution rules</span>
             <span className="badge b-sky">3 rules</span>
           </div>
-          <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className="card-b">
             {RULES.map((r) => (
-              <div
-                key={r.title}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  padding: "12px 14px",
-                  border: "1px solid var(--line)",
-                  borderRadius: 12,
-                }}
-              >
+              <div className="sw-row" key={r.title}>
                 <div className={`switch${r.on ? " on" : ""}`} />
-                <div style={{ flex: 1 }}>
+                <div className="spacer">
                   <b>{r.title}</b>
-                  <div className="muted" style={{ fontSize: 12.5 }}>{r.sub}</div>
+                  <div className="muted fs-12-5">{r.sub}</div>
                 </div>
                 <span className={`badge ${r.badgeClass}`}>{r.badge}</span>
               </div>

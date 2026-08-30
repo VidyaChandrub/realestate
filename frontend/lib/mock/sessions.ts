@@ -20,6 +20,10 @@ export const DEMO_ORGANISATION = {
   state: null,
   postal_code: null,
   country: null,
+  subdomain: "acme",
+  subdomain_status: "active",
+  custom_domain: null,
+  custom_domain_status: "none",
 };
 
 export interface MockAccount {

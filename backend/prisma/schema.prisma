@@ -67,14 +67,29 @@ model Organisation {
   postalCode      String? @map("postal_code")
   country         String?
 
+  // The organisation's own site identity, chosen at registration and/or later
+  // from the Org Settings → Domain screen. subdomain is the organisation's
+  // primary platform address (e.g. skylinedev.ipixxel.in) and is auto-activated
+  // once the Super Admin approves the organisation. A custom domain can be
+  // requested (added as a pending OrgDomainRequest) and, once a Super Admin
+  // approves, is mapped to the organisation's primary site.
+  // Per-website addresses (each template can have its own subdomain or a custom
+  // domain) live on LandingPage / DomainRequest instead.
+  subdomain          String?  @unique
+  subdomainStatus    String   @default("pending") @map("subdomain_status") // none | pending | active | rejected
+  customDomain       String?  @unique @map("custom_domain")
+  customDomainStatus String   @default("none") @map("custom_domain_status") // none | pending | approved | connected | rejected
+
   users                 User[]
   teams                 Team[]
   auditLogs             AuditLog[]
+  notifications         Notification[]
   subscriptions         Subscription[]
   organisationTemplates OrganisationTemplate[]
   landingPages          LandingPage[]
   typographySets        TypographySet[]
   domainRequests        DomainRequest[]
+  orgDomainRequests     OrgDomainRequest[]
   trackingEvents        TrackingEvent[]
   projects              Project[]
 
@@ -103,6 +118,7 @@ model User {
   resetTokens     PasswordResetToken[]
   auditLogs       AuditLog[]
   managedProjects Project[]
+  notifications   Notification[]
 
   @@map("users")
   @@schema("identity")
@@ -242,6 +258,45 @@ model AuditLog {
   actor        User?         @relation(fields: [actorId], references: [id])
 
   @@map("audit_logs")
+  @@schema("audit")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications — in-app alerts surfaced to a recipient (typically a Super
+// Admin) when something needs attention, e.g. an organisation registration or
+// a domain/subdomain request waiting for approval. Email delivery stays
+// stubbed via console.log (matching the rest of the codebase); this row is the
+// durable, queryable "notification" the UI reads for the bell / approvals.
+// ---------------------------------------------------------------------------
+
+enum NotificationType {
+  organisation_registration
+  subdomain_request
+  custom_domain_request
+  organisation_approved
+  organisation_rejected
+
+  @@schema("audit")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  orgId     String?          @map("org_id")
+  recipientId String?        @map("recipient_id") // user id; null = all super admins (cosmetic grouping)
+  type      NotificationType
+  title     String
+  body      String?
+  entity    String?          // e.g. "Organisation" | "OrgDomainRequest"
+  entityId  String?          @map("entity_id")
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  organisation Organisation? @relation(fields: [orgId], references: [id])
+  recipient    User?         @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, readAt])
+  @@index([type])
+  @@map("notifications")
   @@schema("audit")
 }
 
@@ -413,6 +468,11 @@ model LandingPage {
   thumbnail        String?
   pageType         TemplatePageType  @default(landing) @map("page_type")
   parentId         String?           @map("parent_id") // thank-you companion linkage, among the org's own pages
+  // Optional per-website subdomain (e.g. abc.platform.com). A website can have
+  // EITHER a subdomain OR a custom domain (via DomainRequest), mapped
+  // Subdomain/Domain -> Organisation -> LandingPage.
+  subdomain       String?           @unique
+  subdomainStatus String            @default("none") @map("subdomain_status") // none | pending | active | rejected
   submittedAt      DateTime?         @map("submitted_at")
   reviewedAt       DateTime?         @map("reviewed_at")
   reviewedById     String?           @map("reviewed_by_id")
@@ -461,6 +521,54 @@ model TypographySet {
 // → DNS → SSL → Tracking → SEO → Publishing. Every LandingPage is an
 // independent website instance (see prompt §1, §30).
 // ---------------------------------------------------------------------------
+
+enum OrgDomainRequestKind {
+  subdomain
+  custom_domain
+
+  @@schema("templates")
+}
+
+enum OrgDomainRequestStatus {
+  pending
+  approved
+  rejected
+  connected
+
+  @@schema("templates")
+}
+
+// A Super-Admin-reviewed request to claim the organisation's own site address:
+// a platform subdomain (kind = "subdomain") or a custom domain (kind =
+// "custom_domain"). These are the rows the Super Admin "Org Domains" screen
+// lists and approves/rejects across all organisations. Approval writes the
+// ground truth onto Organisation:
+//   - subdomain     -> Organisation.subdomain + subdomainStatus = active
+//   - custom_domain -> Organisation.customDomain + customDomainStatus = connected
+// This is distinct from DomainRequest/LandingPage, which handle per-website
+// custom-domain mapping for a specific landing page.
+model OrgDomainRequest {
+  id              String                 @id @default(uuid())
+  orgId           String                 @map("org_id")
+  kind            OrgDomainRequestKind
+  subdomain       String?
+  customDomain    String?                @map("custom_domain")
+  status          OrgDomainRequestStatus @default(pending)
+  requestedBy     String?                @map("requested_by")
+  requestedAt     DateTime               @default(now()) @map("requested_at")
+  reviewedAt      DateTime?              @map("reviewed_at")
+  reviewedBy      String?                @map("reviewed_by")
+  rejectionReason String?                @map("rejection_reason")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([status])
+  @@map("org_domain_requests")
+  @@schema("templates")
+}
 
 enum DomainRequestStatus {
   pending

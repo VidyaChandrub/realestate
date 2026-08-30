@@ -122,7 +122,7 @@ export function PagesModule({
     <div style={{ overflowY: "auto", height: "100%" }}>
       <ModuleHeader
         title="Landing Pages"
-        description="Preview opens a local URL (/p/your-slug). Assign any hostname (e.g. auroraresidences.com) to map that same page at /p/host/auroraresidences.com."
+        description="Preview opens a local URL (/p/your-slug). Assign any hostname (e.g. auroraresidences.com) to map that same page at /__host/auroraresidences.com."
         actions={<PrimaryAction label="New Landing Page" icon={<FilePlus2 size={15} />} onClick={() => setCreateOpen(true)} />}
       />
 
@@ -292,7 +292,7 @@ export function PagesModule({
         <p style={{ fontSize: 13, color: "var(--ps-slate)", lineHeight: 1.6, margin: "0 0 14px" }}>
           This maps a hostname onto the local preview. The page stays at{" "}
           <strong style={{ color: "var(--ps-ink)", fontFamily: "monospace" }}>{domainFor ? localPreviewPath(domainFor) : ""}</strong>
-          {" "}and also at <strong style={{ color: "var(--ps-ink)", fontFamily: "monospace" }}>/p/host/yourdomain.com</strong>.
+          {" "}and also at <strong style={{ color: "var(--ps-ink)", fontFamily: "monospace" }}>/__host/yourdomain.com</strong>.
         </p>
         <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 6 }}>Domain</div>
         <TextField value={domainValue} onChange={setDomainValue} placeholder="auroraresidences.com" />

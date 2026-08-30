@@ -9,8 +9,8 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { MediaUpload, GalleryUpload } from "@/components/org/media-upload";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import "@/app/org/org.css";
 import type {
   CreateUnitInput,
   CreateUnitTypeInput,
@@ -75,10 +75,6 @@ interface UnitTypeForm {
   builtupSqft: string;
   price: string;
   totalUnits: string;
-  floorPlanUrl: string | null;
-  brochureUrl: string | null;
-  videoUrl: string | null;
-  galleryUrls: string[];
 }
 const EMPTY_UT_FORM: UnitTypeForm = {
   name: "",
@@ -86,10 +82,6 @@ const EMPTY_UT_FORM: UnitTypeForm = {
   builtupSqft: "",
   price: "",
   totalUnits: "",
-  floorPlanUrl: null,
-  brochureUrl: null,
-  videoUrl: null,
-  galleryUrls: [],
 };
 
 interface UnitForm {
@@ -185,10 +177,6 @@ export default function OrgProjectUnitsPage() {
       builtupSqft: ut.builtupSqft == null ? "" : String(ut.builtupSqft),
       price: ut.price == null ? "" : String(ut.price),
       totalUnits: String(ut.totalUnits),
-      floorPlanUrl: ut.floorPlanUrl,
-      brochureUrl: ut.brochureUrl,
-      videoUrl: ut.videoUrl,
-      galleryUrls: ut.galleryUrls ?? [],
     });
     setUtError(null);
   }
@@ -207,10 +195,6 @@ export default function OrgProjectUnitsPage() {
         builtupSqft: numOrUndef(utForm.builtupSqft),
         price: numOrUndef(utForm.price),
         totalUnits: numOrUndef(utForm.totalUnits),
-        floorPlanUrl: utForm.floorPlanUrl,
-        brochureUrl: utForm.brochureUrl,
-        videoUrl: utForm.videoUrl,
-        galleryUrls: utForm.galleryUrls,
       };
       if (utMode === "create") {
         await apiFetch(`/org/projects/${id}/unit-types`, {
@@ -462,10 +446,6 @@ export default function OrgProjectUnitsPage() {
         }
         actions={
           <>
-            {/* Inert for now — public project pages aren't built yet. */}
-            <button className="btn btn-ghost" type="button">
-              🔗 Public page
-            </button>
             <button
               className="btn btn-ghost"
               type="button"
@@ -487,7 +467,7 @@ export default function OrgProjectUnitsPage() {
 
       {error ? (
         <Reveal delay={1}>
-          <div className="form-alert" style={{ marginBottom: 14 }}>
+          <div className="form-alert mb-14">
             {error}
           </div>
         </Reveal>
@@ -506,15 +486,9 @@ export default function OrgProjectUnitsPage() {
           ) : (
             unitTypes.map((u) => (
               <div className="card" key={u.id}>
-                <div style={{ padding: 18 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <b style={{ fontSize: 16 }}>{u.name}</b>
+                <div className="pad-18">
+                  <div className="row between">
+                    <b className="fs-16">{u.name}</b>
                     <span
                       className={`badge ${u.availableUnits > 0 ? "b-green" : "b-amber"}`}
                     >
@@ -556,7 +530,7 @@ export default function OrgProjectUnitsPage() {
                       <span className="badge b-gray">Planned: {u.totalUnits}</span>
                     ) : null}
                   </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <div className="row gap-8 mt-10">
                     <button
                       className="btn btn-ghost btn-sm"
                       type="button"
@@ -564,49 +538,17 @@ export default function OrgProjectUnitsPage() {
                     >
                       ✏️ Edit
                     </button>
-                    {u.floorPlanUrl ? (
-                      <a
-                        className="btn btn-ghost btn-sm"
-                        href={u.floorPlanUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        📐 View floor plan
-                      </a>
-                    ) : (
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        type="button"
-                        disabled
-                        title="No floor plan uploaded yet — add one via Edit"
-                      >
-                        📐 View floor plan
-                      </button>
-                    )}
-                    {u.videoUrl ? (
-                      <a
-                        className="btn btn-ghost btn-sm"
-                        href={u.videoUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        ▶ Watch video
-                      </a>
-                    ) : null}
-                    {u.brochureUrl ? (
-                      <a
-                        className="btn btn-ghost btn-sm"
-                        href={u.brochureUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        📄 Brochure
-                      </a>
-                    ) : null}
                     <button
                       className="btn btn-ghost btn-sm"
                       type="button"
-                      style={{ color: "var(--rose)" }}
+                      disabled
+                      title="Floor plan upload is coming soon"
+                    >
+                      📐 View floor plan
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm text-rose"
+                      type="button"
                       onClick={() =>
                         setPendingDelete({
                           kind: "unitType",
@@ -628,14 +570,7 @@ export default function OrgProjectUnitsPage() {
 
       {units.length > 0 ? (
         <Reveal delay={2}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 18,
-              marginTop: 18,
-            }}
-          >
+          <div className="col gap-18 mt-18">
             {towers.map((t) => (
               <div className="card" key={t.key}>
                 <div className="card-h">
@@ -662,13 +597,13 @@ export default function OrgProjectUnitsPage() {
                   </div>
                   <div className="legend">
                     <span>
-                      <i style={{ background: "#10b981" }} /> Available
+                      <i className="dot-av" /> Available
                     </span>
                     <span>
-                      <i style={{ background: "#f43f5e" }} /> Booked
+                      <i className="dot-bk" /> Booked
                     </span>
                     <span>
-                      <i style={{ background: "#f59e0b" }} /> Held
+                      <i className="dot-hl" /> Held
                     </span>
                   </div>
                 </div>
@@ -679,7 +614,7 @@ export default function OrgProjectUnitsPage() {
       ) : null}
 
       <Reveal delay={2}>
-        <div style={{ margin: "18px 0" }}>
+        <div className="my-18">
           <Seg
             options={[...FILTERS]}
             value={filterIndex}
@@ -733,16 +668,9 @@ export default function OrgProjectUnitsPage() {
                           : "—"}
                       </td>
                       <td>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                          }}
-                        >
+                        <div className="row gap-6">
                           <select
-                            className={`badge ${STATUS_BADGE[row.status]}`}
-                            style={{ border: "none", cursor: "pointer" }}
+                            className={`badge ${STATUS_BADGE[row.status]} nb`}
                             value={row.status}
                             disabled={statusSavingId === row.id}
                             onChange={(e) =>
@@ -759,20 +687,18 @@ export default function OrgProjectUnitsPage() {
                             ))}
                           </select>
                           {statusSavingId === row.id ? (
-                            <span className="muted" style={{ fontSize: 11 }}>
+                            <span className="muted fs-11">
                               …
                             </span>
                           ) : statusSavedId === row.id ? (
-                            <span
-                              style={{ color: "var(--green)", fontSize: 12 }}
-                            >
+                            <span className="text-green fs-12">
                               ✓
                             </span>
                           ) : null}
                         </div>
                       </td>
                       <td>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <div className="row gap-6 wrap">
                           <button
                             className="btn btn-ghost btn-sm"
                             type="button"
@@ -781,9 +707,8 @@ export default function OrgProjectUnitsPage() {
                             Edit
                           </button>
                           <button
-                            className="btn btn-ghost btn-sm"
+                            className="btn btn-ghost btn-sm text-rose"
                             type="button"
-                            style={{ color: "var(--rose)" }}
                             onClick={() =>
                               setPendingDelete({
                                 kind: "unit",
@@ -813,9 +738,9 @@ export default function OrgProjectUnitsPage() {
         title={utMode === "create" ? "Add unit type" : "Edit unit type"}
         size="lg"
       >
-        <div className="superadmin">
+        <div className="org">
           {utError ? (
-            <div className="form-alert" style={{ marginBottom: 12 }}>
+            <div className="form-alert mb-12">
               {utError}
             </div>
           ) : null}
@@ -882,55 +807,13 @@ export default function OrgProjectUnitsPage() {
               }
             />
           </div>
-          <div
-            style={{
-              marginTop: 6,
-              paddingTop: 12,
-              borderTop: "1px dashed var(--line)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-              marginBottom: 4,
-            }}
-          >
-            <div className="row2">
-              <MediaUpload
-                field="floorPlan"
-                label="Floor plan"
-                value={utForm.floorPlanUrl}
-                onChange={(url) =>
-                  setUtForm((f) => ({ ...f, floorPlanUrl: url }))
-                }
-                ctx={{ projectId: id, unitTypeId: utEditingId ?? undefined }}
-              />
-              <MediaUpload
-                field="brochure"
-                label="Brochure (PDF)"
-                value={utForm.brochureUrl}
-                onChange={(url) =>
-                  setUtForm((f) => ({ ...f, brochureUrl: url }))
-                }
-                ctx={{ projectId: id, unitTypeId: utEditingId ?? undefined }}
-              />
-            </div>
-            <MediaUpload
-              field="video"
-              label="Walkthrough video"
-              value={utForm.videoUrl}
-              onChange={(url) => setUtForm((f) => ({ ...f, videoUrl: url }))}
-              ctx={{ projectId: id, unitTypeId: utEditingId ?? undefined }}
-              allowLink
-              linkPlaceholder="Or paste a YouTube link"
-            />
-            <GalleryUpload
-              value={utForm.galleryUrls}
-              onChange={(urls) =>
-                setUtForm((f) => ({ ...f, galleryUrls: urls }))
-              }
-              ctx={{ projectId: id, unitTypeId: utEditingId ?? undefined }}
-            />
+          <div className="muted fs-12 row gap-8 mb-14">
+            <span>📐 Floor plan</span>
+            <span>🎬 Video</span>
+            <span>📄 Brochure</span>
+            <span className="badge b-gray">Coming soon</span>
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="row gap-10">
             <button
               className="btn btn-primary"
               type="button"
@@ -960,131 +843,198 @@ export default function OrgProjectUnitsPage() {
         open={unitMode !== null}
         onClose={() => setUnitMode(null)}
         title={unitMode === "create" ? "Add unit" : "Edit unit"}
-        size="lg"
+        size="xl"
       >
-        <div className="superadmin">
-          {unitError ? (
-            <div className="form-alert" style={{ marginBottom: 12 }}>
-              {unitError}
+        <div className="org">
+        <div className="cgrid">
+          <div>
+            {unitError ? (
+              <div className="form-alert mb-12">
+                {unitError}
+              </div>
+            ) : null}
+
+            <div className="sec">
+              <div className="lbl">🏗️ Project placement</div>
+              <div className="g3">
+                <div className="field">
+                  <label>Unit type <span className="req">*</span></label>
+                  <select
+                    className="inp"
+                    value={unitForm.unitTypeId}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, unitTypeId: e.target.value }))
+                    }
+                  >
+                    <option value="">Select…</option>
+                    {unitTypes.map((ut) => (
+                      <option key={ut.id} value={ut.id}>
+                        {ut.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Tower / block</label>
+                  <input
+                    className="inp"
+                    placeholder="e.g. Tower B"
+                    value={unitForm.tower}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, tower: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label>Floor</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    placeholder="12"
+                    value={unitForm.floor}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, floor: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
             </div>
-          ) : null}
-          <div className="row2">
-            <div className="field">
-              <label>Unit type *</label>
-              <select
-                value={unitForm.unitTypeId}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, unitTypeId: e.target.value }))
-                }
-              >
-                <option value="">Select…</option>
-                {unitTypes.map((ut) => (
-                  <option key={ut.id} value={ut.id}>
-                    {ut.name}
-                  </option>
-                ))}
-              </select>
+
+            <div className="sec">
+              <div className="lbl">🏠 Unit details</div>
+              <div className="g3">
+                <div className="field">
+                  <label>Unit number <span className="req">*</span></label>
+                  <input
+                    className="inp mono"
+                    placeholder="B-1204"
+                    value={unitForm.unitNo}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, unitNo: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label>Facing</label>
+                  <select
+                    className="inp"
+                    value={unitForm.facing}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, facing: e.target.value }))
+                    }
+                  >
+                    <option value="">Select…</option>
+                    <option value="East">East</option>
+                    <option value="West">West</option>
+                    <option value="North">North</option>
+                    <option value="South">South</option>
+                    <option value="North-East">North-East</option>
+                    <option value="North-West">North-West</option>
+                    <option value="South-East">South-East</option>
+                    <option value="South-West">South-West</option>
+                    <option value="Sea">Sea</option>
+                    <option value="Garden">Garden</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Status</label>
+                  <select
+                    className="inp"
+                    value={unitForm.status}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({
+                        ...f,
+                        status: e.target.value as UnitStatus,
+                      }))
+                    }
+                  >
+                    <option value="available">Available</option>
+                    <option value="booked">Booked</option>
+                    <option value="held">Held / Blocked</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div className="field">
-              <label>Unit number *</label>
-              <input
-                className="inp mono"
-                placeholder="A-301"
-                value={unitForm.unitNo}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, unitNo: e.target.value }))
-                }
-              />
+
+            <div className="sec nb">
+              <div className="lbl">💰 Pricing</div>
+              <div className="g2">
+                <div className="field">
+                  <label>Price (₹)</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    placeholder="16500000"
+                    value={unitForm.price}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, price: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label>Price / sqft</label>
+                  <input
+                    className="inp"
+                    placeholder="Auto-calculated"
+                    disabled
+                    value={
+                      unitForm.price && unitTypes.find((ut) => ut.id === unitForm.unitTypeId)?.carpetSqft
+                        ? `₹${Math.round(Number(unitForm.price) / unitTypes.find((ut) => ut.id === unitForm.unitTypeId)!.carpetSqft!).toLocaleString("en-IN")}`
+                        : ""
+                    }
+                  />
+                </div>
+              </div>
             </div>
           </div>
-          <div className="row2">
-            <div className="field">
-              <label>Tower (optional)</label>
-              <input
-                className="inp"
-                placeholder="e.g. A — leave blank if none"
-                value={unitForm.tower}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, tower: e.target.value }))
-                }
-              />
+
+          <div className="col gap-18">
+            <div className="card">
+              <div className="card-h"><span className="t">Preview</span></div>
+              <div className="card-b">
+                <div className="ph-box">📐</div>
+                <div className="row between">
+                  <b>{unitForm.unitNo || "New unit"}</b>
+                  <span className={`badge ${unitForm.status === "available" ? "b-green" : unitForm.status === "booked" ? "b-rose" : "b-amber"}`}>
+                    {unitForm.status === "available" ? "Available" : unitForm.status === "booked" ? "Booked" : "Held"}
+                  </span>
+                </div>
+                <div className="muted fs-12-5 mt-4">
+                  {unitTypes.find((ut) => ut.id === unitForm.unitTypeId)?.name || "Select unit type"}
+                  {unitForm.tower ? ` · ${unitForm.tower}` : ""}
+                  {unitForm.floor ? ` · Floor ${unitForm.floor}` : ""}
+                  <br />
+                  {unitForm.facing || "Facing not set"}
+                </div>
+              </div>
             </div>
-            <div className="field">
-              <label>Floor</label>
-              <input
-                className="inp"
-                type="number"
-                placeholder="3"
-                value={unitForm.floor}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, floor: e.target.value }))
-                }
-              />
-            </div>
+            <div className="help">💡 Add the unit number, type and price to get started. Tower and floor help organize the availability grid.</div>
           </div>
-          <div className="row2">
-            <div className="field">
-              <label>Facing</label>
-              <input
-                className="inp"
-                placeholder="North-East"
-                value={unitForm.facing}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, facing: e.target.value }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Price (₹)</label>
-              <input
-                className="inp"
-                type="number"
-                min={0}
-                value={unitForm.price}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, price: e.target.value }))
-                }
-              />
-            </div>
-          </div>
-          <div className="field">
-            <label>Status</label>
-            <select
-              value={unitForm.status}
-              onChange={(e) =>
-                setUnitForm((f) => ({
-                  ...f,
-                  status: e.target.value as UnitStatus,
-                }))
-              }
-            >
-              <option value="available">Available</option>
-              <option value="booked">Booked</option>
-              <option value="held">Held</option>
-            </select>
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              className="btn btn-primary"
-              type="button"
-              disabled={unitBusy}
-              onClick={() => void submitUnit()}
-            >
-              {unitBusy
-                ? "Saving…"
-                : unitMode === "create"
-                  ? "Add unit"
-                  : "Save"}
-            </button>
-            <button
-              className="btn btn-ghost"
-              type="button"
-              onClick={() => setUnitMode(null)}
-              disabled={unitBusy}
-            >
-              Cancel
-            </button>
-          </div>
+        </div>
+
+        <div className="row gap-10 mt-18 pt-18 b-top">
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={unitBusy}
+            onClick={() => void submitUnit()}
+          >
+            {unitBusy
+              ? "Saving…"
+              : unitMode === "create"
+                ? "Add unit"
+                : "Save"}
+          </button>
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={() => setUnitMode(null)}
+            disabled={unitBusy}
+          >
+            Cancel
+          </button>
+        </div>
         </div>
       </Modal>
 

@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type * as React from "react";
+import { DndContext, DragOverlay, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { ArrowRight, CornerDownLeft, Search, SlidersHorizontal, LayoutGrid, Layers, ListOrdered } from "lucide-react";
 import type { Device, FooterDesignId, HeaderDesignId, LandingPageData, MenuLink, SectionInstance, SectionStyle, SiteConfig } from "@/lib/prestate/types";
 import {
@@ -20,10 +23,13 @@ import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts, loa
 import type { Resource } from "@/lib/prestate/store";
 import {
   cloneWithFreshIds,
+  dropColumnOn,
   duplicateSection,
   findSection,
   insertChild,
+  isDescendant,
   isStructural,
+  newSectionId,
   patchSection,
   placeColumn,
   removeSection,
@@ -64,6 +70,20 @@ function seedSections(page: LandingPageData): SectionInstance[] {
     return migrateSections(JSON.parse(JSON.stringify(page.sections)) as SectionInstance[]);
   }
   return page.pageType === "thank-you" ? buildThankYouSections() : buildTemplateSections(page.template);
+}
+
+// Flatten every section id (including nested children) in render order so the
+// sortable context spans the whole tree, not just the top level.
+function collectSectionIds(list: SectionInstance[]): string[] {
+  const out: string[] = [];
+  const walk = (arr?: SectionInstance[]) => {
+    for (const s of arr ?? []) {
+      out.push(s.id);
+      walk(s.children);
+    }
+  };
+  walk(list);
+  return out;
 }
 
 export function BuilderWorkspace({
@@ -458,6 +478,151 @@ export function BuilderWorkspace({
     setLeftTab("layers");
   }, []);
 
+  const resolveWidget = useCallback((id: string): SectionInstance | null => {
+    if (!id.startsWith(SAVED_WIDGET_PREFIX)) return null;
+    const tpl = loadSectionTemplates().find((t) => t.id === savedWidgetStorageId(id));
+    return tpl ? cloneWithFreshIds(tpl.data) : null;
+  }, []);
+
+  // ---- @dnd-kit drag & drop orchestration ----
+  const allIds = useMemo(() => collectSectionIds(state.sections), [state.sections]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const insertWidgetAt = useCallback(
+    (widgetId: string, index: number) => {
+      mutate((prev) => {
+        const def = WIDGETS.find((w) => w.id === widgetId);
+        const copy = def ? def.make() : resolveWidget(widgetId);
+        if (!copy) return prev;
+        const node = { ...copy, id: newSectionId() };
+        const next = insertChild(prev, null, node, index);
+        setTimeout(() => handleSelect(node.id), 30);
+        return next;
+      });
+    },
+    [mutate, resolveWidget, handleSelect],
+  );
+
+  const nestWidget = useCallback(
+    (widgetId: string, containerId: string) => {
+      mutate((prev) => {
+        if (widgetId === "column") {
+          const placed = dropColumnOn(prev, containerId, true);
+          setTimeout(() => handleSelect(placed.selectId), 30);
+          return placed.list;
+        }
+        const def = WIDGETS.find((w) => w.id === widgetId);
+        const copy = def ? def.make() : resolveWidget(widgetId);
+        if (!copy) return prev;
+        const node = { ...copy, id: newSectionId() };
+        const next = insertChild(prev, containerId, node);
+        setTimeout(() => handleSelect(node.id), 30);
+        return next;
+      });
+    },
+    [mutate, resolveWidget, handleSelect],
+  );
+
+  const moveSectionToStrip = useCallback(
+    (fromId: string, index: number) => {
+      mutate((prev) => {
+        const idx = prev.findIndex((s) => s.id === fromId);
+        if (idx < 0) return prev;
+        const { list, removed } = removeSection(prev, fromId);
+        if (!removed) return prev;
+        const target = index > idx ? index - 1 : index;
+        return insertChild(list, null, removed, target);
+      });
+    },
+    [mutate],
+  );
+
+  const nestSection = useCallback(
+    (fromId: string, containerId: string) => {
+      mutate((prev) => {
+        if (isDescendant(prev, containerId, fromId)) return prev;
+        const { list, removed } = removeSection(prev, fromId);
+        if (!removed) return prev;
+        return insertChild(list, containerId, removed);
+      });
+    },
+    [mutate],
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over) return;
+      const aType = active.data.current?.type;
+      const oType = over.data.current?.type;
+      if (aType === "widget") {
+        const widgetId = active.data.current?.widgetId as string;
+        if (oType === "container") {
+          nestWidget(widgetId, over.data.current?.id as string);
+          return;
+        }
+        if (oType === "strip") {
+          insertWidgetAt(widgetId, over.data.current?.index as number);
+          return;
+        }
+        if (oType === "section") {
+          const ref = findSection(state.sections, over.id as string);
+          insertWidgetAt(widgetId, ref ? ref.index + 1 : state.sections.length);
+          return;
+        }
+        return;
+      }
+      if (aType === "section") {
+        const fromId = active.id as string;
+        if (fromId === over.id) return;
+        if (oType === "container") {
+          nestSection(fromId, over.data.current?.id as string);
+          return;
+        }
+        if (oType === "strip") {
+          moveSectionToStrip(fromId, over.data.current?.index as number);
+          return;
+        }
+        if (oType === "section") {
+          handleReorder(fromId, over.id as string, true);
+          return;
+        }
+      }
+    },
+    [state.sections, nestWidget, insertWidgetAt, nestSection, moveSectionToStrip, handleReorder],
+  );
+
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
+
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const data = event.active.data.current;
+      if (data?.type === "widget") {
+        const wid = data.widgetId as string;
+        const def = WIDGETS.find((w) => w.id === wid);
+        setActiveLabel(def?.label ?? (wid.startsWith(SAVED_WIDGET_PREFIX) ? "Saved template" : wid));
+      } else if (data?.type === "section") {
+        const ref = findSection(state.sections, event.active.id as string);
+        setActiveLabel(ref?.node.label ?? "Section");
+      } else {
+        setActiveLabel(null);
+      }
+    },
+    [state.sections],
+  );
+
+  const onDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      handleDragEnd(event);
+      setActiveLabel(null);
+    },
+    [handleDragEnd],
+  );
+
   // Toolbar "Save as template" → store the section for reuse across pages.
   const saveSectionTemplate = useCallback(
     (node: SectionInstance) => {
@@ -487,12 +652,6 @@ export function BuilderWorkspace({
   }, []);
 
   // Canvas drag-drop of a saved template resolves through localStorage.
-  const resolveWidget = useCallback((id: string): SectionInstance | null => {
-    if (!id.startsWith(SAVED_WIDGET_PREFIX)) return null;
-    const tpl = loadSectionTemplates().find((t) => t.id === savedWidgetStorageId(id));
-    return tpl ? cloneWithFreshIds(tpl.data) : null;
-  }, []);
-
   const patchSelected = useCallback(
     (patch: Partial<SectionInstance>) => {
       if (!selectedId) return;
@@ -543,7 +702,9 @@ export function BuilderWorkspace({
   );
 
   return (
-    <div style={{ display: "flex", height: "100%", minHeight: 0, overflow: "hidden", position: "relative" }}>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragStart={handleDragStart} onDragEnd={onDragEnd}>
+      <SortableContext items={allIds} strategy={verticalListSortingStrategy}>
+        <div style={{ display: "flex", height: "100%", minHeight: 0, overflow: "hidden", position: "relative" }}>
       {dockWidgets || widgetsOpen ? (
         <>
           {!dockWidgets ? <button type="button" className="ps-drawer-backdrop" aria-label="Close widgets" onClick={() => setWidgetsOpen(false)} /> : null}
@@ -635,7 +796,6 @@ export function BuilderWorkspace({
         }}
         pageId={page.id}
         onSaveSectionTemplate={saveSectionTemplate}
-        resolveWidget={resolveWidget}
         onAddAt={handleAddAt}
       />
 
@@ -666,7 +826,27 @@ export function BuilderWorkspace({
       </div>
 
       {quickOpen ? <QuickAdd onClose={() => { setQuickOpen(false); setPendingInsertIndex(null); }} onInsert={addWidget} /> : null}
-    </div>
+        </div>
+      </SortableContext>
+      <DragOverlay dropAnimation={null}>
+        {activeLabel ? (
+          <div
+            style={{
+              padding: "8px 14px",
+              background: "var(--ps-primary)",
+              color: "#fff",
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 800,
+              boxShadow: "0 10px 30px rgba(0,0,0,.3)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {activeLabel}
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
 

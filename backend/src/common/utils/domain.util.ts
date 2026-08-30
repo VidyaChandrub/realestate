@@ -17,8 +17,96 @@ export function isValidDomain(input: string): boolean {
   return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i.test(host);
 }
 
+// Normalises a requested subdomain label (single DNS hostname segment, no dots
+// or protocol). Lowercases, strips trailing dots, and rejects anything that
+// isn't a valid label. Returns the clean value or null when invalid.
+export function normalizeSubdomain(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/\.+$/, '')
+    .replace(/^\.+/, '');
+}
+
+export function isValidSubdomain(input: string): boolean {
+  const label = normalizeSubdomain(input);
+  if (!label || label.length < 2 || label.length > 63) return false;
+  // Single DNS label: alphanumeric start/end, hyphens in the middle only.
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label)) return false;
+  // Reserved / dangerous values.
+  if (['www', 'admin', 'api', 'mail', 'ftp', 'cdn', 'app', 'localhost', 'db', 'staging', 'test'].includes(label)) {
+    return false;
+  }
+  return true;
+}
+
+// The fully-qualified host name for an organisation subdomain, based on the
+// platform's wildcard base domain (e.g. "<sub>.ipixxel.in"). In local dev
+// (SUBDOMAIN_MODE=localhost) it renders "<sub>.localhost" which the OS resolves
+// to 127.0.0.1 (works on mac/linux) so the whole flow works offline.
+export function subdomainHost(subdomain: string): string {
+  const label = normalizeSubdomain(subdomain);
+  if (process.env.SUBDOMAIN_MODE === 'localhost') {
+    return `${label}.localhost`;
+  }
+  const base = (process.env.SUBDOMAIN_BASE_DOMAIN ?? 'ipixxel.in').replace(/^\.+/, '');
+  return `${label}.${base}`;
+}
+
+// Given an incoming request host, return the organisation subdomain label if the
+// host matches the configured wildcard base (dynamic via env) or ".localhost"
+// during local dev. Returns null when the host is not an organisation subdomain.
+export function extractSubdomainFromHost(host: string): string | null {
+  if (!host) return null;
+  const h = host.trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
+  if (h.includes('/')) return null;
+
+  // Local dev: "<sub>.localhost" maps to the local machine.
+  if (h.endsWith('.localhost')) {
+    const label = h.slice(0, -'.localhost'.length);
+    return isValidSubdomain(label) ? label : null;
+  }
+
+  const base = (process.env.SUBDOMAIN_BASE_DOMAIN ?? 'ipixxel.in')
+    .trim()
+    .toLowerCase()
+    .replace(/^\.+/, '');
+  if (!base) return null;
+  if (!h.endsWith(`.${base}`) || h === base) return null;
+  const label = h.slice(0, h.length - base.length - 1);
+  // Exclude other first-level labels that share the base's parent domain.
+  if (!label || label.includes('.') || !isValidSubdomain(label)) return null;
+  return label;
+}
+
 export function generateVerificationToken(): string {
   return randomBytes(16).toString('hex');
+}
+
+// Produces a short list of candidate subdomain labels based on a base label,
+// used to suggest alternatives when the requested one is taken.
+export function generateSubdomainSuggestions(base: string, max = 4): string[] {
+  const label = normalizeSubdomain(base).replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-');
+  if (!label) return [];
+  const raw = [
+    `${label}1`,
+    `${label}2`,
+    label.endsWith('realty') ? label.replace(/realty$/, 'homes') : `${label}realty`,
+    label.endsWith('homes') ? label.replace(/homes$/, 'realty') : `${label}homes`,
+    `${label}estate`,
+    `${label}group`,
+  ];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of raw) {
+    const clean = s.toLowerCase();
+    if (isValidSubdomain(clean) && !seen.has(clean)) {
+      seen.add(clean);
+      out.push(clean);
+    }
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 export function generateDnsInstructions(domain: string, token: string) {

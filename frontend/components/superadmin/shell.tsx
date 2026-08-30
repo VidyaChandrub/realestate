@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Icon } from "@/components/icons";
+import { NotificationsBell } from "./notifications-bell";
 
 type NavItem = {
   href: string;
@@ -27,6 +28,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin-console", icon: "dashboard", label: "Dashboard", tip: "Dashboard", activeMatch: ["/admin-console"] },
       { href: "/admin-console/analytics", icon: "reports", label: "Analytics", tip: "Analytics", activeMatch: ["/admin-console/analytics"] },
+      { href: "/admin-console/notifications", icon: "bell", label: "Notifications", tip: "Notifications", activeMatch: ["/admin-console/notifications"] },
     ],
   },
   {
@@ -54,6 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
         activeMatch: ["/admin-console/templates", "/admin-console/template-detail"],
       },
       { href: "/admin-console/domains", icon: "globe", label: "Domain Requests", tip: "Domain Requests", activeMatch: ["/admin-console/domains"] },
+      { href: "/admin-console/org-domains", icon: "link", label: "Org Domains", tip: "Org Domain Requests", activeMatch: ["/admin-console/org-domains"] },
       { href: "/admin-console/approvals", icon: "check", label: "Approvals", tip: "Approvals", activeMatch: ["/admin-console/approvals"] },
     ],
   },
@@ -70,8 +73,10 @@ const NAV_GROUPS: NavGroup[] = [
 const CRUMB_MAP: Record<string, string> = {
   "/admin-console": "Dashboard",
   "/admin-console/analytics": "Analytics",
+  "/admin-console/notifications": "Notifications",
   "/admin-console/organisations": "Organisations",
   "/admin-console/organisation-detail": "Organisation",
+  "/admin-console/org-domains": "Org Domains",
   "/admin-console/admins": "Platform Team",
   "/admin-console/templates": "Templates",
   "/admin-console/template-detail": "Template",
@@ -227,9 +232,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
             <span className="kbd">⌘K</span>
           </div>
           <div className="tb-right">
-            <button className="icon-btn">
-              <Icon name="bell" size={16} /><span className="dot" />
-            </button>
+            <NotificationsBell accessToken={accessToken} />
             <button className="icon-btn"><Icon name="alert" size={16} /></button>
             <div className="tb-avatar">PP</div>
           </div>

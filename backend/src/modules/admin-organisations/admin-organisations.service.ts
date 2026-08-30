@@ -7,7 +7,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.interface';
-import { generateUniqueOrgSlug } from '../../common/utils/slug.util';
+import { generateUniqueLandingPageSlug, generateUniqueOrgSlug } from '../../common/utils/slug.util';
 import { generateTempPassword } from '../../common/utils/tokens.util';
 import {
   buildOrganisationUpdateData,
@@ -30,6 +30,8 @@ import { UpdateOrganisationStatusDto } from './dto/update-organisation-status.dt
 import { CreateOrgUserDto } from '../org-users/dto/create-org-user.dto';
 import { UpdateOrgUserStatusDto } from '../org-users/dto/update-org-user-status.dto';
 import { ListOrgUsersQueryDto } from '../org-users/dto/list-org-users-query.dto';
+import { subdomainHost } from '../../common/utils/domain.util';
+import { buildNotificationData } from '../../common/utils/notifications.util';
 import type { Prisma } from '@prisma/client';
 
 const BCRYPT_COST_FACTOR = 12;
@@ -42,7 +44,9 @@ export class AdminOrganisationsService {
   // restart between the two steps just means the email log can't include it.
   private readonly pendingTempPasswords = new Map<string, string>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
   async onboardCompany(dto: OnboardCompanyDto) {
     const slug = await generateUniqueOrgSlug(this.prisma, dto.company_name);
@@ -289,6 +293,11 @@ export class AdminOrganisationsService {
           name: org.name,
           slug: org.slug,
           city: org.city,
+          subdomain: org.subdomain,
+          subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
+          subdomainStatus: org.subdomainStatus,
+          customDomain: org.customDomain,
+          customDomainStatus: org.customDomainStatus,
           adminName: admin ? [admin.firstName, admin.lastName].filter(Boolean).join(' ') : null,
           adminEmail: admin?.email ?? null,
           adminPhone: admin?.phoneNumber ?? null,
@@ -339,6 +348,11 @@ export class AdminOrganisationsService {
       name: organisation.name,
       slug: organisation.slug,
       city: organisation.city,
+      subdomain: organisation.subdomain,
+      subdomainHost: organisation.subdomain ? subdomainHost(organisation.subdomain) : null,
+      subdomainStatus: organisation.subdomainStatus,
+      customDomain: organisation.customDomain,
+      customDomainStatus: organisation.customDomainStatus,
       status: organisation.status,
       createdAt: organisation.createdAt,
       timezone: organisation.timezone,
@@ -477,6 +491,78 @@ export class AdminOrganisationsService {
       await tx.auditLog.create({
         data: { orgId: updated.id, actorId: actor.sub, action: 'org_approved', entity: 'Organisation', entityId: updated.id, metadata: dto as any },
       });
+
+      // Auto-activate the organisation's subdomain on approval so it becomes
+      // immediately reachable on the platform wildcard, and provision the
+      // organisation's primary website from the first assigned template so the
+      // subdomain resolves to that template + its data (subdomain -> org ->
+      // template).
+      const primarySubdomain = organisation.subdomain ?? null;
+      if (organisation.subdomain) {
+        await tx.organisation.update({
+          where: { id: orgId },
+          data: { subdomainStatus: 'active' },
+        });
+        const primaryTemplateId = dto.templateIds?.[0] ?? null;
+        const existingPrimary = await tx.landingPage.findFirst({
+          where: { orgId, subdomainStatus: { not: 'none' } },
+          select: { id: true },
+        });
+        if (!existingPrimary && primaryTemplateId) {
+          const tpl = await tx.template.findUnique({
+            where: { id: primaryTemplateId },
+            include: { childPages: { where: { pageType: 'thank_you' }, take: 1 } },
+          });
+          if (tpl) {
+            const baseSlug = await generateUniqueLandingPageSlug(
+              tx,
+              orgId,
+              tpl.name,
+            );
+            const primary = await tx.landingPage.create({
+              data: {
+                orgId,
+                sourceTemplateId: tpl.id,
+                name: tpl.name,
+                slug: baseSlug,
+                pageType: 'landing',
+                status: 'published',
+                publishedAt: new Date(),
+                subdomain: primarySubdomain,
+                subdomainStatus: 'active',
+                content: (tpl.content as Prisma.JsonObject) ?? {},
+              },
+            });
+            if (tpl.childPages?.[0]) {
+              await tx.landingPage.create({
+                data: {
+                  orgId,
+                  sourceTemplateId: tpl.childPages[0].id,
+                  name: tpl.childPages[0].name,
+                  slug: `${baseSlug}-thank-you`,
+                  pageType: 'thank_you',
+                  status: 'published',
+                  publishedAt: new Date(),
+                  parentId: primary.id,
+                  content: (tpl.childPages[0].content as Prisma.JsonObject) ?? {},
+                },
+              });
+            }
+          }
+        }
+      }
+
+      await tx.notification.create({
+        data: buildNotificationData({
+          orgId: orgId,
+          type: 'organisation_approved',
+          title: `Organisation approved: ${organisation.name}`,
+          body: `${organisation.name} was approved and activated.${organisation.subdomain ? ` It is now live at ${subdomainHost(organisation.subdomain)}.` : ''}`,
+          entity: 'Organisation',
+          entityId: orgId,
+        }),
+      });
+
       return { updated, subscription };
     });
 
@@ -491,6 +577,16 @@ export class AdminOrganisationsService {
     const updated = await this.prisma.organisation.update({ where: { id: orgId }, data: { status: 'disabled' } });
     await this.prisma.auditLog.create({
       data: { orgId: updated.id, actorId: actor.sub, action: 'org_rejected', entity: 'Organisation', entityId: updated.id, metadata: { reason } as any },
+    });
+    await this.prisma.notification.create({
+      data: buildNotificationData({
+        orgId,
+        type: 'organisation_rejected',
+        title: `Organisation rejected: ${org.name}`,
+        body: `${org.name} was rejected${reason ? ` — ${reason}` : ''}.`,
+        entity: 'Organisation',
+        entityId: orgId,
+      }),
     });
     return toSafeOrganisation(updated);
   }

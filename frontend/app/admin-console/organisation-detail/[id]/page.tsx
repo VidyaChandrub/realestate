@@ -381,6 +381,22 @@ export default function SuperAdminOrganisationDetailPage() {
             <div className="sub" style={{ marginTop: 4 }}>
               {org.city} · <span className="mono">{org.slug}</span> · onboarded {formatDate(org.createdAt)}
             </div>
+            {(org.subdomain || org.customDomain) ? (
+              <div style={{ display:"flex", gap:12, alignItems:"center", marginTop:8, flexWrap:"wrap" }}>
+                {org.subdomain ? (
+                  <span className="chip">
+                    <Icon name="globe" size={12} /> {org.subdomainHost ?? org.subdomain}
+                    <span style={{ textTransform:"capitalize", fontWeight:700 }}> · {org.subdomainStatus}</span>
+                  </span>
+                ) : null}
+                {org.customDomain ? (
+                  <span className="chip">
+                    <Icon name="link" size={12} /> {org.customDomain}
+                    <span style={{ textTransform:"capitalize", fontWeight:700 }}> · {org.customDomainStatus}</span>
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="actions">

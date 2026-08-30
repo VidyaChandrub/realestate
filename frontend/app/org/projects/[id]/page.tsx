@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
-import { youtubeEmbedUrl } from "@/lib/upload";
 import { Reveal } from "@/components/superadmin/reveal";
+import { CountUp } from "@/components/superadmin/count-up";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import "@/app/org/org.css";
 import type { ProjectDetail } from "@/lib/types";
 
 function compactRupees(value: number | null): string {
@@ -17,130 +18,11 @@ function compactRupees(value: number | null): string {
   return `₹${value.toLocaleString("en-IN")}`;
 }
 
-function openInNewTab(url: string) {
-  window.open(url, "_blank", "noopener,noreferrer");
-}
-
-/** A floor-plan / cover tile: the real image if one is uploaded, else the
- *  striped 📐 placeholder (matches the design reference).
- *
- *  `openMode="window"` renders a non-anchor clickable (opens via
- *  window.open + stopPropagation) — use it when the tile sits inside a
- *  <Link>, since <a> inside <a> is invalid HTML / hydration error. */
-function MediaTile({
-  url,
-  caption,
-  height = 150,
-  topOnly = false,
-  openMode = "anchor",
-}: {
-  url: string | null;
-  caption?: string;
-  height?: number;
-  topOnly?: boolean;
-  openMode?: "anchor" | "window";
-}) {
-  const radius = topOnly ? ("14px 14px 0 0" as const) : 14;
-
-  if (!url) {
-    return (
-      <div className="media plan" style={{ height, borderRadius: radius }}>
-        <span>📐</span>
-        {caption ? <span className="cap">{caption}</span> : null}
-      </div>
-    );
-  }
-
-  const inner = (
-    <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={url}
-        alt={caption ?? ""}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-        }}
-      />
-      {caption ? <span className="cap">{caption}</span> : null}
-    </>
-  );
-
-  const style = {
-    height,
-    borderRadius: radius,
-    textDecoration: "none",
-    cursor: "pointer",
-  } as const;
-
-  if (openMode === "window") {
-    return (
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label={caption ? `Open ${caption}` : "Open media"}
-        className="media"
-        style={style}
-        onClick={(e) => {
-          e.stopPropagation();
-          openInNewTab(url);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            e.stopPropagation();
-            openInNewTab(url);
-          }
-        }}
-      >
-        {inner}
-      </div>
-    );
-  }
-
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="media"
-      style={style}
-    >
-      {inner}
-    </a>
-  );
-}
-
-/** Walkthrough video tile — YouTube embed or an HTML5 player for uploads.
- *  Same `.media` card treatment as the image tiles. */
-function VideoTile({ url, caption }: { url: string; caption?: string }) {
-  const embed = youtubeEmbedUrl(url);
-  return (
-    <div
-      className="media"
-      style={{ height: 190, borderRadius: 14, background: "#000" }}
-    >
-      {embed ? (
-        <iframe
-          src={embed}
-          title={caption ?? "Walkthrough video"}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
-        />
-      ) : (
-        <video
-          src={url}
-          controls
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }}
-        />
-      )}
-      {caption ? <span className="cap">{caption}</span> : null}
-    </div>
-  );
+function managerInitials(name: string | null | undefined): string {
+  if (!name) return "—";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "—";
+  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
 export default function OrgProjectOverviewPage() {
@@ -154,10 +36,8 @@ export default function OrgProjectOverviewPage() {
 
   useEffect(() => {
     if (!accessToken || !id) return;
-    /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     setNotFound(false);
-    /* eslint-enable react-hooks/set-state-in-effect */
     apiFetch<ProjectDetail>(`/org/projects/${id}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
@@ -170,14 +50,7 @@ export default function OrgProjectOverviewPage() {
     return (
       <>
         <ProjectPageHead active="overview" />
-        <div className="card">
-          <div className="card-b">
-            <p className="muted">Project not found.</p>
-            <Link href="/org/projects" className="btn btn-ghost btn-sm">
-              ← Back to projects
-            </Link>
-          </div>
-        </div>
+        <div className="card"><div className="card-b"><p className="muted">Project not found.</p><Link href="/org/projects" className="btn btn-ghost btn-sm">← Back to projects</Link></div></div>
       </>
     );
   }
@@ -186,46 +59,29 @@ export default function OrgProjectOverviewPage() {
     return (
       <>
         <ProjectPageHead active="overview" />
-        <div className="card">
-          <div className="card-b">
-            <p className="muted">Loading…</p>
-          </div>
-        </div>
+        <div className="card"><div className="card-b"><p className="muted">Loading…</p></div></div>
       </>
     );
   }
 
-  const priceRange =
-    project.priceMin != null || project.priceMax != null
-      ? `${compactRupees(project.priceMin)} – ${compactRupees(project.priceMax)}`
-      : "—";
+  const priceRange = project.priceMin != null || project.priceMax != null
+    ? `${compactRupees(project.priceMin)} – ${compactRupees(project.priceMax)}`
+    : "—";
 
-  const configuration =
-    project.unitTypes.length > 0
-      ? project.unitTypes.map((u) => u.name).join(", ")
-      : "—";
+  const configuration = project.unitTypes.length > 0
+    ? project.unitTypes.map((u) => u.name).join(", ")
+    : "—";
 
-  const galleryImages = project.unitTypes.flatMap((u) => u.galleryUrls ?? []);
-  const hasFloorPlans = project.unitTypes.some((u) => u.floorPlanUrl);
-  const videoTypes = project.unitTypes.filter((u) => u.videoUrl);
+  const totalLeads = 0;
 
   const specs: { k: string; v: string; mono?: boolean }[] = [
     { k: "Location", v: project.location || "—" },
     { k: "Configuration", v: configuration },
     { k: "Price range", v: priceRange },
-    { k: "Base rate", v: project.baseRate != null ? `₹${project.baseRate.toLocaleString("en-IN")}/sqft` : "—" },
-    { k: "Land area", v: project.landArea != null ? `${project.landArea} acres` : "—" },
-    {
-      k: "Towers",
-      v: [
-        project.towerCount != null ? `${project.towerCount} towers` : null,
-        project.floorsDescription || null,
-      ]
-        .filter(Boolean)
-        .join(" · ") || "—",
-    },
-    { k: "Units planned", v: String(project.rollup.totalUnitsPlanned) },
-    { k: "Units available", v: `${project.rollup.unitsAvailable} of ${project.rollup.unitsCreated}` },
+    { k: "Total area", v: project.landArea != null ? `${project.landArea} acres` : "—" },
+    { k: "Towers", v: [project.towerCount != null ? `${project.towerCount} towers` : null, project.floorsDescription || null].filter(Boolean).join(" · ") || "—" },
+    { k: "Total units", v: String(project.rollup.totalUnitsPlanned) },
+    { k: "Available", v: String(project.rollup.unitsAvailable) },
     { k: "Possession", v: project.possession || "—" },
     { k: "RERA", v: project.reraId || "—", mono: true },
   ];
@@ -243,35 +99,37 @@ export default function OrgProjectOverviewPage() {
         }}
         actions={
           <>
-            {/* Inert for now — public project pages aren't built yet. */}
-            <button className="btn btn-ghost" type="button">
-              🔗 Public page
-            </button>
-            <Link
-              href={`/org/projects/${id}/units`}
-              className="btn btn-ghost"
-            >
-              📦 Manage inventory
+            <Link href={`/org/projects/${id}/edit`} className="btn btn-ghost">
+              ✏️ Edit
             </Link>
-            <Link
-              href={`/org/projects/${id}/edit`}
-              className="btn btn-primary"
-            >
-              ✏️ Edit project
-            </Link>
+            <button className="btn btn-primary" type="button">＋ Add lead</button>
           </>
         }
       />
 
       <div className="grid g-2-1">
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="col gap-18">
+          <Reveal delay={1}>
+            <div className="media h-280">
+              <span>🏙️</span>
+              <span className="cap">{project.name} — Elevation</span>
+            </div>
+          </Reveal>
+
+          <Reveal delay={2}>
+            <div className="gallery">
+              <div className="thumb media"><span>🏢</span></div>
+              <div className="thumb media ph-green"><span>🌳</span></div>
+              <div className="thumb media ph-blue"><span>🏊</span></div>
+              <div className="thumb media ph-amber"><span>🛋️</span></div>
+            </div>
+          </Reveal>
+
           <Reveal delay={2}>
             <div className="card">
               <div className="card-h">
                 <span className="t">Project details</span>
-                <span
-                  className={`badge ${project.status === "active" ? "b-green" : "b-gray"}`}
-                >
+                <span className={`badge ${project.status === "active" ? "b-green" : "b-gray"}`}>
                   {project.status === "active" ? "Active" : "Inactive"}
                 </span>
               </div>
@@ -292,49 +150,25 @@ export default function OrgProjectOverviewPage() {
             <div className="card">
               <div className="card-h">
                 <span className="t">Unit types</span>
-                <Link
-                  className="x"
-                  href={`/org/projects/${id}/units`}
-                  style={{ color: "var(--brand)" }}
-                >
-                  Manage inventory →
-                </Link>
+                <Link className="x brand-link" href={`/org/projects/${id}/units`}>Manage inventory →</Link>
               </div>
               <div className="card-b">
                 {project.unitTypes.length === 0 ? (
-                  <p className="muted">
-                    No unit types yet — add them from the Units tab.
-                  </p>
+                  <p className="muted">No unit types yet — add them from the Units tab.</p>
                 ) : (
                   <div className="grid g3">
                     {project.unitTypes.map((u) => (
-                      <Link
-                        key={u.id}
-                        href={`/org/projects/${id}/units`}
-                        className="card hover"
-                        style={{ textDecoration: "none" }}
-                      >
-                        <MediaTile
-                          url={u.floorPlanUrl}
-                          caption={u.name}
-                          height={120}
-                          topOnly
-                          openMode="window"
-                        />
-                        <div style={{ padding: 14 }}>
+                      <Link key={u.id} href={`/org/projects/${id}/units`} className="utype-card">
+                        <div className="cover media plan">
+                          <span>📐</span>
+                          <span className="cap">{u.name}</span>
+                        </div>
+                        <div className="info">
                           <b>{u.name}</b>
-                          <div className="muted" style={{ fontSize: 12.5 }}>
-                            {[
-                              u.builtupSqft ? `${u.builtupSqft} sqft` : null,
-                              u.price != null ? compactRupees(u.price) : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ") || "—"}
+                          <div className="muted fs-12-5">
+                            {[u.builtupSqft ? `${u.builtupSqft} sqft` : null, u.price != null ? compactRupees(u.price) : null].filter(Boolean).join(" · ") || "—"}
                           </div>
-                          <span
-                            className={`badge ${u.availableUnits > 0 ? "b-green" : "b-amber"}`}
-                            style={{ marginTop: 8 }}
-                          >
+                          <span className={`badge ${u.availableUnits > 0 ? "b-green" : "b-amber"} mt-8`}>
                             {u.availableUnits} available
                           </span>
                         </div>
@@ -348,156 +182,81 @@ export default function OrgProjectOverviewPage() {
 
           <Reveal delay={3}>
             <div className="card">
-              <div className="card-h">
-                <span className="t">Amenities</span>
-              </div>
-              <div
-                className="card-b"
-                style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-              >
+              <div className="card-h"><span className="t">Amenities</span></div>
+              <div className="card-b row wrap gap-8">
                 {project.amenities.length === 0 ? (
                   <span className="muted">None added.</span>
                 ) : (
                   project.amenities.map((a) => (
-                    <span
-                      className="chip"
-                      key={a.name}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                    >
-                      {a.iconUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={a.iconUrl}
-                          alt=""
-                          width={16}
-                          height={16}
-                          style={{ borderRadius: 3, objectFit: "cover" }}
-                        />
-                      ) : null}
-                      {a.name}
-                    </span>
+                    <span className="chip" key={a.name}>{a.name}</span>
                   ))
                 )}
               </div>
             </div>
           </Reveal>
-
-          {project.unitTypes.length > 0 && hasFloorPlans ? (
-            <Reveal delay={3}>
-              <div className="card">
-                <div className="card-h">
-                  <span className="t">Floor plans</span>
-                </div>
-                <div className="card-b">
-                  <div className="grid g3">
-                    {project.unitTypes.map((u) => (
-                      <MediaTile
-                        key={u.id}
-                        url={u.floorPlanUrl}
-                        caption={u.name}
-                        height={170}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-          ) : null}
-
-          {videoTypes.length > 0 ? (
-            <Reveal delay={3}>
-              <div className="card">
-                <div className="card-h">
-                  <span className="t">Walkthrough videos</span>
-                </div>
-                <div className="card-b">
-                  <div className="grid g2">
-                    {videoTypes.map((u) => (
-                      <VideoTile
-                        key={u.id}
-                        url={u.videoUrl as string}
-                        caption={u.name}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-          ) : null}
-
-          {galleryImages.length > 0 ? (
-            <Reveal delay={3}>
-              <div className="card">
-                <div className="card-h">
-                  <span className="t">Gallery</span>
-                  <span className="x muted">{galleryImages.length} images</span>
-                </div>
-                <div className="card-b">
-                  <div className="gallery">
-                    {galleryImages.map((url) => (
-                      <a
-                        key={url}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="thumb"
-                        style={{ display: "block" }}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={url}
-                          alt=""
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-          ) : null}
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="col gap-18">
+          <Reveal delay={1}>
+            <div className="card">
+              <div className="card-h"><span className="t">Enquire / Apply</span></div>
+              <div className="card-b">
+                <div className="field"><label>Full name</label><input className="inp" placeholder="Customer name" /></div>
+                <div className="field"><label>Phone</label><input className="inp" placeholder="+91 " /></div>
+                <div className="row2">
+                  <div className="field"><label>Configuration</label><select className="inp"><option>Select</option>{project.unitTypes.map((u) => <option key={u.id}>{u.name}</option>)}</select></div>
+                  <div className="field"><label>Budget</label><select className="inp"><option>Select range</option><option>Under ₹50 L</option><option>₹50 L – ₹1 Cr</option><option>₹1 Cr+</option></select></div>
+                </div>
+                <div className="field"><label>Source</label><select className="inp"><option>Walk-in</option><option>Meta Ad</option><option>Google</option><option>Reference</option></select></div>
+                <button className="btn btn-primary btn-block">Apply &amp; create lead →</button>
+                <button className="btn btn-ghost btn-block mt-8">⬇ Download brochure</button>
+              </div>
+            </div>
+          </Reveal>
+
           <Reveal delay={2}>
             <div className="card">
-              <div className="card-h">
-                <span className="t">Inventory</span>
-              </div>
-              <div
-                className="card-b"
-                style={{ display: "flex", flexDirection: "column", gap: 14 }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span className="muted">Units created</span>
-                  <b>{project.rollup.unitsCreated}</b>
+              <div className="card-h"><span className="t">Performance</span></div>
+              <div className="card-b col gap-14">
+                <div className="row between">
+                  <span className="muted">Total leads</span>
+                  <b><CountUp value={totalLeads} /></b>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span className="muted">Available</span>
+                <div className="row between">
+                  <span className="muted">Units available</span>
                   <b>{project.rollup.unitsAvailable}</b>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span className="muted">Booked</span>
+                <div className="row between">
+                  <span className="muted">Units booked</span>
                   <b>{project.rollup.unitsBooked}</b>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span className="muted">Held</span>
-                  <b>{project.rollup.unitsHeld}</b>
+                <div className="divider" />
+                <div>
+                  <div className="row between fs-13 mb-5">
+                    <span>Inventory sold</span>
+                    <b>{project.rollup.unitsCreated > 0 ? Math.round((project.rollup.unitsBooked / project.rollup.unitsCreated) * 100) : 0}%</b>
+                  </div>
+                  <div className="bar">
+                    <i data-w={`${project.rollup.unitsCreated > 0 ? Math.round((project.rollup.unitsBooked / project.rollup.unitsCreated) * 100) : 0}%`} />
+                  </div>
                 </div>
               </div>
             </div>
           </Reveal>
+
           <Reveal delay={3}>
             <div className="card">
-              <div className="card-h">
-                <span className="t">Manager</span>
-              </div>
-              <div className="card-b">
-                <b>{project.manager?.name || "Unassigned"}</b>
+              <div className="card-h"><span className="t">Assigned team</span></div>
+              <div className="card-b col gap-12">
+                {project.manager ? (
+                  <div className="u">
+                    <span className="av">{managerInitials(project.manager.name)}</span>
+                    <span><span className="nm">{project.manager.name}</span><br /><span className="sm">Project Manager</span></span>
+                  </div>
+                ) : (
+                  <span className="muted">No manager assigned.</span>
+                )}
+                <button className="btn btn-ghost btn-block mt-4">✨ AI agent</button>
               </div>
             </div>
           </Reveal>

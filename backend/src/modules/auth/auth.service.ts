@@ -23,6 +23,15 @@ import {
 } from '../../common/utils/mappers.util';
 import { assertTemplateQuota } from '../../common/utils/plan-quota.util';
 import { assertEligibleTemplateIds } from '../../common/utils/template-eligibility.util';
+import {
+  normalizeSubdomain,
+  isValidSubdomain,
+  subdomainHost,
+  normalizeDomain,
+  isValidDomain,
+  generateSubdomainSuggestions,
+} from '../../common/utils/domain.util';
+import { buildNotificationData } from '../../common/utils/notifications.util';
 
 const BCRYPT_COST_FACTOR = 12;
 
@@ -31,6 +40,10 @@ export class AuthService {
   private readonly accessExpiresIn = process.env.JWT_ACCESS_EXPIRES_IN ?? '15m';
   private readonly refreshExpiresIn =
     process.env.JWT_REFRESH_EXPIRES_IN ?? '30d';
+
+  // Ephemeral, single-instance only: password reset tokens. Email sending is
+  // stubbed, so the token is returned to the client for local development.
+  private readonly resetTokens = new Map<string, { email: string; expires: number }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -67,6 +80,32 @@ export class AuthService {
       where: { key: 'admin' },
     });
 
+    // --- Organisation domain identity (subdomain / custom domain) ---
+    // The requested subdomain is validated and reserved on a pending
+    // OrgDomainRequest here; it only becomes an active Organisation.subdomain
+    // once the Super Admin approves the organisation.
+    let subdomain: string | null = null;
+    if (dto.subdomain) {
+      if (!isValidSubdomain(dto.subdomain)) {
+        throw new ConflictException(
+          'Subdomain is invalid. Use 2-63 lowercase letters, digits or hyphens (e.g. skylinedev).',
+        );
+      }
+      subdomain = normalizeSubdomain(dto.subdomain);
+      await this.assertSubdomainAvailable(subdomain);
+    }
+
+    let customDomain: string | null = null;
+    if (dto.custom_domain) {
+      if (!isValidDomain(dto.custom_domain)) {
+        throw new ConflictException(
+          'Custom domain is invalid. Example: example.com',
+        );
+      }
+      customDomain = normalizeDomain(dto.custom_domain);
+      await this.assertCustomDomainAvailable(customDomain);
+    }
+
     const { user, organisation } = await this.prisma.$transaction(
       async (tx) => {
         const organisation = await tx.organisation.create({
@@ -78,6 +117,12 @@ export class AuthService {
             country: dto.country ?? null,
             currency: dto.currency ?? 'INR',
             timezone: dto.timezone ?? 'Asia/Kolkata',
+            // Subdomain only becomes active on approval; reserve the column so
+            // external tooling can read the intended value early.
+            subdomain,
+            customDomain,
+            subdomainStatus: subdomain ? 'pending' : 'none',
+            customDomainStatus: customDomain ? 'pending' : 'none',
           },
         });
 
@@ -96,6 +141,30 @@ export class AuthService {
         await tx.userRole.create({
           data: { userId: user.id, roleId: adminRole.id },
         });
+
+        // Reserve the subdomain request (pending approval)
+        if (subdomain) {
+          await tx.orgDomainRequest.create({
+            data: {
+              orgId: organisation.id,
+              kind: 'subdomain',
+              subdomain,
+              status: 'pending',
+              requestedBy: user.id,
+            },
+          });
+        }
+        if (customDomain) {
+          await tx.orgDomainRequest.create({
+            data: {
+              orgId: organisation.id,
+              kind: 'custom_domain',
+              customDomain,
+              status: 'pending',
+              requestedBy: user.id,
+            },
+          });
+        }
 
         // Create subscription if plan selected at registration
         if (dto.planId && plan) {
@@ -133,8 +202,27 @@ export class AuthService {
             action: 'org_registered_pending',
             entity: 'Organisation',
             entityId: organisation.id,
-            metadata: { planId: dto.planId ?? null, templateIds: dto.templateIds ?? [], billingCycle: dto.billingCycle ?? null } as any,
+            metadata: {
+              planId: dto.planId ?? null,
+              templateIds: dto.templateIds ?? [],
+              billingCycle: dto.billingCycle ?? null,
+              subdomain,
+              customDomain,
+            } as any,
           },
+        });
+
+        // Notify Super Admin that an organisation registration (and any
+        // subdomain / custom-domain request) is awaiting approval.
+        await tx.notification.create({
+          data: buildNotificationData({
+            orgId: organisation.id,
+            type: 'organisation_registration',
+            title: `New organisation awaiting approval: ${organisation.name}`,
+            body: `${organisation.name} (${slug}) registered${subdomain ? ` and requested subdomain ${subdomainHost(subdomain)}` : ''}${customDomain ? ` and/or custom domain ${customDomain}` : ''}. Review and approve or reject from the admin console.`,
+            entity: 'Organisation',
+            entityId: organisation.id,
+          }),
         });
 
         return { user, organisation };
@@ -262,6 +350,46 @@ export class AuthService {
     return { success: true };
   }
 
+  async forgotPassword(
+    email: string,
+  ): Promise<{ success: boolean; resetToken?: string }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    // Always report success to avoid account enumeration.
+    if (!user) {
+      return { success: true };
+    }
+    const token = generateRandomToken(32);
+    this.resetTokens.set(token, {
+      email: user.email,
+      expires: Date.now() + 1000 * 60 * 60,
+    });
+    // TODO: send a real email; for now return the token so local dev can complete the flow.
+    return { success: true, resetToken: token };
+  }
+
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ success: boolean }> {
+    const entry = this.resetTokens.get(token);
+    if (!entry || entry.expires < Date.now()) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { email: entry.email },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST_FACTOR);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, mustChangePassword: false },
+    });
+    this.resetTokens.delete(token);
+    return { success: true };
+  }
+
   private async findActiveRefreshToken(rawToken: string) {
     const tokenHash = hashToken(rawToken);
     const existing = await this.prisma.refreshToken.findFirst({
@@ -300,5 +428,78 @@ export class AuthService {
     });
 
     return { access_token: accessToken, refresh_token: rawRefreshToken };
+  }
+
+  // Public check used by the sign-up form to show availability live and to
+  // suggest alternatives when the requested subdomain is taken.
+  async checkSubdomainAvailability(subdomain: string) {
+    const label = normalizeSubdomain(subdomain);
+    if (!isValidSubdomain(label)) {
+      return { subdomain: label, available: false, reasons: ['invalid'], suggestions: [] };
+    }
+    const taken = await this.isSubdomainTaken(label);
+    const reasons: string[] = [];
+    if (taken === 'org') reasons.push('already_exists');
+    else if (taken === 'pending') reasons.push('pending');
+    return {
+      subdomain: label,
+      host: subdomainHost(label),
+      available: taken === null,
+      reasons,
+      suggestions: taken ? generateSubdomainSuggestions(label) : [],
+    };
+  }
+
+  // Returns 'org' if an organisation already holds it, 'pending' if a pending
+  // subdomain request reserves it, else null when available.
+  private async isSubdomainTaken(label: string): Promise<'org' | 'pending' | null> {
+    const org = await this.prisma.organisation.findFirst({
+      where: { subdomain: label },
+      select: { id: true },
+    });
+    if (org) return 'org';
+    const req = await this.prisma.orgDomainRequest.findFirst({
+      where: { subdomain: label, status: { in: ['pending', 'approved'] } },
+      select: { id: true },
+    });
+    if (req) return 'pending';
+    return null;
+  }
+
+  // A subdomain is unavailable if another organisation is already using it
+  // (active, pending, or reserved in an approved/rejected-but-held request).
+  private async assertSubdomainAvailable(subdomain: string) {
+    const label = normalizeSubdomain(subdomain);
+    const taken = await this.isSubdomainTaken(label);
+    if (taken === 'org') {
+      throw new ConflictException(
+        `Subdomain "${label}" is already taken on ${subdomainHost(label)}. Please choose another.`,
+      );
+    }
+    if (taken === 'pending') {
+      throw new ConflictException(
+        `Subdomain "${label}" is currently pending or in use. Please choose another.`,
+      );
+    }
+  }
+
+  // A custom domain is unavailable if another organisation already owns it or
+  // has a connecting/connected domain for it (globally unique).
+  private async assertCustomDomainAvailable(domain: string) {
+    const host = normalizeDomain(domain);
+    const org = await this.prisma.organisation.findFirst({
+      where: { customDomain: host },
+      select: { id: true },
+    });
+    if (org) {
+      throw new ConflictException(`Domain "${host}" is already mapped to another organisation.`);
+    }
+    const req = await this.prisma.orgDomainRequest.findFirst({
+      where: { customDomain: host, status: { in: ['pending', 'approved', 'connected'] } },
+      select: { id: true },
+    });
+    if (req) {
+      throw new ConflictException(`Domain "${host}" is currently in use or pending.`);
+    }
   }
 }

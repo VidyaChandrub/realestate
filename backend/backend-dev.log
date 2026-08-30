@@ -1,0 +1,271 @@
+
+> realestate_saas_backend@0.0.1 start:dev
+> nest start --watch
+
+[2J[3J[H[[90m8:07:09 am[0m] Starting compilation in watch mode...
+
+[[90m8:07:21 am[0m] Found 0 errors. Watching for file changes.
+
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPrismaModule dependencies initialized[39m[38;5;3m +25ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +47ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPublicSiteModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTeamModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAdminOrganisationsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOrgSettingsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOrgUsersModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAdminTemplatesModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOrgTemplatesModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPlansModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mSubscriptionsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOrgLandingPagesModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAdminLandingPagesModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOrgActivityModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOrgTypographySetsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAdminTypographySetsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOrgBillingModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mLeadsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProjectsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOrgDomainRequestsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAdminDomainRequestsModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOrgTrackingModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAppController {/}:[39m[38;5;3m +6ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/auth}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/signup, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/login, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/refresh, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/logout, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/forgot-password, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/reset-password, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/me, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/change-password, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mTeamController {/team}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/team/invite, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAdminOrganisationsController {/admin/organisations}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/summary, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id/users, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id/users, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id/users/:userId/status, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id/activity, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id/status, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/onboard/company, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:orgId/onboard/admin, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:orgId/onboard/activate, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id/templates, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id/templates, PUT} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id/approve, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/organisations/:id/reject, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOrgSettingsController {/org/settings}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/settings, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/settings, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOrgUsersController {/org/users}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/users, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/users, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/users/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/users/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/users/:id/status, PATCH} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/users/:id/resend-invite, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAdminTemplatesController {/admin/templates}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/templates, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/templates/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/templates, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/templates/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/templates/:id, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/templates/:id/reset, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/templates/:id/duplicate, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mPublicTemplatesController {/templates}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/templates, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/templates/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOrgTemplatesController {/org/templates}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/templates, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/templates/:id, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mPlansController {/admin/plans}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/plans, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/plans/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/plans, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/plans/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/plans/:id, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mPublicPlansController {/plans}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/plans, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mSubscriptionsController {/admin/subscriptions}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/subscriptions/overview, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/subscriptions, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/subscriptions/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/subscriptions, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/subscriptions/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/subscriptions/:id, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOrgLandingPagesController {/org/landing-pages}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/landing-pages, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/landing-pages, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/landing-pages/seo/sitemap.xml, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/landing-pages/seo/robots.txt, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/landing-pages/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/landing-pages/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/landing-pages/:id/publish, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/landing-pages/:id/unpublish, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/landing-pages/:id, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/landing-pages/:id/duplicate, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAdminLandingPagesController {/admin/landing-pages}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/landing-pages, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/landing-pages/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOrgActivityController {/org/activity}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/activity, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOrgTypographySetsController {/org/typography-sets}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/typography-sets, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/typography-sets, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/typography-sets/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/typography-sets/:id, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAdminTypographySetsController {/admin/typography-sets}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/typography-sets, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/typography-sets, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/typography-sets/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/typography-sets/:id, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mPublicTypographySetsController {/typography-sets}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/typography-sets, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOrgBillingController {/org/billing}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/billing, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/billing/invoices, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/billing/plan, PATCH} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mLeadsController {/org/leads}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/leads, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/leads, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProjectsController {/org/projects}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:id, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:id, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/unit-types, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/unit-types, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/unit-types/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/unit-types/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/unit-types/:id, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/units, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/units, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/units/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/units/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/units/:id/status, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/projects/:projectId/units/:id, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOrgDomainRequestsController {/org/domain-requests}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/domain-requests, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/domain-requests, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/domain-requests/page/:landingPageId, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/domain-requests/page/:landingPageId/verify, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAdminDomainRequestsController {/admin/domain-requests}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/domain-requests, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/domain-requests/infra, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/domain-requests/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/domain-requests/:id/review, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/domain-requests/:id/recheck, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOrgTrackingController {/org/tracking}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/tracking/event, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/tracking/:landingPageId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/org/tracking/:landingPageId/stats, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mPublicSiteController {/public/site}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/public/site/resolve/:domain, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/public/site/domain/:domain/sitemap.xml, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/public/site/domain/:domain/robots.txt, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:23 am [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/public/site/canonical/:landingPageId, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 11504  - [39m30/08/2026, 8:07:24 am [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +114ms[39m
+2026-08-30 17:14:13.226 IST [10856] LOG:  starting PostgreSQL 16.8, compiled by Visual C++ build 1942, 64-bit
+2026-08-30 17:14:13.238 IST [10856] LOG:  listening on IPv6 address "::1", port 5432
+2026-08-30 17:14:13.238 IST [10856] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2026-08-30 17:14:13.347 IST [6828] LOG:  database system was interrupted; last known up at 2026-08-28 11:54:53 IST
+2026-08-30 17:14:14.865 IST [6828] LOG:  database system was not properly shut down; automatic recovery in progress
+2026-08-30 17:14:14.876 IST [6828] LOG:  redo starts at 0/3AE9C80
+2026-08-30 17:14:14.876 IST [6828] LOG:  invalid record length at 0/3AE9D68: expected at least 24, got 0
+2026-08-30 17:14:14.877 IST [6828] LOG:  redo done at 0/3AE9D30 system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+2026-08-30 17:14:14.889 IST [3828] LOG:  checkpoint starting: end-of-recovery immediate wait
+2026-08-30 17:14:14.905 IST [3828] LOG:  checkpoint complete: wrote 2 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.003 s, sync=0.004 s, total=0.018 s; sync files=3, longest=0.002 s, average=0.002 s; distance=0 kB, estimate=0 kB; lsn=0/3AE9D68, redo lsn=0/3AE9D68
+2026-08-30 17:14:14.950 IST [10856] LOG:  database system is ready to accept connections
+2026-08-30 17:15:02.826 IST [10856] LOG:  server process (PID 6248) was terminated by exception 0xC0000142
+2026-08-30 17:15:02.826 IST [10856] HINT:  See C include file "ntstatus.h" for a description of the hexadecimal value.
+2026-08-30 17:15:02.826 IST [10856] LOG:  terminating any other active server processes
+2026-08-30 17:15:02.843 IST [10856] LOG:  all server processes terminated; reinitializing
+2026-08-30 17:15:02.887 IST [10856] LOG:  startup process (PID 3684) was terminated by exception 0xC0000142
+2026-08-30 17:15:02.887 IST [10856] HINT:  See C include file "ntstatus.h" for a description of the hexadecimal value.
+2026-08-30 17:15:02.887 IST [10856] LOG:  aborting startup due to startup process failure
+2026-08-30 17:15:02.889 IST [10856] LOG:  database system is shut down
+2026-08-30 17:17:07.936 IST [10508] LOG:  starting PostgreSQL 16.8, compiled by Visual C++ build 1942, 64-bit
+2026-08-30 17:17:07.946 IST [10508] LOG:  listening on IPv6 address "::1", port 5432
+2026-08-30 17:17:07.946 IST [10508] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2026-08-30 17:17:08.030 IST [16416] LOG:  database system was interrupted; last known up at 2026-08-30 17:14:14 IST
+2026-08-30 17:17:09.351 IST [16416] LOG:  database system was not properly shut down; automatic recovery in progress
+2026-08-30 17:17:09.358 IST [16416] LOG:  redo starts at 0/3AE9DE0
+2026-08-30 17:17:09.358 IST [16416] LOG:  invalid record length at 0/3AE9E18: expected at least 24, got 0
+2026-08-30 17:17:09.358 IST [16416] LOG:  redo done at 0/3AE9DE0 system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+2026-08-30 17:17:09.364 IST [18508] LOG:  checkpoint starting: end-of-recovery immediate wait
+2026-08-30 17:17:09.378 IST [18508] LOG:  checkpoint complete: wrote 2 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.003 s, total=0.016 s; sync files=3, longest=0.002 s, average=0.001 s; distance=0 kB, estimate=0 kB; lsn=0/3AE9E18, redo lsn=0/3AE9E18
+2026-08-30 17:17:09.413 IST [10508] LOG:  database system is ready to accept connections
+2026-08-30 17:17:23.217 IST [18508] LOG:  checkpoint starting: immediate force wait
+2026-08-30 17:17:23.238 IST [18508] LOG:  checkpoint complete: wrote 5 buffers (0.0%); 0 WAL file(s) added, 0 removed, 1 recycled; write=0.003 s, sync=0.005 s, total=0.022 s; sync files=5, longest=0.002 s, average=0.001 s; distance=5828 kB, estimate=5828 kB; lsn=0/409B078, redo lsn=0/409B040
+2026-08-30 17:17:24.283 IST [18508] LOG:  checkpoint starting: immediate force wait
+2026-08-30 17:17:24.308 IST [18508] LOG:  checkpoint complete: wrote 29 buffers (0.2%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.005 s, sync=0.012 s, total=0.026 s; sync files=14, longest=0.002 s, average=0.001 s; distance=5870 kB, estimate=5870 kB; lsn=0/4656AC0, redo lsn=0/4656A88
+2026-08-30 17:22:24.309 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 17:22:30.673 IST [18508] LOG:  checkpoint complete: wrote 59 buffers (0.4%); 0 WAL file(s) added, 0 removed, 0 recycled; write=6.303 s, sync=0.049 s, total=6.364 s; sync files=55, longest=0.007 s, average=0.001 s; distance=318 kB, estimate=5315 kB; lsn=0/46A6430, redo lsn=0/46A63F8
+2026-08-30 17:57:24.743 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 17:57:25.188 IST [18508] LOG:  checkpoint complete: wrote 4 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.428 s, sync=0.003 s, total=0.454 s; sync files=1, longest=0.003 s, average=0.003 s; distance=4 kB, estimate=4784 kB; lsn=0/46A75F8, redo lsn=0/46A75C0
+2026-08-30 18:02:24.194 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 18:02:25.961 IST [18508] LOG:  checkpoint complete: wrote 17 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=1.734 s, sync=0.015 s, total=1.767 s; sync files=15, longest=0.002 s, average=0.001 s; distance=39 kB, estimate=4309 kB; lsn=0/46B12A0, redo lsn=0/46B1268
+2026-08-30 18:03:46.887 IST [11448] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:03:46.887 IST [9744] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:03:46.887 IST [3508] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:03:46.887 IST [8940] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:03:46.887 IST [14064] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:03:53.578 IST [13420] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:04:07.562 IST [11636] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:04:14.891 IST [13964] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:07:54.085 IST [408] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:07:54.085 IST [19976] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:07:54.085 IST [19968] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:17:24.987 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 18:17:25.678 IST [18508] LOG:  checkpoint complete: wrote 7 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.664 s, sync=0.013 s, total=0.692 s; sync files=4, longest=0.009 s, average=0.004 s; distance=12 kB, estimate=3880 kB; lsn=0/46B4660, redo lsn=0/46B4628
+2026-08-30 18:28:57.594 IST [11408] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:29:33.392 IST [16740] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:32:24.698 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 18:32:25.368 IST [18508] LOG:  checkpoint complete: wrote 7 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.651 s, sync=0.006 s, total=0.672 s; sync files=6, longest=0.002 s, average=0.001 s; distance=6 kB, estimate=3492 kB; lsn=0/46B60A0, redo lsn=0/46B6068
+2026-08-30 18:37:24.377 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 18:37:28.307 IST [18508] LOG:  checkpoint complete: wrote 37 buffers (0.2%); 0 WAL file(s) added, 0 removed, 0 recycled; write=3.891 s, sync=0.020 s, total=3.931 s; sync files=18, longest=0.002 s, average=0.002 s; distance=465 kB, estimate=3189 kB; lsn=0/472F4D8, redo lsn=0/472A5D0
+2026-08-30 18:42:24.317 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 18:42:34.642 IST [18508] LOG:  checkpoint complete: wrote 96 buffers (0.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=10.254 s, sync=0.055 s, total=10.326 s; sync files=56, longest=0.003 s, average=0.001 s; distance=289 kB, estimate=2899 kB; lsn=0/4772A80, redo lsn=0/4772A48
+2026-08-30 18:47:19.345 IST [20768] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:47:24.677 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 18:47:25.237 IST [18508] LOG:  checkpoint complete: wrote 6 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.547 s, sync=0.004 s, total=0.561 s; sync files=5, longest=0.001 s, average=0.001 s; distance=7 kB, estimate=2610 kB; lsn=0/4774948, redo lsn=0/4774910
+2026-08-30 18:48:12.389 IST [1396] ERROR:  syntax error at or near "﻿SELECT" at character 1
+2026-08-30 18:48:12.389 IST [1396] STATEMENT:  ﻿SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema='identity' AND table_name='org_domain_requests' ORDER BY ordinal_position;
+	
+2026-08-30 18:49:48.120 IST [7448] ERROR:  column "subdomain" does not exist at character 8
+2026-08-30 18:49:48.120 IST [7448] STATEMENT:  SELECT subdomain, count(*) c FROM templates.landing_pages WHERE subdomain IS NOT NULL GROUP BY subdomain HAVING count(*) > 1
+2026-08-30 18:50:24.669 IST [17128] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:50:40.755 IST [19592] LOG:  could not receive data from client: An existing connection was forcibly closed by the remote host.
+	
+2026-08-30 18:52:24.261 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 18:52:27.121 IST [18508] LOG:  checkpoint complete: wrote 27 buffers (0.2%); 0 WAL file(s) added, 0 removed, 0 recycled; write=2.839 s, sync=0.011 s, total=2.861 s; sync files=22, longest=0.001 s, average=0.001 s; distance=104 kB, estimate=2360 kB; lsn=0/478E978, redo lsn=0/478E940
+2026-08-30 19:02:24.154 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 19:02:24.599 IST [18508] LOG:  checkpoint complete: wrote 5 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.432 s, sync=0.005 s, total=0.447 s; sync files=4, longest=0.002 s, average=0.002 s; distance=8 kB, estimate=2124 kB; lsn=0/4790CA0, redo lsn=0/4790C68
+2026-08-30 20:00:27.996 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 20:00:28.449 IST [18508] LOG:  checkpoint complete: wrote 5 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.438 s, sync=0.004 s, total=0.455 s; sync files=4, longest=0.002 s, average=0.001 s; distance=9 kB, estimate=1913 kB; lsn=0/47931D0, redo lsn=0/4793198
+2026-08-30 20:15:27.481 IST [18508] LOG:  checkpoint starting: time
+2026-08-30 20:15:27.954 IST [18508] LOG:  checkpoint complete: wrote 5 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.445 s, sync=0.012 s, total=0.483 s; sync files=4, longest=0.007 s, average=0.003 s; distance=9 kB, estimate=1722 kB; lsn=0/4795830, redo lsn=0/47957F8

@@ -1,9 +1,82 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { extractSubdomainFromHost, subdomainHost } from '../../common/utils/domain.util';
 
 @Injectable()
 export class PublicSiteService {
   constructor(private readonly prisma: PrismaService) {}
+
+  // Resolve an incoming host to an organisation site. Supports:
+  //  - organisation subdomain: "<sub>.<base>" or "<sub>.localhost" (local dev)
+  //  - a custom domain that the org has verified/connected
+  // Returns the org + its active, published landing page.
+  async resolveByHost(host: string) {
+    const normalized = (host ?? '').trim().toLowerCase().replace(/:\d+$/, '').replace(/^www\./, '');
+
+    // 1) Organisation subdomain (platform wildcard / localhost).
+    const subdomain = extractSubdomainFromHost(normalized);
+    if (subdomain) {
+      const org = await this.prisma.organisation.findFirst({
+        where: { subdomain, subdomainStatus: 'active', status: 'active' },
+      });
+      if (org) {
+        return this.buildOrgSite(org, host);
+      }
+    }
+
+    // 2) Custom domain mapped to an organisation (verified/connected).
+    const custom = await this.prisma.organisation.findFirst({
+      where: { customDomain: normalized, customDomainStatus: 'connected', status: 'active' },
+    });
+    if (custom) {
+      return this.buildOrgSite(custom, host);
+    }
+
+    // 3) Legacy per-landing-page custom domain (existing behaviour).
+    const req = await this.prisma.domainRequest.findFirst({
+      where: { domain: normalized, status: 'connected' },
+      include: { landingPage: true },
+    });
+    if (req && req.landingPage.status === 'published') {
+      return { type: 'legacy', domain: req.domain, landingPage: req.landingPage, ssl: req.sslStatus, verifiedAt: req.verifiedAt };
+    }
+
+    throw new NotFoundException('No site for host');
+  }
+
+  private async buildOrgSite(org: any, host: string) {
+    // The org's primary published landing page (first published one, else null).
+    const landingPage = await this.prisma.landingPage.findFirst({
+      where: { orgId: org.id, status: 'published' },
+      orderBy: { updatedAt: 'desc' },
+    }) ?? null;
+    return {
+      type: org.customDomain && host.replace(/^www\./, '') === org.customDomain ? 'custom' : 'subdomain',
+      organisation: {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        subdomain: org.subdomain,
+        subdomainStatus: org.subdomainStatus,
+        customDomain: org.customDomain,
+        customDomainStatus: org.customDomainStatus,
+        logoUrl: org.logoUrl,
+        brandColour: org.brandColour,
+        defaultLanguage: org.defaultLanguage,
+      },
+      subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
+      landingPage: landingPage
+        ? {
+            id: landingPage.id,
+            slug: landingPage.slug,
+            name: landingPage.name,
+            status: landingPage.status,
+            content: landingPage.content,
+            publishedAt: landingPage.publishedAt,
+          }
+        : null,
+    };
+  }
 
   async resolveByDomain(domain: string) {
     const normalized = domain.toLowerCase().replace(/^www\./, '');

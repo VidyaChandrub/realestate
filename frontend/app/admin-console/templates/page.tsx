@@ -48,6 +48,7 @@ export default function SuperAdminTemplatesPage() {
     /* eslint-enable react-hooks/set-state-in-effect */
     loadTemplates()
       .then(setPages)
+      .catch(() => setPages([]))
       .finally(() => setLoading(false));
   }, []);
 

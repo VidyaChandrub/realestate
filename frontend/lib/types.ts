@@ -29,6 +29,10 @@ export interface SafeOrganisation {
   state: string | null;
   postal_code: string | null;
   country: string | null;
+  subdomain: string | null;
+  subdomain_status: string;
+  custom_domain: string | null;
+  custom_domain_status: string;
 }
 
 export interface UpdateOrganisationSettingsInput {
@@ -84,6 +88,8 @@ export interface SignupInput {
   planId?: string;
   billingCycle?: 'monthly' | 'yearly';
   templateIds?: string[];
+  subdomain?: string;
+  custom_domain?: string;
 }
 
 export interface LoginInput {
@@ -158,6 +164,11 @@ export interface OrganisationListRow {
   name: string;
   slug: string;
   city: string;
+  subdomain: string | null;
+  subdomainHost: string | null;
+  subdomainStatus: string;
+  customDomain: string | null;
+  customDomainStatus: string;
   adminName: string | null;
   adminEmail: string | null;
   adminPhone: string | null;
@@ -190,6 +201,11 @@ export interface OrganisationDetail {
   name: string;
   slug: string;
   city: string;
+  subdomain: string | null;
+  subdomainHost: string | null;
+  subdomainStatus: string;
+  customDomain: string | null;
+  customDomainStatus: string;
   status: "active" | "disabled" | "pending";
   createdAt: string;
   timezone: string;
@@ -657,4 +673,100 @@ export interface LeadSubmission {
   source?: string;
   /** Captured field values, keyed by field label. */
   fields: Record<string, string>;
+}
+
+// --- Organisation domain identity (subdomain + custom domain) ---
+
+export type OrgDomainKind = 'subdomain' | 'custom_domain';
+export type OrgDomainRequestStatus = 'pending' | 'approved' | 'rejected' | 'connected';
+
+export interface OrgDomainRequest {
+  id: string;
+  kind: OrgDomainKind;
+  subdomain: string | null;
+  customDomain: string | null;
+  status: OrgDomainRequestStatus;
+  requestedAt: string;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+}
+
+/** GET /org/domain — the organisation's own subdomain/custom-domain identity. */
+export interface OrgDomainInfo {
+  subdomain: string | null;
+  subdomainHost: string | null;
+  subdomainStatus: string;
+  customDomain: string | null;
+  customDomainStatus: string;
+  requests: OrgDomainRequest[];
+}
+
+export interface RequestCustomDomainInput {
+  domain: string;
+}
+
+/** GET /admin/org-domain-requests row (subdomain or custom-domain request). */
+export interface AdminOrgDomainRequest extends OrgDomainRequest {
+  organisation: {
+    id: string;
+    name: string;
+    slug: string;
+    subdomain: string | null;
+    customDomain: string | null;
+  };
+}
+
+export interface AdminOrgDomainRequestListResponse {
+  data: AdminOrgDomainRequest[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ReviewOrgDomainRequestInput {
+  action: 'approve' | 'reject';
+  reason?: string;
+}
+
+// --- In-app notifications (Super Admin bell) ---
+
+export type NotificationType =
+  | 'organisation_registration'
+  | 'subdomain_request'
+  | 'custom_domain_request'
+  | 'organisation_approved'
+  | 'organisation_rejected';
+
+export interface AppNotification {
+  id: string;
+  orgId: string | null;
+  recipientId: string | null;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  entity: string | null;
+  entityId: string | null;
+  readAt: string | null;
+  createdAt: string;
+  organisation: { id: string; name: string; slug: string; subdomain: string | null } | null;
+}
+
+export interface NotificationsListResponse {
+  data: AppNotification[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface UnreadNotificationsResponse {
+  count: number;
+}
+
+/** GET /auth/subdomain-availability — live check for the signup form. */
+export interface SubdomainAvailability {
+  subdomain: string;
+  host: string;
+  available: boolean;
+  reasons: string[];
+  suggestions: string[];
 }

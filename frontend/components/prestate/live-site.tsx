@@ -19,8 +19,8 @@ function deviceFromWidth(w: number): Device {
   return "desktop";
 }
 
-export function LocalSitePreview({ slug, host }: { slug?: string; host?: string }) {
-  const [page, setPage] = useState<LandingPageData | null | undefined>(undefined);
+export function LocalSitePreview({ slug, host, page: serverPage }: { slug?: string; host?: string; page?: LandingPageData | null }) {
+  const [page, setPage] = useState<LandingPageData | null | undefined>(serverPage ?? undefined);
   const [device, setDevice] = useState<Device>("desktop");
   const [gate, setGate] = useState("");
   const [unlocked, setUnlocked] = useState(false);
@@ -48,6 +48,13 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
   }, []);
 
   useEffect(() => {
+    if (serverPage) {
+      if (serverPage) {
+        applyDocumentSeo(serverPage);
+        bumpTracking(serverPage.id, "view");
+      }
+      return;
+    }
     let cancelled = false;
     (async () => {
       const found = host ? await findPageByDomain(host) : slug ? await findPageBySlug(slug) : undefined;
@@ -63,7 +70,7 @@ export function LocalSitePreview({ slug, host }: { slug?: string; host?: string 
     return () => {
       cancelled = true;
     };
-  }, [slug, host]);
+  }, [slug, host, serverPage]);
 
   if (page === undefined) {
     return <div style={{ minHeight: "100vh", background: "#fff", padding: 40, color: "#64748b" }}>Loading local preview…</div>;

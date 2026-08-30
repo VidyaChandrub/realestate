@@ -35,6 +35,10 @@ export function toSafeOrganisation(organisation: Organisation) {
     state: organisation.state,
     postal_code: organisation.postalCode,
     country: organisation.country,
+    subdomain: organisation.subdomain,
+    subdomain_status: organisation.subdomainStatus,
+    custom_domain: organisation.customDomain,
+    custom_domain_status: organisation.customDomainStatus,
   };
 }
 

@@ -11,6 +11,7 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { ProgressBar } from "@/components/superadmin/progress-bar";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import "@/app/org/org.css";
 
 const CALLS = [
   {
@@ -72,15 +73,12 @@ export default function OrgProjectAiCallingPage() {
       <ProjectPageHead
         active="ai-calling"
         actions={
-          <>
-            <button className="btn btn-ghost">🔗 Public page</button>
-            <button className="btn btn-primary">＋ Add lead</button>
-          </>
+          <button className="btn btn-primary">＋ Add lead</button>
         }
       />
 
       <Reveal delay={1}>
-        <div className="help" style={{ marginBottom: 18 }}>
+        <div className="help mb-18">
           AI calling isn&apos;t wired up yet — this is a preview of the agent
           workspace.
         </div>
@@ -93,28 +91,28 @@ export default function OrgProjectAiCallingPage() {
             <span className="t">AI agent assigned</span>
             <span className="badge b-green">● Active</span>
           </div>
-          <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
-            <div className="u" style={{ flex: "0 0 auto" }}>
-              <span className="av a2" style={{ width: 54, height: 54, fontSize: 18 }}>AA</span>
+          <div className="row gap-20 wrap top">
+            <div className="u flex-none">
+              <span className="av a2 lg">AA</span>
               <span>
-                <span className="nm" style={{ fontSize: 16 }}>Aarohi</span><br />
+                <span className="nm fs-16">Aarohi</span><br />
                 <span className="sm">Site Visit Booker · Voice AI</span>
               </span>
             </div>
-            <div style={{ flex: "1 1 320px", minWidth: 280, display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            <div className="col gap-10 flex-1-320">
+              <div className="row gap-8 wrap">
                 <span className="chip">🗣️ Hindi / English</span>
                 <span className="chip">📚 Project knowledge</span>
                 <span className="chip">📞 Outbound</span>
               </div>
-              <p className="muted" style={{ fontSize: 13.5, margin: 0, lineHeight: 1.6 }}>
-                <b style={{ color: "var(--ink)" }}>Goal:</b> Qualify inbound leads,
+              <p className="muted fs-13-5 m-0 lh-16">
+                <b>Goal:</b> Qualify inbound leads,
                 confirm budget &amp; configuration (2/3/4 BHK), and book a weekend site
                 visit. Pitches project pricing, possession and RERA-approved status;
                 hands warm leads to the sales team and logs the visit slot to the CRM.
               </p>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: "0 0 auto" }}>
+            <div className="col gap-8 flex-none">
               <button className="btn btn-ghost">✏️ Edit</button>
               <button className="btn btn-primary">▶ Test call</button>
             </div>
@@ -123,7 +121,7 @@ export default function OrgProjectAiCallingPage() {
       </Reveal>
 
       {/* STAT TILES */}
-      <div className="grid g4" style={{ marginTop: 18 }}>
+      <div className="grid g4 mt-18">
         <Reveal delay={1}>
           <div className="stat">
             <div className="top">
@@ -168,13 +166,13 @@ export default function OrgProjectAiCallingPage() {
 
       {/* ACTIVE CAMPAIGN */}
       <Reveal delay={2}>
-        <div className="card" style={{ marginTop: 18 }}>
+        <div className="card mt-18">
           <div className="card-h">
             <span className="t">Active campaign — Weekend Visits</span>
             <span className="badge b-green">● Running</span>
           </div>
           <div className="card-b">
-            <div className="grid g3" style={{ marginBottom: 16 }}>
+            <div className="grid g3 mb-16">
               <div className="sp">
                 <div className="k">Leads</div>
                 <div className="v"><CountUp value={120} /></div>
@@ -188,12 +186,12 @@ export default function OrgProjectAiCallingPage() {
                 <div className="v"><CountUp value={61} /></div>
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 5 }}>
+            <div className="row between fs-13 mb-5">
               <span className="muted">Campaign progress</span>
               <b>82% dialed</b>
             </div>
             <ProgressBar width="82%" />
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            <div className="row gap-8 mt-16">
               <button className="btn btn-ghost">⏸ Pause</button>
               <button className="btn btn-primary">View</button>
             </div>
@@ -203,12 +201,12 @@ export default function OrgProjectAiCallingPage() {
 
       {/* RECENT AI CALLS */}
       <Reveal delay={2}>
-        <div className="card" style={{ marginTop: 18 }}>
+        <div className="card mt-18">
           <div className="card-h">
             <span className="t">Recent AI calls</span>
-            <Link className="x" href="/org/calling" style={{ color: "var(--brand)" }}>All calls →</Link>
+            <Link className="x brand" href="/org/calling">All calls →</Link>
           </div>
-          <div className="card-b" style={{ padding: 0 }}>
+          <div className="card-b pad-0">
             <div className="tbl-wrap">
               <table className="tbl">
                 <thead>
@@ -232,11 +230,11 @@ export default function OrgProjectAiCallingPage() {
       </Reveal>
 
       <Reveal delay={2}>
-        <div className="help" style={{ marginTop: 18 }}>
+        <div className="help mt-18">
           💡 Aarohi&apos;s call scripts, pricing lines and FAQ answers are pulled live from the{" "}
           <Link
             href={`/org/projects/${id}/knowledge`}
-            style={{ color: "var(--brand)", fontWeight: 600 }}
+            className="brand-link"
           >
             Knowledge tab
           </Link>{" "}

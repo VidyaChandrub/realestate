@@ -36,7 +36,6 @@ export default async function OrgLeadDetailPage({
               <div className="card-b">
                 <div className="prof">
                   <div className="av av-lg a4">RM</div>
-                  <b style={{ fontSize: 16 }}>Rahul Mehta</b>
                   <div className="mono">+91 98204 55127</div>
                   <div className="muted" style={{ fontSize: 13 }}>rahul.mehta@gmail.com</div>
                   <span className="chip" style={{ marginTop: 4 }}>⭐ Lead score <b style={{ color: "var(--brand)", marginLeft: 4 }}>86 / Hot</b></span>
