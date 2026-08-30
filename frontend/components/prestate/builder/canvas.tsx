@@ -970,9 +970,72 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
 function HighlightsSection({ s, device }: { s: SectionInstance; device: Device }) {
   const wt = useContext(SiteLayoutThemeContext);
   const items = (s.settings.items ?? []) as { icon?: string; value: string; label: string }[];
-  const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : Math.min(items.length || 1, 5);
+  const design = String(s.settings.design ?? "strip");
+  const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : Math.min(items.length || 1, 4);
   const txt = s.style.colors?.text;
   const T = typoCss(s, device);
+
+  if (design === "glass-tiles") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14, width: "100%" }}>
+        {items.map((it, i) => (
+          <div
+            key={i}
+            style={{
+              background: "rgba(15,23,42,.75)",
+              backdropFilter: "blur(14px)",
+              border: "1px solid rgba(255,255,255,.14)",
+              borderRadius: wt.radiusLg,
+              padding: "20px 18px",
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              boxShadow: "0 10px 30px rgba(0,0,0,.25)",
+              transition: wt.transition,
+            }}
+          >
+            <span style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(196,164,106,.15)", border: "1px solid rgba(196,164,106,.3)", color: "#c4a46a", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              {iconFor(it.icon, 20)}
+            </span>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", letterSpacing: -0.3, ...T }}>{it.value}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,.7)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, marginTop: 2, ...T }}>{it.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (design === "cards") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14, width: "100%" }}>
+        {items.map((it, i) => (
+          <div
+            key={i}
+            className="ps-card"
+            style={{
+              ...wtCardPremium({ padding: "20px 18px" }, wt),
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              transition: wt.transition,
+            }}
+          >
+            <span style={{ ...wtIconBadge({ size: 44, gold: i % 2 === 1 }, wt), flexShrink: 0, boxShadow: wt.shadowSm }}>
+              {iconFor(it.icon, 20)}
+            </span>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: wt.ink, letterSpacing: -0.3, ...T }}>{it.value}</div>
+              <div style={{ fontSize: 11, color: wt.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, marginTop: 2, ...T }}>{it.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Default: strip
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 0, background: txt ? "transparent" : wt.surface, border: txt ? "none" : wt.border, borderRadius: txt ? 0 : wt.radiusLg, overflow: "hidden", boxShadow: txt ? "none" : wt.shadowSm }}>
       {items.map((it, i) => (
@@ -1008,11 +1071,25 @@ function StatsSection({ s, device }: { s: SectionInstance; device: Device }) {
   const wt = useContext(SiteLayoutThemeContext);
   const st = s.settings;
   const items = (st.items ?? []) as { icon?: string; value: string; label: string }[];
-  const variant = textOf(st.style ?? st.design ?? "cards");
-  const cols = device === "mobile" ? 2 : device === "tablet" ? 3 : Math.min(items.length || 1, 5);
+  const design = String(st.design ?? st.style ?? "cards");
+  const cols = device === "mobile" ? 2 : device === "tablet" ? 3 : Math.min(items.length || 1, 4);
   const txt = s.style.colors?.text;
   const T = typoCss(s, device);
-  if (variant === "minimal") {
+
+  if (design === "strip") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 0, background: wt.surface, border: wt.border, borderRadius: wt.radiusLg, overflow: "hidden", boxShadow: wt.shadowSm }}>
+        {items.map((it, i) => (
+          <div key={i} style={{ padding: "20px 16px", textAlign: "center", borderRight: i < items.length - 1 ? wt.border : "none", background: "#fff" }}>
+            <div className="ps-canvas-serif" style={{ ...wtStatValue(undefined, wt), fontSize: 24, letterSpacing: -0.4, ...T }}>{it.value}</div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8, color: wt.muted, marginTop: 4, ...T }}>{it.label}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (design === "minimal") {
     return (
       <>
         {st.heading ? (
@@ -1037,6 +1114,8 @@ function StatsSection({ s, device }: { s: SectionInstance; device: Device }) {
       </>
     );
   }
+
+  // Default: cards
   return (
     <>
       {st.heading ? (
@@ -1156,7 +1235,83 @@ function SocialShareSection({ s }: { s: SectionInstance }) {
 function OverviewSection({ s, device }: { s: SectionInstance; device: Device }) {
   const wt = useContext(SiteLayoutThemeContext);
   const st = s.settings;
+  const design = String(s.settings.design ?? "classic");
   const T = typoCss(s, device);
+
+  if (design === "stacked") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 28, width: "100%" }}>
+        <Inner section={s}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, justifyContent: "center" }}>
+            <span style={{ width: 28, height: 2, background: wt.gold, borderRadius: 999 }} />
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: wt.gold }}>Project Overview</span>
+            <span style={{ width: 28, height: 2, background: wt.gold, borderRadius: 999 }} />
+          </div>
+          <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 36, margin: "0 0 10px", textAlign: "center", letterSpacing: -0.6, ...T }}>{textOf(st.heading)}</h2>
+          <p style={{ ...wtSectionLede(undefined, wt), textAlign: "center", maxWidth: 700, margin: "0 auto", fontSize: 15, ...T }}>{textOf(st.text)}</p>
+        </Inner>
+        <div style={{ borderRadius: wt.radiusLg, overflow: "hidden", boxShadow: wt.shadowLg, border: wt.border, position: "relative", minHeight: device === "mobile" ? 260 : 420 }}>
+          {isMediaSrc(textOf(st.image)) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={textOf(st.image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ) : (
+            <SceneImage art={textOf(st.image || "lobby")} />
+          )}
+          <div style={{ position: "absolute", bottom: 18, left: 18, background: "rgba(11,18,32,.75)", backdropFilter: "blur(12px)", padding: "10px 16px", borderRadius: 999, border: "1px solid rgba(255,255,255,.14)", display: "flex", alignItems: "center", gap: 8, color: "#fff", fontSize: 12, fontWeight: 700 }}>
+            <ShieldCheck size={16} style={{ color: wt.gold }} /> RERA: {PROPERTY.reraNumber}
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "repeat(3,1fr)", gap: 14 }}>
+          {((st.stats as { value: string; label: string }[] | undefined) ?? []).map((x) => (
+            <div key={x.label} style={{ background: wt.surface, border: wt.border, borderRadius: wt.radius, padding: "18px 16px", textAlign: "center", boxShadow: wt.shadowSm }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: wt.primary, letterSpacing: -0.3 }}>{x.value}</div>
+              <div style={{ fontSize: 11, color: wt.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, marginTop: 4 }}>{x.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (design === "cards") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1fr" : "1fr", gap: 24, alignItems: "stretch", width: "100%" }}>
+        <div style={{ borderRadius: wt.radiusLg, overflow: "hidden", boxShadow: wt.shadowMd, border: wt.border, position: "relative", minHeight: 340 }}>
+          {isMediaSrc(textOf(st.image)) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={textOf(st.image)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ) : (
+            <SceneImage art={textOf(st.image || "lobby")} />
+          )}
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 40%, rgba(8,10,20,.75))", display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: 22 }}>
+            <div style={{ color: "#fff", fontSize: 18, fontWeight: 800 }}>{textOf(st.heading)}</div>
+            <div style={{ color: "rgba(255,255,255,.8)", fontSize: 12.5, marginTop: 4 }}>{PROPERTY.location}</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, justifyContent: "center" }}>
+          <p style={{ ...wtSectionLede(undefined, wt), lineHeight: 1.7, fontSize: 14.5, margin: 0, ...T }}>{textOf(st.text)}</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {((st.bullets as string[] | undefined) ?? []).map((b) => (
+              <div key={b} style={{ display: "flex", alignItems: "center", gap: 8, background: wt.surfaceMuted, border: wt.borderFaint, borderRadius: 10, padding: "10px 12px" }}>
+                <Check size={13} style={{ color: wt.primary }} strokeWidth={3} />
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: wt.inkSoft }}>{b}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginTop: 6 }}>
+            {((st.stats as { value: string; label: string }[] | undefined) ?? []).map((x) => (
+              <div key={x.label} style={{ background: wt.surface, border: wt.border, borderRadius: wt.radius, padding: "12px 10px", textAlign: "center" }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: wt.primary }}>{x.value}</div>
+                <div style={{ fontSize: 10, color: wt.muted, fontWeight: 700, textTransform: "uppercase", marginTop: 2 }}>{x.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default: classic side-by-side
   return (
     <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1.05fr 1fr" : "1fr", gap: device === "mobile" ? 28 : 44, alignItems: "center" }}>
       <div style={{ position: "relative" }}>
@@ -1272,6 +1427,7 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
   const live = useContext(SiteLiveContext);
   const wt = useContext(SiteLayoutThemeContext);
+  const design = String(st.design ?? "masonry");
   const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 3;
   const T = typoCss(s, device);
   const images = (Array.isArray(st.images) ? (st.images as string[]) : []).slice(0, 6);
@@ -1279,6 +1435,7 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
   const lightboxOn = st.lightbox !== false;
   const canOpen = live && lightboxOn && images.length > 0;
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [sliderIndex, setSliderIndex] = useState(0);
 
   const slides = images.map((img, i) => ({
     type: "image" as const,
@@ -1287,6 +1444,8 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
     caption: captions[i] || undefined,
     art: isMediaSrc(img) ? undefined : GALLERY_ART[i % GALLERY_ART.length],
   }));
+
+  const activeSlide = slides[sliderIndex % (slides.length || 1)];
 
   return (
     <>
@@ -1298,30 +1457,147 @@ function GallerySection({ s, device }: { s: SectionInstance; device: Device }) {
         <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "0 0 8px", ...T }}>{textOf(st.heading)}</h2>
         <p style={{ ...wtSectionLede(undefined, wt), fontSize: 14.5, maxWidth: 520, lineHeight: 1.65, ...T }}>{textOf(st.text)}</p>
       </Inner>
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 16, margin: "32px 0 0", width: "100%" }}>
-        {images.map((img, i) => (
-          <div
-            key={i}
-            onClick={canOpen ? (e) => { e.stopPropagation(); setOpenIndex(i); } : undefined}
-            className="ps-gallery-card"
-            style={{ borderRadius: wt.radiusLg, overflow: "hidden", position: "relative", aspectRatio: "4/3", cursor: canOpen ? "zoom-in" : "pointer", boxShadow: wt.shadowMd, border: wt.border, background: wt.surface, transition: wt.transition }}
-          >
-            <div style={{ width: "100%", height: "100%", overflow: "hidden", transition: wt.transition }} className="ps-gallery-img">
-              {isMediaSrc(img) ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={img} alt={captions[i] || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: wt.transitionSlow }} />
-              ) : (
-                <SceneImage art={GALLERY_ART[i % GALLERY_ART.length]} />
+
+      {/* Slider Layout */}
+      {design === "slider" && (
+        <div style={{ maxWidth: 1040, margin: "28px auto 0", width: "100%" }}>
+          <div style={{ position: "relative", borderRadius: wt.radiusLg, overflow: "hidden", aspectRatio: device === "mobile" ? "4/3" : "16/9", boxShadow: wt.shadowMd, border: wt.border, background: wt.surface }}>
+            {activeSlide?.src ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={activeSlide.src} alt={activeSlide.alt} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            ) : (
+              <SceneImage art={activeSlide?.art ?? "skyline"} />
+            )}
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "28px 24px 20px", background: "linear-gradient(180deg, transparent 0%, rgba(8,10,20,.85) 100%)", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+              <div>
+                <span style={{ color: wt.gold, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1 }}>{sliderIndex + 1} / {slides.length || 1}</span>
+                <div style={{ color: "#fff", fontSize: 16, fontWeight: 700, marginTop: 4 }}>{activeSlide?.caption || `Project View ${sliderIndex + 1}`}</div>
+              </div>
+              {canOpen && (
+                <button
+                  type="button"
+                  onClick={() => setOpenIndex(sliderIndex)}
+                  style={{ background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.3)", backdropFilter: "blur(8px)", color: "#fff", padding: "8px 14px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <Eye size={13} /> Fullscreen
+                </button>
               )}
             </div>
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 50%, rgba(8,10,20,.62))", opacity: 0, transition: "opacity .2s", display: "flex", alignItems: "flex-end", padding: 14 }} className="ps-gal-overlay">
-              <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)", backdropFilter: "blur(8px)", padding: "6px 10px", borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <Eye size={12} /> {captions[i] || `View ${i + 1}`}
-              </span>
-            </div>
+            {slides.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous image"
+                  onClick={() => setSliderIndex((v) => (v - 1 + slides.length) % slides.length)}
+                  style={{ position: "absolute", top: "50%", left: 14, transform: "translateY(-50%)", width: 42, height: 42, borderRadius: "50%", background: "rgba(8,10,20,.6)", border: "1px solid rgba(255,255,255,.2)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(6px)" }}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next image"
+                  onClick={() => setSliderIndex((v) => (v + 1) % slides.length)}
+                  style={{ position: "absolute", top: "50%", right: 14, transform: "translateY(-50%)", width: 42, height: 42, borderRadius: "50%", background: "rgba(8,10,20,.6)", border: "1px solid rgba(255,255,255,.2)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(6px)" }}
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </>
+            )}
           </div>
-        ))}
-      </div>
+          {/* Thumbnails row */}
+          {slides.length > 1 && (
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 14, overflowX: "auto", padding: "4px 0" }}>
+              {slides.map((sl, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSliderIndex(i)}
+                  style={{ width: 68, height: 48, borderRadius: 10, overflow: "hidden", border: i === sliderIndex ? `2.5px solid ${wt.primary}` : "1.5px solid transparent", opacity: i === sliderIndex ? 1 : 0.6, cursor: "pointer", padding: 0, flexShrink: 0, transition: wt.transition }}
+                >
+                  {sl.src ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={sl.src} alt={sl.alt} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  ) : (
+                    <SceneImage art={sl.art ?? "skyline"} />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Masonry Layout */}
+      {design === "masonry" && (
+        <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1.4fr 1fr 1fr" : device === "tablet" ? "1fr 1fr" : "1fr", gap: 16, margin: "32px 0 0", width: "100%" }}>
+          {images.map((img, i) => {
+            const isHero = i === 0 && device === "desktop";
+            return (
+              <div
+                key={i}
+                onClick={canOpen ? (e) => { e.stopPropagation(); setOpenIndex(i); } : undefined}
+                className="ps-gallery-card"
+                style={{
+                  borderRadius: wt.radiusLg,
+                  overflow: "hidden",
+                  position: "relative",
+                  gridRow: isHero ? "span 2" : "span 1",
+                  minHeight: isHero ? 360 : 170,
+                  aspectRatio: isHero ? undefined : "16/10",
+                  cursor: canOpen ? "zoom-in" : "pointer",
+                  boxShadow: wt.shadowMd,
+                  border: wt.border,
+                  background: wt.surface,
+                  transition: wt.transition,
+                }}
+              >
+                <div style={{ width: "100%", height: "100%", overflow: "hidden", transition: wt.transition }} className="ps-gallery-img">
+                  {isMediaSrc(img) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={img} alt={captions[i] || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: wt.transitionSlow }} />
+                  ) : (
+                    <SceneImage art={GALLERY_ART[i % GALLERY_ART.length]} />
+                  )}
+                </div>
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 50%, rgba(8,10,20,.68))", opacity: 0, transition: "opacity .2s", display: "flex", alignItems: "flex-end", padding: 14 }} className="ps-gal-overlay">
+                  <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)", backdropFilter: "blur(8px)", padding: "6px 12px", borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <Eye size={12} /> {captions[i] || `View ${i + 1}`}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Grid Layout (Default / geometric) */}
+      {design === "grid" && (
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 16, margin: "32px 0 0", width: "100%" }}>
+          {images.map((img, i) => (
+            <div
+              key={i}
+              onClick={canOpen ? (e) => { e.stopPropagation(); setOpenIndex(i); } : undefined}
+              className="ps-gallery-card"
+              style={{ borderRadius: wt.radiusLg, overflow: "hidden", position: "relative", aspectRatio: "4/3", cursor: canOpen ? "zoom-in" : "pointer", boxShadow: wt.shadowMd, border: wt.border, background: wt.surface, transition: wt.transition }}
+            >
+              <div style={{ width: "100%", height: "100%", overflow: "hidden", transition: wt.transition }} className="ps-gallery-img">
+                {isMediaSrc(img) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={img} alt={captions[i] || ""} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: wt.transitionSlow }} />
+                ) : (
+                  <SceneImage art={GALLERY_ART[i % GALLERY_ART.length]} />
+                )}
+              </div>
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, transparent 50%, rgba(8,10,20,.62))", opacity: 0, transition: "opacity .2s", display: "flex", alignItems: "flex-end", padding: 14 }} className="ps-gal-overlay">
+                <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)", backdropFilter: "blur(8px)", padding: "6px 10px", borderRadius: 999, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <Eye size={12} /> {captions[i] || `View ${i + 1}`}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <style>{`.ps-gallery-card:hover { transform: translateY(-2px); box-shadow: ${wt.shadowHover} !important; } .ps-gallery-card:hover .ps-gallery-img img { transform: scale(1.04); } .ps-gallery-card:hover .ps-gal-overlay { opacity: 1 !important; }`}</style>
       {canOpen && openIndex !== null ? (
         <Lightbox
@@ -1420,90 +1696,232 @@ function FloorPlanGallerySection({ s, device }: { s: SectionInstance; device: De
 
   const activePlan = popupIndex !== null ? plans[popupIndex] : null;
 
+  const design = String(st.design ?? "cards");
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
+
   return (
     <>
       <Inner section={s}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, justifyContent: "center" }}>
           <span style={{ width: 28, height: 2, background: wt.primary, borderRadius: 999 }} />
           <Eyebrow>{textOf(st.eyebrow)}</Eyebrow>
+          <span style={{ width: 28, height: 2, background: wt.primary, borderRadius: 999 }} />
         </div>
-        <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "0 0 8px", ...T }}>{textOf(st.heading)}</h2>
-        <p style={{ ...wtSectionLede(undefined, wt), fontSize: 14.5, maxWidth: 560, lineHeight: 1.65, ...T }}>{textOf(st.text)}</p>
+        <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "0 0 8px", textAlign: "center", ...T }}>{textOf(st.heading)}</h2>
+        <p style={{ ...wtSectionLede(undefined, wt), fontSize: 14.5, maxWidth: 560, lineHeight: 1.65, textAlign: "center", margin: "0 auto", ...T }}>{textOf(st.text)}</p>
       </Inner>
 
-      {/* Gallery grid */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 20, marginTop: 32, width: "100%" }}>
-        {plans.map((plan, i) => {
-          const isUnlocked = unlocked.has(i);
-          const img = textOf(plan.image ?? "");
-          return (
-            <div
-              key={i}
-              style={{ ...wtCard({ padding: 0 }, wt), overflow: "hidden", display: "flex", flexDirection: "column", textAlign: "left", cursor: isUnlocked ? "default" : "pointer", position: "relative" }}
-              onClick={() => openPopup(i)}
-              className="ps-fpg-card"
-            >
-              {/* Image area */}
-              <div style={{ position: "relative", height: 220, overflow: "hidden", background: wt.surfaceMuted }}>
-                {/* The image — blurred when locked */}
-                <div style={{ width: "100%", height: "100%", filter: isUnlocked ? "none" : "blur(14px)", transform: isUnlocked ? "none" : "scale(1.05)", transition: "filter .4s ease, transform .4s ease" }}>
-                  {isMediaSrc(img) ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={img} alt={plan.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  ) : (
-                    <SceneImage art="plan" beds={plan.beds} />
-                  )}
-                </div>
-                {/* Lock overlay — shown only when locked */}
-                {!isUnlocked && (
-                  <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(17,24,39,0.38)", backdropFilter: "blur(2px)", gap: 8 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" }}>
-                      <Lock size={20} color="#fff" />
-                    </div>
-                    <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.25)", backdropFilter: "blur(8px)", padding: "5px 12px", borderRadius: 999, letterSpacing: 0.3 }}>
-                      Click to unlock
-                    </span>
+      {/* Tabs Design Variant */}
+      {design === "tabs" && plans.length > 0 && (
+        <div style={{ maxWidth: 960, margin: "28px auto 0", width: "100%" }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
+            {plans.map((p, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setActiveTabIndex(idx)}
+                style={{
+                  ...wtPill(activeTabIndex === idx ? wt.primary : wt.surfaceMuted, activeTabIndex === idx ? "#fff" : wt.slate, { padding: "10px 20px", border: activeTabIndex === idx ? `1.5px solid ${wt.primary}` : wt.border, fontSize: 13, fontWeight: 700, cursor: "pointer", transition: wt.transition }, wt),
+                }}
+              >
+                {p.beds} BHK · {p.name}
+              </button>
+            ))}
+          </div>
+
+          {plans[activeTabIndex] && (() => {
+            const plan = plans[activeTabIndex];
+            const isUnlocked = unlocked.has(activeTabIndex);
+            const img = textOf(plan.image ?? "");
+            return (
+              <div style={{ ...wtCardPremium({ padding: 24 }, wt), display: "grid", gridTemplateColumns: device === "desktop" ? "1.2fr 1fr" : "1fr", gap: 24, alignItems: "center" }}>
+                <div
+                  style={{ position: "relative", height: 320, borderRadius: wt.radius, overflow: "hidden", background: wt.surfaceMuted, cursor: isUnlocked ? "default" : "pointer" }}
+                  onClick={() => openPopup(activeTabIndex)}
+                >
+                  <div style={{ width: "100%", height: "100%", filter: isUnlocked ? "none" : "blur(14px)", transform: isUnlocked ? "none" : "scale(1.05)", transition: "filter .4s ease, transform .4s ease" }}>
+                    {isMediaSrc(img) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={img} alt={plan.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    ) : (
+                      <SceneImage art="plan" beds={plan.beds} />
+                    )}
                   </div>
-                )}
-                {/* Unlocked badge */}
-                {isUnlocked && (
-                  <span style={{ position: "absolute", top: 10, right: 10, background: wt.primary, color: "#fff", fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 999, display: "flex", alignItems: "center", gap: 4 }}>
-                    <LockOpen size={11} /> Unlocked
-                  </span>
-                )}
-                <span style={{ position: "absolute", top: 10, left: 10, background: wt.ink, color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px", borderRadius: 999 }}>{plan.beds} BHK</span>
-              </div>
-              {/* Card body */}
-              <div style={{ padding: "16px 18px 18px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
-                <div style={{ fontSize: 17, fontWeight: 800, color: wt.ink }}>{plan.name}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {[{ label: "Area", value: plan.area }, { label: "Beds", value: `${plan.beds} BHK` }, { label: "Price", value: plan.price }].map((f) =>
-                    f.value ? (
-                      <div key={f.label} style={{ background: wt.surfaceMuted, borderRadius: 10, padding: "9px 11px" }}>
-                        <div style={{ fontSize: 10, color: wt.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: wt.ink, marginTop: 2 }}>{f.value}</div>
+                  {!isUnlocked && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(17,24,39,0.38)", backdropFilter: "blur(2px)", gap: 8 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,0.18)", border: "1.5px solid rgba(255,255,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" }}>
+                        <Lock size={22} color="#fff" />
                       </div>
-                    ) : null
+                      <span style={{ color: "#fff", fontSize: 13, fontWeight: 700, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.25)", backdropFilter: "blur(8px)", padding: "6px 14px", borderRadius: 999 }}>
+                        Click to unlock blueprint
+                      </span>
+                    </div>
                   )}
                 </div>
-                {!isUnlocked && (
-                  <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 6, color: wt.primary, fontSize: 13, fontWeight: 700, paddingTop: 4 }}>
-                    <Lock size={13} /> Submit details to view floor plan
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div>
+                    <span style={{ ...wtPill(wt.primarySoft, wt.primary, undefined, wt), fontSize: 11, fontWeight: 800 }}>{plan.beds} BHK Layout</span>
+                    <h3 style={{ fontSize: 24, fontWeight: 800, color: wt.ink, margin: "8px 0 0" }}>{plan.name}</h3>
                   </div>
-                )}
-                {isUnlocked && (
-                  <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 6, color: "#16a34a", fontSize: 13, fontWeight: 700, paddingTop: 4 }}>
-                    <LockOpen size={13} /> Floor plan unlocked
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div style={{ background: wt.surfaceMuted, borderRadius: 10, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10.5, color: wt.muted, fontWeight: 700, textTransform: "uppercase" }}>Carpet Area</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: wt.ink, marginTop: 2 }}>{plan.area}</div>
+                    </div>
+                    <div style={{ background: wt.surfaceMuted, borderRadius: 10, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 10.5, color: wt.muted, fontWeight: 700, textTransform: "uppercase" }}>Price</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: wt.primary, marginTop: 2 }}>{plan.price}</div>
+                    </div>
                   </div>
-                )}
+                  {!isUnlocked ? (
+                    <button
+                      type="button"
+                      onClick={() => openPopup(activeTabIndex)}
+                      style={{ ...wtButton({ accent: st.accent }, wt), padding: "13px 20px", justifyContent: "center", marginTop: 6 }}
+                    >
+                      <Lock size={15} /> Unlock Full Floor Plan & CAD
+                    </button>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#16a34a", fontSize: 14, fontWeight: 700, background: wt.successSoft, padding: "12px 16px", borderRadius: 10 }}>
+                      <LockOpen size={16} /> Plan unlocked — high resolution CAD loaded
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-        {plans.length === 0 && (
-          <div style={{ gridColumn: "1 / -1", padding: 40, textAlign: "center", border: `1.5px dashed ${wt.borderStrong}`, borderRadius: 16, color: wt.muted, fontSize: 13 }}>No plans yet — add items in Settings → Content</div>
-        )}
-      </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Split-Showcase Design Variant */}
+      {design === "split-showcase" && plans.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1fr" : "1fr", gap: 20, marginTop: 32, width: "100%" }}>
+          {plans.map((plan, i) => {
+            const isUnlocked = unlocked.has(i);
+            const img = textOf(plan.image ?? "");
+            return (
+              <div key={i} style={{ ...wtCardPremium({ padding: 20 }, wt), display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: wt.ink }}>{plan.name}</span>
+                  <span style={{ ...wtPill(wt.primarySoft, wt.primary, undefined, wt), fontSize: 11, fontWeight: 800 }}>{plan.beds} BHK</span>
+                </div>
+                <div
+                  style={{ position: "relative", height: 240, borderRadius: wt.radiusSm, overflow: "hidden", background: wt.surfaceMuted, cursor: isUnlocked ? "default" : "pointer" }}
+                  onClick={() => openPopup(i)}
+                >
+                  <div style={{ width: "100%", height: "100%", filter: isUnlocked ? "none" : "blur(14px)", transform: isUnlocked ? "none" : "scale(1.05)", transition: "filter .4s ease, transform .4s ease" }}>
+                    {isMediaSrc(img) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={img} alt={plan.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    ) : (
+                      <SceneImage art="plan" beds={plan.beds} />
+                    )}
+                  </div>
+                  {!isUnlocked && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(17,24,39,0.38)", backdropFilter: "blur(2px)", gap: 6 }}>
+                      <Lock size={20} color="#fff" />
+                      <span style={{ color: "#fff", fontSize: 11.5, fontWeight: 700 }}>Click to unlock</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4 }}>
+                  <div>
+                    <span style={{ fontSize: 11, color: wt.muted, fontWeight: 700 }}>AREA</span>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: wt.ink }}>{plan.area}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 11, color: wt.muted, fontWeight: 700 }}>PRICE</span>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: wt.primary }}>{plan.price}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openPopup(i)}
+                    style={{ ...wtButton({ accent: st.accent, outline: isUnlocked }, wt), padding: "8px 14px", fontSize: 12 }}
+                  >
+                    {isUnlocked ? "View Plan" : "Unlock"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Cards Design Variant (Default) */}
+      {(design === "cards" || (design !== "tabs" && design !== "split-showcase")) && (
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 20, marginTop: 32, width: "100%" }}>
+          {plans.map((plan, i) => {
+            const isUnlocked = unlocked.has(i);
+            const img = textOf(plan.image ?? "");
+            return (
+              <div
+                key={i}
+                style={{ ...wtCard({ padding: 0 }, wt), overflow: "hidden", display: "flex", flexDirection: "column", textAlign: "left", cursor: isUnlocked ? "default" : "pointer", position: "relative" }}
+                onClick={() => openPopup(i)}
+                className="ps-fpg-card"
+              >
+                {/* Image area */}
+                <div style={{ position: "relative", height: 220, overflow: "hidden", background: wt.surfaceMuted }}>
+                  {/* The image — blurred when locked */}
+                  <div style={{ width: "100%", height: "100%", filter: isUnlocked ? "none" : "blur(14px)", transform: isUnlocked ? "none" : "scale(1.05)", transition: "filter .4s ease, transform .4s ease" }}>
+                    {isMediaSrc(img) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={img} alt={plan.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    ) : (
+                      <SceneImage art="plan" beds={plan.beds} />
+                    )}
+                  </div>
+                  {/* Lock overlay — shown only when locked */}
+                  {!isUnlocked && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(17,24,39,0.38)", backdropFilter: "blur(2px)", gap: 8 }}>
+                      <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "1.5px solid rgba(255,255,255,0.35)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(8px)" }}>
+                        <Lock size={20} color="#fff" />
+                      </div>
+                      <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.25)", backdropFilter: "blur(8px)", padding: "5px 12px", borderRadius: 999, letterSpacing: 0.3 }}>
+                        Click to unlock
+                      </span>
+                    </div>
+                  )}
+                  {/* Unlocked badge */}
+                  {isUnlocked && (
+                    <span style={{ position: "absolute", top: 10, right: 10, background: wt.primary, color: "#fff", fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 999, display: "flex", alignItems: "center", gap: 4 }}>
+                      <LockOpen size={11} /> Unlocked
+                    </span>
+                  )}
+                  <span style={{ position: "absolute", top: 10, left: 10, background: wt.ink, color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px", borderRadius: 999 }}>{plan.beds} BHK</span>
+                </div>
+                {/* Card body */}
+                <div style={{ padding: "16px 18px 18px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: wt.ink }}>{plan.name}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    {[{ label: "Area", value: plan.area }, { label: "Beds", value: `${plan.beds} BHK` }, { label: "Price", value: plan.price }].map((f) =>
+                      f.value ? (
+                        <div key={f.label} style={{ background: wt.surfaceMuted, borderRadius: 10, padding: "9px 11px" }}>
+                          <div style={{ fontSize: 10, color: wt.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{f.label}</div>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: wt.ink, marginTop: 2 }}>{f.value}</div>
+                        </div>
+                      ) : null
+                    )}
+                  </div>
+                  {!isUnlocked && (
+                    <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 6, color: wt.primary, fontSize: 13, fontWeight: 700, paddingTop: 4 }}>
+                      <Lock size={13} /> Submit details to view floor plan
+                    </div>
+                  )}
+                  {isUnlocked && (
+                    <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 6, color: "#16a34a", fontSize: 13, fontWeight: 700, paddingTop: 4 }}>
+                      <LockOpen size={13} /> Floor plan unlocked
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {plans.length === 0 && (
+            <div style={{ gridColumn: "1 / -1", padding: 40, textAlign: "center", border: `1.5px dashed ${wt.borderStrong}`, borderRadius: 16, color: wt.muted, fontSize: 13 }}>No plans yet — add items in Settings → Content</div>
+          )}
+        </div>
+      )}
 
       <style>{`
         .ps-fpg-card { transition: ${wt.transition}; }
@@ -1681,12 +2099,95 @@ function LocationSection({ s, device }: { s: SectionInstance; device: Device }) 
   const st = s.settings;
   const live = useContext(SiteLiveContext);
   const wt = useContext(SiteLayoutThemeContext);
+  const design = String(st.design ?? "split");
   const items = (st.items ?? []) as { icon?: string; title: string; meta: string }[];
   const address = textOf(st.address ?? "").trim();
   const zoom = Math.min(20, Math.max(1, Number(st.zoom ?? 14) || 14));
   const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(address)}&z=${zoom}&output=embed`;
   const dirHref = address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}` : "";
   const T = typoCss(s, device);
+
+  if (design === "cards") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 28, width: "100%" }}>
+        <Inner section={s}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, justifyContent: "center" }}>
+            <span style={{ width: 28, height: 2, background: wt.primary, borderRadius: 999 }} />
+            <Eyebrow>{textOf(st.eyebrow)}</Eyebrow>
+            <span style={{ width: 28, height: 2, background: wt.primary, borderRadius: 999 }} />
+          </div>
+          <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "0 0 8px", textAlign: "center", ...T }}>{textOf(st.heading)}</h2>
+          <p style={{ ...wtSectionLede(undefined, wt), fontSize: 14.5, textAlign: "center", maxWidth: 560, margin: "0 auto", ...T }}>{textOf(st.text)}</p>
+        </Inner>
+
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "1fr 1fr" : "repeat(4,1fr)", gap: 14 }}>
+          {items.map((it, i) => (
+            <div key={i} className="ps-card" style={{ ...wtCard({ padding: "18px 16px" }, wt), textAlign: "center" }}>
+              <span style={{ ...wtIconBadge({ size: 44 }, wt), margin: "0 auto 12px" }}>
+                {iconFor(it.icon, 20)}
+              </span>
+              <div style={{ fontSize: 14, fontWeight: 800, color: wt.ink }}>{it.title}</div>
+              <div style={{ fontSize: 12, color: wt.primary, fontWeight: 700, marginTop: 4 }}>{it.meta}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ borderRadius: wt.radiusLg, overflow: "hidden", border: wt.border, boxShadow: wt.shadowMd, height: 380, width: "100%" }}>
+          {live && address ? (
+            <iframe
+              title={`Map — ${address}`}
+              src={mapSrc}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+            />
+          ) : (
+            <SceneImage art="map" />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (design === "list") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%" }}>
+        <Inner section={s}>
+          <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "0 0 8px", textAlign: "center", ...T }}>{textOf(st.heading)}</h2>
+          <p style={{ ...wtSectionLede(undefined, wt), fontSize: 14.5, textAlign: "center", maxWidth: 560, margin: "0 auto", ...T }}>{textOf(st.text)}</p>
+        </Inner>
+
+        <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1.2fr" : "1fr", gap: 24, alignItems: "center" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {items.map((it, i) => (
+              <div key={i} style={{ ...wtCard({ padding: "14px 18px" }, wt), display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ color: wt.primary }}>{iconFor(it.icon, 18)}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: wt.ink }}>{it.title}</span>
+                </div>
+                <span style={{ ...wtPill(wt.primarySoft, wt.primary, undefined, wt), fontSize: 11.5, fontWeight: 800 }}>{it.meta}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ borderRadius: wt.radiusLg, overflow: "hidden", border: wt.border, boxShadow: wt.shadowMd, height: 340 }}>
+            {live && address ? (
+              <iframe
+                title={`Map — ${address}`}
+                src={mapSrc}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+              />
+            ) : (
+              <SceneImage art="map" />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default: split
   return (
     <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1.05fr" : "1fr", gap: 32, alignItems: "stretch" }}>
       <div>
@@ -1742,10 +2243,13 @@ function PricingSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
   const live = useContext(SiteLiveContext);
   const wt = useContext(SiteLayoutThemeContext);
+  const design = String(st.design ?? "cards");
   const planLink = textOf(st.planLink ?? "#lead-form");
   const planPopupId = textOf(st.planPopupId ?? "").trim();
   const plans = (st.plans ?? []) as { name: string; area: string; price: string; per: string; features: string[]; cta: string; featured?: boolean }[];
   const T = typoCss(s, device);
+  const [activeToggleIndex, setActiveToggleIndex] = useState(0);
+
   const planClick = (e: ReactMouseEvent) => {
     if (!live) {
       e.preventDefault();
@@ -1758,59 +2262,176 @@ function PricingSection({ s, device }: { s: SectionInstance; device: Device }) {
     }
     anchorNav(planLink, live).onClick(e);
   };
+
   return (
     <>
       <Inner section={s}>
-        <Eyebrow>{textOf(st.eyebrow)}</Eyebrow>
-        <h2 style={{ fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "14px 0 8px", ...T }}>{textOf(st.heading)}</h2>
-        <p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 560, lineHeight: 1.65, ...T }}>{textOf(st.text)}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, justifyContent: "center" }}>
+          <span style={{ width: 28, height: 2, background: wt.primary, borderRadius: 999 }} />
+          <Eyebrow>{textOf(st.eyebrow)}</Eyebrow>
+          <span style={{ width: 28, height: 2, background: wt.primary, borderRadius: 999 }} />
+        </div>
+        <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 34, fontWeight: 800, letterSpacing: -0.5, margin: "0 0 8px", textAlign: "center", ...T }}>{textOf(st.heading)}</h2>
+        <p style={{ fontSize: 14, color: "var(--ps-slate)", maxWidth: 560, lineHeight: 1.65, textAlign: "center", margin: "0 auto", ...T }}>{textOf(st.text)}</p>
       </Inner>
-      <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "repeat(3,1fr)" : device === "tablet" ? "1fr 1fr" : "1fr", gap: 18, margin: "32px 0 0", width: "100%", alignItems: "stretch" }}>
-        {plans.map((p) => (
-          <div
-            key={p.name}
-            className="ps-pricing-card"
-            style={{
-              ...(p.featured
-                ? { ...wtCardPremium({ padding: 26 }, wt), background: "linear-gradient(160deg, #4f46e5 0%, #6366f1 55%, #818cf8 100%)", border: "1px solid rgba(255,255,255,.22)", boxShadow: "0 12px 32px rgba(79,70,229,.28)" }
-                : { ...wtCardPremium({ padding: 26 }, wt), border: wt.border }),
-              position: "relative",
-              transition: wt.transition,
-            }}
-          >
-            {p.featured ? (
-              <span style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: "var(--ps-grad-primary)", color: "#fff", fontSize: 10.5, fontWeight: 800, letterSpacing: 0.6, padding: "5px 14px", borderRadius: 999, textTransform: "uppercase" }}>
-                Most Popular
-              </span>
-            ) : null}
-            <div style={{ fontSize: 13, fontWeight: 700, color: p.featured ? "#fff" : wt.primary, textTransform: "uppercase", letterSpacing: 0.8, ...T }}>{p.name}</div>
-            <div style={{ fontSize: 12.5, color: p.featured ? "rgba(255,255,255,.72)" : wt.muted, margin: "4px 0 14px", ...T }}>{p.area}</div>
-            <div style={{ ...wtStatValue(undefined, wt), fontSize: 30, color: p.featured ? "#fff" : wt.ink, letterSpacing: -0.5, ...T }}>
-              {p.price}
-              <span style={{ fontSize: 12, fontWeight: 600, color: p.featured ? "rgba(255,255,255,.72)" : wt.muted }}> {p.per}</span>
-            </div>
-            <div style={{ height: 1, background: p.featured ? "rgba(255,255,255,.2)" : "var(--ps-line)", margin: "18px 0" }} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 150 }}>
-              {(p.features ?? []).map((f) => (
-                <div key={f} style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                  <CheckCircle2 size={15} style={{ color: p.featured ? "rgba(255,255,255,.9)" : wt.muted, flexShrink: 0 }} />
-                  <span style={{ fontSize: 12.5, color: p.featured ? "rgba(255,255,255,.85)" : wt.slate }}>{f}</span>
-                </div>
+
+      {/* Table Design Variant */}
+      {design === "table" && (
+        <div style={{ maxWidth: 960, margin: "32px auto 0", width: "100%", overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 10px", textAlign: "left" }}>
+            <thead>
+              <tr style={{ color: wt.muted, fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8 }}>
+                <th style={{ padding: "12px 18px" }}>Unit Type</th>
+                <th style={{ padding: "12px 18px" }}>Carpet Area</th>
+                <th style={{ padding: "12px 18px" }}>Starting Price</th>
+                <th style={{ padding: "12px 18px" }}>Key Features</th>
+                <th style={{ padding: "12px 18px", textAlign: "right" }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {plans.map((p, i) => (
+                <tr
+                  key={i}
+                  style={{
+                    background: p.featured ? "linear-gradient(135deg, rgba(79,70,229,0.06), rgba(99,102,241,0.02))" : wt.surface,
+                    boxShadow: wt.shadowSm,
+                    border: p.featured ? `1.5px solid ${wt.primary}` : wt.border,
+                    borderRadius: wt.radius,
+                  }}
+                >
+                  <td style={{ padding: "18px", fontWeight: 800, color: wt.ink, fontSize: 15, borderTopLeftRadius: wt.radius, borderBottomLeftRadius: wt.radius }}>
+                    {p.name}
+                    {p.featured && (
+                      <span style={{ marginLeft: 8, background: wt.primary, color: "#fff", fontSize: 10, fontWeight: 800, padding: "2px 8px", borderRadius: 999 }}>
+                        POPULAR
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: "18px", color: wt.slate, fontSize: 13.5, fontWeight: 600 }}>{p.area}</td>
+                  <td style={{ padding: "18px", color: wt.primary, fontSize: 18, fontWeight: 800 }}>
+                    {p.price} <span style={{ fontSize: 11, fontWeight: 600, color: wt.muted }}>{p.per}</span>
+                  </td>
+                  <td style={{ padding: "18px", color: wt.slate, fontSize: 12.5 }}>
+                    {(p.features ?? []).slice(0, 2).join(" · ")}
+                  </td>
+                  <td style={{ padding: "18px", textAlign: "right", borderTopRightRadius: wt.radius, borderBottomRightRadius: wt.radius }}>
+                    <a
+                      href={resolveCtaHref("link", planLink)}
+                      onClick={planClick}
+                      style={{
+                        ...(p.featured ? wtButton({ accent: st.accent }, wt) : wtButtonLight(undefined, wt)),
+                        padding: "9px 18px",
+                        fontSize: 12.5,
+                        display: "inline-flex",
+                      }}
+                    >
+                      {p.cta || "Enquire"}
+                    </a>
+                  </td>
+                </tr>
               ))}
-            </div>
-            <a
-              href={resolveCtaHref("link", planLink)}
-              onClick={planClick}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Toggle Design Variant */}
+      {design === "toggle" && plans.length > 0 && (
+        <div style={{ maxWidth: 640, margin: "28px auto 0", width: "100%" }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }}>
+            {plans.map((p, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setActiveToggleIndex(idx)}
+                style={{
+                  ...wtPill(activeToggleIndex === idx ? wt.primary : wt.surfaceMuted, activeToggleIndex === idx ? "#fff" : wt.slate, { padding: "10px 20px", border: activeToggleIndex === idx ? `1.5px solid ${wt.primary}` : wt.border, fontSize: 13, fontWeight: 700, cursor: "pointer" }, wt),
+                }}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+          {plans[activeToggleIndex] && (() => {
+            const p = plans[activeToggleIndex];
+            return (
+              <div style={{ ...wtCardPremium({ padding: 32 }, wt), textAlign: "center" }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: wt.primary, textTransform: "uppercase", letterSpacing: 1 }}>{p.name}</div>
+                <div style={{ fontSize: 13, color: wt.muted, margin: "4px 0 16px" }}>{p.area}</div>
+                <div style={{ ...wtStatValue(undefined, wt), fontSize: 36, color: wt.ink }}>
+                  {p.price} <span style={{ fontSize: 14, fontWeight: 600, color: wt.muted }}>{p.per}</span>
+                </div>
+                <div style={{ height: 1, background: wt.borderFaint, margin: "24px 0" }} />
+                <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, textAlign: "left", marginBottom: 24 }}>
+                  {(p.features ?? []).map((f) => (
+                    <div key={f} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                      <CheckCircle2 size={16} style={{ color: wt.primary, flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, color: wt.slate }}>{f}</span>
+                    </div>
+                  ))}
+                </div>
+                <a
+                  href={resolveCtaHref("link", planLink)}
+                  onClick={planClick}
+                  style={{ ...wtButton({ accent: st.accent, block: true }, wt), padding: "14px 24px", fontSize: 15 }}
+                >
+                  {p.cta || "Request Price Sheet"}
+                </a>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Cards Design Variant (Default) */}
+      {(design === "cards" || (design !== "table" && design !== "toggle")) && (
+        <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "repeat(3,1fr)" : device === "tablet" ? "1fr 1fr" : "1fr", gap: 18, margin: "32px 0 0", width: "100%", alignItems: "stretch" }}>
+          {plans.map((p) => (
+            <div
+              key={p.name}
+              className="ps-pricing-card"
               style={{
-                marginTop: 18,
-                ...(p.featured ? wtButtonLight({ block: true }, wt) : wtButton({ accent: st.accent, block: true }, wt)),
+                ...(p.featured
+                  ? { ...wtCardPremium({ padding: 26 }, wt), background: "linear-gradient(160deg, #4f46e5 0%, #6366f1 55%, #818cf8 100%)", border: "1px solid rgba(255,255,255,.22)", boxShadow: "0 12px 32px rgba(79,70,229,.28)" }
+                  : { ...wtCardPremium({ padding: 26 }, wt), border: wt.border }),
+                position: "relative",
+                transition: wt.transition,
               }}
             >
-              {p.cta}
-            </a>
-          </div>
-        ))}
-      </div>
+              {p.featured ? (
+                <span style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: "var(--ps-grad-primary)", color: "#fff", fontSize: 10.5, fontWeight: 800, letterSpacing: 0.6, padding: "5px 14px", borderRadius: 999, textTransform: "uppercase" }}>
+                  Most Popular
+                </span>
+              ) : null}
+              <div style={{ fontSize: 13, fontWeight: 700, color: p.featured ? "#fff" : wt.primary, textTransform: "uppercase", letterSpacing: 0.8, ...T }}>{p.name}</div>
+              <div style={{ fontSize: 12.5, color: p.featured ? "rgba(255,255,255,.72)" : wt.muted, margin: "4px 0 14px", ...T }}>{p.area}</div>
+              <div style={{ ...wtStatValue(undefined, wt), fontSize: 30, color: p.featured ? "#fff" : wt.ink, letterSpacing: -0.5, ...T }}>
+                {p.price}
+                <span style={{ fontSize: 12, fontWeight: 600, color: p.featured ? "rgba(255,255,255,.72)" : wt.muted }}> {p.per}</span>
+              </div>
+              <div style={{ height: 1, background: p.featured ? "rgba(255,255,255,.2)" : "var(--ps-line)", margin: "18px 0" }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 150 }}>
+                {(p.features ?? []).map((f) => (
+                  <div key={f} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    <CheckCircle2 size={15} style={{ color: p.featured ? "rgba(255,255,255,.9)" : wt.muted, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12.5, color: p.featured ? "rgba(255,255,255,.85)" : wt.slate }}>{f}</span>
+                  </div>
+                ))}
+              </div>
+              <a
+                href={resolveCtaHref("link", planLink)}
+                onClick={planClick}
+                style={{
+                  marginTop: 18,
+                  ...(p.featured ? wtButtonLight({ block: true }, wt) : wtButton({ accent: st.accent, block: true }, wt)),
+                }}
+              >
+                {p.cta}
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -1818,8 +2439,86 @@ function PricingSection({ s, device }: { s: SectionInstance; device: Device }) {
 function TestimonialsSection({ s, device }: { s: SectionInstance; device: Device }) {
   const wt = useContext(SiteLayoutThemeContext);
   const st = s.settings;
+  const design = String(st.design ?? "cards");
   const items = (st.items ?? []) as { name: string; role: string; quote: string; rating: number }[];
   const T = typoCss(s, device);
+  const [sliderIndex, setSliderIndex] = useState(0);
+
+  if (design === "slider" && items.length > 0) {
+    const cur = items[sliderIndex % items.length];
+    return (
+      <div style={{ maxWidth: 860, margin: "0 auto", width: "100%" }}>
+        <Inner section={s}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, justifyContent: "center" }}>
+            <span style={{ width: 28, height: 2, background: wt.gold, borderRadius: 999 }} />
+            <Eyebrow gold>Buyer Experiences</Eyebrow>
+            <span style={{ width: 28, height: 2, background: wt.gold, borderRadius: 999 }} />
+          </div>
+          <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "0 0 8px", textAlign: "center", ...T }}>{textOf(st.heading)}</h2>
+        </Inner>
+        <div style={{ ...wtCardPremium({ padding: device === "mobile" ? "28px 20px" : "44px 40px" }, wt), textAlign: "center", position: "relative", marginTop: 28 }}>
+          <Quote size={40} style={{ color: wt.gold, opacity: 0.3, margin: "0 auto 16px" }} />
+          <div style={{ display: "flex", gap: 4, justifyContent: "center", marginBottom: 18 }}>
+            {Array.from({ length: 5 }).map((_, j) => (
+              <Star key={j} size={16} fill={j < cur.rating ? wt.gold : "none"} color={wt.gold} />
+            ))}
+          </div>
+          <p style={{ fontSize: device === "mobile" ? 16 : 20, lineHeight: 1.7, color: wt.ink, fontStyle: "italic", maxWidth: 680, margin: "0 auto 24px", ...T }}>“{cur.quote}”</p>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
+            <span style={{ width: 44, height: 44, borderRadius: "50%", background: `linear-gradient(135deg, ${wt.primary} 0%, #818cf8 100%)`, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800 }}>
+              {cur.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
+            </span>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: wt.ink }}>{cur.name}</div>
+              <div style={{ fontSize: 12, color: wt.muted, fontWeight: 600 }}>{cur.role}</div>
+            </div>
+          </div>
+          {items.length > 1 && (
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 24 }}>
+              {items.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setSliderIndex(i)}
+                  style={{ width: i === (sliderIndex % items.length) ? 24 : 8, height: 8, borderRadius: 999, border: "none", background: i === (sliderIndex % items.length) ? wt.primary : wt.borderStrong, cursor: "pointer", transition: "width .2s" }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (design === "compact") {
+    return (
+      <>
+        <Inner section={s}>
+          <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "0 0 8px", textAlign: "center", ...T }}>{textOf(st.heading)}</h2>
+        </Inner>
+        <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1fr" : "1fr", gap: 14, marginTop: 28, width: "100%" }}>
+          {items.map((t, i) => (
+            <div key={i} style={{ ...wtCard({ padding: "16px 18px" }, wt), display: "flex", alignItems: "center", gap: 14 }}>
+              <span style={{ width: 40, height: 40, borderRadius: "50%", background: wt.primarySoft, color: wt.primary, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, flexShrink: 0 }}>
+                {t.name.slice(0, 1)}
+              </span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ fontSize: 13, color: wt.inkSoft, margin: "0 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>“{t.quote}”</p>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: wt.muted }}>{t.name} · {t.role}</div>
+              </div>
+              <div style={{ display: "flex", gap: 2 }}>
+                {Array.from({ length: 5 }).map((_, j) => (
+                  <Star key={j} size={11} fill={j < t.rating ? wt.gold : "none"} color={wt.gold} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  // Default: cards
   return (
     <>
       <Inner section={s}>
@@ -1861,9 +2560,86 @@ function TestimonialsSection({ s, device }: { s: SectionInstance; device: Device
 function FaqSection({ s, device }: { s: SectionInstance; device: Device }) {
   const wt = useContext(SiteLayoutThemeContext);
   const st = s.settings;
+  const design = String(st.design ?? "accordion");
   const items = (st.items ?? []) as { q?: string; a?: string; title?: string; body?: string }[];
   const [open, setOpen] = useState<number | null>(0);
   const T = typoCss(s, device);
+
+  if (design === "grid") {
+    return (
+      <>
+        <Inner section={s}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, justifyContent: "center" }}>
+            <span style={{ width: 28, height: 2, background: wt.primary, borderRadius: 999 }} />
+            <Eyebrow>{textOf(st.eyebrow)}</Eyebrow>
+            <span style={{ width: 28, height: 2, background: wt.primary, borderRadius: 999 }} />
+          </div>
+          <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "0 0 8px", textAlign: "center", ...T }}>{textOf(st.heading)}</h2>
+        </Inner>
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 16, marginTop: 32, width: "100%" }}>
+          {items.map((it, i) => (
+            <div key={i} style={{ ...wtCard({ padding: "22px 20px" }, wt) }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: wt.ink, marginBottom: 10, ...T }}>
+                {it.q ?? (it as { title?: string }).title}
+              </div>
+              <p style={{ fontSize: 13.5, color: wt.slate, lineHeight: 1.65, margin: 0, ...T }}>
+                {it.a ?? (it as { body?: string }).body}
+              </p>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  if (design === "split-search") {
+    return (
+      <>
+        <Inner section={s}>
+          <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 26 : 34, letterSpacing: -0.5, margin: "0 0 8px", textAlign: "center", ...T }}>{textOf(st.heading)}</h2>
+        </Inner>
+        <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1.2fr" : "1fr", gap: 20, marginTop: 32, width: "100%" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {items.map((it, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setOpen(i)}
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: wt.radiusSm,
+                  border: open === i ? `1.5px solid ${wt.primary}` : wt.border,
+                  background: open === i ? wt.primarySoft : wt.surface,
+                  color: open === i ? wt.primary : wt.ink,
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  textAlign: "left",
+                  cursor: "pointer",
+                  transition: wt.transition,
+                }}
+              >
+                {it.q ?? (it as { title?: string }).title}
+              </button>
+            ))}
+          </div>
+          <div style={{ ...wtCardPremium({ padding: 26 }, wt) }}>
+            {items[open ?? 0] ? (
+              <>
+                <div style={{ fontSize: 17, fontWeight: 800, color: wt.ink, marginBottom: 12 }}>
+                  {items[open ?? 0].q ?? (items[open ?? 0] as { title?: string }).title}
+                </div>
+                <p style={{ fontSize: 14, color: wt.slate, lineHeight: 1.75, margin: 0 }}>
+                  {items[open ?? 0].a ?? (items[open ?? 0] as { body?: string }).body}
+                </p>
+              </>
+            ) : null}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Default: accordion
   return (
     <>
       <Inner section={s}>
@@ -2251,22 +3027,31 @@ function CtaBanner({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
   const live = useContext(SiteLiveContext);
   const wt = useContext(SiteLayoutThemeContext);
+  const design = String(st.design ?? (st.layout === "strip" ? "strip" : "banner"));
   const T = typoCss(s, device);
-  // Hooks run unconditionally, before any conditional return below.
   const handle = useCtaHandlers(live);
-  // Merged widget: layout "strip" renders a slim one-line offer bar (the old
-  // Offer Banner); the default "banner" renders the full conversion wall.
-  if (st.layout === "strip") {
-    const link = textOf(st.link ?? "#lead-form");
-    const popupId = textOf(st.popupId ?? "").trim();
+
+  const primaryAction = textOf(st.primaryAction ?? "link") as CtaAction;
+  const secondaryAction = textOf(st.secondaryAction ?? "call") as CtaAction | "call";
+  const primaryLink = textOf(st.primaryLink ?? st.link ?? "#lead-form");
+  const secondaryLink = textOf(st.ctaSecondaryLink ?? "");
+  const phone = textOf(st.phone ?? "");
+  const popupId = textOf(st.popupId ?? "").trim();
+  const ctaPrimaryText = textOf(resolveVars(st.ctaPrimary ?? st.cta ?? "Book Site Visit"));
+  const ctaSecondaryText = textOf(resolveVars(st.ctaSecondary ?? "Call Expert"));
+
+  if (design === "strip") {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", maxWidth: 1100, margin: "0 auto", width: "100%" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", maxWidth: 1100, margin: "0 auto", width: "100%", padding: "16px 20px" }}>
         <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.15)", padding: "3px 10px", borderRadius: 999, fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8, color: wt.gold, marginBottom: 6 }}>
+            Exclusive Opportunity
+          </div>
           <div style={{ fontSize: device === "mobile" ? 18 : 22, fontWeight: 800, letterSpacing: -0.3, ...T }}>{textOf(st.heading)}</div>
-          <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 4, lineHeight: 1.55, ...T }}>{textOf(resolveVars(st.text))}</div>
+          <div style={{ fontSize: 13.5, opacity: 0.9, marginTop: 4, lineHeight: 1.55, ...T }}>{textOf(resolveVars(st.text || st.sub))}</div>
         </div>
         <a
-          {...anchorNav(link, live)}
+          {...anchorNav(primaryLink, live)}
           onClick={(e) => {
             if (!live) {
               e.preventDefault();
@@ -2277,27 +3062,67 @@ function CtaBanner({ s, device }: { s: SectionInstance; device: Device }) {
               openPopupById(popupId);
               return;
             }
-            anchorNav(link, live).onClick(e);
+            anchorNav(primaryLink, live).onClick(e);
           }}
           style={{ ...wtButtonLight(undefined, wt), whiteSpace: "nowrap" }}
         >
-          {textOf(st.cta ?? st.ctaPrimary ?? "Learn more")} <ArrowRight size={14} />
+          {ctaPrimaryText} <ArrowRight size={14} />
         </a>
       </div>
     );
   }
-  const primaryAction = textOf(st.primaryAction ?? "link") as CtaAction;
-  const secondaryAction = textOf(st.secondaryAction ?? "call") as CtaAction | "call";
-  const primaryLink = textOf(st.primaryLink ?? "#lead-form");
-  const secondaryLink = textOf(st.ctaSecondaryLink ?? "");
-  const phone = textOf(st.phone ?? "");
+
+  if (design === "card") {
+    return (
+      <div style={{ maxWidth: 880, margin: "0 auto", width: "100%", ...wtCardPremium({ padding: device === "mobile" ? "28px 20px" : "44px 40px", borderTop: `4px solid ${wt.gold}` }, wt), textAlign: "center", position: "relative" }}>
+        <span style={{ ...wtIconBadge({ size: 52 }, wt), margin: "0 auto 16px" }}>
+          <Sparkles size={24} style={{ color: wt.gold }} />
+        </span>
+        <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 24 : 32, letterSpacing: -0.5, margin: "0 0 10px", ...T }}>
+          {textOf(resolveVars(st.heading))}
+        </h2>
+        <p style={{ ...wtSectionLede(undefined, wt), maxWidth: 580, margin: "0 auto 26px", lineHeight: 1.65, ...T }}>
+          {textOf(resolveVars(st.sub || st.text))}
+        </p>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          <a
+            {...anchorNav(primaryLink, live)}
+            {...handle(primaryAction, primaryLink)}
+            href={resolveCtaHref(primaryAction === "call" ? "call" : "link", primaryLink, phone)}
+            style={{ ...wtButton({ gold: true }, wt), padding: "14px 28px" }}
+          >
+            {ctaPrimaryText} <ArrowRight size={15} />
+          </a>
+          {secondaryAction === "call" && phone ? (
+            <a
+              href={`tel:${phone.replace(/[^+0-9]/g, "")}`}
+              onClick={(e) => { if (!live) e.preventDefault(); }}
+              style={{ ...wtButtonLight(undefined, wt), padding: "14px 24px" }}
+            >
+              <PhoneCall size={15} /> {ctaSecondaryText}
+            </a>
+          ) : secondaryLink ? (
+            <a
+              href={resolveCtaHref("link", secondaryLink)}
+              {...handle(secondaryAction, secondaryLink)}
+              style={{ ...wtButtonLight(undefined, wt), padding: "14px 24px" }}
+            >
+              {ctaSecondaryText}
+            </a>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  // Default: banner (Full-bleed cinematic banner)
   return (
     <div style={{ position: "relative", textAlign: "center", padding: device === "mobile" ? "48px 22px" : "72px 24px" }}>
       <Overlay section={s} />
       <Inner section={s}>
-        <Eyebrow gold> {textOf(resolveVars(st.eyebrow))}</Eyebrow>
+        <Eyebrow gold>{textOf(resolveVars(st.eyebrow))}</Eyebrow>
         <h2 style={{ fontSize: device === "mobile" ? 26 : 38, fontWeight: 800, letterSpacing: -0.6, margin: "16px 0 12px", color: "#fff", maxWidth: 760, lineHeight: 1.2, ...T }}>{textOf(resolveVars(st.heading))}</h2>
-        <p style={{ fontSize: 15, color: "rgba(255,255,255,.78)", maxWidth: 620, lineHeight: 1.7, ...T }}>{textOf(resolveVars(st.sub))}</p>
+        <p style={{ fontSize: 15, color: "rgba(255,255,255,.78)", maxWidth: 620, lineHeight: 1.7, ...T }}>{textOf(resolveVars(st.sub || st.text))}</p>
         <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 28, flexWrap: "wrap" }}>
           <a
             {...anchorNav(primaryLink, live)}
@@ -2305,9 +3130,9 @@ function CtaBanner({ s, device }: { s: SectionInstance; device: Device }) {
             href={resolveCtaHref(primaryAction === "call" ? "call" : "link", primaryLink, phone)}
             style={{ ...wtButton({ gold: true }, wt) }}
           >
-            {textOf(resolveVars(st.ctaPrimary))} <ArrowRight size={15} />
+            {ctaPrimaryText} <ArrowRight size={15} />
           </a>
-          {secondaryAction === "call" ? (
+          {secondaryAction === "call" && phone ? (
             <a
               href={`tel:${phone.replace(/[^+0-9]/g, "")}`}
               onClick={(e) => {
@@ -2315,17 +3140,17 @@ function CtaBanner({ s, device }: { s: SectionInstance; device: Device }) {
               }}
               style={{ ...wtButtonLight(undefined, wt) }}
             >
-              <PhoneCall size={15} /> {textOf(st.ctaSecondary)}
+              <PhoneCall size={15} /> {ctaSecondaryText}
             </a>
-          ) : (
+          ) : secondaryLink ? (
             <a
               href={resolveCtaHref("link", secondaryLink)}
               {...handle(secondaryAction, secondaryLink)}
               style={{ ...wtButtonLight(undefined, wt) }}
             >
-              {textOf(st.ctaSecondary)}
+              {ctaSecondaryText}
             </a>
-          )}
+          ) : null}
         </div>
       </Inner>
     </div>
@@ -2477,45 +3302,144 @@ function StickyCta({ s, device }: { s: SectionInstance; device: Device }) {
   const live = useContext(SiteLiveContext);
   const pageId = useContext(SitePageIdContext);
   const wt = useContext(SiteLayoutThemeContext);
-  const text = textOf(resolveVars(st.text));
+  const design = String(st.design ?? "floating");
+  const text = textOf(resolveVars(st.text || st.heading || PROPERTY.name));
   const link = textOf(st.link ?? "#lead-form");
-  const waNumber = digitsOnly(textOf(st.whatsapp || st.phone || ""));
+  const phone = textOf(st.phone ?? "");
+  const ctaLabel = textOf(st.ctaLabel ?? st.cta ?? "Enquire Now");
+  const waNumber = digitsOnly(textOf(st.whatsapp || phone || ""));
   const T = typoCss(s, device);
+
+  if (design === "docked") {
+    return (
+      <div style={{ position: "relative", height: 0 }}>
+        <div
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: wt.surface,
+            borderTop: `1.5px solid ${wt.borderStrong}`,
+            padding: device === "mobile" ? "10px 14px" : "12px 28px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 14,
+            boxShadow: "0 -8px 30px rgba(0,0,0,.08)",
+            zIndex: 9999,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: wt.success, boxShadow: `0 0 0 3px ${wt.successSoft}`, flexShrink: 0 }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: wt.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...T }}>{text}</div>
+              <div style={{ fontSize: 11, color: wt.muted }}>{PROPERTY.location} · Available Units</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            {phone ? (
+              <a
+                href={`tel:${phone.replace(/[^+0-9]/g, "")}`}
+                onClick={(e) => { if (!live) e.preventDefault(); else if (pageId) bumpTracking(pageId, "call"); }}
+                style={{ ...wtButtonLight(undefined, wt), padding: "9px 16px", fontSize: 12.5 }}
+              >
+                <Phone size={13} /> {device === "mobile" ? "Call" : phone}
+              </a>
+            ) : null}
+            <a
+              {...anchorNav(link, live)}
+              style={{ ...wtButton({ accent: st.accent }, wt), padding: "9px 20px", fontSize: 12.5 }}
+            >
+              {ctaLabel}
+            </a>
+            {waNumber && device !== "mobile" ? (
+              <a
+                href={`https://wa.me/${waNumber}`}
+                target={live ? "_blank" : undefined}
+                rel="noreferrer"
+                onClick={(e) => { if (!live) { e.preventDefault(); return; } if (pageId) bumpTracking(pageId, "whatsapp"); }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#25d366", background: "rgba(37,211,102,.12)", padding: "9px 14px", borderRadius: wt.radiusSm, textDecoration: "none" }}
+              >
+                <MessageCircle size={14} /> WhatsApp
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (design === "corner-badge") {
+    return (
+      <div style={{ position: "relative", height: 0 }}>
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            ...wtCardGlass({ padding: "12px 16px", borderRadius: 18, background: wt.surface }, wt),
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            boxShadow: wt.shadowLg,
+            zIndex: 9999,
+          }}
+        >
+          <span style={{ width: 38, height: 38, borderRadius: "50%", background: wt.primary, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14 }}>
+            <Building2 size={18} />
+          </span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: wt.ink }}>{text}</div>
+            <div style={{ fontSize: 10.5, color: wt.muted }}>Connect with Sales Advisor</div>
+          </div>
+          <a
+            {...anchorNav(link, live)}
+            style={{ ...wtButton({ accent: st.accent }, wt), padding: "8px 14px", fontSize: 12, borderRadius: 999 }}
+          >
+            {ctaLabel}
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Default: floating (centered pill)
   return (
     <div style={{ position: "relative", height: 0 }}>
       <div
         style={{
-          position: "absolute",
+          position: "fixed",
           bottom: 18,
           left: "50%",
           transform: "translateX(-50%)",
-          width: "min(720px, calc(100% - 24px))",
-          ...wtCard({ padding: device === "mobile" ? "12px 12px" : "12px 18px" }, wt),
+          width: "min(740px, calc(100% - 24px))",
+          ...wtCardGlass({ padding: device === "mobile" ? "11px 14px" : "12px 20px", borderRadius: 999, background: wt.surface }, wt),
           display: "flex",
           alignItems: "center",
-          gap: 10,
+          gap: 12,
           flexWrap: device === "mobile" ? "wrap" : "nowrap",
           boxShadow: "0 18px 50px rgba(17,24,39,.22)",
-          zIndex: 40,
+          zIndex: 9999,
         }}
       >
         <div style={{ flex: "1 1 160px", minWidth: 0 }}>
           <div style={{ fontSize: 13.5, fontWeight: 800, color: wt.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...T }}>{text}</div>
           <div style={{ fontSize: 11, color: wt.muted, marginTop: 1 }}>{PROPERTY.location}</div>
         </div>
-        {device !== "mobile" && textOf(st.phone ?? "").trim() ? (
-            <a href={`tel:${textOf(st.phone ?? "").replace(/[^+0-9]/g, "")}`} onClick={(e) => { if (!live) e.preventDefault(); else if (pageId) bumpTracking(pageId, "call"); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: wt.slate, textDecoration: "none" }}>
-            <Phone size={13} /> {textOf(st.phone)}
+        {device !== "mobile" && phone.trim() ? (
+          <a href={`tel:${phone.replace(/[^+0-9]/g, "")}`} onClick={(e) => { if (!live) e.preventDefault(); else if (pageId) bumpTracking(pageId, "call"); }} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: wt.slate, textDecoration: "none" }}>
+            <Phone size={13} /> {phone}
           </a>
         ) : null}
-        <a {...anchorNav(link, live)} style={{ ...wtButton({ accent: st.accent }, wt), flex: device === "mobile" ? "1 1 auto" : undefined, textAlign: "center" }}>{textOf(st.ctaLabel)}</a>
+        <a {...anchorNav(link, live)} style={{ ...wtButton({ accent: st.accent }, wt), padding: "9px 18px", borderRadius: 999, flex: device === "mobile" ? "1 1 auto" : undefined, textAlign: "center" }}>{ctaLabel}</a>
         {waNumber ? (
           <a
             href={`https://wa.me/${waNumber}`}
             target={live ? "_blank" : undefined}
             rel="noreferrer"
             onClick={(e) => { if (!live) { e.preventDefault(); return; } if (pageId) bumpTracking(pageId, "whatsapp"); }}
-            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#25d366", background: "rgba(37,211,102,.1)", padding: "8px 12px", borderRadius: 9, cursor: "pointer", textDecoration: "none", flex: device === "mobile" ? "1 1 auto" : undefined }}
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#25d366", background: "rgba(37,211,102,.12)", padding: "8px 14px", borderRadius: 999, cursor: "pointer", textDecoration: "none", flex: device === "mobile" ? "1 1 auto" : undefined }}
           >
             <MessageCircle size={14} /> WhatsApp
           </a>
@@ -2921,14 +3845,60 @@ function ContactSection({ s, device }: { s: SectionInstance; device: Device }) {
 // Real-estate widget renderers
 function PropertyDetailsSection({ s, device }: { s: SectionInstance; device: Device }) {
   const wt = useContext(SiteLayoutThemeContext);
+  const st = s.settings;
+  const design = String(st.design ?? "grid");
   const items = (s.settings.items ?? []) as { label?: string; value?: string }[];
   const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 3;
+  const T = typoCss(s, device);
+
+  if (design === "table") {
+    return (
+      <div style={{ maxWidth: 860, margin: "0 auto", width: "100%", ...wtCard({ padding: 0, overflow: "hidden", borderRadius: wt.radius }, wt) }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+          <tbody>
+            {items.map((it, i) => (
+              <tr key={i} style={{ background: i % 2 === 0 ? wt.surface : wt.surfaceMuted, borderBottom: i < items.length - 1 ? wt.border : "none" }}>
+                <td style={{ padding: "14px 20px", fontSize: 12.5, fontWeight: 700, textTransform: "uppercase", color: wt.muted, width: "40%" }}>{it.label}</td>
+                <td style={{ padding: "14px 20px", fontSize: 14.5, fontWeight: 800, color: wt.ink, ...T }}>{String(resolveVars(it.value ?? ""))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (design === "split-highlight") {
+    const first = items[0];
+    const rest = items.slice(1);
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1.6fr" : "1fr", gap: 16, alignItems: "stretch", width: "100%" }}>
+        {first && (
+          <div style={{ ...wtCardPremium({ padding: 26 }, wt), background: `linear-gradient(135deg, ${wt.primary} 0%, #4338ca 100%)`, color: "#fff", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1, opacity: 0.8 }}>Featured Spec</span>
+            <div style={{ fontSize: 28, fontWeight: 800, marginTop: 8, letterSpacing: -0.5 }}>{String(resolveVars(first.value ?? ""))}</div>
+            <div style={{ fontSize: 13, opacity: 0.8, marginTop: 4 }}>{first.label}</div>
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12 }}>
+          {rest.map((it, i) => (
+            <div key={i} style={{ ...wtCard({ padding: "14px 16px" }, wt) }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: wt.muted }}>{it.label}</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: wt.ink, marginTop: 4, ...T }}>{String(resolveVars(it.value ?? ""))}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Default: grid
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 12 }}>
       {items.map((it, i) => (
         <div key={i} style={{ ...wtCard({ padding: "16px 18px" }, wt) }}>
           <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: wt.muted }}>{it.label}</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: wt.ink, marginTop: 5, ...typoCss(s, device) }}>{String(resolveVars(it.value ?? ""))}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: wt.ink, marginTop: 5, ...T }}>{String(resolveVars(it.value ?? ""))}</div>
         </div>
       ))}
     </div>
@@ -2937,9 +3907,76 @@ function PropertyDetailsSection({ s, device }: { s: SectionInstance; device: Dev
 
 function UnitTypesSection({ s, device }: { s: SectionInstance; device: Device }) {
   const wt = useContext(SiteLayoutThemeContext);
+  const st = s.settings;
+  const design = String(st.design ?? "cards");
   const items = (s.settings.items ?? []) as { name?: string; beds?: string; area?: string; price?: string }[];
   const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 3;
   const T = typoCss(s, device);
+  const [activeUnitTab, setActiveUnitTab] = useState(0);
+
+  if (design === "table") {
+    return (
+      <div style={{ maxWidth: 960, margin: "0 auto", width: "100%", overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 8px", textAlign: "left" }}>
+          <thead>
+            <tr style={{ color: wt.muted, fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8 }}>
+              <th style={{ padding: "10px 16px" }}>Typology</th>
+              <th style={{ padding: "10px 16px" }}>Configuration</th>
+              <th style={{ padding: "10px 16px" }}>Carpet Area</th>
+              <th style={{ padding: "10px 16px" }}>Starting Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it, i) => (
+              <tr key={i} style={{ background: wt.surface, boxShadow: wt.shadowSm, borderRadius: wt.radius }}>
+                <td style={{ padding: "16px", fontWeight: 800, color: wt.ink, fontSize: 15, borderTopLeftRadius: wt.radius, borderBottomLeftRadius: wt.radius }}>{it.name}</td>
+                <td style={{ padding: "16px" }}><span style={{ ...wtPill(wt.primarySoft, wt.primary, undefined, wt), fontSize: 11, fontWeight: 800 }}>{it.beds} BHK</span></td>
+                <td style={{ padding: "16px", color: wt.slate, fontSize: 13.5, fontWeight: 600 }}>{it.area}</td>
+                <td style={{ padding: "16px", color: wt.primary, fontSize: 16, fontWeight: 800, borderTopRightRadius: wt.radius, borderBottomRightRadius: wt.radius }}>{it.price || "On Request"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (design === "tabs" && items.length > 0) {
+    const cur = items[activeUnitTab % items.length];
+    return (
+      <div style={{ maxWidth: 760, margin: "0 auto", width: "100%" }}>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 20 }}>
+          {items.map((it, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setActiveUnitTab(idx)}
+              style={{
+                ...wtPill(activeUnitTab === idx ? wt.primary : wt.surfaceMuted, activeUnitTab === idx ? "#fff" : wt.slate, { padding: "9px 18px", border: activeUnitTab === idx ? `1.5px solid ${wt.primary}` : wt.border, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }, wt),
+              }}
+            >
+              {it.beds} BHK · {it.name}
+            </button>
+          ))}
+        </div>
+        {cur && (
+          <div style={{ ...wtCardPremium({ padding: 28 }, wt), display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+            <div>
+              <span style={{ ...wtPill(wt.primarySoft, wt.primary, undefined, wt), fontSize: 11, fontWeight: 800 }}>{cur.beds} BHK Layout</span>
+              <h3 style={{ fontSize: 22, fontWeight: 800, color: wt.ink, margin: "8px 0 4px" }}>{cur.name}</h3>
+              <div style={{ fontSize: 13.5, color: wt.slate }}>Carpet Area: <strong>{cur.area}</strong></div>
+            </div>
+            <div style={{ textAlign: device === "mobile" ? "left" : "right" }}>
+              <div style={{ fontSize: 11, color: wt.muted, fontWeight: 700, textTransform: "uppercase" }}>Price</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: wt.primary }}>{cur.price || "On Request"}</div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Default: cards
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols},1fr)`, gap: 14 }}>
       {items.map((it, i) => (
@@ -2959,10 +3996,61 @@ function UnitTypesSection({ s, device }: { s: SectionInstance; device: Device })
 function PaymentPlansSection({ s, device }: { s: SectionInstance; device: Device }) {
   const wt = useContext(SiteLayoutThemeContext);
   const st = s.settings;
+  const design = String(st.design ?? "cards");
   const heading = textOf(st.heading ?? "Payment Plans");
   const items = (st.items ?? []) as { plan?: string; amount?: string; details?: string }[];
   const cols = device === "mobile" ? 1 : device === "tablet" ? 2 : 3;
   const T = typoCss(s, device);
+
+  if (design === "steps") {
+    return (
+      <div style={{ maxWidth: 960, margin: "0 auto", width: "100%" }}>
+        {heading ? <h3 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, margin: "0 0 28px", textAlign: "center", ...T }}>{heading}</h3> : null}
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : `repeat(${Math.min(items.length || 1, 4)}, 1fr)`, gap: 16 }}>
+          {items.map((it, i) => (
+            <div key={i} style={{ ...wtCard({ padding: "22px 18px" }, wt), textAlign: "center", position: "relative" }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: wt.primary, color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, marginBottom: 12 }}>
+                {i + 1}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: wt.ink }}>{it.plan}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: wt.primary, marginTop: 6 }}>{it.amount}</div>
+              {it.details ? <div style={{ fontSize: 12, color: wt.slate, marginTop: 8, lineHeight: 1.5 }}>{it.details}</div> : null}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (design === "schedule-table") {
+    return (
+      <div style={{ maxWidth: 860, margin: "0 auto", width: "100%" }}>
+        {heading ? <h3 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, margin: "0 0 20px", textAlign: "center", ...T }}>{heading}</h3> : null}
+        <div style={{ ...wtCard({ padding: 0, overflow: "hidden", borderRadius: wt.radius }, wt) }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+            <thead>
+              <tr style={{ background: wt.surfaceMuted, borderBottom: wt.border, color: wt.muted, fontSize: 11.5, fontWeight: 800, textTransform: "uppercase" }}>
+                <th style={{ padding: "14px 20px" }}>Milestone</th>
+                <th style={{ padding: "14px 20px" }}>Percentage / Amount</th>
+                <th style={{ padding: "14px 20px" }}>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={i} style={{ borderBottom: i < items.length - 1 ? wt.border : "none", background: i % 2 === 0 ? wt.surface : wt.surfaceMuted }}>
+                  <td style={{ padding: "16px 20px", fontWeight: 800, color: wt.ink, fontSize: 14 }}>{it.plan}</td>
+                  <td style={{ padding: "16px 20px", fontWeight: 800, color: wt.primary, fontSize: 16 }}>{it.amount}</td>
+                  <td style={{ padding: "16px 20px", color: wt.slate, fontSize: 13 }}>{it.details || "As per agreement"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  // Default: cards
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
       {heading ? <h3 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 22 : 28, fontWeight: 800, letterSpacing: -0.4, margin: "0 0 20px", textAlign: "center", ...T }}>{heading}</h3> : null}
@@ -3199,6 +4287,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
   const pageId = useContext(SitePageIdContext);
   const formCfg = useContext(SiteFormContext);
   const wt = useContext(SiteLayoutThemeContext);
+  const design = String(st.design ?? "modal");
   const heading = textOf(st.heading ?? "");
   const text = textOf(resolveVars(st.text ?? ""));
   const cta = textOf(st.cta ?? st.ctaLabel ?? "");
@@ -3400,23 +4489,135 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
     return (
       <div style={{ maxWidth: 460, margin: "0 auto", width: "100%", border: `1.5px dashed ${wt.borderStrong}`, borderRadius: wt.radius, padding: "30px 22px 24px", textAlign: "center", background: wt.surfaceMuted, position: "relative" }}>
          <div style={{ position: "absolute", top: 10, left: 14, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: wt.muted }}>
-          Conditional popup · {trigger}{popupId ? ` · id: ${popupId}` : ""} · shows {frequency === "always" ? "every visit" : frequency === "once" ? "once ever" : "once per visit"}
+          Popup ({design}) · {trigger}{popupId ? ` · id: ${popupId}` : ""} · {frequency === "always" ? "every visit" : frequency === "once" ? "once ever" : "once per visit"}
         </div>
         {conditions.length ? (
            <div style={{ fontSize: 10.5, fontWeight: 700, color: wt.primary, marginTop: 26 }}>{condSummary}</div>
         ) : null}
          {heading ? <div style={{ fontSize: 20, fontWeight: 800, color: wt.ink, marginTop: conditions.length ? 6 : 14 }}>{heading}</div> : null}
          {text ? <p style={{ fontSize: 13.5, color: wt.slate, lineHeight: 1.6, margin: "8px 0 16px" }}>{text}</p> : null}
-         {showForm ? <div style={{ fontSize: 12, color: wt.muted }}>Embedded lead form renders here on the live page.</div> : null}
+         {showForm ? <div style={{ fontSize: 12, color: wt.muted }}>Embedded lead form ({design} design) renders here on live page.</div> : null}
          {!showForm && cta ? <span style={{ display: "inline-flex", background: st.accent || wt.primary, color: "#fff", fontWeight: 700, fontSize: 13, padding: "11px 22px", borderRadius: wt.radiusSm }}>{cta}</span> : null}
       </div>
     );
   }
 
   if (!open) return null;
+
+  // Slide-in design: floating bottom-right card toast
+  if (design === "slide-in") {
+    return (
+      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 99999, maxWidth: "min(380px, calc(100vw - 32px))" }}>
+        <div className="ps-fade-in" style={{ ...wtCard({ padding: "24px 22px", borderRadius: 16, boxShadow: "0 20px 50px rgba(8,10,20,.28)", position: "relative" }, wt) }}>
+          <button type="button" aria-label="Close" onClick={dismiss} style={{ position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: "50%", border: "none", background: wt.surfaceMuted, color: wt.slate, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <X size={14} />
+          </button>
+          {formDone ? (
+            <div style={{ textAlign: "center", padding: "12px 0" }}>
+              <CheckCircle2 size={32} style={{ color: wt.success, margin: "0 auto 8px" }} />
+              <div style={{ fontSize: 16, fontWeight: 800, color: wt.ink }}>Thank you!</div>
+              <div style={{ fontSize: 12.5, color: wt.slate, marginTop: 4 }}>We will contact you shortly.</div>
+            </div>
+          ) : (
+            <>
+              {heading ? <div style={{ fontSize: 17, fontWeight: 800, color: wt.ink, paddingRight: 20 }}>{heading}</div> : null}
+              {text ? <p style={{ fontSize: 13, color: wt.slate, lineHeight: 1.55, margin: "6px 0 16px" }}>{text}</p> : null}
+              {showForm ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {popupFields.slice(0, 2).map((f, i) => (
+                    <input
+                      key={i}
+                      className="ps-input"
+                      type={f.type === "phone" ? "tel" : "text"}
+                      placeholder={f.label}
+                      value={values[f.label] ?? ""}
+                      onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
+                      style={{ padding: "9px 12px", fontSize: 13 }}
+                    />
+                  ))}
+                  {formError ? <div style={{ fontSize: 11.5, color: wt.danger, fontWeight: 600 }}>{formError}</div> : null}
+                  <button type="button" onClick={submitPopupForm} style={{ ...wtButton({ accent: st.accent, block: true }, wt), padding: "10px 16px", fontSize: 13 }}>
+                    {textOf(st.formButton || "Get Callback")}
+                  </button>
+                </div>
+              ) : cta ? (
+                <a {...anchorNav(link, live)} onClick={(e) => { anchorNav(link, live).onClick(e); dismiss(); }} style={{ ...wtButton({ accent: st.accent, block: true }, wt), padding: "10px 16px", fontSize: 13, textDecoration: "none", textAlign: "center" }}>
+                  {cta} <ArrowRight size={13} />
+                </a>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Takeover design: Split visual takeover
+  if (design === "takeover") {
+    return (
+      <div onClick={dismiss} style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(8,10,20,.75)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+        <div onClick={(e) => e.stopPropagation()} className="ps-fade-in" style={{ ...wtCard({ width: 780, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto", padding: 0, borderRadius: 20, boxShadow: "0 32px 80px rgba(0,0,0,.5)" }, wt), display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1.2fr", position: "relative" }}>
+          <button type="button" aria-label="Close" onClick={dismiss} style={{ position: "absolute", top: 12, right: 12, zIndex: 10, width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(0,0,0,.5)", color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <X size={16} />
+          </button>
+          <div style={{ position: "relative", minHeight: device === "mobile" ? 180 : 380, background: `linear-gradient(135deg, ${wt.primary} 0%, #1e1b4b 100%)`, padding: 24, display: "flex", flexDirection: "column", justifyContent: "flex-end", color: "#fff" }}>
+            <SceneImage art="skyline" />
+            <div style={{ position: "relative", zIndex: 2 }}>
+              <span style={{ ...wtBadge({ gold: true }, undefined, wt), marginBottom: 8, display: "inline-block" }}>Limited Units</span>
+              <div style={{ fontSize: 20, fontWeight: 800 }}>{PROPERTY.name}</div>
+              <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>{PROPERTY.location}</div>
+            </div>
+          </div>
+          <div style={{ padding: device === "mobile" ? "24px 20px" : "36px 30px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            {formDone ? (
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <CheckCircle2 size={44} style={{ color: wt.success, margin: "0 auto 12px" }} />
+                <div style={{ fontSize: 20, fontWeight: 800, color: wt.ink }}>Thank you!</div>
+                <div style={{ fontSize: 13, color: wt.slate, marginTop: 6 }}>Our property specialist will contact you shortly.</div>
+              </div>
+            ) : (
+              <>
+                {heading ? <div style={{ fontSize: 22, fontWeight: 800, color: wt.ink, letterSpacing: -0.4 }}>{heading}</div> : null}
+                {text ? <p style={{ fontSize: 13.5, color: wt.slate, lineHeight: 1.6, margin: "8px 0 20px" }}>{text}</p> : null}
+                {showForm ? (
+                  <div style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 11 }}>
+                    {popupFields.map((f, i) => (
+                      <div key={f.id || f.label || i}>
+                        {f.type !== "checkbox" && (
+                          <label style={{ fontSize: 11.5, fontWeight: 700, color: wt.slate, marginBottom: 4, display: "block" }}>{f.label}</label>
+                        )}
+                        <input
+                          className="ps-input"
+                          type={f.type === "email" ? "email" : f.type === "phone" ? "tel" : "text"}
+                          placeholder={f.placeholder}
+                          value={values[f.label] ?? ""}
+                          onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
+                          style={{ padding: "10px 12px" }}
+                        />
+                      </div>
+                    ))}
+                    {formError ? <div style={{ padding: "8px 12px", borderRadius: 8, background: wt.dangerSoft, color: wt.danger, fontSize: 12, fontWeight: 600 }}>{formError}</div> : null}
+                    <button type="button" onClick={submitPopupForm} style={{ ...wtButton({ accent: st.accent }, wt), marginTop: 6, padding: "12px 20px", borderRadius: wt.radiusSm }}>
+                      {textOf(st.formButton || "Submit Enquiry")}
+                    </button>
+                  </div>
+                ) : cta ? (
+                  <a {...anchorNav(link, live)} onClick={(e) => { anchorNav(link, live).onClick(e); dismiss(); }} style={{ ...wtButton({ accent: st.accent }, wt), padding: "12px 24px", textDecoration: "none", textAlign: "center" }}>
+                    {cta} <ArrowRight size={14} />
+                  </a>
+                ) : null}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default: modal (Centered modal)
   return (
-    <div onClick={dismiss} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(8,10,20,.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} className="ps-fade-in" style={{ ...wtCard({ width: showForm ? 480 : 440, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto", padding: device === "mobile" ? "34px 22px 30px" : "40px 34px", textAlign: "center", borderRadius: 20, boxShadow: "0 30px 80px rgba(8,10,20,.4)" }, wt) }}>
+    <div onClick={dismiss} style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(8,10,20,.65)", backdropFilter: "blur(5px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} className="ps-fade-in" style={{ ...wtCard({ width: showForm ? 480 : 440, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto", padding: device === "mobile" ? "34px 22px 30px" : "40px 34px", textAlign: "center", borderRadius: 20, boxShadow: "0 30px 80px rgba(8,10,20,.4)" }, wt), position: "relative" }}>
          <button type="button" aria-label="Close" onClick={dismiss} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", border: "none", background: wt.surfaceMuted, color: wt.slate, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
           <X size={16} />
         </button>
@@ -3547,10 +4748,92 @@ function DownloadsSection({ s, device }: { s: SectionInstance; device: Device })
   const live = useContext(SiteLiveContext);
   const pageId = useContext(SitePageIdContext);
   const wt = useContext(SiteLayoutThemeContext);
-  const files = (st.files ?? []) as { name?: string; title?: string; url?: string }[];
+  const design = String(st.design ?? "list");
+  const files = (st.files ?? []) as { name?: string; title?: string; url?: string; size?: string }[];
   const heading = textOf(st.heading ?? st.title ?? "");
   const text = textOf(st.text ?? st.sub ?? "");
   const T = typoCss(s, device);
+
+  if (design === "cards") {
+    return (
+      <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
+        {heading ? <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 22 : 28, letterSpacing: -0.4, textAlign: "center", ...T }}>{heading}</h2> : null}
+        {text ? <p style={{ ...wtSectionLede(undefined, wt), textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7, ...T }}>{String(resolveVars(text))}</p> : null}
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "1fr 1fr" : "repeat(3, 1fr)", gap: 16, marginTop: 24 }}>
+          {files.map((f, i) => {
+            const name = f.name || f.title || `Document ${i + 1}`;
+            const url = String(f.url ?? "");
+            const active = live && !!url;
+            return (
+              <div key={i} style={{ ...wtCardPremium({ padding: 22 }, wt), display: "flex", flexDirection: "column", gap: 14 }}>
+                <span style={{ ...wtIconBadge({ size: 44 }, wt) }}>
+                  <FileText size={20} style={{ color: wt.primary }} />
+                </span>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: wt.ink }}>{name}</div>
+                  <div style={{ fontSize: 11.5, color: wt.muted, marginTop: 3 }}>Official PDF Document</div>
+                </div>
+                <a
+                  href={active ? url : undefined}
+                  {...(active ? { download: "", target: "_blank", rel: "noopener noreferrer" } : {})}
+                  onClick={(e) => {
+                    if (!active) e.preventDefault();
+                    else if (pageId) bumpTracking(pageId, "brochure");
+                  }}
+                  style={{ ...wtButton({ accent: st.accent, outline: true, block: true }, wt), marginTop: "auto", fontSize: 12.5 }}
+                >
+                  <Download size={13} /> {active ? "Download PDF" : "File Link"}
+                </a>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (design === "hub") {
+    return (
+      <div style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
+        {heading ? <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 22 : 28, letterSpacing: -0.4, textAlign: "center", ...T }}>{heading}</h2> : null}
+        <div style={{ ...wtCard({ padding: 0, overflow: "hidden", borderRadius: wt.radius }, wt), marginTop: 24 }}>
+          <div style={{ padding: "16px 20px", background: wt.surfaceMuted, borderBottom: wt.border, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: wt.muted, textTransform: "uppercase", letterSpacing: 0.6 }}>Project Resource Center</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: wt.primary }}>{files.length} Available Documents</span>
+          </div>
+          {files.map((f, i) => {
+            const name = f.name || f.title || `Document ${i + 1}`;
+            const url = String(f.url ?? "");
+            const active = live && !!url;
+            return (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: i < files.length - 1 ? wt.border : "none", background: wt.surface }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <FileText size={18} style={{ color: wt.primary }} />
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: wt.ink }}>{name}</div>
+                    <div style={{ fontSize: 11, color: wt.muted }}>Verified Legal & Architectural Assets</div>
+                  </div>
+                </div>
+                <a
+                  href={active ? url : undefined}
+                  {...(active ? { download: "", target: "_blank", rel: "noopener noreferrer" } : {})}
+                  onClick={(e) => {
+                    if (!active) e.preventDefault();
+                    else if (pageId) bumpTracking(pageId, "brochure");
+                  }}
+                  style={{ ...wtButtonLight(undefined, wt), padding: "8px 14px", fontSize: 12 }}
+                >
+                  <Download size={13} /> Get File
+                </a>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Default: list
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", width: "100%" }}>
       {heading ? <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 22 : 28, letterSpacing: -0.4, textAlign: "center", ...T }}>{heading}</h2> : null}
@@ -3596,6 +4879,7 @@ function BrochureSection({ s, device }: { s: SectionInstance; device: Device }) 
   const live = useContext(SiteLiveContext);
   const pageId = useContext(SitePageIdContext);
   const wt = useContext(SiteLayoutThemeContext);
+  const design = String(st.design ?? "centered");
   const heading = textOf(st.heading ?? st.title ?? "Download Brochure");
   const text = textOf(resolveVars(st.text ?? ""));
   const btnLabel = textOf(st.title ?? st.cta ?? "Download Brochure");
@@ -3611,6 +4895,89 @@ function BrochureSection({ s, device }: { s: SectionInstance; device: Device }) 
         { label: "Phone Number", type: "phone", required: true },
         { label: "Email Address", type: "email", required: false },
       ];
+
+  if (design === "split") {
+    return (
+      <div style={{ maxWidth: 960, margin: "0 auto", width: "100%", ...wtCardPremium({ padding: device === "mobile" ? 22 : 36 }, wt), display: "grid", gridTemplateColumns: device === "desktop" ? "1fr 1.2fr" : "1fr", gap: 28, alignItems: "center" }}>
+        <div style={{ background: `linear-gradient(135deg, ${wt.primary} 0%, #1e1b4b 100%)`, borderRadius: wt.radiusLg, padding: "34px 24px", color: "#fff", textAlign: "center", boxShadow: wt.shadowMd, position: "relative" }}>
+          <span style={{ position: "absolute", top: 12, right: 12, background: wt.gold, color: "#fff", fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 999 }}>2026 EDITION</span>
+          <FileText size={48} style={{ color: wt.gold, margin: "0 auto 14px" }} />
+          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: -0.3 }}>{PROPERTY.name}</div>
+          <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>Master Brochure & Floor Plans</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 22 : 28 }}>{heading}</div>
+          {text ? <p style={{ ...wtSectionLede(undefined, wt), margin: 0, lineHeight: 1.65 }}>{text}</p> : null}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (!active) return;
+                if (gateEnabled && !popupId) setGateOpen(true);
+                else downloadFile(file);
+              }}
+              style={{ ...wtButton({ accent: st.accent }, wt), padding: "13px 24px" }}
+            >
+              <Download size={16} /> {btnLabel}
+            </button>
+            <span style={{ fontSize: 12, color: wt.muted, fontWeight: 600 }}>Instant PDF Access</span>
+          </div>
+        </div>
+        {gateEnabled && !popupId && (
+          <GatedDownloadModal
+            open={gateOpen}
+            onClose={() => setGateOpen(false)}
+            live={!!live}
+            pageId={pageId}
+            file={file}
+            heading={textOf(st.gateHeading || "Get the brochure")}
+            text={textOf(st.gateText || "")}
+            fields={gateFields}
+            submitLabel={textOf(st.gateButton || "Submit & Download")}
+            successMessage={textOf(st.gateSuccessMessage || "Verified — your brochure is downloading.")}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (design === "floating-banner") {
+    return (
+      <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%", ...wtCardGlass({ padding: "18px 24px", background: `linear-gradient(135deg, ${wt.primary} 0%, #4338ca 100%)` }, wt), display: "flex", flexDirection: device === "mobile" ? "column" : "row", justifyContent: "space-between", alignItems: "center", gap: 16, color: "#fff" }}>
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 800 }}>{heading}</div>
+          <div style={{ fontSize: 13, opacity: 0.85, marginTop: 2 }}>{text || "Get complete pricing sheet, carpet dimensions, and amenities list."}</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (!active) return;
+            if (gateEnabled && !popupId) setGateOpen(true);
+            else downloadFile(file);
+          }}
+          style={{ ...wtButtonLight(undefined, wt), whiteSpace: "nowrap", flexShrink: 0 }}
+        >
+          <Download size={15} /> {btnLabel}
+        </button>
+        {gateEnabled && !popupId && (
+          <GatedDownloadModal
+            open={gateOpen}
+            onClose={() => setGateOpen(false)}
+            live={!!live}
+            pageId={pageId}
+            file={file}
+            heading={textOf(st.gateHeading || "Get the brochure")}
+            text={textOf(st.gateText || "")}
+            fields={gateFields}
+            submitLabel={textOf(st.gateButton || "Submit & Download")}
+            successMessage={textOf(st.gateSuccessMessage || "Verified — your brochure is downloading.")}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Default: centered
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", width: "100%", textAlign: "center", ...wtCard({ padding: device === "mobile" ? "26px 20px" : "36px 32px" }, wt) }}>
       <span style={{ ...wtIconBadge({ size: 54 }, wt), marginBottom: 14 }}>
@@ -3668,12 +5035,13 @@ function BrochureSection({ s, device }: { s: SectionInstance; device: Device }) 
   );
 }
 
-// Generic renderers for widgets not in the default page
+// Generic renderers for catalog widgets
 function CatalogSection({ s, device }: { s: SectionInstance; device: Device }) {
   const st = s.settings;
   const live = useContext(SiteLiveContext);
   const pageIdCtx = useContext(SitePageIdContext);
   const wt = useContext(SiteLayoutThemeContext);
+  const design = String(st.design ?? "cards");
   const heading = textOf(st.heading ?? st.title ?? s.label);
   const text = textOf(st.text ?? st.subheading ?? st.sub ?? "");
   const tabs = (st.tabs as string[] | undefined) ?? [];
@@ -3681,12 +5049,70 @@ function CatalogSection({ s, device }: { s: SectionInstance; device: Device }) {
   const files = (st.files as { name?: string; title?: string; url?: string }[] | undefined) ?? [];
   const videos = (st.videos as { title?: string; url?: string }[] | undefined) ?? [];
   const rows = (st.rows as { label?: string; value?: string }[] | undefined) ?? [];
-  const items = (st.items as { title?: string; name?: string; label?: string; text?: string; body?: string; value?: string; meta?: string }[] | undefined) ?? [];
+  const items = (st.items as { title?: string; name?: string; label?: string; text?: string; body?: string; value?: string; meta?: string; icon?: string }[] | undefined) ?? [];
   const T = typoCss(s, device);
+
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", width: "100%" }}>
       <h2 style={{ ...wtSectionTitle(undefined, wt), fontSize: device === "mobile" ? 22 : 28, letterSpacing: -0.4, textAlign: "center", ...T }}>{heading}</h2>
       {text ? <p style={{ ...wtSectionLede(undefined, wt), textAlign: "center", maxWidth: 620, margin: "10px auto 0", lineHeight: 1.7, ...T }}>{String(resolveVars(text))}</p> : null}
+
+      {/* Checklist Design */}
+      {design === "checklist" && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, marginTop: 24 }}>
+          {items.map((it, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, background: wt.surfaceMuted, border: wt.borderFaint, borderRadius: 10, padding: "12px 16px" }}>
+              <span style={{ width: 22, height: 22, borderRadius: "50%", background: wt.successSoft, color: wt.success, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Check size={12} strokeWidth={3} />
+              </span>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: wt.ink }}>{it.title ?? it.name ?? it.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Table Design */}
+      {(design === "table" || rows.length > 0) && (
+        <div style={{ marginTop: 22, ...wtCard({ padding: 0, overflow: "hidden", borderRadius: wt.radius }, wt) }}>
+          {(rows.length ? rows : items).map((r, i) => {
+            const label = "label" in r ? r.label : (r as { title?: string }).title ?? `Item ${i + 1}`;
+            const val = "value" in r ? r.value : (r as { text?: string; body?: string }).text ?? (r as { text?: string; body?: string }).body ?? "";
+            return (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "14px 20px", background: i % 2 ? wt.surfaceMuted : wt.surface, borderTop: i ? wt.border : "none" }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: wt.muted }}>{label}</span>
+                <span style={{ fontSize: 13.5, fontWeight: 700, color: wt.ink }}>{String(resolveVars(val ?? ""))}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Timeline Design */}
+      {(design === "timeline" || design === "vertical") && items.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 24, position: "relative", paddingLeft: 20, borderLeft: `2px solid ${wt.primarySoft}` }}>
+          {items.map((it, i) => (
+            <div key={i} style={{ ...wtCard({ padding: "16px 18px" }, wt), position: "relative" }}>
+              <div style={{ position: "absolute", left: -29, top: 18, width: 16, height: 16, borderRadius: "50%", background: wt.primary, border: "3px solid #fff", boxShadow: wt.shadowSm }} />
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: wt.ink }}>{it.title ?? it.name ?? it.label}</div>
+              {it.text || it.body || it.meta ? <div style={{ fontSize: 13, color: wt.slate, marginTop: 4, lineHeight: 1.6 }}>{it.text ?? it.body ?? it.meta}</div> : null}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Cards Design (Default) */}
+      {(design === "cards" || (!rows.length && design !== "checklist" && design !== "table" && design !== "timeline" && design !== "vertical")) && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "1fr 1fr" : "repeat(3,1fr)", gap: 14, marginTop: 22 }}>
+          {items.map((it, i) => (
+            <div key={i} className="ps-card" style={{ ...wtCard({ padding: 20 }, wt) }}>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: wt.ink, ...T }}>{it.title ?? it.name ?? it.label ?? it.value ?? `Item ${i + 1}`}</div>
+              {it.text || it.body || it.meta ? <div style={{ fontSize: 13, color: wt.slate, marginTop: 6, lineHeight: 1.6, ...T }}>{it.text ?? it.body ?? it.meta}</div> : null}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tabs */}
       {tabs.length ? (
         <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 22 }}>
           {tabs.map((t, i) => (
@@ -3694,6 +5120,8 @@ function CatalogSection({ s, device }: { s: SectionInstance; device: Device }) {
           ))}
         </div>
       ) : null}
+
+      {/* Image / Master Plan slides */}
       {slides > 0 ? (
         <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : `repeat(${Math.min(slides, 3)},1fr)`, gap: 12, marginTop: 22 }}>
           {Array.from({ length: Math.min(slides, 6) }).map((_, i) => (
@@ -3703,6 +5131,8 @@ function CatalogSection({ s, device }: { s: SectionInstance; device: Device }) {
           ))}
         </div>
       ) : null}
+
+      {/* Videos */}
       {videos.length ? (
         <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 12, marginTop: 22 }}>
           {videos.map((v, i) => (
@@ -3713,62 +5143,7 @@ function CatalogSection({ s, device }: { s: SectionInstance; device: Device }) {
           ))}
         </div>
       ) : null}
-      {rows.length ? (
-        <div style={{ marginTop: 22, ...wtCard({ padding: 0, overflow: "hidden", borderRadius: wt.radius }, wt) }}>
-          {rows.map((r, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "12px 16px", background: i % 2 ? wt.surfaceMuted : wt.surface, borderTop: i ? wt.border : "none" }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: wt.muted }}>{r.label}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: wt.ink }}>{String(resolveVars(r.value ?? ""))}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {files.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 22 }}>
-          {files.map((f, i) => {
-            const url = String(f.url ?? "").trim();
-            const active = live && !!url;
-            return (
-              <a
-                key={i}
-                href={active ? url : undefined}
-                download={active ? "" : undefined}
-                target={active ? "_blank" : undefined}
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  if (!active) {
-                    e.preventDefault();
-                    return;
-                  }
-                  if (pageIdCtx) bumpTracking(pageIdCtx, "brochure");
-                }}
-                style={{ ...wtCardMuted({ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", gap: 12, borderRadius: wt.radius }, wt), textDecoration: "none", cursor: active ? "pointer" : "default" }}
-              >
-                <span style={{ fontWeight: 700, fontSize: 13, color: wt.ink }}>{f.name || f.title || `File ${i + 1}`}</span>
-                <span style={{ ...wtButton({ accent: st.accent }, wt), ...(active ? {} : { background: wt.surfaceMuted, color: wt.muted, boxShadow: "none", borderColor: "transparent", cursor: "default" }) }}>
-                  {active ? (
-                    <>
-                      <Download size={13} /> Download
-                    </>
-                  ) : (
-                    "Set file URL in Settings"
-                  )}
-                </span>
-              </a>
-            );
-          })}
-        </div>
-      ) : null}
-      {items.length ? (
-        <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "1fr 1fr" : "repeat(3,1fr)", gap: 14, marginTop: 22 }}>
-          {items.map((it, i) => (
-            <div key={i} className="ps-card" style={{ ...wtCard({ padding: 18 }, wt) }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: wt.ink, ...T }}>{it.title ?? it.name ?? it.label ?? it.value ?? `Item ${i + 1}`}</div>
-              {it.text || it.body || it.meta ? <div style={{ fontSize: 12.5, color: wt.slate, marginTop: 5, lineHeight: 1.6, ...T }}>{it.text ?? it.body ?? it.meta}</div> : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
+
       {!text && !tabs.length && !slides && !items.length && !files.length && !rows.length && !videos.length ? (
         <div style={{ marginTop: 16, padding: "18px 16px", border: "1.5px dashed var(--ps-line-strong)", borderRadius: 12, textAlign: "center", color: "var(--ps-muted)", fontSize: 13 }}>
           {s.label} added — edit content in Settings

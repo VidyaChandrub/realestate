@@ -692,8 +692,23 @@ export function SettingsPanel({
             {section.type === "lead-form" ? (
               <FormWidgetConditionalEditor section={section} onChange={set} page={page} onPatchConfig={onPatchConfig} />
             ) : null}
+            {/* Widget Design Selector — always rendered at top if widget has multiple designs */}
+            {section.type === "header" || section.type === "footer" ? (
+              <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
+                <FieldRow label="Layout design">
+                  <DesignPicker kind={section.type} value={String(section.settings.design ?? (section.type === "header" ? "classic" : "minimal"))} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
+                </FieldRow>
+              </div>
+            ) : designsForWidget(section.type).length > 0 ? (
+              <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
+                <FieldRow label="Design layout">
+                  <WidgetDesignPicker widgetType={section.type} value={String(section.settings.design ?? (section.settings.style || designsForWidget(section.type)[0]?.id || ""))} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
+                </FieldRow>
+              </div>
+            ) : null}
+
             {section.type !== "lead-form" && Object.entries(section.settings)
-              .filter(([key]) => key !== "eyebrow")
+              .filter(([key]) => key !== "eyebrow" && key !== "design")
               .filter(([key]) => !(section.type === "text" && (key === "text" || key === "html")))
               .filter(([key]) => !(section.type === "popup" && POPUP_MANAGED_KEYS.includes(key)))
               .filter(([key]) => !(section.type === "html" && key === "code"))
@@ -711,14 +726,6 @@ export function SettingsPanel({
                       }}
                       suffix=""
                     />
-                  </FieldRow>
-                ) : key === "design" ? (
-                  <FieldRow label={section.type === "header" || section.type === "footer" ? "Layout design" : "Premium design"}>
-                    {section.type === "header" || section.type === "footer" ? (
-                      <DesignPicker kind={section.type} value={String(value ?? "")} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
-                    ) : (
-                      <WidgetDesignPicker widgetType={section.type} value={String(value ?? "")} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
-                    )}
                   </FieldRow>
                 ) : (
                   <ContentField fieldKey={key} widgetType={section.type} label={formatFieldLabel(key)} value={value} onChange={(v) => set({ settings: { ...section.settings, [key]: v } })} />
