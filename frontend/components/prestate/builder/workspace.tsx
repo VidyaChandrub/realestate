@@ -336,6 +336,10 @@ export function BuilderWorkspace({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setState((prev) => ({ ...prev, selectedId: null }));
+        return;
+      }
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const k = e.key.toLowerCase();
@@ -351,6 +355,9 @@ export function BuilderWorkspace({
       } else if (k === "k") {
         e.preventDefault();
         setQuickOpen((v) => !v);
+      } else if (k === "b") {
+        e.preventDefault();
+        setWidgetsOpen((v) => !v);
       }
     };
     window.addEventListener("keydown", onKey);

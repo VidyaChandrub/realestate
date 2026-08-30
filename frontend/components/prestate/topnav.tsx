@@ -144,71 +144,83 @@ export function TopNav({
 
   return (
     <header className="ps-topnav ps-glass">
-      {/* Logo */}
-      {onMenu ? (
-        <button type="button" className="ps-nav-toggle" title="Modules" onClick={onMenu}>
-          <Menu size={18} />
-        </button>
-      ) : null}
-      {homeHref ? (
-        <Link href={homeHref} title="Back to pages" className="ps-topnav-icon-btn" style={iconBtn(true)}>
-          <ArrowLeft size={16} />
-        </Link>
-      ) : null}
-      <div className="ps-topnav-brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <PrestateMark />
-        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-          <span className="ps-topnav-wordmark">PRESTATE</span>
-          <span className="ps-topnav-sub">BUILDER</span>
+      {/* Logo & Page Breadcrumbs */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+        {onMenu ? (
+          <button type="button" className="ps-nav-toggle" title="Toggle Dock" onClick={onMenu}>
+            <Menu size={18} />
+          </button>
+        ) : null}
+        {homeHref ? (
+          <Link href={homeHref} title="Back to dashboard" className="ps-topnav-icon-btn" style={iconBtn(true)}>
+            <ArrowLeft size={16} />
+          </Link>
+        ) : null}
+        <div className="ps-topnav-brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <PrestateMark size={28} />
+          <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+            <span className="ps-topnav-wordmark">PRESTATE</span>
+            <span className="ps-topnav-sub">STUDIO</span>
+          </div>
         </div>
-      </div>
 
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minWidth: 0 }}>
-        {/* Page context (builder) or module context */}
+        <div className="ps-vdiv" style={{ height: 20, margin: "0 4px" }} />
+
         {module === "builder" && pageName ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 320 }}>{pageName}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 260 }}>
+              {pageName}
+            </span>
             {pageStatus ? (
-              <span className="ps-draft-pill">{pageStatus}</span>
+              <span className={`ps-draft-pill ${published ? "ps-pill--published" : "ps-pill--draft"}`}>
+                <span className="ps-dot" style={{ background: published ? "#34d399" : "#fbbf24" }} />
+                {pageStatus}
+              </span>
             ) : null}
           </div>
         ) : (
-          <span style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ps-ink)" }}>{MODULE_LABELS[module]}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-ink)" }}>{MODULE_LABELS[module]}</span>
         )}
       </div>
 
+      {/* Center Device Viewport Switcher */}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {module === "builder" ? (
+          <div className="ps-device-toggle">
+            {DEVICES.map((d) => (
+              <button
+                key={d.key}
+                type="button"
+                title={`${d.label} view`}
+                onClick={() => setDevice(d.key)}
+                data-active={device === d.key ? "true" : "false"}
+              >
+                <d.icon size={14} />
+                <span className="ps-device-label">{d.label}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
       {/* Right controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {module === "builder" ? (
           <>
-            <div className="ps-builder-chrome">
-            <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="ps-topnav-icon-btn" style={iconBtn(canUndo)}>
-              <Undo2 size={15} />
-            </button>
-            <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)" className="ps-topnav-icon-btn" style={iconBtn(canRedo)}>
-              <Redo2 size={15} />
-            </button>
-            <div className="ps-vdiv" />
-            </div>
-            <div className="ps-device-toggle">
-              {DEVICES.map((d) => (
-                <button
-                  key={d.key}
-                  type="button"
-                  title={d.label}
-                  onClick={() => setDevice(d.key)}
-                  data-active={device === d.key ? "true" : "false"}
-                >
-                  <d.icon size={14} />
-                </button>
-              ))}
-            </div>
-            <div className="ps-vdiv ps-hide-md" />
-            <div className="ps-builder-actions-wide">
-              <button type="button" onClick={onSave} className="ps-topnav-btn">
-                <Save size={14} /> <span className="ps-btn-label">Save Draft</span>
+            <div className="ps-builder-chrome" style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="ps-topnav-icon-btn" style={iconBtn(canUndo)}>
+                <Undo2 size={15} />
               </button>
-              <button type="button" onClick={onPreview} className="ps-topnav-btn">
+              <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)" className="ps-topnav-icon-btn" style={iconBtn(canRedo)}>
+                <Redo2 size={15} />
+              </button>
+            </div>
+            <div className="ps-vdiv" style={{ height: 20, margin: "0 2px" }} />
+            <div className="ps-builder-actions-wide" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button type="button" onClick={onSave} className="ps-topnav-btn" title="Save draft changes (Ctrl+S)">
+                <Save size={14} /> <span className="ps-btn-label">Save</span>
+              </button>
+              <button type="button" onClick={onPreview} className="ps-topnav-btn" title="Open live preview in new tab">
                 <Eye size={14} /> <span className="ps-btn-label">Preview</span>
               </button>
               {published ? (

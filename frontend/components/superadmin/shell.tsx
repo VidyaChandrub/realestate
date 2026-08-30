@@ -56,7 +56,6 @@ const NAV_GROUPS: NavGroup[] = [
         activeMatch: ["/admin-console/templates", "/admin-console/template-detail"],
       },
       { href: "/admin-console/domains", icon: "globe", label: "Domain Requests", tip: "Domain Requests", activeMatch: ["/admin-console/domains"] },
-      { href: "/admin-console/approvals", icon: "check", label: "Approvals", tip: "Approvals", activeMatch: ["/admin-console/approvals"] },
     ],
   },
   {
@@ -80,7 +79,6 @@ const CRUMB_MAP: Record<string, string> = {
   "/admin-console/template-detail": "Template",
   "/prestate": "Builder",
   "/admin-console/domains": "Domain Requests",
-  "/admin-console/approvals": "Approvals",
   "/admin-console/subscriptions": "Subscriptions",
   "/admin-console/audit-logs": "Audit Logs",
   "/admin-console/settings": "Settings",
@@ -93,13 +91,8 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [approvalsBadge, setApprovalsBadge] = useState<number | null>(null);
+  const [pendingOrgsBadge, setPendingOrgsBadge] = useState<number | null>(null);
 
-  // Approvals covers pending organisation registrations only — landing-page
-  // approval was removed (orgs publish their own pages directly now). The
-  // org-approval queue is slated for retirement too (the Organisations list
-  // already has inline Approve/Reject); once it's actually removed, this
-  // badge goes away entirely.
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
@@ -109,7 +102,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
       .catch(() => null)
       .then((orgSummary) => {
         if (cancelled) return;
-        setApprovalsBadge(orgSummary?.pending ?? 0);
+        setPendingOrgsBadge(orgSummary?.pending ?? 0);
       });
     return () => {
       cancelled = true;
@@ -172,8 +165,8 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
                       (base) => pathname === base || pathname.startsWith(`${base}/`),
                     ) ?? false;
                   const badge =
-                    item.href === "/admin-console/approvals"
-                      ? (approvalsBadge ? String(approvalsBadge) : undefined)
+                    item.href === "/admin-console/organisations"
+                      ? (pendingOrgsBadge && pendingOrgsBadge > 0 ? `${pendingOrgsBadge} pending` : undefined)
                       : item.badge;
                   return (
                     <li key={item.href}>

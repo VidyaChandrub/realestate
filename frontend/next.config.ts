@@ -8,9 +8,10 @@ const nextConfig: NextConfig = {
       { source: "/superadmin", destination: "/admin-console", permanent: false },
       { source: "/superadmin/:path*", destination: "/admin-console/:path*", permanent: false },
       { source: "/admin-console/login", destination: "/admin-login", permanent: false },
-      { source: "/superadmin/login", destination: "/admin-login", permanent: false },
-      { source: "/admin-console/onboarding", destination: "/admin-console/approvals", permanent: false },
-      { source: "/admin-console/onboarding/:path*", destination: "/admin-console/approvals", permanent: false },
+      { source: "/admin-console/onboarding", destination: "/admin-console/organisations", permanent: false },
+      { source: "/admin-console/onboarding/:path*", destination: "/admin-console/organisations", permanent: false },
+      { source: "/admin-console/approvals", destination: "/admin-console/organisations", permanent: false },
+      { source: "/admin-console/approvals/:path*", destination: "/admin-console/organisations", permanent: false },
     ];
   },
   async rewrites() {

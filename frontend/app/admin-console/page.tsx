@@ -35,8 +35,8 @@ export default function SuperAdminDashboardPage() {
         </div>
         <div className="actions">
           <button className="btn btn-ghost">⤓ Export</button>
-          <Link className="btn btn-primary" href="/admin-console/approvals">
-            <Icon name="check" size={14} /> Review approvals
+          <Link className="btn btn-primary" href="/admin-console/organisations">
+            <Icon name="building" size={14} /> Organisations
           </Link>
         </div>
       </div>
@@ -139,11 +139,11 @@ export default function SuperAdminDashboardPage() {
               <span className="t">Quick actions</span>
             </div>
             <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <Link className="btn btn-soft btn-block" href="/admin-console/approvals">
-                <Icon name="check" size={14} /> Review pending organisations
+              <Link className="btn btn-soft btn-block" href="/admin-console/organisations">
+                <Icon name="building" size={14} /> Manage organisations
               </Link>
-              <Link className="btn btn-ghost btn-block" href="/admin-console/organisations">
-                <Icon name="building" size={14} /> Manage organisations (edit)
+              <Link className="btn btn-ghost btn-block" href="/admin-console/domains">
+                <Icon name="globe" size={14} /> Manage domain requests
               </Link>
               <Link className="btn btn-ghost btn-block" href="/admin-console/templates">
                 <Icon name="puzzle" size={14} /> Create a template
@@ -153,9 +153,9 @@ export default function SuperAdminDashboardPage() {
               </Link>
               <div className="divider" />
               <div className="help">
-                Organisation creation is via <b>/register</b> with super admin approval. You have pending approvals waiting.{" "}
-                <Link href="/admin-console/approvals" style={{ color: "var(--brand)", fontWeight: 600 }}>
-                  Review now →
+                Organisations onboarded via <b>/register</b> can be managed directly in{" "}
+                <Link href="/admin-console/organisations" style={{ color: "var(--brand)", fontWeight: 600 }}>
+                  Organisations →
                 </Link>
               </div>
             </div>

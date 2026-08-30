@@ -60,6 +60,7 @@ export function WidgetsPanel({
   onDeleteTemplate?: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>("all");
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     Saved: true,
     Layout: true,
@@ -73,17 +74,19 @@ export function WidgetsPanel({
   });
   const [hovered, setHovered] = useState<string | null>(null);
 
-  // Library entries flagged hidden are aliases of other widgets (e.g. slider ≈
-  // carousel) — they stay valid for existing pages but don't clutter the panel.
   const visibleWidgets = WIDGETS.filter((w) => !w.hidden);
   const q = query.trim().toLowerCase();
-  const filtered = visibleWidgets.filter((w) => !q || w.label.toLowerCase().includes(q) || w.group.toLowerCase().includes(q) || w.desc.toLowerCase().includes(q));
-  const filteredTemplates = (templates ?? []).filter((t) => !q || t.name.toLowerCase().includes(q));
+  const filtered = visibleWidgets
+    .filter((w) => activeCategoryFilter === "all" || w.category === activeCategoryFilter)
+    .filter((w) => !q || w.label.toLowerCase().includes(q) || w.group.toLowerCase().includes(q) || w.desc.toLowerCase().includes(q));
+  const filteredTemplates = (templates ?? []).filter((t) => (activeCategoryFilter === "all" || activeCategoryFilter === "saved") && (!q || t.name.toLowerCase().includes(q)));
 
-  const byCategory = WIDGET_CATEGORY_META.map((meta) => ({
-    meta,
-    items: filtered.filter((w) => w.category === meta.key),
-  })).filter((g) => g.items.length > 0);
+  const byCategory = WIDGET_CATEGORY_META
+    .filter((meta) => activeCategoryFilter === "all" || meta.key === activeCategoryFilter)
+    .map((meta) => ({
+      meta,
+      items: filtered.filter((w) => w.category === meta.key),
+    })).filter((g) => g.items.length > 0);
 
   if (!open) {
     return (
@@ -98,7 +101,7 @@ export function WidgetsPanel({
           <PanelLeftOpen size={17} />
         </button>
         <span style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", fontSize: 10, fontWeight: 800, letterSpacing: 1.6, color: "var(--ps-muted)", marginTop: 10, userSelect: "none" }}>
-          WIDGETS
+          BLOCKS
         </span>
       </div>
     );
@@ -110,15 +113,47 @@ export function WidgetsPanel({
     <div className="ps-widgets">
       <div className="ps-widgets-head">
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="ps-widgets-title">Widgets</span>
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--ps-muted)", marginLeft: "auto" }}>{visibleWidgets.length + filteredTemplates.length}</span>
+          <span className="ps-widgets-title">Block Library</span>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--ps-muted)", marginLeft: "auto" }}>{visibleWidgets.length + (templates?.length ?? 0)} blocks</span>
           <button type="button" onClick={onToggle} title="Collapse widget library" style={{ background: "none", border: "none", color: "var(--ps-muted)", cursor: "pointer", padding: 4, display: "inline-flex" }}>
             <PanelLeftClose size={16} />
           </button>
         </div>
         <div style={{ marginTop: 10, position: "relative" }}>
           <Search size={15} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "var(--ps-muted)", pointerEvents: "none" }} />
-          <input className="ps-input" placeholder="Search widgets…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ paddingLeft: 34 }} />
+          <input className="ps-input" placeholder="Search blocks…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ paddingLeft: 34 }} />
+        </div>
+
+        {/* Quick filter pills */}
+        <div style={{ display: "flex", gap: 4, overflowX: "auto", padding: "8px 0 2px", scrollbarWidth: "none" }}>
+          {[
+            { key: "all", label: "All" },
+            { key: "real-estate", label: "Real Estate" },
+            { key: "forms", label: "Forms" },
+            { key: "layout", label: "Layout" },
+            { key: "media", label: "Media" },
+            ...(templates && templates.length > 0 ? [{ key: "saved", label: "Saved" }] : []),
+          ].map((cat) => (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() => setActiveCategoryFilter(cat.key)}
+              style={{
+                fontSize: 10.5,
+                fontWeight: 700,
+                padding: "3px 8px",
+                borderRadius: 999,
+                border: "none",
+                background: activeCategoryFilter === cat.key ? "var(--ps-primary)" : "rgba(255,255,255,0.06)",
+                color: activeCategoryFilter === cat.key ? "#fff" : "var(--ps-muted)",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                transition: "all .12s",
+              }}
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
       </div>
 

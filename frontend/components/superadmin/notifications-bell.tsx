@@ -40,7 +40,9 @@ function relativeTime(iso: string) {
 }
 
 function getNotificationLink(n: AppNotification): string {
-  if (n.type === "organisation_registration") return "/admin-console/approvals";
+  if (n.type === "organisation_registration") {
+    return n.entityId ? `/admin-console/organisation-detail/${n.entityId}` : "/admin-console/organisations";
+  }
   if (n.type === "custom_domain_request" || n.type === "subdomain_request") return "/admin-console/domains";
   if (n.type === "organisation_approved" || n.type === "organisation_rejected") {
     return n.entityId ? `/admin-console/organisation-detail/${n.entityId}` : "/admin-console/organisations";
