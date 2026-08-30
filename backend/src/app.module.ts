@@ -20,6 +20,9 @@ import { OrgBillingModule } from './modules/org-billing/org-billing.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { OrgDomainRequestsModule } from './modules/org-domain-requests/org-domain-requests.module';
 import { AdminDomainRequestsModule } from './modules/admin-domain-requests/admin-domain-requests.module';
+import { AdminOrgDomainModule } from './modules/admin-org-domain/admin-org-domain.module';
+import { OrgDomainModule } from './modules/org-domain/org-domain.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrgTrackingModule } from './modules/org-tracking/org-tracking.module';
 import { PublicSiteModule } from './modules/public-site/public-site.module';
 import { ProjectsModule } from './modules/projects/projects.module';
@@ -46,6 +49,9 @@ import { ProjectsModule } from './modules/projects/projects.module';
     ProjectsModule,
     OrgDomainRequestsModule,
     AdminDomainRequestsModule,
+    AdminOrgDomainModule,
+    OrgDomainModule,
+    NotificationsModule,
     OrgTrackingModule,
     PublicSiteModule,
   ],

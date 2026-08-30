@@ -144,15 +144,16 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
     const design = searchParams.get("design");
 
     (async () => {
-      if (id) {
-        const page = await loadTemplate(id, resource);
-        if (cancelled) return;
-        if (page) {
-          setActivePage(page);
-          setModule("builder");
-          return;
+      try {
+        if (id) {
+          const page = await loadTemplate(id, resource);
+          if (cancelled) return;
+          if (page) {
+            setActivePage(page);
+            setModule("builder");
+            return;
+          }
         }
-      }
       // ?design= lookup-by-design-id is a Template-only concept (org pages
       // are opened by their own id, never by a shared design id) — skip it
       // entirely for the org resource.
@@ -176,6 +177,9 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
         }
       }
       if (!cancelled) window.location.replace(HOME_PATH[resource]);
+      } catch {
+        if (!cancelled) window.location.replace(HOME_PATH[resource]);
+      }
     })();
 
     return () => {
@@ -190,6 +194,8 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
       // together) — no separate landing/thank-you calls needed.
       loadTemplates({ resource: "landing-page" }).then((pages) => {
         if (!cancelled) setAllPages(pages);
+      }).catch(() => {
+        if (!cancelled) setAllPages([]);
       });
       return () => {
         cancelled = true;
@@ -203,6 +209,8 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
       loadTemplates({ includeContent: false, pageType: "thank-you" }),
     ]).then(([landing, thankYou]) => {
       if (!cancelled) setAllPages([...landing, ...thankYou]);
+    }).catch(() => {
+      if (!cancelled) setAllPages([]);
     });
     return () => {
       cancelled = true;

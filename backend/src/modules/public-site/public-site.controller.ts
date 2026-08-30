@@ -11,6 +11,11 @@ export class PublicSiteController {
     return this.service.resolveByDomain(domain);
   }
 
+  @Get('resolve-org/:host')
+  resolveOrg(@Param('host') host: string) {
+    return this.service.resolveByHost(host);
+  }
+
   @Get('domain/:domain/sitemap.xml')
   @Header('Content-Type', 'application/xml')
   async sitemap(@Param('domain') domain: string) {

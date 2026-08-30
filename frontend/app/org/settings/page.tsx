@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, getPlans, getInvoices, changePlan } from "@/lib/api";
-import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
+import { apiFetch, changePlan, getInvoices, getOrgDomainInfo, getPlans, requestCustomDomain } from "@/lib/api";
+import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, OrgDomainInfo, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
+import { subdomainPreviewHost } from "@/lib/domain";
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
 
 const LANGUAGES = [
@@ -37,6 +38,7 @@ const NAV_GROUPS = [
     { s: "general", icon: "building" as IconName, t: "General" },
     { s: "branding", icon: "sparkles" as IconName, t: "Branding" },
     { s: "localization", icon: "globe" as IconName, t: "Localization" },
+    { s: "domain", icon: "globe" as IconName, t: "Domain" },
   ] },
   { grp: "SALES", items: [
     { s: "crm", icon: "crm" as IconName, t: "CRM & Leads" },
@@ -65,6 +67,7 @@ const SECTION_META: Record<string, { icon: IconName; title: string; sub: string 
   general: { icon: "building", title: "Organisation profile", sub: "Basic details, legal info and registered address" },
   branding: { icon: "sparkles", title: "Logo & identity", sub: "Shown across the app, landing pages & emails" },
   localization: { icon: "globe", title: "Formats & language", sub: "Regional preferences for your workspace" },
+  domain: { icon: "globe", title: "Domain & subdomain", sub: "Your organisation site URL and custom domain" },
   crm: { icon: "crm", title: "CRM & leads", sub: "How leads are captured and handled" },
   fields: { icon: "puzzle", title: "Custom attributes", sub: "Add your own fields to leads, contacts, projects & bookings" },
   pipeline: { icon: "modules", title: "Pipeline & sources", sub: "Stages, lost reasons and lead sources" },
@@ -162,6 +165,125 @@ function Card({
       </div>
       <div className="card-b">{children}</div>
     </div>
+  );
+}
+
+const DOMAIN_STATUS_BADGE: Record<string, string> = {
+  none: "b-gray", pending: "b-amber", approved: "b-blue", active: "b-green", rejected: "b-rose", connected: "b-green",
+};
+const DOMAIN_STATUS_LABEL: Record<string, string> = {
+  none: "Not set", pending: "Pending approval", approved: "Approved", active: "Active", rejected: "Rejected", connected: "Connected",
+};
+
+function DomainSection() {
+  const [info, setInfo] = useState<OrgDomainInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [customDomain, setCustomDomain] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+  const [busy, setBusy] = useState(true);
+
+  async function load() {
+    setBusy(true);
+    try {
+      const data = await getOrgDomainInfo();
+      setInfo(data);
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message ?? "Could not load domain settings");
+    } finally {
+      setLoading(false);
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function handleRequest(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!customDomain.trim()) return;
+    setSending(true);
+    setSent(null);
+    setError(null);
+    try {
+      await requestCustomDomain({ domain: customDomain.trim() });
+      setCustomDomain("");
+      setSent("Custom domain request submitted for review.");
+      await load();
+    } catch (err: any) {
+      setError(err?.message ?? "Could not submit custom domain request");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  const badge = (status: string) => (
+    <span className={`badge ${DOMAIN_STATUS_BADGE[status] ?? "b-gray"}`}>{DOMAIN_STATUS_LABEL[status] ?? status}</span>
+  );
+
+  const host = info?.subdomainHost ?? subdomainPreviewHost(info?.subdomain);
+
+  return (
+    <Card icon="globe" title="Subdomain" sub="Your organisation site address on this platform">
+      <div className="card-b" style={{ padding: 0 }}>
+        {loading ? (
+          <div className="muted" style={{ padding: 16 }}>Loading domain settings…</div>
+        ) : busy ? null : !info ? (
+          <div className="muted" style={{ padding: 16 }}>{error ?? "Domain settings unavailable."}</div>
+        ) : (
+          <>
+            <div className="swrow">
+              <div className="tx">
+                <b>Subdomain</b>
+                <div className="muted">
+                  {info.subdomain ? host : "No subdomain requested."}
+                  {info.subdomainStatus === "active" ? " — live" : ""}
+                </div>
+              </div>
+              {badge(info.subdomainStatus)}
+            </div>
+            <div className="swrow">
+              <div className="tx">
+                <b>Custom domain</b>
+                <div className="muted">
+                  {info.customDomain ?? "No custom domain mapped yet."}
+                  {info.customDomainStatus === "connected" ? " — pointing to your site" : ""}
+                </div>
+              </div>
+              {badge(info.customDomainStatus)}
+            </div>
+
+            <div style={{ padding: "4px 16px 16px" }}>
+              <div className="os-card-x" style={{ margin: "12px 0 8px", fontWeight: 600, color: "var(--fg)" }}>
+                Map a custom domain
+              </div>
+              <div className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
+                Bring your own domain (e.g. homes.skylinedev.com). A super admin reviews and approves it
+                before it goes live. Only available once your organisation is active.
+              </div>
+              <form onSubmit={handleRequest} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                  <input
+                    className="inp"
+                    placeholder="example.com"
+                    value={customDomain}
+                    onChange={(e) => setCustomDomain(e.target.value)}
+                  />
+                </div>
+                <button className="btn btn-primary" type="submit" disabled={sending || info.subdomainStatus !== "active"}>
+                  {sending ? "Submitting…" : "Request"}
+                </button>
+              </form>
+              {sent ? <div className="muted" style={{ color: "var(--green)", marginTop: 8 }}>{sent}</div> : null}
+              {error ? <div className="muted" style={{ color: "var(--rose)", marginTop: 8 }}>{error}</div> : null}
+            </div>
+          </>
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -437,6 +559,12 @@ export default function OrgSettingsPage() {
                 </div>
               </div>
             </Card>
+          </div>
+
+          {/* DOMAIN */}
+          <div className={`os-section${section === "domain" ? " on" : ""}`}>
+            <SectionHead section="domain" />
+            <DomainSection />
           </div>
 
           {/* CRM */}

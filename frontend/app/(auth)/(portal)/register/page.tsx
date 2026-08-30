@@ -8,8 +8,9 @@ import { useAuth } from "@/lib/auth-context";
 import { dashboardPathFor } from "@/lib/mock/sessions";
 import { mapApiFieldErrors } from "@/lib/form-errors";
 import { slugify } from "@/lib/slug";
-import { apiFetch } from "@/lib/api";
-import type { Plan, SignupInput } from "@/lib/types";
+import { apiFetch, checkSubdomainAvailability } from "@/lib/api";
+import { subdomainPreviewHost } from "@/lib/domain";
+import type { Plan, SignupInput, SubdomainAvailability } from "@/lib/types";
 import { COUNTRY_META, COUNTRIES } from "@/lib/countries";
 
 const FIELD_KEYS = [
@@ -97,6 +98,8 @@ export default function RegisterPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [subdomainCheck, setSubdomainCheck] = useState<SubdomainAvailability | null>(null);
+  const [checkingSubdomain, setCheckingSubdomain] = useState(false);
 
   // package & template selection
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -130,6 +133,24 @@ export default function RegisterPage() {
   }
 
   const [pendingOrg, setPendingOrg] = useState<{ name: string; email: string } | null>(null);
+
+  // Debounced live subdomain availability check for the step-2 field.
+  useEffect(() => {
+    const sub = form.subdomain?.trim().toLowerCase();
+    if (!sub || sub.length < 2) {
+      setSubdomainCheck(null);
+      setCheckingSubdomain(false);
+      return;
+    }
+    setCheckingSubdomain(true);
+    const timer = setTimeout(() => {
+      checkSubdomainAvailability(sub)
+        .then((res) => setSubdomainCheck(res))
+        .catch(() => setSubdomainCheck(null))
+        .finally(() => setCheckingSubdomain(false));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [form.subdomain]);
 
   useEffect(() => {
     (async () => {
@@ -237,6 +258,7 @@ export default function RegisterPage() {
         planId: selectedPlanId || undefined,
         billingCycle,
         templateIds: selectedTemplateIds,
+        subdomain: form.subdomain || undefined,
       };
       const session: any = await signup(payload);
       if (session?.pending) {
@@ -397,7 +419,42 @@ export default function RegisterPage() {
                 <div className="field">
                   <label>Subdomain <span className="req">*</span></label>
                   <input className="inp" value={subdomain} onChange={update("subdomain")} placeholder="skylinedev" />
-                  <div className="hint">✅ {subdomain || "yourco"}.ipixxel.in is available</div>
+                  {checkingSubdomain ? (
+                    <div className="hint">Checking availability…</div>
+                  ) : subdomainCheck ? (
+                    subdomainCheck.available ? (
+                      <div className="hint" style={{ color: "var(--green)" }}>
+                        ✅ {subdomainCheck.host} is available
+                      </div>
+                    ) : (
+                      <div className="hint" style={{ color: "var(--rose)" }}>
+                        ❌ {subdomainCheck.host} is already taken. Please choose another.
+                        {subdomainCheck.suggestions.length ? (
+                          <span style={{ display: "block", marginTop: 6, color: "var(--muted)" }}>
+                            Suggestions:{" "}
+                            {subdomainCheck.suggestions.map((s) => (
+                              <button
+                                key={s}
+                                type="button"
+                                className="chip"
+                                style={{ cursor: "pointer", margin: "2px 4px 2px 0" }}
+                                onClick={() => {
+                                  setForm((prev) => ({ ...prev, subdomain: s }));
+                                  setSubdomainCheck(null);
+                                }}
+                              >
+                                {subdomainPreviewHost(s)}
+                              </button>
+                            ))}
+                          </span>
+                        ) : null}
+                      </div>
+                    )
+                  ) : subdomain ? (
+                    <div className="hint">✅ {subdomainPreviewHost(subdomain)} is available</div>
+                  ) : (
+                    <div className="hint">You&apos;ll get <b>{subdomainPreviewHost("yourco")}</b></div>
+                  )}
                 </div>
               <div className="row2">
                 <div className="field">

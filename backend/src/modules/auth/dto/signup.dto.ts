@@ -41,6 +41,20 @@ export class SignupDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(63)
+  // Requested organisation subdomain (single DNS label, no domain). Stored on
+  // the pending OrgDomainRequest and auto-activated on approval.
+  subdomain?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(253)
+  // Optional custom domain the org wants mapped once approved.
+  custom_domain?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(100)
   country?: string;
 

@@ -1,4 +1,5 @@
 import type {
+  AdminOrgDomainRequestListResponse,
   ApiErrorBody,
   AuthTokens,
   ChangePasswordInput,
@@ -6,7 +7,13 @@ import type {
   ChangePlanResult,
   InvoiceRow,
   LeadSubmission,
+  NotificationsListResponse,
+  OrgDomainInfo,
   Plan,
+  RequestCustomDomainInput,
+  ReviewOrgDomainRequestInput,
+  SubdomainAvailability,
+  UnreadNotificationsResponse,
   UserProfile,
 } from "./types";
 
@@ -161,5 +168,92 @@ export async function submitLead(input: LeadSubmission): Promise<void> {
       source: input.source,
       data: input.fields,
     }),
+  });
+}
+
+// --- Organisation domain identity (subdomain + custom domain) ---
+
+export async function checkSubdomainAvailability(
+  subdomain: string,
+): Promise<SubdomainAvailability> {
+  return apiFetch<SubdomainAvailability>(
+    `/auth/subdomain-availability?subdomain=${encodeURIComponent(subdomain)}`,
+  );
+}
+
+export async function getOrgDomainInfo(): Promise<OrgDomainInfo> {
+  return apiFetch<OrgDomainInfo>("/org/domain");
+}
+
+export async function requestCustomDomain(
+  input: RequestCustomDomainInput,
+): Promise<OrgDomainInfo["requests"][number]> {
+  return apiFetch<OrgDomainInfo["requests"][number]>("/org/domain/custom-domain", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// --- Super Admin: org subdomain / custom-domain request review ---
+
+export async function getOrgDomainRequests(params?: {
+  kind?: string;
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<AdminOrgDomainRequestListResponse> {
+  const q = new URLSearchParams();
+  if (params?.kind) q.set("kind", params.kind);
+  if (params?.status) q.set("status", params.status);
+  if (params?.search) q.set("search", params.search);
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  const s = q.toString();
+  return apiFetch<AdminOrgDomainRequestListResponse>(
+    `/admin/org-domain-requests${s ? `?${s}` : ""}`,
+  );
+}
+
+export async function reviewOrgDomainRequest(
+  id: string,
+  input: ReviewOrgDomainRequestInput,
+): Promise<{ id: string; status: string }> {
+  return apiFetch<{ id: string; status: string }>(
+    `/admin/org-domain-requests/${id}/review`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+// --- In-app notifications (Super Admin bell) ---
+
+export async function getNotifications(params?: {
+  page?: number;
+  limit?: number;
+  unreadOnly?: boolean;
+}): Promise<NotificationsListResponse> {
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.unreadOnly) q.set("unreadOnly", "true");
+  const s = q.toString();
+  return apiFetch<NotificationsListResponse>(
+    `/admin/notifications${s ? `?${s}` : ""}`,
+  );
+}
+
+export async function getUnreadNotifications(): Promise<UnreadNotificationsResponse> {
+  return apiFetch<UnreadNotificationsResponse>("/admin/notifications/unread-count");
+}
+
+export async function markNotificationRead(id: string): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/admin/notifications/${id}/read`, {
+    method: "PATCH",
+  });
+}
+
+export async function markAllNotificationsRead(): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>("/admin/notifications/read-all", {
+    method: "POST",
   });
 }

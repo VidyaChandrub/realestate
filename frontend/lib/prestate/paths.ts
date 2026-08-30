@@ -22,5 +22,5 @@ export function localDomainPreviewPath(domain: string): string {
     .replace(/^www\./, "")
     .replace(/\/.*$/, "")
     .replace(/:\d+$/, "");
-  return host ? `/p/host/${host}` : "";
+  return host ? `/__host/${host}` : "";
 }

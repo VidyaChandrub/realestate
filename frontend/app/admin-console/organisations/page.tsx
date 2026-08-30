@@ -283,6 +283,7 @@ export default function SuperAdminOrganisationsPage() {
               <thead>
                 <tr>
                   <th>Organisation</th>
+                  <th>Domain</th>
                   <th>Admin</th>
                   <th>Plan</th>
                   <th>Users</th>
@@ -296,13 +297,13 @@ export default function SuperAdminOrganisationsPage() {
               <tbody>
                 {error ? (
                   <tr>
-                    <td colSpan={9} className="muted">
+                    <td colSpan={10} className="muted">
                       {error}
                     </td>
                   </tr>
                 ) : !loading && rows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="muted">
+                    <td colSpan={10} className="muted">
                       No organisations match this filter.
                     </td>
                   </tr>
@@ -318,6 +319,17 @@ export default function SuperAdminOrganisationsPage() {
                             <span className="sm">{o.city} · {o.slug}</span>
                           </span>
                         </Link>
+                      </td>
+                      <td>
+                        <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                          <span className="sm" style={{ fontSize:11 }}>{o.subdomain ? (o.subdomainHost ?? o.subdomain) : "—"}</span>
+                          {o.customDomain ? <span className="sm" style={{ fontSize:11, color:"var(--muted)" }}>{o.customDomain}</span> : null}
+                          {o.subdomainStatus && o.subdomainStatus !== "none" ? (
+                            <span className={`badge ${o.subdomainStatus === "active" ? "b-green" : o.subdomainStatus === "pending" ? "b-amber" : o.subdomainStatus === "rejected" ? "b-rose" : "b-gray"}`} style={{ fontSize: 10 }}>
+                              {o.subdomainStatus}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td>
                         <div style={{ display:"flex", flexDirection:"column", gap:2}}>
