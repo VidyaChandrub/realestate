@@ -1,0 +1,187 @@
+/* ============================================================
+   iPixxel Realty — Projects module
+   Grid/list views, project cards, availability bars,
+   unit cards, availability matrix, project onboarding wizard.
+   ============================================================ */
+
+/* ---------- Sub nav (Projects / Units tabs) ---------- */
+.psub{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:20px;overflow-x:auto}
+.psub a{padding:11px 16px;font-size:13.5px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;text-decoration:none;transition:.15s}
+.psub a.active{color:var(--brand);border-bottom-color:var(--brand)}
+.psub a:hover{color:var(--ink)}
+
+/* ---------- Project card grid ---------- */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px}
+.pcard{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--surface);cursor:pointer;transition:.18s;display:flex;flex-direction:column}
+.pcard:hover{transform:translateY(-3px);box-shadow:var(--sh)}
+.pcard .cover{height:150px;position:relative}
+.pcard .cover .tag{position:absolute;top:12px;left:12px;background:rgba(15,20,36,.55);color:#fff;font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:20px;backdrop-filter:blur(4px)}
+.pcard .cover .st{position:absolute;top:12px;right:12px}
+.pcard .pb{padding:15px 16px;display:flex;flex-direction:column;gap:12px;flex:1}
+.pcard h3{font-size:16px;margin:0}
+.pcard .loc{font-size:12.5px;color:var(--muted)}
+
+/* ---------- Availability bar ---------- */
+.availbar{display:flex;height:8px;border-radius:20px;overflow:hidden}
+.availbar i{display:block;height:100%}
+.avstat{display:flex;gap:12px;font-size:11.5px;flex-wrap:wrap}
+.avstat span{display:flex;align-items:center;gap:5px}
+.avstat i{width:9px;height:9px;border-radius:3px;display:inline-block}
+
+/* ---------- Project meta row ---------- */
+.pmeta{display:flex;justify-content:space-between;font-size:12.5px;border-top:1px solid var(--line);padding-top:11px;margin-top:auto}
+.pmeta .k{color:var(--muted)}
+.pmeta b{display:block}
+
+/* ---------- View toggle ---------- */
+.view-toggle{display:inline-flex;background:#eef1f6;border-radius:11px;padding:3px}
+.view-toggle span{padding:7px 15px;border-radius:9px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:.18s}
+.view-toggle span.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh-sm)}
+
+/* ---------- List view table ---------- */
+#listView{display:none}
+
+/* ---------- Project detail: spec grid ---------- */
+.spec-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.spec-grid .sp{display:flex;flex-direction:column;gap:2px}
+.spec-grid .sp .k{font-size:11.5px;color:var(--muted)}
+.spec-grid .sp .v{font-size:14px;font-weight:700}
+
+@media(max-width:640px){.spec-grid{grid-template-columns:1fr 1fr}}
+
+/* ---------- Project detail: gallery ---------- */
+.gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.gallery .thumb{aspect-ratio:4/3;border-radius:12px;overflow:hidden;cursor:pointer;transition:.18s}
+.gallery .thumb:hover{transform:translateY(-2px)}
+@media(max-width:560px){.gallery{grid-template-columns:repeat(3,1fr)}}
+
+/* ---------- Unit type cards ---------- */
+.utype-card{border:1px solid var(--line);border-radius:14px;overflow:hidden;text-decoration:none;color:inherit;transition:.18s}
+.utype-card:hover{box-shadow:var(--sh);transform:translateY(-2px)}
+.utype-card .cover{height:120px;position:relative}
+.utype-card .cover .cap{position:absolute;bottom:10px;left:12px;font-size:12px;font-weight:600;color:#fff;background:rgba(15,20,36,.45);padding:3px 9px;border-radius:8px;backdrop-filter:blur(4px)}
+.utype-card .info{padding:14px}
+
+/* ---------- Unit spec grid ---------- */
+.uspec{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;font-size:12.5px;margin:10px 0}
+.uspec .k{color:var(--muted)}
+.uspec .v{font-weight:700}
+
+/* ---------- Badge row ---------- */
+.badge-row{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+
+/* ---------- Availability matrix ---------- */
+.avail{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:8px}
+.avail .u-cell{border-radius:10px;padding:10px 0;text-align:center;font-weight:700;font-size:12.5px;border:1px solid var(--line);cursor:pointer;transition:.12s}
+.avail .u-cell:hover{transform:translateY(-2px)}
+.u-cell.avl{background:rgba(16,185,129,.12);color:#0f9d6f;border-color:rgba(16,185,129,.3)}
+.u-cell.bkd{background:rgba(244,63,94,.12);color:#e11d48;border-color:rgba(244,63,94,.3)}
+.u-cell.hld{background:rgba(245,158,11,.14);color:#b45309;border-color:rgba(245,158,11,.3)}
+.u-cell.sld{background:rgba(100,116,139,.14);color:#475569;border-color:rgba(100,116,139,.3)}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:4px;display:inline-block}
+
+/* ---------- Unit status cards (all units page) ---------- */
+.ustatus{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.ust{flex:1;min-width:150px;border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden}
+.ust .n{font-size:24px;font-weight:800}
+.ust .l{font-size:12.5px;color:var(--muted)}
+.ust::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+.ust.tot::before{background:var(--brand)}
+.ust.av::before{background:#10b981}
+.ust.bk::before{background:#f43f5e}
+.ust.hl::before{background:#f59e0b}
+.ust.sl::before{background:#64748b}
+
+/* ---------- Unit detail grid ---------- */
+.ugrid{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
+@media(max-width:900px){.ugrid{grid-template-columns:1fr}}
+
+.unit-spec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.unit-spec-grid .sp{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.unit-spec-grid .sp .k{font-size:11.5px;color:var(--muted)}
+.unit-spec-grid .sp .v{font-size:14px;font-weight:700;margin-top:2px}
+
+.pricebox{background:linear-gradient(120deg,var(--brand-050),#fff);border:1px solid var(--brand-100);border-radius:14px;padding:16px}
+
+/* ---------- Project onboarding wizard ---------- */
+.wz{display:grid;grid-template-columns:270px 1fr;gap:22px;align-items:start}
+@media(max-width:900px){.wz{grid-template-columns:1fr}}
+.wz-rail{position:sticky;top:18px}
+.wz-prog{height:6px;border-radius:20px;background:var(--line-2);overflow:hidden;margin:6px 0 18px}
+.wz-prog>i{display:block;height:100%;width:11%;background:var(--brand);border-radius:20px;transition:width .35s cubic-bezier(.4,0,.2,1)}
+.wz-steps{display:flex;flex-direction:column;gap:4px}
+.wz-steps button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:transparent;padding:10px 12px;border-radius:11px;cursor:pointer;font:inherit;color:var(--muted);transition:.15s}
+.wz-steps button:hover{background:var(--surface-2)}
+.wz-steps button.on{background:var(--brand-050);color:var(--ink)}
+.wz-steps button.on .num{background:var(--brand);color:#fff;border-color:var(--brand)}
+.wz-steps button.done .num{background:var(--green);color:#fff;border-color:var(--green)}
+.wz-steps .num{flex-shrink:0;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line-2);display:grid;place-items:center;font-size:12.5px;font-weight:700;background:var(--surface);transition:.15s}
+.wz-steps .tx{display:flex;flex-direction:column;line-height:1.25}
+.wz-steps .tx b{font-size:13.5px;font-weight:600}
+.wz-steps .tx small{font-size:11.5px;color:var(--muted)}
+.wz-pane{display:none}
+.wz-pane.on{display:block;animation:wzin .35s ease}
+@keyframes wzin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.q-h{margin-bottom:18px}
+.q-h .st{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--brand)}
+.q-h h2{font-size:20px;margin:2px 0 4px}
+.q-h .sub{font-size:13.5px;color:var(--muted)}
+.q-sec{border-top:1px solid var(--line);margin-top:22px;padding-top:18px}
+.q-sec:first-of-type{border-top:0;margin-top:0;padding-top:0}
+.q-sec>.lbl{font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.req{color:var(--rose)}
+.opts{display:flex;flex-wrap:wrap;gap:9px}
+.opt{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:1.5px solid var(--line-2);border-radius:11px;font-size:13.5px;font-weight:500;cursor:pointer;background:var(--surface);transition:.15s;user-select:none}
+.opt:hover{border-color:var(--brand)}
+.opt.on{border-color:var(--brand);background:var(--brand-050);color:var(--ink);font-weight:600}
+.opt .b{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--line-2);display:grid;place-items:center;font-size:11px;color:#fff}
+.opt.on .b{background:var(--brand);border-color:var(--brand)}
+.opt.rad .b{border-radius:50%}
+.sw-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:13px 0;border-bottom:1px solid var(--line)}
+.sw-row:last-child{border-bottom:0}
+.sw-row .tx b{display:block;font-size:14px}
+.sw-row .tx small{font-size:12.5px;color:var(--muted)}
+.drop{border:1.6px dashed var(--line-2);border-radius:14px;padding:22px;text-align:center;color:var(--muted);cursor:pointer;background:var(--surface-2)}
+.drop:hover{border-color:var(--brand);color:var(--brand)}
+.rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
+@media(max-width:640px){.rev-grid{grid-template-columns:1fr}}
+.rev .sp{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.rev .sp .k{color:var(--muted)}
+.rev .sp .v{font-weight:600;text-align:right}
+.wz-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+.wz-foot .save{font-size:12.5px;color:var(--muted)}
+
+/* ---------- Mode cards (unit create) ---------- */
+.mode{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px}
+@media(max-width:520px){.mode{grid-template-columns:1fr}}
+.modecard{border:1.5px solid var(--line-2);border-radius:14px;padding:15px;cursor:pointer;transition:.15s}
+.modecard:hover{border-color:var(--brand)}
+.modecard.on{border-color:var(--brand);background:var(--brand-050)}
+.modecard .ic{font-size:22px}
+.modecard b{display:block;margin:6px 0 3px}
+.modecard small{color:var(--muted);font-size:12px}
+
+/* ---------- Unit create grid ---------- */
+.cgrid{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+@media(max-width:900px){.cgrid{grid-template-columns:1fr}}
+
+/* ---------- Form sections & grids ---------- */
+.sec{border-top:1px solid var(--line);margin-top:22px;padding-top:18px}
+.sec:first-of-type{border-top:0;margin-top:0;padding-top:0}
+.sec>.lbl{font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:14px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 18px}
+@media(max-width:620px){.g2,.g3{grid-template-columns:1fr}}
+
+/* ---------- Toggle switch ---------- */
+.switch{position:relative;width:42px;height:24px;background:var(--line-2);border-radius:20px;cursor:pointer;transition:.2s;flex-shrink:0}
+.switch.on{background:var(--brand)}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s;box-shadow:var(--sh-sm)}
+.switch.on::after{left:20px}
+
+/* ---------- Field helpers ---------- */
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.mono{font-family:monospace}

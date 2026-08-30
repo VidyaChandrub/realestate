@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
+import "@/app/admin-console/superadmin.css";
 import type { ProjectStatus } from "@/lib/types";
 
 const TAB_DEFS = [

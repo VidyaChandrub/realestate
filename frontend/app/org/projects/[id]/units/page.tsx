@@ -10,6 +10,8 @@ import { Seg } from "@/components/superadmin/seg";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import "@/app/admin-console/superadmin.css";
+import "../../projects.css";
 import type {
   CreateUnitInput,
   CreateUnitTypeInput,
@@ -878,131 +880,196 @@ export default function OrgProjectUnitsPage() {
         open={unitMode !== null}
         onClose={() => setUnitMode(null)}
         title={unitMode === "create" ? "Add unit" : "Edit unit"}
-        size="lg"
+        size="xl"
       >
-        <div className="superadmin">
-          {unitError ? (
-            <div className="form-alert" style={{ marginBottom: 12 }}>
-              {unitError}
+        <div className="cgrid">
+          <div>
+            {unitError ? (
+              <div className="form-alert" style={{ marginBottom: 12 }}>
+                {unitError}
+              </div>
+            ) : null}
+
+            <div className="sec">
+              <div className="lbl">🏗️ Project placement</div>
+              <div className="g3">
+                <div className="field">
+                  <label>Unit type <span className="req">*</span></label>
+                  <select
+                    className="inp"
+                    value={unitForm.unitTypeId}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, unitTypeId: e.target.value }))
+                    }
+                  >
+                    <option value="">Select…</option>
+                    {unitTypes.map((ut) => (
+                      <option key={ut.id} value={ut.id}>
+                        {ut.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Tower / block</label>
+                  <input
+                    className="inp"
+                    placeholder="e.g. Tower B"
+                    value={unitForm.tower}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, tower: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label>Floor</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    placeholder="12"
+                    value={unitForm.floor}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, floor: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
             </div>
-          ) : null}
-          <div className="row2">
-            <div className="field">
-              <label>Unit type *</label>
-              <select
-                value={unitForm.unitTypeId}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, unitTypeId: e.target.value }))
-                }
-              >
-                <option value="">Select…</option>
-                {unitTypes.map((ut) => (
-                  <option key={ut.id} value={ut.id}>
-                    {ut.name}
-                  </option>
-                ))}
-              </select>
+
+            <div className="sec">
+              <div className="lbl">🏠 Unit details</div>
+              <div className="g3">
+                <div className="field">
+                  <label>Unit number <span className="req">*</span></label>
+                  <input
+                    className="inp mono"
+                    placeholder="B-1204"
+                    value={unitForm.unitNo}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, unitNo: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label>Facing</label>
+                  <select
+                    className="inp"
+                    value={unitForm.facing}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, facing: e.target.value }))
+                    }
+                  >
+                    <option value="">Select…</option>
+                    <option value="East">East</option>
+                    <option value="West">West</option>
+                    <option value="North">North</option>
+                    <option value="South">South</option>
+                    <option value="North-East">North-East</option>
+                    <option value="North-West">North-West</option>
+                    <option value="South-East">South-East</option>
+                    <option value="South-West">South-West</option>
+                    <option value="Sea">Sea</option>
+                    <option value="Garden">Garden</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Status</label>
+                  <select
+                    className="inp"
+                    value={unitForm.status}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({
+                        ...f,
+                        status: e.target.value as UnitStatus,
+                      }))
+                    }
+                  >
+                    <option value="available">Available</option>
+                    <option value="booked">Booked</option>
+                    <option value="held">Held / Blocked</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div className="field">
-              <label>Unit number *</label>
-              <input
-                className="inp mono"
-                placeholder="A-301"
-                value={unitForm.unitNo}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, unitNo: e.target.value }))
-                }
-              />
+
+            <div className="sec" style={{ borderBottom: 0 }}>
+              <div className="lbl">💰 Pricing</div>
+              <div className="g2">
+                <div className="field">
+                  <label>Price (₹)</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    placeholder="16500000"
+                    value={unitForm.price}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, price: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label>Price / sqft</label>
+                  <input
+                    className="inp"
+                    placeholder="Auto-calculated"
+                    disabled
+                    value={
+                      unitForm.price && unitTypes.find((ut) => ut.id === unitForm.unitTypeId)?.carpetSqft
+                        ? `₹${Math.round(Number(unitForm.price) / unitTypes.find((ut) => ut.id === unitForm.unitTypeId)!.carpetSqft!).toLocaleString("en-IN")}`
+                        : ""
+                    }
+                  />
+                </div>
+              </div>
             </div>
           </div>
-          <div className="row2">
-            <div className="field">
-              <label>Tower (optional)</label>
-              <input
-                className="inp"
-                placeholder="e.g. A — leave blank if none"
-                value={unitForm.tower}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, tower: e.target.value }))
-                }
-              />
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div className="card">
+              <div className="card-h"><span className="t">Preview</span></div>
+              <div className="card-b">
+                <div style={{ height: 80, borderRadius: 12, background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12, fontSize: 24 }}>📐</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <b>{unitForm.unitNo || "New unit"}</b>
+                  <span className={`badge ${unitForm.status === "available" ? "b-green" : unitForm.status === "booked" ? "b-rose" : "b-amber"}`}>
+                    {unitForm.status === "available" ? "Available" : unitForm.status === "booked" ? "Booked" : "Held"}
+                  </span>
+                </div>
+                <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+                  {unitTypes.find((ut) => ut.id === unitForm.unitTypeId)?.name || "Select unit type"}
+                  {unitForm.tower ? ` · ${unitForm.tower}` : ""}
+                  {unitForm.floor ? ` · Floor ${unitForm.floor}` : ""}
+                  <br />
+                  {unitForm.facing || "Facing not set"}
+                </div>
+              </div>
             </div>
-            <div className="field">
-              <label>Floor</label>
-              <input
-                className="inp"
-                type="number"
-                placeholder="3"
-                value={unitForm.floor}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, floor: e.target.value }))
-                }
-              />
-            </div>
+            <div className="help">💡 Add the unit number, type and price to get started. Tower and floor help organize the availability grid.</div>
           </div>
-          <div className="row2">
-            <div className="field">
-              <label>Facing</label>
-              <input
-                className="inp"
-                placeholder="North-East"
-                value={unitForm.facing}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, facing: e.target.value }))
-                }
-              />
-            </div>
-            <div className="field">
-              <label>Price (₹)</label>
-              <input
-                className="inp"
-                type="number"
-                min={0}
-                value={unitForm.price}
-                onChange={(e) =>
-                  setUnitForm((f) => ({ ...f, price: e.target.value }))
-                }
-              />
-            </div>
-          </div>
-          <div className="field">
-            <label>Status</label>
-            <select
-              value={unitForm.status}
-              onChange={(e) =>
-                setUnitForm((f) => ({
-                  ...f,
-                  status: e.target.value as UnitStatus,
-                }))
-              }
-            >
-              <option value="available">Available</option>
-              <option value="booked">Booked</option>
-              <option value="held">Held</option>
-            </select>
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              className="btn btn-primary"
-              type="button"
-              disabled={unitBusy}
-              onClick={() => void submitUnit()}
-            >
-              {unitBusy
-                ? "Saving…"
-                : unitMode === "create"
-                  ? "Add unit"
-                  : "Save"}
-            </button>
-            <button
-              className="btn btn-ghost"
-              type="button"
-              onClick={() => setUnitMode(null)}
-              disabled={unitBusy}
-            >
-              Cancel
-            </button>
-          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 18, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={unitBusy}
+            onClick={() => void submitUnit()}
+          >
+            {unitBusy
+              ? "Saving…"
+              : unitMode === "create"
+                ? "Add unit"
+                : "Save"}
+          </button>
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={() => setUnitMode(null)}
+            disabled={unitBusy}
+          >
+            Cancel
+          </button>
         </div>
       </Modal>
 

@@ -8,6 +8,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import "@/app/admin-console/superadmin.css";
+import "../../projects.css";
 
 type Doc = { name: string; type: string; typeBadge: string; updated: string };
 

@@ -10,6 +10,8 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import "@/app/admin-console/superadmin.css";
+import "../../projects.css";
 
 type Lead = {
   name: string;

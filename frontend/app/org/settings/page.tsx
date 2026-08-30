@@ -153,7 +153,7 @@ function Card({
   icon, title, sub, action, children,
 }: { icon: IconName; title: string; sub?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="card" style={{ marginBottom: 18 }}>
+    <div className="card" style={{ marginBottom: 16 }}>
       <div className="os-card-top">
         <span className="os-card-ic"><Icon name={icon} size={18} /></span>
         <div className="os-card-htext">

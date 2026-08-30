@@ -7,6 +7,8 @@
 
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import "@/app/admin-console/superadmin.css";
+import "../../projects.css";
 
 type SourceCard = {
   icon: string;

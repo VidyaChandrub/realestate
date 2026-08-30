@@ -11,6 +11,8 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { ProgressBar } from "@/components/superadmin/progress-bar";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import "@/app/admin-console/superadmin.css";
+import "../../projects.css";
 
 const CALLS = [
   {

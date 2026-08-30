@@ -106,18 +106,21 @@
 }
 
 .superadmin ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
+}
+
+.superadmin ::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .superadmin ::-webkit-scrollbar-thumb {
-  background: #d7dce6;
-  border-radius: 20px;
-  border: 3px solid var(--bg);
+  background: #d0d5e2;
+  border-radius: 99px;
 }
 
 .superadmin ::-webkit-scrollbar-thumb:hover {
-  background: #c3cad8;
+  background: #a8b0c4;
 }
 
 /* ---------- Shell ---------- */
@@ -552,8 +555,10 @@
 }
 
 .superadmin .page {
-  padding: 26px 30px 60px;
+  padding: 10px 10px 10px;
   width: 100%;
+  background: #fff;
+  min-height: calc(100vh - 64px);
 }
 
 .superadmin .page-head {
@@ -1429,15 +1434,11 @@
 
 .superadmin .auth .formside {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 40px;
   background: var(--surface);
-}
-
-.superadmin .auth .fw {
-  width: 100%;
-  max-width: 380px;
 }
 
 @media (max-width: 900px) {
@@ -1551,9 +1552,7 @@
     z-index: 35;
     animation: superadmin-fade 0.2s;
   }
-  .superadmin .page {
-    padding: 20px 16px 50px;
-  }
+
 }
 
 /* sign out in footer */
