@@ -339,6 +339,10 @@ function Inner({ section, children, align }: { section: SectionInstance; childre
                 : "flex-start"
             : undefined,
         width: "100%",
+        maxWidth: 1280,
+        margin: "0 auto",
+        padding: device === "mobile" ? "36px 16px" : device === "tablet" ? "48px 24px" : "60px 32px",
+        boxSizing: "border-box",
       }}
     >
       {children}
@@ -814,15 +818,31 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
   const pageId = useContext(SitePageIdContext);
   const wt = useContext(SiteLayoutThemeContext);
   const T = typoCss(s, device);
-  const design = String(s.settings.design ?? "classic");
+  const design = String(s.settings.design ?? "split");
   const primaryAction = textOf(st.primaryAction ?? "link") as CtaAction;
   const secondaryAction = textOf(st.secondaryAction ?? "link") as CtaAction;
   const primaryLink = textOf(st.primaryLink ?? "#enquiry");
   const secondaryLink = textOf(st.secondaryLink ?? "");
   const gateFile = textOf(st.file ?? "").trim();
-  const heroStats = Array.isArray(st.heroStats) ? (st.heroStats as { value: string; label: string }[]) : [];
-  const highlights = Array.isArray(st.highlights) ? (st.highlights as string[]) : [];
+  const heroStats = Array.isArray(st.heroStats) && st.heroStats.length > 0
+    ? (st.heroStats as { value: string; label: string }[])
+    : [
+        { value: "12 Acres", label: "Land Area" },
+        { value: "4 Towers", label: "High-Rise Wings" },
+        { value: "50+ Amenities", label: "Club & Sports" },
+        { value: "Dec 2026", label: "Possession" },
+      ];
+  const highlights = Array.isArray(st.highlights) && st.highlights.length > 0
+    ? (st.highlights as string[])
+    : [
+        "80% Open Lush Landscaped Greens",
+        "Ultra-Luxury 3 & 4 BHK Residences",
+        "50,000 Sq.Ft. Resort Clubhouse",
+        "Connected to Metro & Prime Tech Hubs",
+      ];
   const [gateOpen, setGateOpen] = useState(false);
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [slideIndex, setSlideIndex] = useState(0);
   const handle = useCtaHandlers(live);
   const gateFields = Array.isArray(st.gateFields) && st.gateFields.length
     ? (st.gateFields as GateField[])
@@ -830,13 +850,400 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
         { label: "Full Name", type: "text", required: true },
         { label: "Phone Number", type: "phone", required: true },
       ];
-  const isCentered = design === "centered";
-  const isSplit = design === "split";
-  const sideCardStats = heroStats.slice(0, isSplit ? 3 : 4);
-  const contentWidth = isCentered ? 820 : isSplit ? 620 : 680;
-  const sideCardColumns = device === "mobile" ? "1fr" : device === "tablet" ? "repeat(2,1fr)" : `repeat(${Math.min(sideCardStats.length || 1, isSplit ? 3 : 2)},1fr)`;
+
+  const isSplit = design === "split" || design === "split-form";
+  const isSlider = design === "slider" || design === "creative-slider";
+  const isClassic = !isSplit && !isSlider;
+
+  // Creative Slider Data
+  const slides = [
+    {
+      image: textOf(st.image || st.heroArt || "hero"),
+      heading: textOf(resolveVars(st.heading)) || "Ultra-Luxury 3 & 4 BHK Sky Residences",
+      subheading: textOf(resolveVars(st.subheading)) || "Experience panoramic skyline vistas, 80% open lush greenery, and resort amenities.",
+      price: textOf(resolveVars(st.price)) || "Starting From ₹1.85 Cr*",
+      tag: "✨ PRE-LAUNCH PRIVILEGE • 0% BROKERAGE",
+      highlights: ["80% Open Green Enclave", "Triple-Height Clubhouse", "RERA Approved"],
+    },
+    {
+      image: textOf(st.slide2Image || "clubhouse"),
+      heading: textOf(st.slide2Heading || "50,000 Sq.Ft. Resort Clubhouse & Spa"),
+      subheading: textOf(st.slide2Subheading || "Temperature-controlled infinity pools, bowling alleys, squash courts, and sky lounges."),
+      price: textOf(resolveVars(st.price)) || "Starting From ₹1.85 Cr*",
+      tag: "🏊 50+ WORLD-CLASS AMENITIES",
+      highlights: ["Infinity Olympic Pool", "Private Bowling Alley", "Sky Cinema Lounge"],
+    },
+    {
+      image: textOf(st.slide3Image || "skyline"),
+      heading: textOf(st.slide3Heading || "Italian Marble Finishes & Master Suites"),
+      subheading: textOf(st.slide3Subheading || "Bespoke double-height sundecks, imported German fittings, and smart home automation."),
+      price: textOf(resolveVars(st.price)) || "Starting From ₹1.85 Cr*",
+      tag: "🏛️ BESPOKE SPECIFICATIONS",
+      highlights: ["Italian Marble Floors", "VRV Air Conditioning", "Private Lift Access"],
+    },
+  ];
+
+  const currentSlide = slides[slideIndex % slides.length];
+
+  // -------------------------------------------------------------
+  // Variation 2: Creative Slider Layout
+  // -------------------------------------------------------------
+  if (isSlider) {
+    return (
+      <div style={{ position: "relative", minHeight: device === "mobile" ? 640 : device === "tablet" ? 720 : 840, display: "flex", alignItems: "center", overflow: "hidden", background: "#090d16" }}>
+        {/* Slide Visual Background */}
+        <div style={{ position: "absolute", inset: 0, transition: "all 0.6s ease" }}>
+          {isMediaSrc(currentSlide.image) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={currentSlide.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          ) : (
+            <SceneImage art={currentSlide.image} />
+          )}
+        </div>
+
+        {/* Cinematic Gradient Overlays */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(9,13,22,.92) 0%, rgba(9,13,22,.68) 50%, rgba(9,13,22,.28) 100%)", zIndex: 1 }} />
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(900px 500px at 15% 30%, rgba(99,102,241,.15), transparent 70%)", zIndex: 1, pointerEvents: "none" }} />
+
+        <Inner section={s} align="left">
+          <div style={{ maxWidth: 760, position: "relative", zIndex: 2, animation: "ps-fade-in .5s ease both" }}>
+            {/* Tag / Eyebrow */}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", backdropFilter: "blur(10px)", padding: "6px 14px", borderRadius: 999, marginBottom: 18 }}>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", color: "#cda45e" }}>
+                {currentSlide.tag}
+              </span>
+            </div>
+
+            {/* Headline */}
+            <h1 className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 34 : device === "tablet" ? 46 : 60, lineHeight: 1.05, fontWeight: 900, color: "#fff", letterSpacing: -1, margin: "0 0 16px", textShadow: "0 4px 24px rgba(0,0,0,.45)", ...T }}>
+              {currentSlide.heading}
+            </h1>
+
+            {/* Subheading */}
+            <p style={{ fontSize: device === "mobile" ? 15.5 : device === "tablet" ? 17.5 : 19.5, color: "rgba(255,255,255,.88)", fontWeight: 500, lineHeight: 1.55, marginBottom: 22, maxWidth: 640, ...T }}>
+              {currentSlide.subheading}
+            </p>
+
+            {/* Price Strip */}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 12, background: "rgba(15,23,42,.65)", border: "1px solid rgba(255,255,255,.15)", borderRadius: 14, padding: "10px 18px", backdropFilter: "blur(12px)", marginBottom: 24 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "#cda45e" }}>Starting Price</div>
+                <div style={{ fontSize: 24, fontWeight: 900, color: "#fff", letterSpacing: -0.5 }}>{currentSlide.price.replace(/^Starting From\s*/i, "")}</div>
+              </div>
+              <div style={{ width: 1, height: 28, background: "rgba(255,255,255,.15)" }} />
+              <div style={{ fontSize: 11.5, color: "rgba(255,255,255,.8)", fontWeight: 700 }}>
+                {textOf(st.priceNote || "Possession Dec 2026 • RERA Approved")}
+              </div>
+            </div>
+
+            {/* Bullet Points */}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 28 }}>
+              {currentSlide.highlights.map((h) => (
+                <span key={h} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(255,255,255,.10)", color: "#fff", border: "1px solid rgba(255,255,255,.16)", backdropFilter: "blur(8px)", padding: "7px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 700 }}>
+                  <CheckCircle2 size={13} style={{ color: "#cda45e" }} /> {h}
+                </span>
+              ))}
+            </div>
+
+            {/* CTA Buttons */}
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+              <a
+                href={resolveCtaHref(primaryAction, primaryLink)}
+                {...handle(primaryAction, primaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
+                style={{ ...wtButton({ accent: st.accent, size: "lg" }, wt), padding: "15px 30px", fontSize: 15, fontWeight: 800, boxShadow: "0 10px 30px rgba(99,102,241,.45)" }}
+              >
+                {textOf(resolveVars(st.ctaPrimary)) || "Schedule Site Visit"} <ArrowRight size={16} />
+              </a>
+              <a
+                href={resolveCtaHref(secondaryAction, secondaryLink || (gateFile ? "#" : ""))}
+                {...handle(secondaryAction, secondaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
+                style={{ ...wtButtonLight({ size: "lg" }, wt), padding: "15px 26px", fontSize: 14.5, backdropFilter: "blur(10px)", color: "#fff" }}
+              >
+                <Download size={15} /> {textOf(resolveVars(st.ctaSecondary)) || "Download Brochure"}
+              </a>
+            </div>
+          </div>
+        </Inner>
+
+        {/* Slider Navigation Arrows */}
+        <div style={{ position: "absolute", right: device === "mobile" ? 16 : 36, bottom: 40, zIndex: 10, display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            type="button"
+            aria-label="Previous Slide"
+            onClick={() => setSlideIndex((prev) => (prev > 0 ? prev - 1 : slides.length - 1))}
+            style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(15,23,42,.7)", border: "1px solid rgba(255,255,255,.2)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(8px)", transition: "all 0.15s" }}
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <button
+            type="button"
+            aria-label="Next Slide"
+            onClick={() => setSlideIndex((prev) => (prev + 1) % slides.length)}
+            style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(99,102,241,.8)", border: "1px solid rgba(255,255,255,.25)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(8px)", transition: "all 0.15s" }}
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+
+        {/* Slide Indicator Dots */}
+        <div style={{ position: "absolute", left: device === "mobile" ? 20 : 36, bottom: 36, zIndex: 10, display: "flex", alignItems: "center", gap: 8 }}>
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setSlideIndex(i)}
+              style={{
+                width: i === (slideIndex % slides.length) ? 32 : 10,
+                height: 8,
+                borderRadius: 999,
+                background: i === (slideIndex % slides.length) ? "#818cf8" : "rgba(255,255,255,.3)",
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.25s ease",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // Variation 1: Form + Text / Bullet Points Split Showcase
+  // -------------------------------------------------------------
+  if (isSplit) {
+    return (
+      <div style={{ position: "relative", minHeight: device === "mobile" ? 640 : device === "tablet" ? 740 : 860, display: "flex", alignItems: "center", overflow: "hidden", background: "#090d16" }}>
+        {/* Background Property Visual */}
+        <div style={{ position: "absolute", inset: 0 }}>
+          {isMediaSrc(textOf(st.image || st.heroArt || "")) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={textOf(st.image || st.heroArt)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transform: "scale(1.02)", transition: wt.transitionSlow }} />
+          ) : (
+            <SceneImage art={textOf(st.heroArt ?? st.image ?? "hero")} />
+          )}
+        </div>
+
+        {/* Rich Dark Gradient Backdrop */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(9,13,22,.94) 0%, rgba(9,13,22,.78) 55%, rgba(9,13,22,.45) 100%)", zIndex: 1 }} />
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(900px 500px at 20% 30%, rgba(99,102,241,.18), transparent 70%)", zIndex: 1, pointerEvents: "none" }} />
+
+        <Inner section={s} align="left">
+          <div
+            style={{
+              width: "100%",
+              display: "grid",
+              gridTemplateColumns: device === "desktop" ? "minmax(0, 1.15fr) minmax(360px, 0.85fr)" : "1fr",
+              gap: device === "mobile" ? 28 : 40,
+              alignItems: "center",
+              position: "relative",
+              zIndex: 2,
+            }}
+          >
+            {/* Left Side: Copy, Price & Bullet Points */}
+            <div style={{ animation: "ps-fade-in .6s ease both" }}>
+              {/* Luxury Tag */}
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.10)", border: "1px solid rgba(255,255,255,.18)", backdropFilter: "blur(8px)", padding: "6px 14px", borderRadius: 999, marginBottom: 16 }}>
+                <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "#cda45e" }}>
+                  {textOf(st.tag || "✨ PRE-LAUNCH PRIVILEGE • 0% BROKERAGE")}
+                </span>
+              </div>
+
+              {/* Main Headline */}
+              <h1 className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 32 : device === "tablet" ? 42 : 54, lineHeight: 1.08, fontWeight: 900, color: "#fff", letterSpacing: -0.8, margin: "0 0 14px", textShadow: "0 2px 20px rgba(0,0,0,.35)", ...T }}>
+                {textOf(resolveVars(st.heading)) || "Exclusive 3 & 4 BHK Luxury Residences"}
+              </h1>
+
+              {/* Subheading */}
+              <p style={{ fontSize: device === "mobile" ? 15 : device === "tablet" ? 17 : 18.5, color: "rgba(255,255,255,.88)", fontWeight: 500, lineHeight: 1.55, marginBottom: 20, maxWidth: 580, ...T }}>
+                {textOf(resolveVars(st.subheading)) || "Experience panoramic skyline vistas, 80% open landscaped greens, and 50+ world-class amenities in prime location."}
+              </p>
+
+              {/* Starting Price Badge */}
+              <div style={{ display: "inline-flex", alignItems: "baseline", gap: 10, marginBottom: 20, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", padding: "8px 16px", borderRadius: 12, backdropFilter: "blur(8px)" }}>
+                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "#cda45e" }}>
+                  {textOf(st.priceLabel ?? "STARTING FROM")}
+                </span>
+                <span className="ps-canvas-serif" style={{ fontSize: 24, fontWeight: 900, color: "#fff" }}>
+                  {textOf(resolveVars(st.price || "₹1.85 Cr*")).replace(/^Starting From\s*/i, "")}
+                </span>
+                <span style={{ fontSize: 11.5, color: "rgba(255,255,255,.7)", fontWeight: 700, marginLeft: 4 }}>
+                  • {textOf(st.priceNote || "RERA Approved")}
+                </span>
+              </div>
+
+              {/* Bullet Points Highlight List */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 9, marginBottom: 26 }}>
+                {highlights.map((h) => (
+                  <div key={h} style={{ display: "flex", alignItems: "center", gap: 10, color: "#fff", fontSize: 13.5, fontWeight: 700 }}>
+                    <span style={{ width: 22, height: 22, borderRadius: "50%", background: "rgba(205,164,94,0.2)", border: "1px solid #cda45e", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#cda45e", flexShrink: 0 }}>
+                      <Check size={12} strokeWidth={3} />
+                    </span>
+                    <span>{h}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                <a
+                  href={resolveCtaHref(primaryAction, primaryLink)}
+                  {...handle(primaryAction, primaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
+                  style={{ ...wtButton({ accent: st.accent, size: "lg" }, wt), padding: "13px 26px", fontSize: 14.5, fontWeight: 800, boxShadow: "0 8px 25px rgba(99,102,241,0.4)" }}
+                >
+                  {textOf(resolveVars(st.ctaPrimary)) || "Explore Floor Plans"} <ArrowRight size={15} />
+                </a>
+                <a
+                  href={resolveCtaHref(secondaryAction, secondaryLink || (gateFile ? "#" : ""))}
+                  {...handle(secondaryAction, secondaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
+                  style={{ ...wtButtonLight({ size: "lg" }, wt), padding: "13px 22px", fontSize: 14, backdropFilter: "blur(10px)", color: "#fff" }}
+                >
+                  <Download size={15} /> {textOf(resolveVars(st.ctaSecondary)) || "Download Brochure"}
+                </a>
+              </div>
+            </div>
+
+            {/* Right Side: Embedded Lead Capture Form Card */}
+            <div style={{ animation: "ps-fade-in .7s ease .15s both" }}>
+              <div
+                style={{
+                  background: "rgba(15, 23, 42, 0.78)",
+                  border: "1px solid rgba(255, 255, 255, 0.18)",
+                  borderRadius: 20,
+                  padding: device === "mobile" ? "22px 18px" : "28px 24px",
+                  backdropFilter: "blur(20px)",
+                  boxShadow: "0 25px 60px rgba(0, 0, 0, 0.6)",
+                }}
+              >
+                {formSubmitted ? (
+                  <div style={{ textAlign: "center", padding: "30px 10px" }}>
+                    <div style={{ width: 54, height: 54, borderRadius: "50%", background: "rgba(52, 211, 153, 0.18)", color: "#34d399", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                      <Check size={28} />
+                    </div>
+                    <h3 style={{ fontSize: 20, fontWeight: 900, color: "#fff", margin: "0 0 8px" }}>Enquiry Registered!</h3>
+                    <p style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 20px", lineHeight: 1.5 }}>
+                      Thank you. Our senior property advisor will get in touch with floor plans, pricing sheets, and unit availability.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setFormSubmitted(false)}
+                      style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", padding: "8px 18px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                    >
+                      ← Submit Another Enquiry
+                    </button>
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      setFormSubmitted(true);
+                    }}
+                    style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                  >
+                    <div style={{ marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1.4, color: "#cda45e" }}>
+                        Instant Booking Privileges
+                      </span>
+                      <h3 style={{ fontSize: 19, fontWeight: 900, color: "#fff", margin: "4px 0 2px" }}>
+                        {textOf(st.formTitle || "Schedule a Private Site Visit")}
+                      </h3>
+                      <p style={{ fontSize: 11.5, color: "#94a3b8", margin: 0 }}>
+                        {textOf(st.formSubtitle || "Get instant pricing, floor plans & unit availability")}
+                      </p>
+                    </div>
+
+                    <div>
+                      <input
+                        placeholder="Your Full Name *"
+                        required
+                        style={{ width: "100%", padding: "10px 14px", borderRadius: 9, background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: 13, outline: "none" }}
+                      />
+                    </div>
+
+                    <div>
+                      <input
+                        type="tel"
+                        placeholder="Phone Number (+91) *"
+                        required
+                        style={{ width: "100%", padding: "10px 14px", borderRadius: 9, background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: 13, outline: "none" }}
+                      />
+                    </div>
+
+                    <div>
+                      <input
+                        type="email"
+                        placeholder="Email Address"
+                        style={{ width: "100%", padding: "10px 14px", borderRadius: 9, background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: 13, outline: "none" }}
+                      />
+                    </div>
+
+                    <div>
+                      <select style={{ width: "100%", padding: "10px 14px", borderRadius: 9, background: "rgba(15,23,42,0.95)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: 13, outline: "none" }}>
+                        <option>Interested in 2 BHK Luxury</option>
+                        <option selected>Interested in 3 BHK Premium</option>
+                        <option>Interested in 4 BHK Sky Villa</option>
+                        <option>Interested in Penthouse</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      style={{
+                        width: "100%",
+                        padding: "13px",
+                        borderRadius: 10,
+                        background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+                        color: "#fff",
+                        fontSize: 14,
+                        fontWeight: 800,
+                        border: "none",
+                        cursor: "pointer",
+                        boxShadow: "0 8px 24px rgba(99,102,241,0.45)",
+                        marginTop: 4,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span>{textOf(st.formButton || "Book Site Visit Now")}</span>
+                      <ArrowRight size={15} />
+                    </button>
+
+                    <div style={{ fontSize: 10.5, color: "#64748b", textAlign: "center", marginTop: 2 }}>
+                      🔒 100% Privacy Guaranteed • Direct Developer Booking
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          </div>
+        </Inner>
+
+        {(secondaryAction === "brochure" || primaryAction === "brochure") ? (
+          <GatedDownloadModal
+            open={gateOpen}
+            onClose={() => setGateOpen(false)}
+            live={!!live}
+            pageId={pageId}
+            file={gateFile}
+            heading={textOf(st.gateHeading || "Get the brochure")}
+            text={textOf(st.gateText || "")}
+            fields={gateFields}
+            submitLabel={textOf(st.gateButton || "Submit & Download")}
+            successMessage={textOf(st.gateSuccessMessage || "Verified — your brochure is downloading.")}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // Variation 3: Simple Image + Text (Clean Modern Typography)
+  // -------------------------------------------------------------
   return (
-    <div style={{ position: "relative", minHeight: device === "mobile" ? 580 : device === "tablet" ? 700 : 820, display: "flex", alignItems: "center", overflow: "hidden" }}>
+    <div style={{ position: "relative", minHeight: device === "mobile" ? 580 : device === "tablet" ? 700 : 820, display: "flex", alignItems: "center", overflow: "hidden", background: "#090d16" }}>
+      {/* Background Visual */}
       <div style={{ position: "absolute", inset: 0 }}>
         {isMediaSrc(textOf(st.image || st.heroArt || "")) ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -845,113 +1252,110 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
           <SceneImage art={textOf(st.heroArt ?? st.image ?? "hero")} />
         )}
       </div>
-      <Overlay section={s} />
-      <div style={{ position: "absolute", inset: 0, background: isCentered ? "linear-gradient(180deg, rgba(8,10,20,.58) 0%, rgba(8,10,20,.32) 55%, rgba(8,10,20,.48) 100%)" : "linear-gradient(90deg, rgba(8,10,20,.78) 0%, rgba(8,10,20,.48) 48%, rgba(8,10,20,.16) 100%)", zIndex: 1 }} />
-      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(800px 400px at 20% 20%, rgba(196,164,106,.10), transparent 60%)", zIndex: 1, pointerEvents: "none" }} />
-      <Inner section={s} align={isCentered ? "center" : "left"}>
-       <div
+
+      {/* Gradient Overlay */}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgba(8,10,20,.85) 0%, rgba(8,10,20,.58) 50%, rgba(8,10,20,.20) 100%)", zIndex: 1 }} />
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(800px 400px at 20% 20%, rgba(196,164,106,.14), transparent 60%)", zIndex: 1, pointerEvents: "none" }} />
+
+      <Inner section={s} align="left">
+        <div
           style={{
             width: "100%",
             display: "grid",
-            gridTemplateColumns: isCentered ? "1fr" : device === "desktop" ? (isSplit ? "minmax(0, 1.08fr) minmax(320px, .92fr)" : "minmax(0, 1.15fr) minmax(320px, .85fr)") : "1fr",
-            gap: device === "mobile" ? 20 : 28,
+            gridTemplateColumns: device === "desktop" ? "minmax(0, 1.15fr) minmax(320px, .85fr)" : "1fr",
+            gap: device === "mobile" ? 20 : 32,
             alignItems: "center",
             position: "relative",
             zIndex: 2,
           }}
         >
-          <div style={{ maxWidth: contentWidth, margin: isCentered ? "0 auto" : undefined, textAlign: isCentered ? "center" : "left", animation: "ps-fade-in .6s ease both" }}>
-            <h1 className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 34 : device === "tablet" ? 44 : 58, lineHeight: 1.05, fontWeight: 800, color: "#fff", letterSpacing: -0.8, margin: "0 0 12px", textAlign: isCentered ? "center" : "left", textShadow: "0 2px 18px rgba(0,0,0,.28)", ...T }}>{textOf(resolveVars(st.heading))}</h1>
-            <p style={{ fontSize: device === "mobile" ? 16.5 : device === "tablet" ? 18 : 20, color: "rgba(255,255,255,.88)", fontWeight: 500, letterSpacing: 0.2, marginBottom: 22, lineHeight: 1.5, textAlign: isCentered ? "center" : "left", maxWidth: isCentered ? 640 : 560, marginLeft: isCentered ? "auto" : undefined, marginRight: isCentered ? "auto" : undefined, ...T }}>{textOf(resolveVars(st.subheading))}</p>
-            <div style={{ display: "inline-flex", alignItems: "baseline", gap: 10, marginBottom: 6, justifyContent: isCentered ? "center" : "flex-start", background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.12)", padding: "6px 12px", borderRadius: 999, backdropFilter: "blur(6px)" }}>
-              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", color: "#c4a46a" }}>{textOf(st.priceLabel ?? "STARTING FROM")}</span>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,.4)" }}>•</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,.75)", letterSpacing: 0.4 }}>{textOf(st.priceNote || "Possession Dec 2027 • RERA Approved")}</span>
+          {/* Main Copy & Typography */}
+          <div style={{ maxWidth: 680, animation: "ps-fade-in .6s ease both" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.09)", border: "1px solid rgba(255,255,255,.14)", backdropFilter: "blur(6px)", padding: "5px 12px", borderRadius: 999, marginBottom: 14 }}>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "#cda45e" }}>
+                {textOf(st.tag || "ULTRA-PREMIUM RESIDENCES")}
+              </span>
             </div>
-            <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 30 : 38, fontWeight: 800, color: "#fff", textAlign: isCentered ? "center" : "left", letterSpacing: -0.6, textShadow: "0 2px 12px rgba(0,0,0,.22)", ...T }}>{textOf(resolveVars(st.price)).replace(/^Starting From\s*/i, "")}</div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: isCentered ? "center" : "flex-start", marginTop: 22 }}>
+
+            <h1 className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 34 : device === "tablet" ? 44 : 58, lineHeight: 1.05, fontWeight: 800, color: "#fff", letterSpacing: -0.8, margin: "0 0 12px", textShadow: "0 2px 18px rgba(0,0,0,.28)", ...T }}>
+              {textOf(resolveVars(st.heading))}
+            </h1>
+
+            <p style={{ fontSize: device === "mobile" ? 16.5 : device === "tablet" ? 18 : 20, color: "rgba(255,255,255,.88)", fontWeight: 500, letterSpacing: 0.2, marginBottom: 20, lineHeight: 1.5, maxWidth: 580, ...T }}>
+              {textOf(resolveVars(st.subheading))}
+            </p>
+
+            {/* Price Badge */}
+            <div style={{ display: "inline-flex", alignItems: "baseline", gap: 10, marginBottom: 16, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.12)", padding: "6px 14px", borderRadius: 999, backdropFilter: "blur(6px)" }}>
+              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.6, textTransform: "uppercase", color: "#cda45e" }}>
+                {textOf(st.priceLabel ?? "STARTING FROM")}
+              </span>
+              <span style={{ fontSize: 11, color: "rgba(255,255,255,.4)" }}>•</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,.75)", letterSpacing: 0.4 }}>
+                {textOf(st.priceNote || "Possession Dec 2027 • RERA Approved")}
+              </span>
+            </div>
+
+            <div className="ps-canvas-serif" style={{ fontSize: device === "mobile" ? 30 : 38, fontWeight: 800, color: "#fff", letterSpacing: -0.6, textShadow: "0 2px 12px rgba(0,0,0,.22)", ...T }}>
+              {textOf(resolveVars(st.price)).replace(/^Starting From\s*/i, "")}
+            </div>
+
+            {/* Bullet Points Row */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "22px 0 24px" }}>
+              {highlights.map((h) => (
+                <span key={h} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(255,255,255,.10)", color: "#fff", border: "1px solid rgba(255,255,255,.16)", backdropFilter: "blur(8px)", padding: "7px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, boxShadow: "0 2px 10px rgba(0,0,0,.12)" }}>
+                  <CheckCircle2 size={12} style={{ color: "#cda45e" }} /> {h}
+                </span>
+              ))}
+            </div>
+
+            {/* CTA Buttons */}
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <a
                 href={resolveCtaHref(primaryAction, primaryLink)}
                 {...handle(primaryAction, primaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
-                style={{ ...wtButton({ accent: st.accent, size: "lg" }, wt), padding: "14px 26px", fontSize: 14.5, boxShadow: `0 10px 28px ${hexToSoft(st.accent as string || wt.primary, 0.38)}`, transform: "translateY(0)", transition: wt.transition }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
+                style={{ ...wtButton({ accent: st.accent, size: "lg" }, wt), padding: "14px 26px", fontSize: 14.5, boxShadow: `0 10px 28px ${hexToSoft(st.accent as string || wt.primary, 0.38)}` }}
               >
                 {textOf(resolveVars(st.ctaPrimary))} <ArrowRight size={15} />
               </a>
-              {!isCentered ? (
-                <a
-                  href={resolveCtaHref(secondaryAction, secondaryLink || (gateFile ? "#" : ""))}
-                  {...handle(secondaryAction, secondaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
-                  style={{ ...wtButtonLight({ size: "lg" }, wt), padding: "14px 26px", backdropFilter: "blur(10px)" }}
-                >
-                  <Download size={15} /> {textOf(resolveVars(st.ctaSecondary))}
-                </a>
-              ) : null}
-            </div>
-            {!isCentered && highlights.length ? (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 26, justifyContent: "flex-start" }}>
-                {highlights.map((h) => (
-                  <span key={h} style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "rgba(255,255,255,.10)", color: "#fff", border: "1px solid rgba(255,255,255,.16)", backdropFilter: "blur(8px)", padding: "7px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, boxShadow: "0 2px 10px rgba(0,0,0,.12)" }}>
-                     <CheckCircle2 size={12} style={{ color: "#c4a46a" }} /> {h}
-                   </span>
-                ))}
-               </div>
-            ) : null}
-           </div>
-
-          {!isCentered ? (
-            <div style={{ display: "grid", gap: 14, animation: "ps-fade-in .7s ease .15s both" }}>
-              <div style={{ ...wtCardGlass({ padding: device === "mobile" ? "18px" : "22px" }, wt), background: "rgba(11,18,32,.45)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,.14)", borderRadius: wt.radiusLg }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#c4a46a" }} />
-                  <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "rgba(255,255,255,.72)" }}>
-                    {isSplit ? "Project at a glance" : "Quick facts"}
-                  </span>
-                  <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,.45)", background: "rgba(255,255,255,.08)", padding: "3px 8px", borderRadius: 999, border: "1px solid rgba(255,255,255,.10)" }}>{sideCardStats.length} key facts</span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: sideCardColumns, gap: 10 }}>
-                  {sideCardStats.map((x) => (
-                    <div key={x.label} style={{ background: "rgba(255,255,255,.09)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "14px 14px", backdropFilter: "blur(8px)", transition: wt.transition }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", letterSpacing: -0.3 }}>{x.value}</div>
-                      <div style={{ fontSize: 10.5, color: "rgba(255,255,255,.68)", marginTop: 3, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6 }}>{x.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {isSplit ? (
-                <div style={{ background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", borderRadius: wt.radiusLg, padding: device === "mobile" ? "18px" : "20px", backdropFilter: "blur(12px)" }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", color: "#c4a46a", marginBottom: 8 }}>
-                    Why buyers choose this
-                  </div>
-                  <div style={{ fontSize: 13.5, lineHeight: 1.7, color: "rgba(255,255,255,.82)" }}>
-                    {textOf(st.priceNote || "Designed for strong enquiry conversion with a clean CTA-first layout — RERA approved, metro connected, ready amenities.")}
-                  </div>
-                  <div style={{ display: "flex", gap: 7, marginTop: 12 }}>
-                    <span style={{ ...wtBadge({ gold: true }, undefined, wt), background: "rgba(196,164,106,.18)", color: "#fff", border: "1px solid rgba(196,164,106,.28)" }}>RERA ✓</span>
-                    <span style={{ ...wtBadge(undefined, undefined, wt), background: "rgba(79,70,229,.18)", color: "#fff", border: "1px solid rgba(79,70,229,.28)" }}>Metro 500m</span>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-        {isCentered ? (
-          <div style={{ width: "100%", maxWidth: 920, margin: "32px auto 0", position: "relative", zIndex: 2 }}>
-            <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : device === "tablet" ? "repeat(2,1fr)" : `repeat(${Math.min(heroStats.length || 1, 4)},1fr)`, gap: 12 }}>
-              {heroStats.map((x) => (
-                <div key={x.label} style={{ background: "rgba(255,255,255,.09)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, padding: "16px 16px", textAlign: "center", backdropFilter: "blur(10px)" }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: "#fff", letterSpacing: -0.3 }}>{x.value}</div>
-                  <div style={{ fontSize: 10.5, color: "rgba(255,255,255,.68)", marginTop: 3, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.7 }}>{x.label}</div>
-                </div>
-              ))}
+              <a
+                href={resolveCtaHref(secondaryAction, secondaryLink || (gateFile ? "#" : ""))}
+                {...handle(secondaryAction, secondaryLink, { openBrochure: () => setGateOpen(true), openPopup: () => undefined })}
+                style={{ ...wtButtonLight({ size: "lg" }, wt), padding: "14px 26px", backdropFilter: "blur(10px)", color: "#fff" }}
+              >
+                <Download size={15} /> {textOf(resolveVars(st.ctaSecondary))}
+              </a>
             </div>
           </div>
-        ) : null}
-       </Inner>
+
+          {/* Right Floating Quick Facts Card */}
+          <div style={{ display: "grid", gap: 14, animation: "ps-fade-in .7s ease .15s both" }}>
+            <div style={{ background: "rgba(11,18,32,.55)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,.14)", borderRadius: wt.radiusLg, padding: device === "mobile" ? "18px" : "22px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#cda45e" }} />
+                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: "rgba(255,255,255,.75)" }}>
+                  Project Overview
+                </span>
+                <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,.5)", background: "rgba(255,255,255,.08)", padding: "3px 8px", borderRadius: 999, border: "1px solid rgba(255,255,255,.10)" }}>
+                  {heroStats.length} key facts
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "repeat(2,1fr)", gap: 10 }}>
+                {heroStats.map((x) => (
+                  <div key={x.label} style={{ background: "rgba(255,255,255,.09)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "14px", backdropFilter: "blur(8px)" }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", letterSpacing: -0.3 }}>{x.value}</div>
+                    <div style={{ fontSize: 10.5, color: "rgba(255,255,255,.68)", marginTop: 3, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6 }}>{x.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Inner>
+
       {(secondaryAction === "brochure" || primaryAction === "brochure") ? (
-       <GatedDownloadModal
-         open={gateOpen}
+        <GatedDownloadModal
+          open={gateOpen}
           onClose={() => setGateOpen(false)}
           live={!!live}
           pageId={pageId}
@@ -3684,30 +4088,44 @@ function ImageSection({ s }: { s: SectionInstance }) {
   const st = s.settings;
   const wt = useContext(SiteLayoutThemeContext);
   const live = useContext(SiteLiveContext);
-  const src = textOf(st.src ?? "");
+  const src = textOf(st.src ?? st.image ?? "");
   const alt = textOf(st.alt ?? "Image");
   const title = textOf(st.title ?? "");
-  const width = Math.max(80, Number(st.width ?? 800) || 800);
+  const isFull = Boolean(st.fullWidth || st.isFullWidth || st.width === "100%" || st.width === "full" || s.style.layout?.width === "full");
+  const rawW = Number(st.width);
+  const widthVal = isFull ? "100%" : rawW && !isNaN(rawW) ? `${rawW}px` : "100%";
   const align = (s.style.layout?.align as "left" | "center" | "right" | undefined) ?? (textOf(st.align ?? "center") as "left" | "center" | "right");
   const link = textOf(st.link ?? "").trim();
   const img = isMediaSrc(src) ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={alt} title={title || undefined} style={{ maxWidth: "100%", width: `min(${width}px,100%)`, borderRadius: wt.radius, boxShadow: wt.shadowSm, objectFit: "cover", display: "block" }} />
+    <img
+      src={src}
+      alt={alt}
+      title={title || undefined}
+      style={{
+        width: widthVal,
+        maxWidth: "100%",
+        borderRadius: isFull ? 0 : wt.radius,
+        boxShadow: isFull ? undefined : wt.shadowSm,
+        objectFit: "cover",
+        display: "block",
+      }}
+    />
   ) : src ? (
     // Named art scenes (e.g. "interior", "skyline") render the built-in artwork
     // until a real image is uploaded — same behaviour as the gallery widget.
-    <div title={title || undefined} style={{ width: `min(${width}px,100%)`, aspectRatio: "16/9", borderRadius: wt.radius, boxShadow: wt.shadowSm, overflow: "hidden", display: "block" }}>
+    <div title={title || undefined} style={{ width: widthVal, maxWidth: "100%", aspectRatio: isFull ? "21/9" : "16/9", borderRadius: isFull ? 0 : wt.radius, boxShadow: isFull ? undefined : wt.shadowSm, overflow: "hidden", display: "block" }}>
       <SceneImage art={src} />
     </div>
   ) : (
-    <div style={{ width: `min(${width}px,100%)`, aspectRatio: "16/9", borderRadius: wt.radius, border: "1.5px dashed var(--ps-line-strong)", background: "var(--ps-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ps-muted)", fontSize: 13, fontWeight: 600, textAlign: "center", padding: "0 20px" }}>
+    <div style={{ width: widthVal, maxWidth: "100%", aspectRatio: "16/9", borderRadius: wt.radius, border: "1.5px dashed var(--ps-line-strong)", background: "var(--ps-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--ps-muted)", fontSize: 13, fontWeight: 600, textAlign: "center", padding: "0 20px" }}>
       Image — upload a file or paste a URL in Content
     </div>
   );
   return (
-    <div style={{ display: "flex", justifyContent: align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start" }}>
+    <div style={{ width: "100%", display: "flex", justifyContent: align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start" }}>
       {src && live && link ? (
-        <a href={link} target={/^https?:\/\//i.test(link) ? "_blank" : undefined} rel="noopener noreferrer" style={{ display: "block", lineHeight: 0 }}>
+        <a href={link} target={/^https?:\/\//i.test(link) ? "_blank" : undefined} rel="noopener noreferrer" style={{ display: "block", width: "100%", lineHeight: 0 }}>
           {img}
         </a>
       ) : (
@@ -5430,20 +5848,24 @@ function SectionWrap({
 
       {/* body */}
       {(() => {
-        const cc = containerCss(s, device);
-        const bandNarrow = s.style.layout?.width === "boxed" || s.style.layout?.width === "custom";
+        const isHero = s.type === "hero";
+        if (isHero) {
+          sc.padding = "0px";
+        }
+        const cc = isHero ? { width: "100%", maxWidth: "100%" } : containerCss(s, device);
+        const bandNarrow = !isHero && (s.style.layout?.width === "boxed" || s.style.layout?.width === "custom");
         const outerStyle: CSSProperties = bandNarrow ? { ...sc, ...cc } : sc;
         const body = (
           <>
             <Overlay section={s} />
-            <div style={{ position: "relative", zIndex: 2, ...(bandNarrow ? undefined : cc) }}>
+            <div style={{ position: "relative", zIndex: 2, width: "100%", ...(bandNarrow || isHero ? undefined : cc) }}>
               {children ?? <SectionBody s={s} device={device} />}
             </div>
           </>
         );
         return (
-          <div style={{ opacity: hidden ? 0.3 : 1, pointerEvents: hidden && !readOnly ? "none" : "auto" }}>
-            <div style={outerStyle}>{body}</div>
+          <div style={{ width: "100%", opacity: hidden ? 0.3 : 1, pointerEvents: hidden && !readOnly ? "none" : "auto" }}>
+            <div style={{ width: "100%", ...outerStyle }}>{body}</div>
           </div>
         );
       })()}

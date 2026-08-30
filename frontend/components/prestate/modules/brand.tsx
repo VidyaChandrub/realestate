@@ -1,38 +1,56 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Download, LayoutDashboard, Palette, Save, Share2, Type } from "lucide-react";
+import {
+  Check,
+  Download,
+  Eye,
+  Globe,
+  ImagePlus,
+  LayoutDashboard,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Monitor,
+  Palette,
+  Phone,
+  Save,
+  Share2,
+  Smartphone,
+  Sparkles,
+  Tablet,
+  Type,
+} from "lucide-react";
 import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
 import type { LayoutTheme } from "@/lib/prestate/widget-theme";
-import { ensureConfig, googleFontsHref, siteThemeStyle } from "@/lib/prestate/site-config";
-import { ModuleHeader, SiteScopeBar } from "./shared";
-import { ColorField, FieldRow, TextField, Toggle, Btn } from "@/components/prestate/ui";
-import { PrestateMark } from "@/components/prestate/topnav";
+import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
 import { MediaPicker } from "@/components/media-picker";
 
 const PRIMARY_SWATCHES = [
-  ["#6D5DFC", "Indigo"],
-  ["#4338CA", "Deep Indigo"],
+  ["#6366F1", "Indigo"],
+  ["#4F46E5", "Deep Indigo"],
   ["#8B5CF6", "Violet"],
-  ["#0F766E", "Teal"],
-  ["#B45309", "Amber"],
-  ["#C026D3", "Fuchsia"],
+  ["#0D9488", "Teal"],
+  ["#B45309", "Amber Gold"],
+  ["#E11D48", "Rose"],
+  ["#0284C7", "Sky Blue"],
+  ["#16A34A", "Emerald"],
 ] as const;
 
 const ACCENT_SWATCHES = [
-  ["#CDA45E", "Gold"],
+  ["#CDA45E", "Royal Gold"],
   ["#D4A017", "Mustard"],
-  ["#1E3A5F", "Navy"],
-  ["#111827", "Ink"],
+  ["#1E3A5F", "Deep Navy"],
+  ["#0F172A", "Slate Ink"],
   ["#10B981", "Emerald"],
-  ["#EF4444", "Rose"],
+  ["#F59E0B", "Sunset Amber"],
 ] as const;
 
-const FONTS = [
-  { name: "Inter", spec: "Sans-serif · Geometric, SaaS-grade" },
-  { name: "Playfair Display", spec: "Serif · Editorial, luxury" },
-  { name: "DM Serif Display", spec: "Serif · High-contrast display" },
-  { name: "Plus Jakarta Sans", spec: "Sans-serif · Warm modern" },
+const PALETTE_PRESETS = [
+  { name: "Royal Prestige", primary: "#6366F1", accent: "#CDA45E", desc: "Vibrant Indigo & Imperial Gold for luxury developments" },
+  { name: "Emerald Oasis", primary: "#0D9488", accent: "#10B981", desc: "Lush eco-residences & nature-themed communities" },
+  { name: "Corporate Sapphire", primary: "#0284C7", accent: "#1E3A5F", desc: "High-trust commercial & ultra-modern tech townships" },
+  { name: "Amber Elegance", primary: "#B45309", accent: "#D4A017", desc: "Warm boutique villas and Mediterranean architecture" },
 ];
 
 const LAYOUT_THEMES: {
@@ -40,103 +58,11 @@ const LAYOUT_THEMES: {
   label: string;
   tagline: string;
   previewRadius: number;
-  previewShadow: string;
-  previewBorder: string;
-  accentColor: string;
 }[] = [
-  {
-    key: "standard",
-    label: "Standard",
-    tagline: "Clean · Professional · Balanced",
-    previewRadius: 12,
-    previewShadow: "0 2px 10px rgba(16,24,40,.08)",
-    previewBorder: "1px solid rgba(16,24,40,.09)",
-    accentColor: "#4f46e5",
-  },
-  {
-    key: "premium",
-    label: "Premium",
-    tagline: "Elegant · Luxury · High-end",
-    previewRadius: 18,
-    previewShadow: "0 6px 24px rgba(16,10,4,.12)",
-    previewBorder: "1px solid rgba(196,164,106,.22)",
-    accentColor: "#b8893b",
-  },
-  {
-    key: "modern",
-    label: "Modern",
-    tagline: "Minimal · Bold · Contemporary",
-    previewRadius: 5,
-    previewShadow: "none",
-    previewBorder: "1.5px solid rgba(16,24,40,.18)",
-    accentColor: "#4f46e5",
-  },
+  { key: "standard", label: "Standard", tagline: "Clean · Professional · Balanced", previewRadius: 12 },
+  { key: "premium", label: "Premium", tagline: "Elegant · Luxury · High-end", previewRadius: 18 },
+  { key: "modern", label: "Modern", tagline: "Minimal · Bold · Contemporary", previewRadius: 6 },
 ];
-
-function LayoutThemePicker({ value, onChange }: { value: LayoutTheme; onChange: (t: LayoutTheme) => void }) {
-  return (
-    <div className="ps-card" style={{ borderRadius: 16, padding: "6px 20px 18px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 0 10px", fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>
-        <LayoutDashboard size={15} /> Widget Layout Style
-      </div>
-      <p style={{ fontSize: 12, color: "var(--ps-muted)", lineHeight: 1.55, margin: "0 0 14px" }}>
-        Sets the visual design style for all real estate widgets — radii, shadows, spacing and card style — without changing any content or functionality.
-      </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
-        {LAYOUT_THEMES.map((t) => {
-          const active = value === t.key;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => onChange(t.key)}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 0,
-                padding: 0,
-                borderRadius: 12,
-                border: active ? "2px solid var(--ps-primary)" : "1px solid var(--ps-line-strong)",
-                background: active ? "var(--ps-primary-mist)" : "var(--ps-bg)",
-                cursor: "pointer",
-                overflow: "hidden",
-                transition: "border-color .15s",
-              }}
-            >
-              {/* Mini widget preview */}
-              <div style={{ padding: "12px 12px 8px", background: active ? "rgba(79,70,229,.04)" : "var(--ps-panel-raised)", width: "100%" }}>
-                {/* Mock card */}
-                <div style={{
-                  background: "#ffffff",
-                  borderRadius: t.previewRadius,
-                  boxShadow: t.previewShadow,
-                  border: t.previewBorder,
-                  padding: "8px 10px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 5,
-                }}>
-                  <div style={{ height: 5, borderRadius: 999, background: t.accentColor, width: "60%" }} />
-                  <div style={{ height: 4, borderRadius: 999, background: "rgba(15,23,42,.10)", width: "90%" }} />
-                  <div style={{ height: 4, borderRadius: 999, background: "rgba(15,23,42,.06)", width: "75%" }} />
-                  <div style={{ marginTop: 4, height: 18, borderRadius: t.key === "modern" ? 3 : t.key === "premium" ? 10 : 6, background: t.accentColor, width: "70%", opacity: 0.9 }} />
-                </div>
-              </div>
-              {/* Label row */}
-              <div style={{ padding: "7px 12px 9px", textAlign: "left" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, color: active ? "var(--ps-primary)" : "var(--ps-ink)" }}>{t.label}</span>
-                  {active ? <Check size={12} style={{ color: "var(--ps-primary)", flexShrink: 0 }} /> : null}
-                </div>
-                <div style={{ fontSize: 10, color: "var(--ps-muted)", marginTop: 1, lineHeight: 1.3 }}>{t.tagline}</div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 export function BrandModule({
   site,
@@ -152,211 +78,427 @@ export function BrandModule({
 }) {
   const cfg = ensureConfig(site);
   const { brand } = cfg;
-  const [darkMode, setDarkMode] = useState(false);
+  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
   const patchBrand = (partial: Partial<SiteConfig["brand"]>) =>
     onPatch((c) => ({ ...c, brand: { ...c.brand, ...partial } }));
 
-  const saveBrand = () => {
-    onPatch((c) => ({ ...c, brand: { ...c.brand } }));
-    onToast(`Brand saved for ${site.name}`);
+  const applyPreset = (primary: string, accent: string) => {
+    patchBrand({ primary, accent });
+    onToast(`Applied color palette: ${primary} & ${accent}`);
   };
 
-  const shareKit = async () => {
-    const css = `:root {\n  --brand-primary: ${brand.primary};\n  --brand-accent: ${brand.accent};\n  --brand-heading: ${brand.headingFont};\n  --brand-body: ${brand.bodyFont};\n}`;
-    try {
-      await navigator.clipboard.writeText(css);
-      onToast("Brand CSS copied");
-    } catch {
-      onToast("Could not copy brand kit");
-    }
+  const handleSave = () => {
+    setSavedSuccess(true);
+    onToast(`Brand settings saved for ${site.name}`);
+    setTimeout(() => setSavedSuccess(false), 2000);
   };
-
-  const downloadLogo = () => {
-    if (!brand.logo) {
-      onToast("Upload a logo first");
-      return;
-    }
-    const a = document.createElement("a");
-    a.href = brand.logo;
-    a.download = `${brand.name.replace(/\s+/g, "-").toLowerCase() || "logo"}.png`;
-    a.click();
-  };
-
-  const ink = darkMode ? "#f8fafc" : "#111827";
-  const muted = darkMode ? "#94a3b8" : "#64748B";
-  const panel = darkMode ? "#111827" : "#ffffff";
-  const line = darkMode ? "#1f2937" : "#eef0f5";
 
   return (
-    <div style={{ overflowY: "auto", height: "100%", ...siteThemeStyle(brand) }}>
-      <link rel="stylesheet" href={googleFontsHref(brand.headingFont, brand.bodyFont)} />
-      <ModuleHeader
-        title="Brand Center"
-        description={`Colors, logo, fonts and social for “${site.name}”. Changes apply to this template’s builder and local preview.`}
-        actions={
-          <div style={{ display: "flex", gap: 9 }}>
-            <Btn variant="outline" icon={<Share2 size={14} />} onClick={() => void shareKit()}>Share kit</Btn>
-            <Btn variant="primary" icon={<Save size={14} />} onClick={saveBrand}>Save brand</Btn>
-          </div>
-        }
-      />
-      <SiteScopeBar pages={pages} activeId={site.id} />
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--ps-bg)", color: "var(--ps-ink)", overflow: "hidden", ...siteThemeStyle(brand) }}>
+      {/* Top Action Ribbon */}
+      <div
+        style={{
+          background: "var(--ps-panel)",
+          borderBottom: "1px solid var(--ps-line-strong)",
+          padding: "12px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 13.5, fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: 7 }}>
+            <Palette size={16} style={{ color: "var(--ps-primary)" }} /> Brand Center & Design Tokens
+          </span>
+          <span style={{ fontSize: 11, color: "var(--ps-muted)", borderLeft: "1px solid var(--ps-line-strong)", paddingLeft: 12 }}>
+            Applied across all real estate widgets for {site.name}
+          </span>
+        </div>
 
-      <div className="ps-brand-grid" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 20, padding: "0 28px 40px", alignItems: "start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="ps-card" style={{ borderRadius: 16, overflow: "hidden" }}>
-            <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--ps-line)", fontSize: 12.5, fontWeight: 800, color: "var(--ps-slate)", display: "flex", alignItems: "center", gap: 8 }}>
-              <Palette size={15} /> Live brand preview
-              <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 700 }}>
-                Dark
-                <Toggle on={darkMode} onChange={setDarkMode} />
-              </span>
+        {/* Center Device Switcher */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 2, background: "rgba(0, 0, 0, 0.35)", borderRadius: 10, padding: 3, border: "1px solid var(--ps-line-strong)" }}>
+          {[
+            { key: "desktop", icon: Monitor, label: "Desktop" },
+            { key: "tablet", icon: Tablet, label: "Tablet" },
+            { key: "mobile", icon: Smartphone, label: "Mobile" },
+          ].map((dev) => (
+            <button
+              key={dev.key}
+              type="button"
+              onClick={() => setDevice(dev.key as any)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 7,
+                border: "none",
+                background: device === dev.key ? "var(--ps-panel-raised)" : "transparent",
+                color: device === dev.key ? "#fff" : "var(--ps-muted)",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              <dev.icon size={14} />
+              <span>{dev.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Save button */}
+        <button
+          type="button"
+          onClick={handleSave}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            padding: "8px 18px",
+            borderRadius: 9,
+            border: "none",
+            background: savedSuccess ? "var(--ps-success)" : "var(--ps-primary)",
+            color: "#fff",
+            fontSize: 12.5,
+            fontWeight: 700,
+            cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
+            transition: "background 0.2s",
+          }}
+        >
+          {savedSuccess ? <Check size={15} /> : <Save size={15} />}
+          <span>{savedSuccess ? "Saved!" : "Save Brand"}</span>
+        </button>
+      </div>
+
+      {/* Main 2-Panel Studio Layout */}
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        {/* Left Controls Panel */}
+        <div
+          style={{
+            width: 440,
+            background: "var(--ps-panel)",
+            borderRight: "1px solid var(--ps-line)",
+            overflowY: "auto",
+            padding: "20px 20px 60px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
+            flexShrink: 0,
+          }}
+        >
+          {/* Section 1: 1-Click Curated Palettes */}
+          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+              <Sparkles size={16} style={{ color: "var(--ps-primary)" }} /> Curated Color Palettes
             </div>
-            <div style={{ padding: 22, background: darkMode ? "#0b1020" : "#f6f7fb" }}>
-              <div style={{ borderRadius: 14, overflow: "hidden", background: panel, boxShadow: "0 14px 40px rgba(17,24,39,.12)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderBottom: `1px solid ${line}` }}>
-                  {brand.logo ? (
-                    <img src={brand.logo} alt="" style={{ width: 26, height: 26, borderRadius: 7, objectFit: "cover" }} />
-                  ) : (
-                    <PrestateMark size={26} color={brand.primary} />
-                  )}
-                  <span style={{ fontSize: 14, fontWeight: 800, color: ink, fontFamily: `${brand.headingFont}, Georgia, serif` }}>{brand.name}</span>
-                  <div style={{ marginLeft: "auto", display: "flex", gap: 14, fontSize: 11, fontWeight: 700, color: muted }}>
-                    {["Amenities", "Floor Plans", "Pricing", "Contact"].map((l) => <span key={l}>{l}</span>)}
-                  </div>
+            <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: "0 0 12px", lineHeight: 1.45 }}>
+              Choose a harmonized palette tailored for luxury property marketing.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+              {PALETTE_PRESETS.map((p) => {
+                const active = brand.primary?.toLowerCase() === p.primary.toLowerCase() && brand.accent?.toLowerCase() === p.accent.toLowerCase();
+                return (
+                  <button
+                    key={p.name}
+                    type="button"
+                    onClick={() => applyPreset(p.primary, p.accent)}
+                    style={{
+                      textAlign: "left",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: active ? "2px solid var(--ps-primary)" : "1px solid var(--ps-line)",
+                      background: active ? "rgba(99, 102, 241, 0.18)" : "var(--ps-bg)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      transition: "all 0.12s",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ display: "flex", gap: 3 }}>
+                        <span style={{ width: 18, height: 18, borderRadius: "50%", background: p.primary, border: "2px solid rgba(255,255,255,.2)" }} />
+                        <span style={{ width: 18, height: 18, borderRadius: "50%", background: p.accent, border: "2px solid rgba(255,255,255,.2)" }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: active ? "#818cf8" : "#fff" }}>{p.name}</div>
+                        <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>{p.desc}</div>
+                      </div>
+                    </div>
+                    {active ? <Check size={16} style={{ color: "#818cf8", flexShrink: 0 }} /> : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Section 2: Custom Primary & Secondary Color Pickers */}
+          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <Palette size={16} style={{ color: "var(--ps-primary)" }} /> Theme Colors
+            </div>
+
+            {/* Primary Color */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Primary Brand Color</span>
+                <span style={{ fontSize: 11, color: "var(--ps-muted)", fontFamily: "monospace" }}>{brand.primary || "#6366F1"}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="color"
+                  value={brand.primary || "#6366F1"}
+                  onChange={(e) => patchBrand({ primary: e.target.value })}
+                  style={{ width: 44, height: 36, padding: 0, border: "none", borderRadius: 8, cursor: "pointer", background: "transparent" }}
+                />
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
+                  {PRIMARY_SWATCHES.map(([hex, label]) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      title={label}
+                      onClick={() => patchBrand({ primary: hex })}
+                      style={{ width: 22, height: 22, borderRadius: "50%", background: hex, border: brand.primary === hex ? "2px solid #fff" : "1px solid rgba(255,255,255,.2)", cursor: "pointer" }}
+                    />
+                  ))}
                 </div>
-                <div style={{ padding: 20 }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", color: brand.accent }}>{brand.tagline}</div>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: ink, lineHeight: 1.15, margin: "8px 0 6px", fontFamily: `${brand.headingFont}, Georgia, serif` }}>
-                    Built around <span style={{ color: brand.primary }}>your brand.</span>
-                  </div>
-                  <div style={{ fontSize: 12.5, color: muted, maxWidth: 380, lineHeight: 1.6, fontFamily: `${brand.bodyFont}, Inter, sans-serif` }}>
-                    {brand.email} · {brand.phone}
-                  </div>
-                  <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                    <span style={{ padding: "10px 18px", borderRadius: 10, background: brand.accentButtons ? brand.accent : brand.primary, color: "#fff", fontSize: 12, fontWeight: 800 }}>Book a site visit</span>
-                    <span style={{ padding: "10px 18px", borderRadius: 10, border: `1.5px solid ${brand.primary}`, color: brand.primary, fontSize: 12, fontWeight: 800 }}>Download brochure</span>
-                  </div>
+              </div>
+            </div>
+
+            {/* Secondary / Accent Color */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Secondary / Accent Gold</span>
+                <span style={{ fontSize: 11, color: "var(--ps-muted)", fontFamily: "monospace" }}>{brand.accent || "#CDA45E"}</span>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="color"
+                  value={brand.accent || "#CDA45E"}
+                  onChange={(e) => patchBrand({ accent: e.target.value })}
+                  style={{ width: 44, height: 36, padding: 0, border: "none", borderRadius: 8, cursor: "pointer", background: "transparent" }}
+                />
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
+                  {ACCENT_SWATCHES.map(([hex, label]) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      title={label}
+                      onClick={() => patchBrand({ accent: hex })}
+                      style={{ width: 22, height: 22, borderRadius: "50%", background: hex, border: brand.accent === hex ? "2px solid #fff" : "1px solid rgba(255,255,255,.2)", cursor: "pointer" }}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="ps-card" style={{ borderRadius: 16, padding: "16px 20px 18px" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 12 }}>Colors</div>
-            <FieldRow label="Primary">
-              <ColorField value={brand.primary} onChange={(v) => patchBrand({ primary: v })} />
-            </FieldRow>
-            <FieldRow label="Accent">
-              <ColorField value={brand.accent} onChange={(v) => patchBrand({ accent: v })} />
-            </FieldRow>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", textTransform: "uppercase", letterSpacing: 0.5, margin: "12px 0 8px" }}>Primary swatches</div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {PRIMARY_SWATCHES.map(([hex, name]) => (
-                <button
-                  key={hex}
-                  type="button"
-                  onClick={() => patchBrand({ primary: hex })}
-                  style={{ border: "none", background: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: 4 }}
-                >
-                  <span style={{ position: "relative", width: 44, height: 44, borderRadius: 12, background: hex, boxShadow: "0 4px 12px rgba(17,24,39,.18)" }}>
-                    {hex.toLowerCase() === brand.primary.toLowerCase() ? (
-                      <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><Check size={18} /></span>
-                    ) : null}
-                  </span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "var(--ps-muted)" }}>{name}</span>
-                </button>
-              ))}
+          {/* Section 3: Brand Identity & Media */}
+          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <ImagePlus size={16} style={{ color: "var(--ps-primary)" }} /> Brand Identity & Logo
             </div>
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--ps-slate)", textTransform: "uppercase", letterSpacing: 0.5, margin: "14px 0 8px" }}>Accent swatches</div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {ACCENT_SWATCHES.map(([hex, name]) => (
-                <button
-                  key={hex}
-                  type="button"
-                  onClick={() => patchBrand({ accent: hex })}
-                  style={{ border: "none", background: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: 4 }}
-                >
-                  <span style={{ position: "relative", width: 44, height: 44, borderRadius: 12, background: hex, boxShadow: "0 4px 12px rgba(17,24,39,.18)" }}>
-                    {hex.toLowerCase() === brand.accent.toLowerCase() ? (
-                      <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}><Check size={18} /></span>
-                    ) : null}
-                  </span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "var(--ps-muted)" }}>{name}</span>
-                </button>
-              ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Brand / Project Name</label>
+                <input
+                  className="ps-input"
+                  value={brand.name || ""}
+                  placeholder="e.g. Prestige Green Park"
+                  onChange={(e) => patchBrand({ name: e.target.value })}
+                  style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Tagline / Catchphrase</label>
+                <input
+                  className="ps-input"
+                  value={brand.tagline || ""}
+                  placeholder="e.g. Ultra Luxury Living in South Bangalore"
+                  onChange={(e) => patchBrand({ tagline: e.target.value })}
+                  style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Brand Logo</label>
+                <MediaPicker
+                  kind="image"
+                  label="Upload or select Brand Logo"
+                  value={brand.logo || ""}
+                  onChange={(v) => patchBrand({ logo: v })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: Widget Design Style */}
+          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <LayoutDashboard size={16} style={{ color: "var(--ps-primary)" }} /> Widget Design Style
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+              {LAYOUT_THEMES.map((t) => {
+                const active = (brand.layoutTheme ?? "standard") === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => patchBrand({ layoutTheme: t.key })}
+                    style={{
+                      textAlign: "left",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: active ? "2px solid var(--ps-primary)" : "1px solid var(--ps-line)",
+                      background: active ? "rgba(99, 102, 241, 0.18)" : "var(--ps-bg)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      transition: "all 0.12s",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: active ? "#818cf8" : "#fff" }}>{t.label}</div>
+                      <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>{t.tagline}</div>
+                    </div>
+                    {active ? <Check size={16} style={{ color: "#818cf8", flexShrink: 0 }} /> : null}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="ps-card" style={{ borderRadius: 16, padding: "6px 20px 18px" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", padding: "12px 0 6px" }}>Logo</div>
-            <MediaPicker kind="image" label="Logo — upload or URL" value={brand.logo} onChange={(v) => patchBrand({ logo: v })} />
-            <div style={{ display: "flex", justifyContent: "flex-end", margin: "4px 0 10px" }}>
-              <Btn variant="ghost" size="sm" icon={<Download size={12} />} onClick={downloadLogo}>Download</Btn>
-            </div>
-            <FieldRow label="Brand name">
-              <TextField value={brand.name} onChange={(v) => patchBrand({ name: v })} />
-            </FieldRow>
-            <FieldRow label="Tagline">
-              <TextField value={brand.tagline} onChange={(v) => patchBrand({ tagline: v })} />
-            </FieldRow>
-            <FieldRow label="Support email">
-              <TextField value={brand.email} onChange={(v) => patchBrand({ email: v })} />
-            </FieldRow>
-            <FieldRow label="Phone">
-              <TextField value={brand.phone} onChange={(v) => patchBrand({ phone: v })} />
-            </FieldRow>
-            <FieldRow label="Images & media notes">
-              <textarea className="ps-input" value={cfg.media.notes} onChange={(e) => onPatch((c) => ({ ...c, media: { notes: e.target.value } }))} style={{ minHeight: 64 }} placeholder="Hero, gallery, brochure notes for this template" />
-            </FieldRow>
-          </div>
-
-          <div className="ps-card" style={{ borderRadius: 16, padding: "6px 20px 18px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 0 6px", fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>
-              <Type size={15} /> Typography
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {FONTS.map((f) => (
-                <button
-                  key={f.name}
-                  type="button"
-                  onClick={() => patchBrand({ headingFont: f.name, bodyFont: f.name === "Playfair Display" || f.name === "DM Serif Display" ? "Inter" : f.name })}
-                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: 11, border: brand.headingFont === f.name ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line)", background: brand.headingFont === f.name ? "var(--ps-primary-mist)" : "#fff", cursor: "pointer", textAlign: "left" }}
-                >
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "var(--ps-ink)", width: 130, flexShrink: 0, fontFamily: `${f.name}, system-ui, sans-serif` }}>{f.name}</span>
-                  <span style={{ fontSize: 11, color: "var(--ps-muted)", flex: 1 }}>{f.spec}</span>
-                  {brand.headingFont === f.name ? <span style={{ width: 18, height: 18, borderRadius: 999, background: "var(--ps-primary)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><Check size={11} /></span> : null}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Layout Style picker */}
-          <LayoutThemePicker
-            value={brand.layoutTheme ?? "standard"}
-            onChange={(t) => patchBrand({ layoutTheme: t as SiteConfig["brand"]["layoutTheme"] })}
-          />
-
-          <div className="ps-card" style={{ borderRadius: 16, padding: "6px 20px 18px" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", padding: "12px 0 4px" }}>Social & sharing</div>
-            {[
-              { key: "facebook" as const, label: "Facebook" },
-              { key: "instagram" as const, label: "Instagram" },
-              { key: "twitter" as const, label: "Twitter / X" },
-              { key: "youtube" as const, label: "YouTube" },
-              { key: "linkedin" as const, label: "LinkedIn" },
-            ].map((s) => (
-              <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 11, padding: "8px 0", borderBottom: "1px solid var(--ps-line)" }}>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-slate)", width: 84 }}>{s.label}</span>
-                <input className="ps-input" value={brand[s.key]} onChange={(e) => patchBrand({ [s.key]: e.target.value })} style={{ flex: 1, height: 30 }} placeholder="https://" />
+        {/* Right Live Specimen Canvas */}
+        <div
+          className="ps-canvas-dots"
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "28px 36px 80px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          {/* Mockup Card */}
+          <div
+            style={{
+              width: device === "desktop" ? "100%" : device === "tablet" ? 768 : 390,
+              maxWidth: "100%",
+              background: "#fff",
+              borderRadius: device === "desktop" ? 18 : 28,
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              boxShadow: "0 25px 70px rgba(0, 0, 0, 0.65)",
+              overflow: "hidden",
+              transition: "width 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
+          >
+            {/* Header Stage Bar */}
+            <div
+              style={{
+                background: "#0f172a",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                padding: "12px 18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#f87171" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fbbf24" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#34d399" }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1", marginLeft: 8 }}>
+                  Live Brand Preview & Widget System
+                </span>
               </div>
-            ))}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0 4px" }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Accent buttons on pages</span>
-              <Toggle on={brand.accentButtons} onChange={(v) => patchBrand({ accentButtons: v })} />
+              <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#a5b4fc", background: "rgba(99,102,241,0.2)", padding: "3px 9px", borderRadius: 999 }}>
+                {brand.layoutTheme || "standard"} theme
+              </span>
+            </div>
+
+            {/* Specimen Content Sheet */}
+            <div style={{ padding: device === "mobile" ? "30px 20px" : "48px 40px", display: "flex", flexDirection: "column", gap: 32 }}>
+              {/* Brand Header Banner */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 24, borderBottom: "1px solid #e2e8f0" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  {brand.logo ? (
+                    <img src={brand.logo} alt={brand.name} style={{ height: 48, objectFit: "contain" }} />
+                  ) : (
+                    <div style={{ width: 48, height: 48, borderRadius: 12, background: `linear-gradient(135deg, ${brand.primary || "#6366F1"}, ${brand.accent || "#CDA45E"})`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900 }}>
+                      {brand.name?.slice(0, 2).toUpperCase() || "EP"}
+                    </div>
+                  )}
+                  <div>
+                    <h2 style={{ fontSize: 22, fontWeight: 900, color: "#0f172a", margin: 0 }}>{brand.name || "Estate Pro Luxury Residences"}</h2>
+                    <p style={{ fontSize: 12.5, color: "#64748b", margin: "3px 0 0" }}>{brand.tagline || "Super-premium residential enclave"}</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  style={{
+                    background: brand.primary || "#6366F1",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: brand.layoutTheme === "premium" ? 14 : brand.layoutTheme === "modern" ? 4 : 8,
+                    padding: "10px 20px",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    boxShadow: `0 4px 14px ${brand.primary || "#6366F1"}40`,
+                  }}
+                >
+                  Book Site Visit
+                </button>
+              </div>
+
+              {/* Sample Widgets Grid */}
+              <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 20 }}>
+                {/* Feature Card 1 */}
+                <div
+                  style={{
+                    background: "#f8fafc",
+                    border: brand.layoutTheme === "premium" ? `1px solid ${brand.accent || "#CDA45E"}40` : "1px solid #e2e8f0",
+                    borderRadius: brand.layoutTheme === "premium" ? 18 : brand.layoutTheme === "modern" ? 6 : 12,
+                    padding: "24px",
+                    boxShadow: brand.layoutTheme === "premium" ? "0 8px 30px rgba(0,0,0,0.06)" : "none",
+                  }}
+                >
+                  <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8, color: brand.primary || "#6366F1" }}>
+                    Primary Token
+                  </span>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: "8px 0" }}>Infinity Clubhouse</h3>
+                  <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6, margin: 0 }}>
+                    World-class recreational hub featuring temperature-controlled pools, squash courts, and sky lounges.
+                  </p>
+                </div>
+
+                {/* Feature Card 2 */}
+                <div
+                  style={{
+                    background: "#f8fafc",
+                    border: brand.layoutTheme === "premium" ? `1px solid ${brand.accent || "#CDA45E"}40` : "1px solid #e2e8f0",
+                    borderRadius: brand.layoutTheme === "premium" ? 18 : brand.layoutTheme === "modern" ? 6 : 12,
+                    padding: "24px",
+                    boxShadow: brand.layoutTheme === "premium" ? "0 8px 30px rgba(0,0,0,0.06)" : "none",
+                  }}
+                >
+                  <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8, color: brand.accent || "#CDA45E" }}>
+                    Accent Highlight
+                  </span>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: "8px 0" }}>Gold Specification</h3>
+                  <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6, margin: 0 }}>
+                    Italian marble flooring, smart automated home access, and imported German sanitary fittings.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -7,20 +7,28 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Bell,
+  Check,
   ChevronDown,
   Clock,
   HelpCircle,
   LogOut,
   Menu,
+  MessageCircle,
   Monitor,
   Moon,
+  Palette,
+  PanelsTopLeft,
+  PencilRuler,
   Redo2,
   Rocket,
   Save,
+  Search,
   Settings,
   Smartphone,
   Sun,
   Tablet,
+  Target,
+  Type,
   Undo2,
   User,
   Users,
@@ -64,8 +72,26 @@ const DEVICES: { key: Device; icon: typeof Monitor; label: string }[] = [
   { key: "mobile", icon: Smartphone, label: "Mobile" },
 ];
 
+export const MODULE_OPTIONS: {
+  key: ModuleKey;
+  label: string;
+  icon: React.ComponentType<{ size?: number | string; style?: React.CSSProperties }>;
+  desc: string;
+  color: string;
+  bg: string;
+}[] = [
+  { key: "builder", label: "Canvas Builder", icon: PencilRuler, desc: "Visual drag & drop page editor", color: "#6366f1", bg: "rgba(99, 102, 241, 0.15)" },
+  { key: "typography", label: "Typography & Fonts", icon: Type, desc: "Global font styles & headings", color: "#8b5cf6", bg: "rgba(139, 92, 246, 0.15)" },
+  { key: "forms", label: "Forms & Enquiries", icon: MessageCircle, desc: "Lead capture & dynamic forms", color: "#10b981", bg: "rgba(16, 185, 129, 0.15)" },
+  { key: "brand", label: "Brand & Colors", icon: Palette, desc: "Palette & logo theme settings", color: "#f59e0b", bg: "rgba(245, 158, 11, 0.15)" },
+  { key: "headerfooter", label: "Header & Footer", icon: PanelsTopLeft, desc: "Navigation chrome & footer", color: "#0ea5e9", bg: "rgba(14, 165, 233, 0.15)" },
+  { key: "seo", label: "SEO & Social", icon: Search, desc: "Meta tags & Open Graph previews", color: "#ec4899", bg: "rgba(236, 72, 153, 0.15)" },
+  { key: "tracking", label: "Tracking & Pixels", icon: Target, desc: "Analytics, GTM, Meta Pixel", color: "#06b6d4", bg: "rgba(6, 182, 212, 0.15)" },
+];
+
 export function TopNav({
   module,
+  setModule,
   pageName,
   pageStatus,
   device,
@@ -78,10 +104,6 @@ export function TopNav({
   onPreview,
   onPublish,
   onUnpublish,
-  // Text only — an org session isn't allowed to publish directly, so
-  // studio.tsx passes "Submit for approval" / a review-status label here
-  // instead of the Super Admin's "Publish" / "Unpublish". The click handlers
-  // and branching (which slot renders) are unchanged.
   publishLabel = "Publish",
   unpublishLabel = "Unpublish",
   onNotify,
@@ -95,6 +117,7 @@ export function TopNav({
   homeHref,
 }: {
   module: ModuleKey;
+  setModule?: (m: ModuleKey) => void;
   pageName?: string;
   pageStatus?: string;
   device: Device;
@@ -114,38 +137,33 @@ export function TopNav({
   onHelp: () => void;
   onMenu?: () => void;
   actions?: ReactNode;
-  // The logged-in user, for the profile dropdown. Undefined/null renders a
-  // "—" placeholder instead of guessing.
   user?: { name: string; email: string; initials: string } | null;
   onSignOut: () => void;
-  // Real destination for the "Settings" menu item — differs by session
-  // (org vs Super Admin). No fallback: pass it or the item stays inert.
   settingsHref?: string;
-  // Destination for the header "Back" control. For an org session this is the
-  // Landing Pages hub; for Super Admin it's the Templates hub. When omitted the
-  // header shows no back button (callers that expose back elsewhere can skip it).
   homeHref?: string;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
-  const [dark, setDark] = useState(true);
+  const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
   const published = pageStatus === "published";
 
   useEffect(() => {
-    if (!profileOpen) return;
     const handleOutsideClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest("[data-profile-menu]")) {
         setProfileOpen(false);
       }
+      if (!target.closest("[data-module-menu]")) {
+        setModuleMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [profileOpen]);
+  }, []);
 
   return (
     <header className="ps-topnav ps-glass">
       {/* Logo & Page Breadcrumbs */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
         {onMenu ? (
           <button type="button" className="ps-nav-toggle" title="Toggle Dock" onClick={onMenu}>
             <Menu size={18} />
@@ -164,22 +182,150 @@ export function TopNav({
           </div>
         </div>
 
-        <div className="ps-vdiv" style={{ height: 20, margin: "0 4px" }} />
+        <div className="ps-vdiv" style={{ height: 20, margin: "0 2px" }} />
 
-        {module === "builder" && pageName ? (
+        {module !== "builder" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {setModule && (
+              <button
+                type="button"
+                onClick={() => setModule("builder")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "var(--ps-primary)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "5px 11px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                <ArrowLeft size={13} /> Back to Canvas
+              </button>
+            )}
+            <span style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}>{MODULE_LABELS[module]}</span>
+          </div>
+        ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 260 }}>
-              {pageName}
-            </span>
+            {pageName ? (
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }}>
+                {pageName}
+              </span>
+            ) : null}
             {pageStatus ? (
               <span className={`ps-draft-pill ${published ? "ps-pill--published" : "ps-pill--draft"}`}>
                 <span className="ps-dot" style={{ background: published ? "#34d399" : "#fbbf24" }} />
                 {pageStatus}
               </span>
             ) : null}
+
+            {/* Module Switcher Dropdown */}
+            {setModule && (
+              <div style={{ position: "relative" }} data-module-menu>
+                <button
+                  type="button"
+                  onClick={() => setModuleMenuOpen((v) => !v)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "rgba(255, 255, 255, 0.08)",
+                    border: "1px solid rgba(255, 255, 255, 0.16)",
+                    borderRadius: 8,
+                    padding: "4px 10px",
+                    color: "#ffffff",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  <span>Page Tools</span>
+                  <ChevronDown size={13} style={{ color: "#94a3b8" }} />
+                </button>
+                {moduleMenuOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 6px)",
+                      left: 0,
+                      zIndex: 100,
+                      width: 290,
+                      background: "#161922",
+                      border: "1px solid rgba(255, 255, 255, 0.14)",
+                      borderRadius: 14,
+                      boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+                      padding: "8px 6px",
+                    }}
+                  >
+                    <div style={{ padding: "4px 10px 8px", fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8, color: "#94a3b8" }}>
+                      Studio Modules
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      {MODULE_OPTIONS.map((m) => {
+                        const Icon = m.icon;
+                        const active = module === m.key;
+                        return (
+                          <button
+                            key={m.key}
+                            type="button"
+                            onClick={() => {
+                              setModule(m.key);
+                              setModuleMenuOpen(false);
+                            }}
+                            style={{
+                              width: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 12,
+                              padding: "8px 10px",
+                              borderRadius: 10,
+                              border: "none",
+                              background: active ? "rgba(99, 102, 241, 0.22)" : "transparent",
+                              color: active ? "#818cf8" : "#ffffff",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              transition: "background 0.12s",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!active) e.currentTarget.style.background = "rgba(255, 255, 255, 0.07)";
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!active) e.currentTarget.style.background = "transparent";
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 9,
+                                background: m.bg,
+                                color: m.color,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Icon size={17} />
+                            </span>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: active ? "#818cf8" : "#ffffff" }}>{m.label}</div>
+                              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.desc}</div>
+                            </div>
+                            {active ? <Check size={16} style={{ color: "#818cf8", flexShrink: 0 }} /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        ) : (
-          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-ink)" }}>{MODULE_LABELS[module]}</span>
         )}
       </div>
 

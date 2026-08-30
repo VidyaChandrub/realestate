@@ -12,9 +12,9 @@ export interface WidgetDesignMeta {
 
 export const REAL_ESTATE_DESIGNS: Record<string, WidgetDesignMeta[]> = {
   hero: [
-    { id: "classic", name: "Classic Full", desc: "Full-bleed background with copy, CTA and quick facts" },
-    { id: "split", name: "Split Luxury", desc: "Left headline & enquiry form, right property visual" },
-    { id: "centered", name: "Centered Majestic", desc: "Centered headline with floating glass stats strip" },
+    { id: "split", name: "Form + Split Showcase", desc: "One side lead capture form, other side text, bullet points & CTA" },
+    { id: "slider", name: "Creative Slider", desc: "Dynamic interactive slides with rotating visuals, copy & CTAs" },
+    { id: "classic", name: "Simple Image + Text", desc: "Clean modern layout with strong typography, bullet points & dual CTA" },
   ],
   overview: [
     { id: "classic", name: "Side-by-Side", desc: "Image left, rich content right with RERA badge" },

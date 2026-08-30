@@ -130,14 +130,14 @@ export function BuilderWorkspace({
     sections: seedSections(page),
     history: [],
     future: [],
-    selectedId: "sticky-cta",
+    selectedId: null,
   }));
   const [widgetsOpen, setWidgetsOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const [quickOpen, setQuickOpen] = useState(false);
   const [vp, setVp] = useState(1400);
   const [savedTemplates, setSavedTemplates] = useState<SavedSectionTemplate[]>(() => loadSectionTemplates());
-  const [leftTab, setLeftTab] = useState<"widgets" | "layers">("layers");
+  const [leftTab, setLeftTab] = useState<"widgets" | "layers">("widgets");
   const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
 
   // Design system: typography tokens + uploaded fonts → stylesheet for canvas.

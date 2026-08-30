@@ -20,6 +20,7 @@ import {
   Plus,
   SlidersHorizontal,
   Smartphone,
+  Sparkles,
   Tablet,
   Trash2,
   Type,
@@ -528,16 +529,58 @@ export function SettingsPanel({
   const [tab, setTab] = useState<"content" | "style" | "advanced">("content");
 
   if (!section) {
+    const totalSections = page?.sections?.length || 0;
     return (
       <div className="ps-inspector">
-        <PanelHead title="Settings" subtitle="Select a section to edit" />
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 40, textAlign: "center", color: "var(--ps-muted)" }}>
-          <span style={{ width: 54, height: 54, borderRadius: 16, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-            <LayoutPanelTop size={24} />
-          </span>
-          <div style={{ fontSize: 14, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 6 }}>Nothing selected</div>
-          <div style={{ fontSize: 12.5, lineHeight: 1.6, maxWidth: 240 }}>
-            Click any section on the canvas, or add a widget from the library to start editing content, style and advanced settings.
+        <PanelHead title="Page Settings" subtitle="Global layout & structure" />
+        <div style={{ padding: "18px 16px", display: "flex", flexDirection: "column", gap: 18, overflowY: "auto" }}>
+          {/* Page metadata card */}
+          <div style={{ background: "var(--ps-surface-muted)", border: "1px solid var(--ps-line)", borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--ps-muted)", marginBottom: 6 }}>Page Title</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "var(--ps-ink)" }}>{page?.name || "Real Estate Landing Page"}</div>
+            <div style={{ fontSize: 11.5, color: "var(--ps-muted)", marginTop: 4 }}>
+              Status: <span style={{ color: page?.status === "published" ? "var(--ps-success)" : "var(--ps-warning)", fontWeight: 700 }}>{page?.status?.toUpperCase() || "DRAFT"}</span> · {totalSections} active sections
+            </div>
+          </div>
+
+          {/* Quick tips & shortcuts */}
+          <div style={{ background: "var(--ps-surface)", border: "1px solid var(--ps-line)", borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              <Sparkles size={14} style={{ color: "var(--ps-primary)" }} /> How to customize
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--ps-slate)", lineHeight: 1.6 }}>
+              <li><strong>Click any section</strong> on the canvas to open its design layouts, copy, and style controls.</li>
+              <li>Use the <strong>Blocks panel</strong> on the left to drag & drop or 1-click add new widgets.</li>
+              <li>Press <kbd style={{ background: "var(--ps-line)", padding: "1px 5px", borderRadius: 4, fontSize: 10.5 }}>Ctrl + K</kbd> to quick-add widgets anywhere.</li>
+            </ul>
+          </div>
+
+          {/* Device overview */}
+          <div style={{ background: "var(--ps-surface-muted)", border: "1px solid var(--ps-line)", borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--ps-muted)", marginBottom: 8 }}>Canvas Mode</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["desktop", "tablet", "mobile"] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDevice(d)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 0",
+                    border: device === d ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line)",
+                    borderRadius: 8,
+                    background: device === d ? "var(--ps-primary-soft)" : "#fff",
+                    color: device === d ? "var(--ps-primary)" : "var(--ps-slate)",
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
