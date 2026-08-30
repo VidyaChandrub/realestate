@@ -17,6 +17,7 @@ import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
 import { ListTemplatesQueryDto } from './dto/list-templates-query.dto';
 import { ResetTemplateDto } from './dto/reset-template.dto';
+import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 
 @Controller('admin/templates')
 export class AdminTemplatesController {
@@ -65,6 +66,14 @@ export class AdminTemplatesController {
   @HttpCode(201)
   duplicate(@Param('id') id: string) {
     return this.adminTemplatesService.duplicate(id);
+  }
+
+  // Presigned URL for a builder image upload — browser PUTs straight to R2,
+  // then the URL is stored in `content` (no base64).
+  @Post(':id/upload-url')
+  @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  createUploadUrl(@Param('id') id: string, @Body() dto: CreateUploadUrlDto) {
+    return this.adminTemplatesService.createUploadUrl(id, dto);
   }
 }
 

@@ -77,7 +77,7 @@ export function Modal({
             <Icon name="close" size={18} />
           </button>
         </div>
-        <div className="overflow-y-auto p-6 pt-4">{children}</div>
+        <div className="no-scrollbar overflow-y-auto p-6 pt-4">{children}</div>
       </div>
     </div>,
     document.body,

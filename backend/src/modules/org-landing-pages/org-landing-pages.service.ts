@@ -6,15 +6,35 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { StorageService } from '../../common/storage/storage.service';
 import { generateUniqueLandingPageSlug } from '../../common/utils/slug.util';
 import { deepEqual } from '../../common/utils/deep-equal.util';
 import { CreateLandingPageDto } from './dto/create-landing-page.dto';
 import { UpdateLandingPageDto } from './dto/update-landing-page.dto';
 import { ListLandingPagesQueryDto } from './dto/list-landing-pages-query.dto';
+import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 
 @Injectable()
 export class OrgLandingPagesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
+
+  // Presigned PUT URL for a builder image. Ownership is checked (getOwned)
+  // so an org can only ever get a URL keyed into its own landing page's
+  // prefix; the key's org/{orgId}/... segment comes from the JWT.
+  async createUploadUrl(orgId: string, id: string, dto: CreateUploadUrlDto) {
+    await this.getOwned(orgId, id);
+    return this.storage.createUploadUrl({
+      orgId,
+      field: 'builderImage',
+      landingPageId: id,
+      filename: dto.filename,
+      contentType: dto.contentType,
+      size: dto.size,
+    });
+  }
 
   async create(orgId: string, dto: CreateLandingPageDto) {
     // No cap on how many landing pages an org may hold, template-derived or

@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import type { Device, LandingPageData, ModuleKey, SectionInstance, SiteConfig } from "@/lib/prestate/types";
 import { loadTemplate, loadTemplates, saveTemplate, createTemplate, publishLandingPage, unpublishLandingPage, type Resource } from "@/lib/prestate/store";
+import { uploadBuilderImage } from "@/lib/prestate/persist";
+import { BuilderUploadProvider, type BuilderImageUploader } from "@/components/prestate/builder/upload-context";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
 import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
 import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
@@ -517,7 +519,16 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
     }
   };
 
+  // Builder image uploads go straight to R2 via a presigned URL (no more
+  // base64 data URIs bloating `content`). Null until a page is active —
+  // MediaPicker then falls back to its legacy inline behaviour.
+  const pageId = activePage?.id;
+  const imageUploader: BuilderImageUploader = pageId
+    ? (file: File) => uploadBuilderImage(file, { id: pageId, resource })
+    : null;
+
   return (
+    <BuilderUploadProvider uploader={imageUploader}>
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--ps-bg)" }}>
       <TopNav
         module={module}
@@ -725,6 +736,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
         </div>
       ) : null}
     </div>
+    </BuilderUploadProvider>
   );
 }
 

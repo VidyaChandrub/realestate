@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { StorageService } from '../../common/storage/storage.service';
+import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ListProjectsQueryDto } from './dto/list-projects-query.dto';
@@ -52,7 +54,40 @@ type UnitTypeWithCounts = Prisma.UnitTypeGetPayload<Record<string, never>> & {
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
+
+  // -------------------------------------------------------------------------
+  // Media uploads — issue a short-lived presigned PUT URL for direct
+  // browser → R2 upload. Bytes never pass through this API. The key's
+  // orgId segment is always the caller's own (from the JWT); if a
+  // projectId / unitTypeId is given we verify the caller owns it before
+  // signing, so a URL can only ever be scoped into your own key space.
+  // -------------------------------------------------------------------------
+  async createUploadUrl(orgId: string, dto: CreateUploadUrlDto) {
+    if (dto.unitTypeId) {
+      if (!dto.projectId) {
+        throw new BadRequestException(
+          'projectId is required when unitTypeId is given.',
+        );
+      }
+      await this.getOwnedUnitType(orgId, dto.projectId, dto.unitTypeId);
+    } else if (dto.projectId) {
+      await this.getOwnedProject(orgId, dto.projectId);
+    }
+
+    return this.storage.createUploadUrl({
+      orgId,
+      field: dto.field,
+      filename: dto.filename,
+      contentType: dto.contentType,
+      size: dto.size,
+      projectId: dto.projectId,
+      unitTypeId: dto.unitTypeId,
+    });
+  }
 
   // -------------------------------------------------------------------------
   // Projects
@@ -228,6 +263,10 @@ export class ProjectsService {
           builtupSqft: dto.builtupSqft ?? null,
           price: dto.price ?? null,
           totalUnits: dto.totalUnits ?? 0,
+          floorPlanUrl: dto.floorPlanUrl ?? null,
+          brochureUrl: dto.brochureUrl ?? null,
+          videoUrl: dto.videoUrl ?? null,
+          galleryUrls: dto.galleryUrls ?? [],
         },
       });
       await tx.auditLog.create({
@@ -276,6 +315,10 @@ export class ProjectsService {
     if (dto.builtupSqft !== undefined) data.builtupSqft = dto.builtupSqft;
     if (dto.price !== undefined) data.price = dto.price;
     if (dto.totalUnits !== undefined) data.totalUnits = dto.totalUnits;
+    if (dto.floorPlanUrl !== undefined) data.floorPlanUrl = dto.floorPlanUrl;
+    if (dto.brochureUrl !== undefined) data.brochureUrl = dto.brochureUrl;
+    if (dto.videoUrl !== undefined) data.videoUrl = dto.videoUrl;
+    if (dto.galleryUrls !== undefined) data.galleryUrls = dto.galleryUrls;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const row = await tx.unitType.update({ where: { id }, data });

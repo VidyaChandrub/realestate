@@ -467,6 +467,55 @@ export async function unpublishLandingPage(id: string): Promise<LandingPageData>
 }
 
 // ---------------------------------------------------------------------------
+// Builder image upload — replaces base64-data-URI-in-content (413 fix).
+// Asks the backend for a short-lived presigned PUT URL, uploads the file
+// straight to R2 (never through the API), returns the stored public URL.
+// ---------------------------------------------------------------------------
+
+const BUILDER_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const BUILDER_IMAGE_MIMES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+];
+
+export async function uploadBuilderImage(
+  file: File,
+  opts: { id: string; resource: Resource },
+): Promise<string> {
+  if (file.type && !BUILDER_IMAGE_MIMES.includes(file.type)) {
+    throw new Error("Choose a PNG, JPG, WebP, GIF or SVG image");
+  }
+  if (file.size > BUILDER_IMAGE_MAX_BYTES) {
+    throw new Error("Keep images under 5 MB");
+  }
+  const base =
+    opts.resource === "landing-page" ? LANDING_PAGES_PATH : TEMPLATES_PATH;
+  const { uploadUrl, publicUrl } = await apiFetch<{
+    uploadUrl: string;
+    publicUrl: string;
+  }>(`${base}/${encodeURIComponent(opts.id)}/upload-url`, {
+    method: "POST",
+    body: JSON.stringify({
+      filename: file.name,
+      contentType: file.type,
+      size: file.size,
+    }),
+  });
+  const put = await fetch(uploadUrl, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": file.type },
+  });
+  if (!put.ok) {
+    throw new Error(`Upload to storage failed (${put.status}).`);
+  }
+  return publicUrl;
+}
+
+// ---------------------------------------------------------------------------
 // Saved section templates — "Save as template" in the section toolbar stores
 // reusable sections here; they appear under "Saved" in the widget library.
 // ---------------------------------------------------------------------------
