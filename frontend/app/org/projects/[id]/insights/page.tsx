@@ -49,10 +49,7 @@ export default function OrgProjectInsightsPage() {
       <ProjectPageHead
         active="insights"
         actions={
-          <>
-            <button className="btn btn-ghost">🔗 Public page</button>
-            <button className="btn btn-primary">＋ Add lead</button>
-          </>
+          <button className="btn btn-primary">＋ Add lead</button>
         }
       />
 

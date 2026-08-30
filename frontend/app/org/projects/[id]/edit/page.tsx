@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
+import { ProjectTabs } from "@/components/org/project-tabs";
 import "@/app/admin-console/superadmin.css";
 import "../../projects.css";
 import type {
@@ -220,6 +221,8 @@ export default function OrgProjectEditPage() {
           </Link>
         </div>
       </div>
+
+      <ProjectTabs active="overview" />
 
       <Reveal delay={1}>
         <div className="card">

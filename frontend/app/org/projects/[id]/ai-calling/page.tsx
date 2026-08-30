@@ -74,10 +74,7 @@ export default function OrgProjectAiCallingPage() {
       <ProjectPageHead
         active="ai-calling"
         actions={
-          <>
-            <button className="btn btn-ghost">🔗 Public page</button>
-            <button className="btn btn-primary">＋ Add lead</button>
-          </>
+          <button className="btn btn-primary">＋ Add lead</button>
         }
       />
 

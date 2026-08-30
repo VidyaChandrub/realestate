@@ -100,8 +100,9 @@ export default function OrgProjectOverviewPage() {
         }}
         actions={
           <>
-            <button className="btn btn-ghost" type="button">🔗 Public page</button>
-            <button className="btn btn-ghost" type="button">✏️ Edit</button>
+            <Link href={`/org/projects/${id}/edit`} className="btn btn-ghost">
+              ✏️ Edit
+            </Link>
             <button className="btn btn-primary" type="button">＋ Add lead</button>
           </>
         }

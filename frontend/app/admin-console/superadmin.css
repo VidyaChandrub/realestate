@@ -582,6 +582,14 @@
   gap: 7px;
 }
 
+.superadmin .page-head h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0;
+}
+
 .superadmin .page-head .sub {
   color: var(--muted);
   font-size: 14px;

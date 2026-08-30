@@ -447,10 +447,6 @@ export default function OrgProjectUnitsPage() {
         }
         actions={
           <>
-            {/* Inert for now — public project pages aren't built yet. */}
-            <button className="btn btn-ghost" type="button">
-              🔗 Public page
-            </button>
             <button
               className="btn btn-ghost"
               type="button"

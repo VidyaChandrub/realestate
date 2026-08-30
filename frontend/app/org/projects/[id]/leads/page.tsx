@@ -108,10 +108,7 @@ export default function OrgProjectLeadsPage() {
       <ProjectPageHead
         active="leads"
         actions={
-          <>
-            <button className="btn btn-ghost">🔗 Public page</button>
-            <button className="btn btn-primary">＋ Add lead</button>
-          </>
+          <button className="btn btn-primary">＋ Add lead</button>
         }
       />
 

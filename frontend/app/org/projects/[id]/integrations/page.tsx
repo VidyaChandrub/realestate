@@ -86,10 +86,7 @@ export default function OrgProjectIntegrationsPage() {
       <ProjectPageHead
         active="integrations"
         actions={
-          <>
-            <button className="btn btn-ghost">🔗 Public page</button>
-            <button className="btn btn-primary">＋ Add lead</button>
-          </>
+          <button className="btn btn-primary">＋ Add lead</button>
         }
       />
 
@@ -100,19 +97,7 @@ export default function OrgProjectIntegrationsPage() {
       </Reveal>
 
       <Reveal delay={1}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            margin: "6px 0 14px",
-            color: "var(--muted)",
-            fontSize: 11.5,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-          }}
-        >
+        <div className="sec-title">
           <span>INCOMING · Lead sources for this project</span>
           <button className="btn btn-ghost" style={{ textTransform: "none", letterSpacing: 0 }}>
             ＋ Add custom source
@@ -152,19 +137,9 @@ export default function OrgProjectIntegrationsPage() {
             <span className="t">Distribution rules</span>
             <span className="badge b-sky">3 rules</span>
           </div>
-          <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className="card-b">
             {RULES.map((r) => (
-              <div
-                key={r.title}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  padding: "12px 14px",
-                  border: "1px solid var(--line)",
-                  borderRadius: 12,
-                }}
-              >
+              <div className="sw-row" key={r.title}>
                 <div className={`switch${r.on ? " on" : ""}`} />
                 <div style={{ flex: 1 }}>
                   <b>{r.title}</b>
