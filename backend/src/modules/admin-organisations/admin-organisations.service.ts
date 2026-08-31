@@ -433,12 +433,24 @@ export class AdminOrganisationsService {
   }
 
   async updateStatus(id: string, dto: UpdateOrganisationStatusDto) {
-    await this.getRealOrganisation(id);
+    const existing = await this.getRealOrganisation(id);
 
     const updated = await this.prisma.organisation.update({
       where: { id },
-      data: { status: dto.status },
+      data: {
+        status: dto.status,
+        ...(dto.status === 'active' && existing.subdomain && existing.subdomainStatus === 'pending'
+          ? { subdomainStatus: 'active' }
+          : {}),
+      },
     });
+
+    if (dto.status === 'active' && existing.subdomain) {
+      await this.prisma.orgDomainRequest.updateMany({
+        where: { orgId: id, kind: 'subdomain', status: 'pending' },
+        data: { status: 'approved', reviewedAt: new Date() },
+      });
+    }
 
     return toSafeOrganisation(updated);
   }
@@ -502,6 +514,14 @@ export class AdminOrganisationsService {
         await tx.organisation.update({
           where: { id: orgId },
           data: { subdomainStatus: 'active' },
+        });
+        await tx.orgDomainRequest.updateMany({
+          where: { orgId, kind: 'subdomain', status: 'pending' },
+          data: {
+            status: 'approved',
+            reviewedAt: new Date(),
+            reviewedBy: actor.sub,
+          },
         });
         const primaryTemplateId = dto.templateIds?.[0] ?? null;
         const existingPrimary = await tx.landingPage.findFirst({
@@ -573,8 +593,17 @@ export class AdminOrganisationsService {
     const org = await this.prisma.organisation.findUnique({ where: { id: orgId } });
     if (!org) throw new NotFoundException('Organisation not found');
     if (org.status !== 'pending') throw new BadRequestException('Only pending organisations can be rejected');
-    // For now, disable the org and optionally keep user disabled? We'll set org to disabled
-    const updated = await this.prisma.organisation.update({ where: { id: orgId }, data: { status: 'disabled' } });
+    // For now, disable the org and reject any pending subdomain requests
+    const updated = await this.prisma.organisation.update({ where: { id: orgId }, data: { status: 'disabled', subdomainStatus: 'rejected' } });
+    await this.prisma.orgDomainRequest.updateMany({
+      where: { orgId, kind: 'subdomain', status: 'pending' },
+      data: {
+        status: 'rejected',
+        reviewedAt: new Date(),
+        reviewedBy: actor.sub,
+        rejectionReason: reason ?? 'Organisation was rejected',
+      },
+    });
     await this.prisma.auditLog.create({
       data: { orgId: updated.id, actorId: actor.sub, action: 'org_rejected', entity: 'Organisation', entityId: updated.id, metadata: { reason } as any },
     });
@@ -660,6 +689,43 @@ export class AdminOrganisationsService {
     });
 
     return { success: true };
+  }
+
+  async getOrgDomains(id: string) {
+    const org = await this.getRealOrganisation(id);
+
+    const [domainRequests, landingPages] = await Promise.all([
+      this.prisma.domainRequest.findMany({
+        where: { orgId: id },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          landingPage: { select: { id: true, name: true, slug: true, status: true } },
+          logs: { orderBy: { checkedAt: 'desc' }, take: 5 },
+        },
+      }),
+      this.prisma.landingPage.findMany({
+        where: { orgId: id },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          status: true,
+          subdomain: true,
+          subdomainStatus: true,
+          sourceTemplate: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
+
+    return {
+      subdomain: org.subdomain,
+      subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
+      subdomainStatus: org.subdomainStatus,
+      customDomain: org.customDomain,
+      customDomainStatus: org.customDomainStatus,
+      domainRequests,
+      landingPages,
+    };
   }
 
   private async getDraftOrganisation(orgId: string) {

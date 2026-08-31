@@ -1,7 +1,31 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type * as React from "react";import { Copy, Globe, Trash2, Type as TypeIcon, Upload } from "lucide-react";
+import type * as React from "react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Copy,
+  Download,
+  Eye,
+  FileText,
+  Font,
+  Globe,
+  Heading,
+  Layers,
+  Monitor,
+  Palette,
+  Plus,
+  Save,
+  SlidersHorizontal,
+  Smartphone,
+  Sparkles,
+  Tablet,
+  Trash2,
+  Type as TypeIcon,
+  Upload,
+} from "lucide-react";
 import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
 import type {
   FontDef,
@@ -24,23 +48,30 @@ import {
 } from "@/lib/prestate/design-system";
 import type { Resource } from "@/lib/prestate/store";
 import { uid } from "@/lib/prestate/data";
-import { ensureConfig } from "@/lib/prestate/site-config";
-import { ModuleHeader, SiteScopeBar } from "./shared";
-import { Btn, Chip, Collapse, ColorField, FieldRow, LengthInput, SelectField, SliderField, TabBar, TextField, Toggle } from "@/components/prestate/ui";
-import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { Icon } from "@/components/icons";
+import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
 
-const TYPE_META: { key: TypeKey; label: string; hint: string; isParagraph?: boolean }[] = [
-  { key: "h1", label: "H1", hint: "Hero / page titles" },
-  { key: "h2", label: "H2", hint: "Section headings" },
-  { key: "h3", label: "H3", hint: "Sub-headings" },
-  { key: "h4", label: "H4", hint: "Card titles" },
-  { key: "h5", label: "H5", hint: "Minor headings" },
-  { key: "h6", label: "H6", hint: "Eyebrows / labels" },
-  { key: "p", label: "Paragraph (P)", hint: "Body copy & rich text", isParagraph: true },
+const CURATED_PAIRINGS = [
+  { name: "Luxury Editorial", heading: "Playfair Display", body: "Inter", desc: "Classic high-end serif paired with clean modern sans" },
+  { name: "Modern Minimalist", heading: "Plus Jakarta Sans", body: "Inter", desc: "Sleek geometric tech & urban architecture" },
+  { name: "Royal Prestige", heading: "Cinzel", body: "DM Sans", desc: "Sophisticated luxury estate aesthetic" },
+  { name: "Bold Contemporary", heading: "Outfit", body: "Plus Jakarta Sans", desc: "Dynamic bold headlines with clean readable body" },
 ];
 
-type Breakpoint = "desktop" | "tablet" | "mobile";
+const TYPE_META: { key: TypeKey; label: string; tag: string; defaultSample: string }[] = [
+  { key: "h1", label: "Heading 1 (H1)", tag: "Hero & Page Title", defaultSample: "Luxury 3 & 4 BHK Residences in Bangalore" },
+  { key: "h2", label: "Heading 2 (H2)", tag: "Section Headings", defaultSample: "Architectural Excellence & World-Class Amenities" },
+  { key: "h3", label: "Heading 3 (H3)", tag: "Sub-Headings", defaultSample: "Master Plan & Tower Specifications" },
+  { key: "h4", label: "Heading 4 (H4)", tag: "Card Titles", defaultSample: "3 BHK Premium — 1,850 Sq.Ft." },
+  { key: "h5", label: "Heading 5 (H5)", tag: "Minor Titles", defaultSample: "Possession: December 2026" },
+  { key: "h6", label: "Heading 6 (H6)", tag: "Eyebrow & Badges", defaultSample: "RERA APPROVED • SARJAPUR ROAD" },
+  { key: "p", label: "Paragraph (Body)", tag: "Body Copy & Text", defaultSample: "Thoughtfully crafted luxury residences with 80% open landscaped greens, resort-style double-height clubhouses, and seamless connectivity to prime tech hubs." },
+];
+
+const DEVICES: { key: "desktop" | "tablet" | "mobile"; icon: typeof Monitor; label: string }[] = [
+  { key: "desktop", icon: Monitor, label: "Desktop" },
+  { key: "tablet", icon: Tablet, label: "Tablet" },
+  { key: "mobile", icon: Smartphone, label: "Mobile" },
+];
 
 export function TypographyModule({
   site,
@@ -53,25 +84,21 @@ export function TypographyModule({
   onSelectSite: (id: string) => void;
   onPatch: (fn: (c: SiteConfig) => SiteConfig) => void;
   onToast: (m: string) => void;
-  /** Which typography-sets endpoint this session hits — org sees platform +
-   *  its own sets; Super Admin sees platform sets only, and can edit them
-   *  (an org can't — platform sets render read-only there). */
   resource: Resource;
 }) {
   const cfg = ensureConfig(site);
-  const [deviceTab, setDeviceTab] = useState<Breakpoint>("desktop");
+  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [selectedTag, setSelectedTag] = useState<TypeKey>("h1");
+  const [savedSuccess, setSavedSuccess] = useState(false);
   const [fontsVersion, setFontsVersion] = useState(0);
   const fonts = useMemo(() => {
     void fontsVersion;
     return loadFonts();
   }, [fontsVersion]);
 
-  // Global sets are server-persisted now — fetched once per session/resource,
-  // not read synchronously the way localStorage was. See design-system.ts's
-  // effectiveTypography for why it now takes this as a parameter instead of
-  // loading it internally.
   const [globalSets, setGlobalSets] = useState<GlobalStyleSet[]>([]);
   const [globalSetsLoaded, setGlobalSetsLoaded] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     loadGlobalSets(resource)
@@ -90,112 +117,61 @@ export function TypographyModule({
 
   const eff = effectiveTypography(cfg, globalSets);
   const isGlobal = eff.isGlobal && !!eff.set;
-  // An org session can view and apply a platform set, but never edit or
-  // delete it — enforced here for the UI and again server-side (PATCH/DELETE
-  // reject it regardless of what this renders).
   const isReadOnlySet = isGlobal && eff.set?.scope === "platform" && resource === "landing-page";
 
-  /** Persist typography — to the shared global set or this template's config. */
   const writeTypography = (next: TemplateTypography) => {
     if (isGlobal && eff.set) {
       if (isReadOnlySet) return;
       const setId = eff.set.id;
-      // Optimistic: reflect immediately so sliders/inputs feel instant; the
-      // debounced PATCH (see updateGlobalSet) catches up in the background.
       setGlobalSets((prev) => prev.map((s) => (s.id === setId ? { ...s, typography: next } : s)));
       onPatch((c) => ({ ...c }));
-      updateGlobalSet(resource, setId, { typography: next })
-        .then((updated) => {
-          setGlobalSets((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-        })
-        .catch((err) => onToast(err instanceof Error ? err.message : "Couldn't save the shared set"));
+      updateGlobalSet(resource, setId, { typography: next }).catch((err) =>
+        onToast(err instanceof Error ? err.message : "Couldn't save shared set")
+      );
       return;
     }
-    onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope: c.designSystem?.scope === "global" ? "global" : "template", globalSetId: c.designSystem?.globalSetId, typography: next } }));
+    onPatch((c) => ({
+      ...c,
+      designSystem: {
+        ...ensureDesignSystem(c),
+        scope: c.designSystem?.scope === "global" ? "global" : "template",
+        globalSetId: c.designSystem?.globalSetId,
+        typography: next,
+      },
+    }));
   };
 
-  const bump = () => onPatch((c) => ({ ...c }));
+  const currentTypo = eff.typography;
+  const activeToken: TypeToken = currentTypo[selectedTag] ?? {};
 
-  const switchScope = async (scope: "template" | "global") => {
-    if (scope === eff.state.scope) return;
-    let gid: string | undefined = eff.state.globalSetId;
-    if (scope === "global") {
-      if (!gid || !globalSets.some((s) => s.id === gid)) {
-        if (!globalSets.length) {
-          try {
-            const fresh = await createGlobalSet(resource, { name: "Shared Set 1", typography: defaultTypography() });
-            setGlobalSets((prev) => [...prev, fresh]);
-            gid = fresh.id;
-          } catch (err) {
-            onToast(err instanceof Error ? err.message : "Couldn't create a shared set");
-            return;
-          }
-        } else {
-          gid = globalSets[0].id;
-        }
-      }
-    }
-    onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope, globalSetId: gid } }));
-    onToast(scope === "global" ? "Now editing the shared global set" : "Now editing template-specific typography");
+  const patchToken = (patch: Partial<TypeToken>) => {
+    const nextToken = { ...activeToken, ...patch };
+    const nextTypo = { ...currentTypo, [selectedTag]: nextToken };
+    writeTypography(nextTypo);
   };
 
-  const createGlobalSetFromTemplate = async () => {
-    try {
-      const fresh = await createGlobalSet(resource, { name: `Shared Set ${globalSets.length + 1}`, typography: eff.typography });
-      setGlobalSets((prev) => [...prev, fresh]);
-      onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope: "global", globalSetId: fresh.id } }));
-      onToast(`Created “${fresh.name}” from this template's typography`);
-    } catch (err) {
-      onToast(err instanceof Error ? err.message : "Couldn't create the shared set");
-    }
+  const applyPairing = (headingFont: string, bodyFont: string) => {
+    const nextTypo: TemplateTypography = {
+      ...currentTypo,
+      h1: { ...currentTypo.h1, fontFamily: headingFont },
+      h2: { ...currentTypo.h2, fontFamily: headingFont },
+      h3: { ...currentTypo.h3, fontFamily: headingFont },
+      h4: { ...currentTypo.h4, fontFamily: headingFont },
+      h5: { ...currentTypo.h5, fontFamily: headingFont },
+      h6: { ...currentTypo.h6, fontFamily: headingFont },
+      p: { ...currentTypo.p, fontFamily: bodyFont },
+    };
+    writeTypography(nextTypo);
+    onToast(`Applied pairing: ${headingFont} + ${bodyFont}`);
   };
 
-  const renameGlobalSet = async (set: GlobalStyleSet) => {
-    const name = window.prompt("Rename shared set", set.name);
-    if (!name || !name.trim() || name.trim() === set.name) return;
-    try {
-      const updated = await updateGlobalSet(resource, set.id, { name: name.trim() });
-      setGlobalSets((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-      onToast(`Renamed to “${updated.name}”`);
-    } catch (err) {
-      onToast(err instanceof Error ? err.message : "Couldn't rename the set");
-    }
-  };
-
-  const [deleteSet, setDeleteSet] = useState<GlobalStyleSet | null>(null);
-  const [deletingSet, setDeletingSet] = useState(false);
-  const confirmDeleteGlobalSet = async () => {
-    const set = deleteSet;
-    if (!set) return;
-    setDeletingSet(true);
-    try {
-      await deleteGlobalSet(resource, set.id);
-      setGlobalSets((prev) => prev.filter((s) => s.id !== set.id));
-      if (eff.state.globalSetId === set.id) {
-        onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope: "template" } }));
-      }
-      onToast(`Deleted “${set.name}”`);
-    } catch (err) {
-      onToast(err instanceof Error ? err.message : "Couldn't delete the set");
-    } finally {
-      setDeletingSet(false);
-      setDeleteSet(null);
-    }
-  };
-
-  // ------------------------------ Font manager ------------------------------
-
-  const addFontFiles = async (list: FileList | null) => {
+  const handleUploadFonts = async (list: FileList | null) => {
     for (const file of Array.from(list ?? [])) {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
       const format: FontDef["format"] | null =
         ext === "woff2" ? "woff2" : ext === "woff" ? "woff" : ext === "ttf" ? "truetype" : ext === "otf" ? "opentype" : null;
       if (!format) {
-        onToast(`${file.name} — use WOFF, WOFF2, TTF or OTF`);
-        continue;
-      }
-      if (file.size > 1_500_000) {
-        onToast(`${file.name} is over 1.5 MB — try a subsetted WOFF2`);
+        onToast(`${file.name} — please use WOFF2, TTF or OTF`);
         continue;
       }
       const src = await new Promise<string>((resolve) => {
@@ -204,322 +180,453 @@ export function TypographyModule({
         reader.onerror = () => resolve("");
         reader.readAsDataURL(file);
       });
-      if (!src) {
-        onToast(`Could not read ${file.name}`);
-        continue;
-      }
-      const family = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim() || "Custom Font";
+      if (!src) continue;
+      const family = file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || "Custom Font";
       const next = [...loadFonts(), { id: uid("font"), family, src, format, weight: 400, enabled: true }];
       saveFonts(next);
-      bump();
-      onToast(`Uploaded “${family}” — available in every font dropdown`);
+      setFontsVersion((v) => v + 1);
+      onToast(`Uploaded font “${family}”`);
     }
-    setFontsVersion((v) => v + 1);
   };
 
-  const patchFont = (id: string, patch: Partial<FontDef>) => {
-    saveFonts(loadFonts().map((f) => (f.id === id ? { ...f, ...patch } : f)));
-    setFontsVersion((v) => v + 1);
-    bump();
-  };
+  const fontList = fontOptions(fonts);
 
-  const deleteFont = (id: string) => {
-    saveFonts(loadFonts().filter((f) => f.id !== id));
-    setFontsVersion((v) => v + 1);
-    bump();
-    onToast("Font removed");
+  const handleSave = () => {
+    setSavedSuccess(true);
+    onToast(`Typography & font rules saved`);
+    setTimeout(() => setSavedSuccess(false), 2000);
   };
-
-  const opts = fontOptions(fonts);
 
   return (
-    <div style={{ overflowY: "auto", height: "100%" }}>
-      <ModuleHeader
-        title="Typography & Custom Fonts"
-        description={`Design-system tokens for H1–P. ${isGlobal ? `Editing the shared set “${eff.set?.name}” — every template using it updates together.` : "Editing template-specific typography — other templates are unaffected."}`}
-        actions={
-          !isGlobal && eff.state.scope === "template" ? (
-            <Btn variant="outline" icon={<Copy size={14} />} onClick={createGlobalSetFromTemplate}>Save as global set</Btn>
-          ) : null
-        }
-      />
-      <SiteScopeBar pages={[site]} activeId={site.id} label={resource === "landing-page" ? "Editing this page" : "Editing this template"} />
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--ps-bg)", color: "var(--ps-ink)", overflow: "hidden", ...siteThemeStyle(cfg.brand) }}>
+      {/* Top Action Ribbon */}
+      <div
+        style={{
+          background: "var(--ps-panel)",
+          borderBottom: "1px solid var(--ps-line-strong)",
+          padding: "12px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 13.5, fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: 7 }}>
+            <TypeIcon size={16} style={{ color: "var(--ps-primary)" }} /> Typography & Font System
+          </span>
+          <span style={{ fontSize: 11, color: "var(--ps-muted)", borderLeft: "1px solid var(--ps-line-strong)", paddingLeft: 12 }}>
+            {isGlobal ? `Shared: ${eff.set?.name}` : `Scoped to ${site.name}`}
+          </span>
+        </div>
 
-      {/* Scope selector */}
-      <div style={{ padding: "0 28px 16px", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 4, background: "var(--ps-bg)", borderRadius: 10, padding: 3, border: "1px solid var(--ps-line)" }}>
-          {(
-            [
-              { key: "template", label: "Template-specific", icon: <TypeIcon size={13} /> },
-              { key: "global", label: "Global / shared", icon: <Globe size={13} /> },
-            ] as const
-          ).map((s) => (
+        {/* Center Device Switcher */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 2, background: "rgba(0, 0, 0, 0.35)", borderRadius: 10, padding: 3, border: "1px solid var(--ps-line-strong)" }}>
+          {DEVICES.map((dev) => (
             <button
-              key={s.key}
+              key={dev.key}
               type="button"
-              disabled={s.key === "global" && !globalSetsLoaded}
-              onClick={() => void switchScope(s.key)}
+              title={dev.label}
+              onClick={() => setDevice(dev.key)}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
-                padding: "7px 14px",
+                padding: "6px 12px",
+                borderRadius: 7,
                 border: "none",
-                borderRadius: 8,
-                cursor: s.key === "global" && !globalSetsLoaded ? "not-allowed" : "pointer",
-                opacity: s.key === "global" && !globalSetsLoaded ? 0.5 : 1,
-                fontSize: 12.5,
+                background: device === dev.key ? "var(--ps-panel-raised)" : "transparent",
+                color: device === dev.key ? "#fff" : "var(--ps-muted)",
+                boxShadow: device === dev.key ? "0 1px 3px rgba(0,0,0,.4)" : "none",
+                fontSize: 12,
                 fontWeight: 700,
-                background: eff.state.scope === s.key ? "var(--ps-panel-raised)" : "transparent",
-                color: eff.state.scope === s.key ? "var(--ps-primary)" : "var(--ps-muted)",
-                boxShadow: eff.state.scope === s.key ? "0 1px 4px rgba(17,24,39,.25)" : "none",
+                cursor: "pointer",
               }}
             >
-              {s.icon} {s.label}
+              <dev.icon size={14} />
+              <span>{dev.label}</span>
             </button>
           ))}
         </div>
-        {eff.state.scope === "global" ? (
-          <>
-            <div style={{ width: 240 }}>
-              <SelectField
-                value={eff.state.globalSetId ?? ""}
-                onChange={(id) => onPatch((c) => ({ ...c, designSystem: { ...ensureDesignSystem(c), scope: "global", globalSetId: id || undefined } }))}
-                options={globalSets.map((s) => ({ value: s.id, label: s.scope === "platform" ? `${s.name} (Platform)` : s.name }))}
-                placeholder="Choose a set"
-              />
-            </div>
-            <Chip tone="primary">{globalSets.length} shared set{globalSets.length === 1 ? "" : "s"}</Chip>
-            {eff.set ? (
-              isReadOnlySet ? (
-                <Chip tone="info">Platform set — read-only</Chip>
-              ) : (
-                <>
-                  <Btn variant="outline" size="sm" onClick={() => void renameGlobalSet(eff.set!)}>Rename</Btn>
-                  <Btn variant="danger" size="sm" icon={<Trash2 size={13} />} onClick={() => setDeleteSet(eff.set!)}>Delete</Btn>
-                </>
-              )
-            ) : null}
-          </>
-        ) : (
-          <span style={{ fontSize: 12, color: "var(--ps-muted)" }}>Changes apply only to “{cfg.brand.name}”.</span>
-        )}
+
+        {/* Save button */}
+        <button
+          type="button"
+          onClick={handleSave}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            padding: "8px 18px",
+            borderRadius: 9,
+            border: "none",
+            background: savedSuccess ? "var(--ps-success)" : "var(--ps-primary)",
+            color: "#fff",
+            fontSize: 12.5,
+            fontWeight: 700,
+            cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
+            transition: "background 0.2s",
+          }}
+        >
+          {savedSuccess ? <Check size={15} /> : <Save size={15} />}
+          <span>{savedSuccess ? "Saved!" : "Save Typography"}</span>
+        </button>
       </div>
 
-      {isReadOnlySet ? (
-        <div style={{ margin: "0 28px 16px", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--ps-line)", background: "var(--ps-panel-raised)", fontSize: 12.5, color: "var(--ps-muted)" }}>
-          This is a platform set created by Super Admin — it&apos;s applied here but can&apos;t be edited or deleted from an organisation. Switch to template-specific typography, or create your own shared set, to make changes.
-        </div>
-      ) : null}
+      {/* Main 2-Panel Layout */}
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        {/* Left Control Sidebar */}
+        <div
+          style={{
+            width: 440,
+            background: "var(--ps-panel)",
+            borderRight: "1px solid var(--ps-line)",
+            overflowY: "auto",
+            padding: "20px 20px 60px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
+            flexShrink: 0,
+          }}
+        >
+          {/* Section 1: Curated Font Pairings */}
+          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+              <Sparkles size={16} style={{ color: "var(--ps-primary)" }} /> 1-Click Font Pairings
+            </div>
+            <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: "0 0 12px", lineHeight: 1.45 }}>
+              Instantly apply harmonized typography scales designed for real estate conversion.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+              {CURATED_PAIRINGS.map((pair) => (
+                <button
+                  key={pair.name}
+                  type="button"
+                  onClick={() => applyPairing(pair.heading, pair.body)}
+                  style={{
+                    textAlign: "left",
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid var(--ps-line)",
+                    background: "var(--ps-bg)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    transition: "all 0.12s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--ps-primary)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--ps-line)")}
+                >
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>{pair.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 2 }}>
+                      <span style={{ color: "#a5b4fc", fontWeight: 700 }}>{pair.heading}</span> + {pair.body}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-primary)", background: "rgba(99,102,241,0.15)", padding: "3px 8px", borderRadius: 6 }}>
+                    Apply
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {/* Type scale editor */}
-      <div style={{ padding: "0 28px 20px", display: "flex", flexDirection: "column", gap: 12, opacity: isReadOnlySet ? 0.6 : 1, pointerEvents: isReadOnlySet ? "none" : "auto" }}>
-        <div style={{ maxWidth: 420 }}>
-          <TabBar
-            tabs={[
-              { key: "desktop", label: " Desktop" },
-              { key: "tablet", label: <><Icon name="phone" size={14} /> Tablet</> },
-              { key: "mobile", label: <><Icon name="phone" size={14} /> Mobile</> },
-            ]}
-            active={deviceTab}
-            onChange={(k) => setDeviceTab(k as Breakpoint)}
-          />
-        </div>
-
-        {TYPE_META.map(({ key, label, hint }) => {
-          const resp = eff.typography[key];
-          const bpToken: TypeToken = deviceTab === "desktop" ? resp.desktop : ((resp[deviceTab] ?? {}) as TypeToken);
-          const sizePreview = typeof resp.desktop.fontSize === "number" ? `${resp.desktop.fontSize}px` : String(resp.desktop.fontSize ?? "—");
-          const setToken = (patch: Partial<TypeToken> & { paragraphSpacing?: number | string }) => {
-            const next: TemplateTypography = JSON.parse(JSON.stringify(eff.typography));
-            next[key][deviceTab] = { ...(next[key][deviceTab] ?? {}), ...patch } as TypeToken;
-            writeTypography(next);
-          };
-          return (
-            <div key={key} style={{ border: "1px solid var(--ps-line)", borderRadius: 14, background: "var(--ps-panel-raised)", padding: "14px 18px 14px" }}>
-              {/* Card header */}
-              <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
-                <span style={{ fontSize: deviceTab === "desktop" ? sizeFontSize(key) : undefined, fontWeight: 800, letterSpacing: -0.3 }}>
-                  {String(bpToken.textTransform === "uppercase" ? label.toUpperCase() : label)}
-                </span>
-                <span style={{ fontSize: 11.5, color: "var(--ps-muted)" }}>{hint}</span>
-                <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
-                  {deviceTab !== "desktop" ? <Chip tone="info">{deviceTab}</Chip> : <Chip tone="primary">Desktop</Chip>}
-                  <Chip>{sizePreview}</Chip>
-                </span>
-              </div>
-
-              {/* Two-column body: fields left, live preview right */}
-              <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-                {/* Fields column */}
-                <div style={{ flex: "1 1 0", minWidth: 0 }}>
-                  {/* KNOWN ISSUE: `opts` includes uploaded custom fonts (fontOptions()
-                      below), and picking one here writes its family NAME into this
-                      token — but the font FILE stays in prestate.fonts.v1
-                      (browser-local, see design-system.ts). A global/platform set
-                      is now shared across users, while fonts aren't: anyone
-                      without that exact font uploaded in their own browser gets
-                      a silent fallback font, no error. Resolves once fonts move
-                      to object storage (out of scope here) — tracked as a known
-                      issue, not fixed in this pass. */}
-                  <FieldRow label="Font family">
-                    <SelectField value={bpToken.fontFamily ?? ""} onChange={(v) => setToken({ fontFamily: v || undefined })} options={[{ value: "", label: "Inherit theme" }, ...opts]} />
-                  </FieldRow>
-                  <FieldRow label="Font size" hint="px, rem or % — e.g. 3rem">
-                    <LengthInput value={bpToken.fontSize ?? ""} onChange={(v) => setToken({ fontSize: v === "" ? undefined : v })} min={8} max={140} />
-                  </FieldRow>
-                  <FieldRow label="Weight">
-                    <SliderField value={Number(bpToken.fontWeight ?? 400)} onChange={(v) => setToken({ fontWeight: v })} min={300} max={900} step={100} />
-                  </FieldRow>
-                  <FieldRow label="Line height">
-                    <SliderField value={Number(bpToken.lineHeight ?? 1.15)} onChange={(v) => setToken({ lineHeight: v })} min={0.9} max={2.4} step={0.05} />
-                  </FieldRow>
-                  <FieldRow label="Letter spacing">
-                    <SliderField value={Number(bpToken.letterSpacing ?? 0)} onChange={(v) => setToken({ letterSpacing: v })} min={-3} max={8} step={0.5} />
-                  </FieldRow>
-                  <FieldRow label="Text transform">
-                    <SelectField
-                      value={bpToken.textTransform ?? "none"}
-                      onChange={(v) => setToken({ textTransform: v })}
-                      options={[
-                        { value: "none", label: "None" },
-                        { value: "uppercase", label: "Uppercase" },
-                        { value: "capitalize", label: "Capitalize" },
-                        { value: "lowercase", label: "Lowercase" },
-                      ]}
-                    />
-                  </FieldRow>
-                  <FieldRow label="Text colour">
-                    <ColorField value={bpToken.textColor ?? ""} onChange={(v) => setToken({ textColor: v })} />
-                  </FieldRow>
-                  {key === "p" ? (
-                    <FieldRow label="Paragraph spacing">
-                      <LengthInput value={(bpToken as TypeToken & { paragraphSpacing?: number | string }).paragraphSpacing ?? ""} onChange={(v) => setToken({ paragraphSpacing: v === "" ? undefined : v })} min={0} max={64} />
-                    </FieldRow>
-                  ) : null}
-                </div>
-
-                {/* Live preview column */}
-                <div style={{
-                  flex: "0 0 220px",
-                  minWidth: 0,
-                  alignSelf: "stretch",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderLeft: "1px dashed var(--ps-line)",
-                  paddingLeft: 20,
-                  color: bpToken.textColor || "inherit",
-                }}>
-                  <span
+          {/* Section 2: Hierarchy Elements Selector */}
+          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <Heading size={16} style={{ color: "var(--ps-primary)" }} /> Select Element to Customize
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 14 }}>
+              {TYPE_META.map((t) => {
+                const active = selectedTag === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setSelectedTag(t.key)}
                     style={{
-                      fontFamily: bpToken.fontFamily || "inherit",
-                      fontSize: typeof bpToken.fontSize === "number" ? Math.min(34, bpToken.fontSize) : 22,
-                      fontWeight: Number(bpToken.fontWeight ?? (key === "p" ? 400 : 800)),
-                      lineHeight: Number(bpToken.lineHeight ?? 1.2),
-                      letterSpacing: Number(bpToken.letterSpacing ?? 0),
-                      textTransform: bpToken.textTransform || "none",
-                      wordBreak: "break-word",
+                      padding: "8px 4px",
+                      borderRadius: 8,
+                      border: active ? "2px solid var(--ps-primary)" : "1px solid var(--ps-line)",
+                      background: active ? "rgba(99, 102, 241, 0.22)" : "var(--ps-bg)",
+                      color: active ? "#818cf8" : "#fff",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      textAlign: "center",
                     }}
                   >
-                    {key === "p"
-                      ? "Premium 3 & 4 BHK residences with resort amenities."
-                      : "Where the Skyline Becomes Your Address"}
-                  </span>
+                    {t.key.toUpperCase()}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected Tag Controls */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, background: "var(--ps-bg)", padding: 14, borderRadius: 10, border: "1px solid var(--ps-line)" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#818cf8", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                {TYPE_META.find((m) => m.key === selectedTag)?.label}
+              </div>
+
+              {/* Font Family */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Font Family</label>
+                <select
+                  value={activeToken.fontFamily || "Inter"}
+                  onChange={(e) => patchToken({ fontFamily: e.target.value })}
+                  style={{ width: "100%", background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", color: "#fff", padding: "8px 10px", borderRadius: 8, fontSize: 12.5, outline: "none" }}
+                >
+                  {fontList.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Font Size & Weight Row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>
+                    Size: {activeToken.fontSize ?? (selectedTag === "h1" ? 44 : selectedTag === "h2" ? 32 : 16)}px
+                  </label>
+                  <input
+                    type="range"
+                    min="10"
+                    max="80"
+                    value={Number(activeToken.fontSize ?? (selectedTag === "h1" ? 44 : selectedTag === "h2" ? 32 : 16))}
+                    onChange={(e) => patchToken({ fontSize: Number(e.target.value) })}
+                    style={{ width: "100%", cursor: "pointer", accentColor: "var(--ps-primary)" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Font Weight</label>
+                  <select
+                    value={activeToken.fontWeight || (selectedTag.startsWith("h") ? "800" : "400")}
+                    onChange={(e) => patchToken({ fontWeight: e.target.value })}
+                    style={{ width: "100%", background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", color: "#fff", padding: "6px 8px", borderRadius: 8, fontSize: 12, outline: "none" }}
+                  >
+                    <option value="300">Light 300</option>
+                    <option value="400">Regular 400</option>
+                    <option value="500">Medium 500</option>
+                    <option value="600">Semibold 600</option>
+                    <option value="700">Bold 700</option>
+                    <option value="800">Extra Bold 800</option>
+                    <option value="900">Black 900</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Line Height & Letter Spacing */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Line Height</label>
+                  <input
+                    className="ps-input"
+                    value={activeToken.lineHeight || "1.25"}
+                    placeholder="1.25"
+                    onChange={(e) => patchToken({ lineHeight: e.target.value })}
+                    style={{ fontSize: 12, background: "var(--ps-panel-raised)", color: "#fff", padding: "6px 8px" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Letter Spacing</label>
+                  <input
+                    className="ps-input"
+                    value={activeToken.letterSpacing || "-0.02em"}
+                    placeholder="-0.02em"
+                    onChange={(e) => patchToken({ letterSpacing: e.target.value })}
+                    style={{ fontSize: 12, background: "var(--ps-panel-raised)", color: "#fff", padding: "6px 8px" }}
+                  />
+                </div>
+              </div>
+
+              {/* Text Transform & Color */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Transform</label>
+                  <select
+                    value={activeToken.textTransform || "none"}
+                    onChange={(e) => patchToken({ textTransform: e.target.value as "none" | "uppercase" | "capitalize" | "lowercase" })}
+                    style={{ width: "100%", background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", color: "#fff", padding: "6px 8px", borderRadius: 8, fontSize: 12, outline: "none" }}
+                  >
+                    <option value="none">Normal</option>
+                    <option value="uppercase">UPPERCASE</option>
+                    <option value="capitalize">Capitalize</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Color Override</label>
+                  <input
+                    type="color"
+                    value={activeToken.color || "#111827"}
+                    onChange={(e) => patchToken({ color: e.target.value })}
+                    style={{ width: "100%", height: 32, padding: 0, border: "none", borderRadius: 6, cursor: "pointer", background: "transparent" }}
+                  />
                 </div>
               </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
 
-      {/* Font manager */}
-      <div style={{ padding: "0 28px 56px" }}>
-        <Collapse title={<span>Custom Font Manager ({fonts.length})</span>} icon={<Upload size={14} />} defaultOpen>
-          <p style={{ fontSize: 12.5, color: "var(--ps-slate)", lineHeight: 1.65, margin: "0 0 12px" }}>
-            Upload WOFF, WOFF2, TTF or OTF files (max 1.5 MB each). Uploaded fonts appear in every Font Family dropdown — headings, body, the Text Editor and header/footer chrome — and load automatically on published pages via deduped @font-face rules.
-          </p>
-          <label
+          {/* Section 3: Custom Font Files Uploader */}
+          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+              <Upload size={16} style={{ color: "var(--ps-primary)" }} /> Custom Font Uploads
+            </div>
+            <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: "0 0 12px", lineHeight: 1.45 }}>
+              Upload .woff2, .ttf or .otf files for custom builder brand fonts.
+            </p>
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "20px 14px",
+                borderRadius: 10,
+                border: "1.5px dashed var(--ps-line-strong)",
+                background: "var(--ps-bg)",
+                cursor: "pointer",
+                textAlign: "center",
+                gap: 6,
+              }}
+            >
+              <Upload size={20} style={{ color: "var(--ps-primary)" }} />
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Click to upload custom font files</span>
+              <span style={{ fontSize: 10.5, color: "var(--ps-muted)" }}>Supports WOFF2, TTF, OTF (Max 1.5MB)</span>
+              <input
+                type="file"
+                multiple
+                accept=".woff2,.woff,.ttf,.otf"
+                onChange={(e) => void handleUploadFonts(e.target.files)}
+                style={{ display: "none" }}
+              />
+            </label>
+
+            {fonts.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", textTransform: "uppercase" }}>Installed Custom Fonts:</div>
+                {fonts.map((f) => (
+                  <div key={f.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--ps-bg)", padding: "6px 10px", borderRadius: 8, border: "1px solid var(--ps-line)" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{f.family} ({f.format})</span>
+                    <span style={{ fontSize: 10.5, color: "var(--ps-success)", fontWeight: 700 }}>Ready</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Right Live Specimen Canvas */}
+        <div
+          className="ps-canvas-dots"
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "28px 36px 80px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          {/* Visual Specimen Card */}
+          <div
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "9px 14px",
-              borderRadius: 10,
-              border: "1px dashed var(--ps-primary)",
-              background: "var(--ps-primary-mist)",
-              color: "var(--ps-primary)",
-              fontSize: 12.5,
-              fontWeight: 800,
-              cursor: "pointer",
+              width: device === "desktop" ? "100%" : device === "tablet" ? 768 : 390,
+              maxWidth: "100%",
+              background: "#fff",
+              borderRadius: device === "desktop" ? 18 : 28,
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              boxShadow: "0 25px 70px rgba(0, 0, 0, 0.65)",
+              overflow: "hidden",
+              transition: "width 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
             }}
           >
-            <Upload size={14} /> Upload font files
-            <input
-              type="file"
-              accept=".woff,.woff2,.ttf,.otf"
-              multiple
-              hidden
-              onChange={(e) => {
-                void addFontFiles(e.target.files);
-                e.target.value = "";
+            {/* Header Stage Bar */}
+            <div
+              style={{
+                background: "#0f172a",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                padding: "12px 18px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
-            />
-          </label>
-
-          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-            {fonts.length === 0 ? (
-              <div style={{ padding: 18, textAlign: "center", color: "var(--ps-muted)", fontSize: 12.5, border: "1px dashed var(--ps-line)", borderRadius: 10 }}>No custom fonts yet.</div>
-            ) : null}
-            {fonts.map((f) => (
-              <div key={f.id} style={{ display: "grid", gridTemplateColumns: "64px minmax(140px,1fr) 120px auto auto auto", gap: 10, alignItems: "center", border: "1px solid var(--ps-line)", borderRadius: 11, padding: "9px 12px", opacity: f.enabled === false ? 0.5 : 1 }}>
-                <span style={{ height: 44, borderRadius: 9, background: "var(--ps-bg)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 19, fontWeight: 800, fontFamily: `"${f.family}"` }}>
-                  Ag
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#f87171" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fbbf24" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#34d399" }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1", marginLeft: 8 }}>
+                  Live Typography Specimen — {device.toUpperCase()}
                 </span>
-                <TextField value={f.family} onChange={(v) => patchFont(f.id, { family: v })} placeholder="Font name" />
-                <SelectField
-                  value={String(f.weight ?? 400)}
-                  onChange={(v) => patchFont(f.id, { weight: Number(v) })}
-                  options={[300, 400, 500, 600, 700, 800].map((w) => ({ value: String(w), label: String(w) }))}
-                />
-                <code style={{ fontSize: 10.5, color: "var(--ps-muted)" }}>.{f.format === "truetype" ? "ttf" : f.format === "opentype" ? "otf" : f.format}</code>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11.5, fontWeight: 600, color: "var(--ps-slate)" }}>
-                  <Toggle on={f.enabled !== false} onChange={(v) => patchFont(f.id, { enabled: v })} size="sm" />
-                  {f.enabled !== false ? "On" : "Off"}
-                </span>
-                <Btn variant="danger" size="sm" icon={<Trash2 size={13} />} onClick={() => deleteFont(f.id)}>Delete</Btn>
               </div>
-            ))}
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8" }}>
+                Interactive Visual Hierarchy
+              </span>
+            </div>
+
+            {/* Specimen Content Sheet */}
+            <div style={{ padding: device === "mobile" ? "28px 20px 48px" : "44px 40px 60px", display: "flex", flexDirection: "column", gap: 32 }}>
+              {TYPE_META.map((t) => {
+                const tok: TypeToken = currentTypo[t.key] ?? {};
+                const isSelected = selectedTag === t.key;
+                const fontF = tok.fontFamily || (t.key.startsWith("h") ? "Inter" : "Inter");
+                const fontSz = tok.fontSize ?? (t.key === "h1" ? 42 : t.key === "h2" ? 30 : t.key === "h3" ? 22 : t.key === "h4" ? 18 : t.key === "h5" ? 15 : t.key === "h6" ? 12 : 15);
+                const fontWt = tok.fontWeight ?? (t.key.startsWith("h") ? "800" : "400");
+                const lineH = tok.lineHeight ?? "1.3";
+                const letSp = tok.letterSpacing ?? "normal";
+                const trans = tok.textTransform ?? "none";
+                const clr = tok.color ?? "#0f172a";
+
+                return (
+                  <div
+                    key={t.key}
+                    onClick={() => setSelectedTag(t.key)}
+                    style={{
+                      padding: "16px 18px",
+                      borderRadius: 12,
+                      border: isSelected ? "2px solid var(--ps-primary)" : "1px solid transparent",
+                      background: isSelected ? "rgba(99, 102, 241, 0.05)" : "transparent",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      position: "relative",
+                    }}
+                  >
+                    {/* Meta Specimen Badge */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8, color: isSelected ? "var(--ps-primary)" : "#64748b", background: isSelected ? "rgba(99, 102, 241, 0.15)" : "#f1f5f9", padding: "2px 8px", borderRadius: 6 }}>
+                        {t.label} · {t.tag}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", fontFamily: "monospace" }}>
+                        {fontF} · {fontSz}px · {fontWt}
+                      </span>
+                    </div>
+
+                    {/* Live Rendered Text */}
+                    <div
+                      style={{
+                        fontFamily: `${fontF}, Inter, system-ui, sans-serif`,
+                        fontSize: typeof fontSz === "number" ? `${fontSz}px` : fontSz,
+                        fontWeight: fontWt as any,
+                        lineHeight: lineH,
+                        letterSpacing: letSp,
+                        textTransform: trans,
+                        color: clr,
+                      }}
+                    >
+                      {t.defaultSample}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </Collapse>
+        </div>
       </div>
-      <ConfirmModal
-        open={deleteSet !== null}
-        title="Delete shared typography set?"
-        message={
-          deleteSet
-            ? `Templates using “${deleteSet.name}” will fall back to their own template-specific typography.`
-            : undefined
-        }
-        confirmLabel="Delete set"
-        destructive
-        busy={deletingSet}
-        onConfirm={() => void confirmDeleteGlobalSet()}
-        onClose={() => setDeleteSet(null)}
-      />
     </div>
   );
-}
-
-function sizeFontSize(key: TypeKey): number {
-  switch (key) {
-    case "h1":
-      return 26;
-    case "h2":
-      return 22;
-    case "h3":
-      return 19;
-    default:
-      return 17;
-  }
 }

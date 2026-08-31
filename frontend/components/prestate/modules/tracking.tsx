@@ -1,28 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BarChart3, Check, Clock, Copy, Gauge, Link2, Radio, Target, TrendingUp } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  Check,
+  Code2,
+  Copy,
+  ExternalLink,
+  Layers,
+  Link2,
+  Radio,
+  Save,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  TrendingUp,
+} from "lucide-react";
 import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
 import { buildTrackingSnippet, buildUtmUrl, idStatus, loadTrackingCounts, type TrackingCounts } from "@/lib/prestate/tracking";
 import { localPreviewPath } from "@/lib/prestate/paths";
-import { ModuleHeader, SiteScopeBar, StatCard } from "./shared";
-import { Btn, Chip, Collapse, FieldRow, TextField, Toggle } from "@/components/prestate/ui";
-
-function Code2Icon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="16 18 22 12 16 6" />
-      <polyline points="8 6 2 12 8 18" />
-    </svg>
-  );
-}
-
-const STATUS_CHIP: Record<"ok" | "warn" | "empty", { label: string; tone: "success" | "warn" | "neutral" }> = {
-  ok: { label: "Ready", tone: "success" },
-  warn: { label: "Check ID", tone: "warn" },
-  empty: { label: "Not set", tone: "neutral" },
-};
 
 export function TrackingModule({
   site,
@@ -39,23 +37,17 @@ export function TrackingModule({
   const cfg = ensureConfig(site);
   const { tracking, brand } = cfg;
   const [counts, setCounts] = useState<TrackingCounts>(() => loadTrackingCounts(site.id));
-  const patchTracking = (partial: Partial<SiteConfig["tracking"]>) => onPatch((c) => ({ ...c, tracking: { ...c.tracking, ...partial } }));
+  const [savedSuccess, setSavedSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState<"pixels" | "utm" | "scripts">("pixels");
+
+  const patchTracking = (partial: Partial<SiteConfig["tracking"]>) =>
+    onPatch((c) => ({ ...c, tracking: { ...c.tracking, ...partial } }));
+
   const snippet = buildTrackingSnippet(tracking);
-  // Per-individual landing page: use /preview/:id for landing pages, /p/:slug for templates
   const isLandingPage = site.kind === "custom" || (site.pageType === "landing" && site.id.includes("-"));
   const pagePreviewPath = isLandingPage && site.id ? `/preview/${encodeURIComponent(site.id)}` : localPreviewPath(site);
   const utm = buildUtmUrl(site, tracking);
-  // Override UTM base for landing pages to keep per-page isolation
-  const utmPerPage = isLandingPage ? (() => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    try {
-      const u = new URL(`${origin}${pagePreviewPath}`);
-      if (tracking.utmSource.trim()) u.searchParams.set("utm_source", tracking.utmSource.trim());
-      if (tracking.utmMedium.trim()) u.searchParams.set("utm_medium", tracking.utmMedium.trim());
-      if (tracking.utmCampaign.trim()) u.searchParams.set("utm_campaign", tracking.utmCampaign.trim());
-      return u.toString();
-    } catch { return utm; }
-  })() : utm;
+
   const conv = counts.view ? Math.round((counts.form / counts.view) * 1000) / 10 : 0;
 
   useEffect(() => {
@@ -74,116 +66,310 @@ export function TrackingModule({
       await navigator.clipboard.writeText(text);
       onToast(ok);
     } catch {
-      onToast("Could not copy");
+      onToast("Could not copy to clipboard");
     }
   };
 
-  const pixels: { name: string; id: string; status: "ok" | "warn" | "empty" }[] = [
-    { name: "Google Analytics 4", id: tracking.gaId || "Not set", status: idStatus("ga", tracking.gaId) },
-    { name: "Google Tag Manager", id: tracking.gtmId || "Not set", status: idStatus("gtm", tracking.gtmId) },
-    { name: "Meta Pixel", id: tracking.metaPixel || "Not set", status: idStatus("pixel", tracking.metaPixel) },
-    { name: "Custom scripts", id: tracking.customScripts.trim() ? "Attached" : "Empty", status: tracking.customScripts.trim() ? "ok" : "empty" },
-  ];
+  const handleSave = () => {
+    setSavedSuccess(true);
+    onToast(`Tracking & pixel configurations saved for ${site.name}`);
+    setTimeout(() => setSavedSuccess(false), 2000);
+  };
 
   return (
-    <div style={{ overflowY: "auto", height: "100%", ...siteThemeStyle(brand) }}>
-      <ModuleHeader
-        title="Tracking Center"
-        description={`Pixels and UTMs for “${site.name}”. Tags fire on this template’s local preview. Counts are stored locally.`}
-        actions={<Btn variant="primary" icon={<Radio size={14} />} onClick={() => onToast(`Tracking saved for ${site.name}`)}>Save tracking</Btn>}
-      />
-      <SiteScopeBar pages={pages} activeId={site.id} />
-
-      <div className="ps-form-meta" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, padding: "0 28px 18px" }}>
-        <StatCard label="Preview views" value={String(counts.view)} icon={<BarChart3 size={20} />} />
-        <StatCard label="Form submits" value={String(counts.form)} icon={<Target size={20} />} tone="primary" />
-        <StatCard label="Conv. (local)" value={`${conv}%`} icon={<TrendingUp size={20} />} tone="success" />
-        <StatCard label="WhatsApp clicks" value={String(counts.whatsapp)} icon={<Gauge size={20} />} tone="secondary" />
-      </div>
-
-      <div className="ps-brand-grid" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20, padding: "0 28px 48px", alignItems: "start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-            <Collapse title="Connected pixels & tags" icon={<Radio size={14} />} defaultOpen>
-              {pixels.map((p) => {
-                const chip = STATUS_CHIP[p.status];
-                return (
-                  <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--ps-line)" }}>
-                    <span style={{ width: 30, height: 30, borderRadius: 9, background: p.status === "ok" ? "var(--ps-success-soft)" : p.status === "warn" ? "var(--ps-warn-soft)" : "var(--ps-bg)", color: p.status === "ok" ? "var(--ps-success)" : p.status === "warn" ? "var(--ps-warn)" : "var(--ps-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {p.status === "ok" ? <Check size={14} /> : <Clock size={14} />}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)" }}>{p.name}</div>
-                      <div style={{ fontSize: 10.5, color: "var(--ps-muted)", fontFamily: "monospace" }}>{p.id}</div>
-                    </div>
-                    <Chip tone={chip.tone}>{chip.label}</Chip>
-                  </div>
-                );
-              })}
-            </Collapse>
-          </div>
-
-          <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-            <Collapse title="IDs & custom scripts" icon={<Code2Icon />} defaultOpen>
-              <FieldRow label="GA4 ID">
-                <TextField value={tracking.gaId} onChange={(v) => patchTracking({ gaId: v.trim() })} placeholder="G-XXXXXXXX" />
-              </FieldRow>
-              <FieldRow label="GTM ID">
-                <TextField value={tracking.gtmId} onChange={(v) => patchTracking({ gtmId: v.trim() })} placeholder="GTM-XXXX" />
-              </FieldRow>
-              <FieldRow label="Meta Pixel">
-                <TextField value={tracking.metaPixel} onChange={(v) => patchTracking({ metaPixel: v.trim() })} placeholder="1234567890" />
-              </FieldRow>
-              <FieldRow label="Custom scripts">
-                <textarea className="ps-input" value={tracking.customScripts} onChange={(e) => patchTracking({ customScripts: e.target.value })} style={{ minHeight: 80, fontFamily: "monospace", fontSize: 11 }} placeholder="Optional extra JS for this template only" />
-              </FieldRow>
-              <pre style={{ background: "#0b1020", color: "#b8c2ff", borderRadius: 10, padding: 12, fontSize: 11, lineHeight: 1.6, overflowX: "auto", fontFamily: "monospace", margin: "6px 0 10px", whiteSpace: "pre-wrap" }}>
-                {snippet}
-              </pre>
-              <div style={{ display: "flex", gap: 6 }}>
-                <Btn variant="outline" size="sm" icon={<Copy size={12} />} onClick={() => void copyText(snippet, "Snippet copied")}>Copy snippet</Btn>
-                <Btn variant="ghost" size="sm" onClick={() => onToast(`Scripts saved on ${site.name}`)}>Save to this template</Btn>
-              </div>
-            </Collapse>
-          </div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--ps-bg)", color: "var(--ps-ink)", overflow: "hidden", ...siteThemeStyle(brand) }}>
+      {/* Top Action Ribbon */}
+      <div
+        style={{
+          background: "var(--ps-panel)",
+          borderBottom: "1px solid var(--ps-line-strong)",
+          padding: "12px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 13.5, fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: 7 }}>
+            <Radio size={16} style={{ color: "var(--ps-primary)" }} /> Tracking & Analytics Center
+          </span>
+          <span style={{ fontSize: 11, color: "var(--ps-muted)", borderLeft: "1px solid var(--ps-line-strong)", paddingLeft: 12 }}>
+            GA4, GTM, Meta Pixel & UTM tracking for {site.name}
+          </span>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-            <Collapse title="UTM builder (per-page)" icon={<Link2 size={14} />} defaultOpen>
-              <FieldRow label="Page URL (per-page)">
-                <TextField value={pagePreviewPath} onChange={() => {}} disabled />
-              </FieldRow>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <FieldRow label="Source"><TextField value={tracking.utmSource} onChange={(v) => patchTracking({ utmSource: v })} /></FieldRow>
-                <FieldRow label="Medium"><TextField value={tracking.utmMedium} onChange={(v) => patchTracking({ utmMedium: v })} /></FieldRow>
+        {/* Center Tabs Switcher */}
+        <div style={{ display: "inline-flex", background: "rgba(0, 0, 0, 0.35)", borderRadius: 10, padding: 3, border: "1px solid var(--ps-line-strong)" }}>
+          {[
+            { key: "pixels", label: "Pixels & Tags", icon: Activity },
+            { key: "utm", label: "UTM Campaign Builder", icon: Link2 },
+            { key: "scripts", label: "Custom Scripts", icon: Code2 },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key as any)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 14px",
+                borderRadius: 8,
+                border: "none",
+                background: activeTab === tab.key ? "var(--ps-primary)" : "transparent",
+                color: activeTab === tab.key ? "#fff" : "var(--ps-slate)",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              <tab.icon size={13} />
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Save button */}
+        <button
+          type="button"
+          onClick={handleSave}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            padding: "8px 18px",
+            borderRadius: 9,
+            border: "none",
+            background: savedSuccess ? "var(--ps-success)" : "var(--ps-primary)",
+            color: "#fff",
+            fontSize: 12.5,
+            fontWeight: 700,
+            cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
+            transition: "background 0.2s",
+          }}
+        >
+          {savedSuccess ? <Check size={15} /> : <Save size={15} />}
+          <span>{savedSuccess ? "Saved!" : "Save Tracking"}</span>
+        </button>
+      </div>
+
+      {/* Main 2-Panel Studio Layout */}
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        {/* Left Settings Sidebar */}
+        <div
+          style={{
+            width: 440,
+            background: "var(--ps-panel)",
+            borderRight: "1px solid var(--ps-line)",
+            overflowY: "auto",
+            padding: "20px 20px 60px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
+            flexShrink: 0,
+          }}
+        >
+          {activeTab === "pixels" ? (
+            <>
+              {/* Section 1: Standard Ad & Analytics Pixels */}
+              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Activity size={16} style={{ color: "var(--ps-primary)" }} /> Marketing & Ad Pixels
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Google Analytics 4 (Measurement ID)</label>
+                    <input
+                      className="ps-input"
+                      value={tracking.gaId || ""}
+                      placeholder="e.g. G-XXXXXXXXXX"
+                      onChange={(e) => patchTracking({ gaId: e.target.value })}
+                      style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Google Tag Manager (Container ID)</label>
+                    <input
+                      className="ps-input"
+                      value={tracking.gtmId || ""}
+                      placeholder="e.g. GTM-XXXXXXX"
+                      onChange={(e) => patchTracking({ gtmId: e.target.value })}
+                      style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Meta / Facebook Pixel ID</label>
+                    <input
+                      className="ps-input"
+                      value={tracking.metaPixel || ""}
+                      placeholder="e.g. 123456789012345"
+                      onChange={(e) => patchTracking({ metaPixel: e.target.value })}
+                      style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                    />
+                  </div>
+                </div>
               </div>
-              <FieldRow label="Campaign"><TextField value={tracking.utmCampaign} onChange={(v) => patchTracking({ utmCampaign: v })} /></FieldRow>
-              <div style={{ fontSize: 11.5, color: "var(--ps-muted)", fontFamily: "ui-monospace, monospace", wordBreak: "break-all", margin: "4px 0 10px" }}>{utmPerPage}</div>
-              <Btn variant="primary" size="sm" style={{ width: "100%" }} onClick={() => void copyText(utmPerPage, "UTM link copied")}>
-                <Link2 size={13} /> Copy tracking link
-              </Btn>
-            </Collapse>
+            </>
+          ) : activeTab === "utm" ? (
+            <>
+              {/* Section 2: UTM Campaign URL Builder */}
+              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Link2 size={16} style={{ color: "var(--ps-primary)" }} /> UTM Campaign Parameters
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Campaign Source (utm_source)</label>
+                    <input
+                      className="ps-input"
+                      value={tracking.utmSource || ""}
+                      placeholder="e.g. google / facebook / email"
+                      onChange={(e) => patchTracking({ utmSource: e.target.value })}
+                      style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Campaign Medium (utm_medium)</label>
+                    <input
+                      className="ps-input"
+                      value={tracking.utmMedium || ""}
+                      placeholder="e.g. cpc / paid-social / banner"
+                      onChange={(e) => patchTracking({ utmMedium: e.target.value })}
+                      style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Campaign Name (utm_campaign)</label>
+                    <input
+                      className="ps-input"
+                      value={tracking.utmCampaign || ""}
+                      placeholder="e.g. launch-phase1 / festive-offer"
+                      onChange={(e) => patchTracking({ utmCampaign: e.target.value })}
+                      style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Section 3: Custom Head/Body Scripts */}
+              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Code2 size={16} style={{ color: "var(--ps-primary)" }} /> Custom Tracking Scripts
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>
+                    Custom Head HTML / JS Snippets
+                  </label>
+                  <textarea
+                    className="ps-input"
+                    rows={8}
+                    value={tracking.customScripts || ""}
+                    placeholder="<!-- Paste TikTok, Hotjar, or custom tracking tags here -->"
+                    onChange={(e) => patchTracking({ customScripts: e.target.value })}
+                    style={{ width: "100%", fontFamily: "monospace", fontSize: 11.5, background: "var(--ps-bg)", color: "#fff", resize: "none" }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right Live Stage & Inspector */}
+        <div
+          className="ps-canvas-dots"
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "28px 36px 80px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 24,
+          }}
+        >
+          {/* Performance Stats Strip */}
+          <div style={{ width: 680, maxWidth: "100%", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+            <div style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "16px 18px", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Total Page Views</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#fff", marginTop: 4 }}>{counts.view}</div>
+            </div>
+
+            <div style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "16px 18px", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Form Submissions</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#818cf8", marginTop: 4 }}>{counts.form}</div>
+            </div>
+
+            <div style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: "16px 18px", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" }}>Conversion Rate</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#34d399", marginTop: 4 }}>{conv}%</div>
+            </div>
           </div>
 
-          <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-            <Collapse title="Conversion goals" icon={<Target size={14} />} defaultOpen>
-              {[
-                ["Form submitted", counts.form, tracking.goalForm, (v: boolean) => patchTracking({ goalForm: v })],
-                ["WhatsApp clicked", counts.whatsapp, tracking.goalWhatsapp, (v: boolean) => patchTracking({ goalWhatsapp: v })],
-                ["Call clicked", counts.call, tracking.goalCall, (v: boolean) => patchTracking({ goalCall: v })],
-                ["Brochure downloaded", counts.brochure, tracking.goalBrochure, (v: boolean) => patchTracking({ goalBrochure: v })],
-              ].map(([g, n, on, set]) => (
-                <div key={g as string} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: "1px solid var(--ps-line)" }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-slate)", flex: 1 }}>{g as string}</span>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--ps-primary)" }}>{n as number}</span>
-                  <Toggle on={on as boolean} onChange={set as (v: boolean) => void} />
-                </div>
-              ))}
-              <p style={{ fontSize: 11.5, color: "var(--ps-muted)", lineHeight: 1.5, margin: "10px 0 0" }}>
-                Open local preview to record views. Submitting the lead form records a conversion for this template only.
-              </p>
-            </Collapse>
+          {/* Active UTM URL Card */}
+          <div
+            style={{
+              width: 680,
+              maxWidth: "100%",
+              background: "#0f172a",
+              borderRadius: 16,
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              boxShadow: "0 25px 70px rgba(0, 0, 0, 0.65)",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ padding: "12px 18px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1", display: "flex", alignItems: "center", gap: 6 }}>
+                <Link2 size={14} style={{ color: "#818cf8" }} /> Generated Campaign URL (with UTM tags)
+              </span>
+              <button
+                type="button"
+                onClick={() => copyText(utm, "UTM Campaign URL copied to clipboard")}
+                style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "5px 12px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+              >
+                <Copy size={12} /> Copy URL
+              </button>
+            </div>
+            <div style={{ padding: "16px 20px", color: "#a5b4fc", fontSize: 12, fontFamily: "monospace", wordBreak: "break-all" }}>
+              {utm}
+            </div>
+          </div>
+
+          {/* Generated HTML Injection Inspector */}
+          <div
+            style={{
+              width: 680,
+              maxWidth: "100%",
+              background: "#0f172a",
+              borderRadius: 16,
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              boxShadow: "0 25px 70px rgba(0, 0, 0, 0.65)",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ padding: "12px 18px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1", display: "flex", alignItems: "center", gap: 6 }}>
+                <Code2 size={14} style={{ color: "#34d399" }} /> Live Injected Tracking Snippet
+              </span>
+              <button
+                type="button"
+                onClick={() => copyText(snippet, "Injected tracking snippet copied")}
+                style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "5px 12px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+              >
+                <Copy size={12} /> Copy Code
+              </button>
+            </div>
+            <pre style={{ margin: 0, padding: "20px 24px", color: "#38bdf8", fontSize: 11.5, lineHeight: 1.6, overflowX: "auto", fontFamily: "monospace" }}>
+              {snippet || "<!-- No active pixel IDs or custom scripts configured -->"}
+            </pre>
           </div>
         </div>
       </div>

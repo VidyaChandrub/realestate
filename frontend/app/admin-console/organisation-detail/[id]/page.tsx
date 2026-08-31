@@ -17,7 +17,7 @@ import type {
   Plan,
 } from "@/lib/types";
 
-const TABS = ["Overview", "Subscription", "Templates", "Activity"] as const;
+const TABS = ["Overview", "Subscription", "Templates", "Domains", "Activity"] as const;
 type Tab = (typeof TABS)[number];
 
 const ROLE_OPTIONS: { value: OrgUserAssignableRole; label: string }[] = [
@@ -210,6 +210,18 @@ export default function SuperAdminOrganisationDetailPage() {
     apiFetch<Plan[]>("/admin/plans", { headers: { Authorization: `Bearer ${accessToken}` } }).then(setPlans).catch(()=>{});
     apiFetch<any[]>("/admin/templates", { headers: { Authorization: `Bearer ${accessToken}` } }).then(d=> setAllTemplates(Array.isArray(d)?d:(d as any).data??[])).catch(()=>{});
   }, [accessToken]);
+
+  const [domainsData, setDomainsData] = useState<any | null>(null);
+  const [domainsLoading, setDomainsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken || !params.id) return;
+    setDomainsLoading(true);
+    apiFetch<any>(`/admin/organisations/${params.id}/domains`, { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then(setDomainsData)
+      .catch(() => setDomainsData(null))
+      .finally(() => setDomainsLoading(false));
+  }, [accessToken, params.id, tab]);
 
   useEffect(() => {
     if (!accessToken || !params.id) return;
@@ -912,6 +924,133 @@ export default function SuperAdminOrganisationDetailPage() {
                   </div>
                 </div>
               ) : null}
+            </Reveal>
+          ) : null}
+
+          {tab === "Domains" ? (
+            <Reveal delay={2}>
+              <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+                <div className="grid g3" style={{ gap:14 }}>
+                  <div className="card" style={{ padding:16 }}>
+                    <div className="muted" style={{ fontSize:11.5, fontWeight:700, textTransform:"uppercase" }}>Total Configured Domains</div>
+                    <div style={{ fontSize:22, fontWeight:800, color:"var(--ink)", marginTop:4 }}>
+                      {(domainsData?.subdomain ? 1 : 0) + (domainsData?.customDomain ? 1 : 0) + (domainsData?.domainRequests?.length ?? 0)}
+                    </div>
+                    <div className="delta" style={{ fontSize:12, marginTop:2 }}>Subdomains &amp; Custom Domains</div>
+                  </div>
+                  <div className="card" style={{ padding:16 }}>
+                    <div className="muted" style={{ fontSize:11.5, fontWeight:700, textTransform:"uppercase" }}>Primary Subdomain</div>
+                    <div style={{ fontSize:15, fontWeight:800, fontFamily:"monospace", color:"var(--ink)", marginTop:6, overflow:"hidden", textOverflow:"ellipsis" }}>
+                      {domainsData?.subdomainHost ?? (domainsData?.subdomain ? `${domainsData.subdomain}.localhost` : "—")}
+                    </div>
+                    <div style={{ marginTop:4 }}>
+                      <span className={`badge ${domainsData?.subdomainStatus === "active" ? "b-green" : "b-gray"}`}>
+                        {domainsData?.subdomainStatus ?? "none"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="card" style={{ padding:16 }}>
+                    <div className="muted" style={{ fontSize:11.5, fontWeight:700, textTransform:"uppercase" }}>Website Custom Domains</div>
+                    <div style={{ fontSize:22, fontWeight:800, color:"var(--ink)", marginTop:4 }}>
+                      {domainsData?.domainRequests?.length ?? 0}
+                    </div>
+                    <div className="delta" style={{ fontSize:12, marginTop:2 }}>Mapped to landing pages</div>
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="card-h">
+                    <span className="t">All Domains &amp; Subdomains</span>
+                    <span className="chip">
+                      {(domainsData?.subdomain ? 1 : 0) + (domainsData?.customDomain ? 1 : 0) + (domainsData?.domainRequests?.length ?? 0)} total
+                    </span>
+                  </div>
+                  <div className="tbl-wrap">
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Scope / Website</th>
+                          <th>Domain / Host</th>
+                          <th>Kind</th>
+                          <th>Status</th>
+                          <th>DNS</th>
+                          <th>SSL</th>
+                          <th>Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {domainsLoading ? (
+                          <tr><td colSpan={7} className="muted">Loading domains…</td></tr>
+                        ) : (
+                          <>
+                            {/* 1. Organisation Primary Subdomain */}
+                            {domainsData?.subdomain ? (
+                              <tr style={{ background:"var(--surface-2)" }}>
+                                <td>
+                                  <span style={{ fontWeight:800, color:"var(--brand)" }}>Organisation Portal</span>
+                                  <br /><span className="muted sm">Primary platform subdomain</span>
+                                </td>
+                                <td style={{ fontFamily:"monospace", fontWeight:800 }}>
+                                  {domainsData.subdomainHost ?? `${domainsData.subdomain}.localhost`}
+                                </td>
+                                <td><span className="badge b-teal">Primary Subdomain</span></td>
+                                <td>
+                                  <span className={`badge ${domainsData.subdomainStatus === "active" ? "b-green" : domainsData.subdomainStatus === "pending" ? "b-amber" : "b-gray"}`}>
+                                    {domainsData.subdomainStatus}
+                                  </span>
+                                </td>
+                                <td><span className="badge b-green">Active</span></td>
+                                <td><span className="badge b-green">Active</span></td>
+                                <td className="muted" style={{ fontSize:12 }}>{formatDate(org.createdAt)}</td>
+                              </tr>
+                            ) : null}
+
+                            {/* 2. Organisation Primary Custom Domain (if configured) */}
+                            {domainsData?.customDomain ? (
+                              <tr style={{ background:"var(--surface-2)" }}>
+                                <td>
+                                  <span style={{ fontWeight:800, color:"var(--brand)" }}>Organisation Domain</span>
+                                  <br /><span className="muted sm">Primary company domain</span>
+                                </td>
+                                <td style={{ fontFamily:"monospace", fontWeight:800 }}>{domainsData.customDomain}</td>
+                                <td><span className="badge b-indigo">Org Custom Domain</span></td>
+                                <td>
+                                  <span className={`badge ${domainsData.customDomainStatus === "connected" ? "b-green" : domainsData.customDomainStatus === "pending" ? "b-amber" : "b-gray"}`}>
+                                    {domainsData.customDomainStatus}
+                                  </span>
+                                </td>
+                                <td><span className="badge b-gray">Active</span></td>
+                                <td><span className="badge b-gray">Active</span></td>
+                                <td className="muted" style={{ fontSize:12 }}>—</td>
+                              </tr>
+                            ) : null}
+
+                            {/* 3. Website / Landing Page Custom Domains */}
+                            {(domainsData?.domainRequests ?? []).map((dr: any) => (
+                              <tr key={dr.id}>
+                                <td>
+                                  <span style={{ fontWeight:700 }}>{dr.landingPage?.name ?? "Website"}</span>
+                                  <br /><span className="muted sm">{dr.landingPage?.slug}</span>
+                                </td>
+                                <td style={{ fontFamily:"monospace", fontWeight:700 }}>{dr.domain}</td>
+                                <td><span className="badge b-sky">Website Domain</span></td>
+                                <td><span className={`badge ${dr.status === "connected" ? "b-green" : dr.status === "pending" ? "b-amber" : "b-gray"}`}>{dr.status}</span></td>
+                                <td><span className="badge b-gray">{dr.dnsStatus}</span></td>
+                                <td><span className="badge b-gray">{dr.sslStatus}</span></td>
+                                <td className="muted" style={{ fontSize:12 }}>{new Date(dr.createdAt ?? dr.requestedAt).toLocaleDateString()}</td>
+                              </tr>
+                            ))}
+
+                            {!domainsData?.subdomain && !domainsData?.customDomain && (!domainsData?.domainRequests || domainsData.domainRequests.length === 0) ? (
+                              <tr><td colSpan={7} className="muted">No domains configured for this organisation.</td></tr>
+                            ) : null}
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </Reveal>
           ) : null}
 

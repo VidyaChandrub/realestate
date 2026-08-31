@@ -1,14 +1,32 @@
 "use client";
 
-import { Copy, ExternalLink, FileSearch, Gauge, Link2, ListTree, Save, Search, Settings2, Share2 } from "lucide-react";
+import { useState } from "react";
+import {
+  Check,
+  Code2,
+  Copy,
+  ExternalLink,
+  Eye,
+  FileSearch,
+  Gauge,
+  Globe,
+  ImagePlus,
+  Link2,
+  ListTree,
+  Monitor,
+  Save,
+  Search,
+  Settings2,
+  Share2,
+  Smartphone,
+  Sparkles,
+  Tablet,
+} from "lucide-react";
 import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
 import { buildJsonLd, jsonLdValid, suggestedCanonical } from "@/lib/prestate/seo";
 import { localPreviewPath } from "@/lib/prestate/paths";
-import { ModuleHeader, SiteScopeBar, StatCard } from "./shared";
-import { FieldRow, TextField, Toggle, Btn, Collapse } from "@/components/prestate/ui";
 import { MediaPicker } from "@/components/media-picker";
-import { isMediaSrc } from "@/lib/media";
 
 export function SeoModule({
   site,
@@ -25,225 +43,440 @@ export function SeoModule({
   onToast: (m: string) => void;
 }) {
   const cfg = ensureConfig(site);
-  const { seo, page, brand } = cfg;
-  const patchSeo = (partial: Partial<SiteConfig["seo"]>) => onPatch((c) => ({ ...c, seo: { ...c.seo, ...partial } }));
-  const title = seo.metaTitle;
-  const desc = seo.metaDescription;
+  const { seo, brand } = cfg;
+  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [previewTab, setPreviewTab] = useState<"google" | "social" | "schema">("google");
+  const [savedSuccess, setSavedSuccess] = useState(false);
+
+  const patchSeo = (partial: Partial<SiteConfig["seo"]>) =>
+    onPatch((c) => ({ ...c, seo: { ...c.seo, ...partial } }));
+
+  const title = seo.metaTitle || "";
+  const desc = seo.metaDescription || "";
   const json = buildJsonLd(site, cfg);
   const jsonText = JSON.stringify(json, null, 2);
-  const keywords = seo.keywords.split(",").map((k) => k.trim()).filter(Boolean);
-  const titleOk = title.length >= 40 && title.length <= 60;
-  const descOk = desc.length >= 120 && desc.length <= 160;
-  const ogOk = Boolean(seo.ogImage);
-  const schemaOk = jsonLdValid(json);
-  const ogImageSrc = isMediaSrc(seo.ogImage) ? seo.ogImage : "";
-  // Per-individual landing page: landing pages (kind custom) use /preview/:id, templates use /p/:slug
-  const isLandingPage = site.kind === "custom" || site.pageType === "landing" && site.id.includes("-");
+
+  const isLandingPage = site.kind === "custom" || (site.pageType === "landing" && site.id.includes("-"));
   const previewPath = isLandingPage && site.id ? `/preview/${encodeURIComponent(site.id)}` : localPreviewPath(site);
+  const fullDomain = site.domain ? `https://${site.domain}` : `https://preview.estatepro.com${previewPath}`;
 
   const fillMissing = () => {
-    const nextTitle = title.trim() || `${brand.name} | ${site.template}`.slice(0, 60);
-    const nextDesc = desc.trim() || brand.tagline || `Explore ${brand.name}. Book a site visit and get pricing, floor plans and offers.`;
+    const nextTitle = title.trim() || `${brand.name || site.name} | Luxury Residences`.slice(0, 60);
+    const nextDesc =
+      desc.trim() ||
+      brand.tagline ||
+      `Explore ${brand.name || site.name}. Download brochure, floor plans, pricing & book site visit online.`;
     patchSeo({
       metaTitle: nextTitle,
       metaDescription: nextDesc,
-      ogTitle: seo.ogTitle.trim() || nextTitle,
-      ogDescription: seo.ogDescription.trim() || nextDesc,
-      canonical: seo.canonical.trim() || suggestedCanonical(site),
-      keywords: seo.keywords.trim() || `${brand.name}, ${site.template}, real estate`,
+      ogTitle: seo.ogTitle?.trim() || nextTitle,
+      ogDescription: seo.ogDescription?.trim() || nextDesc,
+      canonical: seo.canonical?.trim() || suggestedCanonical(site),
+      keywords: seo.keywords?.trim() || `${brand.name || site.name}, luxury apartments, real estate, brochure, floor plans`,
     });
-    onToast("Filled empty SEO fields from this template’s brand");
+    onToast("Filled empty SEO fields with optimized defaults");
   };
 
   const copyJson = async () => {
     try {
       await navigator.clipboard.writeText(jsonText);
-      onToast("JSON-LD copied");
+      onToast("JSON-LD schema copied to clipboard");
     } catch {
       onToast("Could not copy JSON-LD");
     }
   };
 
-  const setSlug = (raw: string) => {
-    const next = raw.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "");
-    onPatchPage({ slug: next });
-    if (!seo.canonical || seo.canonical.includes(site.slug)) {
-      patchSeo({ canonical: suggestedCanonical({ ...site, slug: next }) });
-    }
+  const handleSave = () => {
+    setSavedSuccess(true);
+    onToast(`SEO settings saved for ${site.name}`);
+    setTimeout(() => setSavedSuccess(false), 2000);
   };
 
-  return (
-    <div style={{ overflowY: "auto", height: "100%", ...siteThemeStyle(brand) }}>
-      <ModuleHeader
-        title="SEO Center"
-        description={`Meta, Open Graph, slug and schema for “${site.name}”. Applied on this template’s local preview.`}
-        actions={
-          <div style={{ display: "flex", gap: 9 }}>
-            <Btn variant="outline" icon={<Settings2 size={14} />} onClick={fillMissing}>Fill missing</Btn>
-            <Btn variant="primary" icon={<Save size={14} />} onClick={() => onToast(`SEO saved for ${site.name}`)}>Save</Btn>
-          </div>
-        }
-      />
-      <SiteScopeBar pages={pages} activeId={site.id} />
+  const titleLength = title.length;
+  const descLength = desc.length;
 
-      <div className="ps-form-meta" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, padding: "0 28px 18px" }}>
-        <StatCard label="This template" value={site.status} icon={<FileSearch size={20} />} />
-        <StatCard label="Title length" value={`${title.length}/60`} icon={<Gauge size={20} />} tone={titleOk ? "success" : "primary"} />
-        <StatCard label="In sitemap" value={seo.sitemap ? "Yes" : "No"} icon={<ListTree size={20} />} tone="secondary" />
-        <StatCard label="Indexable" value={seo.index ? "Yes" : "No"} icon={<Share2 size={20} />} tone={seo.index ? "success" : "neutral"} />
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--ps-bg)", color: "var(--ps-ink)", overflow: "hidden", ...siteThemeStyle(brand) }}>
+      {/* Top Action Ribbon */}
+      <div
+        style={{
+          background: "var(--ps-panel)",
+          borderBottom: "1px solid var(--ps-line-strong)",
+          padding: "12px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 13.5, fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: 7 }}>
+            <Search size={16} style={{ color: "var(--ps-primary)" }} /> SEO & Social Share Center
+          </span>
+          <span style={{ fontSize: 11, color: "var(--ps-muted)", borderLeft: "1px solid var(--ps-line-strong)", paddingLeft: 12 }}>
+            Search engine metadata & Open Graph preview for {site.name}
+          </span>
+        </div>
+
+        {/* Center Preview Mode Switcher */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 2, background: "rgba(0, 0, 0, 0.35)", borderRadius: 10, padding: 3, border: "1px solid var(--ps-line-strong)" }}>
+          {[
+            { key: "google", label: "Google Snippet", icon: Search },
+            { key: "social", label: "Social Card", icon: Share2 },
+            { key: "schema", label: "JSON-LD Schema", icon: Code2 },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setPreviewTab(tab.key as any)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 7,
+                border: "none",
+                background: previewTab === tab.key ? "var(--ps-panel-raised)" : "transparent",
+                color: previewTab === tab.key ? "#fff" : "var(--ps-muted)",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              <tab.icon size={13} />
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            onClick={fillMissing}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
+              borderRadius: 9,
+              border: "1px solid var(--ps-line-strong)",
+              background: "var(--ps-panel-raised)",
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            <Sparkles size={14} style={{ color: "var(--ps-primary)" }} /> Auto-Fill SEO
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "8px 18px",
+              borderRadius: 9,
+              border: "none",
+              background: savedSuccess ? "var(--ps-success)" : "var(--ps-primary)",
+              color: "#fff",
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
+              transition: "background 0.2s",
+            }}
+          >
+            {savedSuccess ? <Check size={15} /> : <Save size={15} />}
+            <span>{savedSuccess ? "Saved!" : "Save SEO"}</span>
+          </button>
+        </div>
       </div>
 
-      <div className="ps-brand-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, padding: "0 28px 48px", alignItems: "start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="ps-card" style={{ borderRadius: 14, padding: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)" }}>Preview URL (per-page)</span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)", fontFamily: "ui-monospace, monospace" }}>{previewPath}</span>
-            <a href={previewPath} target="_blank" rel="noreferrer" style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "var(--ps-primary)", textDecoration: "none" }}>
-              <ExternalLink size={13} /> Open preview
-            </a>
-          </div>
-
-          <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-            <FieldRow label="Meta title" hint={`${title.length}/60 — aim for 40–60 characters`}>
-              <TextField value={title} onChange={(v) => patchSeo({ metaTitle: v })} />
-            </FieldRow>
-            <FieldRow label="Meta description" hint={`${desc.length}/160 — aim for 120–160 characters`}>
-              <textarea className="ps-input" value={desc} onChange={(e) => patchSeo({ metaDescription: e.target.value })} style={{ minHeight: 78, resize: "vertical", lineHeight: 1.55 }} />
-            </FieldRow>
-            <FieldRow label="URL slug">
-              <TextField value={site.slug} onChange={setSlug} prefix={<span style={{ color: "var(--ps-muted)", fontSize: 12, fontFamily: "monospace" }}>/p/</span>} />
-            </FieldRow>
-            <FieldRow label="Canonical URL">
-              <TextField value={seo.canonical} onChange={(v) => patchSeo({ canonical: v })} placeholder={suggestedCanonical(site)} />
-            </FieldRow>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderTop: "1px solid var(--ps-line)", marginTop: 6 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Allow search engines to index</span>
-              <Toggle on={seo.index} onChange={(v) => patchSeo({ index: v })} />
+      {/* Main 2-Panel Studio Layout */}
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        {/* Left Settings Sidebar */}
+        <div
+          style={{
+            width: 440,
+            background: "var(--ps-panel)",
+            borderRight: "1px solid var(--ps-line)",
+            overflowY: "auto",
+            padding: "20px 20px 60px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
+            flexShrink: 0,
+          }}
+        >
+          {/* Section 1: Search Engine Meta */}
+          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <Search size={16} style={{ color: "var(--ps-primary)" }} /> Google Search Meta Tags
             </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 0", borderTop: "1px solid var(--ps-line)" }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)" }}>Include in sitemap</span>
-              <Toggle on={seo.sitemap} onChange={(v) => patchSeo({ sitemap: v })} />
-            </div>
-          </div>
 
-          <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-            <Collapse title="Social sharing (Open Graph)" icon={<Share2 size={14} />} defaultOpen>
-              <FieldRow label="OG title">
-                <TextField value={seo.ogTitle} onChange={(v) => patchSeo({ ogTitle: v })} />
-              </FieldRow>
-              <FieldRow label="OG description">
-                <TextField value={seo.ogDescription} onChange={(v) => patchSeo({ ogDescription: v })} />
-              </FieldRow>
-              <FieldRow label="OG image">
-                <MediaPicker kind="image" value={seo.ogImage} onChange={(v) => patchSeo({ ogImage: v })} />
-              </FieldRow>
-              <FieldRow label="Keywords">
-                <TextField value={seo.keywords} onChange={(v) => patchSeo({ keywords: v })} placeholder="apartments, bangalore, rera" />
-              </FieldRow>
-              <Btn variant="ghost" size="sm" onClick={() => patchSeo({ ogTitle: title, ogDescription: desc })}>Copy meta into OG</Btn>
-            </Collapse>
-          </div>
-
-          <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-            <Collapse title="Page settings" icon={<Settings2 size={14} />} defaultOpen>
-              <FieldRow label="Language">
-                <TextField value={page.language} onChange={(v) => onPatch((c) => ({ ...c, page: { ...c.page, language: v } }))} placeholder="en" />
-              </FieldRow>
-              <FieldRow label="Favicon">
-                <MediaPicker kind="icon" value={page.favicon} onChange={(v) => onPatch((c) => ({ ...c, page: { ...c.page, favicon: v } }))} />
-              </FieldRow>
-              <FieldRow label="Password (optional)">
-                <TextField value={page.password} onChange={(v) => onPatch((c) => ({ ...c, page: { ...c.page, password: v } }))} placeholder="Leave blank for public preview" />
-              </FieldRow>
-            </Collapse>
-          </div>
-
-          <div className="ps-card" style={{ borderRadius: 14, padding: "6px 20px 18px" }}>
-            <Collapse title="Structured data (JSON-LD)" icon={<Link2 size={14} />} defaultOpen>
-              <pre
-                style={{
-                  background: "#0b1020",
-                  color: "#b8c2ff",
-                  borderRadius: 10,
-                  padding: 14,
-                  fontSize: 10.5,
-                  lineHeight: 1.6,
-                  overflowX: "auto",
-                  fontFamily: "monospace",
-                  margin: "6px 0 12px",
-                }}
-              >
-                {jsonText}
-              </pre>
-              <div style={{ display: "flex", gap: 6 }}>
-                <Btn variant="outline" size="sm" onClick={() => onToast(schemaOk ? "JSON-LD has name, url and description" : "Add title, description and canonical first")}>
-                  Validate
-                </Btn>
-                <Btn variant="ghost" size="sm" icon={<Copy size={13} />} onClick={() => void copyJson()}>Copy</Btn>
+            {/* Meta Title */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)" }}>Meta Title</label>
+                <span style={{ fontSize: 11, fontWeight: 700, color: titleLength >= 40 && titleLength <= 60 ? "var(--ps-success)" : "#fbbf24" }}>
+                  {titleLength}/60 chars
+                </span>
               </div>
-            </Collapse>
+              <input
+                className="ps-input"
+                value={title}
+                placeholder="e.g. Prestige Green Park | Luxury 3 & 4 BHK in Sarjapur"
+                onChange={(e) => patchSeo({ metaTitle: e.target.value })}
+                style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+              />
+            </div>
+
+            {/* Meta Description */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)" }}>Meta Description</label>
+                <span style={{ fontSize: 11, fontWeight: 700, color: descLength >= 120 && descLength <= 160 ? "var(--ps-success)" : "#fbbf24" }}>
+                  {descLength}/160 chars
+                </span>
+              </div>
+              <textarea
+                className="ps-input"
+                rows={3}
+                value={desc}
+                placeholder="e.g. Explore luxury residences with world-class amenities. Download brochure, check pricing & floor plans."
+                onChange={(e) => patchSeo({ metaDescription: e.target.value })}
+                style={{ width: "100%", fontSize: 12, background: "var(--ps-bg)", color: "#fff", resize: "none" }}
+              />
+            </div>
+
+            {/* Meta Keywords */}
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Keywords (comma separated)</label>
+              <input
+                className="ps-input"
+                value={seo.keywords || ""}
+                placeholder="e.g. luxury apartments, sarjapur road, brochure, floor plan"
+                onChange={(e) => patchSeo({ keywords: e.target.value })}
+                style={{ width: "100%", fontSize: 12, background: "var(--ps-bg)", color: "#fff" }}
+              />
+            </div>
+          </div>
+
+          {/* Section 2: Social Media & Open Graph */}
+          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <Share2 size={16} style={{ color: "var(--ps-primary)" }} /> Social Sharing (Open Graph)
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Social Share Image (OG Image)</label>
+                <MediaPicker
+                  kind="image"
+                  label="Upload 1200x630px Banner"
+                  value={seo.ogImage || ""}
+                  onChange={(v) => patchSeo({ ogImage: v })}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Social Title (Optional override)</label>
+                <input
+                  className="ps-input"
+                  value={seo.ogTitle || ""}
+                  placeholder="Defaults to Meta Title if blank"
+                  onChange={(e) => patchSeo({ ogTitle: e.target.value })}
+                  style={{ width: "100%", fontSize: 12, background: "var(--ps-bg)", color: "#fff" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Social Description</label>
+                <textarea
+                  className="ps-input"
+                  rows={2}
+                  value={seo.ogDescription || ""}
+                  placeholder="Defaults to Meta Description if blank"
+                  onChange={(e) => patchSeo({ ogDescription: e.target.value })}
+                  style={{ width: "100%", fontSize: 12, background: "var(--ps-bg)", color: "#fff", resize: "none" }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Indexing & Robots Controls */}
+          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <ListTree size={16} style={{ color: "var(--ps-primary)" }} /> Indexing & Robot Controls
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Allow Search Indexing</div>
+                  <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>Permits Google & Bing to crawl and index page</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={seo.index ?? true}
+                  onChange={(e) => patchSeo({ index: e.target.checked })}
+                  style={{ width: 18, height: 18, cursor: "pointer" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Include in XML Sitemap</div>
+                  <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>Adds this page URL to sitemap.xml</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={seo.sitemap ?? true}
+                  onChange={(e) => patchSeo({ sitemap: e.target.checked })}
+                  style={{ width: 18, height: 18, cursor: "pointer" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Canonical URL</label>
+                <input
+                  className="ps-input"
+                  value={seo.canonical || ""}
+                  placeholder={suggestedCanonical(site)}
+                  onChange={(e) => patchSeo({ canonical: e.target.value })}
+                  style={{ width: "100%", fontSize: 11.5, fontFamily: "monospace", background: "var(--ps-bg)", color: "#fff" }}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="ps-card" style={{ borderRadius: 14, padding: 18 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <Search size={13} /> Google search preview
-            </div>
-            <div style={{ fontFamily: "Arial, sans-serif" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                <span style={{ width: 20, height: 20, borderRadius: "50%", background: brand.primary, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 800 }}>
-                  {(brand.name || "P").slice(0, 1).toUpperCase()}
-                </span>
-                <div>
-                  <div style={{ fontSize: 12, color: "#202124" }}>{brand.name}</div>
-                  <div style={{ fontSize: 10, color: "#5f6368" }}>{seo.canonical || `localhost/p/${site.slug}`}</div>
+        {/* Right Live Preview Stage */}
+        <div
+          className="ps-canvas-dots"
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "28px 36px 80px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          {previewTab === "google" ? (
+            /* Google Search Engine Preview */
+            <div
+              style={{
+                width: 680,
+                maxWidth: "100%",
+                background: "#fff",
+                borderRadius: 16,
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                boxShadow: "0 25px 70px rgba(0, 0, 0, 0.65)",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ background: "#0f172a", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", padding: "12px 18px", display: "flex", alignItems: "center", gap: 8 }}>
+                <Search size={15} style={{ color: "#818cf8" }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1" }}>Google Search Result Preview</span>
+              </div>
+              <div style={{ padding: "28px 32px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "#475569" }}>
+                    {brand.name?.slice(0, 1) || "G"}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, color: "#202124", fontWeight: 500 }}>{brand.name || "Estate Pro"}</div>
+                    <div style={{ fontSize: 11, color: "#4d5156", fontFamily: "monospace" }}>{fullDomain}</div>
+                  </div>
                 </div>
-              </div>
-              <div style={{ fontSize: 15, color: "#1a0dab", fontWeight: 400, margin: "6px 0 3px" }}>{title || "Untitled"}</div>
-              <div style={{ fontSize: 12.5, color: "#4d5156", lineHeight: 1.45, maxWidth: 560 }}>{desc || "No description set."}</div>
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-              {keywords.length ? keywords.map((k) => (
-                <span key={k} style={{ fontSize: 10.5, fontWeight: 700, color: "var(--ps-slate)", background: "var(--ps-bg)", padding: "3px 9px", borderRadius: 999 }}>{k}</span>
-              )) : <span style={{ fontSize: 11.5, color: "var(--ps-muted)" }}>Add keywords to see chips here.</span>}
-            </div>
-          </div>
 
-          <div className="ps-card" style={{ borderRadius: 14, padding: 18 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <Share2 size={13} /> Social link preview
-            </div>
-            <div style={{ border: "1px solid #eef0f5", borderRadius: 12, overflow: "hidden" }}>
-              <div style={{ height: 120, background: ogImageSrc ? `center / cover no-repeat url(${JSON.stringify(ogImageSrc)})` : "var(--ps-grad-primary)" }} />
-              <div style={{ padding: 12 }}>
-                <div style={{ fontSize: 11, color: "#5f6368", marginBottom: 4 }}>{site.domain || "localhost"}</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#202124" }}>{seo.ogTitle || title || "Untitled"}</div>
-                <div style={{ fontSize: 12, color: "#4d5156", marginTop: 4, lineHeight: 1.45 }}>{(seo.ogDescription || desc || "").slice(0, 140)}</div>
-              </div>
-            </div>
-          </div>
+                <h3 style={{ fontSize: 19, fontWeight: 500, color: "#1a0dab", margin: "6px 0", cursor: "pointer", textDecoration: "underline", lineHeight: 1.35 }}>
+                  {title || "Luxury Residences | Prime Real Estate Development"}
+                </h3>
 
-          <div className="ps-card" style={{ borderRadius: 14, padding: 18 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-              <Gauge size={13} /> Health checks
-            </div>
-            {[
-              ["Meta title length", titleOk ? "Good" : "Needs work", titleOk],
-              ["Meta description length", descOk ? "Good" : "Needs work", descOk],
-              ["Canonical set", seo.canonical ? "Good" : "Missing", Boolean(seo.canonical)],
-              ["JSON-LD valid", schemaOk ? "Good" : "Needs work", schemaOk],
-              ["OG image set", ogOk ? "Good" : "Missing", ogOk],
-              ["Indexable", seo.index ? "On" : "Off", seo.index],
-              ["Sitemap", seo.sitemap ? "On" : "Off", seo.sitemap],
-            ].map(([label, status, ok]) => (
-              <div key={label as string} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 0", borderBottom: "1px solid var(--ps-line)" }}>
-                <span style={{ width: 9, height: 9, borderRadius: 999, background: ok ? "var(--ps-success)" : "var(--ps-warn)", flexShrink: 0 }} />
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ps-slate)", flex: 1 }}>{label as string}</span>
-                <span style={{ fontSize: 11.5, fontWeight: 800, color: ok ? "var(--ps-success)" : "var(--ps-warn)" }}>{status as string}</span>
+                <p style={{ fontSize: 13.5, color: "#4d5156", lineHeight: 1.55, margin: 0 }}>
+                  {desc || "Explore master plans, luxury 3 & 4 BHK floor layouts, clubhouse amenities, price sheets, and location map. Book site visit."}
+                </p>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : previewTab === "social" ? (
+            /* Social Card Preview */
+            <div
+              style={{
+                width: 580,
+                maxWidth: "100%",
+                background: "#fff",
+                borderRadius: 16,
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                boxShadow: "0 25px 70px rgba(0, 0, 0, 0.65)",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ background: "#0f172a", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", padding: "12px 18px", display: "flex", alignItems: "center", gap: 8 }}>
+                <Share2 size={15} style={{ color: "#818cf8" }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1" }}>Social Media Share Preview (WhatsApp / FB / LinkedIn)</span>
+              </div>
+
+              {/* Social Image */}
+              <div style={{ width: "100%", height: 260, background: "#0f172a", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {seo.ogImage ? (
+                  <img src={seo.ogImage} alt="OG" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <div style={{ textAlign: "center", color: "#94a3b8" }}>
+                    <ImagePlus size={36} style={{ margin: "0 auto 8px" }} />
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>No Social Share Image Uploaded</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Social Text Excerpt */}
+              <div style={{ padding: "18px 22px", background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#64748b", letterSpacing: 0.5 }}>
+                  {site.domain || "preview.estatepro.com"}
+                </div>
+                <h4 style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", margin: "6px 0 4px" }}>
+                  {seo.ogTitle || title || "Luxury Residences by Estate Pro"}
+                </h4>
+                <p style={{ fontSize: 12.5, color: "#475569", margin: 0, lineHeight: 1.5 }}>
+                  {seo.ogDescription || desc || "Download official brochure, explore floor plans & pricing."}
+                </p>
+              </div>
+            </div>
+          ) : (
+            /* JSON-LD Schema Viewer */
+            <div
+              style={{
+                width: 680,
+                maxWidth: "100%",
+                background: "#0f172a",
+                borderRadius: 16,
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                boxShadow: "0 25px 70px rgba(0, 0, 0, 0.65)",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ padding: "12px 18px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Code2 size={14} style={{ color: "#818cf8" }} /> Generated Schema.org (JSON-LD)
+                </span>
+                <button
+                  type="button"
+                  onClick={copyJson}
+                  style={{ background: "rgba(255,255,255,0.1)", border: "none", color: "#fff", padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+                >
+                  <Copy size={12} /> Copy JSON
+                </button>
+              </div>
+              <pre style={{ margin: 0, padding: "20px 24px", color: "#38bdf8", fontSize: 12, lineHeight: 1.6, overflowX: "auto", fontFamily: "monospace" }}>
+                {jsonText}
+              </pre>
+            </div>
+          )}
         </div>
       </div>
     </div>

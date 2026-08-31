@@ -5,7 +5,7 @@ import type * as React from "react";
 import { DndContext, DragOverlay, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { ArrowRight, CornerDownLeft, Search, SlidersHorizontal, LayoutGrid, Layers, ListOrdered } from "lucide-react";
+import { ArrowRight, CornerDownLeft, Search, SlidersHorizontal, LayoutGrid, Layers, ListOrdered, GripVertical, X } from "lucide-react";
 import type { Device, FooterDesignId, HeaderDesignId, LandingPageData, MenuLink, SectionInstance, SectionStyle, SiteConfig } from "@/lib/prestate/types";
 import {
   CHROME_FOOTER_ID,
@@ -130,14 +130,16 @@ export function BuilderWorkspace({
     sections: seedSections(page),
     history: [],
     future: [],
-    selectedId: "sticky-cta",
+    selectedId: null,
   }));
   const [widgetsOpen, setWidgetsOpen] = useState(true);
   const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [inspectorMode, setInspectorMode] = useState<"docked" | "floating" | "hidden">("docked");
+  const [floatingPos, setFloatingPos] = useState({ x: 24, y: 64 });
   const [quickOpen, setQuickOpen] = useState(false);
   const [vp, setVp] = useState(1400);
   const [savedTemplates, setSavedTemplates] = useState<SavedSectionTemplate[]>(() => loadSectionTemplates());
-  const [leftTab, setLeftTab] = useState<"widgets" | "layers">("layers");
+  const [leftTab, setLeftTab] = useState<"widgets" | "layers">("widgets");
   const [pendingInsertIndex, setPendingInsertIndex] = useState<number | null>(null);
 
   // Design system: typography tokens + uploaded fonts → stylesheet for canvas.
@@ -191,7 +193,7 @@ export function BuilderWorkspace({
 
   const selected = chromeSection ?? (selectedId ? findSection(sections, selectedId)?.node ?? null : null);
   const dockWidgets = vp >= 900;
-  const dockInspector = vp >= 1180;
+  const isDocked = inspectorMode === "docked" && vp >= 1180;
 
   useEffect(() => {
     const sync = () => setVp(window.innerWidth);
@@ -203,7 +205,6 @@ export function BuilderWorkspace({
   useEffect(() => {
     const w = window.innerWidth;
     if (w < 900) setWidgetsOpen(false);
-    if (w < 1180) setInspectorOpen(false);
   }, []);
 
   // Refs for flushing pending autosaves at any time (page switch, tab close).
@@ -321,9 +322,11 @@ export function BuilderWorkspace({
       // real section instead of showing a dead toast.
       const realId = id.startsWith("__template_") ? id.slice("__template_".length) : id;
       setState((prev) => ({ ...prev, selectedId: realId }));
-      if (!dockInspector) setInspectorOpen(true);
+      if (inspectorMode === "hidden") {
+        setInspectorMode("floating");
+      }
     },
-    [dockInspector],
+    [inspectorMode],
   );
 
   useEffect(() => {
@@ -336,6 +339,10 @@ export function BuilderWorkspace({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setState((prev) => ({ ...prev, selectedId: null }));
+        return;
+      }
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
       const k = e.key.toLowerCase();
@@ -351,6 +358,9 @@ export function BuilderWorkspace({
       } else if (k === "k") {
         e.preventDefault();
         setQuickOpen((v) => !v);
+      } else if (k === "b") {
+        e.preventDefault();
+        setWidgetsOpen((v) => !v);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -799,30 +809,147 @@ export function BuilderWorkspace({
         onAddAt={handleAddAt}
       />
 
-      {dockInspector || inspectorOpen ? (
-        <>
-          {!dockInspector ? <button type="button" className="ps-drawer-backdrop" aria-label="Close settings" onClick={() => setInspectorOpen(false)} /> : null}
-          <div className={dockInspector ? "ps-sidebar-col" : "ps-drawer-top"} style={{ zIndex: dockInspector ? 1 : 430 }}>
-            <SettingsPanel section={selected} device={device} setDevice={setDevice} onChange={patchSelected} typographyTokens={design.bundle.tokens} page={page} onPatchConfig={onPatchConfig} />
-          </div>
-        </>
+      {/* Right Inspector: Docked Mode */}
+      {isDocked ? (
+        <div className="ps-sidebar-col" style={{ width: 330, flexShrink: 0, zIndex: 1, display: "flex", flexDirection: "column" }}>
+          <SettingsPanel
+            section={selected}
+            device={device}
+            setDevice={setDevice}
+            onChange={patchSelected}
+            typographyTokens={design.bundle.tokens}
+            page={page}
+            onPatchConfig={onPatchConfig}
+            mode="docked"
+            onToggleMode={(m) => setInspectorMode(m)}
+            onClose={() => setInspectorMode("hidden")}
+          />
+        </div>
       ) : null}
 
-      <div className="ps-builder-fabs">
-        {!dockWidgets ? (
-          <button type="button" className="ps-fab" onClick={() => setWidgetsOpen((v) => !v)} title="Widgets">
-            <LayoutGrid size={16} /> Widgets
-          </button>
-        ) : null}
+      {/* Right Inspector: Floating Draggable Modal (Canvas stays 100% Full Width) */}
+      {inspectorMode === "floating" ? (
+        <div
+          style={{
+            position: "fixed",
+            top: floatingPos.y,
+            right: floatingPos.x,
+            width: 350,
+            maxHeight: "calc(100vh - 100px)",
+            zIndex: 500,
+            background: "var(--ps-panel)",
+            border: "1px solid var(--ps-line-strong)",
+            borderRadius: 16,
+            boxShadow: "0 25px 70px rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(24px)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            animation: "ps-fade-in .2s ease both",
+          }}
+        >
+          {/* Draggable header bar */}
+          <div
+            onMouseDown={(e) => {
+              if ((e.target as HTMLElement).tagName === "BUTTON" || (e.target as HTMLElement).tagName === "INPUT") return;
+              const startX = e.clientX;
+              const startY = e.clientY;
+              const initX = floatingPos.x;
+              const initY = floatingPos.y;
+              const onMove = (ev: MouseEvent) => {
+                const dx = startX - ev.clientX;
+                const dy = ev.clientY - startY;
+                setFloatingPos({
+                  x: Math.max(10, Math.min(window.innerWidth - 380, initX + dx)),
+                  y: Math.max(50, Math.min(window.innerHeight - 250, initY + dy)),
+                });
+              };
+              const onUp = () => {
+                window.removeEventListener("mousemove", onMove);
+                window.removeEventListener("mouseup", onUp);
+              };
+              window.addEventListener("mousemove", onMove);
+              window.addEventListener("mouseup", onUp);
+            }}
+            style={{
+              padding: "6px 12px",
+              background: "var(--ps-panel-raised)",
+              borderBottom: "1px solid var(--ps-line)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              cursor: "move",
+              userSelect: "none",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 800, color: "var(--ps-muted)", letterSpacing: 0.4, textTransform: "uppercase" }}>
+              <GripVertical size={13} /> Movable Inspector
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <button
+                type="button"
+                onClick={() => setInspectorMode("docked")}
+                title="Dock to sidebar"
+                style={{ background: "transparent", border: "none", color: "var(--ps-primary)", cursor: "pointer", padding: "2px 6px", fontSize: 11, fontWeight: 800 }}
+              >
+                📌 Dock
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspectorMode("hidden")}
+                title="Close panel (see full screen)"
+                style={{ background: "transparent", border: "none", color: "var(--ps-muted)", cursor: "pointer", padding: "2px 4px" }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </div>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+            <SettingsPanel
+              section={selected}
+              device={device}
+              setDevice={setDevice}
+              onChange={patchSelected}
+              typographyTokens={design.bundle.tokens}
+              page={page}
+              onPatchConfig={onPatchConfig}
+              mode="floating"
+              onToggleMode={(m) => setInspectorMode(m)}
+              onClose={() => setInspectorMode("hidden")}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {/* Floating Action Ribbon */}
+      <div className="ps-builder-fabs" style={{ zIndex: 400 }}>
+        <button
+          type="button"
+          className="ps-fab"
+          onClick={() => setWidgetsOpen((v) => !v)}
+          title="Toggle Blocks/Widgets Sidebar (Ctrl+B)"
+          style={{ background: widgetsOpen ? "var(--ps-primary)" : undefined, color: widgetsOpen ? "#fff" : undefined }}
+        >
+          <LayoutGrid size={15} /> {widgetsOpen ? "Hide Blocks" : "Blocks"}
+        </button>
+
         <button type="button" className="ps-fab" onClick={() => setQuickOpen(true)} title="Quick Add (Ctrl+K)">
           <Search size={15} /> Quick Add
           <kbd style={{ fontSize: 10, fontWeight: 800, opacity: 0.7 }}>Ctrl K</kbd>
         </button>
-        {!dockInspector ? (
-          <button type="button" className="ps-fab" onClick={() => setInspectorOpen((v) => !v)} title="Settings">
-            <SlidersHorizontal size={16} /> Settings
-          </button>
-        ) : null}
+
+        <button
+          type="button"
+          className="ps-fab"
+          onClick={() => setInspectorMode((prev) => (prev === "hidden" ? "floating" : prev === "floating" ? "docked" : "hidden"))}
+          title="Toggle Inspector / Full Screen Mode"
+          style={{
+            background: inspectorMode !== "hidden" ? "var(--ps-primary)" : undefined,
+            color: inspectorMode !== "hidden" ? "#fff" : undefined,
+          }}
+        >
+          <SlidersHorizontal size={15} /> {inspectorMode === "docked" ? "Docked Inspector" : inspectorMode === "floating" ? "Floating (Move)" : "Full Canvas (Zen)"}
+        </button>
       </div>
 
       {quickOpen ? <QuickAdd onClose={() => { setQuickOpen(false); setPendingInsertIndex(null); }} onInsert={addWidget} /> : null}

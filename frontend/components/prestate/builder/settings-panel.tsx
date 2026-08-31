@@ -20,6 +20,7 @@ import {
   Plus,
   SlidersHorizontal,
   Smartphone,
+  Sparkles,
   Tablet,
   Trash2,
   Type,
@@ -515,6 +516,9 @@ export function SettingsPanel({
   typographyTokens,
   page,
   onPatchConfig,
+  mode = "docked",
+  onToggleMode,
+  onClose,
 }: {
   section: SectionInstance | null;
   device: Device;
@@ -524,20 +528,65 @@ export function SettingsPanel({
   typographyTokens?: TemplateTypography;
   page?: LandingPageData;
   onPatchConfig?: (recipe: (c: SiteConfig) => SiteConfig) => void;
+  mode?: "docked" | "floating" | "hidden";
+  onToggleMode?: (m: "docked" | "floating" | "hidden") => void;
+  onClose?: () => void;
 }) {
   const [tab, setTab] = useState<"content" | "style" | "advanced">("content");
 
   if (!section) {
+    const totalSections = page?.sections?.length || 0;
     return (
       <div className="ps-inspector">
-        <PanelHead title="Settings" subtitle="Select a section to edit" />
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 40, textAlign: "center", color: "var(--ps-muted)" }}>
-          <span style={{ width: 54, height: 54, borderRadius: 16, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-            <LayoutPanelTop size={24} />
-          </span>
-          <div style={{ fontSize: 14, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 6 }}>Nothing selected</div>
-          <div style={{ fontSize: 12.5, lineHeight: 1.6, maxWidth: 240 }}>
-            Click any section on the canvas, or add a widget from the library to start editing content, style and advanced settings.
+        <PanelHead title="Page Settings" subtitle="Global layout & structure" mode={mode} onToggleMode={onToggleMode} onClose={onClose} />
+        <div style={{ padding: "18px 16px", display: "flex", flexDirection: "column", gap: 18, overflowY: "auto" }}>
+          {/* Page metadata card */}
+          <div style={{ background: "var(--ps-surface-muted)", border: "1px solid var(--ps-line)", borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--ps-muted)", marginBottom: 6 }}>Page Title</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "var(--ps-ink)" }}>{page?.name || "Real Estate Landing Page"}</div>
+            <div style={{ fontSize: 11.5, color: "var(--ps-muted)", marginTop: 4 }}>
+              Status: <span style={{ color: page?.status === "published" ? "var(--ps-success)" : "var(--ps-warning)", fontWeight: 700 }}>{page?.status?.toUpperCase() || "DRAFT"}</span> · {totalSections} active sections
+            </div>
+          </div>
+
+          {/* Quick tips & shortcuts */}
+          <div style={{ background: "var(--ps-surface)", border: "1px solid var(--ps-line)", borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: "var(--ps-ink)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              <Sparkles size={14} style={{ color: "var(--ps-primary)" }} /> How to customize
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--ps-slate)", lineHeight: 1.6 }}>
+              <li><strong>Click any section</strong> on the canvas to open its design layouts, copy, and style controls.</li>
+              <li>Use <strong>🪟 Float</strong> in the header to make this panel movable anywhere and view full-width canvas.</li>
+              <li>Press <kbd style={{ background: "var(--ps-line)", padding: "1px 5px", borderRadius: 4, fontSize: 10.5 }}>Ctrl + K</kbd> to quick-add widgets anywhere.</li>
+            </ul>
+          </div>
+
+          {/* Device overview */}
+          <div style={{ background: "var(--ps-surface-muted)", border: "1px solid var(--ps-line)", borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.6, color: "var(--ps-muted)", marginBottom: 8 }}>Canvas Mode</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["desktop", "tablet", "mobile"] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDevice(d)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 0",
+                    border: device === d ? "1.5px solid var(--ps-primary)" : "1px solid var(--ps-line)",
+                    borderRadius: 8,
+                    background: device === d ? "var(--ps-primary-soft)" : "#fff",
+                    color: device === d ? "var(--ps-primary)" : "var(--ps-slate)",
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -555,19 +604,15 @@ export function SettingsPanel({
   const responsive = style.responsive ?? {};
 
   // --- Per-device editing -------------------------------------------------
-  // On tablet/mobile tabs, spacing/layout/typography edits are stored as
-  // overrides under style.responsive[device]; desktop edits the base style.
   const isDeviceTab = device !== "desktop";
   const deviceKey = device === "mobile" ? "mobile" : "tablet";
   const deviceOverride = responsive[deviceKey] ?? {};
   const spacingEff: typeof spacing = { ...spacing, ...(deviceOverride.spacing ?? {}) };
   const layoutEff: typeof layout = { ...layout, ...(deviceOverride.layout ?? {}) };
   const typoEff: typeof typo = { ...typo, ...(deviceOverride.typography ?? {}) };
-  /** The values the badge/reset act on — the active tab's own overrides. */
   const badgeTypo = isDeviceTab ? (deviceOverride.typography ?? {}) : typo;
 
   const setStyle = (patch: Partial<SectionInstance["style"]>) => set({ style: { ...style, ...patch } });
-  /** Write a style group to the base style (desktop) or the active device override. */
   const setGroup = (group: "spacing" | "layout" | "typography", patch: Record<string, unknown>) => {
     if (!isDeviceTab) {
       setStyle({ [group]: { ...((style[group] as Record<string, unknown>) ?? {}), ...patch } } as Partial<SectionInstance["style"]>);
@@ -598,26 +643,68 @@ export function SettingsPanel({
   return (
     <div className="ps-inspector">
       {/* Header */}
-      <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid var(--ps-line)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <span style={{ width: 30, height: 30, borderRadius: 9, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <div style={{ padding: "12px 14px 10px", borderBottom: "1px solid var(--ps-line)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 28, height: 28, borderRadius: 8, background: "var(--ps-primary-soft)", color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             {iconForSection(section)}
           </span>
           <input
             value={section.label}
             onChange={(e) => set({ label: e.target.value })}
-            style={{ flex: 1, border: "none", outline: "none", fontWeight: 800, fontSize: 13.5, color: "var(--ps-ink)", background: "transparent", minWidth: 0 }}
+            style={{ flex: 1, border: "none", outline: "none", fontWeight: 800, fontSize: 13, color: "var(--ps-ink)", background: "transparent", minWidth: 0 }}
           />
-          <button
-            type="button"
-            title={section.hidden ? "Show section" : "Hide section"}
-            onClick={() => set({ hidden: !section.hidden })}
-            style={{ background: "none", border: "none", color: section.hidden ? "var(--ps-danger)" : "var(--ps-muted)", cursor: "pointer", padding: 4 }}
-          >
-            {section.hidden ? <EyeOff size={15} /> : <Eye size={15} />}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <button
+              type="button"
+              title={section.hidden ? "Show section" : "Hide section"}
+              onClick={() => set({ hidden: !section.hidden })}
+              style={{ background: "none", border: "none", color: section.hidden ? "var(--ps-danger)" : "var(--ps-muted)", cursor: "pointer", padding: 4 }}
+            >
+              {section.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+            {onToggleMode ? (
+              <button
+                type="button"
+                title={mode === "floating" ? "Dock to right sidebar" : "Float panel over canvas (see full width canvas)"}
+                onClick={() => onToggleMode(mode === "floating" ? "docked" : "floating")}
+                style={{
+                  background: mode === "floating" ? "var(--ps-primary-mist)" : "var(--ps-bg)",
+                  border: "1px solid var(--ps-line)",
+                  color: mode === "floating" ? "var(--ps-primary)" : "var(--ps-muted)",
+                  borderRadius: 6,
+                  padding: "3px 7px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {mode === "floating" ? "📌 Dock" : "🪟 Float"}
+              </button>
+            ) : null}
+            {onClose ? (
+              <button
+                type="button"
+                title="Minimize inspector (see full screen canvas)"
+                onClick={onClose}
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--ps-line)",
+                  color: "var(--ps-muted)",
+                  borderRadius: 6,
+                  width: 24,
+                  height: 24,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                }}
+              >
+                <X size={13} />
+              </button>
+            ) : null}
+          </div>
         </div>
-        <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 3 }}>{section.type} widget</div>
+        <div style={{ fontSize: 10.5, color: "var(--ps-muted)", marginTop: 2 }}>{section.type} widget · live controls</div>
       </div>
 
       {/* Tabs */}
@@ -692,8 +779,23 @@ export function SettingsPanel({
             {section.type === "lead-form" ? (
               <FormWidgetConditionalEditor section={section} onChange={set} page={page} onPatchConfig={onPatchConfig} />
             ) : null}
+            {/* Widget Design Selector — always rendered at top if widget has multiple designs */}
+            {section.type === "header" || section.type === "footer" ? (
+              <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
+                <FieldRow label="Layout design">
+                  <DesignPicker kind={section.type} value={String(section.settings.design ?? (section.type === "header" ? "classic" : "minimal"))} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
+                </FieldRow>
+              </div>
+            ) : designsForWidget(section.type).length > 0 ? (
+              <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
+                <FieldRow label="Design layout">
+                  <WidgetDesignPicker widgetType={section.type} value={String(section.settings.design ?? (section.settings.style || designsForWidget(section.type)[0]?.id || ""))} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
+                </FieldRow>
+              </div>
+            ) : null}
+
             {section.type !== "lead-form" && Object.entries(section.settings)
-              .filter(([key]) => key !== "eyebrow")
+              .filter(([key]) => key !== "eyebrow" && key !== "design")
               .filter(([key]) => !(section.type === "text" && (key === "text" || key === "html")))
               .filter(([key]) => !(section.type === "popup" && POPUP_MANAGED_KEYS.includes(key)))
               .filter(([key]) => !(section.type === "html" && key === "code"))
@@ -711,14 +813,6 @@ export function SettingsPanel({
                       }}
                       suffix=""
                     />
-                  </FieldRow>
-                ) : key === "design" ? (
-                  <FieldRow label={section.type === "header" || section.type === "footer" ? "Layout design" : "Premium design"}>
-                    {section.type === "header" || section.type === "footer" ? (
-                      <DesignPicker kind={section.type} value={String(value ?? "")} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
-                    ) : (
-                      <WidgetDesignPicker widgetType={section.type} value={String(value ?? "")} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
-                    )}
                   </FieldRow>
                 ) : (
                   <ContentField fieldKey={key} widgetType={section.type} label={formatFieldLabel(key)} value={value} onChange={(v) => set({ settings: { ...section.settings, [key]: v } })} />
@@ -1480,11 +1574,70 @@ function FormFieldLogicEditor({ field, allFields, onChange }: { field: FormLeadF
   );
 }
 
-function PanelHead({ title, subtitle }: { title: string; subtitle: string }) {
+function PanelHead({
+  title,
+  subtitle,
+  mode = "docked",
+  onToggleMode,
+  onClose,
+}: {
+  title: string;
+  subtitle: string;
+  mode?: "docked" | "floating" | "hidden";
+  onToggleMode?: (m: "docked" | "floating" | "hidden") => void;
+  onClose?: () => void;
+}) {
   return (
-    <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--ps-line)" }}>
-      <div style={{ fontSize: 14, fontWeight: 800 }}>{title}</div>
-      <div style={{ fontSize: 11.5, color: "var(--ps-muted)", marginTop: 2 }}>{subtitle}</div>
+    <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--ps-line)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: "var(--ps-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
+        <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{subtitle}</div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {onToggleMode ? (
+          <button
+            type="button"
+            title={mode === "floating" ? "Dock inspector to right sidebar" : "Float inspector over canvas (see full width canvas)"}
+            onClick={() => onToggleMode(mode === "floating" ? "docked" : "floating")}
+            style={{
+              background: mode === "floating" ? "var(--ps-primary-mist)" : "var(--ps-bg)",
+              border: "1px solid var(--ps-line)",
+              color: mode === "floating" ? "var(--ps-primary)" : "var(--ps-muted)",
+              borderRadius: 6,
+              padding: "3px 7px",
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            {mode === "floating" ? "📌 Dock" : "🪟 Float"}
+          </button>
+        ) : null}
+        {onClose ? (
+          <button
+            type="button"
+            title="Minimize inspector (see full screen canvas)"
+            onClick={onClose}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--ps-line)",
+              color: "var(--ps-muted)",
+              borderRadius: 6,
+              width: 24,
+              height: 24,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <X size={13} />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

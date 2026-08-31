@@ -56,7 +56,7 @@ describe("widget library integrity", () => {
   it("hero exposes three layout presets", () => {
     const hero = WIDGETS.find((w) => w.id === "hero");
     expect(hero).toBeDefined();
-    expect(designsForWidget("hero").map((d) => d.id)).toEqual(["classic", "split", "centered"]);
+    expect(designsForWidget("hero").map((d) => d.id)).toEqual(["split", "slider", "classic"]);
     expect(hero?.make().style.layout?.align).toBe("center");
   });
 

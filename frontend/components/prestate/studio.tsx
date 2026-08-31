@@ -532,6 +532,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--ps-bg)" }}>
       <TopNav
         module={module}
+        setModule={setModule}
         pageName={activePage?.name}
         pageStatus={module === "builder" ? activePage?.status : undefined}
         device={device}
@@ -564,36 +565,6 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
         {/* Module content */}
         <main className="ps-module-shell" style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>{renderModule()}</main>
       </div>
-
-      {/* Fixed bottom navigation */}
-      <nav className="ps-bottombar" aria-label="Studio modules">
-        <Link href={HOME_PATH[resource]} title="Back" className="ps-rail-btn ps-bb-item">
-          <LayoutTemplate size={18} />
-          <span className="ps-rail-label">{resource === "landing-page" ? "My Pages" : "Templates"}</span>
-        </Link>
-        {railItems.map((item) => {
-          const Icon = item.icon;
-          const active = module === item.key;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              title={item.label}
-              onClick={() => setModule(item.key)}
-              className="ps-rail-btn ps-bb-item"
-              data-active={active ? "true" : "false"}
-            >
-              <Icon size={18} />
-              <span className="ps-rail-label">{item.label}</span>
-            </button>
-          );
-        })}
-        <div style={{ flex: 1 }} />
-        <button type="button" title="Settings" className="ps-rail-btn ps-bb-item" onClick={() => setSettingsOpen(true)}>
-          <Settings size={18} />
-          <span className="ps-rail-label">Settings</span>
-        </button>
-      </nav>
 
       {/* Toasts */}
       <div className="ps-toast-stack">
