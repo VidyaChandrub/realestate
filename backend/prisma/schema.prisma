@@ -31,10 +31,42 @@ enum UserStatus {
   @@schema("identity")
 }
 
+// Furthest step the signup wizard has *completed* for this user — resume
+// logic shows the step after this one. The values below are just the
+// allowed set; progression ORDER is defined separately in
+// common/utils/onboarding.util.ts's ONBOARDING_STEP_ORDER (not by the
+// declaration order here, which isn't relied on anywhere).
+enum OnboardingStep {
+  account
+  organisation
+  business_details
+  modules
+  subscription
+  templates
+  invite
+  connect
+  completed
+
+  @@schema("identity")
+}
+
 enum RoleScope {
   platform
   organisation
   team
+
+  @@schema("identity")
+}
+
+// What kind of real-estate business the org is — collected at Step 2 of the
+// signup wizard (previously collected in the UI but discarded, never
+// persisted) and editable later from Org Settings → General. Fixed,
+// app-controlled list, hence an enum rather than free text.
+enum OrgIndustry {
+  developer
+  broker
+  channel
+  mixed
 
   @@schema("identity")
 }
@@ -48,7 +80,11 @@ model Organisation {
   id        String    @id @default(uuid())
   name      String
   slug      String    @unique
-  city      String
+  // Nullable: the wizard creates the Organisation at Step 2 (name +
+  // subdomain only) — city is collected later, at Step 3 (Business
+  // Details). Every other org-creation path (Super Admin onboarding,
+  // old atomic signup) still supplies it upfront.
+  city      String?
   status    OrgStatus @default(active)
   createdAt DateTime  @default(now()) @map("created_at")
 
@@ -66,6 +102,22 @@ model Organisation {
   state           String?
   postalCode      String? @map("postal_code")
   country         String?
+
+  // Business-details step of the signup wizard (Step 3). Both nullable —
+  // compliance info a business may not have on day one.
+  reraLicenseNo String? @map("rera_license_no")
+  gstin         String? @map("gstin")
+
+  // Org Settings → General profile fields. All nullable — most orgs won't
+  // have these on day one, and existing rows backfill to null.
+  legalName    String?      @map("legal_name")
+  industry     OrgIndustry?
+  supportEmail String?      @map("support_email")
+  supportPhone String?      @map("support_phone")
+
+  // Modules step of the signup wizard (Step 6, skippable) — informational
+  // only for now, no enforcement reads this yet (see prompt: out of scope).
+  enabledModules String[] @default([]) @map("enabled_modules")
 
   // The organisation's own site identity, chosen at registration and/or later
   // from the Org Settings → Domain screen. subdomain is the organisation's
@@ -110,6 +162,13 @@ model User {
   failedLoginAttempts Int        @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime?  @map("locked_until")
   createdAt           DateTime   @default(now()) @map("created_at")
+
+  // Signup-wizard resume tracking. Lives on User (not Organisation) for the
+  // whole flow, including after the org exists — simplest single source of
+  // truth, and avoids a dual-read on login (see common/utils/onboarding.util.ts).
+  // Defaults to 'account' since a User row is only ever created once Step 1
+  // (Account) has actually completed.
+  onboardingStep OnboardingStep @default(account) @map("onboarding_step")
 
   organisation    Organisation?        @relation(fields: [orgId], references: [id])
   userRoles       UserRole[]

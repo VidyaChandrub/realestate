@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
+import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { ProjectsService } from './projects.service';
@@ -27,7 +28,7 @@ import { ListUnitsQueryDto } from './dto/list-units-query.dto';
 // Every route derives orgId from the JWT — never from a param or body — so
 // one org can never read or touch another org's projects, unit types, or
 // units. Same guard stack as every other org module: Org Admin only.
-@UseGuards(JwtAuthGuard, OrgAdminGuard)
+@UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
 @Controller('org/projects')
 export class ProjectsController {
   constructor(private readonly service: ProjectsService) {}

@@ -5,12 +5,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import type { OnboardingStep } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { OnboardingAccountDto } from './dto/onboarding-account.dto';
+import { OnboardingOrganisationDto } from './dto/onboarding-organisation.dto';
+import { ResumeSignupDto } from './dto/resume-signup.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.interface';
+import {
+  nextOnboardingStep,
+  furthestOnboardingStep,
+} from '../../common/utils/onboarding.util';
 import {
   generateRandomToken,
   hashToken,
@@ -225,6 +233,321 @@ export class AuthService {
       user: toSafeUser(user),
       pending: true,
       message: 'Organisation created — pending super admin approval. You will be able to log in after approval.',
+    };
+  }
+
+  // ---------------------------------------------------------------------
+  // Signup wizard — step-wise persistence (resumable). Replaces the old
+  // one-shot `signup()` above for the real registration flow; that method
+  // is left in place unmodified as a lower-risk fallback / for any other
+  // caller, but the wizard now calls these instead.
+  // ---------------------------------------------------------------------
+
+  // Step 1 (Account). Creates the User with no orgId yet and issues a
+  // token with no orgId claim. If the email already belongs to a user,
+  // this does NOT create anything or issue a token — it just reports
+  // which of the two prompts the frontend should show next:
+  //   - exists_incomplete: offer "resume where you left off" (the
+  //     frontend then calls resumeSignup with just the email — no
+  //     password re-entry here, see resumeSignup for why).
+  //   - exists_completed: offer "sign in instead", routing to the real,
+  //     unchanged /auth/login (password required, pending-org gate
+  //     applies as normal).
+  async signupStep1(dto: OnboardingAccountDto) {
+    const existing = await this.prisma.user.findUnique({
+      where: { email: dto.work_email },
+    });
+
+    if (existing) {
+      if (existing.onboardingStep === 'completed') {
+        return { status: 'exists_completed' as const };
+      }
+      return {
+        status: 'exists_incomplete' as const,
+        onboardingStep: existing.onboardingStep,
+      };
+    }
+
+    // Duplicate check for phone, same idea as email above — but unlike
+    // email there's no resume concept tied to a phone number, so any match
+    // here is necessarily a different account (this email is new) and
+    // just gets rejected outright rather than offered a resume path.
+    const existingByPhone = await this.prisma.user.findFirst({
+      where: { phoneNumber: dto.phone_number },
+    });
+    if (existingByPhone) {
+      throw new ConflictException(
+        'This phone number is already registered to another account.',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
+    const user = await this.prisma.user.create({
+      data: {
+        firstName: dto.first_name,
+        lastName: dto.last_name,
+        email: dto.work_email,
+        phoneNumber: dto.phone_number,
+        passwordHash,
+        status: 'active',
+        onboardingStep: 'account',
+      },
+    });
+
+    // No roles yet — the admin role is assigned once the organisation
+    // exists, at Step 2.
+    const tokens = await this.issueTokens(user.id, null, []);
+
+    return {
+      status: 'created' as const,
+      user: toSafeUser(user),
+      onboardingStep: user.onboardingStep,
+      nextStep: nextOnboardingStep(user.onboardingStep),
+      ...tokens,
+    };
+  }
+
+  // Dedicated resume path — deliberately NOT a login variant. No password
+  // is required: forgot-password doesn't exist in this codebase yet, so
+  // requiring a password here would be a dead end for anyone who forgets
+  // it mid-onboarding. Accepted trade-off: no real dashboard/customer data
+  // exists before onboarding is 'completed', so the exposure is limited to
+  // "someone else can resume filling in your half-finished signup form" —
+  // and this path explicitly refuses to work at all once onboarding is
+  // 'completed' (that's what real login is for, gate and all).
+  async resumeSignup(dto: ResumeSignupDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      include: { userRoles: { include: { role: true } } },
+    });
+    if (!user) {
+      throw new NotFoundException('No signup in progress for this email');
+    }
+    if (user.onboardingStep === 'completed') {
+      throw new ConflictException(
+        'This account has already finished setup — please sign in instead.',
+      );
+    }
+
+    const roles = user.userRoles.map((userRole) => userRole.role.key);
+    const tokens = await this.issueTokens(user.id, user.orgId, roles);
+
+    const organisation = user.orgId
+      ? await this.prisma.organisation.findUnique({ where: { id: user.orgId } })
+      : null;
+
+    let subscription: { planId: string; billingCycle: string } | null = null;
+    let templateIds: string[] = [];
+    if (user.orgId) {
+      const sub = await this.prisma.subscription.findFirst({
+        where: { orgId: user.orgId, status: 'active' },
+        orderBy: { createdAt: 'desc' },
+      });
+      subscription = sub ? { planId: sub.planId, billingCycle: sub.billingCycle } : null;
+
+      const assigned = await this.prisma.organisationTemplate.findMany({
+        where: { orgId: user.orgId },
+        select: { templateId: true },
+      });
+      templateIds = assigned.map((a) => a.templateId);
+    }
+
+    return {
+      user: toSafeUser(user),
+      organisation: organisation ? toSafeOrganisation(organisation) : null,
+      onboardingStep: user.onboardingStep,
+      nextStep: nextOnboardingStep(user.onboardingStep),
+      subscription,
+      templateIds,
+      ...tokens,
+    };
+  }
+
+  // Step 2 (Organisation). JwtAuthGuard only — no org exists yet on first
+  // call, so OrgAdminGuard can't be used. Creates the Organisation, sets
+  // User.orgId, assigns the creating user the admin role (replicating what
+  // the old atomic signup() did at creation time, just moved here), then
+  // reissues the JWT so it carries the real orgId from this point on.
+  //
+  // Idempotent-ish: if the caller's user already has an orgId (a resumed
+  // or repeated Step 2 submit), this updates that same organisation in
+  // place rather than creating a second one.
+  async createOrganisationStep(actor: JwtPayload, dto: OnboardingOrganisationDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: actor.sub } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (user.orgId) {
+      return this.updateOrganisationStep(user.id, user.orgId, user.onboardingStep, dto);
+    }
+
+    const slug = await generateUniqueOrgSlug(this.prisma, dto.company_name);
+
+    let subdomain: string | null = null;
+    if (dto.subdomain) {
+      if (!isValidSubdomain(dto.subdomain)) {
+        throw new ConflictException(
+          'Subdomain is invalid. Use 2-63 lowercase letters, digits or hyphens (e.g. skylinedev).',
+        );
+      }
+      subdomain = normalizeSubdomain(dto.subdomain);
+      await this.assertSubdomainAvailable(subdomain);
+    }
+
+    let customDomain: string | null = null;
+    if (dto.custom_domain) {
+      if (!isValidDomain(dto.custom_domain)) {
+        throw new ConflictException('Custom domain is invalid. Example: example.com');
+      }
+      customDomain = normalizeDomain(dto.custom_domain);
+      await this.assertCustomDomainAvailable(customDomain);
+    }
+
+    const adminRole = await this.prisma.role.findUniqueOrThrow({
+      where: { key: 'admin' },
+    });
+
+    const { organisation, updatedUser } = await this.prisma.$transaction(async (tx) => {
+      const organisation = await tx.organisation.create({
+        data: {
+          name: dto.company_name,
+          slug,
+          status: 'pending',
+          industry: dto.industry ?? null,
+          country: dto.country ?? null,
+          currency: dto.currency ?? 'INR',
+          timezone: dto.timezone ?? 'Asia/Kolkata',
+          subdomain,
+          customDomain,
+          subdomainStatus: subdomain ? 'pending' : 'none',
+          customDomainStatus: customDomain ? 'pending' : 'none',
+        },
+      });
+
+      await tx.userRole.create({
+        data: { userId: user.id, roleId: adminRole.id },
+      });
+
+      if (customDomain) {
+        await tx.orgDomainRequest.create({
+          data: {
+            orgId: organisation.id,
+            kind: 'custom_domain',
+            customDomain,
+            status: 'pending',
+            requestedBy: user.id,
+          },
+        });
+      }
+
+      const updatedUser = await tx.user.update({
+        where: { id: user.id },
+        data: {
+          orgId: organisation.id,
+          onboardingStep: furthestOnboardingStep(user.onboardingStep, 'organisation'),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          orgId: organisation.id,
+          actorId: user.id,
+          action: 'org_registered_pending',
+          entity: 'Organisation',
+          entityId: organisation.id,
+          metadata: { subdomain, customDomain } as any,
+        },
+      });
+
+      await tx.notification.create({
+        data: buildNotificationData({
+          orgId: organisation.id,
+          type: 'organisation_registration',
+          title: `New organisation awaiting approval: ${organisation.name}`,
+          body: `${organisation.name} (${slug}) registered${subdomain ? ` and requested subdomain ${subdomainHost(subdomain)}` : ''}${customDomain ? ` and/or custom domain ${customDomain}` : ''}. Review and approve or reject from the admin console.`,
+          entity: 'Organisation',
+          entityId: organisation.id,
+        }),
+      });
+
+      return { organisation, updatedUser };
+    });
+
+    const tokens = await this.issueTokens(user.id, organisation.id, ['admin']);
+
+    return {
+      organisation: toSafeOrganisation(organisation),
+      user: toSafeUser(updatedUser),
+      onboardingStep: updatedUser.onboardingStep,
+      nextStep: nextOnboardingStep(updatedUser.onboardingStep),
+      ...tokens,
+    };
+  }
+
+  // Re-submit path for Step 2 — the org already exists for this user.
+  // Updates the same row (name / country / currency / timezone always;
+  // subdomain only if actually sent and different, re-validated for
+  // availability against everyone except itself).
+  private async updateOrganisationStep(
+    userId: string,
+    orgId: string,
+    currentStep: OnboardingStep,
+    dto: OnboardingOrganisationDto,
+  ) {
+    const current = await this.prisma.organisation.findUniqueOrThrow({
+      where: { id: orgId },
+    });
+
+    let subdomainUpdate: { subdomain: string | null; subdomainStatus: string } | null = null;
+    if (dto.subdomain !== undefined) {
+      if (dto.subdomain) {
+        if (!isValidSubdomain(dto.subdomain)) {
+          throw new ConflictException(
+            'Subdomain is invalid. Use 2-63 lowercase letters, digits or hyphens (e.g. skylinedev).',
+          );
+        }
+        const normalized = normalizeSubdomain(dto.subdomain);
+        if (normalized !== current.subdomain) {
+          await this.assertSubdomainAvailable(normalized);
+        }
+        subdomainUpdate = { subdomain: normalized, subdomainStatus: 'pending' };
+      } else {
+        subdomainUpdate = { subdomain: null, subdomainStatus: 'none' };
+      }
+    }
+
+    const organisation = await this.prisma.organisation.update({
+      where: { id: orgId },
+      data: {
+        name: dto.company_name,
+        industry: dto.industry ?? current.industry,
+        country: dto.country ?? current.country,
+        currency: dto.currency ?? current.currency,
+        timezone: dto.timezone ?? current.timezone,
+        ...(subdomainUpdate ?? {}),
+      },
+    });
+
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: true },
+    });
+    const roles = userRoles.map((ur) => ur.role.key);
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { onboardingStep: furthestOnboardingStep(currentStep, 'organisation') },
+    });
+
+    const tokens = await this.issueTokens(userId, organisation.id, roles);
+
+    return {
+      organisation: toSafeOrganisation(organisation),
+      user: toSafeUser(updatedUser),
+      onboardingStep: updatedUser.onboardingStep,
+      nextStep: nextOnboardingStep(updatedUser.onboardingStep),
+      ...tokens,
     };
   }
 

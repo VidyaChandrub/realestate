@@ -20,6 +20,13 @@ export const DEMO_ORGANISATION = {
   state: null,
   postal_code: null,
   country: null,
+  rera_license_no: null,
+  gstin: null,
+  legal_name: null,
+  industry: null,
+  support_email: null,
+  support_phone: null,
+  enabled_modules: [],
   subdomain: "acme",
   subdomain_status: "active",
   custom_domain: null,
@@ -46,6 +53,9 @@ function baseUser(overrides: Partial<SessionUser>): SessionUser {
     status: "active",
     must_change_password: false,
     created_at: "2025-03-14T09:00:00.000Z",
+    // Mock accounts are always fully set up — there's no wizard state to
+    // resume for a demo login.
+    onboarding_step: "completed",
     role: overrides.role ?? "organisation_admin",
     roleLabel: overrides.roleLabel ?? "Organisation Admin",
     permissions: overrides.permissions ?? allPermissions(),

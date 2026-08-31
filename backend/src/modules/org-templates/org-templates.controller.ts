@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
+import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { OrgTemplatesService } from './org-templates.service';
@@ -8,7 +9,7 @@ import { ListOrgTemplatesQueryDto } from './dto/list-org-templates-query.dto';
 
 // Read-only — org admins browse assigned templates based on package.
 // If organisation has package assignments, only those are visible.
-@UseGuards(JwtAuthGuard, OrgAdminGuard)
+@UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
 @Controller('org/templates')
 export class OrgTemplatesController {
   constructor(private readonly orgTemplatesService: OrgTemplatesService) {}

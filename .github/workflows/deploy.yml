@@ -1,0 +1,170 @@
+# iPixxel Realty — auto-deploy on merge to main
+#
+# FILE LOCATION: .github/workflows/deploy.yml
+#
+# ---------------------------------------------------------------------------
+# ONE-TIME SETUP (all on GitHub, nothing on the server)
+# ---------------------------------------------------------------------------
+# GitHub → your repo → Settings → Secrets and variables → Actions →
+# "New repository secret", add these three:
+#
+#   SSH_PRIVATE_KEY   The ENTIRE contents of your .pem file, including the
+#                     "-----BEGIN RSA PRIVATE KEY-----" and
+#                     "-----END RSA PRIVATE KEY-----" lines.
+#                     (Open the .pem in a text editor and copy everything.)
+#   SSH_HOST          65.0.61.249
+#   SSH_USER          ubuntu
+#
+# Then commit this file to .github/workflows/deploy.yml on main.
+# From then on, every merged PR deploys automatically.
+#
+# ---------------------------------------------------------------------------
+# ASSUMPTIONS about the server (all already true — nothing to do)
+# ---------------------------------------------------------------------------
+#   - Repo cloned at ~/realestate
+#   - ~/realestate/.env and ~/realestate/backend/.env exist with real values
+#   - Swap is enabled (the frontend build is OOM-killed without it)
+#   - PM2 app is named "realestate-web"
+#   - Security group allows SSH (port 22) from anywhere, so GitHub's runners
+#     can connect — their IPs aren't fixed
+# ---------------------------------------------------------------------------
+
+name: Deploy to production
+
+on:
+  # Merging a PR into main creates a push to main, which triggers this.
+  push:
+    branches: [main]
+
+  # Also gives you a manual "Run workflow" button on the Actions tab.
+  workflow_dispatch:
+
+# Never let two deploys overlap — a second one starting mid-build would leave
+# the server in an unpredictable state.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Verify it actually builds BEFORE touching the server.
+  #    Lockfile drift has broken deploys repeatedly — this catches it here
+  #    instead of halfway through a deploy.
+  # ---------------------------------------------------------------------------
+  build-check:
+    name: Build check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Backend — install and build
+        working-directory: backend
+        run: |
+          # npm ci fails loudly if package-lock.json is out of sync with
+          # package.json. That is intentional — fix the lockfile, don't
+          # switch to npm install.
+          npm ci
+          npx prisma generate
+          npm run build
+
+      - name: Frontend — install and build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+  # ---------------------------------------------------------------------------
+  # 2. Deploy. Only runs if build-check passed.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to server
+    needs: build-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy
+        run: |
+          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            'bash -s' << 'ENDSSH'
+          set -euo pipefail
+
+          REPO="$HOME/realestate"
+          COMPOSE="$REPO/docker-compose.prod.yml"
+          PM2_APP="realestate-web"
+
+          echo "=== Pre-flight ==="
+          cd "$REPO"
+
+          # The Next.js build needs more RAM than this instance has. Without
+          # swap it gets OOM-killed and leaves a broken .next behind.
+          if [ "$(free -m | awk '/^Swap:/ {print $2}')" -lt 1024 ]; then
+            echo "ERROR: swap missing or under 1GB — the frontend build will be killed."
+            exit 1
+          fi
+
+          echo "=== Pulling latest code ==="
+          git pull --ff-only
+          echo "Now at: $(git rev-parse --short HEAD)"
+
+          echo "=== Backend: build image ==="
+          docker compose -f "$COMPOSE" build api
+
+          echo "=== Backend: start containers ==="
+          docker compose -f "$COMPOSE" up -d
+          sleep 5
+
+          if ! docker compose -f "$COMPOSE" ps api | grep -q "Up"; then
+            echo "ERROR: api container is not running. Recent logs:"
+            docker compose -f "$COMPOSE" logs api --tail 40
+            exit 1
+          fi
+
+          echo "=== Database migrations ==="
+          docker compose -f "$COMPOSE" exec -T api npx prisma migrate deploy
+
+          echo "=== Frontend: stop to free memory ==="
+          pm2 stop "$PM2_APP" 2>/dev/null || echo "(not running yet)"
+
+          echo "=== Frontend: install and build ==="
+          cd "$REPO/frontend"
+          npm ci
+          rm -rf .next
+          npm run build
+
+          # A successful build always writes BUILD_ID. If it is missing, the
+          # build was killed partway and PM2 would crash-loop.
+          if [ ! -f ".next/BUILD_ID" ]; then
+            echo "ERROR: build produced no BUILD_ID — it was likely OOM-killed."
+            exit 1
+          fi
+
+          echo "=== Frontend: restart ==="
+          cd "$REPO"
+          pm2 restart "$PM2_APP" --update-env
+          pm2 save
+
+          echo "=== Verify ==="
+          sleep 5
+          curl -fsS -o /dev/null http://localhost:3001 && echo "Frontend OK" || {
+            echo "ERROR: frontend not responding. Recent logs:"
+            pm2 logs "$PM2_APP" --lines 30 --nostream
+            exit 1
+          }
+
+          echo "=== Deploy complete ==="
+          ENDSSH
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

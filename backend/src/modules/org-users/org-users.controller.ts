@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
+import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { OrgUsersService } from './org-users.service';
@@ -21,7 +22,7 @@ import { ListOrgUsersQueryDto } from './dto/list-org-users-query.dto';
 
 // orgId always comes from the JWT, never a client-supplied param — core
 // multi-tenant isolation rule for every /org/* endpoint.
-@UseGuards(JwtAuthGuard, OrgAdminGuard)
+@UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
 @Controller('org/users')
 export class OrgUsersController {
   constructor(private readonly orgUsersService: OrgUsersService) {}

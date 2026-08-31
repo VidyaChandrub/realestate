@@ -5,6 +5,7 @@ import { PrismaModule } from './database/prisma.module';
 import { StorageModule } from './common/storage/storage.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TeamModule } from './modules/team/team.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { AdminOrganisationsModule } from './modules/admin-organisations/admin-organisations.module';
 import { OrgSettingsModule } from './modules/org-settings/org-settings.module';
 import { OrgUsersModule } from './modules/org-users/org-users.module';
@@ -33,6 +34,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
     StorageModule,
     AuthModule,
     TeamModule,
+    OnboardingModule,
     AdminOrganisationsModule,
     OrgSettingsModule,
     OrgUsersModule,
