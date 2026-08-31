@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
+import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { OrgTypographySetsService } from './org-typography-sets.service';
@@ -18,7 +19,7 @@ import { UpdateTypographySetDto } from './dto/update-typography-set.dto';
 
 // Every route derives orgId from the JWT — never from a client-supplied
 // param — so one org can never read or touch another org's sets.
-@UseGuards(JwtAuthGuard, OrgAdminGuard)
+@UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
 @Controller('org/typography-sets')
 export class OrgTypographySetsController {
   constructor(private readonly service: OrgTypographySetsService) {}

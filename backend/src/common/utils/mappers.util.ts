@@ -1,4 +1,4 @@
-import { Organisation, Prisma, User } from '@prisma/client';
+import { Organisation, OrgIndustry, Prisma, User } from '@prisma/client';
 
 // Strips password_hash and other internal fields before a user ever reaches a response.
 export function toSafeUser(user: User) {
@@ -12,6 +12,7 @@ export function toSafeUser(user: User) {
     status: user.status,
     must_change_password: user.mustChangePassword,
     created_at: user.createdAt,
+    onboarding_step: user.onboardingStep,
   };
 }
 
@@ -35,6 +36,13 @@ export function toSafeOrganisation(organisation: Organisation) {
     state: organisation.state,
     postal_code: organisation.postalCode,
     country: organisation.country,
+    rera_license_no: organisation.reraLicenseNo,
+    gstin: organisation.gstin,
+    legal_name: organisation.legalName,
+    industry: organisation.industry,
+    support_email: organisation.supportEmail,
+    support_phone: organisation.supportPhone,
+    enabled_modules: organisation.enabledModules,
     subdomain: organisation.subdomain,
     subdomain_status: organisation.subdomainStatus,
     custom_domain: organisation.customDomain,
@@ -57,20 +65,35 @@ const ORGANISATION_EDITABLE_FIELDS = [
   'state',
   'postalCode',
   'country',
+  'reraLicenseNo',
+  'gstin',
+  'legalName',
+  'supportEmail',
+  'supportPhone',
 ] as const;
 
 // Shared by the Super Admin and Org Admin organisation-update paths — both
 // accept the same editable-profile-fields DTO shape (slug/status excluded).
 // Only copies fields the caller actually sent, so a partial PATCH body
 // doesn't clobber the rest with undefined.
+//
+// `industry` is handled separately from the loop below — it's the one
+// enum among these fields (Prisma.OrganisationUpdateInput expects
+// OrgIndustry, not an arbitrary string), so it can't share the generic
+// plain-string assignment the rest of these fields use.
 export function buildOrganisationUpdateData(
-  dto: Partial<Record<(typeof ORGANISATION_EDITABLE_FIELDS)[number], string>>,
+  dto: Partial<Record<(typeof ORGANISATION_EDITABLE_FIELDS)[number], string>> & {
+    industry?: OrgIndustry;
+  },
 ): Prisma.OrganisationUpdateInput {
   const data: Prisma.OrganisationUpdateInput = {};
   for (const field of ORGANISATION_EDITABLE_FIELDS) {
     if (dto[field] !== undefined) {
       data[field] = dto[field];
     }
+  }
+  if (dto.industry !== undefined) {
+    data.industry = dto.industry;
   }
   return data;
 }

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { apiFetch } from "./api";
 import type {
+  AuthTokens,
   LoginInput,
   LoginResponse,
   OrganisationRegistrationInput,
@@ -47,6 +48,12 @@ interface AuthContextValue {
   isMock: boolean;
   login: (input: LoginInput) => Promise<SessionUser>;
   signup: (input: SignupInput) => Promise<SessionUser>;
+  // Persists a session from a SafeUser + token pair returned by any of the
+  // signup-wizard step endpoints (Step 1, resume, Step 2's reissue) —
+  // those aren't full logins, but they hand back a real session the same
+  // way login() does, so the wizard reuses this instead of duplicating
+  // toSessionUser/persist logic itself.
+  applyAuthTokens: (safeUser: SafeUser, tokens: AuthTokens) => SessionUser;
   logout: () => Promise<void>;
   mockLogin: (
     role: UserRole,
@@ -181,6 +188,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persist, toSessionUser],
   );
 
+  const applyAuthTokens = useCallback(
+    (safeUser: SafeUser, tokens: AuthTokens) => {
+      const session = toSessionUser(safeUser, {
+        dashboard: { view: true },
+        settings: { view: true, edit: true },
+      });
+      persist(session, tokens.access_token, tokens.refresh_token);
+      return session;
+    },
+    [persist, toSessionUser],
+  );
+
   const mockLogin = useCallback(
     async (role: UserRole, email: string, password: string) => {
       const account = findMockAccount(email, role);
@@ -263,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMock: true,
       login,
       signup,
+      applyAuthTokens,
       logout,
       mockLogin,
       mockRegister,
@@ -277,6 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       login,
       signup,
+      applyAuthTokens,
       logout,
       mockLogin,
       mockRegister,

@@ -19,8 +19,13 @@ type OrgUsersPrisma = Pick<
 >;
 
 export interface ProvisionUserInput {
-  firstName: string;
-  lastName: string;
+  // Optional — the invite path (POST /team/invite, the wizard's Invite
+  // step) only collects email + role; the invited person fills in their
+  // own name later. Org/Super Admin's "create user directly" callers
+  // always pass real names (their own DTOs require them), so this being
+  // optional here doesn't weaken that path.
+  firstName?: string;
+  lastName?: string;
   email: string;
   phoneNumber?: string;
   role: AssignableRole;
@@ -68,6 +73,15 @@ export async function provisionInvitedUser(
         passwordHash,
         status: 'active',
         mustChangePassword: true,
+        // Invited users join an org that already exists — they never go
+        // through the signup wizard themselves. Marking them 'completed'
+        // from creation matters beyond bookkeeping: onboardingStep is what
+        // gates the passwordless /auth/resume-signup endpoint (see
+        // AuthService.resumeSignup). Leaving this at the schema default
+        // ('account') would let anyone who knows an invited teammate's
+        // email — not just self-signup admins mid-wizard — resume into a
+        // live, no-password session on that org via that endpoint.
+        onboardingStep: 'completed',
       },
     });
 

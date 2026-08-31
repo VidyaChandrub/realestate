@@ -9,7 +9,12 @@ export type UploadField =
   | 'video'
   // Images placed into a template / landing-page's builder `content` JSON —
   // replaces the old base64-data-URI-in-JSON approach that caused 413s.
-  | 'builderImage';
+  | 'builderImage'
+  // Organisation logo — Business Details step of the signup wizard, and
+  // /org/settings later. Organisation always exists by upload time (it's
+  // created at Step 2, logo is Step 3), so this is a normal org-scoped
+  // upload, no pre-org nonce scheme needed.
+  | 'logo';
 
 export const UPLOAD_FIELDS: readonly UploadField[] = [
   'amenityIcon',
@@ -18,6 +23,7 @@ export const UPLOAD_FIELDS: readonly UploadField[] = [
   'brochure',
   'video',
   'builderImage',
+  'logo',
 ] as const;
 
 export interface FieldRule {
@@ -68,6 +74,11 @@ export const FIELD_RULES: Record<UploadField, FieldRule> = {
     mimeTypes: [...IMAGE_MIMES, 'image/svg+xml'],
     maxBytes: 5 * MB,
     label: 'image',
+  },
+  logo: {
+    mimeTypes: [...IMAGE_MIMES, 'image/svg+xml'],
+    maxBytes: 2 * MB,
+    label: 'logo',
   },
 };
 

@@ -1,10 +1,14 @@
 import {
+  IsEmail,
+  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
 } from 'class-validator';
+
+const INDUSTRIES = ['developer', 'broker', 'channel', 'mixed'] as const;
 
 // Shared by both the Super Admin PATCH /admin/organisations/:id and the Org
 // Admin PATCH /org/settings — same editable-profile-fields set. slug and
@@ -84,4 +88,34 @@ export class UpdateOrganisationDto {
   @IsString()
   @MaxLength(100)
   country?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  reraLicenseNo?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  gstin?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(150)
+  legalName?: string;
+
+  @IsOptional()
+  @IsIn(INDUSTRIES)
+  industry?: (typeof INDUSTRIES)[number];
+
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(255)
+  supportEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  supportPhone?: string;
 }

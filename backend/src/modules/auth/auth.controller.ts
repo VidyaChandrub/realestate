@@ -7,6 +7,9 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { OnboardingAccountDto } from './dto/onboarding-account.dto';
+import { OnboardingOrganisationDto } from './dto/onboarding-organisation.dto';
+import { ResumeSignupDto } from './dto/resume-signup.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
@@ -18,6 +21,30 @@ export class AuthController {
   @Post('signup')
   signup(@Body() dto: SignupDto) {
     return this.authService.signup(dto);
+  }
+
+  // --- Signup wizard (resumable, step-wise) ---
+
+  @Post('signup/step1')
+  @HttpCode(200)
+  signupStep1(@Body() dto: OnboardingAccountDto) {
+    return this.authService.signupStep1(dto);
+  }
+
+  @Post('resume-signup')
+  @HttpCode(200)
+  resumeSignup(@Body() dto: ResumeSignupDto) {
+    return this.authService.resumeSignup(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('signup/organisation')
+  @HttpCode(200)
+  createOrganisationStep(
+    @CurrentUser() actor: JwtPayload,
+    @Body() dto: OnboardingOrganisationDto,
+  ) {
+    return this.authService.createOrganisationStep(actor, dto);
   }
 
   @Get('subdomain-availability')

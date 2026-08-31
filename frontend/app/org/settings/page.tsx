@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, changePlan, getInvoices, getOrgDomainInfo, getPlans, requestCustomDomain } from "@/lib/api";
-import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, OrgDomainInfo, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
+import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { subdomainPreviewHost } from "@/lib/domain";
@@ -14,6 +14,16 @@ const LANGUAGES = [
   { value: "hi", label: "Hindi" },
   { value: "gu", label: "Gujarati" },
   { value: "ar", label: "Arabic" },
+];
+
+// Matches the registration wizard's ORG_TYPES exactly (Organisation.industry
+// enum) — the wizard's "What describes you best?" step and this dropdown
+// edit the same field, so the option set has to stay in sync.
+const INDUSTRY_OPTIONS: { value: OrgIndustry; label: string }[] = [
+  { value: "developer", label: "Real Estate — Developer" },
+  { value: "broker", label: "Real Estate — Broker / Agency" },
+  { value: "channel", label: "Channel Partner" },
+  { value: "mixed", label: "Mixed" },
 ];
 
 const BRAND_SWATCHES = ["#4f46e5", "#0ea5e9", "#0d9488", "#16a34a", "#d97706", "#e11d48", "#7c3aed"];
@@ -89,13 +99,18 @@ function Toggle({ on = false }: { on?: boolean }) {
 }
 
 interface GeneralBrandingForm {
-  name: string; city: string; country: string; addressLine1: string; state: string; postalCode: string;
+  name: string; legalName: string; industry: OrgIndustry | ""; reraLicenseNo: string; gstin: string;
+  supportEmail: string; supportPhone: string;
+  city: string; country: string; addressLine1: string; addressLine2: string; state: string; postalCode: string;
   timezone: string; currency: string; defaultLanguage: string; brandColour: string;
 }
 
 function formToOrg(org: SafeOrganisation): GeneralBrandingForm {
   return {
-    name: org.name, city: org.city, country: org.country ?? "", addressLine1: org.address_line1 ?? "",
+    name: org.name, legalName: org.legal_name ?? "", industry: org.industry ?? "",
+    reraLicenseNo: org.rera_license_no ?? "", gstin: org.gstin ?? "",
+    supportEmail: org.support_email ?? "", supportPhone: org.support_phone ?? "",
+    city: org.city, country: org.country ?? "", addressLine1: org.address_line1 ?? "", addressLine2: org.address_line2 ?? "",
     state: org.state ?? "", postalCode: org.postal_code ?? "", timezone: org.timezone, currency: org.currency,
     defaultLanguage: org.default_language, brandColour: org.brand_colour ?? "#4f46e5",
   };
@@ -292,8 +307,6 @@ export default function OrgSettingsPage() {
   const [section, setSection] = useState("general");
   const [org, setOrg] = useState<SafeOrganisation | null>(null);
   const [form, setForm] = useState<GeneralBrandingForm | null>(null);
-  const [rera, setRera] = useState("");
-  const [gstin, setGstin] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -371,8 +384,15 @@ export default function OrgSettingsPage() {
     try {
       const body: UpdateOrganisationSettingsInput = {
         name: form.name, city: form.city, country: form.country, addressLine1: form.addressLine1,
-        state: form.state, postalCode: form.postalCode, timezone: form.timezone, currency: form.currency,
+        addressLine2: form.addressLine2, state: form.state, postalCode: form.postalCode,
+        timezone: form.timezone, currency: form.currency,
         defaultLanguage: form.defaultLanguage, brandColour: form.brandColour,
+        legalName: form.legalName || undefined,
+        industry: form.industry || undefined,
+        reraLicenseNo: form.reraLicenseNo || undefined,
+        gstin: form.gstin || undefined,
+        supportEmail: form.supportEmail || undefined,
+        supportPhone: form.supportPhone || undefined,
       };
       const updated = await apiFetch<SafeOrganisation>("/org/settings", {
         method: "PATCH", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify(body),
@@ -385,7 +405,7 @@ export default function OrgSettingsPage() {
 
   function handleDiscard() {
     if (!org) return;
-    setForm(formToOrg(org)); setRera(""); setGstin(""); setDirty(false); setSaved(false); setSaveError(null);
+    setForm(formToOrg(org)); setDirty(false); setSaved(false); setSaveError(null);
   }
 
   async function handleChangePlan(planId: string, cycle: "monthly" | "yearly" = plansCycle) {
@@ -472,19 +492,29 @@ export default function OrgSettingsPage() {
             <Card icon="building" title="Organisation profile" sub="Basic details" >
               <div className="row2">
                 <div className="field"><label>Organisation name</label><input className="inp" value={form.name} onChange={(e) => updateForm({ name: e.target.value })} /></div>
-                <div className="field"><label>Legal / registered name</label><input className="inp" placeholder="Skyline Developers Pvt. Ltd." /></div>
+                <div className="field"><label>Legal / registered name</label><input className="inp" value={form.legalName} onChange={(e) => updateForm({ legalName: e.target.value })} placeholder="Skyline Developers Pvt. Ltd." /></div>
               </div>
               <div className="row2">
-                <div className="field"><label>Subdomain</label><input className="inp inp-mono" value={org.slug} readOnly disabled /></div>
-                <div className="field"><label>Industry</label><select className="inp"><option>Real Estate — Developer</option><option>Real Estate — Broker</option><option>Channel Partner</option></select></div>
+                <div className="field">
+                  <label>Subdomain</label>
+                  <input className="inp inp-mono" value={org.subdomain ?? ""} readOnly disabled placeholder="Not set yet" />
+                  <div className="hint">Set from the Domain section — changing it here would break existing links.</div>
+                </div>
+                <div className="field">
+                  <label>Industry</label>
+                  <select className="inp" value={form.industry} onChange={(e) => updateForm({ industry: e.target.value as OrgIndustry })}>
+                    <option value="">Select…</option>
+                    {INDUSTRY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="row2">
-                <div className="field"><label>RERA / license no.</label><input className="inp inp-mono" value={rera} onChange={(e) => { setRera(e.target.value); markDirty(); }} placeholder="PR/GJ/AHM/2026/00842" /></div>
-                <div className="field"><label>GSTIN</label><input className="inp inp-mono" value={gstin} onChange={(e) => { setGstin(e.target.value); markDirty(); }} placeholder="24AABCS1234F1Z5" /></div>
+                <div className="field"><label>RERA / license no.</label><input className="inp inp-mono" value={form.reraLicenseNo} onChange={(e) => updateForm({ reraLicenseNo: e.target.value })} placeholder="PR/GJ/AHM/2026/00842" /></div>
+                <div className="field"><label>GSTIN</label><input className="inp inp-mono" value={form.gstin} onChange={(e) => updateForm({ gstin: e.target.value })} placeholder="24AABCS1234F1Z5" /></div>
               </div>
               <div className="row2">
-                <div className="field"><label>Support email</label><input className="inp" placeholder="care@skylinedev.in" /></div>
-                <div className="field"><label>Support phone</label><input className="inp inp-mono" placeholder="+91 79000 12345" /></div>
+                <div className="field"><label>Support email</label><input className="inp" type="email" value={form.supportEmail} onChange={(e) => updateForm({ supportEmail: e.target.value })} placeholder="care@skylinedev.in" /></div>
+                <div className="field"><label>Support phone</label><input className="inp inp-mono" value={form.supportPhone} onChange={(e) => updateForm({ supportPhone: e.target.value })} placeholder="+91 79000 12345" /></div>
               </div>
               <div className="row2">
                 <div className="field">
@@ -504,9 +534,17 @@ export default function OrgSettingsPage() {
                 </div>
                 <div className="field"><label>City</label><input className="inp" value={form.city} onChange={(e) => updateForm({ city: e.target.value })} /></div>
               </div>
-              <div className="field" style={{ marginBottom: 0 }}>
+              <div className="row2">
+                <div className="field"><label>State</label><input className="inp" value={form.state} onChange={(e) => updateForm({ state: e.target.value })} /></div>
+                <div className="field"><label>Postal code</label><input className="inp inp-mono" value={form.postalCode} onChange={(e) => updateForm({ postalCode: e.target.value })} /></div>
+              </div>
+              <div className="field">
                 <label>Registered address</label>
-                <textarea className="inp" rows={2} value={form.addressLine1} onChange={(e) => updateForm({ addressLine1: e.target.value })} />
+                <textarea className="inp" rows={2} value={form.addressLine1} onChange={(e) => updateForm({ addressLine1: e.target.value })} placeholder="Address line 1" />
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Address line 2</label>
+                <input className="inp" value={form.addressLine2} onChange={(e) => updateForm({ addressLine2: e.target.value })} placeholder="Optional" />
               </div>
             </Card>
           </div>
@@ -533,7 +571,10 @@ export default function OrgSettingsPage() {
                   <span className="mono" style={{ alignSelf: "center" }}>{form.brandColour}</span>
                 </div>
               </div>
-              <div className="field" style={{ marginBottom: 0 }}><label>Email sender name</label><input className="inp" defaultValue="Skyline Developers" /></div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Email sender name</label>
+                <input className="inp" value="" disabled placeholder="Coming soon — part of the Email module" />
+              </div>
             </Card>
           </div>
 
@@ -544,19 +585,15 @@ export default function OrgSettingsPage() {
               <div className="row3">
                 <div className="field"><label>Timezone</label><select className="inp" value={form.timezone} onChange={(e) => updateForm({ timezone: e.target.value })}>{!TIMEZONE_OPTIONS.some((t) => t.value === form.timezone) && form.timezone ? <option value={form.timezone}>{form.timezone}</option> : null}{TIMEZONE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
                 <div className="field"><label>Currency</label><select className="inp" value={form.currency} onChange={(e) => updateForm({ currency: e.target.value })}>{!CURRENCY_OPTIONS.some((c) => c.value === form.currency) && form.currency ? <option value={form.currency}>{form.currency}</option> : null}{CURRENCY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
-                <div className="field"><label>Number format</label><select className="inp"><option>12,34,567 (Indian)</option><option>1,234,567 (International)</option></select></div>
+                <div className="field"><label>Language</label><select className="inp" value={form.defaultLanguage} onChange={(e) => updateForm({ defaultLanguage: e.target.value })}>{!LANGUAGES.some((l) => l.value === form.defaultLanguage) && form.defaultLanguage ? <option value={form.defaultLanguage}>{form.defaultLanguage}</option> : null}{LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}</select></div>
               </div>
               <div className="row3">
-                <div className="field"><label>Date format</label><select className="inp"><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option><option>YYYY-MM-DD</option></select></div>
-                <div className="field"><label>Time format</label><select className="inp"><option>12-hour</option><option>24-hour</option></select></div>
-                <div className="field"><label>Week starts</label><select className="inp"><option>Monday</option><option>Sunday</option></select></div>
+                <div className="field"><label>Number format</label><select className="inp" value="" disabled><option value="">Coming soon</option></select></div>
+                <div className="field"><label>Date format</label><select className="inp" value="" disabled><option value="">Coming soon</option></select></div>
+                <div className="field"><label>Time format</label><select className="inp" value="" disabled><option value="">Coming soon</option></select></div>
               </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>Enabled languages</label>
-                <div className="pill-list">
-                  {LANGUAGES.map((l) => <span key={l.value} className="pill">{l.label}<span className="x">×</span></span>)}
-                  <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add</span>
-                </div>
+              <div className="field" style={{ marginBottom: 0, maxWidth: "calc(33.33% - 8px)" }}>
+                <label>Week starts</label><select className="inp" value="" disabled><option value="">Coming soon</option></select>
               </div>
             </Card>
           </div>
@@ -771,19 +808,14 @@ export default function OrgSettingsPage() {
           <div className={`os-section${section === "api" ? " on" : ""}`}>
             <SectionHead section="api" />
             <Card icon="key" title="API keys" sub="Programmatic access">
-              <div className="tbl-wrap"><table className="tbl">
-                <thead><tr><th>Key</th><th>Created</th><th>Last used</th><th>Scope</th><th /></tr></thead>
-                <tbody>
-                  <tr><td><span className="mono">sk_live_••••4f2a</span></td><td className="muted">12 Jan 2026</td><td className="muted">2h ago</td><td><span className="chip">Read/Write</span></td><td><button className="btn btn-ghost btn-sm">Revoke</button></td></tr>
-                  <tr><td><span className="mono">sk_test_••••9c11</span></td><td className="muted">03 Feb 2026</td><td className="muted">Yesterday</td><td><span className="chip">Read</span></td><td><button className="btn btn-ghost btn-sm">Revoke</button></td></tr>
-                </tbody>
-              </table></div><button className="btn btn-primary btn-sm" style={{ marginTop: 12 }}>+ Generate API key</button>
+              <p className="muted" style={{ margin: 0 }}>
+                API access isn&apos;t available yet — no keys exist on any organisation. Coming soon.
+              </p>
             </Card>
             <Card icon="link" title="Webhooks" sub="POST events to your endpoints">
-              <div className="field" style={{ marginBottom: 16 }}><label>Endpoint URL</label><input className="inp inp-mono" placeholder="https://yourapp.com/webhooks/ipixxel" /></div>
-              {[["lead.created", true], ["lead.status_changed", true], ["booking.created", true], ["call.completed", false]].map(([t, on]) => (
-                <div className="swrow" key={t as string}><div className="tx"><b>{t as string}</b></div><Toggle on={on as boolean} /></div>
-              ))}
+              <p className="muted" style={{ margin: 0 }}>
+                Webhook delivery isn&apos;t available yet. Coming soon.
+              </p>
             </Card>
           </div>
 

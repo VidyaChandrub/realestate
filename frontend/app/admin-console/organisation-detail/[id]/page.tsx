@@ -371,8 +371,10 @@ export default function SuperAdminOrganisationDetailPage() {
     );
   }
 
+  // Invited users have no name until they set one themselves at first
+  // login — fall back to their email rather than rendering blank.
   const adminName = org.admin
-    ? [org.admin.firstName, org.admin.lastName].filter(Boolean).join(" ") || "—"
+    ? [org.admin.firstName, org.admin.lastName].filter(Boolean).join(" ") || org.admin.email
     : "—";
 
   return (

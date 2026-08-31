@@ -1,3 +1,16 @@
+export type OnboardingStep =
+  | "account"
+  | "organisation"
+  | "business_details"
+  | "modules"
+  | "subscription"
+  | "templates"
+  | "invite"
+  | "connect"
+  | "completed";
+
+export type OrgIndustry = "developer" | "broker" | "channel" | "mixed";
+
 export interface SafeUser {
   id: string;
   org_id: string | null;
@@ -8,6 +21,7 @@ export interface SafeUser {
   status: string;
   must_change_password: boolean;
   created_at: string;
+  onboarding_step: OnboardingStep;
 }
 
 export interface SafeOrganisation {
@@ -29,6 +43,13 @@ export interface SafeOrganisation {
   state: string | null;
   postal_code: string | null;
   country: string | null;
+  rera_license_no: string | null;
+  gstin: string | null;
+  legal_name: string | null;
+  industry: OrgIndustry | null;
+  support_email: string | null;
+  support_phone: string | null;
+  enabled_modules: string[];
   subdomain: string | null;
   subdomain_status: string;
   custom_domain: string | null;
@@ -50,6 +71,12 @@ export interface UpdateOrganisationSettingsInput {
   state?: string;
   postalCode?: string;
   country?: string;
+  reraLicenseNo?: string;
+  gstin?: string;
+  legalName?: string;
+  industry?: OrgIndustry;
+  supportEmail?: string;
+  supportPhone?: string;
 }
 
 export interface AuthTokens {
@@ -72,6 +99,130 @@ export interface ApiErrorBody {
   statusCode?: number;
   message?: string | string[];
   error?: string;
+}
+
+// --- Signup wizard (resumable, step-wise) ---
+
+export interface OnboardingAccountInput {
+  first_name: string;
+  last_name: string;
+  work_email: string;
+  phone_number: string;
+  password: string;
+}
+
+export type SignupStep1Response =
+  | ({ status: "created" } & AuthTokens & {
+        user: SafeUser;
+        onboardingStep: OnboardingStep;
+        nextStep: OnboardingStep;
+      })
+  | { status: "exists_incomplete"; onboardingStep: OnboardingStep }
+  | { status: "exists_completed" };
+
+export interface ResumeSignupResponse extends AuthTokens {
+  user: SafeUser;
+  organisation: SafeOrganisation | null;
+  onboardingStep: OnboardingStep;
+  nextStep: OnboardingStep;
+  subscription: { planId: string; billingCycle: string } | null;
+  templateIds: string[];
+}
+
+export interface OnboardingOrganisationInput {
+  company_name: string;
+  industry?: OrgIndustry;
+  subdomain?: string;
+  custom_domain?: string;
+  country?: string;
+  currency?: string;
+  timezone?: string;
+}
+
+export interface OrganisationStepResponse extends AuthTokens {
+  organisation: SafeOrganisation;
+  user: SafeUser;
+  onboardingStep: OnboardingStep;
+  nextStep: OnboardingStep;
+}
+
+export interface OnboardingStepResult {
+  onboardingStep: OnboardingStep;
+  nextStep: OnboardingStep;
+}
+
+// /onboarding/complete has no "next" wizard step — instead it reports
+// whether the org is actually usable yet, so the frontend can show a
+// holding screen for a still-pending org instead of a dashboard that
+// 403s on its first real request (see backend OrgApprovedGuard).
+export interface CompleteOnboardingResult {
+  onboardingStep: OnboardingStep;
+  organisationStatus: string;
+}
+
+export interface BusinessDetailsInput {
+  city?: string;
+  reraLicenseNo?: string;
+  gstin?: string;
+  brandColour?: string;
+  logoUrl?: string;
+}
+
+export interface BusinessDetailsStepResponse extends OnboardingStepResult {
+  organisation: SafeOrganisation;
+}
+
+export interface SubscriptionStepInput {
+  planId: string;
+  billingCycle?: "monthly" | "yearly";
+}
+
+export interface SubscriptionStepResponse extends OnboardingStepResult {
+  subscription: { id: string; planId: string; billingCycle: string };
+}
+
+export interface TemplatesStepInput {
+  templateIds: string[];
+}
+
+export interface TemplatesStepResponse extends OnboardingStepResult {
+  templateIds: string[];
+}
+
+export interface ModulesStepInput {
+  enabledModules?: string[];
+  skip?: boolean;
+}
+
+export interface ModulesStepResponse extends OnboardingStepResult {
+  enabledModules: string[];
+}
+
+export interface InviteEntry {
+  email: string;
+  role: "manager" | "sales";
+}
+
+export interface InviteStepInput {
+  invites: InviteEntry[];
+}
+
+export interface InviteStepResponse extends OnboardingStepResult {
+  sent: unknown[];
+  failed: { email: string; reason: string }[];
+}
+
+export interface LogoUploadUrlInput {
+  filename: string;
+  contentType: string;
+  size: number;
+}
+
+export interface LogoUploadUrlResult {
+  uploadUrl: string;
+  publicUrl: string;
+  key: string;
+  expiresIn: number;
 }
 
 export interface SignupInput {

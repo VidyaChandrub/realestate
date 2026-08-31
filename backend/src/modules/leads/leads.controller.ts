@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
+import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { LeadsService } from './leads.service';
@@ -19,7 +20,7 @@ export class LeadsController {
     return this.service.createFromPublic(dto);
   }
 
-  @UseGuards(JwtAuthGuard, OrgAdminGuard)
+  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
   @Get()
   list(@CurrentUser() user: JwtPayload) {
     return this.service.list(user.orgId as string);

@@ -47,8 +47,11 @@ function initials(firstName: string | null, lastName: string | null): string {
   return chars ? chars.toUpperCase() : "—";
 }
 
-function fullName(firstName: string | null, lastName: string | null): string {
-  return [firstName, lastName].filter(Boolean).join(" ") || "—";
+// Invited users have no name until they set one themselves at first login
+// (see the registration-wizard Invite step) — fall back to their email
+// rather than rendering blank.
+function fullName(firstName: string | null, lastName: string | null, email: string): string {
+  return [firstName, lastName].filter(Boolean).join(" ") || email;
 }
 
 function formatDate(iso: string): string {
@@ -487,7 +490,7 @@ export default function OrgUsersPage() {
                             </span>
                             <span>
                               <span className="nm">
-                                {fullName(user.firstName, user.lastName)}
+                                {fullName(user.firstName, user.lastName, user.email)}
                               </span>
                               <br />
                               <span className="sm">{user.email}</span>

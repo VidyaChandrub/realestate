@@ -46,6 +46,19 @@ export function mapApiFieldErrors(
     }
   }
 
+  // Same heuristic as email, for messages like "This phone number is
+  // already registered" (ConflictException — a plain string, not a
+  // per-field ValidationPipe message, so it doesn't start with the field
+  // key and needs the same pattern-match fallback).
+  if (leftover.length && !fieldErrors.phone_number) {
+    const phoneKey = fieldKeys.find((k) => k === "phone_number");
+    const phoneMsgIndex = leftover.findIndex((m) => /phone/i.test(m));
+    if (phoneKey && phoneMsgIndex !== -1) {
+      fieldErrors[phoneKey] = capitalize(leftover[phoneMsgIndex]);
+      leftover.splice(phoneMsgIndex, 1);
+    }
+  }
+
   return { fieldErrors, general: leftover.length ? leftover.join(" ") : null };
 }
 

@@ -3,10 +3,11 @@ import { AuthModule } from '../auth/auth.module';
 import { LeadsController } from './leads.controller';
 import { LeadsService } from './leads.service';
 import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
+import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 
 @Module({
   imports: [AuthModule],
   controllers: [LeadsController],
-  providers: [LeadsService, OrgAdminGuard],
+  providers: [LeadsService, OrgAdminGuard, OrgApprovedGuard],
 })
 export class LeadsModule {}

@@ -2,17 +2,36 @@ import type {
   AdminOrgDomainRequestListResponse,
   ApiErrorBody,
   AuthTokens,
+  BusinessDetailsInput,
+  BusinessDetailsStepResponse,
   ChangePasswordInput,
   ChangePlanInput,
   ChangePlanResult,
+  CompleteOnboardingResult,
+  InviteStepInput,
+  InviteStepResponse,
   InvoiceRow,
   LeadSubmission,
+  LogoUploadUrlInput,
+  LogoUploadUrlResult,
+  ModulesStepInput,
+  ModulesStepResponse,
   NotificationsListResponse,
+  OnboardingAccountInput,
+  OnboardingOrganisationInput,
+  OnboardingStepResult,
   OrgDomainInfo,
+  OrganisationStepResponse,
   Plan,
   RequestCustomDomainInput,
+  ResumeSignupResponse,
   ReviewOrgDomainRequestInput,
+  SignupStep1Response,
   SubdomainAvailability,
+  SubscriptionStepInput,
+  SubscriptionStepResponse,
+  TemplatesStepInput,
+  TemplatesStepResponse,
   UnreadNotificationsResponse,
   UserProfile,
 } from "./types";
@@ -144,6 +163,93 @@ export async function changePassword(
 
 export async function getPlans(): Promise<Plan[]> {
   return apiFetch<Plan[]>("/plans");
+}
+
+// --- Signup wizard (resumable, step-wise) ---
+
+export async function signupStep1(
+  input: OnboardingAccountInput,
+): Promise<SignupStep1Response> {
+  return apiFetch<SignupStep1Response>("/auth/signup/step1", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function resumeSignup(email: string): Promise<ResumeSignupResponse> {
+  return apiFetch<ResumeSignupResponse>("/auth/resume-signup", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function createOrganisationStep(
+  input: OnboardingOrganisationInput,
+): Promise<OrganisationStepResponse> {
+  return apiFetch<OrganisationStepResponse>("/auth/signup/organisation", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function saveBusinessDetailsStep(
+  input: BusinessDetailsInput,
+): Promise<BusinessDetailsStepResponse> {
+  return apiFetch<BusinessDetailsStepResponse>("/onboarding/business-details", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getLogoUploadUrl(
+  input: LogoUploadUrlInput,
+): Promise<LogoUploadUrlResult> {
+  return apiFetch<LogoUploadUrlResult>("/onboarding/logo-upload-url", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function saveSubscriptionStep(
+  input: SubscriptionStepInput,
+): Promise<SubscriptionStepResponse> {
+  return apiFetch<SubscriptionStepResponse>("/onboarding/subscription", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function saveTemplatesStep(
+  input: TemplatesStepInput,
+): Promise<TemplatesStepResponse> {
+  return apiFetch<TemplatesStepResponse>("/onboarding/templates", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function saveModulesStep(
+  input: ModulesStepInput,
+): Promise<ModulesStepResponse> {
+  return apiFetch<ModulesStepResponse>("/onboarding/modules", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function saveInviteStep(
+  input: InviteStepInput,
+): Promise<InviteStepResponse> {
+  return apiFetch<InviteStepResponse>("/onboarding/invite", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function completeOnboardingStep(): Promise<CompleteOnboardingResult> {
+  return apiFetch<CompleteOnboardingResult>("/onboarding/complete", {
+    method: "POST",
+  });
 }
 
 export async function getInvoices(): Promise<InvoiceRow[]> {

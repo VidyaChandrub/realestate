@@ -8,8 +8,10 @@ export function initials(firstName?: string | null, lastName?: string | null) {
   return (first + last).toUpperCase() || "?";
 }
 
-export function fullName(firstName?: string | null, lastName?: string | null) {
-  return [firstName, lastName].filter(Boolean).join(" ") || "—";
+// Invited users have no name until they set one themselves at first login
+// — pass their email as a fallback rather than rendering blank/"—".
+export function fullName(firstName?: string | null, lastName?: string | null, email?: string | null) {
+  return [firstName, lastName].filter(Boolean).join(" ") || email || "—";
 }
 
 export function formatCurrency(value: number) {

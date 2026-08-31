@@ -1,12 +1,13 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
+import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { OrgBillingService } from './org-billing.service';
 import { ChangePlanDto } from './dto/change-plan.dto';
 
-@UseGuards(JwtAuthGuard, OrgAdminGuard)
+@UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
 @Controller('org/billing')
 export class OrgBillingController {
   constructor(private readonly service: OrgBillingService) {}
