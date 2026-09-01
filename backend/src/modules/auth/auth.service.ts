@@ -25,6 +25,7 @@ import {
   parseDuration,
 } from '../../common/utils/tokens.util';
 import { generateUniqueOrgSlug } from '../../common/utils/slug.util';
+import { normalizePhoneNumber } from '../../common/utils/phone.util';
 import {
   toSafeOrganisation,
   toSafeUser,
@@ -272,8 +273,13 @@ export class AuthService {
     // email there's no resume concept tied to a phone number, so any match
     // here is necessarily a different account (this email is new) and
     // just gets rejected outright rather than offered a resume path.
+    //
+    // Normalized before comparing AND before storing: "+91 9825041200",
+    // "+919825041200" and "+91 98250 41200" are the same number, and an
+    // exact-string check let all three through as "different" numbers.
+    const normalizedPhone = normalizePhoneNumber(dto.phone_number);
     const existingByPhone = await this.prisma.user.findFirst({
-      where: { phoneNumber: dto.phone_number },
+      where: { phoneNumber: normalizedPhone },
     });
     if (existingByPhone) {
       throw new ConflictException(
@@ -287,7 +293,7 @@ export class AuthService {
         firstName: dto.first_name,
         lastName: dto.last_name,
         email: dto.work_email,
-        phoneNumber: dto.phone_number,
+        phoneNumber: normalizedPhone,
         passwordHash,
         status: 'active',
         onboardingStep: 'account',

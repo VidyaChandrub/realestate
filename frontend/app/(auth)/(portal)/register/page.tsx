@@ -177,6 +177,18 @@ export default function RegisterPage() {
     setFieldErrors((prev) => ({ ...prev, company_name: "" }));
   }
 
+  // Digits only, capped at 15 — the ITU E.164 maximum length for the
+  // national number across every country — so the field can't be typed
+  // into indefinitely, and what's stored is always a plain digit string
+  // (paired with the derived country code prefixed at submit time, see
+  // commitStep's Step 1 branch) rather than free text that could contain
+  // spaces/dashes and vary between two entries of the "same" number.
+  function updatePhoneNumber(e: React.ChangeEvent<HTMLInputElement>) {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 15);
+    setForm((prev) => ({ ...prev, phone_number: digits }));
+    setFieldErrors((prev) => ({ ...prev, phone_number: "" }));
+  }
+
   function handleCountryChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const country = e.target.value;
     setForm((prev) => ({ ...prev, country }));
@@ -678,8 +690,10 @@ export default function RegisterPage() {
                     <input
                       className="inp"
                       style={{ flex: 1 }}
+                      type="text"
+                      inputMode="numeric"
                       value={form.phone_number}
-                      onChange={update("phone_number")}
+                      onChange={updatePhoneNumber}
                       placeholder="98250 41200"
                     />
                   </div>
