@@ -32,6 +32,22 @@ const ROLE_BADGE_CLASS: Record<OrgUserAssignableRole, string> = {
   sales: "b-teal",
 };
 
+// Every OrgStatus value, one source of truth for label + badge colour on
+// this page — the list page (admin-console/organisations) had this right
+// already; the detail page had two spots that collapsed anything non-
+// "active" straight to "Disabled", which is how a "pending" org ended up
+// showing "Pending" on the list but "Disabled" here for the same org.
+const ORG_STATUS_META: Record<string, { label: string; badge: string }> = {
+  active: { label: "Active", badge: "b-green" },
+  pending: { label: "Pending", badge: "b-amber" },
+  draft: { label: "Draft", badge: "b-gray" },
+  disabled: { label: "Disabled", badge: "b-rose" },
+};
+
+function orgStatusMeta(status: string) {
+  return ORG_STATUS_META[status] ?? { label: status, badge: "b-gray" };
+}
+
 interface UserFormData {
   firstName: string;
   lastName: string;
@@ -387,9 +403,9 @@ export default function SuperAdminOrganisationDetailPage() {
           <div>
             <h1 style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {org.name}{" "}
-              <span className={`badge ${org.status === "active" ? "b-green" : "b-rose"}`}>
+              <span className={`badge ${orgStatusMeta(org.status).badge}`}>
                 <span className="dot" style={{ background: "currentColor" }} />
-                {org.status === "active" ? "Active" : "Disabled"}
+                {orgStatusMeta(org.status).label}
               </span>
             </h1>
             <div className="sub" style={{ marginTop: 4 }}>
@@ -414,8 +430,8 @@ export default function SuperAdminOrganisationDetailPage() {
           </div>
         </div>
         <div className="actions">
-          <span className={`badge ${org.status === "active" ? "b-green" : org.status === "pending" ? "b-amber" : "b-rose"}`}>
-            {org.status}
+          <span className={`badge ${orgStatusMeta(org.status).badge}`}>
+            {orgStatusMeta(org.status).label}
           </span>
         </div>
       </div>
@@ -731,8 +747,8 @@ export default function SuperAdminOrganisationDetailPage() {
                         <div className="muted" style={{ fontSize: 12 }}>
                           Status
                         </div>
-                        <span className={`badge ${org.status === "active" ? "b-green" : "b-rose"}`}>
-                          {org.status === "active" ? "Active" : "Disabled"}
+                        <span className={`badge ${orgStatusMeta(org.status).badge}`}>
+                          {orgStatusMeta(org.status).label}
                         </span>
                       </div>
                     </div>

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
@@ -47,10 +47,18 @@ export class AuthController {
     return this.authService.createOrganisationStep(actor, dto);
   }
 
+  // Deliberately no @UseGuards — must work for a brand-new visitor with no
+  // account yet. Still reads the Authorization header when present (e.g. a
+  // resuming user whose Step 2 is pre-filled with their own org's
+  // subdomain) so that caller's own org isn't falsely flagged as taken —
+  // see AuthService.checkSubdomainAvailability.
   @Get('subdomain-availability')
   @HttpCode(200)
-  subdomainAvailability(@Query('subdomain') subdomain: string) {
-    return this.authService.checkSubdomainAvailability(subdomain ?? '');
+  subdomainAvailability(
+    @Query('subdomain') subdomain: string,
+    @Headers('authorization') authHeader?: string,
+  ) {
+    return this.authService.checkSubdomainAvailability(subdomain ?? '', authHeader);
   }
 
   @Post('login')

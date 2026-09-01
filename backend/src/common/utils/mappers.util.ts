@@ -38,6 +38,7 @@ export function toSafeOrganisation(organisation: Organisation) {
     country: organisation.country,
     rera_license_no: organisation.reraLicenseNo,
     gstin: organisation.gstin,
+    team_size: organisation.teamSize,
     legal_name: organisation.legalName,
     industry: organisation.industry,
     support_email: organisation.supportEmail,

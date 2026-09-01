@@ -108,6 +108,11 @@ model Organisation {
   reraLicenseNo String? @map("rera_license_no")
   gstin         String? @map("gstin")
 
+  // Organisation step of the signup wizard (Step 2) — bucket-style value
+  // ("Just me", "2–10", "11–50", "50+"), stored as entered rather than a
+  // separate code, matching how it was originally collected.
+  teamSize String? @map("team_size")
+
   // Org Settings → General profile fields. All nullable — most orgs won't
   // have these on day one, and existing rows backfill to null.
   legalName    String?      @map("legal_name")

@@ -45,6 +45,7 @@ export interface SafeOrganisation {
   country: string | null;
   rera_license_no: string | null;
   gstin: string | null;
+  team_size: string | null;
   legal_name: string | null;
   industry: OrgIndustry | null;
   support_email: string | null;
@@ -132,6 +133,7 @@ export interface ResumeSignupResponse extends AuthTokens {
 export interface OnboardingOrganisationInput {
   company_name: string;
   industry?: OrgIndustry;
+  teamSize?: string;
   subdomain?: string;
   custom_domain?: string;
   country?: string;
@@ -357,7 +359,7 @@ export interface OrganisationDetail {
   subdomainStatus: string;
   customDomain: string | null;
   customDomainStatus: string;
-  status: "active" | "disabled" | "pending";
+  status: "active" | "disabled" | "pending" | "draft";
   createdAt: string;
   timezone: string;
   currency: string;
