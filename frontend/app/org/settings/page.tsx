@@ -556,11 +556,27 @@ export default function OrgSettingsPage() {
               <div className="row2">
                 <div className="field">
                   <label>Logo</label>
-                  <div className="drop"><Icon name="upload" size={16} /> Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
+                  {org.logo_url ? (
+                    <div className="drop" style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-start" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={org.logo_url} alt="Organisation logo" style={{ height: 32, width: "auto", borderRadius: 6 }} />
+                      <span className="muted" style={{ fontSize: 12.5 }}>Uploaded during registration · re-upload coming soon</span>
+                    </div>
+                  ) : (
+                    <div className="drop"><Icon name="upload" size={16} /> Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
+                  )}
                 </div>
                 <div className="field">
                   <label>Favicon</label>
-                  <div className="drop"><Icon name="upload" size={16} /> Upload favicon · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
+                  {org.favicon_url ? (
+                    <div className="drop" style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-start" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={org.favicon_url} alt="Organisation favicon" style={{ height: 24, width: 24, borderRadius: 6 }} />
+                      <span className="muted" style={{ fontSize: 12.5 }}>Re-upload coming soon</span>
+                    </div>
+                  ) : (
+                    <div className="drop"><Icon name="upload" size={16} /> Upload favicon · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
+                  )}
                 </div>
               </div>
               <div className="field"><label>Brand colour</label>
@@ -568,7 +584,6 @@ export default function OrgSettingsPage() {
                   {BRAND_SWATCHES.map((c) => (
                     <span key={c} className={form.brandColour.toLowerCase() === c ? "on" : ""} style={{ background: c }} onClick={() => updateForm({ brandColour: c })} />
                   ))}
-                  <span className="mono" style={{ alignSelf: "center" }}>{form.brandColour}</span>
                 </div>
               </div>
               <div className="field" style={{ marginBottom: 0 }}>

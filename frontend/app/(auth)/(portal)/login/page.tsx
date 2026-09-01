@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { dashboardPathFor } from "@/lib/mock/sessions";
+import { PasswordInput } from "@/components/auth/password-input";
 import { mapApiFieldErrors } from "@/lib/form-errors";
 
 const FIELD_KEYS = ["email", "password"];
@@ -98,9 +99,7 @@ export default function LoginPage() {
             </div>
             <div className="field">
               <label>Password</label>
-              <input
-                className="inp"
-                type="password"
+              <PasswordInput
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);

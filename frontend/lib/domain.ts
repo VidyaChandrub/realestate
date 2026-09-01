@@ -19,3 +19,36 @@ export function subdomainPreviewHost(subdomain?: string | null): string | null {
   const base = BASE_DOMAIN.replace(/^\.+/, "");
   return `${label}.${base}`;
 }
+
+// Proactive suggestions derived straight from the company name, shown
+// before the user has typed a subdomain (or hit a real conflict) — same
+// style as backend/src/common/utils/domain.util.ts's
+// generateSubdomainSuggestions (used once a *typed* subdomain is actually
+// taken), just computed client-side with no availability check, since
+// nothing's been typed into the subdomain field yet to check against.
+export function suggestSubdomainsFromName(name: string, max = 4): string[] {
+  const label = name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 40);
+  if (!label) return [];
+  const raw = [
+    `${label}1`,
+    `${label}2`,
+    label.endsWith("realty") ? label.replace(/realty$/, "homes") : `${label}realty`,
+    label.endsWith("homes") ? label.replace(/homes$/, "realty") : `${label}homes`,
+    `${label}estate`,
+    `${label}group`,
+  ];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of raw) {
+    if (!seen.has(s)) {
+      seen.add(s);
+      out.push(s);
+    }
+    if (out.length >= max) break;
+  }
+  return out;
+}

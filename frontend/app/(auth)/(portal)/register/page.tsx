@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { PasswordInput } from "@/components/auth/password-input";
 import { mapApiFieldErrors } from "@/lib/form-errors";
 import { slugify } from "@/lib/slug";
 import {
@@ -21,7 +22,8 @@ import {
   saveTemplatesStep,
   signupStep1,
 } from "@/lib/api";
-import { subdomainPreviewHost } from "@/lib/domain";
+import { subdomainPreviewHost, suggestSubdomainsFromName } from "@/lib/domain";
+import { callingCodeForCountry, validatePhoneForCountry } from "@/lib/phone";
 import type { OnboardingStep, OrgIndustry, Plan, SubdomainAvailability } from "@/lib/types";
 import { COUNTRY_META, COUNTRIES } from "@/lib/countries";
 
@@ -117,6 +119,7 @@ export default function RegisterPage() {
     password: "",
   });
   const [orgType, setOrgType] = useState("developer");
+  const [teamSize, setTeamSize] = useState("2–10");
   const [rera, setRera] = useState("");
   const [gstin, setGstin] = useState("");
   const [brandColour, setBrandColour] = useState("#4f46e5");
@@ -243,23 +246,37 @@ export default function RegisterPage() {
     }
   };
 
+  // Proactive subdomain suggestions, derived from the company name as soon
+  // as it's entered — additive to (not a replacement for) the real
+  // conflict-check suggestions below, which only exist once something's
+  // actually been typed into Subdomain and found taken.
+  const companySubdomainSuggestions = useMemo(
+    () => suggestSubdomainsFromName(form.company_name),
+    [form.company_name],
+  );
+
+  // Auto-derived from the Step 1 Country selector — shown as a fixed
+  // prefix next to Mobile, editable only for the number itself.
+  const phoneCallingCode = useMemo(() => callingCodeForCountry(form.country), [form.country]);
+
   // n is the 1-indexed step being left (matches STEPS[].n / the wizard
   // order above: 1 Account, 2 Organisation, 3 Business details,
   // 4 Subscription, 5 Templates, 6 Modules, 7 Invite, 8 Connect).
   function validateStep(n: number): boolean {
     setGeneralError(null);
     if (n === 1) {
-      const required: (keyof typeof form)[] = ["first_name", "last_name", "work_email", "phone_number", "password"];
+      const required: (keyof typeof form)[] = ["first_name", "last_name", "work_email", "country", "phone_number", "password"];
       for (const k of required) {
         if (!form[k]?.trim()) { setGeneralError(`${k.replace(/_/g, " ")} is required`); return false; }
       }
+      const phoneError = validatePhoneForCountry(form.phone_number, form.country);
+      if (phoneError) { setGeneralError(phoneError); return false; }
       if (form.password.length < 8) { setGeneralError("Password must be at least 8 characters"); return false; }
       return true;
     }
     if (n === 2) {
       if (!form.company_name?.trim()) { setGeneralError("Company name is required"); return false; }
       if (!form.subdomain?.trim()) { setGeneralError("Subdomain is required"); return false; }
-      if (!form.country) { setGeneralError("Country is required"); return false; }
       return true;
     }
     if (n === 3) {
@@ -295,7 +312,11 @@ export default function RegisterPage() {
         first_name: form.first_name,
         last_name: form.last_name,
         work_email: form.work_email,
-        phone_number: form.phone_number,
+        // form.phone_number holds just the national number the user
+        // typed — the country's dial code (derived from the Step 1
+        // Country selector) is prefixed here so what's persisted is a
+        // fully-qualified number, not just the digits.
+        phone_number: phoneCallingCode ? `${phoneCallingCode} ${form.phone_number}` : form.phone_number,
         password: form.password,
       });
       if (res.status === "exists_completed") {
@@ -319,6 +340,10 @@ export default function RegisterPage() {
           setGstin(resumed.organisation.gstin ?? "");
           setBrandColour(resumed.organisation.brand_colour ?? "#4f46e5");
           setLogoUrl(resumed.organisation.logo_url ?? null);
+          // industry was already being persisted (Step 2) but never restored
+          // here — same class of bug as teamSize, fixing both together.
+          if (resumed.organisation.industry) setOrgType(resumed.organisation.industry);
+          if (resumed.organisation.team_size) setTeamSize(resumed.organisation.team_size);
         }
         if (resumed.subscription) {
           setSelectedPlanId(resumed.subscription.planId);
@@ -337,6 +362,7 @@ export default function RegisterPage() {
       const res = await createOrganisationStep({
         company_name: form.company_name,
         industry: orgType as OrgIndustry,
+        teamSize,
         subdomain: form.subdomain || undefined,
         country: form.country || undefined,
         currency: COUNTRY_META[form.country]?.currency ?? undefined,
@@ -622,14 +648,48 @@ export default function RegisterPage() {
                 <input className="inp" type="email" value={form.work_email} onChange={update("work_email")} placeholder="admin@skylinedev.com" />
                 {fieldErrors.work_email ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.work_email}</div> : null}
               </div>
-              <div className="field">
-                <label>Mobile</label>
-                <input className="inp" value={form.phone_number} onChange={update("phone_number")} placeholder="+91 98250 41200" />
-                {fieldErrors.phone_number ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.phone_number}</div> : null}
+              <div className="row2">
+                <div className="field">
+                  <label>Country <span className="req">*</span></label>
+                  <select className="inp" value={form.country} onChange={handleCountryChange}>
+                    <option value="">Select country…</option>
+                    {COUNTRIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Mobile <span className="req">*</span></label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <span
+                      className="inp mono"
+                      style={{
+                        width: 64,
+                        flex: "0 0 auto",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--muted)",
+                        background: "var(--surface-2)",
+                      }}
+                    >
+                      {phoneCallingCode ?? "+--"}
+                    </span>
+                    <input
+                      className="inp"
+                      style={{ flex: 1 }}
+                      value={form.phone_number}
+                      onChange={update("phone_number")}
+                      placeholder="98250 41200"
+                    />
+                  </div>
+                  <div className="hint">{phoneCallingCode ? "Auto-set from Country." : "Select a country to set the code."}</div>
+                  {fieldErrors.phone_number ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.phone_number}</div> : null}
+                </div>
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>Password <span className="req">*</span></label>
-                <input className="inp" type="password" value={form.password} onChange={update("password")} placeholder="••••••••••" />
+                <PasswordInput value={form.password} onChange={update("password")} placeholder="••••••••••" autoComplete="new-password" />
                 <div className="hint">Min 8 characters.</div>
                 {fieldErrors.password ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.password}</div> : null}
               </div>
@@ -664,6 +724,22 @@ export default function RegisterPage() {
                 <div className="field">
                   <label>Subdomain <span className="req">*</span></label>
                   <input className="inp" value={subdomain} onChange={update("subdomain")} placeholder="skylinedev" />
+                  {!checkingSubdomain && !subdomainCheck && companySubdomainSuggestions.length > 0 ? (
+                    <div className="hint" style={{ display: "block", color: "var(--muted)" }}>
+                      Suggestions:{" "}
+                      {companySubdomainSuggestions.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          className="chip"
+                          style={{ cursor: "pointer", margin: "2px 4px 2px 0" }}
+                          onClick={() => setForm((prev) => ({ ...prev, subdomain: s }))}
+                        >
+                          {subdomainPreviewHost(s)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   {checkingSubdomain ? (
                     <div className="hint">Checking availability…</div>
                   ) : subdomainCheck ? (
@@ -702,24 +778,30 @@ export default function RegisterPage() {
                   )}
                 </div>
               <div className="row2">
-                <div className="field">
+                <div className="field" style={{ marginBottom: form.country ? 0 : undefined }}>
                   <label>Team size</label>
-                  <select className="inp" defaultValue="2-10">
-                    <option>Just me</option>
-                    <option>2–10</option>
-                    <option>11–50</option>
-                    <option>50+</option>
+                  <select className="inp" value={teamSize} onChange={(e) => setTeamSize(e.target.value)}>
+                    <option value="Just me">Just me</option>
+                    <option value="2–10">2–10</option>
+                    <option value="11–50">11–50</option>
+                    <option value="50+">50+</option>
                   </select>
                 </div>
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label>Country</label>
-                  <select className="inp" value={form.country} onChange={handleCountryChange}>
-                    <option value="">Select country…</option>
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
+                {!form.country ? (
+                  // Country now lives on Step 1 — this only appears as a
+                  // fallback if it somehow wasn't set there (e.g. resuming
+                  // right after Step 1, before Step 2 ever submitted and
+                  // persisted it — Step 1 itself isn't shown again on resume).
+                  <div className="field" style={{ marginBottom: 0 }}>
+                    <label>Country</label>
+                    <select className="inp" value={form.country} onChange={handleCountryChange}>
+                      <option value="">Select country…</option>
+                      {COUNTRIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>

@@ -8,6 +8,21 @@
    .brandside, .formside …) come from superadmin.css.
    ============================================================ */
 
+/* ---------- Auth: fixed-width form panel ----------
+   .fw (the <form> in every auth page: wizard, login, reset-password) had
+   no width rule anywhere — its parent .formside is a column flexbox with
+   align-items:center, which sizes an unconstrained child by shrink-to-fit
+   (max-content) rather than stretching it. Normally invisible, but any
+   long unwrapped content inside .fw (e.g. a row of subdomain-suggestion
+   chips, whose text length scales with the typed company name) pushes
+   .fw — and with it the whole two-panel grid — wider instead of wrapping.
+   Giving .fw an explicit width fixes this for every field inside it, not
+   just the one that happens to expose it. */
+.fw {
+  width: 100%;
+  max-width: 460px;
+}
+
 /* ---------- Signup wizard: brand rail ---------- */
 .steps-rail{position:relative;display:flex;flex-direction:column;gap:0;margin-top:30px}
 .steps-rail .sr{display:flex;align-items:center;gap:13px;padding:9px 0;color:#8891b4;transition:.2s}

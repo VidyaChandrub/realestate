@@ -22,6 +22,7 @@ export const DEMO_ORGANISATION = {
   country: null,
   rera_license_no: null,
   gstin: null,
+  team_size: null,
   legal_name: null,
   industry: null,
   support_email: null,

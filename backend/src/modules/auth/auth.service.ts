@@ -415,6 +415,7 @@ export class AuthService {
           slug,
           status: 'pending',
           industry: dto.industry ?? null,
+          teamSize: dto.teamSize ?? null,
           country: dto.country ?? null,
           currency: dto.currency ?? 'INR',
           timezone: dto.timezone ?? 'Asia/Kolkata',
@@ -522,6 +523,7 @@ export class AuthService {
       data: {
         name: dto.company_name,
         industry: dto.industry ?? current.industry,
+        teamSize: dto.teamSize ?? current.teamSize,
         country: dto.country ?? current.country,
         currency: dto.currency ?? current.currency,
         timezone: dto.timezone ?? current.timezone,
@@ -745,12 +747,22 @@ export class AuthService {
 
   // Public check used by the sign-up form to show availability live and to
   // suggest alternatives when the requested subdomain is taken.
-  async checkSubdomainAvailability(subdomain: string) {
+  //
+  // Called unauthenticated (a brand-new visitor has no account yet), but
+  // also called by an already-signed-up user resuming the wizard, whose
+  // Step 2 form is pre-filled with their OWN org's existing subdomain —
+  // apiFetch already attaches whatever token is in localStorage to every
+  // request, so if one is present and valid we decode it (soft: an
+  // invalid/expired/missing token just means "treat as anonymous", never
+  // a 401 here) and exclude that caller's own org from the "taken" check,
+  // so their own unchanged subdomain doesn't falsely show as taken.
+  async checkSubdomainAvailability(subdomain: string, authHeader?: string) {
     const label = normalizeSubdomain(subdomain);
     if (!isValidSubdomain(label)) {
       return { subdomain: label, available: false, reasons: ['invalid'], suggestions: [] };
     }
-    const taken = await this.isSubdomainTaken(label);
+    const excludeOrgId = this.tryDecodeOrgId(authHeader);
+    const taken = await this.isSubdomainTaken(label, excludeOrgId);
     const reasons: string[] = [];
     if (taken === 'org') reasons.push('already_exists');
     else if (taken === 'pending') reasons.push('pending');
@@ -763,16 +775,42 @@ export class AuthService {
     };
   }
 
+  // Best-effort, never throws — a missing/invalid/expired token here just
+  // means "treat this caller as anonymous", not an auth failure. Only used
+  // by the one endpoint above that's intentionally unauthenticated but
+  // still wants to recognise its own caller when possible.
+  private tryDecodeOrgId(authHeader?: string): string | null {
+    if (!authHeader?.startsWith('Bearer ')) return null;
+    try {
+      const payload = this.jwtService.verify<JwtPayload>(
+        authHeader.slice('Bearer '.length),
+        { secret: process.env.JWT_SECRET },
+      );
+      return payload.orgId ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   // Returns 'org' if an organisation already holds it, 'pending' if a pending
-  // subdomain request reserves it, else null when available.
-  private async isSubdomainTaken(label: string): Promise<'org' | 'pending' | null> {
+  // subdomain request reserves it, else null when available. excludeOrgId
+  // (the caller's own org, if known) is never considered "taken" — see
+  // checkSubdomainAvailability above for why.
+  private async isSubdomainTaken(
+    label: string,
+    excludeOrgId?: string | null,
+  ): Promise<'org' | 'pending' | null> {
     const org = await this.prisma.organisation.findFirst({
-      where: { subdomain: label },
+      where: { subdomain: label, ...(excludeOrgId ? { id: { not: excludeOrgId } } : {}) },
       select: { id: true },
     });
     if (org) return 'org';
     const req = await this.prisma.orgDomainRequest.findFirst({
-      where: { subdomain: label, status: { in: ['pending', 'approved'] } },
+      where: {
+        subdomain: label,
+        status: { in: ['pending', 'approved'] },
+        ...(excludeOrgId ? { orgId: { not: excludeOrgId } } : {}),
+      },
       select: { id: true },
     });
     if (req) return 'pending';

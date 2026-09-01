@@ -4,6 +4,7 @@ import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { PasswordInput } from "@/components/auth/password-input";
 
 function ResetForm() {
   const router = useRouter();
@@ -81,9 +82,7 @@ function ResetForm() {
             <form className="reveal in" data-delay="1" style={{ marginTop: 26 }} onSubmit={handleSubmit} noValidate>
               <div className="field">
                 <label>New password</label>
-                <input
-                  className="inp"
-                  type="password"
+                <PasswordInput
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="new-password"
@@ -92,9 +91,7 @@ function ResetForm() {
               </div>
               <div className="field">
                 <label>Confirm password</label>
-                <input
-                  className="inp"
-                  type="password"
+                <PasswordInput
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   autoComplete="new-password"
