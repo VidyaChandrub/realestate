@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
+import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectTabs } from "@/components/org/project-tabs";
 import "@/app/org/org.css";
@@ -32,13 +33,6 @@ const AMENITY_OPTIONS = [
   "Sports court",
   "Yoga deck",
 ];
-
-function numOrUndef(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  const n = Number(trimmed);
-  return Number.isFinite(n) ? n : undefined;
-}
 
 function toField(value: number | null): string {
   return value == null ? "" : String(value);
@@ -147,11 +141,11 @@ export default function OrgProjectEditPage() {
         possession: possession.trim() || undefined,
         managerId: managerId || null,
         status,
-        priceMin: numOrUndef(priceMin),
-        priceMax: numOrUndef(priceMax),
-        baseRate: numOrUndef(baseRate),
-        landArea: numOrUndef(landArea),
-        towerCount: numOrUndef(towerCount),
+        priceMin: parseAmount(priceMin),
+        priceMax: parseAmount(priceMax),
+        baseRate: parseAmount(baseRate),
+        landArea: parseDecimal(landArea),
+        towerCount: parseCount(towerCount),
         floorsDescription: floorsDescription.trim() || undefined,
         amenities: amenityPayload,
       };

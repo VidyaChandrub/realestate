@@ -4,19 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getProjectSalesAgents } from "@/lib/api";
+import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { ProjectPageHead } from "@/components/org/project-tabs";
 import "@/app/org/org.css";
-import type { ProjectDetail } from "@/lib/types";
-
-function compactRupees(value: number | null): string {
-  if (value == null) return "—";
-  if (value >= 1e7) return `₹${(value / 1e7).toFixed(2).replace(/\.?0+$/, "")} Cr`;
-  if (value >= 1e5) return `₹${(value / 1e5).toFixed(2).replace(/\.?0+$/, "")} L`;
-  return `₹${value.toLocaleString("en-IN")}`;
-}
+import type { ProjectDetail, ProjectSalesAgent } from "@/lib/types";
 
 function managerInitials(name: string | null | undefined): string {
   if (!name) return "—";
@@ -31,6 +25,7 @@ export default function OrgProjectOverviewPage() {
   const { accessToken } = useAuth();
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
+  const [salesAgents, setSalesAgents] = useState<ProjectSalesAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -44,6 +39,13 @@ export default function OrgProjectOverviewPage() {
       .then(setProject)
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
+  }, [accessToken, id]);
+
+  useEffect(() => {
+    if (!accessToken || !id) return;
+    getProjectSalesAgents(id)
+      .then(setSalesAgents)
+      .catch(() => setSalesAgents([]));
   }, [accessToken, id]);
 
   if (notFound) {
@@ -64,9 +66,50 @@ export default function OrgProjectOverviewPage() {
     );
   }
 
-  const priceRange = project.priceMin != null || project.priceMax != null
-    ? `${compactRupees(project.priceMin)} – ${compactRupees(project.priceMax)}`
-    : "—";
+  const priceRange = formatMoneyRange(
+    project.priceMin,
+    project.priceMax,
+    project.currency,
+  );
+
+  // Piece A/C preference blobs — loosely typed, may be null or partial.
+  const spec = (project.specifications ?? {}) as {
+    flooring?: string; kitchen?: string; doorsWindows?: string;
+    fittings?: string; notes?: string;
+  };
+  const specRows: [string, string | undefined][] = [
+    ["Flooring", spec.flooring],
+    ["Kitchen", spec.kitchen],
+    ["Doors & windows", spec.doorsWindows],
+    ["Fittings", spec.fittings],
+  ].filter(([, v]) => v) as [string, string][];
+
+  const mkt = (project.marketing ?? {}) as {
+    adSources?: string[];
+    monthlyBudget?: number | null;
+    targetCpl?: number | null;
+    leadGoal?: number | null;
+    landingPageChoice?: string;
+    aiCallingEnabled?: boolean;
+    whatsappWelcomeEnabled?: boolean;
+    roundRobinEnabled?: boolean;
+    aiKnowledgeBaseEnabled?: boolean;
+  };
+  const hasMarketing = project.marketing != null;
+  const onOff = (v: boolean | undefined) => (
+    <span className={`badge ${v ? "b-green" : "b-gray"}`}>{v ? "On" : "Off"}</span>
+  );
+
+  // A labelled free-text block (landmarks, spec notes) — separated from the
+  // chips/tiles above it so it doesn't read as stray grey text.
+  const noteBlock = (label: string, text: string, divided: boolean) => (
+    <div style={divided ? { marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--line)" } : undefined}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 6 }}>
+        {label}
+      </div>
+      <p style={{ whiteSpace: "pre-line", margin: 0, fontSize: 13, lineHeight: 1.6 }}>{text}</p>
+    </div>
+  );
 
   const configuration = project.unitTypes.length > 0
     ? project.unitTypes.map((u) => u.name).join(", ")
@@ -80,8 +123,10 @@ export default function OrgProjectOverviewPage() {
     { k: "Price range", v: priceRange },
     { k: "Total area", v: project.landArea != null ? `${project.landArea} acres` : "—" },
     { k: "Towers", v: [project.towerCount != null ? `${project.towerCount} towers` : null, project.floorsDescription || null].filter(Boolean).join(" · ") || "—" },
-    { k: "Total units", v: String(project.rollup.totalUnitsPlanned) },
-    { k: "Available", v: String(project.rollup.unitsAvailable) },
+    // Derived from real UnitType/Unit records — "—" until inventory is set up
+    // in the Units section (the wizard never creates unit types).
+    { k: "Total units", v: project.unitTypes.length === 0 ? "—" : String(project.rollup.totalUnitsPlanned) },
+    { k: "Available", v: project.unitTypes.length === 0 ? "—" : String(project.rollup.unitsAvailable) },
     { k: "Possession", v: project.possession || "—" },
     { k: "RERA", v: project.reraId || "—", mono: true },
   ];
@@ -111,19 +156,32 @@ export default function OrgProjectOverviewPage() {
         <div className="col gap-18">
           <Reveal delay={1}>
             <div className="media h-280">
-              <span>🏙️</span>
-              <span className="cap">{project.name} — Elevation</span>
+              {project.coverImageUrl ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={project.coverImageUrl}
+                  alt={`${project.name} cover`}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <>
+                  <span>🏙️</span>
+                  <span className="cap">{project.name} — Elevation</span>
+                </>
+              )}
             </div>
           </Reveal>
 
-          <Reveal delay={2}>
-            <div className="gallery">
-              <div className="thumb media"><span>🏢</span></div>
-              <div className="thumb media ph-green"><span>🌳</span></div>
-              <div className="thumb media ph-blue"><span>🏊</span></div>
-              <div className="thumb media ph-amber"><span>🛋️</span></div>
-            </div>
-          </Reveal>
+          {project.galleryUrls.length > 0 ? (
+            <Reveal delay={2}>
+              <div className="gallery">
+                {project.galleryUrls.map((url) => (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img key={url} src={url} alt="" className="thumb media" style={{ objectFit: "cover" }} />
+                ))}
+              </div>
+            </Reveal>
+          ) : null}
 
           <Reveal delay={2}>
             <div className="card">
@@ -166,7 +224,7 @@ export default function OrgProjectOverviewPage() {
                         <div className="info">
                           <b>{u.name}</b>
                           <div className="muted fs-12-5">
-                            {[u.builtupSqft ? `${u.builtupSqft} sqft` : null, u.price != null ? compactRupees(u.price) : null].filter(Boolean).join(" · ") || "—"}
+                            {[u.builtupSqft ? `${u.builtupSqft} sqft` : null, u.price != null ? formatMoney(u.price, project.currency) : null].filter(Boolean).join(" · ") || "—"}
                           </div>
                           <span className={`badge ${u.availableUnits > 0 ? "b-green" : "b-amber"} mt-8`}>
                             {u.availableUnits} available
@@ -194,6 +252,73 @@ export default function OrgProjectOverviewPage() {
               </div>
             </div>
           </Reveal>
+
+          <Reveal delay={3}>
+            <div className="card">
+              <div className="card-h"><span className="t">Connectivity &amp; landmarks</span></div>
+              <div className="card-b">
+                <div className="row wrap gap-8">
+                  {project.connectivity.length === 0 ? (
+                    <span className="muted">None added.</span>
+                  ) : (
+                    project.connectivity.map((c) => (
+                      <span className="chip" key={c}>{c}</span>
+                    ))
+                  )}
+                </div>
+                {project.landmarks
+                  ? noteBlock("Key landmarks", project.landmarks, project.connectivity.length > 0)
+                  : null}
+              </div>
+            </div>
+          </Reveal>
+
+          <Reveal delay={3}>
+            <div className="card">
+              <div className="card-h"><span className="t">Specifications</span></div>
+              <div className="card-b">
+                {specRows.length === 0 && !spec.notes ? (
+                  <span className="muted">None added.</span>
+                ) : (
+                  <>
+                    {specRows.length > 0 ? (
+                      <div className="spec-grid">
+                        {specRows.map(([k, v]) => (
+                          <div className="sp" key={k}><div className="k">{k}</div><div className="v">{v}</div></div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {spec.notes
+                      ? noteBlock("Additional notes", spec.notes, specRows.length > 0)
+                      : null}
+                  </>
+                )}
+              </div>
+            </div>
+          </Reveal>
+
+          <Reveal delay={3}>
+            <div className="card">
+              <div className="card-h"><span className="t">Marketing</span></div>
+              <div className="card-b">
+                {!hasMarketing ? (
+                  <span className="muted">Not configured.</span>
+                ) : (
+                  <div className="spec-grid">
+                    <div className="sp"><div className="k">Ad sources</div><div className="v">{mkt.adSources?.length ? mkt.adSources.join(", ") : "—"}</div></div>
+                    <div className="sp"><div className="k">Monthly budget</div><div className="v">{formatMoney(mkt.monthlyBudget ?? null, project.currency)}</div></div>
+                    <div className="sp"><div className="k">Target CPL</div><div className="v">{formatMoney(mkt.targetCpl ?? null, project.currency)}</div></div>
+                    <div className="sp"><div className="k">Monthly lead goal</div><div className="v">{mkt.leadGoal ?? "—"}</div></div>
+                    <div className="sp"><div className="k">Landing page</div><div className="v">{mkt.landingPageChoice || "—"}</div></div>
+                    <div className="sp"><div className="k">AI voice calling</div><div className="v">{onOff(mkt.aiCallingEnabled)}</div></div>
+                    <div className="sp"><div className="k">WhatsApp auto-welcome</div><div className="v">{onOff(mkt.whatsappWelcomeEnabled)}</div></div>
+                    <div className="sp"><div className="k">Round-robin assignment</div><div className="v">{onOff(mkt.roundRobinEnabled)}</div></div>
+                    <div className="sp"><div className="k">AI knowledge base</div><div className="v">{onOff(mkt.aiKnowledgeBaseEnabled)}</div></div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Reveal>
         </div>
 
         <div className="col gap-18">
@@ -209,7 +334,14 @@ export default function OrgProjectOverviewPage() {
                 </div>
                 <div className="field"><label>Source</label><select className="inp"><option>Walk-in</option><option>Meta Ad</option><option>Google</option><option>Reference</option></select></div>
                 <button className="btn btn-primary btn-block">Apply &amp; create lead →</button>
-                <button className="btn btn-ghost btn-block mt-8">⬇ Download brochure</button>
+                {project.brochureUrl ? (
+                  <a href={project.brochureUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-block mt-8">⬇ Download brochure</a>
+                ) : (
+                  <button className="btn btn-ghost btn-block mt-8" disabled>Brochure not uploaded</button>
+                )}
+                {project.reraCertificateUrl ? (
+                  <a href={project.reraCertificateUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-block mt-8">🏛️ RERA certificate</a>
+                ) : null}
               </div>
             </div>
           </Reveal>
@@ -256,7 +388,29 @@ export default function OrgProjectOverviewPage() {
                 ) : (
                   <span className="muted">No manager assigned.</span>
                 )}
+                {salesAgents.map((a) => (
+                  <div className="u" key={a.id}>
+                    <span className="av">{managerInitials(a.name)}</span>
+                    <span><span className="nm">{a.name}</span><br /><span className="sm">Sales Agent</span></span>
+                  </div>
+                ))}
+                {salesAgents.length === 0 ? (
+                  <span className="muted fs-12-5">No sales agents assigned.</span>
+                ) : null}
                 <button className="btn btn-ghost btn-block mt-4">✨ AI agent</button>
+              </div>
+            </div>
+          </Reveal>
+
+          <Reveal delay={3}>
+            <div className="card">
+              <div className="card-h"><span className="t">Access</span></div>
+              <div className="card-b">
+                <div className="spec-grid">
+                  <div className="sp"><div className="k">Booking approval</div><div className="v">{onOff(project.requireBookingApproval)}</div></div>
+                  <div className="sp"><div className="k">Visible to telecallers</div><div className="v">{onOff(project.visibleToTelecallers)}</div></div>
+                  <div className="sp"><div className="k">Published to website</div><div className="v">{onOff(project.publishedToWebsite)}</div></div>
+                </div>
               </div>
             </div>
           </Reveal>

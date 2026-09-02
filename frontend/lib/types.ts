@@ -703,12 +703,48 @@ export interface Project {
   towerCount: number | null;
   floorsDescription: string | null;
   amenities: Amenity[];
+  // --- Onboarding-wizard fields (Steps 3-8). Persisted by the backend as of
+  // Piece A; the wizard wires them progressively in Pieces B-E. ---
+  bookingAmount: number | null;
+  currency: string;
+  priceIncludes: string[];
+  paymentPlan: string | null;
+  offers: string | null;
+  addressLine: string | null;
+  city: string | null;
+  locality: string | null;
+  pincode: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  connectivity: string[];
+  landmarks: string | null;
+  /** Loose preference blob: { flooring, kitchen, doorsWindows, fittings, notes } */
+  specifications: Record<string, unknown> | null;
+  /** Loose preference blob: ad sources, budgets, lead goal, automation flags */
+  marketing: Record<string, unknown> | null;
+  requireBookingApproval: boolean;
+  visibleToTelecallers: boolean;
+  publishedToWebsite: boolean;
+  coverImageUrl: string | null;
+  galleryUrls: string[];
+  brochureUrl: string | null;
+  reraCertificateUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ProjectListRow extends Project {
   unitTypeCount: number;
+}
+
+/** A sales user assigned to a project (GET/PUT /org/projects/:id/sales-agents). */
+export interface ProjectSalesAgent {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  name: string;
+  assignedAt: string;
 }
 
 export interface UnitType {
@@ -756,6 +792,8 @@ export interface ProjectDetail extends Project {
     unitsBooked: number;
     unitsHeld: number;
   };
+  /** User ids of the assigned sales agents (full objects via the dedicated endpoint). */
+  salesAgentIds: string[];
 }
 
 export interface ProjectsListResponse {
@@ -779,6 +817,30 @@ export interface CreateProjectInput {
   towerCount?: number;
   floorsDescription?: string;
   amenities?: Amenity[];
+  // Onboarding-wizard fields (Steps 3-8) — all optional; wired progressively
+  // by Pieces B-E. `null` is accepted on update to clear a field.
+  bookingAmount?: number;
+  currency?: "INR" | "AED" | "USD";
+  priceIncludes?: string[];
+  paymentPlan?: string;
+  offers?: string;
+  addressLine?: string;
+  city?: string;
+  locality?: string;
+  pincode?: string;
+  latitude?: number;
+  longitude?: number;
+  connectivity?: string[];
+  landmarks?: string;
+  specifications?: Record<string, unknown>;
+  marketing?: Record<string, unknown>;
+  requireBookingApproval?: boolean;
+  visibleToTelecallers?: boolean;
+  publishedToWebsite?: boolean;
+  coverImageUrl?: string;
+  galleryUrls?: string[];
+  brochureUrl?: string;
+  reraCertificateUrl?: string;
 }
 
 export type UpdateProjectInput = Partial<
@@ -787,6 +849,38 @@ export type UpdateProjectInput = Partial<
   /** id to (re)assign, or explicit null to unassign. */
   managerId?: string | null;
 };
+
+// --- Org custom catalogs (project onboarding wizard option lists) ---
+// Org-managed, pre-created option lists the project wizard picks from — one
+// generic row shape keyed by `category`. Picked values are copied onto a
+// project's own fields at creation time; nothing references these rows, so
+// editing or deleting one never affects an existing project.
+export type OrgCatalogCategory =
+  | "project_type"
+  | "unit_type"
+  | "connectivity"
+  | "amenity";
+
+export interface OrgCatalogOption {
+  id: string;
+  orgId: string;
+  category: OrgCatalogCategory;
+  label: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOrgCatalogOptionInput {
+  category: OrgCatalogCategory;
+  label: string;
+  sortOrder?: number;
+}
+
+export interface UpdateOrgCatalogOptionInput {
+  label?: string;
+  sortOrder?: number;
+}
 
 export interface CreateUnitTypeInput {
   name: string;

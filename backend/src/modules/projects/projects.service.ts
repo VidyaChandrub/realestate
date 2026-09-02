@@ -32,6 +32,26 @@ const PROJECT_SCALARS = [
   'baseRate',
   'towerCount',
   'floorsDescription',
+  // Onboarding-wizard scalars (Steps 3-8). Arrays (priceIncludes,
+  // connectivity, galleryUrls) and Json (specifications, marketing) are
+  // handled separately below.
+  'bookingAmount',
+  'currency',
+  'paymentPlan',
+  'offers',
+  'addressLine',
+  'city',
+  'locality',
+  'pincode',
+  'latitude',
+  'longitude',
+  'landmarks',
+  'requireBookingApproval',
+  'visibleToTelecallers',
+  'publishedToWebsite',
+  'coverImageUrl',
+  'brochureUrl',
+  'reraCertificateUrl',
 ] as const;
 
 // The manager relation is expanded on every project response so the client
@@ -113,6 +133,31 @@ export class ProjectsService {
           towerCount: dto.towerCount ?? null,
           floorsDescription: dto.floorsDescription ?? null,
           amenities: (dto.amenities ?? []) as unknown as Prisma.InputJsonValue,
+          // Onboarding-wizard fields (Steps 3-8).
+          bookingAmount: dto.bookingAmount ?? null,
+          currency: dto.currency ?? 'INR',
+          priceIncludes: dto.priceIncludes ?? [],
+          paymentPlan: dto.paymentPlan ?? null,
+          offers: dto.offers ?? null,
+          addressLine: dto.addressLine ?? null,
+          city: dto.city ?? null,
+          locality: dto.locality ?? null,
+          pincode: dto.pincode ?? null,
+          latitude: dto.latitude ?? null,
+          longitude: dto.longitude ?? null,
+          connectivity: dto.connectivity ?? [],
+          landmarks: dto.landmarks ?? null,
+          specifications: dto.specifications as unknown as
+            Prisma.InputJsonValue | undefined,
+          marketing: dto.marketing as unknown as
+            Prisma.InputJsonValue | undefined,
+          requireBookingApproval: dto.requireBookingApproval ?? false,
+          visibleToTelecallers: dto.visibleToTelecallers ?? true,
+          publishedToWebsite: dto.publishedToWebsite ?? false,
+          coverImageUrl: dto.coverImageUrl ?? null,
+          galleryUrls: dto.galleryUrls ?? [],
+          brochureUrl: dto.brochureUrl ?? null,
+          reraCertificateUrl: dto.reraCertificateUrl ?? null,
         },
       });
 
@@ -148,7 +193,10 @@ export class ProjectsService {
         orderBy: { updatedAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: { ...PROJECT_INCLUDE, _count: { select: { unitTypes: true } } },
+        include: {
+          ...PROJECT_INCLUDE,
+          _count: { select: { unitTypes: true } },
+        },
       }),
       this.prisma.project.count({ where }),
     ]);
@@ -169,6 +217,11 @@ export class ProjectsService {
       orderBy: { createdAt: 'asc' },
     });
     const decorated = await this.decorateUnitTypes(unitTypes);
+
+    const salesAgentRows = await this.prisma.projectSalesAgent.findMany({
+      where: { projectId: id },
+      select: { userId: true },
+    });
 
     const rollup = decorated.reduce(
       (acc, ut) => {
@@ -192,6 +245,7 @@ export class ProjectsService {
       ...this.serializeProject(project),
       unitTypes: decorated.map((ut) => this.serializeUnitType(ut)),
       rollup,
+      salesAgentIds: salesAgentRows.map((r) => r.userId),
     };
   }
 
@@ -208,6 +262,17 @@ export class ProjectsService {
     if (dto.landArea !== undefined) data.landArea = dto.landArea;
     if (dto.amenities !== undefined) {
       data.amenities = dto.amenities as unknown as Prisma.InputJsonValue;
+    }
+    // Onboarding-wizard arrays + preference blobs.
+    if (dto.priceIncludes !== undefined) data.priceIncludes = dto.priceIncludes;
+    if (dto.connectivity !== undefined) data.connectivity = dto.connectivity;
+    if (dto.galleryUrls !== undefined) data.galleryUrls = dto.galleryUrls;
+    if (dto.specifications !== undefined) {
+      data.specifications =
+        dto.specifications as unknown as Prisma.InputJsonValue;
+    }
+    if (dto.marketing !== undefined) {
+      data.marketing = dto.marketing as unknown as Prisma.InputJsonValue;
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -248,10 +313,88 @@ export class ProjectsService {
   }
 
   // -------------------------------------------------------------------------
+  // Sales agents assigned to a project (Step 7 of the onboarding wizard).
+  // A plain many-to-many with User; PUT replaces the whole set so
+  // re-submitting is idempotent (delete-all + recreate in one transaction).
+  // -------------------------------------------------------------------------
+
+  async listSalesAgents(orgId: string, projectId: string) {
+    await this.getOwnedProject(orgId, projectId);
+    const rows = await this.prisma.projectSalesAgent.findMany({
+      where: { projectId },
+      orderBy: { assignedAt: 'asc' },
+      include: {
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+      },
+    });
+    return rows.map((r) => ({
+      id: r.user.id,
+      firstName: r.user.firstName,
+      lastName: r.user.lastName,
+      email: r.user.email,
+      name:
+        [r.user.firstName, r.user.lastName].filter(Boolean).join(' ') ||
+        r.user.email,
+      assignedAt: r.assignedAt,
+    }));
+  }
+
+  async setSalesAgents(orgId: string, projectId: string, userIds: string[]) {
+    await this.getOwnedProject(orgId, projectId);
+
+    const unique = [...new Set(userIds)];
+    if (unique.length > 0) {
+      // Every id must be a Sales-role user in the caller's own org — never
+      // trusted from the body. The picker only shows sales users, but a
+      // direct API call must not be able to attach an admin/manager. Role
+      // check uses the same `userRoles.some.role.key` shape as
+      // org-users.util.ts / admin-organisations.service.ts.
+      const count = await this.prisma.user.count({
+        where: {
+          id: { in: unique },
+          orgId,
+          userRoles: { some: { role: { key: 'sales' } } },
+        },
+      });
+      if (count !== unique.length) {
+        throw new BadRequestException(
+          'Every assigned agent must be a Sales-role user in your organisation',
+        );
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.projectSalesAgent.deleteMany({ where: { projectId } });
+      if (unique.length > 0) {
+        await tx.projectSalesAgent.createMany({
+          data: unique.map((userId) => ({ projectId, userId })),
+        });
+      }
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          action: 'project_sales_agents_set',
+          entity: 'Project',
+          entityId: projectId,
+          metadata: { count: unique.length },
+        },
+      });
+    });
+
+    return this.listSalesAgents(orgId, projectId);
+  }
+
+  // -------------------------------------------------------------------------
   // Unit types
   // -------------------------------------------------------------------------
 
-  async createUnitType(orgId: string, projectId: string, dto: CreateUnitTypeDto) {
+  async createUnitType(
+    orgId: string,
+    projectId: string,
+    dto: CreateUnitTypeDto,
+  ) {
     await this.getOwnedProject(orgId, projectId);
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -382,7 +525,11 @@ export class ProjectsService {
           action: 'unit_created',
           entity: 'Unit',
           entityId: row.id,
-          metadata: { projectId, unitTypeId: row.unitTypeId, unitNo: row.unitNo },
+          metadata: {
+            projectId,
+            unitTypeId: row.unitTypeId,
+            unitNo: row.unitNo,
+          },
         },
       });
       return row;
@@ -434,7 +581,8 @@ export class ProjectsService {
     }
     if (dto.unitNo !== undefined) data.unitNo = dto.unitNo;
     if (dto.tower !== undefined) {
-      data.tower = typeof dto.tower === 'string' ? dto.tower.trim() || null : null;
+      data.tower =
+        typeof dto.tower === 'string' ? dto.tower.trim() || null : null;
     }
     if (dto.floor !== undefined) data.floor = dto.floor;
     if (dto.facing !== undefined) data.facing = dto.facing;
@@ -524,7 +672,9 @@ export class ProjectsService {
       select: { id: true },
     });
     if (!user) {
-      throw new BadRequestException('Manager must be a user in your organisation');
+      throw new BadRequestException(
+        'Manager must be a user in your organisation',
+      );
     }
   }
 
@@ -627,6 +777,29 @@ export class ProjectsService {
         name: string;
         iconUrl: string | null;
       }>,
+      // Onboarding-wizard fields (Steps 3-8).
+      bookingAmount: project.bookingAmount,
+      currency: project.currency,
+      priceIncludes: project.priceIncludes,
+      paymentPlan: project.paymentPlan,
+      offers: project.offers,
+      addressLine: project.addressLine,
+      city: project.city,
+      locality: project.locality,
+      pincode: project.pincode,
+      latitude: project.latitude,
+      longitude: project.longitude,
+      connectivity: project.connectivity,
+      landmarks: project.landmarks,
+      specifications: project.specifications,
+      marketing: project.marketing,
+      requireBookingApproval: project.requireBookingApproval,
+      visibleToTelecallers: project.visibleToTelecallers,
+      publishedToWebsite: project.publishedToWebsite,
+      coverImageUrl: project.coverImageUrl,
+      galleryUrls: project.galleryUrls,
+      brochureUrl: project.brochureUrl,
+      reraCertificateUrl: project.reraCertificateUrl,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
     };

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ListProjectsQueryDto } from './dto/list-projects-query.dto';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
+import { SetSalesAgentsDto } from './dto/set-sales-agents.dto';
 import { CreateUnitTypeDto } from './dto/create-unit-type.dto';
 import { UpdateUnitTypeDto } from './dto/update-unit-type.dto';
 import { CreateUnitDto } from './dto/create-unit.dto';
@@ -76,6 +78,24 @@ export class ProjectsController {
     return this.service.remove(user.orgId as string, id);
   }
 
+  // --- Sales agents assigned to a project (Step 7 of the wizard) ---
+
+  @Get(':id/sales-agents')
+  listSalesAgents(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.service.listSalesAgents(user.orgId as string, id);
+  }
+
+  // Full-set replace — send every assigned user id; whatever was there
+  // before is discarded. Re-submitting the same set is a no-op (no dupes).
+  @Put(':id/sales-agents')
+  setSalesAgents(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: SetSalesAgentsDto,
+  ) {
+    return this.service.setSalesAgents(user.orgId as string, id, dto.userIds);
+  }
+
   // --- Unit types (nested under a project) ---
 
   @Post(':projectId/unit-types')
@@ -111,7 +131,12 @@ export class ProjectsController {
     @Param('id') id: string,
     @Body() dto: UpdateUnitTypeDto,
   ) {
-    return this.service.updateUnitType(user.orgId as string, projectId, id, dto);
+    return this.service.updateUnitType(
+      user.orgId as string,
+      projectId,
+      id,
+      dto,
+    );
   }
 
   @Delete(':projectId/unit-types/:id')
@@ -169,7 +194,12 @@ export class ProjectsController {
     @Param('id') id: string,
     @Body() dto: UpdateUnitStatusDto,
   ) {
-    return this.service.updateUnitStatus(user.orgId as string, projectId, id, dto);
+    return this.service.updateUnitStatus(
+      user.orgId as string,
+      projectId,
+      id,
+      dto,
+    );
   }
 
   @Delete(':projectId/units/:id')

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
+import { parseAmount, parseCount, parseInteger } from "@/lib/parse";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
 import { Modal } from "@/components/ui/modal";
@@ -55,12 +56,6 @@ function pricePerSqft(
   return `₹${Math.round(price / carpetSqft).toLocaleString("en-IN")}/sqft`;
 }
 
-function numOrUndef(value: string): number | undefined {
-  const t = value.trim();
-  if (!t) return undefined;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : undefined;
-}
 
 function compactRupees(value: number | null): string {
   if (value == null) return "—";
@@ -191,10 +186,10 @@ export default function OrgProjectUnitsPage() {
     try {
       const body: CreateUnitTypeInput = {
         name: utForm.name.trim(),
-        carpetSqft: numOrUndef(utForm.carpetSqft),
-        builtupSqft: numOrUndef(utForm.builtupSqft),
-        price: numOrUndef(utForm.price),
-        totalUnits: numOrUndef(utForm.totalUnits),
+        carpetSqft: parseCount(utForm.carpetSqft),
+        builtupSqft: parseCount(utForm.builtupSqft),
+        price: parseAmount(utForm.price),
+        totalUnits: parseCount(utForm.totalUnits),
       };
       if (utMode === "create") {
         await apiFetch(`/org/projects/${id}/unit-types`, {
@@ -260,9 +255,9 @@ export default function OrgProjectUnitsPage() {
           unitTypeId: unitForm.unitTypeId,
           unitNo: unitForm.unitNo.trim(),
           tower: unitForm.tower.trim() || undefined,
-          floor: numOrUndef(unitForm.floor),
+          floor: parseInteger(unitForm.floor),
           facing: unitForm.facing.trim() || undefined,
-          price: numOrUndef(unitForm.price),
+          price: parseAmount(unitForm.price),
           status: unitForm.status,
         };
         await apiFetch(`/org/projects/${id}/units`, {
@@ -276,9 +271,9 @@ export default function OrgProjectUnitsPage() {
           unitTypeId: unitForm.unitTypeId,
           unitNo: unitForm.unitNo.trim(),
           tower: unitForm.tower.trim() || null,
-          floor: numOrUndef(unitForm.floor) ?? null,
+          floor: parseInteger(unitForm.floor) ?? null,
           facing: unitForm.facing.trim() || null,
-          price: numOrUndef(unitForm.price) ?? null,
+          price: parseAmount(unitForm.price) ?? null,
           status: unitForm.status,
         };
         await apiFetch(`/org/projects/${id}/units/${unitEditingId}`, {
@@ -856,7 +851,7 @@ export default function OrgProjectUnitsPage() {
 
             <div className="sec">
               <div className="lbl">🏗️ Project placement</div>
-              <div className="g3">
+              <div className="grid g3">
                 <div className="field">
                   <label>Unit type <span className="req">*</span></label>
                   <select
@@ -902,7 +897,7 @@ export default function OrgProjectUnitsPage() {
 
             <div className="sec">
               <div className="lbl">🏠 Unit details</div>
-              <div className="g3">
+              <div className="grid g3">
                 <div className="field">
                   <label>Unit number <span className="req">*</span></label>
                   <input
@@ -958,7 +953,7 @@ export default function OrgProjectUnitsPage() {
 
             <div className="sec nb">
               <div className="lbl">💰 Pricing</div>
-              <div className="g2">
+              <div className="grid g2">
                 <div className="field">
                   <label>Price (₹)</label>
                   <input

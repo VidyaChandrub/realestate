@@ -149,6 +149,7 @@ model Organisation {
   orgDomainRequests     OrgDomainRequest[]
   trackingEvents        TrackingEvent[]
   projects              Project[]
+  catalogOptions        OrgCatalogOption[]
 
   @@map("organisations")
   @@schema("identity")
@@ -182,6 +183,7 @@ model User {
   resetTokens     PasswordResetToken[]
   auditLogs       AuditLog[]
   managedProjects Project[]
+  salesProjects   ProjectSalesAgent[]
   assignedLeads   Lead[]
   callLogs        CallLog[]
   activityEvents  ActivityEvent[]
@@ -881,6 +883,19 @@ enum UnitStatus {
   @@schema("projects")
 }
 
+// The four org-managed catalogs the project onboarding wizard picks from.
+// All four are structurally identical (an org-scoped, orderable label), so
+// one table keyed by this discriminator beats four near-identical tables —
+// see OrgCatalogOption.
+enum OrgCatalogCategory {
+  project_type
+  unit_type
+  connectivity
+  amenity
+
+  @@schema("projects")
+}
+
 model Project {
   id                String        @id @default(uuid())
   orgId             String        @map("org_id")
@@ -902,16 +917,62 @@ model Project {
   // Array of { name: string, iconUrl: string | null }. iconUrl is always
   // null for now — amenity-icon upload is out of scope (blocked on S3).
   amenities         Json          @default("[]")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
 
-  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  manager      User?        @relation(fields: [managerId], references: [id], onDelete: SetNull)
+  // --- Onboarding-wizard fields (Steps 3-8), added by Piece A. All optional;
+  // the wizard wires them progressively in Pieces B-E. `specifications` and
+  // `marketing` are deliberately loose preference blobs — their inner shape
+  // is expected to evolve, so they're Json rather than columns. ---
+  bookingAmount          Int?     @map("booking_amount") // rupees
+  currency               String   @default("INR")
+  priceIncludes          String[] @default([]) @map("price_includes")
+  paymentPlan            String?  @map("payment_plan")
+  offers                 String?
+  addressLine            String?  @map("address_line")
+  city                   String?
+  locality               String?
+  pincode                String? // kept as text — leading zeros matter
+  latitude               Float?
+  longitude              Float?
+  connectivity           String[] @default([]) // labels copied from the org "connectivity" catalog
+  landmarks              String?
+  specifications         Json? // { flooring, kitchen, doorsWindows, fittings, notes }
+  marketing              Json? // { adSources, monthlyBudget, targetCpl, leadGoal, landingPageChoice, aiCallingEnabled, whatsappWelcomeEnabled, roundRobinEnabled, aiKnowledgeBaseEnabled }
+  requireBookingApproval Boolean  @default(false) @map("require_booking_approval")
+  visibleToTelecallers   Boolean  @default(true) @map("visible_to_telecallers")
+  publishedToWebsite     Boolean  @default(false) @map("published_to_website")
+  coverImageUrl          String?  @map("cover_image_url")
+  galleryUrls            String[] @default([]) @map("gallery_urls")
+  brochureUrl            String?  @map("brochure_url")
+  reraCertificateUrl     String?  @map("rera_certificate_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organisation Organisation        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  manager      User?               @relation(fields: [managerId], references: [id], onDelete: SetNull)
   unitTypes    UnitType[]
+  salesAgents  ProjectSalesAgent[]
 
   @@index([orgId])
   @@index([managerId])
   @@map("projects")
+  @@schema("projects")
+}
+
+// Sales users assigned to work a project's leads (Step 7 of the wizard).
+// Plain many-to-many, same shape as OrganisationTemplate: composite id, both
+// sides cascade-delete. Links straight to User — no team concept here.
+model ProjectSalesAgent {
+  projectId  String   @map("project_id")
+  userId     String   @map("user_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+  @@map("project_sales_agents")
   @@schema("projects")
 }
 
@@ -964,5 +1025,32 @@ model Unit {
 
   @@index([unitTypeId])
   @@map("units")
+  @@schema("projects")
+}
+
+// Org-managed custom catalogs — each organisation builds its own option
+// lists for the project onboarding wizard (project types, unit-type labels,
+// connectivity/landmark categories, amenities). Not a Super Admin global
+// list, not hardcoded in the frontend. Managed from Org Settings;
+// pre-created only. One generic table keyed by `category`. "Copy, don't
+// reference": when a project is created the picked labels are copied onto
+// the project's own columns — there is NO foreign key from a project back
+// to a catalog option, so editing/deleting an option never affects an
+// already-created project.
+model OrgCatalogOption {
+  id        String             @id @default(uuid())
+  orgId     String             @map("org_id")
+  category  OrgCatalogCategory
+  label     String
+  // Manual display order within one (org, category) list; ties broken by label.
+  sortOrder Int                @default(0) @map("sort_order")
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, category, label])
+  @@index([orgId, category])
+  @@map("org_catalog_options")
   @@schema("projects")
 }
