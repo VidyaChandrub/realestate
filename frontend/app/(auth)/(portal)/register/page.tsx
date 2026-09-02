@@ -837,11 +837,11 @@ export default function RegisterPage() {
               <div className="row2">
                 <div className="field">
                   <label>RERA / license no.</label>
-                  <input className="inp mono" value={rera} onChange={(e) => setRera(e.target.value)} placeholder="PR/GJ/AHM/2026/…" />
+                  <input className="inp inp-mono" value={rera} onChange={(e) => setRera(e.target.value)} placeholder="PR/GJ/AHM/2026/…" />
                 </div>
                 <div className="field">
                   <label>GSTIN</label>
-                  <input className="inp mono" value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="24AABCS…" />
+                  <input className="inp inp-mono" value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="24AABCS…" />
                 </div>
               </div>
               <div className="field">
