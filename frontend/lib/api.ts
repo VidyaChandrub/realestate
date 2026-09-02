@@ -9,6 +9,7 @@ import type {
   ChangePlanInput,
   ChangePlanResult,
   CompleteOnboardingResult,
+  CreateOrgCatalogOptionInput,
   CrmAssignee,
   CrmAssignableResponse,
   CrmLead,
@@ -22,6 +23,9 @@ import type {
   ModulesStepInput,
   ModulesStepResponse,
   NotificationsListResponse,
+  OrgCatalogCategory,
+  OrgCatalogOption,
+  ProjectSalesAgent,
   OnboardingAccountInput,
   OnboardingOrganisationInput,
   OnboardingStepResult,
@@ -40,6 +44,7 @@ import type {
   TemplatesStepInput,
   TemplatesStepResponse,
   UnreadNotificationsResponse,
+  UpdateOrgCatalogOptionInput,
   UserProfile,
 } from "./types";
 
@@ -423,4 +428,59 @@ export async function markAllNotificationsRead(): Promise<{ success: boolean }> 
   return apiFetch<{ success: boolean }>("/admin/notifications/read-all", {
     method: "POST",
   });
+}
+
+// --- Org custom catalogs (project onboarding wizard option lists) ---
+
+export async function getOrgCatalogOptions(
+  category?: OrgCatalogCategory,
+): Promise<OrgCatalogOption[]> {
+  const q = category ? `?category=${category}` : "";
+  return apiFetch<OrgCatalogOption[]>(`/org/project-catalog${q}`);
+}
+
+export async function createOrgCatalogOption(
+  input: CreateOrgCatalogOptionInput,
+): Promise<OrgCatalogOption> {
+  return apiFetch<OrgCatalogOption>("/org/project-catalog", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateOrgCatalogOption(
+  id: string,
+  input: UpdateOrgCatalogOptionInput,
+): Promise<OrgCatalogOption> {
+  return apiFetch<OrgCatalogOption>(`/org/project-catalog/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteOrgCatalogOption(
+  id: string,
+): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/org/project-catalog/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// --- Project sales agents (Step 7 of the onboarding wizard) ---
+
+export async function getProjectSalesAgents(
+  projectId: string,
+): Promise<ProjectSalesAgent[]> {
+  return apiFetch<ProjectSalesAgent[]>(`/org/projects/${projectId}/sales-agents`);
+}
+
+/** Full-set replace — pass every assigned user id; re-submitting is idempotent. */
+export async function setProjectSalesAgents(
+  projectId: string,
+  userIds: string[],
+): Promise<ProjectSalesAgent[]> {
+  return apiFetch<ProjectSalesAgent[]>(
+    `/org/projects/${projectId}/sales-agents`,
+    { method: "PUT", body: JSON.stringify({ userIds }) },
+  );
 }

@@ -28,6 +28,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { OrgTrackingModule } from './modules/org-tracking/org-tracking.module';
 import { PublicSiteModule } from './modules/public-site/public-site.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { OrgProjectCatalogModule } from './modules/org-project-catalog/org-project-catalog.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
     LeadsModule,
     SalesAgentsModule,
     ProjectsModule,
+    OrgProjectCatalogModule,
     OrgDomainRequestsModule,
     AdminDomainRequestsModule,
     OrgDomainModule,

@@ -64,7 +64,7 @@ export default function UnitCreatePage() {
             {mode === "project" && (
               <div className="sec" id="projField">
                 <div className="lbl">🏗️ Project placement</div>
-                <div className="g3">
+                <div className="grid g3">
                   <div className="field">
                     <label>Project</label>
                     <select className="inp" value={project} onChange={(e) => setProject(e.target.value)}>
@@ -87,7 +87,7 @@ export default function UnitCreatePage() {
 
             <div className="sec">
               <div className="lbl">🏠 Unit details</div>
-              <div className="g3">
+              <div className="grid g3">
                 <div className="field">
                   <label>Unit number <span className="req">*</span></label>
                   <input className="inp" placeholder="B-1204" value={unitNo} onChange={(e) => setUnitNo(e.target.value)} />
@@ -103,7 +103,7 @@ export default function UnitCreatePage() {
                   <input className="inp" placeholder="Type A" value={unitType} onChange={(e) => setUnitType(e.target.value)} />
                 </div>
               </div>
-              <div className="g3">
+              <div className="grid g3">
                 <div className="field">
                   <label>Carpet area (sqft)</label>
                   <input className="inp" placeholder="1,450" value={carpet} onChange={(e) => setCarpet(e.target.value)} />
@@ -133,7 +133,7 @@ export default function UnitCreatePage() {
 
             <div className="sec">
               <div className="lbl">💰 Pricing &amp; status</div>
-              <div className="g3">
+              <div className="grid g3">
                 <div className="field">
                   <label>Price <span className="req">*</span></label>
                   <input className="inp" placeholder="₹ 1,65,00,000" value={price} onChange={(e) => setPrice(e.target.value)} />
@@ -153,7 +153,7 @@ export default function UnitCreatePage() {
 
             <div className="sec">
               <div className="lbl">🖼️ Media &amp; documents</div>
-              <div className="g2">
+              <div className="grid g2">
                 <div className="field">
                   <label>Floor plan</label>
                   <div className="drop"><div className="em">📐</div>Upload floor plan</div>
@@ -167,7 +167,7 @@ export default function UnitCreatePage() {
 
             <div className="sec nb">
               <div className="lbl">📋 For standalone / resale (optional)</div>
-              <div className="g2">
+              <div className="grid g2">
                 <div className="field">
                   <label>Location / address</label>
                   <input className="inp" placeholder="SG Highway, Ahmedabad" value={location} onChange={(e) => setLocation(e.target.value)} />

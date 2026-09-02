@@ -4,15 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
+import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
 import "@/app/org/org.css";
-import type {
-  ProjectListRow,
-  ProjectsListResponse,
-  ProjectStatus,
-} from "@/lib/types";
+import type { ProjectsListResponse, ProjectStatus } from "@/lib/types";
 
 const LIMIT = 20;
 
@@ -22,21 +19,6 @@ const STATUS_FOR_TAB: (ProjectStatus | undefined)[] = [
   "active",
   "inactive",
 ];
-
-function compactRupees(value: number | null): string {
-  if (value == null) return "—";
-  if (value >= 1e7) return `₹${(value / 1e7).toFixed(2).replace(/\.?0+$/, "")} Cr`;
-  if (value >= 1e5) return `₹${(value / 1e5).toFixed(2).replace(/\.?0+$/, "")} L`;
-  return `₹${value.toLocaleString("en-IN")}`;
-}
-
-function priceRange(row: ProjectListRow): string {
-  if (row.priceMin == null && row.priceMax == null) return "—";
-  if (row.priceMin != null && row.priceMax != null) {
-    return `${compactRupees(row.priceMin)} – ${compactRupees(row.priceMax)}`;
-  }
-  return compactRupees(row.priceMin ?? row.priceMax);
-}
 
 function managerInitials(name: string | null | undefined): string {
   if (!name) return "—";
@@ -232,7 +214,7 @@ export default function OrgProjectsPage() {
                       <div className="loc">📍 {[p.location, p.reraId].filter(Boolean).join(" · ") || "—"}</div>
                     </div>
                     <div className="pmeta">
-                      <div><span className="k">Starting</span><b>{compactRupees(p.priceMin)}</b></div>
+                      <div><span className="k">Starting</span><b>{formatMoney(p.priceMin, p.currency)}</b></div>
                       <div><span className="k">Unit types</span><b>{p.unitTypeCount}</b></div>
                       <div><span className="k">Manager</span>                      <b><span className="u"><span className="av xs">{managerInitials(p.manager?.name)}</span></span></b></div>
                     </div>
@@ -289,7 +271,7 @@ export default function OrgProjectsPage() {
                             <span className="badge b-gray">Inactive</span>
                           )}
                         </td>
-                        <td>{priceRange(p)}</td>
+                        <td>{formatMoneyRange(p.priceMin, p.priceMax, p.currency)}</td>
                         <td>{p.unitTypeCount}</td>
                         <td><Link href={`/org/projects/${p.id}`} className="btn btn-ghost btn-sm">Open</Link></td>
                       </tr>

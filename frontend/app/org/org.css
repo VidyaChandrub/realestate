@@ -2273,9 +2273,12 @@
 .drop:hover{border-color:var(--brand);color:var(--brand)}
 .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
 @media(max-width:640px){.rev-grid{grid-template-columns:1fr}}
-.rev .sp{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
-.rev .sp .k{color:var(--muted)}
-.rev .sp .v{font-weight:600;text-align:right}
+/* Review rows are flat key/value lines — explicitly reset the generic
+   boxed `.sp` stat-tile style (background/border/radius, 20px display font
+   on `.v`) so it doesn't bleed through this partial override. */
+.rev .sp{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;font-size:13.5px}
+.rev .sp .k{color:var(--muted);font-size:13.5px;margin-bottom:0}
+.rev .sp .v{font-weight:600;font-size:13.5px;font-family:inherit;text-align:right}
 .wz-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
 .wz-foot .save{font-size:12.5px;color:var(--muted)}
 

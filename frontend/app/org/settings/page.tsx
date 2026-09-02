@@ -2,8 +2,8 @@
 
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, changePlan, getInvoices, getOrgDomainInfo, getPlans, requestCustomDomain } from "@/lib/api";
-import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
+import { apiFetch, changePlan, createOrgCatalogOption, deleteOrgCatalogOption, getInvoices, getOrgCatalogOptions, getOrgDomainInfo, getPlans, requestCustomDomain } from "@/lib/api";
+import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { subdomainPreviewHost } from "@/lib/domain";
@@ -53,6 +53,7 @@ const NAV_GROUPS = [
     { s: "crm", icon: "crm" as IconName, t: "CRM & Leads" },
     { s: "fields", icon: "puzzle" as IconName, t: "Custom Attributes" },
     { s: "pipeline", icon: "modules" as IconName, t: "Pipeline & Sources" },
+    { s: "catalogs", icon: "properties" as IconName, t: "Project Catalogs" },
     { s: "scoring", icon: "star" as IconName, t: "Scoring & Assignment" },
     { s: "automation", icon: "link" as IconName, t: "Automation & SLA" },
   ] },
@@ -80,6 +81,7 @@ const SECTION_META: Record<string, { icon: IconName; title: string; sub: string 
   crm: { icon: "crm", title: "CRM & leads", sub: "How leads are captured and handled" },
   fields: { icon: "puzzle", title: "Custom attributes", sub: "Add your own fields to leads, contacts, projects & bookings" },
   pipeline: { icon: "modules", title: "Pipeline & sources", sub: "Stages, lost reasons and lead sources" },
+  catalogs: { icon: "properties", title: "Project catalogs", sub: "Your own option lists the project onboarding wizard picks from" },
   scoring: { icon: "star", title: "Scoring & assignment", sub: "Lead scores and distribution rules" },
   automation: { icon: "link", title: "Automation & SLA", sub: "Trigger workflows and response targets" },
   comms: { icon: "phone", title: "Calling & WhatsApp", sub: "Dialler, AI voice and WhatsApp Business" },
@@ -351,6 +353,117 @@ function DomainSection() {
         )}
       </div>
     </Card>
+  );
+}
+
+// The four project-wizard catalogs, in the order they appear in the wizard.
+// Each maps to one OrgCatalogCategory; the section renders one card per row.
+const CATALOG_GROUPS: {
+  category: OrgCatalogCategory;
+  title: string;
+  sub: string;
+  placeholder: string;
+}[] = [
+  { category: "project_type", title: "Project types", sub: "e.g. Apartments, Villas, Plots, Commercial, Mixed-use", placeholder: "Add a project type…" },
+  { category: "unit_type", title: "Unit types", sub: "Configuration labels — e.g. 2 BHK, 3 BHK, Penthouse, Shop / Office", placeholder: "Add a unit type…" },
+  { category: "connectivity", title: "Connectivity & landmarks", sub: "Nearby categories — e.g. Metro / transit, Schools, Hospitals, Airport", placeholder: "Add a connectivity category…" },
+  { category: "amenity", title: "Amenities", sub: "Lifestyle features — e.g. Clubhouse, Gymnasium, Swimming pool", placeholder: "Add an amenity…" },
+];
+
+function CatalogSection() {
+  const [options, setOptions] = useState<OrgCatalogOption[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // Whichever category or option id is mid-request, so its control can show
+  // a pending state without a page-wide spinner.
+  const [busy, setBusy] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    getOrgCatalogOptions()
+      .then((rows) => setOptions(rows))
+      .catch((e) => setLoadError(e instanceof Error ? e.message : "Failed to load catalogs."));
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  async function addOption(category: OrgCatalogCategory) {
+    const label = (drafts[category] ?? "").trim();
+    if (!label) return;
+    setBusy(category); setRowError(null);
+    try {
+      const created = await createOrgCatalogOption({ category, label });
+      setOptions((prev) => (prev ? [...prev, created] : [created]));
+      setDrafts((d) => ({ ...d, [category]: "" }));
+    } catch (e) {
+      setRowError(e instanceof Error ? e.message : "Could not add that option.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function removeOption(id: string) {
+    setBusy(id); setRowError(null);
+    try {
+      await deleteOrgCatalogOption(id);
+      setOptions((prev) => (prev ? prev.filter((o) => o.id !== id) : prev));
+    } catch (e) {
+      setRowError(e instanceof Error ? e.message : "Could not remove that option.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <>
+      {loadError ? <div className="form-alert">{loadError}</div> : null}
+      {rowError ? <div className="form-alert">{rowError}</div> : null}
+      {CATALOG_GROUPS.map((g) => {
+        const rows = (options ?? [])
+          .filter((o) => o.category === g.category)
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
+        const draft = drafts[g.category] ?? "";
+        return (
+          <Card key={g.category} icon="properties" title={g.title} sub={g.sub}>
+            {options === null ? (
+              <p className="muted" style={{ margin: 0 }}>Loading…</p>
+            ) : (
+              <>
+                <div className="pill-list">
+                  {rows.length === 0 ? (
+                    <span className="muted" style={{ fontSize: 12.5 }}>No options yet — add the first one below.</span>
+                  ) : rows.map((o) => (
+                    <span key={o.id} className="pill" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                      {o.label}
+                      <span
+                        className="x"
+                        style={{ cursor: busy ? "wait" : "pointer", opacity: busy === o.id ? 0.4 : 1 }}
+                        onClick={() => { if (!busy) void removeOption(o.id); }}
+                      >×</span>
+                    </span>
+                  ))}
+                </div>
+                <form
+                  onSubmit={(e) => { e.preventDefault(); void addOption(g.category); }}
+                  style={{ display: "flex", gap: 8, marginTop: 12, maxWidth: 440 }}
+                >
+                  <input
+                    className="inp"
+                    placeholder={g.placeholder}
+                    value={draft}
+                    maxLength={120}
+                    onChange={(e) => setDrafts((d) => ({ ...d, [g.category]: e.target.value }))}
+                  />
+                  <button className="btn btn-primary btn-sm" type="submit" disabled={busy === g.category || !draft.trim()}>
+                    {busy === g.category ? "Adding…" : "+ Add"}
+                  </button>
+                </form>
+              </>
+            )}
+          </Card>
+        );
+      })}
+    </>
   );
 }
 
@@ -794,6 +907,12 @@ export default function OrgSettingsPage() {
                 <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add source</span>
               </div>
             </Card>
+          </div>
+
+          {/* CATALOGS */}
+          <div className={`os-section${section === "catalogs" ? " on" : ""}`}>
+            <SectionHead section="catalogs" />
+            <CatalogSection />
           </div>
 
           {/* SCORING */}
