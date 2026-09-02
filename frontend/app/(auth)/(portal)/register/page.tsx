@@ -673,32 +673,18 @@ export default function RegisterPage() {
                 </div>
                 <div className="field">
                   <label>Mobile <span className="req">*</span></label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <span
-                      className="inp mono"
-                      style={{
-                        width: 64,
-                        flex: "0 0 auto",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "var(--muted)",
-                        background: "var(--surface-2)",
-                      }}
-                    >
-                      {phoneCallingCode ?? "+--"}
-                    </span>
+                  <div className="phone-inp">
+                    <span className="cc">{phoneCallingCode ?? "+--"}</span>
                     <input
-                      className="inp"
-                      style={{ flex: 1 }}
                       type="text"
                       inputMode="numeric"
                       value={form.phone_number}
                       onChange={updatePhoneNumber}
                       placeholder="98250 41200"
+                      aria-label="Mobile number"
                     />
                   </div>
-                  <div className="hint">{phoneCallingCode ? "Auto-set from Country." : "Select a country to set the code."}</div>
+                {/*<div className="hint">{phoneCallingCode ? "Auto-set from Country." : "Select a country to set the code."}</div>*/}
                   {fieldErrors.phone_number ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.phone_number}</div> : null}
                 </div>
               </div>

@@ -95,3 +95,12 @@
 .seg{display:inline-flex;background:#eef1f6;border-radius:11px;padding:3px}
 .seg span{padding:7px 15px;border-radius:9px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:.18s}
 .seg span.on{background:var(--surface);color:var(--ink);box-shadow:var(--sh-sm)}
+
+/* ---------- Signup wizard: unified Mobile field ----------
+   The country code (read-only, derived from the Country selector) and the
+   number share one bordered box instead of two separate inputs. Purely
+   presentational — the value, validation and hint logic are unchanged. */
+.phone-inp{display:flex;align-items:center;width:100%;border:1px solid var(--line-2);border-radius:11px;background:var(--surface);transition:.18s;overflow:hidden}
+.phone-inp:focus-within{border-color:var(--brand);box-shadow:0 0 0 4px var(--brand-050)}
+.phone-inp .cc{flex:0 0 auto;padding:11px 4px 11px 13px;color:var(--muted);font-size:14px;white-space:nowrap;user-select:none}
+.phone-inp input{flex:1;min-width:0;border:0;outline:0;background:transparent;padding:11px 13px 11px 6px;font-size:14px;font-family:inherit;color:var(--ink)}
