@@ -939,10 +939,78 @@ export interface SalesAgentRecentLead {
   createdAt: string;
 }
 
+export type SalesAgentCallDirection = "outgoing" | "incoming";
+
+export interface SalesAgentComms {
+  callsMade: number;
+  connected: number;
+  connectRate: number;
+  talkSeconds: number;
+  avgCallSeconds: number;
+  whatsappSent: number;
+  whatsappRead: number;
+  whatsappReadPct: number;
+}
+
+export interface SalesAgentCall {
+  id: string;
+  leadId: string | null;
+  leadName: string | null;
+  direction: SalesAgentCallDirection;
+  outcome:
+    | "connected"
+    | "booked_visit"
+    | "callback"
+    | "no_answer"
+    | "missed"
+    | "busy";
+  durationSeconds: number;
+  createdAt: string;
+}
+
+export type SalesAgentActivityType =
+  | "closed_deal"
+  | "site_visit_booked"
+  | "call_logged"
+  | "whatsapp_sent"
+  | "whatsapp_read"
+  | "note_added"
+  | "status_updated"
+  | "logged_in";
+
+export interface SalesAgentActivity {
+  id: string;
+  type: SalesAgentActivityType;
+  text: string;
+  createdAt: string;
+}
+
+export interface SalesAgentTargets {
+  revenueCr: number;
+  revenueTargetCr: number;
+  closures: number;
+  targetClosures: number;
+  siteVisits: number;
+  siteVisitTarget: number;
+  leadsWorked: number;
+  leadsWorkedTarget: number;
+}
+
+export interface SalesAgentDayBar {
+  day: string;
+  leads: number;
+  calls: number;
+}
+
 export interface SalesAgentDetailResponse {
   agent: SalesAgent;
   totalAgents: number;
   recentLeads: SalesAgentRecentLead[];
+  comms: SalesAgentComms;
+  calls: SalesAgentCall[];
+  activity: SalesAgentActivity[];
+  targets: SalesAgentTargets;
+  activity14: SalesAgentDayBar[];
 }
 
 // --- Organisation domain identity (subdomain + custom domain) ---

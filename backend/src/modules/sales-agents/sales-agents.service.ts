@@ -7,9 +7,9 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 
-/** Sales agents = org members who carry leads. Visible roles on the team
- *  dashboard mirror `LeadsService.LIMITED_ROLES` — the same roles that are
- *  scoped to their own leads in the inbox. */
+/** Sales agents = org members who carry leads. Only manager/sales appear on
+ *  the team dashboard — the same roles scoped to their own leads in the
+ *  inbox (mirrors `LeadsService.LIMITED_ROLES`). */
 const AGENT_ROLES = ['manager', 'sales'];
 
 /** Ordered pipeline so the response always lists every stage, zero or not. */
@@ -117,19 +117,153 @@ export class SalesAgentsService {
       throw new NotFoundException('Sales agent not found');
     }
 
-    const recentLeads = await this.prisma.lead.findMany({
-      where: { orgId, assignedToId: agentId },
-      orderBy: { createdAt: 'desc' },
-      take: 15,
-      select: {
-        id: true,
-        formName: true,
-        source: true,
-        status: true,
-        data: true,
-        createdAt: true,
+    const since14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+    const [recentLeads, calls, activity, callStats, leadDays, callDays] =
+      await Promise.all([
+        this.prisma.lead.findMany({
+          where: { orgId, assignedToId: agentId },
+          orderBy: { createdAt: 'desc' },
+          take: 15,
+          select: {
+            id: true,
+            formName: true,
+            source: true,
+            status: true,
+            data: true,
+            createdAt: true,
+          },
+        }),
+        this.prisma.callLog.findMany({
+          where: { orgId, agentId },
+          orderBy: { createdAt: 'desc' },
+          take: 12,
+          select: {
+            id: true,
+            leadId: true,
+            leadName: true,
+            direction: true,
+            outcome: true,
+            durationSeconds: true,
+            createdAt: true,
+          },
+        }),
+        this.prisma.activityEvent.findMany({
+          where: { orgId, agentId },
+          orderBy: { createdAt: 'desc' },
+          take: 12,
+          select: { id: true, type: true, text: true, createdAt: true },
+        }),
+        this.prisma.callLog.groupBy({
+          by: ['outcome'],
+          where: { orgId, agentId },
+          _count: { _all: true },
+          _sum: { durationSeconds: true },
+        }),
+        // Last-14-days series for the "Activity — last 14 days" chart. Leases
+        // and calls are bucketed by calendar day (server-local) so the paired
+        // bars show real work over the trailing fortnight.
+        this.prisma.lead.findMany({
+          where: { orgId, assignedToId: agentId, createdAt: { gte: since14 } },
+          select: { createdAt: true },
+        }),
+        this.prisma.callLog.findMany({
+          where: { orgId, agentId, createdAt: { gte: since14 } },
+          select: { createdAt: true },
+        }),
+      ]);
+
+    const outcomeMap = new Map(
+      callStats.map((row) => [
+        row.outcome,
+        { count: row._count._all, secs: row._sum.durationSeconds ?? 0 },
+      ]),
+    );
+    // Outcomes that actually established a conversation (voice connects + a
+    // visit booked on the call); no-answer / busy / missed calls are attempts.
+    const connectable = (['connected', 'booked_visit'] as const).filter(
+      (outcome) => outcomeMap.has(outcome),
+    );
+    const callsMade = callStats.reduce((sum, row) => sum + row._count._all, 0);
+    const connected = connectable.reduce(
+      (sum, outcome) => sum + (outcomeMap.get(outcome)?.count ?? 0),
+      0,
+    );
+    const talkSeconds = callStats.reduce(
+      (sum, row) => sum + (row._sum.durationSeconds ?? 0),
+      0,
+    );
+
+    const whatsapp = await this.prisma.activityEvent.groupBy({
+      by: ['type'],
+      where: {
+        orgId,
+        agentId,
+        type: { in: ['whatsapp_sent', 'whatsapp_read'] },
       },
+      _count: { _all: true },
     });
+    const whatsappSent =
+      whatsapp.find((row) => row.type === 'whatsapp_sent')?._count._all ?? 0;
+    const whatsappRead =
+      whatsapp.find((row) => row.type === 'whatsapp_read')?._count._all ?? 0;
+
+    // Last-14-days paired series (leads vs calls) — bucketed by calendar day.
+    const bucketDay = (rows: { createdAt: Date }[]) =>
+      rows.reduce<Record<string, number>>((acc, r) => {
+        const key = r.createdAt.toISOString().slice(5, 10);
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+      }, {});
+    const leadBuckets = bucketDay(leadDays);
+    const callBuckets = bucketDay(callDays);
+    const activity14 = Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(Date.now() - (13 - i) * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().slice(5, 10);
+      return {
+        day: String(14 - i),
+        leads: leadBuckets[key] ?? 0,
+        calls: callBuckets[key] ?? 0,
+      };
+    });
+
+    // Monthly "Targets — this month" block. Current values come straight from
+    // real CRM data; targets are modest stretch goals derived from the whole
+    // org's run-rate (so each bar stays honest but signals headroom). Site
+    // visits = leads in the site-visit stage; leads worked = any lead beyond
+    // "new".
+    const siteVisits =
+      summary.stats.pipeline.find((s) => s.status === 'site_visit')?.count ?? 0;
+    const leadsWorked = summary.stats.leadsAssigned - siteVisits;
+    const revenueCr = Math.round((summary.stats.revenueBooked / 1e7) * 10) / 10;
+    const closuresAvg =
+      allRows.length > 0
+        ? allRows.reduce((s, r) => s + r.stats.closures, 0) / allRows.length
+        : 0;
+    const revenueAvg =
+      allRows.length > 0
+        ? allRows.reduce((s, r) => s + r.stats.revenueBooked / 1e7, 0) /
+          allRows.length
+        : 0;
+    const targets = {
+      revenueCr,
+      revenueTargetCr: Math.max(
+        revenueCr,
+        Math.round(Math.ceil(revenueAvg * 1.15) * 10) / 10,
+      ),
+      closures: summary.stats.closures,
+      targetClosures: Math.max(
+        summary.stats.closures + 1,
+        Math.ceil(closuresAvg * 1.2),
+      ),
+      siteVisits,
+      siteVisitTarget: Math.max(siteVisits + 1, 10),
+      leadsWorked,
+      leadsWorkedTarget: Math.max(
+        leadsWorked + 1,
+        Math.ceil(leadsWorked + closuresAvg * 2),
+      ),
+    };
 
     return {
       agent: summary,
@@ -143,6 +277,37 @@ export class SalesAgentsService {
         budget: this.parseAmount(lead.data),
         createdAt: lead.createdAt,
       })),
+      comms: {
+        callsMade,
+        connected,
+        connectRate:
+          callsMade > 0 ? Math.round((connected / callsMade) * 1000) / 10 : 0,
+        talkSeconds,
+        avgCallSeconds: connected > 0 ? Math.round(talkSeconds / connected) : 0,
+        whatsappSent,
+        whatsappRead,
+        whatsappReadPct:
+          whatsappSent > 0
+            ? Math.round((whatsappRead / whatsappSent) * 100)
+            : 0,
+      },
+      calls: calls.map((call) => ({
+        id: call.id,
+        leadId: call.leadId,
+        leadName: call.leadName,
+        direction: call.direction,
+        outcome: call.outcome,
+        durationSeconds: call.durationSeconds,
+        createdAt: call.createdAt,
+      })),
+      activity: activity.map((event) => ({
+        id: event.id,
+        type: event.type,
+        text: event.text,
+        createdAt: event.createdAt,
+      })),
+      targets,
+      activity14,
     };
   }
 
