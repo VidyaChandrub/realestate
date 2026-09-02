@@ -7,7 +7,7 @@ import { ArrowLeft, CheckCircle2, Copy, Eye, LayoutTemplate, Pencil, X } from "l
 import { Reveal } from "@/components/superadmin/reveal";
 import { StatusBadge, TemplateCover, manageHref, statusStyle } from "@/components/superadmin/templates/shared";
 import { loadTemplate, duplicateTemplate, saveTemplate } from "@/lib/prestate/persist";
-import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
+import { builderPath, templatePreviewPath } from "@/lib/prestate/paths";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import type { LandingPageData } from "@/lib/prestate/types";
 
@@ -119,7 +119,7 @@ export default function SuperAdminTemplateDetailPage() {
     }
   }
 
-  const previewHref = localPreviewPath(template);
+  const previewHref = templatePreviewPath(template.id);
 
   return (
     <>
@@ -229,7 +229,7 @@ export default function SuperAdminTemplateDetailPage() {
                 <div className="field">
                   <label>URL slug</label>
                   <input className="inp" value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-template" />
-                  <div className="hint">Preview at {localPreviewPath({ slug: slug || template.slug })}</div>
+                  <div className="hint">Public URL slug — used when a domain is mapped to this template.</div>
                 </div>
                 <div className="row2">
                   <div className="field">
