@@ -27,6 +27,8 @@ import { ActivateOrganisationDto } from './dto/activate-organisation.dto';
 import { ListOrganisationsQueryDto } from './dto/list-organisations-query.dto';
 import { UpdateOrganisationDto } from './dto/update-organisation.dto';
 import { UpdateOrganisationStatusDto } from './dto/update-organisation-status.dto';
+import { LogoUploadUrlDto } from './dto/logo-upload-url.dto';
+import { StorageService } from '../../common/storage/storage.service';
 import { CreateOrgUserDto } from '../org-users/dto/create-org-user.dto';
 import { UpdateOrgUserStatusDto } from '../org-users/dto/update-org-user-status.dto';
 import { ListOrgUsersQueryDto } from '../org-users/dto/list-org-users-query.dto';
@@ -46,6 +48,7 @@ export class AdminOrganisationsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
   ) {}
 
   async onboardCompany(dto: OnboardCompanyDto) {
@@ -430,6 +433,25 @@ export class AdminOrganisationsService {
     });
 
     return toSafeOrganisation(updated);
+  }
+
+  // Presigned PUT URL for the target org's logo or favicon, used by the
+  // Super Admin org-detail edit form. Same StorageService rules as the
+  // signup wizard — the key is scoped to this org's id (path param,
+  // already validated to be a real org above), never a client value.
+  async createAssetUploadUrl(
+    id: string,
+    field: 'logo' | 'favicon',
+    dto: LogoUploadUrlDto,
+  ) {
+    await this.getRealOrganisation(id);
+    return this.storage.createUploadUrl({
+      orgId: id,
+      field,
+      filename: dto.filename,
+      contentType: dto.contentType,
+      size: dto.size,
+    });
   }
 
   async updateStatus(id: string, dto: UpdateOrganisationStatusDto) {

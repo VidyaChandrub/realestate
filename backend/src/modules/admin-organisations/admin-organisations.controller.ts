@@ -22,6 +22,7 @@ import { ActivateOrganisationDto } from './dto/activate-organisation.dto';
 import { ListOrganisationsQueryDto } from './dto/list-organisations-query.dto';
 import { UpdateOrganisationDto } from './dto/update-organisation.dto';
 import { UpdateOrganisationStatusDto } from './dto/update-organisation-status.dto';
+import { LogoUploadUrlDto } from './dto/logo-upload-url.dto';
 import { CreateOrgUserDto } from '../org-users/dto/create-org-user.dto';
 import { UpdateOrgUserStatusDto } from '../org-users/dto/update-org-user-status.dto';
 import { ListOrgUsersQueryDto } from '../org-users/dto/list-org-users-query.dto';
@@ -75,6 +76,16 @@ export class AdminOrganisationsController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateOrganisationDto) {
     return this.adminOrganisationsService.update(id, dto);
+  }
+
+  @Post(':id/logo-upload-url')
+  logoUploadUrl(@Param('id') id: string, @Body() dto: LogoUploadUrlDto) {
+    return this.adminOrganisationsService.createAssetUploadUrl(id, 'logo', dto);
+  }
+
+  @Post(':id/favicon-upload-url')
+  faviconUploadUrl(@Param('id') id: string, @Body() dto: LogoUploadUrlDto) {
+    return this.adminOrganisationsService.createAssetUploadUrl(id, 'favicon', dto);
   }
 
   @Patch(':id/status')
