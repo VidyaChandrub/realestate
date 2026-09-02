@@ -995,11 +995,12 @@ export default function RegisterPage() {
                   })}
                 </div>
               )}
-              <label className="check" style={{ marginTop: 18, alignItems: "flex-start" }}>
+              <label className="check" style={{ marginTop: 18 }}>
                 <input
                   type="checkbox"
                   checked={agreedToTerms}
                   onChange={(e) => { setAgreedToTerms(e.target.checked); setGeneralError(null); }}
+                  style={{ flexShrink: 0 }}
                 />
                 I agree to the Terms of Service &amp; Privacy Policy
               </label>
