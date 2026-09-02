@@ -846,28 +846,53 @@ export default function RegisterPage() {
               </div>
               <div className="field">
                 <label>Logo</label>
-                <label className="drop" style={{ cursor: "pointer", display: "block" }}>
-                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" onChange={handleLogoSelect} style={{ display: "none" }} />
-                  {logoUploading ? (
-                    "Uploading…"
-                  ) : logoUrl ? (
-                    <>✅ Logo uploaded · <span style={{ color: "var(--brand)", fontWeight: 600 }}>replace</span></>
-                  ) : (
-                    <>🖼️ Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></>
-                  )}
-                </label>
+                {logoUrl ? (
+                  <div className="drop" style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-start", cursor: "default" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={logoUrl}
+                      alt="Logo preview"
+                      style={{ width: 40, height: 40, objectFit: "contain", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--surface)", flexShrink: 0 }}
+                    />
+                    <span className="muted" style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {logoUploading ? "Uploading…" : "Logo uploaded"}
+                    </span>
+                    <label style={{ flexShrink: 0, cursor: "pointer", color: "var(--brand)", fontWeight: 600, fontSize: 12.5 }}>
+                      <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" onChange={handleLogoSelect} style={{ display: "none" }} />
+                      Replace
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setLogoUrl(null)}
+                      aria-label="Remove logo"
+                      title="Remove logo"
+                      style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, border: "1px solid var(--line-2)", background: "var(--surface)", color: "var(--muted)", cursor: "pointer", fontSize: 13, lineHeight: 1 }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <label className="drop" style={{ cursor: "pointer", display: "block" }}>
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" onChange={handleLogoSelect} style={{ display: "none" }} />
+                    {logoUploading ? (
+                      "Uploading…"
+                    ) : (
+                      <>🖼️ Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></>
+                    )}
+                  </label>
+                )}
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>Brand colour</label>
-                <div className="colorset" id="colors">
-                  {["#4f46e5", "#0ea5e9", "#0d9488", "#16a34a", "#d97706", "#e11d48", "#7c3aed"].map((c) => (
-                    <span
-                      key={c}
-                      className={brandColour.toLowerCase() === c ? "on" : ""}
-                      style={{ background: c }}
-                      onClick={() => setBrandColour(c)}
-                    />
-                  ))}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input
+                    type="color"
+                    className="colorpick"
+                    value={/^#[0-9a-f]{6}$/i.test(brandColour) ? brandColour : "#4f46e5"}
+                    onChange={(e) => setBrandColour(e.target.value)}
+                    aria-label="Pick a brand colour"
+                  />
+                  <span className="mono">{brandColour.toUpperCase()}</span>
                 </div>
               </div>
             </div>
