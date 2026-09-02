@@ -29,6 +29,22 @@ import { JwtPayload } from '../types/jwt-payload.interface';
 // Must run after JwtAuthGuard (and typically OrgAdminGuard) — relies on
 // request.user.orgId already being attached.
 // Use as @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard).
+//
+// Every rejection here carries `error: 'ORG_INACTIVE'` in the response body
+// (alongside the human message, which is unchanged) so the frontend can
+// tell "your org access was revoked mid-session" apart from an ordinary
+// 403 and end the session immediately — e.g. a Super Admin deactivating an
+// org while its admin is still logged in.
+export const ORG_INACTIVE_ERROR = 'ORG_INACTIVE';
+
+function orgInactive(message: string): ForbiddenException {
+  return new ForbiddenException({
+    statusCode: 403,
+    error: ORG_INACTIVE_ERROR,
+    message,
+  });
+}
+
 @Injectable()
 export class OrgApprovedGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
@@ -40,7 +56,7 @@ export class OrgApprovedGuard implements CanActivate {
 
     const orgId = request.user?.orgId;
     if (!orgId) {
-      throw new ForbiddenException('Organisation Admin access required');
+      throw orgInactive('Organisation Admin access required');
     }
 
     const organisation = await this.prisma.organisation.findUnique({
@@ -49,18 +65,18 @@ export class OrgApprovedGuard implements CanActivate {
     });
 
     if (!organisation) {
-      throw new ForbiddenException('Organisation not found');
+      throw orgInactive('Organisation not found');
     }
     if (organisation.status === 'pending') {
-      throw new ForbiddenException(
+      throw orgInactive(
         'Organisation pending approval — please wait for super admin approval',
       );
     }
     if (organisation.status === 'disabled') {
-      throw new ForbiddenException('Organisation is disabled');
+      throw orgInactive('Organisation is disabled');
     }
     if (organisation.status === 'draft') {
-      throw new ForbiddenException('Organisation not yet activated');
+      throw orgInactive('Organisation not yet activated');
     }
 
     return true;

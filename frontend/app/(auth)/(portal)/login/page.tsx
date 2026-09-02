@@ -21,6 +21,16 @@ export default function LoginPage() {
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Shown after a forced sign-out — e.g. the org was deactivated while the
+  // user was still working in the portal (see forceLogoutOrgInactive in
+  // api.ts). Read once from the URL on mount via a lazy initializer.
+  const [notice] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("reason") === "org_inactive"
+      ? "You were signed out because your organisation's access was changed. Contact your administrator if this is unexpected."
+      : null;
+  });
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setGeneralError(null);
@@ -81,6 +91,11 @@ export default function LoginPage() {
               One login for Super Admin, Org Admin, Managers &amp; Sales.
             </p>
           </div>
+          {notice ? (
+            <p role="status" className="help reveal in" style={{ marginTop: 18, borderColor: "var(--rose-050)", background: "var(--rose-050)", color: "var(--rose)" }}>
+              {notice}
+            </p>
+          ) : null}
           <form className="reveal in" data-delay="1" style={{ marginTop: 26 }} onSubmit={handleSubmit} noValidate>
             <div className="field">
               <label>Work email</label>
