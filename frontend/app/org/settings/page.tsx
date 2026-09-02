@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, changePlan, getInvoices, getOrgDomainInfo, getPlans, requestCustomDomain } from "@/lib/api";
 import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
@@ -26,7 +26,6 @@ const INDUSTRY_OPTIONS: { value: OrgIndustry; label: string }[] = [
   { value: "mixed", label: "Mixed" },
 ];
 
-const BRAND_SWATCHES = ["#4f46e5", "#0ea5e9", "#0d9488", "#16a34a", "#d97706", "#e11d48", "#7c3aed"];
 
 const SUBSCRIPTION_STATUS_BADGE: Record<string, string> = {
   active: "b-green", trial: "b-amber", past_due: "b-rose", paused: "b-gray", cancelled: "b-gray",
@@ -103,6 +102,7 @@ interface GeneralBrandingForm {
   supportEmail: string; supportPhone: string;
   city: string; country: string; addressLine1: string; addressLine2: string; state: string; postalCode: string;
   timezone: string; currency: string; defaultLanguage: string; brandColour: string;
+  logoUrl: string; faviconUrl: string;
 }
 
 function formToOrg(org: SafeOrganisation): GeneralBrandingForm {
@@ -113,7 +113,59 @@ function formToOrg(org: SafeOrganisation): GeneralBrandingForm {
     city: org.city, country: org.country ?? "", addressLine1: org.address_line1 ?? "", addressLine2: org.address_line2 ?? "",
     state: org.state ?? "", postalCode: org.postal_code ?? "", timezone: org.timezone, currency: org.currency,
     defaultLanguage: org.default_language, brandColour: org.brand_colour ?? "#4f46e5",
+    logoUrl: org.logo_url ?? "", faviconUrl: org.favicon_url ?? "",
   };
+}
+
+// Image field with inline preview + upload + remove — org logo & favicon
+// in the branding section. `value` is the stored public URL ("" = none).
+function AssetField({
+  value,
+  uploading,
+  accept,
+  uploadedLabel,
+  onPick,
+  onRemove,
+}: {
+  value: string;
+  uploading: boolean;
+  accept: string;
+  uploadedLabel: string;
+  onPick: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const onChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) onPick(file);
+  };
+  return value ? (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", border: "1px solid var(--line-2)", borderRadius: 11, background: "var(--surface)" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={value} alt="Preview" style={{ width: 40, height: 40, objectFit: "contain", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--surface)", flexShrink: 0 }} />
+      <span className="muted" style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {uploading ? "Uploading…" : uploadedLabel}
+      </span>
+      <label style={{ flexShrink: 0, cursor: "pointer", color: "var(--brand)", fontWeight: 600, fontSize: 12.5 }}>
+        <input type="file" accept={accept} style={{ display: "none" }} onChange={onChange} />
+        Replace
+      </label>
+      <button
+        type="button"
+        aria-label="Remove"
+        title="Remove"
+        onClick={onRemove}
+        style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, border: "1px solid var(--line-2)", background: "var(--surface)", color: "var(--muted)", cursor: "pointer", fontSize: 13, lineHeight: 1 }}
+      >
+        ✕
+      </button>
+    </div>
+  ) : (
+    <label className="drop" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer" }}>
+      <input type="file" accept={accept} style={{ display: "none" }} onChange={onChange} />
+      {uploading ? "Uploading…" : <><Icon name="upload" size={16} /> Upload · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></>}
+    </label>
+  );
 }
 
 function formatMoney(amount: number, currency: string) {
@@ -309,6 +361,8 @@ export default function OrgSettingsPage() {
   const [form, setForm] = useState<GeneralBrandingForm | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [faviconUploading, setFaviconUploading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -368,6 +422,34 @@ export default function OrgSettingsPage() {
     setForm((prev) => (prev ? { ...prev, ...patch } : prev)); markDirty();
   }
 
+  // Logo + favicon share one presigned-upload flow against the org-scoped
+  // endpoint (key is scoped to the caller's org server-side). The URL lands
+  // in the form and is persisted on the next "Save changes".
+  async function handleAssetUpload(kind: "logo" | "favicon", file: File) {
+    if (!accessToken) return;
+    const setBusy = kind === "logo" ? setLogoUploading : setFaviconUploading;
+    const key: "logoUrl" | "faviconUrl" = kind === "logo" ? "logoUrl" : "faviconUrl";
+    setSaveError(null);
+    setBusy(true);
+    try {
+      const { uploadUrl, publicUrl } = await apiFetch<{ uploadUrl: string; publicUrl: string }>(
+        `/org/settings/${kind}-upload-url`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }),
+        },
+      );
+      const put = await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!put.ok) throw new Error(`Upload failed (${put.status}).`);
+      updateForm({ [key]: publicUrl });
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Upload failed — please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function handleCountryChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const country = e.target.value;
     const meta = COUNTRY_META[country];
@@ -387,6 +469,7 @@ export default function OrgSettingsPage() {
         addressLine2: form.addressLine2, state: form.state, postalCode: form.postalCode,
         timezone: form.timezone, currency: form.currency,
         defaultLanguage: form.defaultLanguage, brandColour: form.brandColour,
+        logoUrl: form.logoUrl, faviconUrl: form.faviconUrl,
         legalName: form.legalName || undefined,
         industry: form.industry || undefined,
         reraLicenseNo: form.reraLicenseNo || undefined,
@@ -556,34 +639,37 @@ export default function OrgSettingsPage() {
               <div className="row2">
                 <div className="field">
                   <label>Logo</label>
-                  {org.logo_url ? (
-                    <div className="drop" style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-start" }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={org.logo_url} alt="Organisation logo" style={{ height: 32, width: "auto", borderRadius: 6 }} />
-                      <span className="muted" style={{ fontSize: 12.5 }}>Uploaded during registration · re-upload coming soon</span>
-                    </div>
-                  ) : (
-                    <div className="drop"><Icon name="upload" size={16} /> Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
-                  )}
+                  <AssetField
+                    value={form.logoUrl}
+                    uploading={logoUploading}
+                    accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                    uploadedLabel="Logo uploaded"
+                    onPick={(file) => void handleAssetUpload("logo", file)}
+                    onRemove={() => updateForm({ logoUrl: "" })}
+                  />
                 </div>
                 <div className="field">
                   <label>Favicon</label>
-                  {org.favicon_url ? (
-                    <div className="drop" style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "flex-start" }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={org.favicon_url} alt="Organisation favicon" style={{ height: 24, width: 24, borderRadius: 6 }} />
-                      <span className="muted" style={{ fontSize: 12.5 }}>Re-upload coming soon</span>
-                    </div>
-                  ) : (
-                    <div className="drop"><Icon name="upload" size={16} /> Upload favicon · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></div>
-                  )}
+                  <AssetField
+                    value={form.faviconUrl}
+                    uploading={faviconUploading}
+                    accept="image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon,.ico"
+                    uploadedLabel="Favicon uploaded"
+                    onPick={(file) => void handleAssetUpload("favicon", file)}
+                    onRemove={() => updateForm({ faviconUrl: "" })}
+                  />
                 </div>
               </div>
               <div className="field"><label>Brand colour</label>
-                <div className="colorset">
-                  {BRAND_SWATCHES.map((c) => (
-                    <span key={c} className={form.brandColour.toLowerCase() === c ? "on" : ""} style={{ background: c }} onClick={() => updateForm({ brandColour: c })} />
-                  ))}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input
+                    type="color"
+                    className="colorpick"
+                    value={/^#[0-9a-f]{6}$/i.test(form.brandColour) ? form.brandColour : "#4f46e5"}
+                    onChange={(e) => updateForm({ brandColour: e.target.value })}
+                    aria-label="Pick a brand colour"
+                  />
+                  <span className="mono">{(form.brandColour || "#4f46e5").toUpperCase()}</span>
                 </div>
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
