@@ -752,19 +752,26 @@ model Lead {
   id            String     @id @default(uuid())
   orgId         String     @map("org_id")
   landingPageId String?    @map("landing_page_id")
+  projectId     String?    @map("project_id")
   formName      String?    @map("form_name")
-  source        String?    @default("website") // website | popup | floorplan | preview
+  source        String?    @default("website") // website | popup | floorplan | preview | project-widget
   data          Json
   status        LeadStatus @default(new)
   assignedToId  String?    @map("assigned_to_id")
+  nextActionType String?   @map("next_action_type")
+  nextActionAt   DateTime? @map("next_action_at")
+  nextActionNote String?   @map("next_action_note")
+  reminderAt     DateTime? @map("reminder_at")
   createdAt     DateTime   @default(now()) @map("created_at")
 
-  assignedTo User? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo User?    @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   callLogs   CallLog[]
   activities ActivityEvent[]
 
   @@index([orgId])
   @@index([landingPageId])
+  @@index([projectId])
   @@index([assignedToId])
   @@index([status])
   @@index([createdAt])
@@ -952,6 +959,7 @@ model Project {
   manager      User?               @relation(fields: [managerId], references: [id], onDelete: SetNull)
   unitTypes    UnitType[]
   salesAgents  ProjectSalesAgent[]
+  leads        Lead[]
 
   @@index([orgId])
   @@index([managerId])

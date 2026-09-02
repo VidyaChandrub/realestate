@@ -16,6 +16,11 @@ export class PublicSiteController {
     return this.service.resolveByHost(host);
   }
 
+  @Get('projects/:landingPageId')
+  projects(@Param('landingPageId') landingPageId: string) {
+    return this.service.projectsForLandingPage(landingPageId);
+  }
+
   @Get('domain/:domain/sitemap.xml')
   @Header('Content-Type', 'application/xml')
   async sitemap(@Param('domain') domain: string) {

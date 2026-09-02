@@ -38,6 +38,7 @@ import {
   X,
   FileText,
   Plus,
+  Building2,
 } from "lucide-react";
 import { Lightbox } from "yet-another-react-lightbox";
 import { Captions, Counter, Zoom, Fullscreen, Download as LightboxDownload } from "yet-another-react-lightbox/plugins";
@@ -112,6 +113,7 @@ import {
 import { bumpTracking } from "@/lib/prestate/tracking";
 import { firePrestateLead } from "@/components/prestate/tracking-scripts";
 import { submitLead } from "@/lib/api";
+import { ProjectSection } from "@/components/prestate/project-widget";
 
 type CanvasTheme = {
   primary: string;
@@ -5599,8 +5601,10 @@ function AnnouncementBar({ s }: { s: SectionInstance }) {
   );
 }
 
-function SectionBody({ s, device }: { s: SectionInstance; device: Device }) {
+function SectionBody({ s, device, readOnly = false }: { s: SectionInstance; device: Device; readOnly?: boolean }) {
   const live = useContext(SiteLiveContext);
+  const pageId = useContext(SitePageIdContext);
+  const form = useContext(SiteFormContext);
   switch (s.type) {
     case "announcement":
       return <AnnouncementBar s={s} />;
@@ -5690,6 +5694,8 @@ function SectionBody({ s, device }: { s: SectionInstance; device: Device }) {
       return <PopupSection s={s} device={device} />;
     case "social-share":
       return <SocialShareSection s={s} />;
+    case "project":
+      return <ProjectSection s={s} device={device} pageId={pageId} live={live} readOnly={readOnly} form={form} />;
     case "section":
     case "master-plan":
     case "features":
@@ -5874,7 +5880,7 @@ function SectionWrap({
           <>
             <Overlay section={s} />
             <div style={{ position: "relative", zIndex: 2, width: "100%", ...(bandNarrow || isHero ? undefined : cc) }}>
-              {children ?? <SectionBody s={s} device={device} />}
+              {children ?? <SectionBody s={s} device={device} readOnly={readOnly} />}
             </div>
           </>
         );
@@ -6125,7 +6131,7 @@ export function Canvas({
       <SectionWrap key={s.id} s={s} {...common}>
         {structural ? renderChildren(s) : hasNestedChildren ? (
           <>
-            <SectionBody s={s} device={device} />
+            <SectionBody s={s} device={device} readOnly={readOnly} />
             {renderChildren(s)}
           </>
         ) : undefined}

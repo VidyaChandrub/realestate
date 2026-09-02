@@ -176,6 +176,11 @@ export const REAL_ESTATE_DESIGNS: Record<string, WidgetDesignMeta[]> = {
     { id: "slide-in", name: "Corner Slide-In", desc: "Bottom-right floating notification popup with quick form" },
     { id: "takeover", name: "Split Takeover", desc: "Split visual takeover with property image & lead capture" },
   ],
+  project: [
+    { id: "grid", name: "Project Grid", desc: "Card grid — all projects or single selected project" },
+    { id: "list", name: "Project List", desc: "Stacked list with enquiry CTA per project" },
+    { id: "carousel", name: "Project Carousel", desc: "Horizontal slider with project cards" },
+  ],
   // Generic fallback for any other widget
   default: [
     { id: "classic", name: "Classic", desc: "Premium default" },

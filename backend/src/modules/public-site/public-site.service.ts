@@ -78,6 +78,39 @@ export class PublicSiteService {
     };
   }
 
+  async projectsForLandingPage(landingPageId: string) {
+    const page = await this.prisma.landingPage.findFirst({
+      where: { id: landingPageId, status: 'published' },
+      select: { orgId: true },
+    });
+    if (!page) throw new NotFoundException('Published landing page not found');
+
+    const projects = await this.prisma.project.findMany({
+      where: {
+        orgId: page.orgId,
+        status: 'active',
+      },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        unitTypes: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            units: {
+              where: { status: 'available' },
+              orderBy: { unitNo: 'asc' },
+              select: { id: true, unitNo: true, tower: true, floor: true, facing: true, price: true, status: true },
+            },
+          },
+        },
+      },
+    });
+
+    return projects.map((project) => ({
+      ...project,
+      landArea: project.landArea === null ? null : Number(project.landArea),
+    }));
+  }
+
   async resolveByDomain(domain: string) {
     const normalized = domain.toLowerCase().replace(/^www\./, '');
     const req = await this.prisma.domainRequest.findFirst({ where: { domain: normalized, status: 'connected' }, include: { landingPage: true } });
