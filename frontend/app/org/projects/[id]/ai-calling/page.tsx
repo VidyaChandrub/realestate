@@ -101,9 +101,9 @@ export default function OrgProjectAiCallingPage() {
             </div>
             <div className="col gap-10 flex-1-320">
               <div className="row gap-8 wrap">
-                <span className="chip">🗣️ Hindi / English</span>
-                <span className="chip">📚 Project knowledge</span>
-                <span className="chip">📞 Outbound</span>
+                <span className="chip"><Icon name="globe" size={13} /> Hindi / English</span>
+                <span className="chip"><Icon name="document" size={13} /> Project knowledge</span>
+                <span className="chip"><Icon name="phone" size={13} /> Outbound</span>
               </div>
               <p className="muted fs-13-5 m-0 lh-16">
                 <b>Goal:</b> Qualify inbound leads,

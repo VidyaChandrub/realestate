@@ -21,10 +21,10 @@ const SPEND = [
 ];
 
 const SOURCES = [
-  { name: "📱 Meta", pct: "46%" },
-  { name: "🔍 Google", pct: "24%" },
-  { name: "💬 WhatsApp", pct: "18%" },
-  { name: "🚶 Walk-in", pct: "12%" },
+  { name: "Meta", pct: "46%" },
+  { name: "Google", pct: "24%" },
+  { name: "WhatsApp", pct: "18%" },
+  { name: "Walk-in", pct: "12%" },
 ];
 
 const FUNNEL = [

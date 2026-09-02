@@ -18,7 +18,7 @@ export default async function OrgLeadDetailPage({
 
       <div className="page-head reveal in" style={{ marginTop: 4 }}>
         <div>
-          <div className="eyebrow">📇 Lead</div>
+          <div className="eyebrow"><Icon name="crm" size={14} /> Lead</div>
           <h1>Rahul Mehta</h1>
           <div className="sub">Palm Residency · 3 BHK enquiry · captured 2 days ago</div>
         </div>
@@ -38,7 +38,7 @@ export default async function OrgLeadDetailPage({
                   <div className="av av-lg a4">RM</div>
                   <div className="mono">+91 98204 55127</div>
                   <div className="muted" style={{ fontSize: 13 }}>rahul.mehta@gmail.com</div>
-                  <span className="chip" style={{ marginTop: 4 }}>⭐ Lead score <b style={{ color: "var(--brand)", marginLeft: 4 }}>86 / Hot</b></span>
+                  <span className="chip" style={{ marginTop: 4 }}><Icon name="star" size={13} /> Lead score <b style={{ color: "var(--brand)", marginLeft: 4 }}>86 / Hot</b></span>
                 </div>
                 <div className="field" style={{ marginTop: 14 }}>
                   <label>Pipeline status</label>
@@ -75,11 +75,11 @@ export default async function OrgLeadDetailPage({
             <div className="card-h"><span className="t">Activity timeline</span><span className="x">All interactions</span></div>
             <div className="card-b">
               <ul className="timeline">
-                <li><b>📞 Call logged</b> — Connected 4m 12s. Interested in 3 BHK, asked for floor plan.<div className="tt">Today · 11:20 AM · Priya S.</div></li>
-                <li><b>💬 WhatsApp sent</b> — Shared Palm Residency brochure &amp; price sheet.<div className="tt">Today · 11:32 AM · Priya S.</div></li>
-                <li><b>📝 Note added</b> — Prefers higher floor, sea-facing. Decision by month end.<div className="tt">Today · 11:40 AM · Priya S.</div></li>
-                <li><b>🔄 Status changed</b> — Contacted → Follow-up.<div className="tt">Today · 11:41 AM · System</div></li>
-                <li><b>🏠 Site visit scheduled</b> — Palm Residency show flat, Sat 3:00 PM.<div className="tt">Yesterday · 6:15 PM · Priya S.</div></li>
+                <li><b><Icon name="phone" size={14} /> Call logged</b> — Connected 4m 12s. Interested in 3 BHK, asked for floor plan.<div className="tt">Today · 11:20 AM · Priya S.</div></li>
+                <li><b><Icon name="mail" size={14} /> WhatsApp sent</b> — Shared Palm Residency brochure &amp; price sheet.<div className="tt">Today · 11:32 AM · Priya S.</div></li>
+                <li><b><Icon name="document" size={14} /> Note added</b> — Prefers higher floor, sea-facing. Decision by month end.<div className="tt">Today · 11:40 AM · Priya S.</div></li>
+                <li><b><Icon name="refresh" size={14} /> Status changed</b> — Contacted → Follow-up.<div className="tt">Today · 11:41 AM · System</div></li>
+                <li><b><Icon name="home" size={14} /> Site visit scheduled</b> — Palm Residency show flat, Sat 3:00 PM.<div className="tt">Yesterday · 6:15 PM · Priya S.</div></li>
               </ul>
 
               <div className="field" style={{ marginTop: 16 }}>
@@ -103,9 +103,9 @@ export default async function OrgLeadDetailPage({
             <div className="card">
               <div className="card-h"><span className="t">Quick actions</span></div>
               <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <button className="btn btn-primary btn-block">📞 Call +91 98204 55127</button>
-                <button className="btn btn-success btn-block">💬 WhatsApp</button>
-                <button className="btn btn-ghost btn-block">✉️ Email</button>
+                <button className="btn btn-primary btn-block"><Icon name="phone" size={15} /> Call +91 98204 55127</button>
+                <button className="btn btn-success btn-block"><Icon name="mail" size={15} /> WhatsApp</button>
+                <button className="btn btn-ghost btn-block"><Icon name="mail" size={15} /> Email</button>
               </div>
             </div>
           </Reveal>
@@ -115,7 +115,7 @@ export default async function OrgLeadDetailPage({
               <div className="card-h"><span className="t">Follow-up</span></div>
               <div className="card-b">
                 <div className="field"><label>Reminder date</label><input className="inp" type="date" defaultValue="2026-08-20" /></div>
-                <button className="btn btn-soft btn-block">🔔 Set reminder</button>
+                <button className="btn btn-soft btn-block"><Icon name="bell" size={15} /> Set reminder</button>
               </div>
             </div>
           </Reveal>

@@ -828,6 +828,191 @@ export interface LeadSubmission {
   fields: Record<string, string>;
 }
 
+// --- CRM leads (org-scoped inbox, role-aware) ---
+export type CrmLeadStatus =
+  | "new"
+  | "contacted"
+  | "follow_up"
+  | "site_visit"
+  | "negotiation"
+  | "won"
+  | "lost";
+
+export interface CrmAssignee {
+  id: string;
+  name: string;
+}
+
+export interface CrmLead {
+  id: string;
+  landingPageId: string | null;
+  formName: string | null;
+  source: string | null;
+  data: Record<string, unknown>;
+  status: CrmLeadStatus;
+  assignedTo: CrmAssignee | null;
+  createdAt: string;
+}
+
+export interface CrmLeadListResponse {
+  data: CrmLead[];
+  total: number;
+}
+
+export interface CrmAssignableUser {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  name: string;
+  role: { key: string; name: string } | null;
+}
+
+export interface CrmAssignableResponse {
+  data: CrmAssignableUser[];
+  total: number;
+}
+
+export interface AssignLeadInput {
+  assignedToId?: string | null;
+  status?: CrmLeadStatus;
+}
+
+// --- Sales agents (org CRM team dashboard) ---
+
+export interface SalesAgentPipelineStage {
+  status: CrmLeadStatus;
+  count: number;
+}
+
+export interface SalesAgentSource {
+  source: string | null;
+  count: number;
+}
+
+export interface SalesAgentStats {
+  leadsAssigned: number;
+  activeLeads: number;
+  closures: number;
+  lost: number;
+  conversion: number;
+  revenueBooked: number;
+  pipeline: SalesAgentPipelineStage[];
+  sources: SalesAgentSource[];
+}
+
+export interface SalesAgent {
+  id: string;
+  name: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  phoneNumber: string | null;
+  role: { key: string; name: string } | null;
+  status: "active" | "disabled";
+  online: boolean;
+  bridgeMissing: boolean;
+  joinedAt: string;
+  rank: number;
+  stats: SalesAgentStats;
+}
+
+export interface SalesAgentsSnapshot {
+  agents: number;
+  online: number;
+  missingPhone: number;
+}
+
+export interface SalesAgentsListResponse {
+  total: number;
+  snapshot: SalesAgentsSnapshot;
+  data: SalesAgent[];
+}
+
+export interface SalesAgentRecentLead {
+  id: string;
+  formName: string | null;
+  source: string | null;
+  status: CrmLeadStatus;
+  data: Record<string, unknown>;
+  budget: number;
+  createdAt: string;
+}
+
+export type SalesAgentCallDirection = "outgoing" | "incoming";
+
+export interface SalesAgentComms {
+  callsMade: number;
+  connected: number;
+  connectRate: number;
+  talkSeconds: number;
+  avgCallSeconds: number;
+  whatsappSent: number;
+  whatsappRead: number;
+  whatsappReadPct: number;
+}
+
+export interface SalesAgentCall {
+  id: string;
+  leadId: string | null;
+  leadName: string | null;
+  direction: SalesAgentCallDirection;
+  outcome:
+    | "connected"
+    | "booked_visit"
+    | "callback"
+    | "no_answer"
+    | "missed"
+    | "busy";
+  durationSeconds: number;
+  createdAt: string;
+}
+
+export type SalesAgentActivityType =
+  | "closed_deal"
+  | "site_visit_booked"
+  | "call_logged"
+  | "whatsapp_sent"
+  | "whatsapp_read"
+  | "note_added"
+  | "status_updated"
+  | "logged_in";
+
+export interface SalesAgentActivity {
+  id: string;
+  type: SalesAgentActivityType;
+  text: string;
+  createdAt: string;
+}
+
+export interface SalesAgentTargets {
+  revenueCr: number;
+  revenueTargetCr: number;
+  closures: number;
+  targetClosures: number;
+  siteVisits: number;
+  siteVisitTarget: number;
+  leadsWorked: number;
+  leadsWorkedTarget: number;
+}
+
+export interface SalesAgentDayBar {
+  day: string;
+  leads: number;
+  calls: number;
+}
+
+export interface SalesAgentDetailResponse {
+  agent: SalesAgent;
+  totalAgents: number;
+  recentLeads: SalesAgentRecentLead[];
+  comms: SalesAgentComms;
+  calls: SalesAgentCall[];
+  activity: SalesAgentActivity[];
+  targets: SalesAgentTargets;
+  activity14: SalesAgentDayBar[];
+}
+
 // --- Organisation domain identity (subdomain + custom domain) ---
 
 export type OrgDomainKind = 'subdomain' | 'custom_domain';

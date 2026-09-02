@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
+import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
 import "@/app/org/org.css";
 
@@ -157,14 +158,14 @@ export default function OrgProjectKnowledgePage() {
               <div className="card-h"><span className="t">Used by</span></div>
               <div className="card-b col gap-12">
                 <div className="u">
-                  <span className="av a3">✨</span>
+                  <span className="av a3"><Icon name="sparkles" size={16} /></span>
                   <span>
                     <span className="nm">Aarohi</span><br />
                     <span className="sm">AI voice agent</span>
                   </span>
                 </div>
                 <div className="u">
-                  <span className="av a2">💬</span>
+                  <span className="av a2"><Icon name="mail" size={16} /></span>
                   <span>
                     <span className="nm">Property Q&amp;A bot</span><br />
                     <span className="sm">WhatsApp agent</span>

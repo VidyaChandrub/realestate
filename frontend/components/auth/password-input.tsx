@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Icon } from "@/components/icons";
 
 interface PasswordInputProps {
   className?: string;
@@ -57,7 +58,7 @@ export function PasswordInput({
           color: "var(--muted)",
         }}
       >
-        {visible ? "🙈" : "👁️"}
+        {visible ? <Icon name="eye-off" size={16} /> : <Icon name="eye" size={16} />}
       </button>
     </div>
   );

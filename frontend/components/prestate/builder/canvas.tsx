@@ -843,6 +843,8 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
   const [gateOpen, setGateOpen] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
+  const [heroPhone, setHeroPhone] = useState("");
+  const [heroPhoneError, setHeroPhoneError] = useState("");
   const handle = useCtaHandlers(live);
   const gateFields = Array.isArray(st.gateFields) && st.gateFields.length
     ? (st.gateFields as GateField[])
@@ -1136,6 +1138,11 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
+                      if (!isValidPhone(heroPhone)) {
+                        setHeroPhoneError("Enter a valid phone number.");
+                        return;
+                      }
+                      setHeroPhoneError("");
                       setFormSubmitted(true);
                     }}
                     style={{ display: "flex", flexDirection: "column", gap: 12 }}
@@ -1165,8 +1172,16 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
                         type="tel"
                         placeholder="Phone Number (+91) *"
                         required
-                        style={{ width: "100%", padding: "10px 14px", borderRadius: 9, background: "rgba(0,0,0,0.35)", border: "1px solid rgba(255,255,255,0.16)", color: "#fff", fontSize: 13, outline: "none" }}
+                        value={heroPhone}
+                        onChange={(e) => {
+                          setHeroPhone(e.target.value);
+                          if (heroPhoneError) setHeroPhoneError("");
+                        }}
+                        style={{ width: "100%", padding: "10px 14px", borderRadius: 9, background: "rgba(0,0,0,0.35)", border: `1px solid ${heroPhoneError ? "#ef4444" : "rgba(255,255,255,0.16)"}`, color: "#fff", fontSize: 13, outline: "none" }}
                       />
+                      {heroPhoneError ? (
+                        <div style={{ fontSize: 11, color: "#f87171", fontWeight: 600, marginTop: 5 }}>{heroPhoneError}</div>
+                      ) : null}
                     </div>
 
                     <div>
@@ -6072,6 +6087,12 @@ export function Canvas({
 
   const renderItem = (s: SectionInstance, index: number, total: number, wrapStyle?: CSSProperties, resizable = false) => {
     const structural = isStructural(s.type);
+    // Sections (a non-structural widget type) can still have nested children
+    // dropped into them (e.g. a Button inside a Section) — render those kids
+    // through renderChildren so each one gets its own drag handle/drop-zone
+    // via SectionWrap+useSortable, instead of silently vanishing because only
+    // structural types (container/row/column/grid) rendered kids before.
+    const hasNestedChildren = !structural && s.type === "section";
     const common = {
       index,
       total,
@@ -6102,7 +6123,12 @@ export function Canvas({
     };
     return (
       <SectionWrap key={s.id} s={s} {...common}>
-        {structural ? renderChildren(s) : undefined}
+        {structural ? renderChildren(s) : hasNestedChildren ? (
+          <>
+            <SectionBody s={s} device={device} />
+            {renderChildren(s)}
+          </>
+        ) : undefined}
       </SectionWrap>
     );
   };

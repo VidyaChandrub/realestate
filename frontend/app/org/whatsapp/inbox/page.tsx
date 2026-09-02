@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
+import { Icon } from "@/components/icons";
 import { WhatsAppPageHead } from "@/components/org/crm-tabs";
 
 export const metadata = { title: "iPixxel Realty · WhatsApp Inbox" };
@@ -53,7 +54,7 @@ export default function OrgWhatsAppInboxPage() {
           <div className="wa-chead">
             <span className="av">AR</span>
             <div className="meta"><b>Aarav Reddy</b><span>+91 98220 41567</span></div>
-            <span className="chip" style={{ marginLeft: "auto" }}>🏢 Palm Residency</span>
+            <span className="chip" style={{ marginLeft: "auto" }}><Icon name="building" size={13} /> Palm Residency</span>
           </div>
           <div className="wa-msgs">
             <div className="wa-day">Today</div>
@@ -64,8 +65,8 @@ export default function OrgWhatsAppInboxPage() {
             ))}
           </div>
           <div className="wa-comp">
-            <button className="wa-ib" title="Attach">📎</button>
-            <button className="wa-ib" style={{ width: "auto", padding: "0 12px", fontSize: 13, fontWeight: 600, gap: 6 }} title="Templates">⚡ Templates</button>
+            <button className="wa-ib" title="Attach"><Icon name="link" size={16} /></button>
+            <button className="wa-ib" style={{ width: "auto", padding: "0 12px", fontSize: 13, fontWeight: 600, gap: 6 }} title="Templates"><Icon name="sparkles" size={15} /> Templates</button>
             <input className="inp" placeholder="Type a message…" />
             <button className="btn btn-primary">Send</button>
           </div>
@@ -88,9 +89,9 @@ export default function OrgWhatsAppInboxPage() {
             </div>
           </div>
           <div className="qa">
-            <button className="btn btn-ghost btn-block">📞 Call</button>
-            <button className="btn btn-ghost btn-block">📅 Schedule visit</button>
-            <button className="btn btn-ghost btn-block">📝 Add note</button>
+            <button className="btn btn-ghost btn-block"><Icon name="phone" size={14} /> Call</button>
+            <button className="btn btn-ghost btn-block"><Icon name="calendar" size={14} /> Schedule visit</button>
+            <button className="btn btn-ghost btn-block"><Icon name="document" size={14} /> Add note</button>
             <Link className="btn btn-primary btn-block" href="/org/leads">Open lead →</Link>
           </div>
         </div>

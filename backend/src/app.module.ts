@@ -20,6 +20,7 @@ import { OrgTypographySetsModule } from './modules/org-typography-sets/org-typog
 import { AdminTypographySetsModule } from './modules/admin-typography-sets/admin-typography-sets.module';
 import { OrgBillingModule } from './modules/org-billing/org-billing.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { SalesAgentsModule } from './modules/sales-agents/sales-agents.module';
 import { OrgDomainRequestsModule } from './modules/org-domain-requests/org-domain-requests.module';
 import { AdminDomainRequestsModule } from './modules/admin-domain-requests/admin-domain-requests.module';
 import { OrgDomainModule } from './modules/org-domain/org-domain.module';
@@ -49,6 +50,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
     AdminTypographySetsModule,
     OrgBillingModule,
     LeadsModule,
+    SalesAgentsModule,
     ProjectsModule,
     OrgDomainRequestsModule,
     AdminDomainRequestsModule,

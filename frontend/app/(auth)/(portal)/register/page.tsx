@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { Icon, type IconName } from "@/components/icons";
 import { PasswordInput } from "@/components/auth/password-input";
 import { mapApiFieldErrors } from "@/lib/form-errors";
 import { slugify } from "@/lib/slug";
@@ -74,20 +75,20 @@ function uiStepForOnboardingStep(step: OnboardingStep): number {
   return Math.min(Math.max(idx + 1, 1), TOTAL);
 }
 
-const ORG_TYPES = [
-  { v: "developer", ic: "🏗️", b: "Developer", s: "Build & sell own projects" },
-  { v: "broker", ic: "🤝", b: "Broker / Agency", s: "Sell others' inventory" },
-  { v: "channel", ic: "🔗", b: "Channel Partner", s: "Refer & close deals" },
-  { v: "mixed", ic: "🏢", b: "Mixed", s: "A bit of everything" },
+const ORG_TYPES: { v: string; ic: IconName; b: string; s: string }[] = [
+  { v: "developer", ic: "building", b: "Developer", s: "Build & sell own projects" },
+  { v: "broker", ic: "users", b: "Broker / Agency", s: "Sell others' inventory" },
+  { v: "channel", ic: "link", b: "Channel Partner", s: "Refer & close deals" },
+  { v: "mixed", ic: "building", b: "Mixed", s: "A bit of everything" },
 ];
 
-const MODULES = [
-  { v: "leads", ic: "📇", b: "Leads / CRM", s: "Capture & work every lead" },
-  { v: "projects", ic: "🏗️", b: "Projects & Units", s: "Inventory & availability" },
-  { v: "calling", ic: "📞", b: "AI Calling", s: "Auto-dial & qualify leads" },
-  { v: "whatsapp", ic: "💬", b: "WhatsApp Business", s: "Shared inbox & templates" },
-  { v: "landing", ic: "📄", b: "Landing Pages", s: "Campaign pages & forms" },
-  { v: "reporting", ic: "📈", b: "Reporting", s: "Lead-gen to closing analytics" },
+const MODULES: { v: string; ic: IconName; b: string; s: string }[] = [
+  { v: "leads", ic: "crm", b: "Leads / CRM", s: "Capture & work every lead" },
+  { v: "projects", ic: "building", b: "Projects & Units", s: "Inventory & availability" },
+  { v: "calling", ic: "phone", b: "AI Calling", s: "Auto-dial & qualify leads" },
+  { v: "whatsapp", ic: "mail", b: "WhatsApp Business", s: "Shared inbox & templates" },
+  { v: "landing", ic: "document", b: "Landing Pages", s: "Campaign pages & forms" },
+  { v: "reporting", ic: "reports", b: "Reporting", s: "Lead-gen to closing analytics" },
 ];
 
 const INVITE_ROLES = [
@@ -95,11 +96,11 @@ const INVITE_ROLES = [
   { v: "sales", label: "Sales" },
 ] as const;
 
-const CHANNELS = [
-  { ic: "📱", b: "Meta Ads", s: "Facebook & Instagram lead forms" },
-  { ic: "🔍", b: "Google Ads", s: "Search & Performance Max" },
-  { ic: "💬", b: "WhatsApp Business API", s: "Shared number for the team" },
-  { ic: "📞", b: "Calling / phone bridge", s: "Masked dialler & recordings" },
+const CHANNELS: { ic: IconName; b: string; s: string }[] = [
+  { ic: "phone", b: "Meta Ads", s: "Facebook & Instagram lead forms" },
+  { ic: "search", b: "Google Ads", s: "Search & Performance Max" },
+  { ic: "mail", b: "WhatsApp Business API", s: "Shared number for the team" },
+  { ic: "phone", b: "Calling / phone bridge", s: "Masked dialler & recordings" },
 ];
 
 export default function RegisterPage() {
@@ -724,7 +725,7 @@ export default function RegisterPage() {
                       className={`rc${orgType === o.v ? " on" : ""}`}
                       onClick={() => setOrgType(o.v)}
                     >
-                      <div className="ic">{o.ic}</div>
+                      <div className="ic"><Icon name={o.ic} /></div>
                       <b>{o.b}</b>
                       <small>{o.s}</small>
                     </div>
@@ -990,7 +991,7 @@ export default function RegisterPage() {
               {MODULES.map((m) => (
                 <div className="chan" key={m.v}>
                   <div className="l">
-                    <span className="ci">{m.ic}</span>
+                    <span className="ci"><Icon name={m.ic} /></span>
                     <div>
                       <b>{m.b}</b>
                       <small>{m.s}</small>
@@ -1051,7 +1052,7 @@ export default function RegisterPage() {
               {CHANNELS.map((c) => (
                 <div className="chan" key={c.b}>
                   <div className="l">
-                    <span className="ci">{c.ic}</span>
+                    <span className="ci"><Icon name={c.ic} /></span>
                     <div>
                       <b>{c.b}</b>
                       <small>{c.s}</small>

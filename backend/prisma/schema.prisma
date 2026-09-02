@@ -182,6 +182,9 @@ model User {
   resetTokens     PasswordResetToken[]
   auditLogs       AuditLog[]
   managedProjects Project[]
+  assignedLeads   Lead[]
+  callLogs        CallLog[]
+  activityEvents  ActivityEvent[]
   notifications   Notification[]
 
   @@map("users")
@@ -744,18 +747,98 @@ model TrackingEvent {
 // ---------------------------------------------------------------------------
 
 model Lead {
-  id             String   @id @default(uuid())
-  orgId          String   @map("org_id")
-  landingPageId  String?  @map("landing_page_id")
-  formName       String?  @map("form_name")
-  source         String?  @default("website") // website | popup | floorplan | preview
-  data           Json
-  createdAt      DateTime @default(now()) @map("created_at")
+  id            String     @id @default(uuid())
+  orgId         String     @map("org_id")
+  landingPageId String?    @map("landing_page_id")
+  formName      String?    @map("form_name")
+  source        String?    @default("website") // website | popup | floorplan | preview
+  data          Json
+  status        LeadStatus @default(new)
+  assignedToId  String?    @map("assigned_to_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  assignedTo User? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  callLogs   CallLog[]
+  activities ActivityEvent[]
 
   @@index([orgId])
   @@index([landingPageId])
+  @@index([assignedToId])
+  @@index([status])
   @@index([createdAt])
   @@map("leads")
+  @@schema("templates")
+}
+
+// ---------------------------------------------------------------------------
+// Call logs — phone activity per sales agent, for the Calls & comms tab on an
+// agent's dashboard. leadName is denormalised (snapshot at call time) so the
+// recent-calls table renders without a join; leadId is kept for drill-through.
+// ---------------------------------------------------------------------------
+
+enum CallDirection {
+  outgoing
+  incoming
+
+  @@schema("templates")
+}
+
+model CallLog {
+  id              String        @id @default(uuid())
+  orgId           String        @map("org_id")
+  agentId         String        @map("agent_id")
+  leadId          String?       @map("lead_id")
+  leadName        String?       @map("lead_name")
+  direction       CallDirection @default(outgoing) @map("direction")
+  outcome         String        // connected | booked_visit | callback | no_answer | missed | busy
+  durationSeconds Int           @default(0) @map("duration_seconds")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  agent User? @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  lead  Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([agentId])
+  @@index([createdAt])
+  @@map("call_logs")
+  @@schema("templates")
+}
+
+// ---------------------------------------------------------------------------
+// Activity feed — the human-visible timeline on an agent's dashboard (deal
+// closed, visit booked, call logged, message sent, stage changed, shift
+// start). text is the ready-to-render line; type drives the icon/badging.
+// ---------------------------------------------------------------------------
+
+enum ActivityType {
+  closed_deal
+  site_visit_booked
+  call_logged
+  whatsapp_sent
+  whatsapp_read
+  note_added
+  status_updated
+  logged_in
+
+  @@schema("templates")
+}
+
+model ActivityEvent {
+  id        String       @id @default(uuid())
+  orgId     String       @map("org_id")
+  agentId   String       @map("agent_id")
+  leadId    String?      @map("lead_id")
+  type      ActivityType
+  text      String
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  agent User? @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  lead  Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([agentId])
+  @@index([createdAt])
+  @@map("activity_events")
   @@schema("templates")
 }
 
@@ -774,6 +857,20 @@ enum ProjectStatus {
   inactive
 
   @@schema("projects")
+}
+
+// Lifecycle of a captured lead in the CRM. Not driven by hard-coded casing
+// order here — the allowed set only; stages are a presentation concern.
+enum LeadStatus {
+  new
+  contacted
+  follow_up
+  site_visit
+  negotiation
+  won
+  lost
+
+  @@schema("templates")
 }
 
 enum UnitStatus {
