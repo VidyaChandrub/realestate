@@ -40,6 +40,18 @@ const FIELD_KEYS = [
   "password",
 ];
 
+// On-screen labels for the Step 1 required-field check, so the
+// "… is required" message reads like the field's label (capitalised)
+// instead of the raw snake_case key ("first name is required").
+const STEP1_FIELD_LABELS: Record<string, string> = {
+  first_name: "First name",
+  last_name: "Last name",
+  work_email: "Work email",
+  country: "Country",
+  phone_number: "Mobile number",
+  password: "Password",
+};
+
 // Order here is the actual wizard flow: Modules sits between Templates and
 // Invite (mandatory steps — Account, Organisation, Business Details,
 // Subscription, Templates — come first; skippable ones after).
@@ -280,7 +292,7 @@ export default function RegisterPage() {
     if (n === 1) {
       const required: (keyof typeof form)[] = ["first_name", "last_name", "work_email", "country", "phone_number", "password"];
       for (const k of required) {
-        if (!form[k]?.trim()) { setGeneralError(`${k.replace(/_/g, " ")} is required`); return false; }
+        if (!form[k]?.trim()) { setGeneralError(`${STEP1_FIELD_LABELS[k] ?? k.replace(/_/g, " ")} is required`); return false; }
       }
       const phoneError = validatePhoneForCountry(form.phone_number, form.country);
       if (phoneError) { setGeneralError(phoneError); return false; }
