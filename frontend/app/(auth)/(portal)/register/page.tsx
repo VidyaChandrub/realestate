@@ -40,6 +40,18 @@ const FIELD_KEYS = [
   "password",
 ];
 
+// On-screen labels for the Step 1 required-field check, so the
+// "… is required" message reads like the field's label (capitalised)
+// instead of the raw snake_case key ("first name is required").
+const STEP1_FIELD_LABELS: Record<string, string> = {
+  first_name: "First name",
+  last_name: "Last name",
+  work_email: "Work email",
+  country: "Country",
+  phone_number: "Mobile number",
+  password: "Password",
+};
+
 // Order here is the actual wizard flow: Modules sits between Templates and
 // Invite (mandatory steps — Account, Organisation, Business Details,
 // Subscription, Templates — come first; skippable ones after).
@@ -280,7 +292,7 @@ export default function RegisterPage() {
     if (n === 1) {
       const required: (keyof typeof form)[] = ["first_name", "last_name", "work_email", "country", "phone_number", "password"];
       for (const k of required) {
-        if (!form[k]?.trim()) { setGeneralError(`${k.replace(/_/g, " ")} is required`); return false; }
+        if (!form[k]?.trim()) { setGeneralError(`${STEP1_FIELD_LABELS[k] ?? k.replace(/_/g, " ")} is required`); return false; }
       }
       const phoneError = validatePhoneForCountry(form.phone_number, form.country);
       if (phoneError) { setGeneralError(phoneError); return false; }
@@ -673,32 +685,18 @@ export default function RegisterPage() {
                 </div>
                 <div className="field">
                   <label>Mobile <span className="req">*</span></label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <span
-                      className="inp mono"
-                      style={{
-                        width: 64,
-                        flex: "0 0 auto",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "var(--muted)",
-                        background: "var(--surface-2)",
-                      }}
-                    >
-                      {phoneCallingCode ?? "+--"}
-                    </span>
+                  <div className="phone-inp">
+                    <span className="cc">{phoneCallingCode ?? "+--"}</span>
                     <input
-                      className="inp"
-                      style={{ flex: 1 }}
                       type="text"
                       inputMode="numeric"
                       value={form.phone_number}
                       onChange={updatePhoneNumber}
                       placeholder="98250 41200"
+                      aria-label="Mobile number"
                     />
                   </div>
-                  <div className="hint">{phoneCallingCode ? "Auto-set from Country." : "Select a country to set the code."}</div>
+                {/*<div className="hint">{phoneCallingCode ? "Auto-set from Country." : "Select a country to set the code."}</div>*/}
                   {fieldErrors.phone_number ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.phone_number}</div> : null}
                 </div>
               </div>
@@ -839,37 +837,62 @@ export default function RegisterPage() {
               <div className="row2">
                 <div className="field">
                   <label>RERA / license no.</label>
-                  <input className="inp mono" value={rera} onChange={(e) => setRera(e.target.value)} placeholder="PR/GJ/AHM/2026/…" />
+                  <input className="inp inp-mono" value={rera} onChange={(e) => setRera(e.target.value)} placeholder="PR/GJ/AHM/2026/…" />
                 </div>
                 <div className="field">
                   <label>GSTIN</label>
-                  <input className="inp mono" value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="24AABCS…" />
+                  <input className="inp inp-mono" value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="24AABCS…" />
                 </div>
               </div>
               <div className="field">
                 <label>Logo</label>
-                <label className="drop" style={{ cursor: "pointer", display: "block" }}>
-                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" onChange={handleLogoSelect} style={{ display: "none" }} />
-                  {logoUploading ? (
-                    "Uploading…"
-                  ) : logoUrl ? (
-                    <>✅ Logo uploaded · <span style={{ color: "var(--brand)", fontWeight: 600 }}>replace</span></>
-                  ) : (
-                    <>🖼️ Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></>
-                  )}
-                </label>
+                {logoUrl ? (
+                  <div className="drop" style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-start", cursor: "default" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={logoUrl}
+                      alt="Logo preview"
+                      style={{ width: 40, height: 40, objectFit: "contain", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--surface)", flexShrink: 0 }}
+                    />
+                    <span className="muted" style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {logoUploading ? "Uploading…" : "Logo uploaded"}
+                    </span>
+                    <label style={{ flexShrink: 0, cursor: "pointer", color: "var(--brand)", fontWeight: 600, fontSize: 12.5 }}>
+                      <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" onChange={handleLogoSelect} style={{ display: "none" }} />
+                      Replace
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setLogoUrl(null)}
+                      aria-label="Remove logo"
+                      title="Remove logo"
+                      style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, border: "1px solid var(--line-2)", background: "var(--surface)", color: "var(--muted)", cursor: "pointer", fontSize: 13, lineHeight: 1 }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <label className="drop" style={{ cursor: "pointer", display: "block" }}>
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" onChange={handleLogoSelect} style={{ display: "none" }} />
+                    {logoUploading ? (
+                      "Uploading…"
+                    ) : (
+                      <>🖼️ Upload logo · <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span></>
+                    )}
+                  </label>
+                )}
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>Brand colour</label>
-                <div className="colorset" id="colors">
-                  {["#4f46e5", "#0ea5e9", "#0d9488", "#16a34a", "#d97706", "#e11d48", "#7c3aed"].map((c) => (
-                    <span
-                      key={c}
-                      className={brandColour.toLowerCase() === c ? "on" : ""}
-                      style={{ background: c }}
-                      onClick={() => setBrandColour(c)}
-                    />
-                  ))}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <input
+                    type="color"
+                    className="colorpick"
+                    value={/^#[0-9a-f]{6}$/i.test(brandColour) ? brandColour : "#4f46e5"}
+                    onChange={(e) => setBrandColour(e.target.value)}
+                    aria-label="Pick a brand colour"
+                  />
+                  <span className="mono">{brandColour.toUpperCase()}</span>
                 </div>
               </div>
             </div>
@@ -972,11 +995,12 @@ export default function RegisterPage() {
                   })}
                 </div>
               )}
-              <label className="check" style={{ marginTop: 18, alignItems: "flex-start" }}>
+              <label className="check" style={{ marginTop: 18 }}>
                 <input
                   type="checkbox"
                   checked={agreedToTerms}
                   onChange={(e) => { setAgreedToTerms(e.target.checked); setGeneralError(null); }}
+                  style={{ flexShrink: 0 }}
                 />
                 I agree to the Terms of Service &amp; Privacy Policy
               </label>

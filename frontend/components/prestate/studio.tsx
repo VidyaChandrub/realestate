@@ -30,7 +30,7 @@ import { loadTemplate, loadTemplates, saveTemplate, createTemplate, publishLandi
 import { uploadBuilderImage } from "@/lib/prestate/persist";
 import { BuilderUploadProvider, type BuilderImageUploader } from "@/components/prestate/builder/upload-context";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
-import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
+import { builderPath, templatePreviewPath } from "@/lib/prestate/paths";
 import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
 import { TopNav, MODULE_LABELS } from "@/components/prestate/topnav";
 import { BuilderWorkspace, type BuilderApi } from "@/components/prestate/builder/workspace";
@@ -365,16 +365,17 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
     (pageId?: string) => {
       const page = !pageId || pageId === activePage?.id ? activePage : null;
       if (!page) return;
-      // /p/[slug] only works for Templates — slugs there are globally
-      // unique. A LandingPage's slug is only unique per-org, and public
-      // serving of org pages is out of scope, so there's no route that
-      // could resolve one anyway. Preview in-app instead of opening a tab
-      // that would 403/404.
+      // A LandingPage's slug is only unique per-org and public serving of org
+      // pages is out of scope, so there's no route that could resolve one —
+      // preview in-app instead of opening a tab that would 403/404.
       if (resource === "landing-page") {
         setInAppPreviewOpen(true);
         return;
       }
-      window.open(localPreviewPath(page), "_blank", "noopener,noreferrer");
+      // Templates: open the backend-backed preview keyed by id. The old
+      // /p/[slug] route only resolves seeded/localStorage pages, never a
+      // template that lives in the database.
+      window.open(templatePreviewPath(page.id), "_blank", "noopener,noreferrer");
     },
     [activePage, resource],
   );

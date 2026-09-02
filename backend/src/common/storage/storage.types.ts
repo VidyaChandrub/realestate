@@ -14,7 +14,10 @@ export type UploadField =
   // /org/settings later. Organisation always exists by upload time (it's
   // created at Step 2, logo is Step 3), so this is a normal org-scoped
   // upload, no pre-org nonce scheme needed.
-  | 'logo';
+  | 'logo'
+  // Organisation favicon — same lifecycle as the logo, uploaded from the
+  // Super Admin org-detail edit form. Smaller size cap and .ico allowed.
+  | 'favicon';
 
 export const UPLOAD_FIELDS: readonly UploadField[] = [
   'amenityIcon',
@@ -24,6 +27,7 @@ export const UPLOAD_FIELDS: readonly UploadField[] = [
   'video',
   'builderImage',
   'logo',
+  'favicon',
 ] as const;
 
 export interface FieldRule {
@@ -79,6 +83,16 @@ export const FIELD_RULES: Record<UploadField, FieldRule> = {
     mimeTypes: [...IMAGE_MIMES, 'image/svg+xml'],
     maxBytes: 2 * MB,
     label: 'logo',
+  },
+  favicon: {
+    mimeTypes: [
+      ...IMAGE_MIMES,
+      'image/svg+xml',
+      'image/x-icon',
+      'image/vnd.microsoft.icon',
+    ],
+    maxBytes: 512 * 1024,
+    label: 'favicon',
   },
 };
 

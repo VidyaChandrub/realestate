@@ -119,6 +119,24 @@ function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
+// Backend guards on /org/* dashboard routes re-check the organisation's
+// status from the DB on every request. When a Super Admin deactivates an
+// org whose admin/users are still logged in, their very next action gets a
+// 403 tagged `error: "ORG_INACTIVE"` — end the session and bounce to login
+// straight away rather than leaving a half-dead portal open.
+let forcedLogoutInFlight = false;
+function forceLogoutOrgInactive() {
+  clearSession();
+  if (typeof window === "undefined" || forcedLogoutInFlight) return;
+  const path = window.location.pathname;
+  if (path === "/login" || path.startsWith("/admin-login")) return;
+  forcedLogoutInFlight = true;
+  // Hard replace (not router.push): a full reload resets every bit of
+  // in-memory auth/React state, and replace() keeps the dead portal page
+  // out of history.
+  window.location.replace("/login?reason=org_inactive");
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -147,6 +165,14 @@ export async function apiFetch<T>(
   const body = contentType.includes("application/json")
     ? await res.json()
     : null;
+
+  if (
+    res.status === 403 &&
+    (body as ApiErrorBody | null)?.error === "ORG_INACTIVE" &&
+    !path.startsWith("/auth/")
+  ) {
+    forceLogoutOrgInactive();
+  }
 
   if (!res.ok) {
     throw new ApiError(errorMessage(body, res.status), res.status, body);

@@ -14,6 +14,14 @@ export function localPreviewPath(page: { slug: string }): string {
   return `/p/${encodeURIComponent(page.slug)}`;
 }
 
+/** Backend-backed preview for a Super Admin Template, keyed by id — mirrors
+ *  the org builder's /preview/:id. Unlike localPreviewPath (/p/:slug), this
+ *  resolves the template straight from the API, so it works for templates
+ *  that only exist in the database (every real one). */
+export function templatePreviewPath(templateId: string): string {
+  return `/preview/template/${encodeURIComponent(templateId)}`;
+}
+
 export function localDomainPreviewPath(domain: string): string {
   const host = domain
     .trim()

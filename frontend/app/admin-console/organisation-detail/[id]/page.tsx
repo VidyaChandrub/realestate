@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -132,6 +132,69 @@ function formatActionLabel(action: string): string {
     .join(" ");
 }
 
+// Image field with inline preview + upload + remove — used for both the
+// org logo and favicon in the edit form. `value` is the stored public URL
+// ("" when none); `onPick` runs the presigned upload, `onRemove` clears it.
+function AssetUploadField({
+  value,
+  uploading,
+  accept,
+  uploadedLabel,
+  onPick,
+  onRemove,
+}: {
+  value: string;
+  uploading: boolean;
+  accept: string;
+  uploadedLabel: string;
+  onPick: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const onChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) onPick(file);
+  };
+  return value ? (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 11px", border: "1px solid var(--line-2)", borderRadius: 11, background: "var(--surface)" }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={value}
+        alt="Preview"
+        style={{ width: 40, height: 40, objectFit: "contain", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--surface)", flexShrink: 0 }}
+      />
+      <span className="muted" style={{ flex: 1, minWidth: 0, fontSize: 12.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {uploading ? "Uploading…" : uploadedLabel}
+      </span>
+      <label style={{ flexShrink: 0, cursor: "pointer", color: "var(--brand)", fontWeight: 600, fontSize: 12.5 }}>
+        <input type="file" accept={accept} style={{ display: "none" }} onChange={onChange} />
+        Replace
+      </label>
+      <button
+        type="button"
+        aria-label="Remove"
+        title="Remove"
+        onClick={onRemove}
+        style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, border: "1px solid var(--line-2)", background: "var(--surface)", color: "var(--muted)", cursor: "pointer", fontSize: 13, lineHeight: 1 }}
+      >
+        ✕
+      </button>
+    </div>
+  ) : (
+    <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 13px", border: "1px dashed var(--line-2)", borderRadius: 11, background: "var(--surface)", cursor: "pointer", fontSize: 13, color: "var(--muted)" }}>
+      <input type="file" accept={accept} style={{ display: "none" }} onChange={onChange} />
+      {uploading ? (
+        "Uploading…"
+      ) : (
+        <>
+          <Icon name="upload" size={16} /> Upload ·{" "}
+          <span style={{ color: "var(--brand)", fontWeight: 600 }}>browse</span>
+        </>
+      )}
+    </label>
+  );
+}
+
 export default function SuperAdminOrganisationDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -156,6 +219,8 @@ export default function SuperAdminOrganisationDetailPage() {
   const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT_FORM);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [faviconUploading, setFaviconUploading] = useState(false);
 
   const [statusSubmitting, setStatusSubmitting] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
@@ -317,16 +382,49 @@ export default function SuperAdminOrganisationDetailPage() {
     setEditing(true);
   }
 
+  // Logo + favicon share one presigned-upload flow — same shape as the
+  // signup wizard's logo upload, just pointed at the admin org-scoped
+  // endpoint (key is scoped to this org id server-side).
+  async function handleAssetUpload(kind: "logo" | "favicon", file: File) {
+    if (!org || !accessToken) return;
+    const setBusy = kind === "logo" ? setLogoUploading : setFaviconUploading;
+    const formKey: "logoUrl" | "faviconUrl" = kind === "logo" ? "logoUrl" : "faviconUrl";
+    setEditError(null);
+    setBusy(true);
+    try {
+      const { uploadUrl, publicUrl } = await apiFetch<{ uploadUrl: string; publicUrl: string }>(
+        `/admin/organisations/${org.id}/${kind}-upload-url`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }),
+        },
+      );
+      const put = await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!put.ok) throw new Error(`Upload failed (${put.status}).`);
+      setEditForm((f) => ({ ...f, [formKey]: publicUrl }));
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Upload failed — please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!org || !accessToken) return;
     setEditError(null);
     setEditSubmitting(true);
+    // brandColour is validated server-side as a strict hex — only send it
+    // when it's a real value, so editing an org that never set one doesn't 400.
+    const { brandColour, ...rest } = editForm;
+    const payload: Partial<EditForm> = { ...rest };
+    if (/^#[0-9a-fA-F]{6}$/.test(brandColour)) payload.brandColour = brandColour;
     try {
       await apiFetch(`/admin/organisations/${org.id}`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(payload),
       });
       setOrg((prev) => (prev ? { ...prev, ...editForm } : prev));
       setEditing(false);
@@ -609,31 +707,39 @@ export default function SuperAdminOrganisationDetailPage() {
                         </div>
                         <div className="field">
                           <label>Brand colour</label>
-                          <input
-                            className="inp mono"
-                            placeholder="#4f46e5"
-                            value={editForm.brandColour}
-                            onChange={(e) => setEditForm((f) => ({ ...f, brandColour: e.target.value }))}
-                          />
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <input
+                              type="color"
+                              className="colorpick"
+                              value={/^#[0-9a-f]{6}$/i.test(editForm.brandColour) ? editForm.brandColour : "#4f46e5"}
+                              onChange={(e) => setEditForm((f) => ({ ...f, brandColour: e.target.value }))}
+                              aria-label="Pick a brand colour"
+                            />
+                            <span className="mono">{(editForm.brandColour || "#4f46e5").toUpperCase()}</span>
+                          </div>
                         </div>
                       </div>
                       <div className="row2">
                         <div className="field">
-                          <label>Logo URL</label>
-                          <input
-                            className="inp"
-                            placeholder="https://…"
+                          <label>Logo</label>
+                          <AssetUploadField
                             value={editForm.logoUrl}
-                            onChange={(e) => setEditForm((f) => ({ ...f, logoUrl: e.target.value }))}
+                            uploading={logoUploading}
+                            accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                            uploadedLabel="Logo uploaded"
+                            onPick={(file) => void handleAssetUpload("logo", file)}
+                            onRemove={() => setEditForm((f) => ({ ...f, logoUrl: "" }))}
                           />
                         </div>
                         <div className="field">
-                          <label>Favicon URL</label>
-                          <input
-                            className="inp"
-                            placeholder="https://…"
+                          <label>Favicon</label>
+                          <AssetUploadField
                             value={editForm.faviconUrl}
-                            onChange={(e) => setEditForm((f) => ({ ...f, faviconUrl: e.target.value }))}
+                            uploading={faviconUploading}
+                            accept="image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon,.ico"
+                            uploadedLabel="Favicon uploaded"
+                            onPick={(file) => void handleAssetUpload("favicon", file)}
+                            onRemove={() => setEditForm((f) => ({ ...f, faviconUrl: "" }))}
                           />
                         </div>
                       </div>
@@ -712,6 +818,36 @@ export default function SuperAdminOrganisationDetailPage() {
                             .filter(Boolean)
                             .join(", ") || "—"}
                         </b>
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Logo
+                        </div>
+                        {org.logoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={org.logoUrl}
+                            alt="Organisation logo"
+                            style={{ height: 36, width: "auto", maxWidth: 140, objectFit: "contain", borderRadius: 6, marginTop: 2 }}
+                          />
+                        ) : (
+                          <b>—</b>
+                        )}
+                      </div>
+                      <div>
+                        <div className="muted" style={{ fontSize: 12 }}>
+                          Favicon
+                        </div>
+                        {org.faviconUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={org.faviconUrl}
+                            alt="Organisation favicon"
+                            style={{ height: 24, width: 24, objectFit: "contain", borderRadius: 4, marginTop: 2 }}
+                          />
+                        ) : (
+                          <b>—</b>
+                        )}
                       </div>
                       <div>
                         <div className="muted" style={{ fontSize: 12 }}>

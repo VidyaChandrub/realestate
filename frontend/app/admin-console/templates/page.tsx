@@ -17,7 +17,7 @@ import {
 import { TemplateCard } from "@/components/superadmin/templates/template-card";
 import { BLANK_TEMPLATE, TEMPLATES, buildTemplateSections } from "@/lib/prestate/data";
 import { createTemplate, deleteTemplate, duplicateTemplate, loadTemplates, resetTemplate, saveTemplate } from "@/lib/prestate/persist";
-import { builderPath, localPreviewPath } from "@/lib/prestate/paths";
+import { builderPath, templatePreviewPath } from "@/lib/prestate/paths";
 import { defaultSiteConfig, seedConfigFor } from "@/lib/prestate/site-config";
 import { inferDesignId } from "@/lib/prestate/page-templates";
 import type { LandingPageData, TemplateData } from "@/lib/prestate/types";
@@ -135,7 +135,7 @@ export default function SuperAdminTemplatesPage() {
   const preview = useCallback(
     (pageId: string) => {
       const page = pages.find((p) => p.id === pageId);
-      if (page) window.open(localPreviewPath(page), "_blank", "noopener,noreferrer");
+      if (page) window.open(templatePreviewPath(pageId), "_blank", "noopener,noreferrer");
     },
     [pages],
   );

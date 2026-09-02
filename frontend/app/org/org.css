@@ -2753,6 +2753,13 @@
 .org .colorset { display: flex; gap: 8px; flex-wrap: wrap; }
 .org .colorset span { width: 30px; height: 30px; border-radius: 8px; cursor: pointer; }
 .org .colorset span.on { box-shadow: 0 0 0 3px var(--brand-050), 0 0 0 1px var(--brand); }
+
+/* Native colour input styled as a swatch — brand-colour picker in the
+   branding section. Output is always #rrggbb, matching the API. */
+.org .colorpick { width: 46px; height: 36px; padding: 2px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); cursor: pointer; flex-shrink: 0; }
+.org .colorpick::-webkit-color-swatch-wrapper { padding: 0; }
+.org .colorpick::-webkit-color-swatch { border: none; border-radius: 7px; }
+.org .colorpick::-moz-color-swatch { border: none; border-radius: 7px; }
 .org .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 18px; }
 @media (max-width: 600px) { .org .row2, .org .row3 { grid-template-columns: 1fr; } }
 .org .stage { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
