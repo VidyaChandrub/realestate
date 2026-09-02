@@ -120,7 +120,7 @@ export function RichTextEditor({
   };
 
   return (
-    <div style={{ border: "1px solid var(--ps-line-strong)", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+    <div style={{ border: "1px solid var(--ps-line-strong)", borderRadius: 10, overflow: "hidden", background: "var(--ps-panel)" }}>
       {/* Toolbar row 1 */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 1, padding: 5, borderBottom: "1px solid var(--ps-line)", background: "var(--ps-bg)" }}>
         <ToolBtn title="Bold" onClick={() => exec("bold")}><Bold size={14} /></ToolBtn>

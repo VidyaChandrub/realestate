@@ -321,13 +321,25 @@ function DraggableCard({
     id: `widget:${id}`,
     data: { type: "widget", widgetId: id },
   });
+  // Track whether this gesture actually dragged the card so we don't ALSO
+  // fire onAdd() for the same interaction — dnd-kit still lets the native
+  // "click" event fire on pointerup after a drag, which previously caused
+  // the widget to be inserted twice (once via drop, once via onClick).
+  const wasDragging = useRef(false);
+  if (isDragging) wasDragging.current = true;
   return (
     <button
       ref={setNodeRef}
       {...attributes}
       {...listeners}
       type="button"
-      onClick={onAdd}
+      onClick={() => {
+        if (wasDragging.current) {
+          wasDragging.current = false;
+          return;
+        }
+        onAdd();
+      }}
       onMouseEnter={() => onHover(id)}
       onMouseLeave={() => onHover(null)}
       title={desc}

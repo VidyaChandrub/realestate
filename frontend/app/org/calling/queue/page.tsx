@@ -32,7 +32,7 @@ export default function OrgCallingQueuePage() {
 
       <div className="page-head reveal in" style={{ marginTop: 4 }}>
         <div>
-          <div className="eyebrow">📞 Sales</div>
+          <div className="eyebrow"><Icon name="phone" size={14} /> Sales</div>
           <h1>My Call Queue · Priya</h1>
           <div className="sub">18 leads to work today</div>
         </div>
@@ -77,12 +77,12 @@ export default function OrgCallingQueuePage() {
                   <div className="mono">+91 98204 55127</div>
                   <div className="muted" style={{ fontSize: 12.5 }}>Palm Residency · 3 BHK · Meta Lead Ad</div>
                 </div>
-                <span className="chip" style={{ marginLeft: "auto" }}>⭐ Score 86</span>
+                <span className="chip" style={{ marginLeft: "auto" }}><Icon name="star" size={13} /> Score 86</span>
               </div>
 
               <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
-                <button className="btn btn-primary" style={{ flex: 1 }}>📞 Call now</button>
-                <button className="btn btn-success" style={{ flex: 1 }}>💬 WhatsApp</button>
+                <button className="btn btn-primary" style={{ flex: 1 }}><Icon name="phone" size={15} /> Call now</button>
+                <button className="btn btn-success" style={{ flex: 1 }}><Icon name="mail" size={15} /> WhatsApp</button>
               </div>
 
               <div className="field"><label>Disposition</label>

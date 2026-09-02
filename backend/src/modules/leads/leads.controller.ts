@@ -1,11 +1,20 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { LeadsService } from './leads.service';
-import type { CreateLeadDto } from './dto/create-lead.dto';
+import { CreateLeadDto } from './dto/create-lead.dto';
+import { AssignLeadDto } from './dto/assign-lead.dto';
 
 @Controller('org/leads')
 export class LeadsController {
@@ -20,9 +29,36 @@ export class LeadsController {
     return this.service.createFromPublic(dto);
   }
 
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
+  /**
+   * Lead inbox. Open to any approved org member; the service scopes the rows
+   * by role (admin = all, manager/sales = assigned only).
+   */
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard)
   @Get()
   list(@CurrentUser() user: JwtPayload) {
-    return this.service.list(user.orgId as string);
+    return this.service.list(user.orgId as string, user);
+  }
+
+  /**
+   * Admin-only: org members eligible as assignees (manager/sales) for the
+   * assignment UI.
+   */
+  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
+  @Get('assignable')
+  listAssignableUsers(@CurrentUser() user: JwtPayload) {
+    return this.service.listAssignableUsers(user.orgId as string);
+  }
+
+  /**
+   * Admin-only: (re)assign a lead to an org member and/or move its stage.
+   */
+  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
+  @Patch(':id/assign')
+  assign(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: AssignLeadDto,
+  ) {
+    return this.service.assign(user.orgId as string, id, dto);
   }
 }

@@ -1233,7 +1233,7 @@ function HtmlCodeEditor({
             className="ps-rich ps-fade-in"
             // Builder-authored content — sanitised exactly like the canvas/live render.
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(value) }}
-            style={{ minHeight: 56, padding: "12px 14px", background: "#fff", border: "1px solid var(--ps-line)", borderRadius: 10, fontSize: 13.5, color: "var(--ps-ink)", overflowWrap: "break-word" }}
+            style={{ minHeight: 56, padding: "12px 14px", background: "#fff", border: "1px solid var(--ps-line)", borderRadius: 10, fontSize: 13.5, color: "#111827", overflowWrap: "break-word" }}
           />
           <style>{`.ps-rich p { margin: 0 0 0.8em; } .ps-rich a { color: var(--ps-primary); }`}</style>
         </>

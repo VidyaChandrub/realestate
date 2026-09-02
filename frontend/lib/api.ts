@@ -1,6 +1,7 @@
 import type {
   AdminOrgDomainRequestListResponse,
   ApiErrorBody,
+  AssignLeadInput,
   AuthTokens,
   BusinessDetailsInput,
   BusinessDetailsStepResponse,
@@ -8,6 +9,10 @@ import type {
   ChangePlanInput,
   ChangePlanResult,
   CompleteOnboardingResult,
+  CrmAssignee,
+  CrmAssignableResponse,
+  CrmLead,
+  CrmLeadListResponse,
   InviteStepInput,
   InviteStepResponse,
   InvoiceRow,
@@ -26,6 +31,8 @@ import type {
   RequestCustomDomainInput,
   ResumeSignupResponse,
   ReviewOrgDomainRequestInput,
+  SalesAgentDetailResponse,
+  SalesAgentsListResponse,
   SignupStep1Response,
   SubdomainAvailability,
   SubscriptionStepInput,
@@ -275,6 +282,34 @@ export async function submitLead(input: LeadSubmission): Promise<void> {
       data: input.fields,
     }),
   });
+}
+
+// --- CRM leads (org-scoped inbox, role-aware) ---
+
+export async function getCrmLeads(): Promise<CrmLeadListResponse> {
+  return apiFetch<CrmLeadListResponse>("/org/leads");
+}
+
+export async function getCrmAssignableUsers(): Promise<CrmAssignableResponse> {
+  return apiFetch<CrmAssignableResponse>("/org/leads/assignable");
+}
+
+export async function assignCrmLead(
+  id: string,
+  input: AssignLeadInput,
+): Promise<CrmLead> {
+  return apiFetch(`/org/leads/${id}/assign`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getSalesAgents(): Promise<SalesAgentsListResponse> {
+  return apiFetch<SalesAgentsListResponse>("/org/sales-agents");
+}
+
+export function getSalesAgent(id: string): Promise<SalesAgentDetailResponse> {
+  return apiFetch<SalesAgentDetailResponse>(`/org/sales-agents/${id}`);
 }
 
 // --- Organisation domain identity (subdomain + custom domain) ---

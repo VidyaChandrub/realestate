@@ -75,7 +75,7 @@ export function CallingPageHead({
   return (
     <>
       <CrmPageHead
-        eyebrow="📞 Communication"
+        eyebrow="Communication"
         icon="phone"
         title="Calling Centre"
         sub="AI-powered voice calling to reach, qualify, and book site visits with your leads — around the clock."
@@ -111,7 +111,7 @@ export function WhatsAppPageHead({
   return (
     <>
       <CrmPageHead
-        eyebrow="💬 Communication"
+        eyebrow="Communication"
         icon="mail"
         title="WhatsApp"
         sub="Automated, AI-assisted WhatsApp conversations with your leads."
@@ -127,7 +127,6 @@ export function WhatsAppPageHead({
 /* ------------------------------------------------------------------ */
 const LEADS_TABS: Tab[] = [
   { key: "lead-center", label: "Lead Center", href: "/org/leads" },
-  { key: "call-queue", label: "Call Queue", href: "/org/calling/queue" },
 ];
 
 export function LeadsTabs({ active }: { active: string }) {
@@ -144,7 +143,7 @@ export function LeadsPageHead({
   return (
     <>
       <CrmPageHead
-        eyebrow="📇 Sales"
+        eyebrow="Sales"
         icon="crm"
         title="Lead Center"
         sub="All leads across projects — captured, assigned and worked to close."

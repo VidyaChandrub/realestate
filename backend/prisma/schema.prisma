@@ -182,6 +182,7 @@ model User {
   resetTokens     PasswordResetToken[]
   auditLogs       AuditLog[]
   managedProjects Project[]
+  assignedLeads   Lead[]
   notifications   Notification[]
 
   @@map("users")
@@ -744,16 +745,22 @@ model TrackingEvent {
 // ---------------------------------------------------------------------------
 
 model Lead {
-  id             String   @id @default(uuid())
-  orgId          String   @map("org_id")
-  landingPageId  String?  @map("landing_page_id")
-  formName       String?  @map("form_name")
-  source         String?  @default("website") // website | popup | floorplan | preview
-  data           Json
-  createdAt      DateTime @default(now()) @map("created_at")
+  id            String     @id @default(uuid())
+  orgId         String     @map("org_id")
+  landingPageId String?    @map("landing_page_id")
+  formName      String?    @map("form_name")
+  source        String?    @default("website") // website | popup | floorplan | preview
+  data          Json
+  status        LeadStatus @default(new)
+  assignedToId  String?    @map("assigned_to_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  assignedTo User? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
 
   @@index([orgId])
   @@index([landingPageId])
+  @@index([assignedToId])
+  @@index([status])
   @@index([createdAt])
   @@map("leads")
   @@schema("templates")
@@ -774,6 +781,20 @@ enum ProjectStatus {
   inactive
 
   @@schema("projects")
+}
+
+// Lifecycle of a captured lead in the CRM. Not driven by hard-coded casing
+// order here — the allowed set only; stages are a presentation concern.
+enum LeadStatus {
+  new
+  contacted
+  follow_up
+  site_visit
+  negotiation
+  won
+  lost
+
+  @@schema("templates")
 }
 
 enum UnitStatus {

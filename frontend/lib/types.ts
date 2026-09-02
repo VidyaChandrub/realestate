@@ -828,6 +828,123 @@ export interface LeadSubmission {
   fields: Record<string, string>;
 }
 
+// --- CRM leads (org-scoped inbox, role-aware) ---
+export type CrmLeadStatus =
+  | "new"
+  | "contacted"
+  | "follow_up"
+  | "site_visit"
+  | "negotiation"
+  | "won"
+  | "lost";
+
+export interface CrmAssignee {
+  id: string;
+  name: string;
+}
+
+export interface CrmLead {
+  id: string;
+  landingPageId: string | null;
+  formName: string | null;
+  source: string | null;
+  data: Record<string, unknown>;
+  status: CrmLeadStatus;
+  assignedTo: CrmAssignee | null;
+  createdAt: string;
+}
+
+export interface CrmLeadListResponse {
+  data: CrmLead[];
+  total: number;
+}
+
+export interface CrmAssignableUser {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  name: string;
+  role: { key: string; name: string } | null;
+}
+
+export interface CrmAssignableResponse {
+  data: CrmAssignableUser[];
+  total: number;
+}
+
+export interface AssignLeadInput {
+  assignedToId?: string | null;
+  status?: CrmLeadStatus;
+}
+
+// --- Sales agents (org CRM team dashboard) ---
+
+export interface SalesAgentPipelineStage {
+  status: CrmLeadStatus;
+  count: number;
+}
+
+export interface SalesAgentSource {
+  source: string | null;
+  count: number;
+}
+
+export interface SalesAgentStats {
+  leadsAssigned: number;
+  activeLeads: number;
+  closures: number;
+  lost: number;
+  conversion: number;
+  revenueBooked: number;
+  pipeline: SalesAgentPipelineStage[];
+  sources: SalesAgentSource[];
+}
+
+export interface SalesAgent {
+  id: string;
+  name: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  phoneNumber: string | null;
+  role: { key: string; name: string } | null;
+  status: "active" | "disabled";
+  online: boolean;
+  bridgeMissing: boolean;
+  joinedAt: string;
+  rank: number;
+  stats: SalesAgentStats;
+}
+
+export interface SalesAgentsSnapshot {
+  agents: number;
+  online: number;
+  missingPhone: number;
+}
+
+export interface SalesAgentsListResponse {
+  total: number;
+  snapshot: SalesAgentsSnapshot;
+  data: SalesAgent[];
+}
+
+export interface SalesAgentRecentLead {
+  id: string;
+  formName: string | null;
+  source: string | null;
+  status: CrmLeadStatus;
+  data: Record<string, unknown>;
+  budget: number;
+  createdAt: string;
+}
+
+export interface SalesAgentDetailResponse {
+  agent: SalesAgent;
+  totalAgents: number;
+  recentLeads: SalesAgentRecentLead[];
+}
+
 // --- Organisation domain identity (subdomain + custom domain) ---
 
 export type OrgDomainKind = 'subdomain' | 'custom_domain';
