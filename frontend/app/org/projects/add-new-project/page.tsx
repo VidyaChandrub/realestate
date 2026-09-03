@@ -18,6 +18,7 @@ import type {
   OrgUsersListResponse,
   Project,
   ProjectStatus,
+  SafeOrganisation,
 } from "@/lib/types";
 
 function userLabel(u: OrgUser): string {
@@ -333,6 +334,11 @@ export default function AddNewProjectPage() {
   // work must NOT add a separate column/toggle for this.
   const [aiKnowledgeBase, setAiKnowledgeBase] = useState(true);
 
+  // The org's registered name — shown read-only as "Developer / channel
+  // partner" (it's the organisation entered at onboarding, not a per-project
+  // value). Fetched from /org/settings.
+  const [orgName, setOrgName] = useState("");
+
   // Step 7 — team
   const [managerId, setManagerId] = useState("");
   const [managers, setManagers] = useState<OrgUser[]>([]);
@@ -382,6 +388,9 @@ export default function AddNewProjectPage() {
     apiFetch<OrgUsersListResponse>("/org/users?role=sales&limit=100&status=active", auth)
       .then((res) => setSalesAgents(res.data))
       .catch(() => setSalesAgents([]));
+    apiFetch<SafeOrganisation>("/org/settings", auth)
+      .then((o) => setOrgName(o.name))
+      .catch(() => setOrgName(""));
   }, [accessToken]);
 
   useEffect(() => {
@@ -741,7 +750,7 @@ export default function AddNewProjectPage() {
                   <div className="lbl">📋 Identity</div>
                   <div className="grid g2">
                     <div className="field"><label>Project name <span className="req">*</span></label><input className="inp" placeholder="e.g. Palm Residency" value={name} onChange={(e) => setName(e.target.value)} /></div>
-                    <div className="field"><label>Developer / channel partner <span className="req">*</span></label><input className="inp" value="Skyline Developers" readOnly /></div>
+                    <div className="field"><label>Developer / channel partner <span className="req">*</span></label><input className="inp" value={orgName} placeholder="Loading…" readOnly /><div className="hint">Your organisation, set during onboarding. Change it in Settings → General.</div></div>
                   </div>
                   <div className="field"><label>Project type <span className="req">*</span></label>
                     <CatalogOptions
