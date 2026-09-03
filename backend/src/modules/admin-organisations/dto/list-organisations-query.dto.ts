@@ -4,6 +4,7 @@ import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 export const ORG_LIST_STATUS_VALUES = [
   'active',
   'disabled',
+  'rejected',
   'all',
   'pending',
   'draft',

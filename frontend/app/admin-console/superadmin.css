@@ -1182,6 +1182,86 @@
   border-bottom: none;
 }
 
+/* ---------- Row actions menu (kebab) ---------- */
+.superadmin .row-menu-trigger {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.superadmin .row-menu-trigger:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+
+.superadmin .row-menu-trigger[aria-expanded="true"] {
+  background: var(--surface-2);
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+
+.superadmin .row-menu-trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.superadmin .row-menu {
+  position: fixed;
+  min-width: 168px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--sh-lg), 0 12px 36px -8px rgba(14, 21, 37, 0.16);
+  z-index: 500;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: nbSlideIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.superadmin .row-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 11px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: 0.12s;
+}
+
+.superadmin .row-menu-item:hover:not(:disabled) {
+  background: var(--line);
+}
+
+.superadmin .row-menu-item.danger {
+  color: var(--rose);
+}
+
+.superadmin .row-menu-item.danger:hover:not(:disabled) {
+  background: var(--rose-050);
+}
+
+.superadmin .row-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .superadmin .u {
   display: flex;
   align-items: center;

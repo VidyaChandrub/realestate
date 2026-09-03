@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, getOrgCatalogOptions, setProjectSalesAgents } from "@/lib/api";
+import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCoord, parseCount, parseDecimal } from "@/lib/parse";
 import { CURRENCY_LABELS, formatMoneyRange, PROJECT_CURRENCIES } from "@/lib/money";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
+import { CatalogOptions, MoneyInput } from "@/components/org/project-form-fields";
 import { Reveal } from "@/components/superadmin/reveal";
 import "@/app/org/org.css";
 import type {
@@ -14,10 +15,12 @@ import type {
   CreateUnitTypeInput,
   OrgCatalogCategory,
   OrgCatalogOption,
+  LandingPageRow,
   OrgUser,
   OrgUsersListResponse,
   Project,
   ProjectStatus,
+  SafeOrganisation,
 } from "@/lib/types";
 
 function userLabel(u: OrgUser): string {
@@ -43,15 +46,9 @@ const makeUnitType = (): UnitTypeDraft => ({
 });
 
 // The four wizard option lists are org-managed catalogs now (Settings →
-// Project Catalogs), fetched per step. There is no hardcoded fallback: an org
-// with an empty catalog sees an empty-state pointing at Settings.
-const CATALOG_NOUNS: Record<OrgCatalogCategory, string> = {
-  project_type: "project types",
-  unit_type: "unit configurations",
-  connectivity: "connectivity options",
-  amenity: "amenities",
-};
-
+// Project Catalogs), fetched per step (see CatalogOptions in
+// components/org/project-form-fields).
+//
 // Wizard steps (0-indexed) that read a catalog — used to refetch on entry so
 // options just added in Settings appear without a full page reload.
 const CATALOG_STEPS = new Set([0, 1, 3, 4]);
@@ -85,39 +82,6 @@ function formatConfigs(labels: string[]): string {
 // money-field text first, then defers to the shared money formatter.
 function priceRangeLabel(from: string, to: string, currency: string): string {
   return formatMoneyRange(parseAmount(from), parseAmount(to), currency);
-}
-
-// A text money field with a static ₹ adornment (kept out of the value, so
-// parseAmount always sees clean input) instead of a "₹ …" placeholder.
-function MoneyInput({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <div style={{ position: "relative" }}>
-      <span
-        style={{
-          position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)",
-          color: "var(--muted)", fontSize: 13, pointerEvents: "none",
-        }}
-      >
-        ₹
-      </span>
-      <input
-        className="inp"
-        style={{ paddingLeft: 24 }}
-        inputMode="numeric"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -196,74 +160,6 @@ function formatRelative(ts: number): string {
   return new Date(ts).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 }
 
-// Renders one catalog-backed option list (project type / unit config /
-// connectivity / amenity). No hardcoded fallback: while unloaded it shows a
-// spinner line, and an empty catalog shows an empty-state linking to Settings
-// rather than silently substituting a default list.
-function CatalogOptions({
-  category,
-  options,
-  loaded,
-  error,
-  single = false,
-  isSelected,
-  onToggle,
-}: {
-  category: OrgCatalogCategory;
-  options: OrgCatalogOption[];
-  loaded: boolean;
-  error: string | null;
-  single?: boolean;
-  isSelected: (label: string) => boolean;
-  onToggle: (label: string) => void;
-}) {
-  if (error) {
-    return <div className="hint" style={{ color: "var(--rose)" }}>{error}</div>;
-  }
-  if (!loaded) {
-    return <div className="hint">Loading options…</div>;
-  }
-  if (options.length === 0) {
-    return (
-      <div
-        style={{
-          border: "1.5px dashed var(--line-2)",
-          borderRadius: 12,
-          padding: "14px 16px",
-          background: "var(--surface-2)",
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          gap: "4px 10px",
-          fontSize: 13,
-          color: "var(--muted)",
-        }}
-      >
-        <span>No {CATALOG_NOUNS[category]} configured yet.</span>
-        <a className="brand-link" href="/org/settings?section=catalogs" target="_blank" rel="noreferrer">
-          Add them in Settings →
-        </a>
-      </div>
-    );
-  }
-  return (
-    <div className="opts" data-single={single || undefined}>
-      {options.map((o) => {
-        const on = isSelected(o.label);
-        return (
-          <span
-            key={o.id}
-            className={`opt ${single ? "rad " : ""}${on ? "on" : ""}`}
-            onClick={() => onToggle(o.label)}
-          >
-            <span className="b">{on ? (single ? "●" : "✓") : ""}</span>{o.label}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function AddNewProjectPage() {
   const router = useRouter();
   const { accessToken, user } = useAuth();
@@ -325,6 +221,7 @@ export default function AddNewProjectPage() {
   const [targetCpl, setTargetCpl] = useState("");
   const [leadGoal, setLeadGoal] = useState("");
   const [landingPage, setLandingPage] = useState("Create new from template…");
+  const [orgLandingPages, setOrgLandingPages] = useState<LandingPageRow[]>([]);
   const [aiCalling, setAiCalling] = useState(true);
   const [whatsappAuto, setWhatsappAuto] = useState(true);
   const [roundRobin, setRoundRobin] = useState(true);
@@ -332,6 +229,11 @@ export default function AddNewProjectPage() {
   // in the `marketing` blob (Piece A's schema design) — Piece E's file-upload
   // work must NOT add a separate column/toggle for this.
   const [aiKnowledgeBase, setAiKnowledgeBase] = useState(true);
+
+  // The org's registered name — shown read-only as "Developer / channel
+  // partner" (it's the organisation entered at onboarding, not a per-project
+  // value). Fetched from /org/settings.
+  const [orgName, setOrgName] = useState("");
 
   // Step 7 — team
   const [managerId, setManagerId] = useState("");
@@ -382,6 +284,12 @@ export default function AddNewProjectPage() {
     apiFetch<OrgUsersListResponse>("/org/users?role=sales&limit=100&status=active", auth)
       .then((res) => setSalesAgents(res.data))
       .catch(() => setSalesAgents([]));
+    apiFetch<SafeOrganisation>("/org/settings", auth)
+      .then((o) => setOrgName(o.name))
+      .catch(() => setOrgName(""));
+    getOrgLandingPages()
+      .then((rows) => setOrgLandingPages(rows.filter((lp) => lp.pageType === "landing")))
+      .catch(() => setOrgLandingPages([]));
   }, [accessToken]);
 
   useEffect(() => {
@@ -741,7 +649,7 @@ export default function AddNewProjectPage() {
                   <div className="lbl">📋 Identity</div>
                   <div className="grid g2">
                     <div className="field"><label>Project name <span className="req">*</span></label><input className="inp" placeholder="e.g. Palm Residency" value={name} onChange={(e) => setName(e.target.value)} /></div>
-                    <div className="field"><label>Developer / channel partner <span className="req">*</span></label><input className="inp" value="Skyline Developers" readOnly /></div>
+                    <div className="field"><label>Developer / channel partner <span className="req">*</span></label><input className="inp" value={orgName} placeholder="Loading…" readOnly /><div className="hint">Your organisation, set during onboarding. Change it in Settings → General.</div></div>
                   </div>
                   <div className="field"><label>Project type <span className="req">*</span></label>
                     <CatalogOptions
@@ -926,7 +834,16 @@ export default function AddNewProjectPage() {
                     <div className="field"><label>Target CPL</label><MoneyInput placeholder="300" value={targetCpl} onChange={setTargetCpl} /></div>
                     <div className="field"><label>Monthly lead goal</label><input className="inp" type="number" placeholder="400" value={leadGoal} onChange={(e) => setLeadGoal(e.target.value)} /></div>
                   </div>
-                  <div className="field"><label>Landing page</label><select className="inp" value={landingPage} onChange={(e) => setLandingPage(e.target.value)}><option>Create new from template…</option><option>Use existing — Palm Residency LP</option><option>External URL</option></select></div>
+                  <div className="field"><label>Landing page</label>
+                    <select className="inp" value={landingPage} onChange={(e) => setLandingPage(e.target.value)}>
+                      <option>Create new from template…</option>
+                      {orgLandingPages.map((lp) => (
+                        <option key={lp.id} value={`Use existing — ${lp.name}`}>Use existing — {lp.name}</option>
+                      ))}
+                      <option>External URL</option>
+                    </select>
+                    {orgLandingPages.length === 0 ? <div className="hint">No landing pages yet — create one from Landing Pages.</div> : null}
+                  </div>
                 </div>
                 <div className="q-sec">
                   <div className="lbl">🤖 Automation &amp; assignment</div>

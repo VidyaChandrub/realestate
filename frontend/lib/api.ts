@@ -24,7 +24,9 @@ import type {
   ModulesStepResponse,
   NotificationsListResponse,
   OrgCatalogCategory,
+  LandingPageRow,
   OrgCatalogOption,
+  OrgLandingPagesListResponse,
   ProjectSalesAgent,
   OnboardingAccountInput,
   OnboardingOrganisationInput,
@@ -520,4 +522,12 @@ export async function setProjectSalesAgents(
     `/org/projects/${projectId}/sales-agents`,
     { method: "PUT", body: JSON.stringify({ userIds }) },
   );
+}
+
+/** The org's landing pages (for the project wizard/edit "Landing page" picker). */
+export async function getOrgLandingPages(): Promise<LandingPageRow[]> {
+  const res = await apiFetch<OrgLandingPagesListResponse>(
+    "/org/landing-pages?page=1&limit=100",
+  );
+  return res.data;
 }

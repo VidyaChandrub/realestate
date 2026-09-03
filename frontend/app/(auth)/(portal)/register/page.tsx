@@ -239,20 +239,32 @@ export default function RegisterPage() {
     })();
   }, []);
 
+  // The template catalog is reference data a Super Admin can change at any
+  // time (add/edit/unpublish/delete) — it must be re-fetched live every
+  // time this step is actually shown, not just once when a plan is first
+  // picked. Depending on `cur` too (not just selectedPlanId) means going
+  // Back then Continue back into this step — or resuming straight into
+  // it — always fires a fresh fetch. selectedTemplateIds (the user's own
+  // picks) is untouched here on purpose: only cleared when the plan
+  // itself goes away, never just from navigating off this step.
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
     if (!selectedPlanId) { setTemplates([]); setSelectedTemplateIds([]); return; }
+    if (cur !== 4) return; // Step 5 (Templates), 0-indexed — see STEPS above
+    let cancelled = false;
     (async () => {
       setLoadingTemplates(true);
       try {
         const data = await apiFetch<any[]>("/templates");
+        if (cancelled) return;
         const list = Array.isArray(data) ? data : (data as any).data ?? [];
         setTemplates(list);
-      } catch { setTemplates([]); }
-      finally { setLoadingTemplates(false); }
+      } catch { if (!cancelled) setTemplates([]); }
+      finally { if (!cancelled) setLoadingTemplates(false); }
     })();
+    return () => { cancelled = true; };
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [selectedPlanId]);
+  }, [selectedPlanId, cur]);
 
   const selectedPlan = plans.find((p) => p.id === selectedPlanId) ?? null;
   const maxTemplates = (() => {

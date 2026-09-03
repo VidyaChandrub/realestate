@@ -325,7 +325,8 @@ export interface OrganisationListRow {
   adminName: string | null;
   adminEmail: string | null;
   adminPhone: string | null;
-  status: "active" | "disabled" | "pending";
+  status: "active" | "disabled" | "pending" | "rejected";
+  rejectionReason?: string | null;
   createdAt: string;
   userCount: number;
   teamCount: number;
@@ -345,6 +346,7 @@ export interface OrganisationSummary {
   total: number;
   active: number;
   pending?: number;
+  disabled?: number;
   onTrial: null;
   suspended: null;
 }
@@ -359,7 +361,8 @@ export interface OrganisationDetail {
   subdomainStatus: string;
   customDomain: string | null;
   customDomainStatus: string;
-  status: "active" | "disabled" | "pending" | "draft";
+  status: "active" | "disabled" | "pending" | "draft" | "rejected";
+  rejectionReason?: string | null;
   createdAt: string;
   timezone: string;
   currency: string;
@@ -861,12 +864,46 @@ export interface CreateProjectInput {
   reraCertificateUrl?: string;
 }
 
-export type UpdateProjectInput = Partial<
-  Omit<CreateProjectInput, "managerId">
-> & {
-  /** id to (re)assign, or explicit null to unassign. */
+// Every field optional. Nullable columns also accept an explicit `null` to
+// clear them (mirrors the backend UpdateProjectDto). Arrays clear with `[]`,
+// the JSON blobs with `{}`.
+export interface UpdateProjectInput {
+  name?: string;
+  location?: string | null;
+  reraId?: string | null;
+  possession?: string | null;
   managerId?: string | null;
-};
+  status?: ProjectStatus;
+  priceMin?: number | null;
+  priceMax?: number | null;
+  baseRate?: number | null;
+  landArea?: number | null;
+  towerCount?: number | null;
+  floorsDescription?: string | null;
+  amenities?: Amenity[];
+  bookingAmount?: number | null;
+  currency?: "INR" | "AED" | "USD";
+  priceIncludes?: string[];
+  paymentPlan?: string | null;
+  offers?: string | null;
+  addressLine?: string | null;
+  city?: string | null;
+  locality?: string | null;
+  pincode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  connectivity?: string[];
+  landmarks?: string | null;
+  specifications?: Record<string, unknown>;
+  marketing?: Record<string, unknown>;
+  requireBookingApproval?: boolean;
+  visibleToTelecallers?: boolean;
+  publishedToWebsite?: boolean;
+  coverImageUrl?: string | null;
+  galleryUrls?: string[];
+  brochureUrl?: string | null;
+  reraCertificateUrl?: string | null;
+}
 
 // --- Org custom catalogs (project onboarding wizard option lists) ---
 // Org-managed, pre-created option lists the project wizard picks from — one

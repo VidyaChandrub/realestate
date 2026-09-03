@@ -59,7 +59,8 @@ export type IconName =
   | "flame"
   | "sun"
   | "snowflake"
-  | "upload";
+  | "upload"
+  | "info";
 
 interface IconProps extends SVGProps<SVGSVGElement> {
   name: IconName;
@@ -390,6 +391,12 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <path d="m17 8-5-5-5 5" />
       <path d="M12 3v12" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4M12 8h.01" />
     </>
   ),
 };
