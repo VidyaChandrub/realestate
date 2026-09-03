@@ -13,7 +13,9 @@ import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RowActionsMenu, type RowAction } from "@/components/superadmin/row-actions-menu";
 
-const STATUS_TABS = ["All", "Active", "Pending", "Disabled"] as const;
+// The "Disabled" tab's status param covers both admin-disabled and
+// rejected orgs (see the backend's list() query) — labelled to match.
+const STATUS_TABS = ["All", "Active", "Pending", "Rejected/Disabled"] as const;
 const LIMIT = 20;
 
 function statusParamFor(tabIndex: number): "all" | "active" | "pending" | "disabled" {
@@ -300,13 +302,13 @@ export default function SuperAdminOrganisationsPage() {
           </div>
           <div className="stat">
             <div className="top">
-              <span className="label">Disabled</span>
+              <span className="label">Rejected/Disabled</span>
               <span className="ic ic-rose"><Icon name="flag" size={16} /></span>
             </div>
             <div className="value">
-              {summary ? `—` : "—"}
+              {summary ? <CountUp value={summary.disabled ?? 0} /> : "—"}
             </div>
-            <div className="delta">Rejected/disabled</div>
+            <div className="delta">Rejected registrations + disabled orgs</div>
           </div>
         </Reveal>
       </div>

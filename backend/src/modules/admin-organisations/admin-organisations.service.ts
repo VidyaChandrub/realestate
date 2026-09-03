@@ -232,6 +232,12 @@ export class AdminOrganisationsService {
       where.status = { not: 'draft' };
     } else if (query.status === 'pending') {
       where.status = 'pending';
+    } else if (query.status === 'disabled') {
+      // The Super Admin UI's "Rejected/Disabled" tab is one bucket over two
+      // distinct statuses — an admin-initiated disable and a rejected
+      // registration both land an org here, kept separate in the data model
+      // but shown together since both mean "not usable right now".
+      where.status = { in: ['disabled', 'rejected'] };
     } else {
       where.status = query.status as any;
     }
@@ -321,13 +327,16 @@ export class AdminOrganisationsService {
   }
 
   async summary() {
-    const [total, active, pending] = await Promise.all([
+    const [total, active, pending, disabled] = await Promise.all([
       this.prisma.organisation.count({ where: { status: { not: 'draft' } } }),
       this.prisma.organisation.count({ where: { status: 'active' } }),
       this.prisma.organisation.count({ where: { status: 'pending' } }),
+      // Matches the list() "Rejected/Disabled" bucket — both statuses read
+      // as "not usable right now" in the Super Admin UI.
+      this.prisma.organisation.count({ where: { status: { in: ['disabled', 'rejected'] } } }),
     ]);
 
-    return { total, active, pending, onTrial: null, suspended: null };
+    return { total, active, pending, disabled, onTrial: null, suspended: null };
   }
 
   async getById(id: string) {
