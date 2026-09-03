@@ -247,6 +247,7 @@ export const WIDGETS: WidgetDef[] = [
 
   // REAL ESTATE (continued)
   { id: "emi-calculator", label: "EMI Calculator", category: "Real Estate", group: "Real Estate", icon: Gauge, desc: "Home-loan EMI estimator with live sliders", make: () => sec("emi-calculator", "EMI Calculator", "Gauge", { heading: "Estimate Your Monthly EMI", price: 125, downPayment: 25, rate: 8.5, tenure: 20, currency: "₹", note: "Indicative calculation only. Final EMI depends on lender terms, tenure and eligibility." }) },
+  { id: "project", label: "Project", category: "Real Estate", group: "Real Estate", icon: Building2, desc: "Dynamic project list — select a project, visitor enquiry opens form linked to that project", make: () => sec("project", "Project", "Building2", { selectedProjectId: null, layout: "grid", columns: 3, cardStyle: "classic", design: "grid", showFilters: true, enquiryFormHeading: "Enquire About This Project", enquiryFormText: "Share your details and our team will get back to you shortly.", enquiryButtonLabel: "Submit Enquiry" }) },
 ];
 
 export const WIDGET_CATEGORY_META: { key: WidgetDef["category"]; label: string }[] = [

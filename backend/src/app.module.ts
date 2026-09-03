@@ -29,6 +29,9 @@ import { OrgTrackingModule } from './modules/org-tracking/org-tracking.module';
 import { PublicSiteModule } from './modules/public-site/public-site.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { OrgProjectCatalogModule } from './modules/org-project-catalog/org-project-catalog.module';
+import { OrgPermissionsModule } from './modules/org-permissions/org-permissions.module';
+import { AdminRolesModule } from './modules/admin-roles/admin-roles.module';
+import { OrgDashboardModule } from './modules/org-dashboard/org-dashboard.module';
 
 @Module({
   imports: [
@@ -54,6 +57,9 @@ import { OrgProjectCatalogModule } from './modules/org-project-catalog/org-proje
     SalesAgentsModule,
     ProjectsModule,
     OrgProjectCatalogModule,
+    OrgPermissionsModule,
+    AdminRolesModule,
+    OrgDashboardModule,
     OrgDomainRequestsModule,
     AdminDomainRequestsModule,
     OrgDomainModule,

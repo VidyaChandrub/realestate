@@ -68,6 +68,20 @@ export default function SuperAdminOrganisationsPage() {
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [rejectError, setRejectError] = useState<string | null>(null);
 
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: "",
+    city: "",
+    adminFirstName: "",
+    adminLastName: "",
+    adminEmail: "",
+    adminPhone: "",
+    adminPassword: "",
+    status: "active",
+  });
+  const [createFormError, setCreateFormError] = useState<string | null>(null);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+
   const notify = (m:string)=>{ setToast(m); setTimeout(()=>setToast(null),2500); };
 
   useEffect(() => {
@@ -233,13 +247,20 @@ export default function SuperAdminOrganisationsPage() {
           <div className="eyebrow"><Icon name="building" size={14} /> Manage</div>
           <h1>Organisations</h1>
           <div className="sub">
-            Every developer, agency and brokerage on the iPixxel Realty platform. Inline approve/reject/activate/deactivate/delete.
+            Every developer, agency and brokerage on the iPixxel Realty platform. Direct creation, approve/reject/activate/deactivate/delete.
           </div>
         </div>
         <div className="actions">
-          <span className="badge b-amber" style={{ fontSize: 12 }}>
-            Creation via register + approval — super admin edit only
-          </span>
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={() => {
+              setCreateFormError(null);
+              setCreateModalOpen(true);
+            }}
+          >
+            ＋ Create Organisation
+          </button>
         </div>
       </div>
 

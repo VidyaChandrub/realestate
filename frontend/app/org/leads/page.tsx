@@ -10,6 +10,7 @@ import {
   getCrmAssignableUsers,
   getCrmLeads,
 } from "@/lib/api";
+import Link from "next/link";
 import { isOrgAdmin } from "@/lib/session";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 
@@ -270,7 +271,7 @@ export default function OrgLeadsPage() {
                           <span className="u">
                             <span className={`av ${phone ? "a2" : ""}`}>{initialsFor(name)}</span>
                             <span>
-                              <span className="nm">{name}</span>
+                              <Link className="nm" href={`/org/leads/${lead.id}`}>{name}</Link>
                               {phone ? <br /> : null}
                               {phone ? <span className="sm">{phone}</span> : null}
                             </span>

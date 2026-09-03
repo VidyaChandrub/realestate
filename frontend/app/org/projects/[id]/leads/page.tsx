@@ -1,237 +1,197 @@
 "use client";
 
-// Static mockup carried over from the previous hardcoded project folder.
-// The Leads domain is out of scope for this build — nothing here is wired
-// to the backend. It exists so the project tab bar doesn't 404.
-
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
-import { Seg } from "@/components/superadmin/seg";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import { assignCrmLead, getCrmAssignableUsers, getCrmLeads } from "@/lib/api";
+import { isOrgAdmin } from "@/lib/session";
+import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import "@/app/org/org.css";
 
-type Lead = {
-  name: string;
-  initials: string;
-  avClass?: string;
-  phone: string;
-  interest: string;
-  source: string;
-  sourceBadge: string;
-  assignee: string | null;
-  assigneeInitials?: string;
-  assigneeAv?: string;
-  status: string;
-  statusBadge: string;
-  summary: string;
+const STATUS_BADGE: Record<CrmLeadStatus, string> = {
+  new: "b-gray",
+  contacted: "b-sky",
+  follow_up: "b-amber",
+  site_visit: "b-indigo",
+  negotiation: "b-violet",
+  won: "b-green",
+  lost: "b-rose",
 };
 
-const LEADS: Lead[] = [
-  {
-    name: "Rakesh Mehta", initials: "RM", phone: "+91 98250 43117",
-    interest: "3 BHK", source: "Meta", sourceBadge: "b-sky",
-    assignee: "Priya Sharma", assigneeInitials: "PS", assigneeAv: "a2",
-    status: "Site Visit", statusBadge: "b-indigo",
-    summary: "Ready buyer, budget ₹1.1 Cr, visited Tower B.",
-  },
-  {
-    name: "Nisha Shah", initials: "NS", avClass: "a3", phone: "+91 99040 22876",
-    interest: "2 BHK", source: "Google", sourceBadge: "b-amber",
-    assignee: "Aditya Verma", assigneeInitials: "AV", assigneeAv: "a3",
-    status: "Follow-up", statusBadge: "b-amber",
-    summary: "First-time buyer, wants Dec-2027 possession clarity.",
-  },
-  {
-    name: "Dhruv Kapadia", initials: "DK", avClass: "a5", phone: "+91 97250 11903",
-    interest: "4 BHK", source: "WhatsApp", sourceBadge: "b-green",
-    assignee: "Rohit Menon", assigneeInitials: "RM",
-    status: "Negotiation", statusBadge: "b-violet",
-    summary: "Penthouse interest, negotiating on floor-rise charge.",
-  },
-  {
-    name: "Meera Patel", initials: "MP", avClass: "a2", phone: "+91 98790 55402",
-    interest: "3 BHK", source: "Walk-in", sourceBadge: "b-gray",
-    assignee: "Sneha Kulkarni", assigneeInitials: "SK", assigneeAv: "a2",
-    status: "New", statusBadge: "b-gray",
-    summary: "Walk-in at site office, took brochure, warm intent.",
-  },
-  {
-    name: "Harsh Trivedi", initials: "HT", phone: "+91 96240 78811",
-    interest: "2 BHK", source: "Meta", sourceBadge: "b-sky",
-    assignee: "Priya Sharma", assigneeInitials: "PS", assigneeAv: "a2",
-    status: "Contacted", statusBadge: "b-sky",
-    summary: "Investor, comparing with SG Highway resale rates.",
-  },
-  {
-    name: "Anjali Vora", initials: "AV", avClass: "a3", phone: "+91 99250 30014",
-    interest: "3 BHK", source: "WhatsApp", sourceBadge: "b-green",
-    assignee: "Aditya Verma", assigneeInitials: "AV", assigneeAv: "a3",
-    status: "Won", statusBadge: "b-green",
-    summary: "Booked Unit 1204, token paid ₹2 L, loan in process.",
-  },
-  {
-    name: "Kunal Joshi", initials: "KJ", avClass: "a5", phone: "+91 97120 66233",
-    interest: "4 BHK", source: "Google", sourceBadge: "b-amber",
-    assignee: "Rohit Menon", assigneeInitials: "RM",
-    status: "Site Visit", statusBadge: "b-indigo",
-    summary: "NRI buyer, virtual tour done, site visit on weekend.",
-  },
-  {
-    name: "Riya Desai", initials: "RD", avClass: "a2", phone: "+91 98980 41590",
-    interest: "2 BHK", source: "Meta", sourceBadge: "b-sky",
-    assignee: "Sneha Kulkarni", assigneeInitials: "SK", assigneeAv: "a2",
-    status: "Lost", statusBadge: "b-rose",
-    summary: "Budget mismatch, went for a 2 BHK resale nearby.",
-  },
-  {
-    name: "Sameer Gandhi", initials: "SG", phone: "+91 99790 87456",
-    interest: "3 BHK", source: "Walk-in", sourceBadge: "b-gray",
-    assignee: "Priya Sharma", assigneeInitials: "PS", assigneeAv: "a2",
-    status: "Follow-up", statusBadge: "b-amber",
-    summary: "Wants corner unit, awaiting availability confirmation.",
-  },
-  {
-    name: "Tanvi Pandya", initials: "TP", avClass: "a3", phone: "+91 98240 90021",
-    interest: "4 BHK", source: "WhatsApp", sourceBadge: "b-green",
-    assignee: null,
-    status: "New", statusBadge: "b-gray",
-    summary: "Penthouse enquiry, high budget, needs callback.",
-  },
-];
+const STATUS_LABEL: Record<CrmLeadStatus, string> = {
+  new: "New",
+  contacted: "Contacted",
+  follow_up: "Follow-up",
+  site_visit: "Site Visit",
+  negotiation: "Negotiation",
+  won: "Won",
+  lost: "Lost",
+};
+
+const ALL_STATUSES = Object.keys(STATUS_LABEL) as CrmLeadStatus[];
+
+function initialsFor(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function leadName(lead: CrmLead): string {
+  const full =
+    typeof lead.data?.fullName === "string"
+      ? lead.data.fullName
+      : typeof lead.data?.name === "string"
+        ? lead.data.name
+        : null;
+  return full || lead.formName || "Unnamed lead";
+}
+
+function leadPhone(lead: CrmLead): string {
+  const phone =
+    typeof lead.data?.phone === "string"
+      ? lead.data.phone
+      : typeof lead.data?.phoneNumber === "string"
+        ? lead.data.phoneNumber
+        : null;
+  return phone || "";
+}
+
+function sourceBadgeClass(source: string | null): string {
+  switch (source) {
+    case "Meta": return "b-indigo";
+    case "Google": return "b-sky";
+    case "WhatsApp": return "b-green";
+    default: return "b-amber";
+  }
+}
 
 export default function OrgProjectLeadsPage() {
+  const params = useParams<{ id: string }>();
+  const projectId = params?.id ?? "";
+  const admin = isOrgAdmin();
+  const [leads, setLeads] = useState<CrmLead[] | null>(null);
+  const [assignable, setAssignable] = useState<{ id: string; name: string }[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!projectId) return;
+    setError(null);
+    try {
+      const res = await getCrmLeads({ projectId });
+      setLeads(res.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load leads.");
+    }
+  }, [projectId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (admin) {
+      getCrmAssignableUsers()
+        .then((res) => { if (!cancelled) setAssignable(res.data); })
+        .catch(() => { if (!cancelled) setAssignable([]); });
+    }
+    return () => { cancelled = true; };
+  }, [admin]);
+
+  const stats = useMemo(() => {
+    const current = leads ?? [];
+    return {
+      total: current.length,
+      new: current.filter((l) => l.status === "new").length,
+      siteVisits: current.filter((l) => l.status === "site_visit").length,
+      won: current.filter((l) => l.status === "won").length,
+    };
+  }, [leads]);
+
+  const handleAssign = useCallback(async (lead: CrmLead, assignedToId: string | null, status?: CrmLeadStatus) => {
+    if (!admin || savingId) return;
+    setSavingId(lead.id);
+    setError(null);
+    try {
+      const result = await assignCrmLead(lead.id, { assignedToId, status });
+      setLeads((prev) =>
+        prev
+          ? prev.map((l) =>
+              l.id === lead.id
+                ? { ...l, assignedTo: result.assignedTo, ...(status ? { status } : {}) }
+                : l,
+            )
+          : prev,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update lead.");
+    } finally {
+      setSavingId(null);
+    }
+  }, [admin, savingId]);
+
+  const assigneeOptions = useMemo(
+    () => assignable?.map((a) => ({ id: a.id, name: a.name })) ?? [],
+    [assignable],
+  );
+
   return (
     <>
-      <ProjectPageHead
-        active="leads"
-        actions={
-          <button className="btn btn-primary">＋ Add lead</button>
-        }
-      />
-
-      <Reveal delay={1}>
-        <div className="help mb-18">
-          Lead management isn&apos;t wired up yet — this is a preview of the
-          project Leads workspace.
-        </div>
-      </Reveal>
-
+      <ProjectPageHead active="leads" actions={admin ? <button className="btn btn-primary">＋ Add lead</button> : undefined} />
       <Reveal delay={1}>
         <div className="mb-20">
-          <Seg options={["All Leads", "Follow Ups", "Site Visits", "Closures"]} defaultIndex={0} />
+          <div className="seg-wrap"><div className="seg">
+            <button className="active">All Leads</button>
+            <button>Follow Ups</button>
+            <button>Site Visits</button>
+            <button>Closures</button>
+          </div></div>
         </div>
       </Reveal>
-
       <div className="grid g4 mb-20">
-        <Reveal delay={1}>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Total leads</span>
-              <span className="ic ic-indigo"><Icon name="crm" size={16} /></span>
-            </div>
-            <div className="value"><CountUp value={214} /></div>
-            <div className="delta up">↑ 12% this month</div>
-          </div>
-        </Reveal>
-        <Reveal delay={2}>
-          <div className="stat">
-            <div className="top">
-              <span className="label">New</span>
-              <span className="ic ic-sky"><Icon name="download" size={16} /></span>
-            </div>
-            <div className="value"><CountUp value={22} /></div>
-            <div className="delta">Awaiting first touch</div>
-          </div>
-        </Reveal>
-        <Reveal delay={3}>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Site visits</span>
-              <span className="ic ic-amber"><Icon name="calendar" size={16} /></span>
-            </div>
-            <div className="value"><CountUp value={18} /></div>
-            <div className="delta up">6 scheduled this week</div>
-          </div>
-        </Reveal>
-        <Reveal delay={4}>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Booked</span>
-              <span className="ic ic-green"><Icon name="star" size={16} /></span>
-            </div>
-            <div className="value"><CountUp value={6} /></div>
-            <div className="delta up">₹5.9 Cr booked value</div>
-          </div>
-        </Reveal>
+        <Reveal delay={1}><div className="stat"><div className="top"><span className="label">Total leads</span><span className="ic ic-indigo"><Icon name="download" size={16} /></span></div><div className="value"><CountUp value={stats.total} /></div><div className="delta">In this project</div></div></Reveal>
+        <Reveal delay={2}><div className="stat"><div className="top"><span className="label">New</span><span className="ic ic-sky"><Icon name="bell" size={16} /></span></div><div className="value"><CountUp value={stats.new} /></div><div className="delta">Awaiting first touch</div></div></Reveal>
+        <Reveal delay={3}><div className="stat"><div className="top"><span className="label">Site visits</span><span className="ic ic-amber"><Icon name="calendar" size={16} /></span></div><div className="value"><CountUp value={stats.siteVisits} /></div><div className="delta">Scheduled</div></div></Reveal>
+        <Reveal delay={4}><div className="stat"><div className="top"><span className="label">Won</span><span className="ic ic-green"><Icon name="star" size={16} /></span></div><div className="value"><CountUp value={stats.won} /></div><div className="delta">Closed deals</div></div></Reveal>
       </div>
-
       <Reveal delay={2}>
         <div className="card">
           <div className="card-h">
-            <div className="tb-search search-box">
-              <span className="si"><Icon name="search" size={14} /></span>
-              <input placeholder="Search by name or phone…" />
-            </div>
+            <div className="tb-search" style={{ maxWidth: 320, position: "static", margin: 0 }}><span className="si"><Icon name="search" size={14} /></span><input placeholder="Search by name or phone…" /></div>
             <div className="row gap-8 wrap">
-              <select className="inp w-auto" defaultValue="All Sources">
-                <option>All Sources</option><option>Meta</option><option>Google</option>
-                <option>WhatsApp</option><option>Walk-in</option>
-              </select>
-              <select className="inp w-auto" defaultValue="All Statuses">
-                <option>All Statuses</option><option>New</option><option>Contacted</option>
-                <option>Follow-up</option><option>Site Visit</option><option>Negotiation</option>
-                <option>Won</option><option>Lost</option>
-              </select>
-              <select className="inp w-auto" defaultValue="All Agents">
-                <option>All Agents</option><option>Priya Sharma</option><option>Aditya Verma</option>
-                <option>Rohit Menon</option><option>Sneha Kulkarni</option>
-              </select>
+              <select className="inp w-auto" defaultValue="All Statuses"><option>All Statuses</option>{ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select>
             </div>
           </div>
-          <div className="tbl-wrap">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Lead</th><th>Interested in</th><th>Source</th><th>Assigned To</th>
-                  <th>Status</th><th>AI Summary</th><th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {LEADS.map((l) => (
-                  <tr key={l.phone}>
-                    <td>
-                       <Link className="u" href="/org/leads">
-                        <span className={`av ${l.avClass ?? ""}`}>{l.initials}</span>
-                        <span>
-                          <span className="nm">{l.name}</span><br />
-                          <span className="sm">{l.phone}</span>
-                        </span>
-                      </Link>
-                    </td>
-                    <td><span className="chip">{l.interest}</span></td>
-                    <td><span className={`badge ${l.sourceBadge}`}>{l.source}</span></td>
-                    <td>
-                      {l.assignee ? (
-                        <span className="u">
-                          <span className={`av ${l.assigneeAv ?? ""}`}>{l.assigneeInitials}</span>
-                          <span className="nm">{l.assignee}</span>
-                        </span>
-                      ) : (
-                        <span className="muted">Unassigned</span>
-                      )}
-                    </td>
-                    <td><span className={`badge ${l.statusBadge}`}>{l.status}</span></td>
-                    <td className="muted">{l.summary}</td>
-                    <td>
-                      <Link className="btn btn-ghost btn-sm" href="/org/leads">Open</Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {error ? (
+            <div className="empty" style={{ padding: 40, textAlign: "center" }}><div className="muted">{error}</div><button className="btn btn-ghost" onClick={load} style={{ marginTop: 12 }}><Icon name="refresh" size={14} /> Retry</button></div>
+          ) : leads === null ? (
+            <div className="empty" style={{ padding: 40, textAlign: "center" }}><span className="muted">Loading leads…</span></div>
+          ) : leads.length === 0 ? (
+            <div className="empty" style={{ padding: 40, textAlign: "center" }}><span className="muted">No leads yet for this project. Publish a landing page form to start capturing them.</span></div>
+          ) : (
+            <div className="tbl-wrap">
+              <table className="tbl">
+                <thead><tr><th>Lead</th><th>Source</th><th>Assigned To</th><th>Status</th>{admin ? <th>Actions</th> : null}</tr></thead>
+                <tbody>{leads.map((lead) => {
+                  const name = leadName(lead);
+                  const phone = leadPhone(lead);
+                  return (
+                    <tr key={lead.id}>
+                      <td><span className="u"><span className={`av ${phone ? "a2" : ""}`}>{initialsFor(name)}</span><span><Link className="nm" href={`/org/leads/${lead.id}`}>{name}</Link>{phone ? <br /> : null}{phone ? <span className="sm">{phone}</span> : null}</span></span></td>
+                      <td><span className={`badge ${sourceBadgeClass(lead.source)}`}>{lead.source ?? "website"}</span></td>
+                      <td>{lead.assignedTo ? <span className="u"><span className="av a3">{initialsFor(lead.assignedTo.name)}</span><span className="nm">{lead.assignedTo.name}</span></span> : <span className="muted">Unassigned</span>}</td>
+                      <td>{admin ? <select className="inp" style={{ width: "auto" }} value={lead.status} disabled={savingId === lead.id} onChange={(e) => handleAssign(lead, lead.assignedTo?.id ?? null, e.target.value as CrmLeadStatus)}>{ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select> : <span className={`badge ${STATUS_BADGE[lead.status]}`}>{STATUS_LABEL[lead.status]}</span>}</td>
+                      {admin ? <td><select className="inp" style={{ width: "auto" }} value={lead.assignedTo?.id ?? ""} disabled={savingId === lead.id} onChange={(e) => handleAssign(lead, e.target.value || null)}><option value="">Unassigned</option>{assigneeOptions.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></td> : null}
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+          )}
         </div>
       </Reveal>
     </>

@@ -1,13 +1,11 @@
 import {
   IsEmail,
-  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  MinLength,
 } from 'class-validator';
-import { ASSIGNABLE_ROLES } from '../../../common/utils/org-users.util';
-import type { AssignableRole } from '../../../common/utils/org-users.util';
 
 export class CreateOrgUserDto {
   @IsString()
@@ -28,6 +26,13 @@ export class CreateOrgUserDto {
   @MaxLength(30)
   phoneNumber?: string;
 
-  @IsIn(ASSIGNABLE_ROLES)
-  role: AssignableRole;
+  @IsString()
+  @IsNotEmpty()
+  role: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(100)
+  password?: string;
 }

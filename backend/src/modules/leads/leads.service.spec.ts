@@ -19,6 +19,8 @@ describe('LeadsService', () => {
       update: jest.Mock;
     };
     landingPage: { findUnique: jest.Mock };
+    project: { findMany: jest.Mock; findFirst: jest.Mock };
+    projectSalesAgent: { findMany: jest.Mock; findFirst: jest.Mock };
     user: { findFirst: jest.Mock; findMany: jest.Mock };
   };
 
@@ -32,6 +34,15 @@ describe('LeadsService', () => {
         update: jest.fn(),
       },
       landingPage: { findUnique: jest.fn() },
+      project: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+      },
+      projectSalesAgent: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn(),
+      },
       user: { findFirst: jest.fn(), findMany: jest.fn() },
     };
 
@@ -62,9 +73,14 @@ describe('LeadsService', () => {
 
       await service.list('org-1', actor({ roles: ['sales'], sub: 'sales-9' }));
 
-      expect(prisma.lead.findMany).toHaveBeenCalledWith(
+      // Sales users get an AND with OR: (assignedToId == actor OR projectId in [...])
+      const call = prisma.lead.findMany.mock.calls[0][0];
+      expect(call.where).toEqual(
         expect.objectContaining({
-          where: { orgId: 'org-1', assignedToId: 'sales-9' },
+          AND: expect.arrayContaining([
+            { orgId: 'org-1' },
+            { OR: [{ assignedToId: 'sales-9' }] },
+          ]),
         }),
       );
     });
@@ -75,11 +91,38 @@ describe('LeadsService', () => {
 
       await service.list('org-1', actor({ roles: ['manager'], sub: 'mgr-2' }));
 
-      expect(prisma.lead.findMany).toHaveBeenCalledWith(
+      const call = prisma.lead.findMany.mock.calls[0][0];
+      expect(call.where).toEqual(
         expect.objectContaining({
-          where: { orgId: 'org-1', assignedToId: 'mgr-2' },
+          AND: expect.arrayContaining([
+            { orgId: 'org-1' },
+            { OR: [{ assignedToId: 'mgr-2' }] },
+          ]),
         }),
       );
+    });
+
+    it('sales user sees leads on projects they are assigned to', async () => {
+      prisma.lead.findMany.mockResolvedValue([]);
+      prisma.lead.count.mockResolvedValue(0);
+      prisma.project.findMany.mockResolvedValue([]);
+      prisma.projectSalesAgent.findMany.mockResolvedValue([{ projectId: 'proj-5' }]);
+
+      await service.list('org-1', actor({ roles: ['sales'], sub: 'sales-9' }));
+
+      expect(prisma.projectSalesAgent.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'sales-9', project: { orgId: 'org-1' } },
+        }),
+      );
+
+      const call = prisma.lead.findMany.mock.calls[0][0];
+      const andClauses = call.where.AND;
+      const orClause = andClauses.find((c: any) => Array.isArray(c.OR));
+      expect(orClause.OR).toEqual([
+        { assignedToId: 'sales-9' },
+        { projectId: { in: ['proj-5'] } },
+      ]);
     });
   });
 
@@ -98,7 +141,10 @@ describe('LeadsService', () => {
     });
 
     it('resolves org from the landing page and creates the lead', async () => {
-      prisma.landingPage.findUnique.mockResolvedValue({ orgId: 'org-42' });
+      prisma.landingPage.findUnique.mockResolvedValue({
+        orgId: 'org-42',
+        status: 'published',
+      });
       prisma.lead.create.mockResolvedValue({ id: 'lead-1' });
 
       const result = await service.createFromPublic({
@@ -112,12 +158,38 @@ describe('LeadsService', () => {
         data: {
           orgId: 'org-42',
           landingPageId: 'lp-x',
+          projectId: null,
           formName: 'enquiry',
           source: 'website',
           data: { name: 'Aarav' },
         },
       });
       expect(result.id).toBe('lead-1');
+    });
+
+    it('resolves org from a projectId when no landingPageId', async () => {
+      (prisma.project.findUnique as jest.Mock).mockResolvedValue({
+        orgId: 'org-42',
+        status: 'active',
+      });
+      prisma.lead.create.mockResolvedValue({ id: 'lead-2' });
+
+      const result = await service.createFromPublic({
+        projectId: 'proj-1',
+        formName: 'enquiry',
+        source: 'website',
+        data: { name: 'Test' },
+      });
+
+      expect(prisma.lead.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            orgId: 'org-42',
+            projectId: 'proj-1',
+          }),
+        }),
+      );
+      expect(result.id).toBe('lead-2');
     });
   });
 

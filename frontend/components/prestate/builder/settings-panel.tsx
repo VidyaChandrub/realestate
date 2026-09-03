@@ -6,6 +6,7 @@ import {
   AlignLeft,
   AlignRight,
   Box,
+  Building2,
   ChevronDown,
   ChevronUp,
   Code2,
@@ -504,6 +505,65 @@ function ObjectList({ label, fieldKey, widgetType, value, onChange, seedKeys }: 
 
 
 
+function ProjectWidgetSettings({ section, onChange }: { section: SectionInstance; onChange: (patch: Record<string, unknown>) => void }) {
+  const [projects, setProjects] = useState<{ id: string; name: string; location: string | null; status: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = await import("@/lib/api");
+        const res = await mod.apiFetch<{ data: { id: string; name: string; location: string | null; status: string }[] }>("/org/projects?limit=100");
+        if (!cancelled && Array.isArray(res.data)) setProjects(res.data);
+      } catch {
+        if (!cancelled) setProjects([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const selected = String(section.settings.selectedProjectId ?? "");
+  return (
+    <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ps-primary)", fontWeight: 800, fontSize: 12.5 }}>
+        <Building2 size={14} /> Project Widget — DB-driven
+      </div>
+      <FieldRow label="Selected project">
+        <SelectField
+          value={selected}
+          onChange={(v) => onChange({ selectedProjectId: v || null })}
+          options={[{ value: "", label: loading ? "Loading…" : "All projects (grid of org projects)" }, ...projects.map((p) => ({ value: p.id, label: `${p.name}${p.location ? ` — ${p.location}` : ""} (${p.status})` }))]}
+          placeholder="All projects"
+        />
+      </FieldRow>
+      <div style={{ fontSize: 11, color: "var(--ps-muted)", lineHeight: 1.5 }}>
+        Single widget supports all projects. Pick one to show a single card, or leave “All projects” to render a dynamic grid. Visitor click opens the org’s form (Forms module) and creates a lead linked to that project.
+      </div>
+      <FieldRow label="Layout">
+        <SelectField value={String(section.settings.layout ?? section.settings.design ?? "grid")} onChange={(v) => onChange({ layout: v, design: v })} options={[{ value: "grid", label: "Grid" }, { value: "list", label: "List" }, { value: "carousel", label: "Carousel" }]} />
+      </FieldRow>
+      <FieldRow label="Columns">
+        <SliderField value={Number(section.settings.columns ?? 3)} min={1} max={4} onChange={(v) => onChange({ columns: v })} />
+      </FieldRow>
+      <FieldRow label="Enquiry heading">
+        <TextField value={String(section.settings.enquiryFormHeading ?? "")} onChange={(v) => onChange({ enquiryFormHeading: v })} placeholder="Enquire About This Project" />
+      </FieldRow>
+      <FieldRow label="Enquiry text">
+        <TextField value={String(section.settings.enquiryFormText ?? "")} onChange={(v) => onChange({ enquiryFormText: v })} placeholder="Share your details and our team will get back to you" />
+      </FieldRow>
+      <FieldRow label="Button label">
+        <TextField value={String(section.settings.enquiryButtonLabel ?? "")} onChange={(v) => onChange({ enquiryButtonLabel: v })} placeholder="Submit Enquiry" />
+      </FieldRow>
+      <div style={{ fontSize: 11, color: "var(--ps-muted)", background: "var(--ps-primary-mist)", border: "1px solid var(--ps-line)", borderRadius: 8, padding: "8px 10px" }}>
+        Form fields come from <b>Forms module → SiteConfig.form</b> (dynamic per org). The modal injects <code>projectId</code> hidden and posts to <code>POST /org/leads {"{ landingPageId, projectId, data }"} </code>.
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main settings panel
 // ---------------------------------------------------------------------------
@@ -779,6 +839,9 @@ export function SettingsPanel({
             {section.type === "lead-form" ? (
               <FormWidgetConditionalEditor section={section} onChange={set} page={page} onPatchConfig={onPatchConfig} />
             ) : null}
+            {/* Project Widget — custom DB-driven selector */}
+            {section.type === "project" ? <ProjectWidgetSettings section={section} onChange={(patch) => set({ settings: { ...section.settings, ...patch } })} /> : null}
+
             {/* Widget Design Selector — always rendered at top if widget has multiple designs */}
             {section.type === "header" || section.type === "footer" ? (
               <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
@@ -786,7 +849,7 @@ export function SettingsPanel({
                   <DesignPicker kind={section.type} value={String(section.settings.design ?? (section.type === "header" ? "classic" : "minimal"))} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
                 </FieldRow>
               </div>
-            ) : designsForWidget(section.type).length > 0 ? (
+            ) : designsForWidget(section.type).length > 0 && section.type !== "project" ? (
               <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
                 <FieldRow label="Design layout">
                   <WidgetDesignPicker widgetType={section.type} value={String(section.settings.design ?? (section.settings.style || designsForWidget(section.type)[0]?.id || ""))} onChange={(v) => set({ settings: { ...section.settings, design: v } })} />
@@ -794,7 +857,7 @@ export function SettingsPanel({
               </div>
             ) : null}
 
-            {section.type !== "lead-form" && Object.entries(section.settings)
+            {section.type !== "lead-form" && section.type !== "project" && Object.entries(section.settings)
               .filter(([key]) => key !== "eyebrow" && key !== "design")
               .filter(([key]) => !(section.type === "text" && (key === "text" || key === "html")))
               .filter(([key]) => !(section.type === "popup" && POPUP_MANAGED_KEYS.includes(key)))

@@ -2,23 +2,20 @@ import {
   ArrayMaxSize,
   IsArray,
   IsEmail,
-  IsIn,
+  IsNotEmpty,
+  IsString,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-const INVITE_ROLES = ['manager', 'sales'] as const;
-
 // Email + role only — the invited person supplies their own name later
-// (see provisionInvitedUser / Issue 2 investigation: there's currently no
-// first-login profile step for that; recommended separately, not built
-// here).
 class InviteEntryDto {
   @IsEmail()
   email: string;
 
-  @IsIn(INVITE_ROLES)
-  role: (typeof INVITE_ROLES)[number];
+  @IsString()
+  @IsNotEmpty()
+  role: string;
 }
 
 // Signup wizard — Step 7 (Invite team, skippable). Each entry fires

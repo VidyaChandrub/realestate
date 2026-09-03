@@ -310,6 +310,8 @@ export async function submitLead(input: LeadSubmission): Promise<void> {
     method: "POST",
     body: JSON.stringify({
       landingPageId: input.landingPageId,
+      projectId: input.projectId,
+      unitId: input.unitId,
       formName: input.formName,
       source: input.source,
       data: input.fields,
@@ -319,8 +321,43 @@ export async function submitLead(input: LeadSubmission): Promise<void> {
 
 // --- CRM leads (org-scoped inbox, role-aware) ---
 
-export async function getCrmLeads(): Promise<CrmLeadListResponse> {
-  return apiFetch<CrmLeadListResponse>("/org/leads");
+export async function getCrmLeads(
+  params?: import("./types").GetCrmLeadsParams,
+): Promise<CrmLeadListResponse> {
+  const q = new URLSearchParams();
+  if (params?.projectId) q.set("projectId", params.projectId);
+  if (params?.status) q.set("status", params.status);
+  if (params?.source) q.set("source", params.source);
+  if (params?.assignedToId) q.set("assignedToId", params.assignedToId);
+  if (params?.search) q.set("search", params.search);
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  const s = q.toString();
+  return apiFetch<CrmLeadListResponse>(`/org/leads${s ? `?${s}` : ""}`);
+}
+
+export async function getCrmLead(id: string): Promise<import("./types").CrmLead> {
+  return apiFetch<import("./types").CrmLead>(`/org/leads/${id}`);
+}
+
+export async function addCrmLeadNote(
+  id: string,
+  text: string,
+): Promise<import("./types").CrmLeadActivity> {
+  return apiFetch<import("./types").CrmLeadActivity>(`/org/leads/${id}/notes`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function updateCrmLeadNextAction(
+  id: string,
+  input: { actionType: "site_visit" | "follow_up"; scheduledAt: string; note?: string; reminderAt?: string },
+): Promise<NonNullable<import("./types").CrmLead["nextAction"]> & { activity: import("./types").CrmLeadActivity }> {
+  return apiFetch(`/org/leads/${id}/next-action`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
 
 export async function getCrmAssignableUsers(): Promise<CrmAssignableResponse> {

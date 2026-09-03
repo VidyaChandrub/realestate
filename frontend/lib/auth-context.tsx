@@ -157,10 +157,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         body: JSON.stringify(input),
       });
-      const session = toSessionUser(response.user, {
+
+      let permissions: Permissions = {
         dashboard: { view: true },
-        settings: { view: true, edit: true },
-      });
+        crm: { view: true, add: true, edit: true, delete: true },
+        projects: { view: true, add: true, edit: true, delete: true },
+        calling: { view: true, add: true, edit: true, delete: true },
+        whatsapp: { view: true, add: true, edit: true, delete: true },
+        websites: { view: true, add: true, edit: true, delete: true },
+        domains: { view: true, add: true, edit: true, delete: true },
+        sales_agents: { view: true, add: true, edit: true, delete: true },
+        teams: { view: true, add: true, edit: true, delete: true },
+        users: { view: true, add: true, edit: true, delete: true },
+        reports: { view: true, add: true, edit: true, delete: true },
+        integrations: { view: true, add: true, edit: true, delete: true },
+        billing: { view: true, add: true, edit: true, delete: true },
+        settings: { view: true, add: true, edit: true, delete: true },
+      };
+
+      try {
+        const meRes = await apiFetch<{ permissions: Permissions }>("/org/permissions/me", {
+          headers: { Authorization: `Bearer ${response.access_token}` },
+        });
+        if (meRes.permissions) {
+          permissions = meRes.permissions;
+        }
+      } catch {
+        // Fallback to default
+      }
+
+      const session = toSessionUser(response.user, permissions);
       persist(session, response.access_token, response.refresh_token);
       return session;
     },
@@ -269,7 +295,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasPermission = useCallback(
     (module: string, action: "view" | "add" | "edit" | "delete") => {
-      return user?.permissions?.[module]?.[action] === true;
+      if (!user) return false;
+      if (user.role === "super_admin") return true;
+      if (user.permissions && user.permissions[module]) {
+        return user.permissions[module][action] !== false;
+      }
+      return true;
     },
     [user],
   );

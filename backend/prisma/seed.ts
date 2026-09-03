@@ -10,10 +10,11 @@ import * as bcrypt from 'bcrypt';
 //   3. A demo organisation + its sales team (org admin, manager, sales agents,
 //      all with full profile fields) so the Sales Agents dashboard and lead
 //      inbox show realistic data out of the box.
-//   4. Landing pages and a spread of leads assigned across the team, with
+//   4. A demo project assigned to the seeded manager and sales users.
+//   5. Landing pages and a spread of leads assigned across the team, with
 //      every Lead field populated (formName, source, status, budget in the
 //      `data` JSON, captured-at timestamps).
-//   5. Per-agent call logs and activity events powering the Calls & comms and
+//   6. Per-agent call logs and activity events powering the Calls & comms and
 //      Activity tabs on each agent's dashboard.
 //
 // Idempotent: roles and users upsert by key/email, leads / calls / activity are
@@ -239,14 +240,18 @@ async function seedRoles() {
     },
     { key: 'manager', name: 'Manager', scope: 'team' as const, sortOrder: 2 },
     { key: 'sales', name: 'Sales', scope: 'team' as const, sortOrder: 3 },
+    { key: 'telecaller', name: 'Telecaller', scope: 'team' as const, sortOrder: 4 },
   ];
 
   for (const role of roles) {
-    await prisma.role.upsert({
-      where: { key: role.key },
-      update: {},
-      create: role,
+    const existingRole = await prisma.role.findFirst({
+      where: { orgId: null, key: role.key },
     });
+    if (existingRole) {
+      // no fields to update — system role definitions are fixed
+    } else {
+      await prisma.role.create({ data: role });
+    }
   }
   console.log(`Seeded ${roles.length} roles.`);
   return roles;
@@ -266,8 +271,8 @@ async function seedSuperAdmin() {
   }
 
   const passwordHash = await bcrypt.hash(superAdminPassword, 12);
-  const superAdminRole = await prisma.role.findUniqueOrThrow({
-    where: { key: 'super_admin' },
+  const superAdminRole = await prisma.role.findFirstOrThrow({
+    where: { orgId: null, key: 'super_admin' },
   });
 
   const existing = await prisma.user.findUnique({
@@ -326,8 +331,8 @@ async function seedDemoOrg() {
   // --- Sales team (org admin + manager + sales agents) ----------------------
   const userIds: Record<string, string> = {};
   for (const agent of AGENTS) {
-    const role = await prisma.role.findUniqueOrThrow({
-      where: { key: agent.role },
+    const role = await prisma.role.findFirstOrThrow({
+      where: { orgId: null, key: agent.role },
     });
 
     const user = await prisma.user.upsert({
@@ -362,6 +367,86 @@ async function seedDemoOrg() {
   console.log(
     `Sales team seeded (${Object.keys(userIds).length} users) — sign in with any ` +
       `of them, password: ${SEED_USER_PASSWORD}`,
+  );
+
+  // --- Demo project -----------------------------------------------------------
+  const managerId = userIds['priya@skylinedev.in'];
+  const projectSalesAgentIds = [
+    userIds['vijay@skylinedev.in'],
+    userIds['rohit@skylinedev.in'],
+    userIds['sneha@skylinedev.in'],
+  ];
+  const existingProject = await prisma.project.findFirst({
+    where: { orgId: org.id, name: 'Skyline Heights' },
+    select: { id: true },
+  });
+  const project = existingProject
+    ? await prisma.project.update({
+        where: { id: existingProject.id },
+        data: {
+          location: 'Bandra East, Mumbai',
+          reraId: 'P51800012345',
+          possession: 'Dec 2027',
+          managerId,
+          status: 'active',
+          priceMin: 12500000,
+          priceMax: 28500000,
+          baseRate: 18500,
+          landArea: 4.5,
+          towerCount: 3,
+          floorsDescription: 'G+22',
+          amenities: [
+            { name: 'Swimming Pool', iconUrl: null },
+            { name: 'Clubhouse', iconUrl: null },
+            { name: 'Gymnasium', iconUrl: null },
+          ],
+          city: 'Mumbai',
+          locality: 'Bandra East',
+          pincode: '400051',
+          connectivity: ['Metro', 'School', 'Hospital', 'Airport'],
+          publishedToWebsite: true,
+        },
+      })
+    : await prisma.project.create({
+        data: {
+          orgId: org.id,
+          name: 'Skyline Heights',
+          location: 'Bandra East, Mumbai',
+          reraId: 'P51800012345',
+          possession: 'Dec 2027',
+          managerId,
+          status: 'active',
+          priceMin: 12500000,
+          priceMax: 28500000,
+          baseRate: 18500,
+          landArea: 4.5,
+          towerCount: 3,
+          floorsDescription: 'G+22',
+          amenities: [
+            { name: 'Swimming Pool', iconUrl: null },
+            { name: 'Clubhouse', iconUrl: null },
+            { name: 'Gymnasium', iconUrl: null },
+          ],
+          city: 'Mumbai',
+          locality: 'Bandra East',
+          pincode: '400051',
+          connectivity: ['Metro', 'School', 'Hospital', 'Airport'],
+          publishedToWebsite: true,
+        },
+      });
+
+  await prisma.projectSalesAgent.deleteMany({
+    where: { projectId: project.id },
+  });
+  await prisma.projectSalesAgent.createMany({
+    data: projectSalesAgentIds.map((userId) => ({
+      projectId: project.id,
+      userId,
+    })),
+  });
+  console.log(
+    `Demo project seeded: ${project.name} — manager: priya@skylinedev.in, ` +
+      `${projectSalesAgentIds.length} sales users assigned.`,
   );
 
   // --- Landing pages --------------------------------------------------------

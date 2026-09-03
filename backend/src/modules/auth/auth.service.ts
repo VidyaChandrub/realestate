@@ -41,6 +41,11 @@ import {
   generateSubdomainSuggestions,
 } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
+import {
+  PERMISSION_MODULES,
+  computeEffectivePermissions,
+  emptyModulePermission,
+} from '../../common/utils/permissions.util';
 
 const BCRYPT_COST_FACTOR = 12;
 
@@ -85,8 +90,8 @@ export class AuthService {
 
     const slug = await generateUniqueOrgSlug(this.prisma, dto.company_name);
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
-    const adminRole = await this.prisma.role.findUniqueOrThrow({
-      where: { key: 'admin' },
+    const adminRole = await this.prisma.role.findFirstOrThrow({
+      where: { orgId: null, key: 'admin' },
     });
 
     // --- Organisation domain identity (subdomain / custom domain) ---
@@ -410,8 +415,8 @@ export class AuthService {
       await this.assertCustomDomainAvailable(customDomain);
     }
 
-    const adminRole = await this.prisma.role.findUniqueOrThrow({
-      where: { key: 'admin' },
+    const adminRole = await this.prisma.role.findFirstOrThrow({
+      where: { orgId: null, key: 'admin' },
     });
 
     const { organisation, updatedUser } = await this.prisma.$transaction(async (tx) => {
@@ -647,7 +652,67 @@ export class AuthService {
     const organisation = user.organisation
       ? toSafeOrganisation(user.organisation)
       : null;
-    return { user: toSafeUser(user), organisation };
+    const permissions = organisation
+      ? await this.effectivePermissions(userId, organisation.id)
+      : null;
+    return { user: toSafeUser(user), organisation, permissions };
+  }
+
+  /** Effective page/action permissions for a user within their org. */
+  private async effectivePermissions(userId: string, orgId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        orgId: true,
+        userRoles: { select: { role: { select: { key: true } } } },
+        userPermissions: {
+          select: {
+            moduleKey: true,
+            canView: true,
+            canAdd: true,
+            canEdit: true,
+            canDelete: true,
+            canApprove: true,
+          },
+        },
+      },
+    });
+    if (!user || user.orgId !== orgId) {
+      return null;
+    }
+
+    const roleKeys = user.userRoles.map((ur) => ur.role.key);
+    const rolePermissions = await this.prisma.roleModulePermission.findMany({
+      where: { orgId, role: { key: { in: roleKeys } } },
+      select: {
+        role: { select: { key: true } },
+        moduleKey: true,
+        canView: true,
+        canAdd: true,
+        canEdit: true,
+        canDelete: true,
+        canApprove: true,
+      },
+    });
+
+    const effective = computeEffectivePermissions({
+      roleKeys,
+      rolePermissions,
+      userOverrides: user.userPermissions,
+    });
+
+    const result: Record<string, Record<string, boolean>> = {};
+    for (const module of PERMISSION_MODULES) {
+      const value = effective.byModule[module.key] ?? emptyModulePermission(module.key);
+      result[module.key] = {
+        view: value.canView,
+        add: value.canAdd,
+        edit: value.canEdit,
+        delete: value.canDelete,
+        approve: value.canApprove,
+      };
+    }
+    return result;
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto) {
