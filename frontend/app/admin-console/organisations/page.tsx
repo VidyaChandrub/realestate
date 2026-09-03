@@ -117,7 +117,7 @@ export default function SuperAdminOrganisationsPage() {
     if (!accessToken) return;
     setConfirmState({
       title: "Reject organisation?",
-      message: "The organisation will be disabled.",
+      message: "The organisation will be marked rejected.",
       run: async () => {
         setActionBusy(id);
         try{
@@ -345,7 +345,7 @@ export default function SuperAdminOrganisationsPage() {
                       <td>
                         <span className={`badge ${o.status === "active" ? "b-green" : o.status === "pending" ? "b-amber" : "b-rose"}`}>
                           <span className="dot" style={{ background: "currentColor" }} />
-                          {o.status === "active" ? "Active" : o.status === "pending" ? "Pending" : "Disabled"}
+                          {o.status === "active" ? "Active" : o.status === "pending" ? "Pending" : o.status === "rejected" ? "Rejected" : "Disabled"}
                         </span>
                       </td>
                       <td>{formatDate(o.createdAt)}</td>

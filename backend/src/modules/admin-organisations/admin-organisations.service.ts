@@ -615,8 +615,9 @@ export class AdminOrganisationsService {
     const org = await this.prisma.organisation.findUnique({ where: { id: orgId } });
     if (!org) throw new NotFoundException('Organisation not found');
     if (org.status !== 'pending') throw new BadRequestException('Only pending organisations can be rejected');
-    // For now, disable the org and reject any pending subdomain requests
-    const updated = await this.prisma.organisation.update({ where: { id: orgId }, data: { status: 'disabled', subdomainStatus: 'rejected' } });
+    // Mark the org rejected (distinct from a later admin-initiated disable)
+    // and reject any pending subdomain requests.
+    const updated = await this.prisma.organisation.update({ where: { id: orgId }, data: { status: 'rejected', subdomainStatus: 'rejected' } });
     await this.prisma.orgDomainRequest.updateMany({
       where: { orgId, kind: 'subdomain', status: 'pending' },
       data: {

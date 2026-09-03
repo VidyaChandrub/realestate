@@ -42,6 +42,7 @@ const ORG_STATUS_META: Record<string, { label: string; badge: string }> = {
   pending: { label: "Pending", badge: "b-amber" },
   draft: { label: "Draft", badge: "b-gray" },
   disabled: { label: "Disabled", badge: "b-rose" },
+  rejected: { label: "Rejected", badge: "b-rose" },
 };
 
 function orgStatusMeta(status: string) {

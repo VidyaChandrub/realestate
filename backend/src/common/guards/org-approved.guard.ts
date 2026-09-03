@@ -75,6 +75,9 @@ export class OrgApprovedGuard implements CanActivate {
     if (organisation.status === 'disabled') {
       throw orgInactive('Organisation is disabled');
     }
+    if (organisation.status === 'rejected') {
+      throw orgInactive('Organisation registration was rejected');
+    }
     if (organisation.status === 'draft') {
       throw orgInactive('Organisation not yet activated');
     }
