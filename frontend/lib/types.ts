@@ -326,6 +326,7 @@ export interface OrganisationListRow {
   adminEmail: string | null;
   adminPhone: string | null;
   status: "active" | "disabled" | "pending" | "rejected";
+  rejectionReason?: string | null;
   createdAt: string;
   userCount: number;
   teamCount: number;
@@ -360,6 +361,7 @@ export interface OrganisationDetail {
   customDomain: string | null;
   customDomainStatus: string;
   status: "active" | "disabled" | "pending" | "draft" | "rejected";
+  rejectionReason?: string | null;
   createdAt: string;
   timezone: string;
   currency: string;

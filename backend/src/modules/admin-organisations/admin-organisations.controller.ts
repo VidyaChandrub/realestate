@@ -23,6 +23,7 @@ import { ListOrganisationsQueryDto } from './dto/list-organisations-query.dto';
 import { UpdateOrganisationDto } from './dto/update-organisation.dto';
 import { UpdateOrganisationStatusDto } from './dto/update-organisation-status.dto';
 import { LogoUploadUrlDto } from './dto/logo-upload-url.dto';
+import { RejectOrganisationDto } from './dto/reject-organisation.dto';
 import { CreateOrgUserDto } from '../org-users/dto/create-org-user.dto';
 import { UpdateOrgUserStatusDto } from '../org-users/dto/update-org-user-status.dto';
 import { ListOrgUsersQueryDto } from '../org-users/dto/list-org-users-query.dto';
@@ -156,8 +157,8 @@ export class AdminOrganisationsController {
   reject(
     @Param('id') id: string,
     @CurrentUser() actor: JwtPayload,
-    @Body() dto: { reason?: string },
+    @Body() dto: RejectOrganisationDto,
   ) {
-    return this.adminOrganisationsService.rejectPending(id, actor, dto?.reason);
+    return this.adminOrganisationsService.rejectPending(id, actor, dto.reason);
   }
 }

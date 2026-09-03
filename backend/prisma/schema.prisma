@@ -138,6 +138,13 @@ model Organisation {
   customDomain       String?  @unique @map("custom_domain")
   customDomainStatus String   @default("none") @map("custom_domain_status") // none | pending | approved | connected | rejected
 
+  // Set by AdminOrganisationsService.rejectPending when a Super Admin
+  // rejects a pending registration — the mandatory reason they entered.
+  // Surfaced back in the Super Admin organisations list/detail (an info
+  // tooltip next to the "Rejected" status badge) so the decision stays on
+  // record. Cleared if the org is later reactivated (see updateStatus).
+  rejectionReason String? @map("rejection_reason")
+
   users                 User[]
   teams                 Team[]
   auditLogs             AuditLog[]

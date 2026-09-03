@@ -8,9 +8,10 @@ import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
-import type { OrganisationListResponse, OrganisationSummary } from "@/lib/types";
+import type { OrganisationListResponse, OrganisationListRow, OrganisationSummary } from "@/lib/types";
 import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { RowActionsMenu, type RowAction } from "@/components/superadmin/row-actions-menu";
 
 const STATUS_TABS = ["All", "Active", "Pending", "Disabled"] as const;
 const LIMIT = 20;
@@ -60,6 +61,10 @@ export default function SuperAdminOrganisationsPage() {
     run: () => Promise<void>;
   } | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [rejectModal, setRejectModal] = useState<{ id: string; name: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  const [rejectError, setRejectError] = useState<string | null>(null);
 
   const notify = (m:string)=>{ setToast(m); setTimeout(()=>setToast(null),2500); };
 
@@ -113,21 +118,35 @@ export default function SuperAdminOrganisationsPage() {
     } catch(e:any){ notify(e.message||"Approve failed"); }
     finally{ setActionBusy(null); }
   };
-  const handleReject = (id:string) => {
+  const handleReject = (id:string, name:string) => {
     if (!accessToken) return;
-    setConfirmState({
-      title: "Reject organisation?",
-      message: "The organisation will be marked rejected.",
-      run: async () => {
-        setActionBusy(id);
-        try{
-          await apiFetch(`/admin/organisations/${id}/reject`, { method:"POST", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({}) });
-          notify("Rejected");
-          fetchList(); fetchSummary();
-        } catch(e:any){ notify(e.message||"Reject failed"); }
-        finally{ setActionBusy(null); }
-      },
-    });
+    setRejectReason("");
+    setRejectError(null);
+    setRejectModal({ id, name });
+  };
+  const submitReject = async () => {
+    if (!accessToken || !rejectModal) return;
+    const reason = rejectReason.trim();
+    if (reason.length === 0) {
+      setRejectError("Please enter a reason before rejecting this organisation.");
+      return;
+    }
+    if (reason.length < 3) {
+      setRejectError("Reason must be at least 3 characters.");
+      return;
+    }
+    setRejectError(null);
+    const { id } = rejectModal;
+    setRejectSubmitting(true);
+    setActionBusy(id);
+    try{
+      await apiFetch(`/admin/organisations/${id}/reject`, { method:"POST", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ reason }) });
+      notify("Rejected");
+      setRejectModal(null);
+      setRejectReason("");
+      fetchList(); fetchSummary();
+    } catch(e:any){ notify(e.message||"Reject failed"); }
+    finally{ setRejectSubmitting(false); setActionBusy(null); }
   };
   const handleActivate = async (id:string) => {
     if (!accessToken) return;
@@ -170,6 +189,29 @@ export default function SuperAdminOrganisationsPage() {
         finally{ setActionBusy(null);}
       },
     });
+  };
+
+  // Same handlers as before, just surfaced through the row's kebab menu
+  // instead of a row of buttons — approve/reject/activate/deactivate/delete
+  // behaviour is unchanged, only the presentation moved.
+  const rowActionsFor = (o: OrganisationListRow): RowAction[] => {
+    const rowBusy = actionBusy === o.id;
+    const actions: RowAction[] = [];
+    if (o.status === "pending") {
+      actions.push({ key: "approve", label: "Approve", onClick: () => handleApprove(o.id), disabled: rowBusy });
+      actions.push({ key: "reject", label: "Reject", onClick: () => handleReject(o.id, o.name), disabled: rowBusy });
+    } else if (o.status === "active") {
+      actions.push({ key: "deactivate", label: "Deactivate", onClick: () => handleDeactivate(o.id), disabled: rowBusy });
+    } else {
+      actions.push({ key: "activate", label: "Activate", onClick: () => handleActivate(o.id), disabled: rowBusy });
+    }
+    actions.push({
+      key: "view",
+      label: o.status === "pending" ? "Edit" : "View",
+      onClick: () => router.push(`/admin-console/organisation-detail/${o.id}`),
+    });
+    actions.push({ key: "delete", label: "Delete", danger: true, onClick: () => handleDelete(o.id), disabled: rowBusy });
+    return actions;
   };
 
   if (authLoading || !accessToken) {
@@ -343,29 +385,24 @@ export default function SuperAdminOrganisationsPage() {
                       <td>{o.templatesCount}</td>
                       <td>{o.mrr ? `₹${o.mrr.toLocaleString("en-IN")}` : "—"}</td>
                       <td>
-                        <span className={`badge ${o.status === "active" ? "b-green" : o.status === "pending" ? "b-amber" : "b-rose"}`}>
-                          <span className="dot" style={{ background: "currentColor" }} />
-                          {o.status === "active" ? "Active" : o.status === "pending" ? "Pending" : o.status === "rejected" ? "Rejected" : "Disabled"}
-                        </span>
+                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          <span className={`badge ${o.status === "active" ? "b-green" : o.status === "pending" ? "b-amber" : "b-rose"}`}>
+                            <span className="dot" style={{ background: "currentColor" }} />
+                            {o.status === "active" ? "Active" : o.status === "pending" ? "Pending" : o.status === "rejected" ? "Rejected" : "Disabled"}
+                          </span>
+                          {o.status === "rejected" && o.rejectionReason ? (
+                            <span
+                              title={`Rejection reason: ${o.rejectionReason}`}
+                              style={{ display:"inline-flex", color:"var(--rose)", cursor:"help" }}
+                            >
+                              <Icon name="info" size={14} />
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td>{formatDate(o.createdAt)}</td>
                       <td>
-                        <div style={{ display:"flex", gap:6, flexWrap:"wrap", alignItems:"center"}}>
-                          {o.status==="pending" ? (
-                            <>
-                              <button className="btn btn-success btn-sm" disabled={actionBusy===o.id} onClick={()=>handleApprove(o.id)}>Approve</button>
-                              <button className="btn btn-danger btn-sm" disabled={actionBusy===o.id} onClick={()=>handleReject(o.id)}>Reject</button>
-                            </>
-                          ) : o.status==="active" ? (
-                            <button className="btn btn-ghost btn-sm" disabled={actionBusy===o.id} onClick={()=>handleDeactivate(o.id)}>Deactivate</button>
-                          ) : (
-                            <button className="btn btn-success btn-sm" disabled={actionBusy===o.id} onClick={()=>handleActivate(o.id)}>Activate</button>
-                          )}
-                          <Link className="btn btn-ghost btn-sm" href={`/admin-console/organisation-detail/${o.id}`}>
-                            {o.status==="pending"?"Edit":"View"}
-                          </Link>
-                          <button className="btn btn-ghost btn-sm" style={{ color:"var(--rose)"}} disabled={actionBusy===o.id} onClick={()=>handleDelete(o.id)}>Delete</button>
-                        </div>
+                        <RowActionsMenu actions={rowActionsFor(o)} />
                       </td>
                     </tr>
                   ))
@@ -418,6 +455,89 @@ export default function SuperAdminOrganisationsPage() {
         }}
         onClose={() => setConfirmState(null)}
       />
+      {rejectModal ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 400,
+            padding: 20,
+          }}
+          onClick={() => {
+            if (!rejectSubmitting) { setRejectModal(null); setRejectReason(""); setRejectError(null); }
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--surface)",
+              borderRadius: 20,
+              padding: 28,
+              width: 460,
+              maxWidth: "100%",
+              boxShadow: "var(--sh-lg)",
+            }}
+          >
+            <h2 style={{ margin: "0 0 6px", fontSize: 19, fontWeight: 800, color: "var(--ink)" }}>
+              Reject organisation?
+            </h2>
+            <p style={{ margin: "0 0 14px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
+              <strong>&quot;{rejectModal.name}&quot;</strong> will be marked rejected. A reason is required
+              — it&apos;s saved with the organisation and shown to super admins on the organisations list.
+            </p>
+            <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6 }}>
+              Rejection reason <span style={{ color: "var(--rose)" }}>*</span>
+            </label>
+            <textarea
+              style={{ minHeight: 90, resize: "vertical", ...(rejectError ? { borderColor: "var(--rose)" } : {}) }}
+              placeholder="Why is this organisation being rejected?"
+              value={rejectReason}
+              onChange={(e) => {
+                setRejectReason(e.target.value);
+                if (rejectError) setRejectError(null);
+              }}
+              disabled={rejectSubmitting}
+              autoFocus
+              maxLength={500}
+              aria-invalid={rejectError ? true : undefined}
+            />
+            <div style={{ marginTop: 6, fontSize: 11.5, color: rejectError ? "var(--rose)" : "var(--faint)", fontWeight: rejectError ? 600 : 400 }}>
+              {rejectError ?? `${rejectReason.length}/500`}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                marginTop: 20,
+                paddingTop: 18,
+                borderTop: "1px solid var(--line)",
+              }}
+            >
+              <button
+                className="btn btn-ghost"
+                type="button"
+                onClick={() => { setRejectModal(null); setRejectReason(""); setRejectError(null); }}
+                disabled={rejectSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                type="button"
+                onClick={() => void submitReject()}
+                disabled={rejectSubmitting}
+              >
+                {rejectSubmitting ? "Rejecting…" : "Reject organisation"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
