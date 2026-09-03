@@ -346,6 +346,7 @@ export interface OrganisationSummary {
   total: number;
   active: number;
   pending?: number;
+  disabled?: number;
   onTrial: null;
   suspended: null;
 }
