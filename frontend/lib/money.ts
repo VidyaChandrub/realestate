@@ -18,6 +18,11 @@ function prefix(currency: string): string {
   return PREFIX[currency] ?? `${currency} `;
 }
 
+/** The display prefix for a currency ("₹", "$", "AED "). */
+export function currencyPrefix(currency: string): string {
+  return prefix(currency);
+}
+
 /** Compact price. INR: "₹62 L" / "₹1.2 Cr". AED/USD: "AED 620,000" / "$62,000". */
 export function formatMoney(
   value: number | null | undefined,
