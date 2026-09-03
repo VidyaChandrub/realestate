@@ -305,6 +305,7 @@ export class AdminOrganisationsService {
           adminEmail: admin?.email ?? null,
           adminPhone: admin?.phoneNumber ?? null,
           status: org.status,
+          rejectionReason: org.rejectionReason,
           createdAt: org.createdAt,
           userCount: org._count.users,
           teamCount: (org._count as any).teams ?? 0,
@@ -357,6 +358,7 @@ export class AdminOrganisationsService {
       customDomain: organisation.customDomain,
       customDomainStatus: organisation.customDomainStatus,
       status: organisation.status,
+      rejectionReason: organisation.rejectionReason,
       createdAt: organisation.createdAt,
       timezone: organisation.timezone,
       currency: organisation.currency,
@@ -461,9 +463,20 @@ export class AdminOrganisationsService {
       where: { id },
       data: {
         status: dto.status,
-        ...(dto.status === 'active' && existing.subdomain && existing.subdomainStatus === 'pending'
+        // Reactivating flips the subdomain back to active too — otherwise a
+        // rejected org (whose subdomain was rejected alongside it) stays
+        // stuck showing "rejected" in the domain column even after its
+        // status badge reads "Active" again.
+        ...(dto.status === 'active' &&
+        existing.subdomain &&
+        (existing.subdomainStatus === 'pending' || existing.subdomainStatus === 'rejected')
           ? { subdomainStatus: 'active' }
           : {}),
+        // Reactivating a previously-rejected org — the old reason no longer
+        // describes its current state, so drop it rather than leave stale
+        // data behind. dto.status is always 'active' | 'disabled' here
+        // (UpdateOrganisationStatusDto), never 'rejected' itself.
+        ...(existing.status === 'rejected' ? { rejectionReason: null } : {}),
       },
     });
 
@@ -611,12 +624,22 @@ export class AdminOrganisationsService {
     return { organisation: toSafeOrganisation(result.updated), subscription: result.subscription };
   }
 
-  async rejectPending(orgId: string, actor: JwtPayload, reason?: string) {
+  async rejectPending(orgId: string, actor: JwtPayload, reason: string) {
     const org = await this.prisma.organisation.findUnique({ where: { id: orgId } });
     if (!org) throw new NotFoundException('Organisation not found');
     if (org.status !== 'pending') throw new BadRequestException('Only pending organisations can be rejected');
-    // For now, disable the org and reject any pending subdomain requests
-    const updated = await this.prisma.organisation.update({ where: { id: orgId }, data: { status: 'disabled', subdomainStatus: 'rejected' } });
+    // Reason is mandatory (enforced by RejectOrganisationDto) — defensive
+    // check here too since this is a public service method, not just a
+    // controller-reachable one.
+    if (!reason || !reason.trim()) {
+      throw new BadRequestException('A rejection reason is required');
+    }
+    // Mark the org rejected (distinct from a later admin-initiated disable),
+    // record why, and reject any pending subdomain requests.
+    const updated = await this.prisma.organisation.update({
+      where: { id: orgId },
+      data: { status: 'rejected', subdomainStatus: 'rejected', rejectionReason: reason },
+    });
     await this.prisma.orgDomainRequest.updateMany({
       where: { orgId, kind: 'subdomain', status: 'pending' },
       data: {

@@ -42,6 +42,7 @@ const ORG_STATUS_META: Record<string, { label: string; badge: string }> = {
   pending: { label: "Pending", badge: "b-amber" },
   draft: { label: "Draft", badge: "b-gray" },
   disabled: { label: "Disabled", badge: "b-rose" },
+  rejected: { label: "Rejected", badge: "b-rose" },
 };
 
 function orgStatusMeta(status: string) {
@@ -883,9 +884,19 @@ export default function SuperAdminOrganisationDetailPage() {
                         <div className="muted" style={{ fontSize: 12 }}>
                           Status
                         </div>
-                        <span className={`badge ${orgStatusMeta(org.status).badge}`}>
-                          {orgStatusMeta(org.status).label}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span className={`badge ${orgStatusMeta(org.status).badge}`}>
+                            {orgStatusMeta(org.status).label}
+                          </span>
+                          {org.status === "rejected" && org.rejectionReason ? (
+                            <span
+                              title={`Rejection reason: ${org.rejectionReason}`}
+                              style={{ display: "inline-flex", color: "var(--rose)", cursor: "help" }}
+                            >
+                              <Icon name="info" size={14} />
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   )}

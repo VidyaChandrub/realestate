@@ -48,6 +48,7 @@ export function toSafeOrganisation(organisation: Organisation) {
     subdomain_status: organisation.subdomainStatus,
     custom_domain: organisation.customDomain,
     custom_domain_status: organisation.customDomainStatus,
+    rejection_reason: organisation.rejectionReason,
   };
 }
 

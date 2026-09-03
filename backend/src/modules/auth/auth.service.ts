@@ -586,6 +586,9 @@ export class AuthService {
       if (org && org.status === 'disabled') {
         throw new UnauthorizedException('Organisation is disabled');
       }
+      if (org && org.status === 'rejected') {
+        throw new UnauthorizedException('Organisation registration was rejected');
+      }
       if (org && org.status === 'draft') {
         throw new UnauthorizedException('Organisation not yet activated');
       }
