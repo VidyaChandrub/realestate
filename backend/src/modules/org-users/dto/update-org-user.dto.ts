@@ -1,14 +1,11 @@
 import {
-  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
+  MinLength,
 } from 'class-validator';
-import { ASSIGNABLE_ROLES } from '../../../common/utils/org-users.util';
-import type { AssignableRole } from '../../../common/utils/org-users.util';
 
-// Email is intentionally absent — it's the login identifier and is not editable.
 export class UpdateOrgUserDto {
   @IsOptional()
   @IsString()
@@ -28,6 +25,12 @@ export class UpdateOrgUserDto {
   phoneNumber?: string;
 
   @IsOptional()
-  @IsIn(ASSIGNABLE_ROLES)
-  role?: AssignableRole;
+  @IsString()
+  role?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(100)
+  password?: string;
 }

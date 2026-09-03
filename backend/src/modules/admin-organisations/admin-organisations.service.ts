@@ -23,6 +23,7 @@ import { assertTemplateQuota } from '../../common/utils/plan-quota.util';
 import { assertEligibleTemplateIds } from '../../common/utils/template-eligibility.util';
 import { OnboardCompanyDto } from './dto/onboard-company.dto';
 import { OnboardAdminDto } from './dto/onboard-admin.dto';
+import { CreateOrganisationWithAdminDto } from './dto/create-organisation-with-admin.dto';
 import { ActivateOrganisationDto } from './dto/activate-organisation.dto';
 import { ListOrganisationsQueryDto } from './dto/list-organisations-query.dto';
 import { UpdateOrganisationDto } from './dto/update-organisation.dto';
@@ -61,6 +62,66 @@ export class AdminOrganisationsService {
     return { orgId: organisation.id, slug: organisation.slug };
   }
 
+  async createWithAdmin(dto: CreateOrganisationWithAdminDto) {
+    const existingEmail = await this.prisma.user.findUnique({
+      where: { email: dto.adminEmail },
+    });
+    if (existingEmail) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const slug = await generateUniqueOrgSlug(this.prisma, dto.name);
+
+    const adminRole = await this.prisma.role.findFirstOrThrow({
+      where: { orgId: null, key: 'admin' },
+    });
+
+    const rawPassword = dto.adminPassword || generateTempPassword();
+    const passwordHash = await bcrypt.hash(rawPassword, BCRYPT_COST_FACTOR);
+    const mustChangePassword = dto.adminPassword ? false : true;
+
+    const orgStatus = dto.status ?? 'active';
+
+    const { organisation, user } = await this.prisma.$transaction(async (tx) => {
+      const organisation = await tx.organisation.create({
+        data: {
+          name: dto.name,
+          slug,
+          city: dto.city,
+          status: orgStatus as any,
+          subdomain: slug,
+          subdomainStatus: 'active',
+        },
+      });
+
+      const user = await tx.user.create({
+        data: {
+          orgId: organisation.id,
+          firstName: dto.adminFirstName,
+          lastName: dto.adminLastName,
+          email: dto.adminEmail,
+          phoneNumber: dto.adminPhone,
+          passwordHash,
+          status: 'active',
+          mustChangePassword,
+          onboardingStep: 'completed',
+        },
+      });
+
+      await tx.userRole.create({
+        data: { userId: user.id, roleId: adminRole.id },
+      });
+
+      return { organisation, user };
+    });
+
+    return {
+      organisation: toSafeOrganisation(organisation),
+      user: toSafeUser(user),
+      tempPassword: dto.adminPassword ? undefined : rawPassword,
+    };
+  }
+
   async onboardAdmin(orgId: string, dto: OnboardAdminDto) {
     const organisation = await this.getDraftOrganisation(orgId);
 
@@ -80,8 +141,8 @@ export class AdminOrganisationsService {
       throw new ConflictException('Email already registered');
     }
 
-    const adminRole = await this.prisma.role.findUniqueOrThrow({
-      where: { key: 'admin' },
+    const adminRole = await this.prisma.role.findFirstOrThrow({
+      where: { orgId: null, key: 'admin' },
     });
 
     const tempPassword = generateTempPassword();

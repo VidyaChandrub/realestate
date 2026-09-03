@@ -202,7 +202,7 @@ export interface ModulesStepResponse extends OnboardingStepResult {
 
 export interface InviteEntry {
   email: string;
-  role: "manager" | "sales";
+  role: string;
 }
 
 export interface InviteStepInput {
@@ -391,11 +391,11 @@ export interface OrganisationDetail {
   subscription?: Subscription | null;
 }
 
-export type OrgUserAssignableRole = "admin" | "manager" | "sales";
+export type OrgUserAssignableRole = string;
 export type OrgUserStatus = "active" | "disabled";
 
 export interface OrgUserRole {
-  key: OrgUserAssignableRole;
+  key: string;
   name: string;
 }
 
@@ -425,14 +425,50 @@ export interface CreateOrgUserInput {
   lastName: string;
   email: string;
   phoneNumber?: string;
-  role: OrgUserAssignableRole;
+  role: string;
+  password?: string;
 }
 
 export interface UpdateOrgUserInput {
   firstName?: string;
   lastName?: string;
   phoneNumber?: string;
-  role?: OrgUserAssignableRole;
+  role?: string;
+  password?: string;
+}
+
+export interface DynamicRole {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  scope: "platform" | "organisation" | "team";
+  status: "active" | "inactive";
+  sortOrder: number;
+  _count?: { userRoles: number };
+}
+
+export interface OrgDashboardKpiData {
+  role: string;
+  period: string;
+  kpis: {
+    totalLeads: number;
+    periodChangePercent: number;
+    wonLeads: number;
+    wonRevenue: number;
+    activePipelineRevenue: number;
+    conversionRate: number;
+    totalCalls: number;
+    connectedCalls: number;
+    callConnectRate: number;
+    totalTalkTimeSeconds: number;
+    siteVisitsBooked: number;
+  };
+  pipelineBreakdown: { status: string; label: string; count: number }[];
+  callOutcomes: { outcome: string; label: string; count: number }[];
+  projectMetrics: { projectId: string; projectName: string; leadsCount: number; wonCount: number; revenue: number }[];
+  agentLeaderboard: { userId: string; name: string; email: string; role: string; leadsCount: number; wonCount: number; revenue: number; callsCount: number; conversionRate: number }[];
+  recentActivity: { id: string; type: string; text: string; createdAt: string }[];
 }
 
 export interface OrganisationActivityRow {

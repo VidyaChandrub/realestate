@@ -1,11 +1,9 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import {
-  ASSIGNABLE_ROLES,
   ORG_USER_STATUS_VALUES,
 } from '../../../common/utils/org-users.util';
 import type {
-  AssignableRole,
   OrgUserStatus,
 } from '../../../common/utils/org-users.util';
 
@@ -28,8 +26,8 @@ export class ListOrgUsersQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsIn(ASSIGNABLE_ROLES)
-  role?: AssignableRole;
+  @IsString()
+  role?: string;
 
   @IsOptional()
   @IsIn(ORG_USER_STATUS_VALUES)

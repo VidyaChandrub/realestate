@@ -14,24 +14,35 @@ import type {
 
 const LIMIT = 20;
 
-const ROLE_OPTIONS: { value: OrgUserAssignableRole; label: string }[] = [
+const DEFAULT_ROLE_OPTIONS: { value: string; label: string }[] = [
   { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
   { value: "sales", label: "Sales" },
+  { value: "telecaller", label: "Telecaller" },
 ];
 
-const ROLE_BADGE_CLASS: Record<OrgUserAssignableRole, string> = {
-  admin: "b-indigo",
-  manager: "b-violet",
-  sales: "b-teal",
-};
+function roleBadgeClass(roleKey: string): string {
+  switch (roleKey) {
+    case "admin":
+      return "b-indigo";
+    case "manager":
+      return "b-violet";
+    case "sales":
+      return "b-teal";
+    case "telecaller":
+      return "b-amber";
+    default:
+      return "b-gray";
+  }
+}
 
 interface UserFormData {
   firstName: string;
   lastName: string;
   email: string;
   phoneNumber: string;
-  role: OrgUserAssignableRole;
+  role: string;
+  password?: string;
 }
 
 const EMPTY_FORM: UserFormData = {
@@ -40,6 +51,7 @@ const EMPTY_FORM: UserFormData = {
   email: "",
   phoneNumber: "",
   role: "sales",
+  password: "",
 };
 
 function initials(firstName: string | null, lastName: string | null): string {
@@ -67,11 +79,10 @@ export default function OrgUsersPage() {
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<OrgUserAssignableRole | "">("");
-  const [statusFilter, setStatusFilter] = useState<"active" | "disabled" | "">(
-    "",
-  );
+  const [roleFilter, setRoleFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<"active" | "disabled" | "">("");
   const [page, setPage] = useState(1);
+  const [dynamicRoles, setDynamicRoles] = useState<{ value: string; label: string }[]>(DEFAULT_ROLE_OPTIONS);
 
   const [result, setResult] = useState<OrgUsersListResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -83,6 +94,19 @@ export default function OrgUsersPage() {
   const [form, setForm] = useState<UserFormData>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    apiFetch<{ roles: { key: string; name: string }[] }>("/org/permissions/modules", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((res) => {
+        if (res.roles && res.roles.length > 0) {
+          setDynamicRoles(res.roles.map((r) => ({ value: r.key, label: r.name })));
+        }
+      })
+      .catch(() => {});
+  }, [accessToken]);
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<{
@@ -326,28 +350,40 @@ export default function OrgUsersPage() {
                   />
                 </div>
               </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>Role</label>
-                <select
-                  value={form.role}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      role: e.target.value as OrgUserAssignableRole,
-                    }))
-                  }
-                >
-                  {ROLE_OPTIONS.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>
-                  Role determines what this person can do. They&apos;ll get
-                  access to modules (Leads, Call Centre, Landing Pages, Reports)
-                  once they&apos;re added to a team.
+              <div className="row2">
+                <div className="field">
+                  <label>Role</label>
+                  <select
+                    value={form.role}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        role: e.target.value,
+                      }))
+                    }
+                  >
+                    {dynamicRoles.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+                <div className="field">
+                  <label>{formMode === "create" ? "Password (optional)" : "New Password (leave blank to keep current)"}</label>
+                  <input
+                    className="inp"
+                    type="password"
+                    placeholder={formMode === "create" ? "Auto-generates temp password if blank" : "••••••••"}
+                    value={form.password ?? ""}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, password: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
+                Role determines what this person can do. Access to features and pages is governed by organisation dynamic roles & permissions.
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
                 <button
@@ -418,12 +454,12 @@ export default function OrgUsersPage() {
               style={{ width: 160, flexShrink: 0 }}
               value={roleFilter}
               onChange={(e) => {
-                setRoleFilter(e.target.value as OrgUserAssignableRole | "");
+                setRoleFilter(e.target.value);
                 setPage(1);
               }}
             >
               <option value="">All roles</option>
-              {ROLE_OPTIONS.map((r) => (
+              {dynamicRoles.map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>
@@ -500,7 +536,7 @@ export default function OrgUsersPage() {
                         <td>
                           {user.role ? (
                             <span
-                              className={`badge ${ROLE_BADGE_CLASS[user.role.key]}`}
+                              className={`badge ${roleBadgeClass(user.role.key)}`}
                             >
                               {user.role.name}
                             </span>

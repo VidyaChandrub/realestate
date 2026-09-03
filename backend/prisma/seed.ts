@@ -240,14 +240,18 @@ async function seedRoles() {
     },
     { key: 'manager', name: 'Manager', scope: 'team' as const, sortOrder: 2 },
     { key: 'sales', name: 'Sales', scope: 'team' as const, sortOrder: 3 },
+    { key: 'telecaller', name: 'Telecaller', scope: 'team' as const, sortOrder: 4 },
   ];
 
   for (const role of roles) {
-    await prisma.role.upsert({
-      where: { key: role.key },
-      update: {},
-      create: role,
+    const existingRole = await prisma.role.findFirst({
+      where: { orgId: null, key: role.key },
     });
+    if (existingRole) {
+      // no fields to update — system role definitions are fixed
+    } else {
+      await prisma.role.create({ data: role });
+    }
   }
   console.log(`Seeded ${roles.length} roles.`);
   return roles;
@@ -267,8 +271,8 @@ async function seedSuperAdmin() {
   }
 
   const passwordHash = await bcrypt.hash(superAdminPassword, 12);
-  const superAdminRole = await prisma.role.findUniqueOrThrow({
-    where: { key: 'super_admin' },
+  const superAdminRole = await prisma.role.findFirstOrThrow({
+    where: { orgId: null, key: 'super_admin' },
   });
 
   const existing = await prisma.user.findUnique({
@@ -327,8 +331,8 @@ async function seedDemoOrg() {
   // --- Sales team (org admin + manager + sales agents) ----------------------
   const userIds: Record<string, string> = {};
   for (const agent of AGENTS) {
-    const role = await prisma.role.findUniqueOrThrow({
-      where: { key: agent.role },
+    const role = await prisma.role.findFirstOrThrow({
+      where: { orgId: null, key: agent.role },
     });
 
     const user = await prisma.user.upsert({

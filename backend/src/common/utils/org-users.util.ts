@@ -7,8 +7,8 @@ import { toSafeUser } from './mappers.util';
 
 const BCRYPT_COST_FACTOR = 12;
 
-export const ASSIGNABLE_ROLES = ['admin', 'manager', 'sales'] as const;
-export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
+export const ASSIGNABLE_ROLES = ['admin', 'manager', 'sales', 'telecaller'] as const;
+export type AssignableRole = string;
 
 export const ORG_USER_STATUS_VALUES = ['active', 'disabled'] as const;
 export type OrgUserStatus = (typeof ORG_USER_STATUS_VALUES)[number];
@@ -19,16 +19,12 @@ type OrgUsersPrisma = Pick<
 >;
 
 export interface ProvisionUserInput {
-  // Optional — the invite path (POST /team/invite, the wizard's Invite
-  // step) only collects email + role; the invited person fills in their
-  // own name later. Org/Super Admin's "create user directly" callers
-  // always pass real names (their own DTOs require them), so this being
-  // optional here doesn't weaken that path.
   firstName?: string;
   lastName?: string;
   email: string;
   phoneNumber?: string;
-  role: AssignableRole;
+  role: string;
+  password?: string;
 }
 
 function sendStubInviteEmail(email: string, tempPassword: string) {
@@ -55,12 +51,16 @@ export async function provisionInvitedUser(
     throw new ConflictException('Email already registered');
   }
 
-  const role = await prisma.role.findUniqueOrThrow({
-    where: { key: dto.role },
+  const role = await prisma.role.findFirst({
+    where: { key: dto.role, status: 'active', OR: [{ orgId: null }, { orgId }] },
   });
+  if (!role) {
+    throw new NotFoundException(`Role '${dto.role}' not found or inactive`);
+  }
 
-  const tempPassword = generateTempPassword();
-  const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_COST_FACTOR);
+  const rawPassword = dto.password || generateTempPassword();
+  const passwordHash = await bcrypt.hash(rawPassword, BCRYPT_COST_FACTOR);
+  const mustChangePassword = dto.password ? false : true;
 
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
@@ -72,15 +72,7 @@ export async function provisionInvitedUser(
         phoneNumber: dto.phoneNumber,
         passwordHash,
         status: 'active',
-        mustChangePassword: true,
-        // Invited users join an org that already exists — they never go
-        // through the signup wizard themselves. Marking them 'completed'
-        // from creation matters beyond bookkeeping: onboardingStep is what
-        // gates the passwordless /auth/resume-signup endpoint (see
-        // AuthService.resumeSignup). Leaving this at the schema default
-        // ('account') would let anyone who knows an invited teammate's
-        // email — not just self-signup admins mid-wizard — resume into a
-        // live, no-password session on that org via that endpoint.
+        mustChangePassword,
         onboardingStep: 'completed',
       },
     });
@@ -92,7 +84,9 @@ export async function provisionInvitedUser(
     return created;
   });
 
-  sendStubInviteEmail(user.email, tempPassword);
+  if (!dto.password) {
+    sendStubInviteEmail(user.email, rawPassword);
+  }
   return toSafeUser(user);
 }
 
@@ -222,7 +216,8 @@ export interface UpdateOrgUserInput {
   firstName?: string;
   lastName?: string;
   phoneNumber?: string;
-  role?: AssignableRole;
+  role?: string;
+  password?: string;
 }
 
 export async function updateOrgUser(
@@ -237,19 +232,29 @@ export async function updateOrgUser(
   }
 
   await prisma.$transaction(async (tx) => {
+    const dataToUpdate: Prisma.UserUpdateInput = {
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      phoneNumber: dto.phoneNumber,
+    };
+
+    if (dto.password) {
+      dataToUpdate.passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
+      dataToUpdate.mustChangePassword = false;
+    }
+
     await tx.user.update({
       where: { id },
-      data: {
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        phoneNumber: dto.phoneNumber,
-      },
+      data: dataToUpdate,
     });
 
     if (dto.role) {
-      const role = await tx.role.findUniqueOrThrow({
-        where: { key: dto.role },
+      const role = await tx.role.findFirst({
+        where: { key: dto.role, status: 'active', OR: [{ orgId: null }, { orgId }] },
       });
+      if (!role) {
+        throw new NotFoundException(`Role '${dto.role}' not found or inactive`);
+      }
       await tx.userRole.deleteMany({ where: { userId: id } });
       await tx.userRole.create({ data: { userId: id, roleId: role.id } });
     }

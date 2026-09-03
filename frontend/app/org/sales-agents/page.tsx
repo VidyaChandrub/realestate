@@ -85,19 +85,23 @@ function mockRows(): DisplayRow[] {
 }
 
 export default function OrgSalesAgentsPage() {
-  const [rows, setRows] = useState<DisplayRow[]>(() => mockRows());
-  const [fromApi, setFromApi] = useState(false);
+  const [rows, setRows] = useState<DisplayRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     getSalesAgents()
       .then((res) => {
-        if (mounted && res.data.length > 0) {
+        if (mounted) {
           setRows(apiRows(res.data));
-          setFromApi(true);
+          setLoading(false);
         }
       })
-      .catch(() => {}); // no backend / no session → keep the prototype data
+      .catch(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
     return () => {
       mounted = false;
     };
@@ -213,7 +217,7 @@ export default function OrgSalesAgentsPage() {
         <div className="card" id="missing">
           <div className="card-h">
             <span className="t">Team members</span>
-            <span className="x">{rows.length} agents{fromApi ? "" : " · prototype"}</span>
+            <span className="x">{loading ? "Loading…" : `${rows.length} agents`}</span>
           </div>
           <div className="tbl-wrap">
             <table className="tbl">
@@ -229,7 +233,16 @@ export default function OrgSalesAgentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((agent) => (
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="muted">Loading sales agents…</td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="muted">No sales agents found. Invite or create team members in Users management.</td>
+                  </tr>
+                ) : (
+                  rows.map((agent) => (
                   <tr key={agent.id}>
                     <td>
                       <div className="u">
@@ -280,7 +293,8 @@ export default function OrgSalesAgentsPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>

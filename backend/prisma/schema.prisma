@@ -133,10 +133,10 @@ model Organisation {
   // approves, is mapped to the organisation's primary site.
   // Per-website addresses (each template can have its own subdomain or a custom
   // domain) live on LandingPage / DomainRequest instead.
-  subdomain          String?  @unique
-  subdomainStatus    String   @default("pending") @map("subdomain_status") // none | pending | active | rejected
-  customDomain       String?  @unique @map("custom_domain")
-  customDomainStatus String   @default("none") @map("custom_domain_status") // none | pending | approved | connected | rejected
+  subdomain          String? @unique
+  subdomainStatus    String  @default("pending") @map("subdomain_status") // none | pending | active | rejected
+  customDomain       String? @unique @map("custom_domain")
+  customDomainStatus String  @default("none") @map("custom_domain_status") // none | pending | approved | connected | rejected
 
   // Set by AdminOrganisationsService.rejectPending when a Super Admin
   // rejects a pending registration — the mandatory reason they entered.
@@ -148,6 +148,7 @@ model Organisation {
   users                 User[]
   teams                 Team[]
   auditLogs             AuditLog[]
+  customRoles           Role[]
   notifications         Notification[]
   subscriptions         Subscription[]
   organisationTemplates OrganisationTemplate[]
@@ -184,8 +185,9 @@ model User {
   // (Account) has actually completed.
   onboardingStep OnboardingStep @default(account) @map("onboarding_step")
 
-  organisation    Organisation?        @relation(fields: [orgId], references: [id])
+  organisation    Organisation?          @relation(fields: [orgId], references: [id])
   userRoles       UserRole[]
+  userPermissions UserModulePermission[]
   teamMembers     TeamMember[]
   refreshTokens   RefreshToken[]
   resetTokens     PasswordResetToken[]
@@ -203,15 +205,35 @@ model User {
 
 model Role {
   id        String    @id @default(uuid())
-  key       String    @unique // super_admin / admin / manager / sales
+  key       String    // super_admin / admin / manager / sales / telecaller / custom
   name      String
   scope     RoleScope
+  // Null = platform-wide system/default role (visible to every org).
+  // Set   = a custom role created by a specific org's Admin, visible only
+  //         within that org.
+  orgId     String?   @map("org_id")
+  // A role can be soft-disabled so it can no longer be newly assigned to org
+  // users (existing memberships keep working). System roles can be disabled
+  // too but never deleted.
+  status    RoleStatus @default(active)
+  description String?  @default("")
   sortOrder Int       @default(0) @map("sort_order")
 
+  organisation Organisation? @relation(fields: [orgId], references: [id], onDelete: Cascade)
   userRoles   UserRole[]
   permissions RoleModulePermission[]
 
+  // A role key only needs to be unique within its scope: once globally
+  // (orgId IS NULL) and once per-org (orgId, key) for custom roles.
+  @@unique([orgId, key])
   @@map("roles")
+  @@schema("identity")
+}
+
+enum RoleStatus {
+  active
+  inactive
+
   @@schema("identity")
 }
 
@@ -300,19 +322,52 @@ model TeamModuleAccess {
   @@schema("access")
 }
 
-// Layer 2 — what a role can do within a module, once it's in scope for the team
+// Layer 2 — what a role can do within a module, once it's in scope for the team.
+//
+// org-scoped: the org admin configures each assignable role's page/action
+// access for THEIR organisation only (orgId + roleId). The roles themselves
+// are a global catalogue, but the permissions an org grants each role are
+// per-org — so editing "manager" in org A never touches org B. The org-wide
+// `admin` role and the platform `super_admin` role are never restricted here
+// (they always has every permission).
 model RoleModulePermission {
-  roleId    String  @map("role_id")
-  moduleKey String  @map("module_key")
-  canView   Boolean @default(true) @map("can_view")
-  canAdd    Boolean @default(false) @map("can_add")
-  canEdit   Boolean @default(false) @map("can_edit")
-  canDelete Boolean @default(false) @map("can_delete")
+  orgId      String  @map("org_id")
+  roleId     String  @map("role_id")
+  moduleKey  String  @map("module_key")
+  canView    Boolean @default(true) @map("can_view")
+  canAdd     Boolean @default(false) @map("can_add")
+  canEdit    Boolean @default(false) @map("can_edit")
+  canDelete  Boolean @default(false) @map("can_delete")
+  canApprove Boolean @default(false) @map("can_approve") // e.g. approving a landing-page publish
 
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  @@id([roleId, moduleKey])
+  @@id([orgId, roleId, moduleKey])
+  @@index([orgId, roleId])
   @@map("role_module_permissions")
+  @@schema("access")
+}
+
+// Per-user page/action overrides — an org admin can grant a SPECIFIC user or
+// sales agent different access than their role grants by default. Keyed to
+// (orgId, userId, moduleKey); null/absent means "inherit from the role".
+// Actions are stored on single columns (like RoleModulePermission) with null
+// meaning "not overridden" — falling back to the user's role permission.
+model UserModulePermission {
+  orgId      String   @map("org_id")
+  userId     String   @map("user_id")
+  moduleKey  String   @map("module_key")
+  canView    Boolean? @map("can_view")
+  canAdd     Boolean? @map("can_add")
+  canEdit    Boolean? @map("can_edit")
+  canDelete  Boolean? @map("can_delete")
+  canApprove Boolean? @map("can_approve")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([orgId, userId, moduleKey])
+  @@index([orgId, userId])
+  @@map("user_module_permissions")
   @@schema("access")
 }
 
@@ -357,16 +412,16 @@ enum NotificationType {
 }
 
 model Notification {
-  id        String           @id @default(uuid())
-  orgId     String?          @map("org_id")
-  recipientId String?        @map("recipient_id") // user id; null = all super admins (cosmetic grouping)
-  type      NotificationType
-  title     String
-  body      String?
-  entity    String?          // e.g. "Organisation" | "OrgDomainRequest"
-  entityId  String?          @map("entity_id")
-  readAt    DateTime?        @map("read_at")
-  createdAt DateTime         @default(now()) @map("created_at")
+  id          String           @id @default(uuid())
+  orgId       String?          @map("org_id")
+  recipientId String?          @map("recipient_id") // user id; null = all super admins (cosmetic grouping)
+  type        NotificationType
+  title       String
+  body        String?
+  entity      String? // e.g. "Organisation" | "OrgDomainRequest"
+  entityId    String?          @map("entity_id")
+  readAt      DateTime?        @map("read_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
 
   organisation Organisation? @relation(fields: [orgId], references: [id])
   recipient    User?         @relation(fields: [recipientId], references: [id], onDelete: Cascade)
@@ -548,8 +603,8 @@ model LandingPage {
   // Optional per-website subdomain (e.g. abc.platform.com). A website can have
   // EITHER a subdomain OR a custom domain (via DomainRequest), mapped
   // Subdomain/Domain -> Organisation -> LandingPage.
-  subdomain       String?           @unique
-  subdomainStatus String            @default("none") @map("subdomain_status") // none | pending | active | rejected
+  subdomain        String?           @unique
+  subdomainStatus  String            @default("none") @map("subdomain_status") // none | pending | active | rejected
   submittedAt      DateTime?         @map("submitted_at")
   reviewedAt       DateTime?         @map("reviewed_at")
   reviewedById     String?           @map("reviewed_by_id")
@@ -558,10 +613,10 @@ model LandingPage {
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
 
-  organisation   Organisation  @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  sourceTemplate Template?     @relation(fields: [sourceTemplateId], references: [id], onDelete: SetNull)
-  parent         LandingPage?  @relation("LandingPageCompanion", fields: [parentId], references: [id], onDelete: SetNull)
-  children       LandingPage[] @relation("LandingPageCompanion")
+  organisation   Organisation    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sourceTemplate Template?       @relation(fields: [sourceTemplateId], references: [id], onDelete: SetNull)
+  parent         LandingPage?    @relation("LandingPageCompanion", fields: [parentId], references: [id], onDelete: SetNull)
+  children       LandingPage[]   @relation("LandingPageCompanion")
   domainRequest  DomainRequest?
   trackingEvents TrackingEvent[]
 
@@ -680,31 +735,31 @@ enum SslStatus {
 }
 
 model DomainRequest {
-  id              String              @id @default(uuid())
-  orgId           String              @map("org_id")
-  landingPageId   String              @unique @map("landing_page_id")
-  domain          String
-  status          DomainRequestStatus @default(pending)
-  requestedBy     String?             @map("requested_by")
-  requestedAt     DateTime            @default(now()) @map("requested_at")
-  reviewedAt      DateTime?           @map("reviewed_at")
-  reviewedBy      String?             @map("reviewed_by")
-  rejectionReason String?             @map("rejection_reason")
-  dnsStatus       DnsStatus           @default(pending) @map("dns_status")
-  sslStatus       SslStatus           @default(pending) @map("ssl_status")
-  verificationToken String            @map("verification_token")
-  dnsInstructions Json?               @map("dns_instructions")
-  expectedRecords Json?               @map("expected_records")
-  detectedRecords Json?               @map("detected_records")
-  lastVerificationAt DateTime?        @map("last_verification_at")
-  verifiedAt      DateTime?           @map("verified_at")
-  sslIssuedAt     DateTime?           @map("ssl_issued_at")
-  sslExpiresAt    DateTime?           @map("ssl_expires_at")
-  createdAt       DateTime            @default(now()) @map("created_at")
-  updatedAt       DateTime            @updatedAt @map("updated_at")
+  id                 String              @id @default(uuid())
+  orgId              String              @map("org_id")
+  landingPageId      String              @unique @map("landing_page_id")
+  domain             String
+  status             DomainRequestStatus @default(pending)
+  requestedBy        String?             @map("requested_by")
+  requestedAt        DateTime            @default(now()) @map("requested_at")
+  reviewedAt         DateTime?           @map("reviewed_at")
+  reviewedBy         String?             @map("reviewed_by")
+  rejectionReason    String?             @map("rejection_reason")
+  dnsStatus          DnsStatus           @default(pending) @map("dns_status")
+  sslStatus          SslStatus           @default(pending) @map("ssl_status")
+  verificationToken  String              @map("verification_token")
+  dnsInstructions    Json?               @map("dns_instructions")
+  expectedRecords    Json?               @map("expected_records")
+  detectedRecords    Json?               @map("detected_records")
+  lastVerificationAt DateTime?           @map("last_verification_at")
+  verifiedAt         DateTime?           @map("verified_at")
+  sslIssuedAt        DateTime?           @map("ssl_issued_at")
+  sslExpiresAt       DateTime?           @map("ssl_expires_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
 
-  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  landingPage  LandingPage  @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+  organisation Organisation         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  landingPage  LandingPage          @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
   logs         DnsVerificationLog[]
 
   @@index([orgId])
@@ -742,9 +797,9 @@ model TrackingEvent {
   organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
   landingPage  LandingPage  @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
 
-   @@index([orgId])
+  @@index([orgId])
   @@index([landingPageId])
-   @@index([eventType])
+  @@index([eventType])
   @@map("tracking_events")
   @@schema("templates")
 }
@@ -757,23 +812,23 @@ model TrackingEvent {
 // ---------------------------------------------------------------------------
 
 model Lead {
-  id            String     @id @default(uuid())
-  orgId         String     @map("org_id")
-  landingPageId String?    @map("landing_page_id")
-  projectId     String?    @map("project_id")
-  formName      String?    @map("form_name")
-  source        String?    @default("website") // website | popup | floorplan | preview | project-widget
-  data          Json
-  status        LeadStatus @default(new)
-  assignedToId  String?    @map("assigned_to_id")
-  nextActionType String?   @map("next_action_type")
-  nextActionAt   DateTime? @map("next_action_at")
-  nextActionNote String?   @map("next_action_note")
-  reminderAt     DateTime? @map("reminder_at")
-  createdAt     DateTime   @default(now()) @map("created_at")
+  id             String     @id @default(uuid())
+  orgId          String     @map("org_id")
+  landingPageId  String?    @map("landing_page_id")
+  projectId      String?    @map("project_id")
+  formName       String?    @map("form_name")
+  source         String?    @default("website") // website | popup | floorplan | preview | project-widget
+  data           Json
+  status         LeadStatus @default(new)
+  assignedToId   String?    @map("assigned_to_id")
+  nextActionType String?    @map("next_action_type")
+  nextActionAt   DateTime?  @map("next_action_at")
+  nextActionNote String?    @map("next_action_note")
+  reminderAt     DateTime?  @map("reminder_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
 
-  assignedTo User?    @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  assignedTo User?           @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  project    Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   callLogs   CallLog[]
   activities ActivityEvent[]
 
@@ -807,7 +862,7 @@ model CallLog {
   leadId          String?       @map("lead_id")
   leadName        String?       @map("lead_name")
   direction       CallDirection @default(outgoing) @map("direction")
-  outcome         String        // connected | booked_visit | callback | no_answer | missed | busy
+  outcome         String // connected | booked_visit | callback | no_answer | missed | busy
   durationSeconds Int           @default(0) @map("duration_seconds")
   createdAt       DateTime      @default(now()) @map("created_at")
 

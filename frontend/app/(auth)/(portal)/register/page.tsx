@@ -103,10 +103,11 @@ const MODULES: { v: string; ic: IconName; b: string; s: string }[] = [
   { v: "reporting", ic: "reports", b: "Reporting", s: "Lead-gen to closing analytics" },
 ];
 
-const INVITE_ROLES = [
+const DEFAULT_INVITE_ROLES = [
   { v: "manager", label: "Manager" },
   { v: "sales", label: "Sales" },
-] as const;
+  { v: "telecaller", label: "Telecaller" },
+];
 
 const CHANNELS: { ic: IconName; b: string; s: string }[] = [
   { ic: "phone", b: "Meta Ads", s: "Facebook & Instagram lead forms" },
@@ -146,9 +147,9 @@ export default function RegisterPage() {
     landing: true,
     reporting: true,
   });
+  const [availableRoles, setAvailableRoles] = useState<{ v: string; label: string }[]>(DEFAULT_INVITE_ROLES);
   // Email + role only — the invited person supplies their own name later
-  // (there's no first-login profile step yet; see the Issue 2 writeup).
-  const [invites, setInvites] = useState<{ email: string; role: "manager" | "sales" }[]>([
+  const [invites, setInvites] = useState<{ email: string; role: string }[]>([
     { email: "", role: "manager" },
     { email: "", role: "sales" },
   ]);
@@ -228,6 +229,32 @@ export default function RegisterPage() {
     }, 350);
     return () => clearTimeout(timer);
   }, [form.subdomain]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await apiFetch<any[]>("/admin/roles");
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped = data
+            .filter((r) => r.key !== "super_admin" && r.key !== "admin" && r.status === "active")
+            .map((r) => ({ v: r.key, label: r.name }));
+          if (mapped.length > 0) setAvailableRoles(mapped);
+        }
+      } catch {
+        // Fallback: try org permissions catalog if logged in
+        apiFetch<any>("/org/permissions/modules")
+          .then((res) => {
+            if (res?.roles && res.roles.length > 0) {
+              const mapped = res.roles
+                .filter((r: any) => r.key !== "super_admin" && r.key !== "admin")
+                .map((r: any) => ({ v: r.key, label: r.name }));
+              if (mapped.length > 0) setAvailableRoles(mapped);
+            }
+          })
+          .catch(() => {});
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -1061,9 +1088,9 @@ export default function RegisterPage() {
                   <select
                     className="inp"
                     value={inv.role}
-                    onChange={(e) => setInvites((prev) => prev.map((x, j) => (j === i ? { ...x, role: e.target.value as "manager" | "sales" } : x)))}
+                    onChange={(e) => setInvites((prev) => prev.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))}
                   >
-                    {INVITE_ROLES.map((r) => (
+                    {availableRoles.map((r) => (
                       <option key={r.v} value={r.v}>{r.label}</option>
                     ))}
                   </select>

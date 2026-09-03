@@ -12,6 +12,7 @@ export function Modal({
   description,
   children,
   size = "md",
+  containerClassName,
 }: {
   open: boolean;
   onClose: () => void;
@@ -19,6 +20,7 @@ export function Modal({
   description?: string;
   children: ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
+  containerClassName?: string;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -42,8 +44,15 @@ export function Modal({
     xl: "max-w-4xl",
   };
 
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const scopeClass = pathname.startsWith("/admin-console")
+    ? "superadmin"
+    : pathname.startsWith("/org")
+    ? "org"
+    : "superadmin org";
+
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className={cn("fixed inset-0 z-50 flex items-center justify-center p-4", scopeClass, containerClassName)}>
       <div
         className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
         onClick={onClose}

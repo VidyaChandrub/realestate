@@ -18,6 +18,7 @@ import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { AdminOrganisationsService } from './admin-organisations.service';
 import { OnboardCompanyDto } from './dto/onboard-company.dto';
 import { OnboardAdminDto } from './dto/onboard-admin.dto';
+import { CreateOrganisationWithAdminDto } from './dto/create-organisation-with-admin.dto';
 import { ActivateOrganisationDto } from './dto/activate-organisation.dto';
 import { ListOrganisationsQueryDto } from './dto/list-organisations-query.dto';
 import { UpdateOrganisationDto } from './dto/update-organisation.dto';
@@ -100,6 +101,11 @@ export class AdminOrganisationsController {
   @Delete(':id')
   remove(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
     return this.adminOrganisationsService.remove(id, actor);
+  }
+
+  @Post('create-with-admin')
+  createWithAdmin(@Body() dto: CreateOrganisationWithAdminDto) {
+    return this.adminOrganisationsService.createWithAdmin(dto);
   }
 
   @Post('onboard/company')

@@ -105,7 +105,7 @@ function initials(firstName: string | null, lastName: string | null): string {
 export function OrgAdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, accessToken, isLoading: authLoading, logout } = useAuth();
+  const { user, accessToken, isLoading: authLoading, logout, hasPermission } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -243,26 +243,44 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
         </div>
         <nav>
           <ul className="nav">
-            {NAV_GROUPS.map((group) => (
-              <ul className="nav-group" key={group.grp}>
-                <li className="grp">{group.grp}</li>
-                {group.items.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        data-tip={item.tip}
-                        className={isActive ? "active" : ""}
-                      >
-                        <span className="ic"><Icon name={item.icon} size={16} /></span>
-                        <span className="lbl">{item.label}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            ))}
+            {NAV_GROUPS.map((group) => {
+              const visibleItems = group.items.filter((item) => {
+                if (item.href === "/org") return hasPermission("dashboard", "view");
+                if (item.href.startsWith("/org/leads")) return hasPermission("crm", "view");
+                if (item.href.startsWith("/org/projects")) return hasPermission("projects", "view");
+                if (item.href.startsWith("/org/calling")) return hasPermission("calling", "view");
+                if (item.href.startsWith("/org/whatsapp")) return hasPermission("whatsapp", "view");
+                if (item.href.startsWith("/org/landing-pages") || item.href.startsWith("/org/templates")) return hasPermission("websites", "view");
+                if (item.href.startsWith("/org/domains")) return hasPermission("domains", "view");
+                if (item.href.startsWith("/org/sales-agents")) return hasPermission("sales_agents", "view");
+                if (item.href.startsWith("/org/teams")) return hasPermission("teams", "view");
+                if (item.href.startsWith("/org/users") || item.href.startsWith("/org/roles-permissions")) return hasPermission("users", "view");
+                return true;
+              });
+
+              if (visibleItems.length === 0) return null;
+
+              return (
+                <ul className="nav-group" key={group.grp}>
+                  <li className="grp">{group.grp}</li>
+                  {visibleItems.map((item) => {
+                    const isActive = pathname === item.href || (item.href !== "/org" && pathname.startsWith(`${item.href}/`));
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          data-tip={item.tip}
+                          className={isActive ? "active" : ""}
+                        >
+                          <span className="ic"><Icon name={item.icon} size={16} /></span>
+                          <span className="lbl">{item.label}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              );
+            })}
           </ul>
         </nav>
       </aside>

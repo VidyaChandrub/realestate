@@ -1,6 +1,5 @@
 import {
   IsEmail,
-  IsIn,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -27,6 +26,7 @@ export class InviteDto {
   @IsEmail()
   email: string;
 
-  @IsIn(['admin', 'manager', 'sales'])
-  role: 'admin' | 'manager' | 'sales';
+  @IsString()
+  @IsNotEmpty()
+  role: string;
 }
