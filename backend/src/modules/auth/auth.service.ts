@@ -746,7 +746,15 @@ export class AuthService {
     const roles = user.userRoles.map((userRole) => userRole.role.key);
     const tokens = await this.issueTokens(user.id, user.orgId, roles);
 
-    return { user: toSafeUser(user), ...tokens };
+    const safeUser = toSafeUser(user);
+    // Password changes are mandatory for organisation users provisioned by
+    // an Organisation Admin. Platform Super Admins use their managed admin
+    // credentials and must not be redirected into the org-user flow.
+    if (!user.orgId) {
+      safeUser.must_change_password = false;
+    }
+
+    return { user: safeUser, ...tokens };
   }
 
   async refresh(rawToken: string) {

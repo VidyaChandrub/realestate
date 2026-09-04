@@ -285,7 +285,7 @@ async function seedSuperAdmin() {
         email: superAdminEmail,
         passwordHash,
         status: 'active',
-        mustChangePassword: true,
+        mustChangePassword: false,
       },
     });
     await prisma.userRole.create({
