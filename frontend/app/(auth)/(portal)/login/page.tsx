@@ -38,7 +38,11 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       const session = await login({ email, password });
-      router.push(dashboardPathFor(session.role));
+      router.push(
+        session.must_change_password
+          ? "/change-password"
+          : dashboardPathFor(session.role),
+      );
       router.refresh();
     } catch (err) {
       const { fieldErrors: fe, general } = mapApiFieldErrors(err, FIELD_KEYS);

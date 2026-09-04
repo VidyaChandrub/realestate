@@ -19,12 +19,13 @@ export class CreateOrgUserDto {
   lastName: string;
 
   @IsEmail()
+  @IsNotEmpty()
   email: string;
 
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(30)
-  phoneNumber?: string;
+  phoneNumber: string;
 
   @IsString()
   @IsNotEmpty()

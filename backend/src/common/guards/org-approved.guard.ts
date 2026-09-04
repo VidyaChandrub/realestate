@@ -82,6 +82,16 @@ export class OrgApprovedGuard implements CanActivate {
       throw orgInactive('Organisation not yet activated');
     }
 
+    const user = await this.prisma.user.findUnique({
+      where: { id: request.user.sub },
+      select: { mustChangePassword: true },
+    });
+    if (user?.mustChangePassword) {
+      throw new ForbiddenException(
+        'Password change required before accessing the organisation',
+      );
+    }
+
     return true;
   }
 }
