@@ -14,18 +14,21 @@ const STATUS_BADGE: Record<UnitStatus, string> = {
   available: "b-green",
   booked: "b-rose",
   held: "b-amber",
+  sold: "b-gray",
 };
 
 const STATUS_DOT: Record<UnitStatus, string> = {
   available: "var(--green)",
   booked: "var(--rose)",
   held: "var(--amber)",
+  sold: "var(--slate, #64748b)",
 };
 
 const STATUS_LABEL: Record<UnitStatus, string> = {
   available: "Available",
   booked: "Booked",
   held: "Held",
+  sold: "Sold",
 };
 
 function compactRupees(value: number | null): string {
@@ -144,12 +147,17 @@ export default function OrgProjectUnitDetailPage() {
     );
   }
 
-  const unitType = project?.unitTypes.find((ut) => ut.id === unit?.unitTypeId) ?? null;
-  const effectivePrice = unit?.price ?? unitType?.price ?? null;
-  const carpet = unitType?.carpetSqft ?? null;
+  // Planned mix for this configuration — used only as a fallback for
+  // display when the unit itself has no carpet/built-up/price set.
+  const plannedType =
+    project?.unitTypes.find((ut) => ut.name === unit?.configuration) ?? null;
+  const effectivePrice = unit?.price ?? plannedType?.price ?? null;
+  const carpet = unit?.carpetSqft ?? plannedType?.carpetSqft ?? null;
+  const builtup = unit?.builtupSqft ?? plannedType?.builtupSqft ?? null;
 
   const subParts = [
-    unitType?.name,
+    unit?.configuration ?? null,
+    unit?.variantLabel ?? null,
     unit?.tower ?? null,
     unit?.floor != null ? `Floor ${unit.floor}` : null,
     carpet != null ? `${carpet.toLocaleString("en-IN")} sqft carpet` : null,
@@ -157,9 +165,10 @@ export default function OrgProjectUnitDetailPage() {
   ].filter(Boolean) as string[];
 
   const specs: { k: string; v: string }[] = [
-    { k: "Configuration", v: unit?.unitType.name ?? "—" },
+    { k: "Configuration", v: unit?.configuration ?? "—" },
+    { k: "Unit type", v: unit?.variantLabel ?? "—" },
     { k: "Carpet area", v: carpet != null ? `${carpet.toLocaleString("en-IN")} sqft` : "—" },
-    { k: "Built-up", v: unitType?.builtupSqft != null ? `${unitType.builtupSqft.toLocaleString("en-IN")} sqft` : "—" },
+    { k: "Built-up", v: builtup != null ? `${builtup.toLocaleString("en-IN")} sqft` : "—" },
     {
       k: "Floor",
       v:
@@ -170,13 +179,14 @@ export default function OrgProjectUnitDetailPage() {
           : "—",
     },
     { k: "Facing", v: unit?.facing ?? "—" },
+    { k: "Parking", v: unit?.parking ?? "—" },
     { k: "₹/sqft", v: pricePerSqft(effectivePrice, carpet) ?? "—" },
     { k: "Tower", v: unit?.tower ?? "—" },
     { k: "Possession", v: project?.possession ?? "—" },
   ];
 
   const kvRows: { k: string; v: string }[] = [
-    { k: "Base price", v: unitType?.price != null ? compactRupees(unitType.price) : "—" },
+    { k: "Base price", v: effectivePrice != null ? compactRupees(effectivePrice) : "—" },
     { k: "Status", v: unit ? STATUS_LABEL[unit.status] : "—" },
     { k: "Tower", v: unit?.tower ?? "—" },
     { k: "Floor", v: unit?.floor != null ? String(unit.floor) : "—" },
@@ -187,7 +197,7 @@ export default function OrgProjectUnitDetailPage() {
   const timeline = unit
     ? [
         {
-          title: unit.unitType.name || "Unit",
+          title: unit.configuration || "Unit",
           text: `Created — added to ${project?.name ?? "project"} sales inventory.`,
           date: formatDate(unit.createdAt),
         },
@@ -385,6 +395,14 @@ export default function OrgProjectUnitDetailPage() {
                     onClick={() => void changeStatus("held")}
                   >
                     {busyAction === "held" ? "Saving…" : "🔒 Hold (48h)"}
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-block"
+                    type="button"
+                    disabled={busyAction !== null || unit.status === "sold"}
+                    onClick={() => void changeStatus("sold")}
+                  >
+                    {busyAction === "sold" ? "Saving…" : "🏷️ Mark as sold"}
                   </button>
                   <button className="btn btn-ghost btn-block" type="button" disabled>
                     🔗 Send unit details

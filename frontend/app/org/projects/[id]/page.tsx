@@ -119,9 +119,20 @@ export default function OrgProjectOverviewPage() {
     </div>
   );
 
-  const configuration = project.unitTypes.length > 0
-    ? project.unitTypes.map((u) => u.name).join(", ")
-    : "—";
+  // Configurations = planned mix (UnitType names) ∪ what's actually on units
+  // (project.configurations, from the server's live groupBy). The wizard
+  // never writes a planned mix, so a wizard project relies on the latter.
+  const configLabels = [
+    ...new Set([
+      ...project.unitTypes.map((u) => u.name),
+      ...project.configurations.map((c) => c.label),
+    ]),
+  ];
+  const configuration = configLabels.length > 0 ? configLabels.join(", ") : "—";
+
+  // Any inventory at all — a planned mix, or real units.
+  const hasInventory =
+    project.unitTypes.length > 0 || project.rollup.unitsCreated > 0;
 
   const totalLeads = 0;
 
@@ -131,12 +142,23 @@ export default function OrgProjectOverviewPage() {
     { k: "Price range", v: priceRange },
     { k: "Total area", v: project.landArea != null ? `${project.landArea} acres` : "—" },
     { k: "Towers", v: [project.towerCount != null ? `${project.towerCount} towers` : null, project.floorsDescription || null].filter(Boolean).join(" · ") || "—" },
-    // Derived from real UnitType/Unit records — "—" until inventory is set up
-    // in the Units section (the wizard never creates unit types).
-    { k: "Total units", v: project.unitTypes.length === 0 ? "—" : String(project.rollup.totalUnitsPlanned) },
-    { k: "Available", v: project.unitTypes.length === 0 ? "—" : String(project.rollup.unitsAvailable) },
+    { k: "Carpet range", v: project.carpetRange || "—" },
+    // Planned figure when a planned mix exists, otherwise the real created
+    // count. "—" only when there's no inventory of either kind.
+    {
+      k: "Total units",
+      v: !hasInventory
+        ? "—"
+        : String(
+            project.rollup.totalUnitsPlanned || project.rollup.unitsCreated,
+          ),
+    },
+    {
+      k: "Available",
+      v: !hasInventory ? "—" : String(project.rollup.unitsAvailable),
+    },
     { k: "Possession", v: project.possession || "—" },
-    { k: "RERA", v: project.reraId || "—", mono: true },
+    { k: "RERA", v: project.reraId || "—" },
   ];
 
   return (
@@ -299,49 +321,36 @@ export default function OrgProjectOverviewPage() {
           <Reveal delay={3}>
             <div className="card">
               <div className="card-h">
-                <span className="t">Unit Configurations &amp; BHK Inventory</span>
+                <span className="t">Configurations</span>
                 <Link className="x brand-link" href={`/org/projects/${id}/units`}>Manage inventory →</Link>
               </div>
               <div className="card-b">
-                {project.unitTypes.length === 0 ? (
-                  <p className="muted">No unit types configured yet — add them from the Units tab.</p>
+                {configLabels.length === 0 ? (
+                  <p className="muted">No configurations yet — add units, or a planned mix, from the Units tab.</p>
                 ) : (
                   <div className="grid g3">
-                    {project.unitTypes.map((u) => (
-                      <Link key={u.id} href={`/org/projects/${id}/units`} className="utype-card" style={{ textDecoration: "none", color: "inherit" }}>
-                        <div className="cover media plan" style={{ position: "relative" }}>
-                          <span>📐</span>
-                          <span className="cap">{u.name}</span>
-                          {u.carpetSqft ? (
-                            <span style={{ position: "absolute", top: 8, right: 8, fontSize: 10.5, background: "rgba(0,0,0,0.6)", color: "#fff", padding: "2px 6px", borderRadius: 4 }}>
-                              {u.carpetSqft} sqft carpet
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="info">
-                          <b>{u.name}</b>
-                          <div className="muted fs-12-5" style={{ marginTop: 2 }}>
-                            {[
-                              u.builtupSqft ? `${u.builtupSqft} sqft super` : null,
-                              u.price != null ? formatMoney(u.price, project.currency) : null,
-                            ].filter(Boolean).join(" · ") || "—"}
+                    {configLabels.map((label) => {
+                      const ut = project.unitTypes.find((u) => u.name === label);
+                      const act = project.configurations.find((c) => c.label === label);
+                      const available = act?.available ?? ut?.availableUnits ?? 0;
+                      return (
+                        <Link key={label} href={`/org/projects/${id}/units`} className="utype-card">
+                          <div className="cover media plan">
+                            <span>📐</span>
+                            <span className="cap">{label}</span>
                           </div>
-                          {u.price && u.builtupSqft ? (
-                            <div style={{ fontSize: 11, color: "var(--indigo, #4f46e5)", fontWeight: 600, marginTop: 3 }}>
-                              ₹{Math.round(u.price / u.builtupSqft).toLocaleString("en-IN")}/sqft
+                          <div className="info">
+                            <b>{label}</b>
+                            <div className="muted fs-12-5">
+                              {[ut?.builtupSqft ? `${ut.builtupSqft} sqft` : null, ut?.price != null ? formatMoney(ut.price, project.currency) : null].filter(Boolean).join(" · ") || (ut ? "—" : "Derived from units")}
                             </div>
-                          ) : null}
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                            <span className={`badge ${u.availableUnits > 0 ? "b-green" : "b-amber"}`}>
-                              {u.availableUnits} available
-                            </span>
-                            <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                              {u.bookedUnits} booked / {u.totalUnits || u.unitCount}
+                            <span className={`badge ${available > 0 ? "b-green" : "b-amber"} mt-8`}>
+                              {available} available
                             </span>
                           </div>
-                        </div>
-                      </Link>
-                    ))}
+                        </Link>
+                      );
+                    })}
                   </div>
                 )}
               </div>

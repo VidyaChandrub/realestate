@@ -90,6 +90,12 @@ export class CreateProjectDto {
   @MaxLength(120)
   floorsDescription?: string;
 
+  // Free-text carpet-area range for the whole project ("640 – 1,850 sqft").
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  carpetRange?: string;
+
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(100)

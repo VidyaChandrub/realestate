@@ -678,6 +678,7 @@ export default function AddNewProjectPage() {
         landArea: parseDecimal(landArea),
         towerCount: parseCount(towerCount),
         floorsDescription: floorsDescription.trim() || undefined,
+        carpetRange: carpetRange.trim() || undefined,
         amenities: amenities.map((a) => ({ name: a, iconUrl: null })),
         // Step 3 — pricing & payment (remaining fields)
         bookingAmount: parseAmount(bookingAmount),
@@ -714,6 +715,7 @@ export default function AddNewProjectPage() {
         body: JSON.stringify(body),
       });
 
+      const seededNames = new Set<string>();
       for (const u of unitTypes) {
         if (!u.name.trim()) continue;
         const utBody: CreateUnitTypeInput = {
@@ -723,6 +725,20 @@ export default function AddNewProjectPage() {
           price: parseAmount(u.price),
           totalUnits: parseCount(u.totalUnits),
         };
+        await apiFetch(`/org/projects/${project.id}/unit-types`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify(utBody),
+        });
+        seededNames.add(utBody.name);
+      }
+
+      // Seed the planned unit mix from the configurations picked in Step 2.
+      // Counts start at 0 — the user fills them in later on the Units tab.
+      // Without this the picked configs are shown in Review and then vanish.
+      for (const label of selectedConfigs) {
+        if (seededNames.has(label)) continue;
+        const utBody: CreateUnitTypeInput = { name: label, totalUnits: 0 };
         await apiFetch(`/org/projects/${project.id}/unit-types`, {
           method: "POST",
           headers: { Authorization: `Bearer ${accessToken}` },
@@ -1079,7 +1095,7 @@ export default function AddNewProjectPage() {
                 <div className="q-sec">
                   <div className="lbl">🏛️ Approvals &amp; timeline</div>
                   <div className="grid g2">
-                    <div className="field"><label>RERA registration no. <span className="req">*</span></label><input className="inp mono" placeholder="PR/GJ/AHM/2026/00842" value={reraId} onChange={(e) => setReraId(e.target.value)} /></div>
+                    <div className="field"><label>RERA registration no. <span className="req">*</span></label><input className="inp" placeholder="PR/GJ/AHM/2026/00842" value={reraId} onChange={(e) => setReraId(e.target.value)} /></div>
                     <div className="field"><label>Status</label><select className="inp" value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
                   </div>
                   <div className="grid g3">
@@ -1177,8 +1193,8 @@ export default function AddNewProjectPage() {
                     <div className="field"><label>Pincode</label><input className="inp" placeholder="380058" value={pincode} onChange={(e) => setPincode(e.target.value)} /></div>
                   </div>
                   <div className="grid g2">
-                    <div className="field"><label>Map latitude</label><input className="inp mono" type="number" step="any" placeholder="23.0301" value={latitude} onChange={(e) => setLatitude(e.target.value)} /></div>
-                    <div className="field"><label>Map longitude</label><input className="inp mono" type="number" step="any" placeholder="72.5100" value={longitude} onChange={(e) => setLongitude(e.target.value)} /></div>
+                    <div className="field"><label>Map latitude</label><input className="inp" type="number" step="any" placeholder="23.0301" value={latitude} onChange={(e) => setLatitude(e.target.value)} /></div>
+                    <div className="field"><label>Map longitude</label><input className="inp" type="number" step="any" placeholder="72.5100" value={longitude} onChange={(e) => setLongitude(e.target.value)} /></div>
                   </div>
                 </div>
                 <div className="q-sec">
@@ -1408,6 +1424,7 @@ export default function AddNewProjectPage() {
                       <div className="q-sec"><div className="lbl">🏠 Inventory</div>
                         <div className="sp"><span className="k">Configs</span><span className="v">{formatConfigs(selectedConfigs)}</span></div>
                         <div className="sp"><span className="k">Towers / floors</span><span className="v">{[towerCount, floorsDescription].filter(Boolean).join(" · ") || "—"}</span></div>
+                        <div className="sp"><span className="k">Carpet range</span><span className="v">{carpetRange || "—"}</span></div>
                         <div className="sp"><span className="k">Land area</span><span className="v">{landArea ? `${landArea} acres` : "—"}</span></div>
                         <div className="sp"><span className="k">Price range</span><span className="v">{priceRangeLabel(priceMin, priceMax, currency)}</span></div>
                       </div>

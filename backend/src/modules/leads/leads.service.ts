@@ -66,12 +66,12 @@ export class LeadsService {
     if (dto.unitId) {
       const unit = await this.prisma.unit.findUnique({
         where: { id: dto.unitId },
-        select: { unitType: { select: { projectId: true, project: { select: { orgId: true } } } } },
+        select: { projectId: true, orgId: true },
       });
-      if (!unit || !dto.projectId || unit.unitType.projectId !== dto.projectId) {
+      if (!unit || !dto.projectId || unit.projectId !== dto.projectId) {
         throw new BadRequestException('Selected unit does not belong to the selected project');
       }
-      if (orgId !== unit.unitType.project.orgId) {
+      if (orgId !== unit.orgId) {
         throw new BadRequestException('Selected unit belongs to another organisation');
       }
     }

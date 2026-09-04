@@ -756,7 +756,7 @@ export interface InvoiceRow {
 // deliberately free text ("Dec 2027"); `manager` is a free-text name, not a
 // user id.
 export type ProjectStatus = "active" | "inactive";
-export type UnitStatus = "available" | "booked" | "held";
+export type UnitStatus = "available" | "booked" | "held" | "sold";
 
 export interface Amenity {
   name: string;
@@ -791,6 +791,7 @@ export interface Project {
   landArea: number | null;
   towerCount: number | null;
   floorsDescription: string | null;
+  carpetRange: string | null;
   amenities: Amenity[];
   // --- Onboarding-wizard fields (Steps 3-8). Persisted by the backend as of
   // Piece A; the wizard wires them progressively in Pieces B-E. ---
@@ -825,6 +826,10 @@ export interface Project {
 export interface EnquiryUnit {
   id: string;
   unitNo: string;
+  configuration: string | null;
+  variantLabel: string | null;
+  carpetSqft: number | null;
+  builtupSqft: number | null;
   tower: string | null;
   floor: number | null;
   facing: string | null;
@@ -833,11 +838,10 @@ export interface EnquiryUnit {
 }
 
 export interface PublicProject extends Project {
-  unitTypes: Array<{
-    id: string;
-    name: string;
-    units: EnquiryUnit[];
-  }>;
+  /** Available units for this project (a unit belongs straight to the project now). */
+  units: EnquiryUnit[];
+  /** Planned unit mix. */
+  unitTypes: Array<{ id: string; name: string }>;
 }
 
 export interface ProjectListRow extends Project {
@@ -871,33 +875,63 @@ export interface UnitType {
   availableUnits: number;
   bookedUnits: number;
   heldUnits: number;
+  soldUnits: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Unit {
   id: string;
-  unitTypeId: string;
-  unitType: { id: string; name: string };
+  orgId: string;
+  /** Null for a standalone unit (no project). */
+  projectId: string | null;
+  /** A `unit_type` catalog label. Null only on legacy/imported rows. */
+  configuration: string | null;
+  /** Optional free-text variant label ("Type A"). Not a catalog. */
+  variantLabel: string | null;
   unitNo: string;
+  carpetSqft: number | null;
+  builtupSqft: number | null;
   /** Optional — null for projects with no tower concept (villas, plots). */
   tower: string | null;
   floor: number | null;
   facing: string | null;
+  /** Free text as entered on the form ("1 covered", "2 covered", "Open"). */
+  parking: string | null;
   price: number | null;
+  /** Standalone-listing-only (null for project units). */
+  addressLine: string | null;
+  ownerName: string | null;
+  notes: string | null;
+  /** Public R2 URLs. */
+  floorPlanUrl: string | null;
+  galleryUrls: string[];
   status: UnitStatus;
   createdAt: string;
   updatedAt: string;
 }
 
+/** One configuration present on a project's units, with its status breakdown. */
+export interface ProjectConfigurationRollup {
+  label: string;
+  total: number;
+  available: number;
+  booked: number;
+  held: number;
+  sold: number;
+}
+
 export interface ProjectDetail extends Project {
   unitTypes: UnitType[];
+  /** Distinct configurations actually on the project's units (superset of unitTypes names). */
+  configurations: ProjectConfigurationRollup[];
   rollup: {
     totalUnitsPlanned: number;
     unitsCreated: number;
     unitsAvailable: number;
     unitsBooked: number;
     unitsHeld: number;
+    unitsSold: number;
   };
   /** User ids of the assigned sales agents (full objects via the dedicated endpoint). */
   salesAgentIds: string[];
@@ -923,6 +957,7 @@ export interface CreateProjectInput {
   landArea?: number;
   towerCount?: number;
   floorsDescription?: string;
+  carpetRange?: string;
   amenities?: Amenity[];
   // Onboarding-wizard fields (Steps 3-8) — all optional; wired progressively
   // by Pieces B-E. `null` is accepted on update to clear a field.
@@ -966,6 +1001,7 @@ export interface UpdateProjectInput {
   landArea?: number | null;
   towerCount?: number | null;
   floorsDescription?: string | null;
+  carpetRange?: string | null;
   amenities?: Amenity[];
   bookingAmount?: number | null;
   currency?: "INR" | "AED" | "USD";
@@ -1038,19 +1074,87 @@ export interface CreateUnitTypeInput {
 export type UpdateUnitTypeInput = Partial<CreateUnitTypeInput>;
 
 export interface CreateUnitInput {
-  unitTypeId: string;
+  /** A `unit_type` catalog label — required, validated server-side. */
+  configuration: string;
+  /** Optional free-text variant label. */
+  variantLabel?: string;
   unitNo: string;
+  carpetSqft?: number;
+  builtupSqft?: number;
   tower?: string;
   floor?: number;
   facing?: string;
+  parking?: string;
   price?: number;
   status?: UnitStatus;
+  /** Standalone-listing fields. */
+  addressLine?: string;
+  ownerName?: string;
+  notes?: string;
+  /** Media — public R2 URLs. */
+  floorPlanUrl?: string;
+  galleryUrls?: string[];
 }
 
-export type UpdateUnitInput = Partial<Omit<CreateUnitInput, "tower">> & {
+export type UpdateUnitInput = Partial<
+  Omit<
+    CreateUnitInput,
+    | "tower"
+    | "parking"
+    | "variantLabel"
+    | "carpetSqft"
+    | "builtupSqft"
+    | "facing"
+    | "price"
+    | "addressLine"
+    | "ownerName"
+    | "notes"
+    | "floorPlanUrl"
+  >
+> & {
   /** value to set, or explicit null to clear. */
   tower?: string | null;
+  parking?: string | null;
+  variantLabel?: string | null;
+  carpetSqft?: number | null;
+  builtupSqft?: number | null;
+  facing?: string | null;
+  price?: number | null;
+  addressLine?: string | null;
+  ownerName?: string | null;
+  notes?: string | null;
+  floorPlanUrl?: string | null;
+  galleryUrls?: string[];
 };
+
+/** One row of the cross-project "All Units" list (GET /org/units). */
+export interface OrgUnitRow {
+  id: string;
+  unitNo: string;
+  configuration: string | null;
+  variantLabel: string | null;
+  carpetSqft: number | null;
+  builtupSqft: number | null;
+  tower: string | null;
+  floor: number | null;
+  facing: string | null;
+  parking: string | null;
+  price: number | null;
+  status: UnitStatus;
+  createdAt: string;
+  updatedAt: string;
+  /** Null for a standalone unit. */
+  project: { id: string; name: string; currency: string } | null;
+}
+
+export interface OrgUnitsListResponse {
+  data: OrgUnitRow[];
+  total: number;
+  page: number;
+  limit: number;
+  /** Status breakdown for the current filter set, ignoring pagination. */
+  counts: { available: number; booked: number; held: number; sold: number };
+}
 
 export interface LeadSubmission {
   /** Landing page id the form belongs to (used server-side to attribute the org). */

@@ -96,6 +96,11 @@ export class UpdateProjectDto {
   floorsDescription?: string | null;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  carpetRange?: string | null;
+
+  @IsOptional()
   @IsArray()
   @ArrayMaxSize(100)
   @ValidateNested({ each: true })

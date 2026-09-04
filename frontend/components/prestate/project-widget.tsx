@@ -376,7 +376,7 @@ export function ProjectSection({
         heading={heading}
         text={text}
         buttonLabel={buttonLabel}
-        units={active ? (active as PublicProject).unitTypes?.flatMap((type) => type.units) ?? [] : []}
+        units={active ? (active as PublicProject).units ?? [] : []}
       />
     </>
   );

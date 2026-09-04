@@ -27,6 +27,11 @@ import type {
   LandingPageRow,
   OrgCatalogOption,
   OrgLandingPagesListResponse,
+  OrgUnitsListResponse,
+  Unit,
+  CreateUnitInput,
+  UpdateUnitInput,
+  UnitStatus,
   ProjectSalesAgent,
   OnboardingAccountInput,
   OnboardingOrganisationInput,
@@ -522,6 +527,65 @@ export async function deleteOrgCatalogOption(
   id: string,
 ): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/org/project-catalog/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// --- Cross-project units ("All Units" screen) ---
+
+/** GET /org/units — the org's whole inventory, flat and paginated. */
+export async function getOrgUnits(params?: {
+  page?: number;
+  limit?: number;
+  projectId?: string;
+  standalone?: boolean;
+  status?: UnitStatus;
+  search?: string;
+}): Promise<OrgUnitsListResponse> {
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.projectId) q.set("projectId", params.projectId);
+  if (params?.standalone) q.set("standalone", "1");
+  if (params?.status) q.set("status", params.status);
+  if (params?.search) q.set("search", params.search);
+  const qs = q.toString();
+  return apiFetch<OrgUnitsListResponse>(`/org/units${qs ? `?${qs}` : ""}`);
+}
+
+// --- Standalone units (resale / broker listings, no project) ---
+
+/** POST /org/units — create a standalone unit. */
+export async function createStandaloneUnit(
+  input: CreateUnitInput,
+): Promise<Unit> {
+  return apiFetch<Unit>("/org/units", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** GET /org/units/:id — a single standalone unit. */
+export async function getStandaloneUnit(id: string): Promise<Unit> {
+  return apiFetch<Unit>(`/org/units/${id}`);
+}
+
+/** PATCH /org/units/:id — update a standalone unit. */
+export async function updateStandaloneUnit(
+  id: string,
+  input: UpdateUnitInput,
+): Promise<Unit> {
+  return apiFetch<Unit>(`/org/units/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+/** DELETE /org/units/:id. */
+export async function deleteStandaloneUnit(
+  id: string,
+): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/org/units/${id}`, {
     method: "DELETE",
   });
 }

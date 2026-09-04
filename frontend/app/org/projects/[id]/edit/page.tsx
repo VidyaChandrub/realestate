@@ -100,6 +100,7 @@ export default function OrgProjectEditPage() {
   // --- Inventory & specs ---
   const [towerCount, setTowerCount] = useState("");
   const [floorsDescription, setFloorsDescription] = useState("");
+  const [carpetRange, setCarpetRange] = useState("");
   const [landArea, setLandArea] = useState("");
   const [amenities, setAmenities] = useState<string[]>([]);
   const [flooring, setFlooring] = useState("");
@@ -179,6 +180,7 @@ export default function OrgProjectEditPage() {
 
         setTowerCount(toField(p.towerCount));
         setFloorsDescription(p.floorsDescription ?? "");
+        setCarpetRange(p.carpetRange ?? "");
         setLandArea(toField(p.landArea));
         setAmenities(p.amenities.map((a) => a.name));
 
@@ -341,6 +343,7 @@ export default function OrgProjectEditPage() {
 
         towerCount: parseCount(towerCount) ?? null,
         floorsDescription: floorsDescription.trim() || null,
+        carpetRange: carpetRange.trim() || null,
         landArea: parseDecimal(landArea) ?? null,
         amenities: amenityPayload,
         specifications,
@@ -480,7 +483,7 @@ export default function OrgProjectEditPage() {
               <div className="row2">
                 <div className="field">
                   <label>RERA ID</label>
-                  <input className="inp mono" value={reraId} onChange={(e) => setReraId(e.target.value)} />
+                  <input className="inp" value={reraId} onChange={(e) => setReraId(e.target.value)} />
                 </div>
                 <div className="field">
                   <label>Possession</label>
@@ -577,8 +580,8 @@ export default function OrgProjectEditPage() {
                 <div className="field"><label>Pincode</label><input className="inp" value={pincode} onChange={(e) => setPincode(e.target.value)} /></div>
               </div>
               <div className="row2">
-                <div className="field"><label>Map latitude</label><input className="inp mono" type="number" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} /></div>
-                <div className="field"><label>Map longitude</label><input className="inp mono" type="number" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} /></div>
+                <div className="field"><label>Map latitude</label><input className="inp" type="number" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} /></div>
+                <div className="field"><label>Map longitude</label><input className="inp" type="number" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} /></div>
               </div>
               <div className="field">
                 <label>Nearby (connectivity)</label>
@@ -616,6 +619,12 @@ export default function OrgProjectEditPage() {
                 <div className="field"><label>No. of towers / blocks</label><input className="inp" type="number" min={0} value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /></div>
                 <div className="field"><label>Floors / structure</label><input className="inp" placeholder="G+22" value={floorsDescription} onChange={(e) => setFloorsDescription(e.target.value)} /></div>
                 <div className="field"><label>Land area (acres)</label><input className="inp" type="number" min={0} step="0.01" value={landArea} onChange={(e) => setLandArea(e.target.value)} /></div>
+              </div>
+
+              <div className="field">
+                <label>Carpet area range (sqft)</label>
+                <input className="inp" placeholder="640 – 1,850" value={carpetRange} onChange={(e) => setCarpetRange(e.target.value)} />
+                <div className="hint">Whole-project summary. Per-unit-type carpet area is set on each unit type.</div>
               </div>
 
               <div className="field">
