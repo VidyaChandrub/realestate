@@ -17,6 +17,7 @@ import { UpdateUnitTypeDto } from './dto/update-unit-type.dto';
 import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto, UpdateUnitStatusDto } from './dto/update-unit.dto';
 import { ListUnitsQueryDto } from './dto/list-units-query.dto';
+import { ListOrgUnitsQueryDto } from './dto/list-org-units-query.dto';
 
 // Columns a PATCH may set on a Project, and the coercion each needs. Keeps
 // update() free of a 12-branch if-ladder while still only touching the keys
@@ -34,6 +35,7 @@ const PROJECT_SCALARS = [
   'baseRate',
   'towerCount',
   'floorsDescription',
+  'carpetRange',
   // Onboarding-wizard scalars (Steps 3-8). Arrays (priceIncludes,
   // connectivity, galleryUrls) and Json (specifications, marketing) are
   // handled separately below.
@@ -72,6 +74,7 @@ type UnitTypeWithCounts = Prisma.UnitTypeGetPayload<Record<string, never>> & {
   availableUnits: number;
   bookedUnits: number;
   heldUnits: number;
+  soldUnits: number;
 };
 
 @Injectable()
@@ -134,6 +137,7 @@ export class ProjectsService {
           landArea: dto.landArea ?? null,
           towerCount: dto.towerCount ?? null,
           floorsDescription: dto.floorsDescription ?? null,
+          carpetRange: dto.carpetRange ?? null,
           amenities: (dto.amenities ?? []) as unknown as Prisma.InputJsonValue,
           // Onboarding-wizard fields (Steps 3-8).
           bookingAmount: dto.bookingAmount ?? null,
@@ -236,27 +240,65 @@ export class ProjectsService {
       select: { userId: true },
     });
 
-    const rollup = decorated.reduce(
-      (acc, ut) => {
-        acc.totalUnitsPlanned += ut.totalUnits;
-        acc.unitsCreated += ut.unitCount;
-        acc.unitsAvailable += ut.availableUnits;
-        acc.unitsBooked += ut.bookedUnits;
-        acc.unitsHeld += ut.heldUnits;
-        return acc;
-      },
+    // Actual counts come straight from the project's Unit rows (grouped by
+    // status), so a unit whose configuration matches no planned UnitType is
+    // still counted. Planned total still comes from the UnitType rows.
+    const statusGrouped = await this.prisma.unit.groupBy({
+      by: ['status'],
+      where: { projectId: id },
+      _count: { _all: true },
+    });
+    const actual = { available: 0, booked: 0, held: 0, sold: 0, total: 0 };
+    for (const g of statusGrouped) {
+      actual[g.status] = g._count._all;
+      actual.total += g._count._all;
+    }
+
+    const rollup = {
+      totalUnitsPlanned: decorated.reduce((s, ut) => s + ut.totalUnits, 0),
+      unitsCreated: actual.total,
+      unitsAvailable: actual.available,
+      unitsBooked: actual.booked,
+      unitsHeld: actual.held,
+      unitsSold: actual.sold,
+    };
+
+    // Every distinct configuration actually present on the project's units
+    // (a superset of the planned UnitType names) with its status breakdown —
+    // the [id]/units page renders one card per configuration.
+    const configGrouped = await this.prisma.unit.groupBy({
+      by: ['configuration', 'status'],
+      where: { projectId: id, configuration: { not: null } },
+      _count: { _all: true },
+    });
+    const configMap = new Map<
+      string,
       {
-        totalUnitsPlanned: 0,
-        unitsCreated: 0,
-        unitsAvailable: 0,
-        unitsBooked: 0,
-        unitsHeld: 0,
-      },
-    );
+        label: string;
+        total: number;
+        available: number;
+        booked: number;
+        held: number;
+        sold: number;
+      }
+    >();
+    for (const g of configGrouped) {
+      const label = g.configuration!;
+      const e =
+        configMap.get(label) ??
+        { label, total: 0, available: 0, booked: 0, held: 0, sold: 0 };
+      const n = g._count._all;
+      e.total += n;
+      e[g.status] += n;
+      configMap.set(label, e);
+    }
 
     return {
       ...this.serializeProject(project),
       unitTypes: decorated.map((ut) => this.serializeUnitType(ut)),
+      configurations: [...configMap.values()].sort((a, b) =>
+        a.label.localeCompare(b.label),
+      ),
       rollup,
       salesAgentIds: salesAgentRows.map((r) => r.userId),
     };
@@ -516,19 +558,36 @@ export class ProjectsService {
   // -------------------------------------------------------------------------
 
   async createUnit(orgId: string, projectId: string, dto: CreateUnitDto) {
-    // unitTypeId must be a real type under *this* project (and therefore
-    // this org) — never trusted from the body without the check.
-    await this.getOwnedUnitType(orgId, projectId, dto.unitTypeId);
+    const project = await this.getOwnedProject(orgId, projectId);
+
+    // `configuration` must be one of the org's own `unit_type` catalog
+    // labels — never trusted from the body, the UI restricting it isn't
+    // enough.
+    await this.assertConfigurationInCatalog(orgId, dto.configuration);
+
+    const tower = dto.tower?.trim() || null;
+    await this.assertTowerWithinLimit(projectId, project.towerCount, tower);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const row = await tx.unit.create({
         data: {
-          unitTypeId: dto.unitTypeId,
+          orgId,
+          projectId,
+          configuration: dto.configuration.trim(),
+          variantLabel: dto.variantLabel?.trim() || null,
           unitNo: dto.unitNo,
-          tower: dto.tower?.trim() || null,
+          carpetSqft: dto.carpetSqft ?? null,
+          builtupSqft: dto.builtupSqft ?? null,
+          tower,
           floor: dto.floor ?? null,
           facing: dto.facing ?? null,
+          parking: dto.parking?.trim() || null,
           price: dto.price ?? null,
+          addressLine: dto.addressLine?.trim() || null,
+          ownerName: dto.ownerName?.trim() || null,
+          notes: dto.notes?.trim() || null,
+          floorPlanUrl: dto.floorPlanUrl ?? null,
+          galleryUrls: dto.galleryUrls ?? [],
           status: dto.status ?? 'available',
         },
       });
@@ -540,7 +599,7 @@ export class ProjectsService {
           entityId: row.id,
           metadata: {
             projectId,
-            unitTypeId: row.unitTypeId,
+            configuration: row.configuration,
             unitNo: row.unitNo,
           },
         },
@@ -554,8 +613,8 @@ export class ProjectsService {
   async listUnits(orgId: string, projectId: string, query: ListUnitsQueryDto) {
     await this.getOwnedProject(orgId, projectId);
 
-    const where: Prisma.UnitWhereInput = { unitType: { projectId } };
-    if (query.unitTypeId) where.unitTypeId = query.unitTypeId;
+    const where: Prisma.UnitWhereInput = { projectId };
+    if (query.configuration) where.configuration = query.configuration;
     if (query.status) where.status = query.status;
     if (query.search) {
       where.unitNo = { contains: query.search, mode: 'insensitive' };
@@ -564,7 +623,6 @@ export class ProjectsService {
     const rows = await this.prisma.unit.findMany({
       where,
       orderBy: [{ unitNo: 'asc' }],
-      include: { unitType: { select: { id: true, name: true } } },
     });
 
     return rows.map((row) => this.serializeUnit(row));
@@ -581,17 +639,34 @@ export class ProjectsService {
     id: string,
     dto: UpdateUnitDto,
   ) {
+    const project = await this.getOwnedProject(orgId, projectId);
     await this.getOwnedUnit(orgId, projectId, id);
 
-    if (dto.unitTypeId !== undefined) {
-      // Re-parent only within the same project.
-      await this.getOwnedUnitType(orgId, projectId, dto.unitTypeId);
+    if (dto.configuration !== undefined) {
+      await this.assertConfigurationInCatalog(orgId, dto.configuration);
+    }
+    if (dto.tower !== undefined && typeof dto.tower === 'string') {
+      const nextTower = dto.tower.trim() || null;
+      await this.assertTowerWithinLimit(
+        projectId,
+        project.towerCount,
+        nextTower,
+        id,
+      );
     }
 
-    const data: Prisma.UnitUpdateInput = {};
-    if (dto.unitTypeId !== undefined) {
-      data.unitType = { connect: { id: dto.unitTypeId } };
+    const data: Prisma.UnitUncheckedUpdateInput = {};
+    if (dto.configuration !== undefined) {
+      data.configuration = dto.configuration.trim();
     }
+    if (dto.variantLabel !== undefined) {
+      data.variantLabel =
+        typeof dto.variantLabel === 'string'
+          ? dto.variantLabel.trim() || null
+          : null;
+    }
+    if (dto.carpetSqft !== undefined) data.carpetSqft = dto.carpetSqft;
+    if (dto.builtupSqft !== undefined) data.builtupSqft = dto.builtupSqft;
     if (dto.unitNo !== undefined) data.unitNo = dto.unitNo;
     if (dto.tower !== undefined) {
       data.tower =
@@ -599,8 +674,28 @@ export class ProjectsService {
     }
     if (dto.floor !== undefined) data.floor = dto.floor;
     if (dto.facing !== undefined) data.facing = dto.facing;
+    if (dto.parking !== undefined) {
+      data.parking =
+        typeof dto.parking === 'string' ? dto.parking.trim() || null : null;
+    }
     if (dto.price !== undefined) data.price = dto.price;
     if (dto.status !== undefined) data.status = dto.status;
+    if (dto.addressLine !== undefined) {
+      data.addressLine =
+        typeof dto.addressLine === 'string'
+          ? dto.addressLine.trim() || null
+          : null;
+    }
+    if (dto.ownerName !== undefined) {
+      data.ownerName =
+        typeof dto.ownerName === 'string' ? dto.ownerName.trim() || null : null;
+    }
+    if (dto.notes !== undefined) {
+      data.notes =
+        typeof dto.notes === 'string' ? dto.notes.trim() || null : null;
+    }
+    if (dto.floorPlanUrl !== undefined) data.floorPlanUrl = dto.floorPlanUrl;
+    if (dto.galleryUrls !== undefined) data.galleryUrls = dto.galleryUrls;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.unit.update({ where: { id }, data });
@@ -663,6 +758,209 @@ export class ProjectsService {
   }
 
   // -------------------------------------------------------------------------
+  // Standalone units — resale / broker listings with no project. Same table,
+  // same catalog-validated `configuration`, `projectId` is null. No tower /
+  // floor (there's no project to bound the tower count against). Reached via
+  // the non-nested /org/units routes.
+  // -------------------------------------------------------------------------
+
+  async createStandaloneUnit(orgId: string, dto: CreateUnitDto) {
+    await this.assertConfigurationInCatalog(orgId, dto.configuration);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.unit.create({
+        data: {
+          orgId,
+          projectId: null,
+          configuration: dto.configuration.trim(),
+          variantLabel: dto.variantLabel?.trim() || null,
+          unitNo: dto.unitNo,
+          carpetSqft: dto.carpetSqft ?? null,
+          builtupSqft: dto.builtupSqft ?? null,
+          tower: null,
+          floor: null,
+          facing: dto.facing ?? null,
+          parking: dto.parking?.trim() || null,
+          price: dto.price ?? null,
+          addressLine: dto.addressLine?.trim() || null,
+          ownerName: dto.ownerName?.trim() || null,
+          notes: dto.notes?.trim() || null,
+          floorPlanUrl: dto.floorPlanUrl ?? null,
+          galleryUrls: dto.galleryUrls ?? [],
+          status: dto.status ?? 'available',
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          action: 'standalone_unit_created',
+          entity: 'Unit',
+          entityId: row.id,
+          metadata: { configuration: row.configuration, unitNo: row.unitNo },
+        },
+      });
+      return row;
+    });
+
+    return this.serializeUnit(created);
+  }
+
+  async getStandaloneUnit(orgId: string, id: string) {
+    return this.serializeUnit(await this.getOwnedStandaloneUnit(orgId, id));
+  }
+
+  async updateStandaloneUnit(orgId: string, id: string, dto: UpdateUnitDto) {
+    await this.getOwnedStandaloneUnit(orgId, id);
+
+    if (dto.configuration !== undefined) {
+      await this.assertConfigurationInCatalog(orgId, dto.configuration);
+    }
+
+    const data: Prisma.UnitUncheckedUpdateInput = {};
+    if (dto.configuration !== undefined) {
+      data.configuration = dto.configuration.trim();
+    }
+    if (dto.variantLabel !== undefined) {
+      data.variantLabel =
+        typeof dto.variantLabel === 'string'
+          ? dto.variantLabel.trim() || null
+          : null;
+    }
+    if (dto.carpetSqft !== undefined) data.carpetSqft = dto.carpetSqft;
+    if (dto.builtupSqft !== undefined) data.builtupSqft = dto.builtupSqft;
+    if (dto.unitNo !== undefined) data.unitNo = dto.unitNo;
+    if (dto.facing !== undefined) data.facing = dto.facing;
+    if (dto.parking !== undefined) {
+      data.parking =
+        typeof dto.parking === 'string' ? dto.parking.trim() || null : null;
+    }
+    if (dto.price !== undefined) data.price = dto.price;
+    if (dto.status !== undefined) data.status = dto.status;
+    if (dto.addressLine !== undefined) {
+      data.addressLine =
+        typeof dto.addressLine === 'string'
+          ? dto.addressLine.trim() || null
+          : null;
+    }
+    if (dto.ownerName !== undefined) {
+      data.ownerName =
+        typeof dto.ownerName === 'string' ? dto.ownerName.trim() || null : null;
+    }
+    if (dto.notes !== undefined) {
+      data.notes =
+        typeof dto.notes === 'string' ? dto.notes.trim() || null : null;
+    }
+    if (dto.floorPlanUrl !== undefined) data.floorPlanUrl = dto.floorPlanUrl;
+    if (dto.galleryUrls !== undefined) data.galleryUrls = dto.galleryUrls;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.unit.update({ where: { id }, data });
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          action: 'standalone_unit_updated',
+          entity: 'Unit',
+          entityId: id,
+          metadata: { fields: Object.keys(data) },
+        },
+      });
+    });
+
+    return this.getStandaloneUnit(orgId, id);
+  }
+
+  async removeStandaloneUnit(orgId: string, id: string) {
+    await this.getOwnedStandaloneUnit(orgId, id);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.unit.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          action: 'standalone_unit_deleted',
+          entity: 'Unit',
+          entityId: id,
+          metadata: {},
+        },
+      });
+    });
+    return { success: true };
+  }
+
+  private async getOwnedStandaloneUnit(orgId: string, id: string) {
+    const unit = await this.prisma.unit.findFirst({
+      where: { id, orgId, projectId: null },
+    });
+    if (!unit) throw new NotFoundException('Unit not found');
+    return unit;
+  }
+
+  // -------------------------------------------------------------------------
+  // Cross-project unit list — the "All Units" screen. Org-scoped directly by
+  // Unit.orgId (project-bound and standalone units alike). Paginated
+  // { data, total, page, limit } like ListProjects; `counts` is the status
+  // breakdown for the same filter set (minus pagination) so the summary
+  // tiles don't need a second request.
+  // -------------------------------------------------------------------------
+
+  async listAllUnits(orgId: string, query: ListOrgUnitsQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const where: Prisma.UnitWhereInput = { orgId };
+    if (query.projectId) where.projectId = query.projectId;
+    else if (query.standalone) where.projectId = null;
+    if (query.status) where.status = query.status;
+    if (query.search) {
+      where.unitNo = { contains: query.search, mode: 'insensitive' };
+    }
+
+    const [rows, total, grouped] = await Promise.all([
+      this.prisma.unit.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          project: { select: { id: true, name: true, currency: true } },
+        },
+      }),
+      this.prisma.unit.count({ where }),
+      this.prisma.unit.groupBy({
+        by: ['status'],
+        where,
+        _count: { _all: true },
+      }),
+    ]);
+
+    const counts = { available: 0, booked: 0, held: 0, sold: 0 };
+    for (const g of grouped) {
+      counts[g.status] = g._count._all;
+    }
+
+    const data = rows.map((u) => ({
+      id: u.id,
+      unitNo: u.unitNo,
+      configuration: u.configuration,
+      variantLabel: u.variantLabel,
+      carpetSqft: u.carpetSqft,
+      builtupSqft: u.builtupSqft,
+      tower: u.tower,
+      floor: u.floor,
+      facing: u.facing,
+      parking: u.parking,
+      price: u.price,
+      status: u.status,
+      createdAt: u.createdAt,
+      updatedAt: u.updatedAt,
+      project: u.project
+        ? { id: u.project.id, name: u.project.name, currency: u.project.currency }
+        : null,
+    }));
+
+    return { data, total, page, limit, counts };
+  }
+
+  // -------------------------------------------------------------------------
   // Ownership helpers — every path re-derives scope from orgId (the JWT),
   // never from a client-supplied id. A foreign org's row 404s exactly the
   // same as a non-existent id, so existence never leaks across tenants.
@@ -690,7 +988,7 @@ export class ProjectsService {
   }
 
   // A project's manager must be a user in the same org — verified here,
-  // never trusted from the body. Mirrors createUnit's unitTypeId check.
+  // never trusted from the body.
   private async assertOrgUser(orgId: string, userId: string) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, orgId },
@@ -715,54 +1013,116 @@ export class ProjectsService {
   private async getOwnedUnit(orgId: string, projectId: string, id: string) {
     await this.getOwnedProject(orgId, projectId);
     const unit = await this.prisma.unit.findFirst({
-      where: { id, unitType: { projectId } },
-      include: { unitType: { select: { id: true, name: true } } },
+      where: { id, projectId },
     });
     if (!unit) throw new NotFoundException('Unit not found');
     return unit;
+  }
+
+  // `configuration` must be one of the caller org's `unit_type` catalog
+  // labels. Same catalog the wizard and the [id]/units page read.
+  private async assertConfigurationInCatalog(
+    orgId: string,
+    configuration: string,
+  ) {
+    const label = configuration.trim();
+    const match = await this.prisma.orgCatalogOption.findFirst({
+      where: { orgId, category: 'unit_type', label },
+      select: { id: true },
+    });
+    if (!match) {
+      throw new BadRequestException(
+        `"${label}" is not one of your unit configurations. Add it in Settings → Project Catalogs first.`,
+      );
+    }
+  }
+
+  // A new tower name may only be introduced while the project's distinct
+  // tower count is below Project.towerCount. Reusing a name already in use,
+  // or clearing the tower, is always fine. A null towerCount means the
+  // project never declared a tower count — no limit is enforced.
+  private async assertTowerWithinLimit(
+    projectId: string,
+    towerCount: number | null,
+    nextTower: string | null,
+    excludeUnitId?: string,
+  ) {
+    if (!nextTower || towerCount == null) return;
+
+    const rows = await this.prisma.unit.findMany({
+      where: {
+        projectId,
+        tower: { not: null },
+        ...(excludeUnitId ? { id: { not: excludeUnitId } } : {}),
+      },
+      select: { tower: true },
+      distinct: ['tower'],
+    });
+    const existing = rows
+      .map((r) => r.tower)
+      .filter((t): t is string => t != null);
+
+    if (existing.includes(nextTower)) return;
+    if (existing.length + 1 > towerCount) {
+      throw new BadRequestException(
+        `This project allows ${towerCount} tower(s) and already uses ${existing.length}` +
+          (existing.length ? ` (${existing.join(', ')})` : '') +
+          `. Reuse an existing tower name, or raise the tower count on the project before adding "${nextTower}".`,
+      );
+    }
   }
 
   // -------------------------------------------------------------------------
   // Serialisation / derived fields
   // -------------------------------------------------------------------------
 
-  // availableUnits/bookedUnits/heldUnits are NOT stored — they're counted
-  // live from the Unit rows so a stored figure can never drift from reality.
+  // A UnitType no longer owns Units. Its live counts come from Unit rows on
+  // the same project whose `configuration` equals this type's `name` (both
+  // are `unit_type` catalog labels). Never stored — always counted live.
   private async decorateUnitTypes(
     unitTypes: Prisma.UnitTypeGetPayload<Record<string, never>>[],
   ): Promise<UnitTypeWithCounts[]> {
     if (unitTypes.length === 0) return [];
-    const ids = unitTypes.map((ut) => ut.id);
+    const projectIds = [...new Set(unitTypes.map((ut) => ut.projectId))];
     const grouped = await this.prisma.unit.groupBy({
-      by: ['unitTypeId', 'status'],
-      where: { unitTypeId: { in: ids } },
+      by: ['configuration', 'status'],
+      where: { projectId: { in: projectIds }, configuration: { not: null } },
       _count: { _all: true },
     });
 
-    const counts = new Map<
-      string,
-      { unitCount: number; available: number; booked: number; held: number }
-    >();
-    for (const id of ids) {
-      counts.set(id, { unitCount: 0, available: 0, booked: 0, held: 0 });
-    }
+    type Row = {
+      unitCount: number;
+      available: number;
+      booked: number;
+      held: number;
+      sold: number;
+    };
+    const byLabel = new Map<string, Row>();
     for (const g of grouped) {
-      const entry = counts.get(g.unitTypeId)!;
+      const label = g.configuration!;
+      const entry =
+        byLabel.get(label) ??
+        { unitCount: 0, available: 0, booked: 0, held: 0, sold: 0 };
       const n = g._count._all;
       entry.unitCount += n;
       if (g.status === 'available') entry.available += n;
       else if (g.status === 'booked') entry.booked += n;
       else if (g.status === 'held') entry.held += n;
+      else if (g.status === 'sold') entry.sold += n;
+      byLabel.set(label, entry);
     }
 
     return unitTypes.map((ut) => {
-      const c = counts.get(ut.id)!;
+      const c =
+        byLabel.get(ut.name) ??
+        { unitCount: 0, available: 0, booked: 0, held: 0, sold: 0 };
       return {
         ...ut,
         unitCount: c.unitCount,
         availableUnits: c.available,
         bookedUnits: c.booked,
         heldUnits: c.held,
+        soldUnits: c.sold,
       };
     });
   }
@@ -798,6 +1158,7 @@ export class ProjectsService {
       landArea: project.landArea == null ? null : Number(project.landArea),
       towerCount: project.towerCount,
       floorsDescription: project.floorsDescription,
+      carpetRange: project.carpetRange,
       amenities: (project.amenities ?? []) as Array<{
         name: string;
         iconUrl: string | null;
@@ -848,25 +1209,32 @@ export class ProjectsService {
       availableUnits: ut.availableUnits,
       bookedUnits: ut.bookedUnits,
       heldUnits: ut.heldUnits,
+      soldUnits: ut.soldUnits,
       createdAt: ut.createdAt,
       updatedAt: ut.updatedAt,
     };
   }
 
-  private serializeUnit(
-    unit: Prisma.UnitGetPayload<{
-      include: { unitType: { select: { id: true; name: true } } };
-    }>,
-  ) {
+  private serializeUnit(unit: Prisma.UnitGetPayload<Record<string, never>>) {
     return {
       id: unit.id,
-      unitTypeId: unit.unitTypeId,
-      unitType: unit.unitType,
+      orgId: unit.orgId,
+      projectId: unit.projectId,
+      configuration: unit.configuration,
+      variantLabel: unit.variantLabel,
       unitNo: unit.unitNo,
+      carpetSqft: unit.carpetSqft,
+      builtupSqft: unit.builtupSqft,
       tower: unit.tower,
       floor: unit.floor,
       facing: unit.facing,
+      parking: unit.parking,
       price: unit.price,
+      addressLine: unit.addressLine,
+      ownerName: unit.ownerName,
+      notes: unit.notes,
+      floorPlanUrl: unit.floorPlanUrl,
+      galleryUrls: unit.galleryUrls,
       status: unit.status,
       createdAt: unit.createdAt,
       updatedAt: unit.updatedAt,

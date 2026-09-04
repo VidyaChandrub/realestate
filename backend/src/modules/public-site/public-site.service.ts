@@ -92,14 +92,24 @@ export class PublicSiteService {
       },
       orderBy: { updatedAt: 'desc' },
       include: {
-        unitTypes: {
-          orderBy: { createdAt: 'asc' },
-          include: {
-            units: {
-              where: { status: 'available' },
-              orderBy: { unitNo: 'asc' },
-              select: { id: true, unitNo: true, tower: true, floor: true, facing: true, price: true, status: true },
-            },
+        // Planned unit mix.
+        unitTypes: { orderBy: { createdAt: 'asc' } },
+        // A unit now belongs straight to the project, not to a unit type.
+        units: {
+          where: { status: 'available' },
+          orderBy: { unitNo: 'asc' },
+          select: {
+            id: true,
+            unitNo: true,
+            configuration: true,
+            variantLabel: true,
+            carpetSqft: true,
+            builtupSqft: true,
+            tower: true,
+            floor: true,
+            facing: true,
+            price: true,
+            status: true,
           },
         },
       },

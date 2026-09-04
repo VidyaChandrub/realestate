@@ -4,17 +4,26 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getOrgCatalogOptions } from "@/lib/api";
 import { parseAmount, parseCount, parseInteger } from "@/lib/parse";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import {
+  ConfigurationSelect,
+  FACING_OPTIONS,
+  PARKING_OPTIONS,
+  TowerCombobox,
+  UnitMediaFields,
+  pricePerSqftCarpet,
+} from "@/components/org/project-form-fields";
 import "@/app/org/org.css";
 import type {
   CreateUnitInput,
   CreateUnitTypeInput,
+  OrgCatalogOption,
   ProjectDetail,
   Unit,
   UnitStatus,
@@ -25,24 +34,27 @@ const STATUS_BADGE: Record<UnitStatus, string> = {
   available: "b-green",
   booked: "b-rose",
   held: "b-amber",
+  sold: "b-gray",
 };
 
 const STATUS_LABEL: Record<UnitStatus, string> = {
   available: "Available",
   booked: "Booked",
   held: "Held",
+  sold: "Sold",
 };
 
-// Class suffix for the availability-grid pills (see .u-cell.avl/.bkd/.hld).
+// Class suffix for the availability-grid pills (see .u-cell.avl/.bkd/.hld/.sld).
 const STATUS_CELL: Record<UnitStatus, string> = {
   available: "avl",
   booked: "bkd",
   held: "hld",
+  sold: "sld",
 };
 
-const STATUS_OPTIONS: UnitStatus[] = ["available", "booked", "held"];
+const STATUS_OPTIONS: UnitStatus[] = ["available", "booked", "held", "sold"];
 
-const FILTERS = ["All", "Available", "Booked", "Held"] as const;
+const FILTERS = ["All", "Available", "Booked", "Held", "Sold"] as const;
 
 // Bucket key for units with no tower set — grouped together as "All units".
 const NO_TOWER = "__NO_TOWER__";
@@ -80,22 +92,34 @@ const EMPTY_UT_FORM: UnitTypeForm = {
 };
 
 interface UnitForm {
-  unitTypeId: string;
+  configuration: string;
+  variantLabel: string;
   unitNo: string;
+  carpetSqft: string;
+  builtupSqft: string;
   tower: string;
   floor: string;
   facing: string;
+  parking: string;
   price: string;
   status: UnitStatus;
+  floorPlanUrl: string;
+  galleryUrls: string[];
 }
-const emptyUnitForm = (unitTypeId = ""): UnitForm => ({
-  unitTypeId,
+const emptyUnitForm = (): UnitForm => ({
+  configuration: "",
+  variantLabel: "",
   unitNo: "",
+  carpetSqft: "",
+  builtupSqft: "",
   tower: "",
   floor: "",
   facing: "",
+  parking: "",
   price: "",
   status: "available",
+  floorPlanUrl: "",
+  galleryUrls: [],
 });
 
 type PendingDelete =
@@ -119,6 +143,18 @@ export default function OrgProjectUnitsPage() {
   const [utForm, setUtForm] = useState<UnitTypeForm>(EMPTY_UT_FORM);
   const [utError, setUtError] = useState<string | null>(null);
   const [utBusy, setUtBusy] = useState(false);
+
+  // Org-managed "Unit types" catalog (Settings → Project Catalogs). Same
+  // source the wizard's Step 2 chip-selector reads — the unit-type name is
+  // picked from here, never free-typed, so labels stay consistent. `null`
+  // = not loaded yet. "Copy, don't reference": the chosen label is just
+  // written to UnitType.name; there's no FK to the catalog.
+  const [unitTypeCatalog, setUnitTypeCatalog] = useState<
+    OrgCatalogOption[] | null
+  >(null);
+  const [unitTypeCatalogError, setUnitTypeCatalogError] = useState<
+    string | null
+  >(null);
 
   const [unitMode, setUnitMode] = useState<"create" | "edit" | null>(null);
   const [unitEditingId, setUnitEditingId] = useState<string | null>(null);
@@ -156,6 +192,32 @@ export default function OrgProjectUnitsPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    getOrgCatalogOptions("unit_type")
+      .then((rows) => {
+        if (cancelled) return;
+        setUnitTypeCatalog(
+          [...rows].sort(
+            (a, b) =>
+              a.sortOrder - b.sortOrder || a.label.localeCompare(b.label),
+          ),
+        );
+        setUnitTypeCatalogError(null);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setUnitTypeCatalogError(
+            e instanceof Error ? e.message : "Couldn't load unit type options.",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
   // --- unit type handlers ---
   function openUtCreate() {
     setUtMode("create");
@@ -178,7 +240,7 @@ export default function OrgProjectUnitsPage() {
   async function submitUt() {
     if (!accessToken) return;
     if (!utForm.name.trim()) {
-      setUtError("Unit type name is required.");
+      setUtError("Pick a unit type from the list.");
       return;
     }
     setUtBusy(true);
@@ -217,30 +279,35 @@ export default function OrgProjectUnitsPage() {
 
   // --- unit handlers ---
   function openUnitCreate() {
-    const firstType = project?.unitTypes[0]?.id ?? "";
     setUnitMode("create");
     setUnitEditingId(null);
-    setUnitForm(emptyUnitForm(firstType));
+    setUnitForm(emptyUnitForm());
     setUnitError(null);
   }
   function openUnitEdit(unit: Unit) {
     setUnitMode("edit");
     setUnitEditingId(unit.id);
     setUnitForm({
-      unitTypeId: unit.unitTypeId,
+      configuration: unit.configuration ?? "",
+      variantLabel: unit.variantLabel ?? "",
       unitNo: unit.unitNo,
+      carpetSqft: unit.carpetSqft == null ? "" : String(unit.carpetSqft),
+      builtupSqft: unit.builtupSqft == null ? "" : String(unit.builtupSqft),
       tower: unit.tower ?? "",
       floor: unit.floor == null ? "" : String(unit.floor),
       facing: unit.facing ?? "",
+      parking: unit.parking ?? "",
       price: unit.price == null ? "" : String(unit.price),
       status: unit.status,
+      floorPlanUrl: unit.floorPlanUrl ?? "",
+      galleryUrls: unit.galleryUrls ?? [],
     });
     setUnitError(null);
   }
   async function submitUnit() {
     if (!accessToken) return;
-    if (!unitForm.unitTypeId) {
-      setUnitError("Pick a unit type for this unit.");
+    if (!unitForm.configuration) {
+      setUnitError("Pick a configuration for this unit.");
       return;
     }
     if (!unitForm.unitNo.trim()) {
@@ -252,13 +319,21 @@ export default function OrgProjectUnitsPage() {
     try {
       if (unitMode === "create") {
         const body: CreateUnitInput = {
-          unitTypeId: unitForm.unitTypeId,
+          configuration: unitForm.configuration,
+          variantLabel: unitForm.variantLabel.trim() || undefined,
           unitNo: unitForm.unitNo.trim(),
+          carpetSqft: parseCount(unitForm.carpetSqft),
+          builtupSqft: parseCount(unitForm.builtupSqft),
           tower: unitForm.tower.trim() || undefined,
           floor: parseInteger(unitForm.floor),
           facing: unitForm.facing.trim() || undefined,
+          parking: unitForm.parking.trim() || undefined,
           price: parseAmount(unitForm.price),
           status: unitForm.status,
+          floorPlanUrl: unitForm.floorPlanUrl || undefined,
+          galleryUrls: unitForm.galleryUrls.length
+            ? unitForm.galleryUrls
+            : undefined,
         };
         await apiFetch(`/org/projects/${id}/units`, {
           method: "POST",
@@ -266,15 +341,21 @@ export default function OrgProjectUnitsPage() {
           body: JSON.stringify(body),
         });
       } else if (unitEditingId) {
-        // PATCH: send `tower` explicitly (null clears it) since it's optional.
+        // PATCH: nullable fields sent explicitly so they can be cleared.
         const body = {
-          unitTypeId: unitForm.unitTypeId,
+          configuration: unitForm.configuration,
+          variantLabel: unitForm.variantLabel.trim() || null,
           unitNo: unitForm.unitNo.trim(),
+          carpetSqft: parseCount(unitForm.carpetSqft) ?? null,
+          builtupSqft: parseCount(unitForm.builtupSqft) ?? null,
           tower: unitForm.tower.trim() || null,
           floor: parseInteger(unitForm.floor) ?? null,
           facing: unitForm.facing.trim() || null,
+          parking: unitForm.parking.trim() || null,
           price: parseAmount(unitForm.price) ?? null,
           status: unitForm.status,
+          floorPlanUrl: unitForm.floorPlanUrl || null,
+          galleryUrls: unitForm.galleryUrls,
         };
         await apiFetch(`/org/projects/${id}/units/${unitEditingId}`, {
           method: "PATCH",
@@ -373,11 +454,52 @@ export default function OrgProjectUnitsPage() {
   }
 
   const unitTypes = project?.unitTypes ?? [];
+  const catalogEmpty =
+    unitTypeCatalog !== null && unitTypeCatalog.length === 0;
+
+  // One card per configuration = the union of the planned mix (UnitType rows,
+  // from the wizard / "Add unit type") and the configurations actually
+  // present on units (from the server's live unit.groupBy). A wizard-made
+  // project has no planned mix, so without the union its real units would
+  // show no per-config cards at all.
+  const plannedByName = new Map(unitTypes.map((ut) => [ut.name, ut]));
+  const actualByLabel = new Map(
+    (project?.configurations ?? []).map((c) => [c.label, c]),
+  );
+  const configCards = [
+    ...new Set([...plannedByName.keys(), ...actualByLabel.keys()]),
+  ].sort((a, b) => a.localeCompare(b));
+
   const filter = FILTERS[filterIndex];
   const visibleUnits =
     filter === "All"
       ? units
       : units.filter((u) => u.status === filter.toLowerCase());
+
+  // Distinct tower names in use by units OTHER than the one being edited —
+  // feeds the tower combobox + its towerCount limit (server is authoritative).
+  const otherTowers = (() => {
+    const set = new Set<string>();
+    for (const u of units) {
+      if (u.id === unitEditingId) continue;
+      if (u.tower && u.tower.trim()) set.add(u.tower.trim());
+    }
+    return [...set].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true }),
+    );
+  })();
+
+  // Live ₹/sqft for the modal (carpet basis) — never stored, blank when
+  // either input is missing.
+  const modalPricePerSqft = pricePerSqftCarpet(
+    parseAmount(unitForm.price),
+    parseCount(unitForm.carpetSqft),
+  );
+
+  // Can a unit be created at all? Only when the org has ≥1 unit_type catalog
+  // option (or the form already carries a legacy configuration value).
+  const canPickConfiguration =
+    (unitTypeCatalog?.length ?? 0) > 0 || unitForm.configuration !== "";
 
   // Availability grid: units grouped by the explicit `tower` field. Units
   // with no tower fall into one "All units" bucket. Floor range per tower
@@ -452,7 +574,12 @@ export default function OrgProjectUnitsPage() {
               className="btn btn-primary"
               type="button"
               onClick={openUnitCreate}
-              disabled={unitTypes.length === 0}
+              disabled={catalogEmpty}
+              title={
+                catalogEmpty
+                  ? "Add unit configurations in Settings → Project Catalogs first"
+                  : undefined
+              }
             >
               ＋ Add unit
             </button>
@@ -470,95 +597,115 @@ export default function OrgProjectUnitsPage() {
 
       <Reveal delay={1}>
         <div className="grid g2">
-          {unitTypes.length === 0 ? (
+          {configCards.length === 0 ? (
             <div className="card">
               <div className="card-b">
                 <p className="muted">
-                  No unit types yet — add one to start building inventory.
+                  No configurations yet — add a unit, or a planned unit mix
+                  with “＋ Add unit type”.
                 </p>
               </div>
             </div>
           ) : (
-            unitTypes.map((u) => (
-              <div className="card" key={u.id}>
-                <div className="pad-18">
-                  <div className="row between">
-                    <b className="fs-16">{u.name}</b>
-                    <span
-                      className={`badge ${u.availableUnits > 0 ? "b-green" : "b-amber"}`}
-                    >
-                      {u.availableUnits} available
-                    </span>
-                  </div>
-                  <div className="uspec">
-                    <div>
-                      <div className="k">Carpet</div>
-                      <div className="v">
-                        {u.carpetSqft != null ? `${u.carpetSqft} sqft` : "—"}
+            configCards.map((label) => {
+              const ut = plannedByName.get(label);
+              const act = actualByLabel.get(label);
+              const available = act?.available ?? 0;
+              const total = act?.total ?? 0;
+              return (
+                <div className="card" key={label}>
+                  <div className="pad-18">
+                    <div className="row between">
+                      <b className="fs-16">{label}</b>
+                      <span
+                        className={`badge ${available > 0 ? "b-green" : "b-amber"}`}
+                      >
+                        {available} available
+                      </span>
+                    </div>
+                    <div className="uspec">
+                      <div>
+                        <div className="k">Carpet</div>
+                        <div className="v">
+                          {ut?.carpetSqft != null
+                            ? `${ut.carpetSqft} sqft`
+                            : "—"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="k">Built-up</div>
+                        <div className="v">
+                          {ut?.builtupSqft != null
+                            ? `${ut.builtupSqft} sqft`
+                            : "—"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="k">Price</div>
+                        <div className="v">
+                          {compactRupees(ut?.price ?? null)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="k">₹/sqft</div>
+                        <div className="v">
+                          {pricePerSqft(ut?.price ?? null, ut?.carpetSqft ?? null) ??
+                            "—"}
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <div className="k">Built-up</div>
-                      <div className="v">
-                        {u.builtupSqft != null ? `${u.builtupSqft} sqft` : "—"}
-                      </div>
+                    <div className="badge-row">
+                      <span className="badge">Total {total}</span>
+                      <span className="badge b-green">{available} Available</span>
+                      <span className="badge b-rose">
+                        {act?.booked ?? 0} Booked
+                      </span>
+                      <span className="badge b-amber">{act?.held ?? 0} Held</span>
+                      <span className="badge b-gray">{act?.sold ?? 0} Sold</span>
+                      {ut && ut.totalUnits > 0 ? (
+                        <span className="badge b-gray">
+                          Planned: {ut.totalUnits}
+                        </span>
+                      ) : null}
                     </div>
-                    <div>
-                      <div className="k">Price</div>
-                      <div className="v">{compactRupees(u.price)}</div>
+                    <div className="row gap-8 mt-10">
+                      {ut ? (
+                        <>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            type="button"
+                            onClick={() => openUtEdit(ut)}
+                          >
+                            ✏️ Edit planned mix
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm text-rose"
+                            type="button"
+                            onClick={() =>
+                              setPendingDelete({
+                                kind: "unitType",
+                                id: ut.id,
+                                label: ut.name,
+                                extra:
+                                  total > 0
+                                    ? `The ${total} unit(s) with this configuration are kept.`
+                                    : "",
+                              })
+                            }
+                          >
+                            🗑 Remove from planned mix
+                          </button>
+                        </>
+                      ) : (
+                        <span className="muted fs-12">
+                          Derived from units — not in the planned mix.
+                        </span>
+                      )}
                     </div>
-                    <div>
-                      <div className="k">₹/sqft</div>
-                      <div className="v">
-                        {pricePerSqft(u.price, u.carpetSqft) ?? "—"}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="badge-row">
-                    <span className="badge">
-                      Total {u.availableUnits + u.bookedUnits + u.heldUnits}
-                    </span>
-                    <span className="badge b-green">{u.availableUnits} Available</span>
-                    <span className="badge b-rose">{u.bookedUnits} Booked</span>
-                    <span className="badge b-amber">{u.heldUnits} Held</span>
-                    {u.totalUnits > 0 ? (
-                      <span className="badge b-gray">Planned: {u.totalUnits}</span>
-                    ) : null}
-                  </div>
-                  <div className="row gap-8 mt-10">
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      type="button"
-                      onClick={() => openUtEdit(u)}
-                    >
-                      ✏️ Edit
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      type="button"
-                      disabled
-                      title="Floor plan upload is coming soon"
-                    >
-                      📐 View floor plan
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm text-rose"
-                      type="button"
-                      onClick={() =>
-                        setPendingDelete({
-                          kind: "unitType",
-                          id: u.id,
-                          label: u.name,
-                          extra: `Its ${u.unitCount} unit(s) will be deleted too.`,
-                        })
-                      }
-                    >
-                      🗑 Delete
-                    </button>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </Reveal>
@@ -600,6 +747,9 @@ export default function OrgProjectUnitsPage() {
                     <span>
                       <i className="dot-hl" /> Held
                     </span>
+                    <span>
+                      <i className="dot-sl" /> Sold
+                    </span>
                   </div>
                 </div>
               </div>
@@ -632,9 +782,11 @@ export default function OrgProjectUnitsPage() {
                 <tr>
                   <th>Unit No</th>
                   <th>Tower</th>
-                  <th>Type</th>
+                  <th>Config</th>
+                  <th>Carpet</th>
                   <th>Floor</th>
                   <th>Facing</th>
+                  <th>Parking</th>
                   <th>Price ₹</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -643,7 +795,7 @@ export default function OrgProjectUnitsPage() {
               <tbody>
                 {visibleUnits.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="muted">
+                    <td colSpan={10} className="muted">
                       {units.length === 0
                         ? "No units yet — add one with “＋ Add unit”."
                         : "No units match this filter."}
@@ -654,9 +806,15 @@ export default function OrgProjectUnitsPage() {
                     <tr key={row.id}>
                       <td className="mono">{row.unitNo}</td>
                       <td>{row.tower ?? "—"}</td>
-                      <td>{row.unitType.name}</td>
+                      <td>{row.configuration ?? "—"}</td>
+                      <td>
+                        {row.carpetSqft != null
+                          ? `${row.carpetSqft.toLocaleString("en-IN")}`
+                          : "—"}
+                      </td>
                       <td>{row.floor ?? "—"}</td>
                       <td>{row.facing ?? "—"}</td>
+                      <td>{row.parking ?? "—"}</td>
                       <td>
                         {row.price != null
                           ? row.price.toLocaleString("en-IN")
@@ -741,15 +899,45 @@ export default function OrgProjectUnitsPage() {
           ) : null}
           <div className="row2">
             <div className="field">
-              <label>Name *</label>
-              <input
-                className="inp"
-                placeholder="3 BHK — Type B"
-                value={utForm.name}
-                onChange={(e) =>
-                  setUtForm((f) => ({ ...f, name: e.target.value }))
-                }
-              />
+              <label>Unit type *</label>
+              {unitTypeCatalogError ? (
+                <div className="hint text-rose">{unitTypeCatalogError}</div>
+              ) : unitTypeCatalog === null ? (
+                <div className="hint">Loading unit types…</div>
+              ) : unitTypeCatalog.length === 0 ? (
+                <div className="hint">
+                  No unit types configured yet.{" "}
+                  <Link
+                    className="brand-link"
+                    href="/org/settings?section=catalogs"
+                  >
+                    Add them in Settings →
+                  </Link>
+                </div>
+              ) : (
+                <select
+                  className="inp"
+                  value={utForm.name}
+                  onChange={(e) =>
+                    setUtForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                >
+                  <option value="">Select a unit type…</option>
+                  {unitTypeCatalog.map((o) => (
+                    <option key={o.id} value={o.label}>
+                      {o.label}
+                    </option>
+                  ))}
+                  {/* Existing row whose name predates the current catalog:
+                      keep it selectable so edit doesn't silently rename it. */}
+                  {utForm.name &&
+                  !unitTypeCatalog.some((o) => o.label === utForm.name) ? (
+                    <option value={utForm.name}>
+                      {utForm.name} (not in catalog)
+                    </option>
+                  ) : null}
+                </select>
+              )}
             </div>
             <div className="field">
               <label>Planned units</label>
@@ -812,7 +1000,11 @@ export default function OrgProjectUnitsPage() {
             <button
               className="btn btn-primary"
               type="button"
-              disabled={utBusy}
+              disabled={
+                utBusy ||
+                (utMode === "create" &&
+                  (unitTypeCatalog?.length ?? 0) === 0)
+              }
               onClick={() => void submitUt()}
             >
               {utBusy
@@ -850,34 +1042,26 @@ export default function OrgProjectUnitsPage() {
             ) : null}
 
             <div className="sec">
-              <div className="lbl">🏗️ Project placement</div>
+              <div className="lbl">🏗️ Placement</div>
               <div className="grid g3">
                 <div className="field">
-                  <label>Unit type <span className="req">*</span></label>
-                  <select
-                    className="inp"
-                    value={unitForm.unitTypeId}
-                    onChange={(e) =>
-                      setUnitForm((f) => ({ ...f, unitTypeId: e.target.value }))
+                  <label>Configuration <span className="req">*</span></label>
+                  <ConfigurationSelect
+                    catalog={unitTypeCatalog}
+                    error={unitTypeCatalogError}
+                    value={unitForm.configuration}
+                    onChange={(v) =>
+                      setUnitForm((f) => ({ ...f, configuration: v }))
                     }
-                  >
-                    <option value="">Select…</option>
-                    {unitTypes.map((ut) => (
-                      <option key={ut.id} value={ut.id}>
-                        {ut.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
                 <div className="field">
                   <label>Tower / block</label>
-                  <input
-                    className="inp"
-                    placeholder="e.g. Tower B"
+                  <TowerCombobox
                     value={unitForm.tower}
-                    onChange={(e) =>
-                      setUnitForm((f) => ({ ...f, tower: e.target.value }))
-                    }
+                    onChange={(v) => setUnitForm((f) => ({ ...f, tower: v }))}
+                    otherTowers={otherTowers}
+                    towerCount={project?.towerCount ?? null}
                   />
                 </div>
                 <div className="field">
@@ -910,6 +1094,20 @@ export default function OrgProjectUnitsPage() {
                   />
                 </div>
                 <div className="field">
+                  <label>Unit type</label>
+                  <input
+                    className="inp"
+                    placeholder="e.g. Type A (optional)"
+                    value={unitForm.variantLabel}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({
+                        ...f,
+                        variantLabel: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="field">
                   <label>Facing</label>
                   <select
                     className="inp"
@@ -919,19 +1117,64 @@ export default function OrgProjectUnitsPage() {
                     }
                   >
                     <option value="">Select…</option>
-                    <option value="East">East</option>
-                    <option value="West">West</option>
-                    <option value="North">North</option>
-                    <option value="South">South</option>
-                    <option value="North-East">North-East</option>
-                    <option value="North-West">North-West</option>
-                    <option value="South-East">South-East</option>
-                    <option value="South-West">South-West</option>
-                    <option value="Sea">Sea</option>
-                    <option value="Garden">Garden</option>
+                    {FACING_OPTIONS.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
                   </select>
                 </div>
+              </div>
+              <div className="grid g3">
                 <div className="field">
+                  <label>Carpet area (sqft)</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    placeholder="1450"
+                    value={unitForm.carpetSqft}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, carpetSqft: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label>Built-up area (sqft)</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    placeholder="1720"
+                    value={unitForm.builtupSqft}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({
+                        ...f,
+                        builtupSqft: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label>Parking</label>
+                  <select
+                    className="inp"
+                    value={unitForm.parking}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, parking: e.target.value }))
+                    }
+                  >
+                    <option value="">Not set</option>
+                    {PARKING_OPTIONS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid g3">
+                <div className="field mb-0">
                   <label>Status</label>
                   <select
                     className="inp"
@@ -946,12 +1189,13 @@ export default function OrgProjectUnitsPage() {
                     <option value="available">Available</option>
                     <option value="booked">Booked</option>
                     <option value="held">Held / Blocked</option>
+                    <option value="sold">Sold</option>
                   </select>
                 </div>
               </div>
             </div>
 
-            <div className="sec nb">
+            <div className="sec">
               <div className="lbl">💰 Pricing</div>
               <div className="grid g2">
                 <div className="field">
@@ -971,16 +1215,27 @@ export default function OrgProjectUnitsPage() {
                   <label>Price / sqft</label>
                   <input
                     className="inp"
-                    placeholder="Auto-calculated"
+                    placeholder="—"
                     disabled
-                    value={
-                      unitForm.price && unitTypes.find((ut) => ut.id === unitForm.unitTypeId)?.carpetSqft
-                        ? `₹${Math.round(Number(unitForm.price) / unitTypes.find((ut) => ut.id === unitForm.unitTypeId)!.carpetSqft!).toLocaleString("en-IN")}`
-                        : ""
-                    }
+                    value={modalPricePerSqft}
                   />
                 </div>
               </div>
+            </div>
+
+            <div className="sec nb">
+              <div className="lbl">🖼️ Media &amp; documents</div>
+              <UnitMediaFields
+                floorPlanUrl={unitForm.floorPlanUrl}
+                galleryUrls={unitForm.galleryUrls}
+                onFloorPlanChange={(v) =>
+                  setUnitForm((f) => ({ ...f, floorPlanUrl: v }))
+                }
+                onGalleryChange={(urls) =>
+                  setUnitForm((f) => ({ ...f, galleryUrls: urls }))
+                }
+                ctx={{ projectId: id }}
+              />
             </div>
           </div>
 
@@ -991,20 +1246,29 @@ export default function OrgProjectUnitsPage() {
                 <div className="ph-box">📐</div>
                 <div className="row between">
                   <b>{unitForm.unitNo || "New unit"}</b>
-                  <span className={`badge ${unitForm.status === "available" ? "b-green" : unitForm.status === "booked" ? "b-rose" : "b-amber"}`}>
-                    {unitForm.status === "available" ? "Available" : unitForm.status === "booked" ? "Booked" : "Held"}
+                  <span className={`badge ${STATUS_BADGE[unitForm.status]}`}>
+                    {STATUS_LABEL[unitForm.status]}
                   </span>
                 </div>
                 <div className="muted fs-12-5 mt-4">
-                  {unitTypes.find((ut) => ut.id === unitForm.unitTypeId)?.name || "Select unit type"}
+                  {unitForm.configuration || "Select a configuration"}
+                  {unitForm.variantLabel ? ` · ${unitForm.variantLabel}` : ""}
                   {unitForm.tower ? ` · ${unitForm.tower}` : ""}
                   {unitForm.floor ? ` · Floor ${unitForm.floor}` : ""}
                   <br />
-                  {unitForm.facing || "Facing not set"}
+                  {[
+                    unitForm.facing || null,
+                    unitForm.carpetSqft
+                      ? `${Number(unitForm.carpetSqft).toLocaleString("en-IN")} sqft carpet`
+                      : null,
+                    modalPricePerSqft || null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "Fill the form to preview."}
                 </div>
               </div>
             </div>
-            <div className="help">💡 Add the unit number, type and price to get started. Tower and floor help organize the availability grid.</div>
+            <div className="help">💡 Configuration comes from your Project Catalogs. Tower / floor drive the availability grid.</div>
           </div>
         </div>
 
@@ -1012,7 +1276,7 @@ export default function OrgProjectUnitsPage() {
           <button
             className="btn btn-primary"
             type="button"
-            disabled={unitBusy}
+            disabled={unitBusy || !canPickConfiguration}
             onClick={() => void submitUnit()}
           >
             {unitBusy

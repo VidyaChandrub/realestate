@@ -159,6 +159,7 @@ model Organisation {
   trackingEvents        TrackingEvent[]
   projects              Project[]
   catalogOptions        OrgCatalogOption[]
+  units                 Unit[]
 
   @@map("organisations")
   @@schema("identity")
@@ -949,6 +950,7 @@ enum UnitStatus {
   available
   booked
   held
+  sold
 
   @@schema("projects")
 }
@@ -984,6 +986,10 @@ model Project {
   landArea          Decimal?      @map("land_area") @db.Decimal(8, 2) // acres
   towerCount        Int?          @map("tower_count")
   floorsDescription String?       @map("floors_description") // e.g. "G+22"
+  // Free-text carpet-area range for the project as a whole, e.g. "640 – 1,850
+  // sqft". Per-unit-type carpet area lives on UnitType.carpetSqft; this is the
+  // headline summary shown before unit types are entered.
+  carpetRange       String?       @map("carpet_range")
   // Array of { name: string, iconUrl: string | null }. iconUrl is always
   // null for now — amenity-icon upload is out of scope (blocked on S3).
   amenities         Json          @default("[]")
@@ -1021,6 +1027,7 @@ model Project {
   organisation Organisation        @relation(fields: [orgId], references: [id], onDelete: Cascade)
   manager      User?               @relation(fields: [managerId], references: [id], onDelete: SetNull)
   unitTypes    UnitType[]
+  units        Unit[]
   salesAgents  ProjectSalesAgent[]
   leads        Lead[]
 
@@ -1047,6 +1054,13 @@ model ProjectSalesAgent {
   @@schema("projects")
 }
 
+// A project's *planned* unit mix, entered in the wizard (Step 2). Since a
+// Unit now carries its own configuration/carpet/built-up/price, a UnitType
+// no longer owns any Unit — it only records "we plan N of this
+// configuration". `name` is a `unit_type` catalog label (same source the
+// Unit's `configuration` comes from); the actual per-config counts are
+// derived from Unit rows matched by that label. Kept so the project detail
+// page can show planned-vs-actual.
 model UnitType {
   id          String @id @default(uuid())
   projectId   String @map("project_id")
@@ -1054,8 +1068,8 @@ model UnitType {
   carpetSqft  Int?   @map("carpet_sqft")
   builtupSqft Int?   @map("builtup_sqft")
   price       Int? // rupees — the type's base price
-  // Planned/marketed unit count for this type, entered on the form. The
-  // *available* count is NOT stored here — it's derived at read time from
+  // Planned/marketed unit count for this configuration, entered on the form.
+  // The *available* count is NOT stored here — it's derived at read time from
   // the actual Unit rows' status so the two can never drift apart.
   totalUnits  Int    @default(0) @map("total_units")
 
@@ -1071,7 +1085,6 @@ model UnitType {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  units   Unit[]
 
   @@index([projectId])
   @@map("unit_types")
@@ -1079,22 +1092,57 @@ model UnitType {
 }
 
 model Unit {
-  id         String     @id @default(uuid())
-  unitTypeId String     @map("unit_type_id")
-  unitNo     String     @map("unit_no") // e.g. "A-301"
+  id     String @id @default(uuid())
+  // Always set (from the JWT) so every unit — project-bound or standalone —
+  // is org-scoped directly, without a join through the project.
+  orgId  String @map("org_id")
+  // Null for a standalone unit (resale / broker listing with no project).
+  projectId String? @map("project_id")
+  unitNo String  @map("unit_no") // e.g. "A-301"
+
+  // The unit's configuration — a `unit_type` catalog label ("2 BHK",
+  // "Villa"). Validated server-side against the org's catalog on write.
+  // Nullable at the DB level for forward-compat / imports; required by the
+  // API and the create form.
+  configuration String?
+  // Optional free-text variant label ("Type A", "Corner"). NOT a catalog,
+  // NOT the unit_types table — just a string.
+  variantLabel  String? @map("variant_label")
+
+  // The unit carries its own areas now (was on UnitType).
+  carpetSqft  Int? @map("carpet_sqft")
+  builtupSqft Int? @map("builtup_sqft")
+
   // Optional — villas / plots / single-building projects have no tower.
-  // Drives the availability-grid grouping (no unitNo parsing).
-  tower      String?
-  floor      Int?
-  facing     String? // e.g. "North-East"
-  price      Int? // rupees — a unit may be priced apart from its type
-  status     UnitStatus @default(available)
-  createdAt  DateTime   @default(now()) @map("created_at")
-  updatedAt  DateTime   @updatedAt @map("updated_at")
+  // Drives the availability-grid grouping (no unitNo parsing). New tower
+  // names are bounded server-side by Project.towerCount.
+  tower   String?
+  floor   Int?
+  facing  String? // e.g. "North-East"
+  // Free text as entered on the form ("1 covered", "2 covered", "Open").
+  parking String?
+  price   Int? // rupees
 
-  unitType UnitType @relation(fields: [unitTypeId], references: [id], onDelete: Cascade)
+  // Standalone-listing-only fields (null for project units).
+  addressLine String? @map("address_line")
+  ownerName   String? @map("owner_name")
+  notes       String?
 
-  @@index([unitTypeId])
+  // Media — public R2 URLs from POST /org/projects/upload-url (fields
+  // `floorPlan` / `gallery`). Floor plans have no home until the unit
+  // exists (project creation defers them here).
+  floorPlanUrl String?  @map("floor_plan_url")
+  galleryUrls  String[] @default([]) @map("gallery_urls")
+
+  status    UnitStatus @default(available)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([projectId])
   @@map("units")
   @@schema("projects")
 }

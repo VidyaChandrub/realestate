@@ -4,6 +4,7 @@ import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { ProjectsController } from './projects.controller';
+import { OrgUnitsController } from './org-units.controller';
 import { ProjectsService } from './projects.service';
 
 @Module({
