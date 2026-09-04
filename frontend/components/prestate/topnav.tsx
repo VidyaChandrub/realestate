@@ -170,8 +170,16 @@ export function TopNav({
           </button>
         ) : null}
         {homeHref ? (
-          <Link href={homeHref} title="Back to dashboard" className="ps-topnav-icon-btn" style={iconBtn(true)}>
+          <Link
+            href={homeHref}
+            title={homeHref.includes("/add-new-project") ? "Back to Project Setup Wizard" : homeHref.includes("/projects") ? "Back to Project" : "Back to dashboard"}
+            className="ps-topnav-icon-btn"
+            style={{ ...iconBtn(true), display: "inline-flex", alignItems: "center", gap: 6, width: "auto", padding: "0 10px" }}
+          >
             <ArrowLeft size={16} />
+            <span style={{ fontSize: 12, fontWeight: 600 }}>
+              {homeHref.includes("/add-new-project") ? "Back to Project Setup" : homeHref.includes("/projects") ? "Back to Project" : "Exit"}
+            </span>
           </Link>
         ) : null}
         <div className="ps-topnav-brand" style={{ display: "flex", alignItems: "center", gap: 10 }}>

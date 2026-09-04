@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getProjectSalesAgents } from "@/lib/api";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import { buildCustomizedProjectSections } from "@/lib/project-templates";
+import { defaultSiteConfig } from "@/lib/prestate/site-config";
 import "@/app/org/org.css";
 import type { ProjectDetail, ProjectSalesAgent } from "@/lib/types";
 
@@ -20,6 +22,7 @@ function managerInitials(name: string | null | undefined): string {
 }
 
 export default function OrgProjectOverviewPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
   const { accessToken } = useAuth();
@@ -28,6 +31,8 @@ export default function OrgProjectOverviewPage() {
   const [salesAgents, setSalesAgents] = useState<ProjectSalesAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [publishingPage, setPublishingPage] = useState(false);
+  const [pagePublishSuccess, setPagePublishSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accessToken || !id) return;
@@ -90,6 +95,9 @@ export default function OrgProjectOverviewPage() {
     targetCpl?: number | null;
     leadGoal?: number | null;
     landingPageChoice?: string;
+    landingPageId?: string;
+    landingPageSlug?: string;
+    landingPageStatus?: string;
     aiCallingEnabled?: boolean;
     whatsappWelcomeEnabled?: boolean;
     roundRobinEnabled?: boolean;
@@ -489,6 +497,245 @@ export default function OrgProjectOverviewPage() {
 
         {/* Right Column / Side Widgets */}
         <div className="col gap-18">
+          {/* Website & Live Landing Page Hub Widget */}
+          <Reveal delay={1}>
+            <div className="card" style={{ border: "1.5px solid var(--brand, #4f46e5)" }}>
+              <div className="card-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="t" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>🌐</span> Website &amp; Landing Page
+                </span>
+                {project.publishedToWebsite || pagePublishSuccess ? (
+                  <span className="badge b-green">● Published</span>
+                ) : (
+                  <span className="badge b-gray">Not Published</span>
+                )}
+              </div>
+              <div className="card-b col gap-12">
+                {project.publishedToWebsite || mkt.landingPageSlug || pagePublishSuccess ? (
+                  <>
+                    <div style={{ background: "var(--surface-2, #f8fafc)", padding: 12, borderRadius: 8, border: "1px solid var(--line)" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--muted)", letterSpacing: ".05em" }}>
+                        Live Destination URL
+                      </div>
+                      <a
+                        href={`/p/${pagePublishSuccess || mkt.landingPageSlug || project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: "inline-block",
+                          marginTop: 4,
+                          fontSize: 13.5,
+                          fontWeight: 600,
+                          color: "var(--brand, #4f46e5)",
+                          wordBreak: "break-all",
+                        }}
+                      >
+                        /p/{pagePublishSuccess || mkt.landingPageSlug || project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")} ↗
+                      </a>
+                    </div>
+
+                    <div className="row gap-8 wrap">
+                      <a
+                        href={`/p/${pagePublishSuccess || mkt.landingPageSlug || project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-primary btn-sm"
+                        style={{ flex: 1, textDecoration: "none", textAlign: "center" }}
+                      >
+                        Open Live Site ↗
+                      </a>
+                      {mkt.landingPageId ? (
+                        <Link
+                          href={`/org-builder?id=${mkt.landingPageId}&returnUrl=${encodeURIComponent(`/org/projects/${id}`)}`}
+                          className="btn btn-secondary btn-sm"
+                          style={{ flex: 1, textDecoration: "none", textAlign: "center" }}
+                        >
+                          ✏️ Edit in Builder
+                        </Link>
+                      ) : (
+                        <Link
+                          href="/org/landing-pages"
+                          className="btn btn-secondary btn-sm"
+                          style={{ flex: 1, textDecoration: "none", textAlign: "center" }}
+                        >
+                          📑 Pages
+                        </Link>
+                      )}
+                    </div>
+                    <div className="muted fs-11" style={{ lineHeight: 1.4 }}>
+                      💡 You can add, edit, or customize sections in the visual builder anytime without affecting original templates.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="muted fs-13" style={{ margin: 0 }}>
+                      This project does not have a landing page yet. You can customize the template visually in the builder or launch it live with 1 click.
+                    </p>
+                    <div className="col gap-8">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-block"
+                        disabled={publishingPage}
+                        onClick={async () => {
+                          if (!accessToken || !project) return;
+                          setPublishingPage(true);
+                          try {
+                            const pageName = `${project.name} — Official Landing Page`;
+                            const lp = await apiFetch<any>("/org/landing-pages", {
+                              method: "POST",
+                              headers: { Authorization: `Bearer ${accessToken}` },
+                              body: JSON.stringify({
+                                name: pageName,
+                                content: {
+                                  sections: buildCustomizedProjectSections("tpl-estatepro-luxury", {
+                                    name: project.name,
+                                    priceMin: project.priceMin ? String(project.priceMin) : undefined,
+                                    priceMax: project.priceMax ? String(project.priceMax) : undefined,
+                                    currency: project.currency,
+                                    address: project.addressLine || undefined,
+                                    city: project.city || undefined,
+                                    locality: project.locality || undefined,
+                                    amenities: project.amenities?.map((a: any) => a.name),
+                                    coverImageUrl: project.coverImageUrl,
+                                    galleryUrls: project.galleryUrls,
+                                    unitTypes: project.unitTypes.map((u) => ({
+                                      name: u.name,
+                                      carpetSqft: String(u.carpetSqft || ""),
+                                      builtupSqft: String(u.builtupSqft || ""),
+                                      price: String(u.price || ""),
+                                    })),
+                                  }),
+                                  config: defaultSiteConfig({
+                                    name: pageName,
+                                    slug: project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project",
+                                    primary: "#4f46e5",
+                                    accent: "#cda45e",
+                                  }),
+                                },
+                              }),
+                            });
+
+                            if (lp?.id) {
+                              await apiFetch(`/org/projects/${project.id}`, {
+                                method: "PATCH",
+                                headers: { Authorization: `Bearer ${accessToken}` },
+                                body: JSON.stringify({
+                                  marketing: {
+                                    ...mkt,
+                                    landingPageId: lp.id,
+                                    landingPageSlug: lp.slug,
+                                    landingPageChoice: pageName,
+                                  },
+                                }),
+                              });
+
+                              router.push(`/org-builder?id=${encodeURIComponent(lp.id)}&returnUrl=${encodeURIComponent(`/org/projects/${id}`)}`);
+                            }
+                          } catch (e) {
+                            alert(e instanceof Error ? e.message : "Failed to create landing page.");
+                          } finally {
+                            setPublishingPage(false);
+                          }
+                        }}
+                      >
+                        {publishingPage ? "Preparing Builder…" : "✏️ Customize in Visual Builder"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-block"
+                        disabled={publishingPage}
+                        onClick={async () => {
+                          if (!accessToken || !project) return;
+                          setPublishingPage(true);
+                          try {
+                            const pageName = `${project.name} — Official Landing Page`;
+                            const lp = await apiFetch<any>("/org/landing-pages", {
+                              method: "POST",
+                              headers: { Authorization: `Bearer ${accessToken}` },
+                              body: JSON.stringify({
+                                name: pageName,
+                                content: {
+                                  sections: buildCustomizedProjectSections("tpl-estatepro-luxury", {
+                                    name: project.name,
+                                    priceMin: project.priceMin ? String(project.priceMin) : undefined,
+                                    priceMax: project.priceMax ? String(project.priceMax) : undefined,
+                                    currency: project.currency,
+                                    address: project.addressLine || undefined,
+                                    city: project.city || undefined,
+                                    locality: project.locality || undefined,
+                                    amenities: project.amenities?.map((a: any) => a.name),
+                                    coverImageUrl: project.coverImageUrl,
+                                    galleryUrls: project.galleryUrls,
+                                    unitTypes: project.unitTypes.map((u) => ({
+                                      name: u.name,
+                                      carpetSqft: String(u.carpetSqft || ""),
+                                      builtupSqft: String(u.builtupSqft || ""),
+                                      price: String(u.price || ""),
+                                    })),
+                                  }),
+                                  config: defaultSiteConfig({
+                                    name: pageName,
+                                    slug: project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project",
+                                    primary: "#4f46e5",
+                                    accent: "#cda45e",
+                                  }),
+                                },
+                              }),
+                            });
+
+                            if (lp?.id) {
+                              await apiFetch(`/org/landing-pages/${lp.id}/publish`, {
+                                method: "POST",
+                                headers: { Authorization: `Bearer ${accessToken}` },
+                              });
+
+                              await apiFetch(`/org/projects/${project.id}`, {
+                                method: "PATCH",
+                                headers: { Authorization: `Bearer ${accessToken}` },
+                                body: JSON.stringify({
+                                  publishedToWebsite: true,
+                                  marketing: {
+                                    ...mkt,
+                                    landingPageId: lp.id,
+                                    landingPageSlug: lp.slug,
+                                    landingPageChoice: pageName,
+                                  },
+                                }),
+                              });
+
+                              setProject((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      publishedToWebsite: true,
+                                      marketing: {
+                                        ...mkt,
+                                        landingPageId: lp.id,
+                                        landingPageSlug: lp.slug,
+                                        landingPageChoice: pageName,
+                                      },
+                                    }
+                                  : null,
+                              );
+                              setPagePublishSuccess(lp.slug);
+                            }
+                          } catch (e) {
+                            alert(e instanceof Error ? e.message : "Failed to publish landing page.");
+                          } finally {
+                            setPublishingPage(false);
+                          }
+                        }}
+                      >
+                        {publishingPage ? "Publishing…" : "🚀 Publish Live Landing Page"}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </Reveal>
+
           <Reveal delay={1}>
             <div className="card">
               <div className="card-h"><span className="t">Direct Lead Entry</span></div>

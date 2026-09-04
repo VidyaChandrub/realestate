@@ -37,4 +37,9 @@ export class PublicSiteController {
   canonical(@Param('landingPageId') id: string) {
     return this.service.canonicalForPage(id);
   }
+
+  @Get('page/:slug')
+  resolvePage(@Param('slug') slug: string) {
+    return this.service.resolveBySlug(slug);
+  }
 }
