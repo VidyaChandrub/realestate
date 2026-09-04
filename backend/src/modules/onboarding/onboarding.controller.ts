@@ -1,4 +1,4 @@
-import { Body, Controller, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -47,6 +47,11 @@ export class OnboardingController {
   @Post('invite')
   invite(@CurrentUser() actor: JwtPayload, @Body() dto: InviteStepDto) {
     return this.onboardingService.sendInvites(actor, dto);
+  }
+
+  @Get('roles')
+  roles(@CurrentUser() actor: JwtPayload) {
+    return this.onboardingService.listAvailableRoles(actor);
   }
 
   @Post('complete')

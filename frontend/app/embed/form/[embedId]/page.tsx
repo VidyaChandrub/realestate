@@ -53,7 +53,7 @@ export default function EmbedFormPage({ params }: { params: Promise<{ embedId: s
       settings: { heading: form.name || "Enquiry", sub: form.description || "", button: form.submitLabel || "Submit" },
       style: {
         colors: { bg: "#ffffff", text: "#111827" },
-        spacing: { padding: { top: 24, right: 16, bottom: 24, left: 16 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 16 },
+        spacing: { padding: { top: 12, right: 12, bottom: 12, left: 12 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 8 },
         layout: { width: "full", height: "auto", align: "center", direction: "column" },
         typography: {},
         responsive: {},
@@ -62,8 +62,8 @@ export default function EmbedFormPage({ params }: { params: Promise<{ embedId: s
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fff" }}>
-      <style>{`body{margin:0}`}</style>
+    <div style={{ minHeight: "auto", background: "#fff", padding: 0 }}>
+      <style>{`body{margin:0;padding:0}`}</style>
       <Canvas
         sections={sections as never}
         selectedId={null}

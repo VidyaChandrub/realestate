@@ -11,7 +11,7 @@ import {
   getCrmLeads,
 } from "@/lib/api";
 import Link from "next/link";
-import { isOrgAdmin } from "@/lib/session";
+import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 
 const STATUS_BADGE: Record<CrmLeadStatus, string> = {
@@ -78,7 +78,8 @@ function sourceBadgeClass(source: string | null): string {
 }
 
 export default function OrgLeadsPage() {
-  const admin = isOrgAdmin();
+  const { isOrgAdmin, hasPermission } = useAuth();
+  const canAssign = isOrgAdmin() || hasPermission("crm", "edit");
 
   const [leads, setLeads] = useState<CrmLead[] | null>(null);
   const [assignable, setAssignable] = useState<
@@ -105,7 +106,7 @@ export default function OrgLeadsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (admin) {
+    if (canAssign) {
       getCrmAssignableUsers()
         .then((res) => {
           if (!cancelled) setAssignable(res.data);
@@ -117,7 +118,7 @@ export default function OrgLeadsPage() {
     return () => {
       cancelled = true;
     };
-  }, [admin]);
+  }, [canAssign]);
 
   const stats = useMemo(() => {
     const current = leads ?? [];
@@ -131,7 +132,7 @@ export default function OrgLeadsPage() {
 
   const handleAssign = useCallback(
     async (lead: CrmLead, assignedToId: string | null, status?: CrmLeadStatus) => {
-      if (!admin || savingId) return;
+      if (!canAssign || savingId) return;
       setSavingId(lead.id);
       setError(null);
       try {
@@ -258,7 +259,7 @@ export default function OrgLeadsPage() {
                     <th>Source</th>
                     <th>Assigned To</th>
                     <th>Status</th>
-                    {admin ? <th>Actions</th> : null}
+                    {canAssign ? <th>Actions</th> : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -293,7 +294,7 @@ export default function OrgLeadsPage() {
                           )}
                         </td>
                         <td>
-                          {admin ? (
+                          {canAssign ? (
                             <select
                               className="inp"
                               style={{ width: "auto" }}
@@ -315,7 +316,7 @@ export default function OrgLeadsPage() {
                             </span>
                           )}
                         </td>
-                        {admin ? (
+                        {canAssign ? (
                           <td>
                             <select
                               className="inp"

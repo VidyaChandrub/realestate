@@ -111,6 +111,40 @@
   color: var(--ps-ink);
 }
 
+/* High contrast and readability for inputs inside landing page popups, gates, and modals */
+.ps-gate-card .ps-input,
+.ps-popup-card .ps-input,
+.ps-lead-modal .ps-input,
+[data-popup-card] .ps-input,
+.ps-gate-card select,
+.ps-popup-card select,
+.ps-lead-modal select,
+.ps-gate-card input,
+.ps-popup-card input,
+.ps-lead-modal input,
+.ps-gate-card textarea,
+.ps-popup-card textarea,
+.ps-lead-modal textarea {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+.ps-gate-card .ps-input::placeholder,
+.ps-popup-card .ps-input::placeholder,
+.ps-gate-card input::placeholder,
+.ps-popup-card input::placeholder,
+.ps-gate-card textarea::placeholder,
+.ps-popup-card textarea::placeholder {
+  color: #94a3b8 !important;
+}
+.ps-gate-card select option,
+.ps-popup-card select option,
+.ps-gate-card option,
+.ps-popup-card option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
 .ps-btn {
   display: inline-flex;
   align-items: center;

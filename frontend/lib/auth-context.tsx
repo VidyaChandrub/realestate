@@ -68,6 +68,7 @@ interface AuthContextValue {
     module: string,
     action: "view" | "add" | "edit" | "delete",
   ) => boolean;
+  refreshPermissions: () => Promise<Permissions | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -305,6 +306,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const refreshPermissions = useCallback(async (): Promise<Permissions | null> => {
+    const token = accessToken ?? (typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.accessToken) : null);
+    if (!token || token.startsWith("mock-access-")) return null;
+    try {
+      const meRes = await apiFetch<{ permissions: Permissions }>("/org/permissions/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (meRes?.permissions) {
+        setUser((prev) => {
+          if (!prev) return null;
+          const updated = { ...prev, permissions: meRes.permissions };
+          try {
+            localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(updated));
+          } catch {
+            // ignore
+          }
+          return updated;
+        });
+        return meRes.permissions;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    void refreshPermissions();
+
+    const onVisibilityChange = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        void refreshPermissions();
+      }
+    };
+    window.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onVisibilityChange);
+
+    const interval = setInterval(() => {
+      void refreshPermissions();
+    }, 45000);
+
+    return () => {
+      window.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [accessToken, refreshPermissions]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -321,6 +371,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       completeOnboarding,
       getOrgSetup,
       hasPermission,
+      refreshPermissions,
     }),
     [
       user,
@@ -336,6 +387,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       completeOnboarding,
       getOrgSetup,
       hasPermission,
+      refreshPermissions,
     ],
   );
 
