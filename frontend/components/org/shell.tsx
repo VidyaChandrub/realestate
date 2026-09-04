@@ -119,6 +119,10 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
       router.replace("/login");
       return;
     }
+    if (user.must_change_password) {
+      router.replace("/change-password");
+      return;
+    }
     if (user.role !== "organisation_admin") {
       router.replace(dashboardPathFor(user.role));
     }

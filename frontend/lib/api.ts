@@ -139,6 +139,22 @@ function clearSession() {
 // straight away rather than leaving a half-dead portal open.
 let forcedLogoutInFlight = false;
 function forceLogoutOrgInactive() {
+  let isOrganisationSession = false;
+  if (typeof window !== "undefined") {
+    try {
+      const user = JSON.parse(localStorage.getItem(USER_KEY) ?? "null") as {
+        org_id?: string | null;
+      } | null;
+      isOrganisationSession = Boolean(user?.org_id);
+    } catch {
+      isOrganisationSession = false;
+    }
+  }
+
+  // ORG_INACTIVE is only actionable for an organisation session. A platform
+  // Super Admin has no org_id and must never be redirected to the org login.
+  if (!isOrganisationSession) return;
+
   clearSession();
   if (typeof window === "undefined" || forcedLogoutInFlight) return;
   const path = window.location.pathname;

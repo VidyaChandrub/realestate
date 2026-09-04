@@ -1,4 +1,5 @@
 import {
+  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -7,6 +8,10 @@ import {
 } from 'class-validator';
 
 export class UpdateOrgUserDto {
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
   @IsOptional()
   @IsString()
   @IsNotEmpty()

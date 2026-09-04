@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -21,15 +21,19 @@ export default function LoginPage() {
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Shown after a forced sign-out — e.g. the org was deactivated while the
-  // user was still working in the portal (see forceLogoutOrgInactive in
-  // api.ts). Read once from the URL on mount via a lazy initializer.
-  const [notice] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return new URLSearchParams(window.location.search).get("reason") === "org_inactive"
-      ? "You were signed out because your organisation's access was changed. Contact your administrator if this is unexpected."
-      : null;
-  });
+  // Read the browser-only query string after hydration so the server and
+  // client render the same initial markup.
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (new URLSearchParams(window.location.search).get("reason") === "org_inactive") {
+      setNotice(
+        "You were signed out because your organisation's access was changed. Contact your administrator if this is unexpected.",
+      );
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,7 +42,11 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       const session = await login({ email, password });
-      router.push(dashboardPathFor(session.role));
+      router.push(
+        session.must_change_password
+          ? "/change-password"
+          : dashboardPathFor(session.role),
+      );
       router.refresh();
     } catch (err) {
       const { fieldErrors: fe, general } = mapApiFieldErrors(err, FIELD_KEYS);

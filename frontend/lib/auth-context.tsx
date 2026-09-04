@@ -176,15 +176,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         settings: { view: true, add: true, edit: true, delete: true },
       };
 
-      try {
-        const meRes = await apiFetch<{ permissions: Permissions }>("/org/permissions/me", {
-          headers: { Authorization: `Bearer ${response.access_token}` },
-        });
-        if (meRes.permissions) {
-          permissions = meRes.permissions;
+      if (response.user.org_id) {
+        try {
+          const meRes = await apiFetch<{ permissions: Permissions }>("/org/permissions/me", {
+            headers: { Authorization: `Bearer ${response.access_token}` },
+          });
+          if (meRes.permissions) {
+            permissions = meRes.permissions;
+          }
+        } catch {
+          // Fallback to default
         }
-      } catch {
-        // Fallback to default
       }
 
       const session = toSessionUser(response.user, permissions);

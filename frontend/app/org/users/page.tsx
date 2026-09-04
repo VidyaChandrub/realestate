@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, ApiError } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
+import { PasswordInput } from "@/components/auth/password-input";
 import type {
   CreateOrgUserInput,
   OrgUser,
-  OrgUserAssignableRole,
   OrgUsersListResponse,
   UpdateOrgUserInput,
 } from "@/lib/types";
@@ -183,14 +183,33 @@ export default function OrgUsersPage() {
     if (!accessToken || !formMode) return;
     setFormSubmitting(true);
     setFormError(null);
+    const email = form.email.trim();
+    const phoneNumber = form.phoneNumber.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setFormError("Please enter a valid email address.");
+      setFormSubmitting(false);
+      return;
+    }
+    if (!phoneNumber) {
+      setFormError("Mobile number is required.");
+      setFormSubmitting(false);
+      return;
+    }
+    const phoneDigits = phoneNumber.replace(/\D/g, "");
+    if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+      setFormError("Please enter a valid mobile number.");
+      setFormSubmitting(false);
+      return;
+    }
     try {
       if (formMode === "create") {
         const body: CreateOrgUserInput = {
           firstName: form.firstName,
           lastName: form.lastName,
-          email: form.email,
-          phoneNumber: form.phoneNumber || undefined,
+          email,
+          phoneNumber,
           role: form.role,
+          password: form.password || undefined,
         };
         await apiFetch("/org/users", {
           method: "POST",
@@ -202,8 +221,10 @@ export default function OrgUsersPage() {
         const body: UpdateOrgUserInput = {
           firstName: form.firstName,
           lastName: form.lastName,
-          phoneNumber: form.phoneNumber || undefined,
+          email,
+          phoneNumber,
           role: form.role,
+          password: form.password || undefined,
         };
         await apiFetch(`/org/users/${editingId}`, {
           method: "PATCH",
@@ -327,22 +348,21 @@ export default function OrgUsersPage() {
               </div>
               <div className="row2">
                 <div className="field">
-                  <label>Email</label>
+                  <label>Email <span aria-hidden="true">*</span></label>
                   <input
                     className="inp"
                     type="email"
                     value={form.email}
-                    readOnly={formMode === "edit"}
-                    disabled={formMode === "edit"}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, email: e.target.value }))
                     }
                   />
                 </div>
                 <div className="field">
-                  <label>Phone (optional)</label>
+                  <label>Mobile Number <span aria-hidden="true">*</span></label>
                   <input
                     className="inp"
+                    required
                     value={form.phoneNumber}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, phoneNumber: e.target.value }))
@@ -370,11 +390,9 @@ export default function OrgUsersPage() {
                   </select>
                 </div>
                 <div className="field">
-                  <label>{formMode === "create" ? "Password (optional)" : "New Password (leave blank to keep current)"}</label>
-                  <input
-                    className="inp"
-                    type="password"
-                    placeholder={formMode === "create" ? "Auto-generates temp password if blank" : "••••••••"}
+                  <label>{formMode === "create" ? "Password (optional)" : "New Password (optional)"}</label>
+                  <PasswordInput
+                    placeholder={formMode === "create" ? "Auto-generates temp password if blank" : "Leave blank to keep current password"}
                     value={form.password ?? ""}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, password: e.target.value }))
@@ -572,16 +590,16 @@ export default function OrgUsersPage() {
                             >
                               Edit
                             </button>
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              type="button"
-                              disabled={busyId === user.id}
-                              onClick={() => void toggleStatus(user)}
-                            >
-                              {user.status === "active"
-                                ? "Deactivate"
-                                : "Activate"}
-                            </button>
+                            {user.role?.key === "admin" && user.status === "active" ? null : (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                type="button"
+                                disabled={busyId === user.id}
+                                onClick={() => void toggleStatus(user)}
+                              >
+                                {user.status === "active" ? "Deactivate" : "Activate"}
+                              </button>
+                            )}
                             {user.mustChangePassword ? (
                               <button
                                 className="btn btn-ghost btn-sm"
