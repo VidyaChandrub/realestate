@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { OnboardingStep } from '@prisma/client';
+import type { OnboardingStep, Role, User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
 import { SignupDto } from './dto/signup.dto';
@@ -14,6 +14,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { OnboardingAccountDto } from './dto/onboarding-account.dto';
 import { OnboardingOrganisationDto } from './dto/onboarding-organisation.dto';
 import { ResumeSignupDto } from './dto/resume-signup.dto';
+import { ResolveDraftDto } from './dto/resolve-draft.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.interface';
 import {
   nextOnboardingStep,
@@ -268,16 +269,20 @@ export class AuthService {
       if (existing.onboardingStep === 'completed') {
         return { status: 'exists_completed' as const };
       }
+      // Incomplete draft under this email — don't silently resume it (that
+      // used to discard whatever the caller just retyped here, see
+      // resumeExistingDraft/restartExistingDraft). Report the match; the
+      // frontend asks the user whether to continue or start fresh.
       return {
         status: 'exists_incomplete' as const,
+        existingUserId: existing.id,
+        firstName: existing.firstName,
+        lastName: existing.lastName,
         onboardingStep: existing.onboardingStep,
       };
     }
 
-    // Duplicate check for phone, same idea as email above — but unlike
-    // email there's no resume concept tied to a phone number, so any match
-    // here is necessarily a different account (this email is new) and
-    // just gets rejected outright rather than offered a resume path.
+    // Duplicate check for phone, same idea as email above.
     //
     // Normalized before comparing AND before storing: "+91 9825041200",
     // "+919825041200" and "+91 98250 41200" are the same number, and an
@@ -287,9 +292,20 @@ export class AuthService {
       where: { phoneNumber: normalizedPhone },
     });
     if (existingByPhone) {
-      throw new ConflictException(
-        'This phone number is already registered to another account.',
-      );
+      if (existingByPhone.onboardingStep === 'completed') {
+        throw new ConflictException(
+          'This phone number is already registered to another account.',
+        );
+      }
+      // Same offer as the email-match case above — this email is new, but
+      // the phone belongs to someone's still-in-progress signup.
+      return {
+        status: 'exists_incomplete' as const,
+        existingUserId: existingByPhone.id,
+        firstName: existingByPhone.firstName,
+        lastName: existingByPhone.lastName,
+        onboardingStep: existingByPhone.onboardingStep,
+      };
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
@@ -340,6 +356,149 @@ export class AuthService {
       );
     }
 
+    return this.buildResumePayload(user);
+  }
+
+  // Step 1 collision, "Continue previous setup" branch — the caller picked
+  // up their old draft and (optionally) edited name/email/phone/password on
+  // the retry. Updates those fields on the SAME user row (onboardingStep is
+  // left alone, so the wizard still resumes wherever they'd got to) rather
+  // than silently keeping the stale values, which is the bug this fixes.
+  async resumeExistingDraft(dto: ResolveDraftDto) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id: dto.existingUserId },
+    });
+    if (!existingUser) {
+      throw new NotFoundException('No signup in progress for this account');
+    }
+    if (existingUser.onboardingStep === 'completed') {
+      throw new ConflictException(
+        'This account has already finished setup — please sign in instead.',
+      );
+    }
+
+    const normalizedPhone = normalizePhoneNumber(dto.phone_number);
+    if (dto.work_email !== existingUser.email) {
+      const emailTaken = await this.prisma.user.findUnique({
+        where: { email: dto.work_email },
+      });
+      if (emailTaken) {
+        throw new ConflictException('Email already registered to another account.');
+      }
+    }
+    if (normalizedPhone !== existingUser.phoneNumber) {
+      const phoneTaken = await this.prisma.user.findFirst({
+        where: { phoneNumber: normalizedPhone, id: { not: existingUser.id } },
+      });
+      if (phoneTaken) {
+        throw new ConflictException(
+          'This phone number is already registered to another account.',
+        );
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
+    const updated = await this.prisma.user.update({
+      where: { id: existingUser.id },
+      data: {
+        firstName: dto.first_name,
+        lastName: dto.last_name,
+        email: dto.work_email,
+        phoneNumber: normalizedPhone,
+        passwordHash,
+      },
+      include: { userRoles: { include: { role: true } } },
+    });
+
+    return this.buildResumePayload(updated);
+  }
+
+  // Step 1 collision, "Start fresh instead" branch. The selected signup is
+  // explicitly discarded, including its draft organisation and onboarding
+  // records, before a new account is created from the submitted values.
+  async restartExistingDraft(dto: ResolveDraftDto) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { id: dto.existingUserId },
+    });
+    if (!existingUser) {
+      throw new NotFoundException('No signup in progress for this account');
+    }
+    if (existingUser.onboardingStep === 'completed') {
+      throw new ConflictException(
+        'This account has already finished setup — please sign in instead.',
+      );
+    }
+
+    const normalizedPhone = normalizePhoneNumber(dto.phone_number);
+    if (dto.work_email !== existingUser.email) {
+      const emailTaken = await this.prisma.user.findUnique({
+        where: { email: dto.work_email },
+      });
+      if (emailTaken) {
+        throw new ConflictException('Email already registered to another account.');
+      }
+    }
+    if (normalizedPhone !== existingUser.phoneNumber) {
+      const phoneTaken = await this.prisma.user.findFirst({
+        where: { phoneNumber: normalizedPhone, id: { not: existingUser.id } },
+      });
+      if (phoneTaken) {
+        throw new ConflictException(
+          'This phone number is already registered to another account.',
+        );
+      }
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
+    const replacement = await this.prisma.$transaction(async (tx) => {
+      if (existingUser.orgId) {
+        const organisation = await tx.organisation.findUnique({
+          where: { id: existingUser.orgId },
+          select: { status: true },
+        });
+        if (!organisation || organisation.status !== 'draft') {
+          throw new ConflictException(
+            'This setup is no longer an incomplete draft and cannot be restarted.',
+          );
+        }
+
+        // User -> Organisation is intentionally not cascade-deleted, so
+        // remove every user in this abandoned draft before its org row.
+        await tx.user.deleteMany({ where: { orgId: existingUser.orgId } });
+        await tx.organisation.delete({ where: { id: existingUser.orgId } });
+      } else {
+        await tx.user.delete({ where: { id: existingUser.id } });
+      }
+
+      return tx.user.create({
+        data: {
+          firstName: dto.first_name,
+          lastName: dto.last_name,
+          email: dto.work_email,
+          phoneNumber: normalizedPhone,
+          passwordHash,
+          status: 'active',
+          onboardingStep: 'account',
+        },
+      });
+    });
+
+    const tokens = await this.issueTokens(replacement.id, null, []);
+
+    return {
+      status: 'created' as const,
+      user: toSafeUser(replacement),
+      onboardingStep: replacement.onboardingStep,
+      nextStep: nextOnboardingStep(replacement.onboardingStep),
+      ...tokens,
+    };
+  }
+
+  // Shared by resumeSignup and resumeExistingDraft — everything after the
+  // user row itself has been loaded (with its roles) and validated.
+  private async buildResumePayload(
+    user: User & { userRoles: (UserRole & { role: Role })[] },
+  ) {
     const roles = user.userRoles.map((userRole) => userRole.role.key);
     const tokens = await this.issueTokens(user.id, user.orgId, roles);
 
@@ -424,7 +583,12 @@ export class AuthService {
         data: {
           name: dto.company_name,
           slug,
-          status: 'pending',
+          // 'draft', not 'pending': the wizard has 6 steps left after this
+          // one, and nothing here is actually ready for Super Admin review
+          // yet. Flips to 'pending' — with the "awaiting approval" audit
+          // log/notification — once OnboardingService.complete() runs, see
+          // there for why.
+          status: 'draft',
           industry: dto.industry ?? null,
           teamSize: dto.teamSize ?? null,
           country: dto.country ?? null,
@@ -459,28 +623,6 @@ export class AuthService {
           orgId: organisation.id,
           onboardingStep: furthestOnboardingStep(user.onboardingStep, 'organisation'),
         },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          orgId: organisation.id,
-          actorId: user.id,
-          action: 'org_registered_pending',
-          entity: 'Organisation',
-          entityId: organisation.id,
-          metadata: { subdomain, customDomain } as any,
-        },
-      });
-
-      await tx.notification.create({
-        data: buildNotificationData({
-          orgId: organisation.id,
-          type: 'organisation_registration',
-          title: `New organisation awaiting approval: ${organisation.name}`,
-          body: `${organisation.name} (${slug}) registered${subdomain ? ` and requested subdomain ${subdomainHost(subdomain)}` : ''}${customDomain ? ` and/or custom domain ${customDomain}` : ''}. Review and approve or reject from the admin console.`,
-          entity: 'Organisation',
-          entityId: organisation.id,
-        }),
       });
 
       return { organisation, updatedUser };

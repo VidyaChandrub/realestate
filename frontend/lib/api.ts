@@ -35,6 +35,7 @@ import type {
   OrganisationStepResponse,
   Plan,
   RequestCustomDomainInput,
+  ResolveDraftInput,
   ResumeSignupResponse,
   ReviewOrgDomainRequestInput,
   SalesAgentDetailResponse,
@@ -220,6 +221,26 @@ export async function resumeSignup(email: string): Promise<ResumeSignupResponse>
   return apiFetch<ResumeSignupResponse>("/auth/resume-signup", {
     method: "POST",
     body: JSON.stringify({ email }),
+  });
+}
+
+// "You already started this" popup — either continue the old draft or
+// restart it, both carrying whatever was just retyped on Step 1.
+export async function resumeExistingDraft(
+  input: ResolveDraftInput,
+): Promise<ResumeSignupResponse> {
+  return apiFetch<ResumeSignupResponse>("/auth/signup/step1/resume", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function restartExistingDraft(
+  input: ResolveDraftInput,
+): Promise<SignupStep1Response> {
+  return apiFetch<SignupStep1Response>("/auth/signup/step1/restart", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }
 

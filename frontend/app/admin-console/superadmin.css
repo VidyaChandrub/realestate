@@ -951,12 +951,17 @@
   grid-template-columns: repeat(4, 1fr);
 }
 
+.superadmin .g5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
 .superadmin .g-2-1 {
   grid-template-columns: 2fr 1fr;
 }
 
 @media (max-width: 1200px) {
-  .superadmin .g4 {
+  .superadmin .g4,
+  .superadmin .g5 {
     grid-template-columns: repeat(2, 1fr);
   }
   .superadmin .g3 {
@@ -969,7 +974,8 @@
 
 @media (max-width: 820px) {
   .superadmin .g2,
-  .superadmin .g4 {
+  .superadmin .g4,
+  .superadmin .g5 {
     grid-template-columns: 1fr;
   }
 }

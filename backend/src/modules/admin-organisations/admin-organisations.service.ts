@@ -288,9 +288,8 @@ export class AdminOrganisationsService {
 
     const where: Prisma.OrganisationWhereInput = {};
     if (query.status === 'all' || !query.status) {
-      // Drafts are incomplete onboarding attempts, never real customers —
-      // excluded under every status filter, including "all".
-      where.status = { not: 'draft' };
+      // Include incomplete onboarding attempts in the unfiltered list so
+      // Super Admin can see and identify them as drafts.
     } else if (query.status === 'pending') {
       where.status = 'pending';
     } else if (query.status === 'disabled') {
@@ -388,16 +387,17 @@ export class AdminOrganisationsService {
   }
 
   async summary() {
-    const [total, active, pending, disabled] = await Promise.all([
+    const [total, active, pending, disabled, draft] = await Promise.all([
       this.prisma.organisation.count({ where: { status: { not: 'draft' } } }),
       this.prisma.organisation.count({ where: { status: 'active' } }),
       this.prisma.organisation.count({ where: { status: 'pending' } }),
       // Matches the list() "Rejected/Disabled" bucket — both statuses read
       // as "not usable right now" in the Super Admin UI.
       this.prisma.organisation.count({ where: { status: { in: ['disabled', 'rejected'] } } }),
+      this.prisma.organisation.count({ where: { status: 'draft' } }),
     ]);
 
-    return { total, active, pending, disabled, onTrial: null, suspended: null };
+    return { total, active, pending, disabled, draft, onTrial: null, suspended: null };
   }
 
   async getById(id: string) {
@@ -782,7 +782,15 @@ export class AdminOrganisationsService {
   }
 
   async remove(id: string, actor: JwtPayload) {
-    const organisation = await this.getRealOrganisation(id);
+    // Deliberately NOT getRealOrganisation here — deletion is exactly the
+    // one action that should work on a 'draft' org too (an abandoned
+    // self-serve signup, or a Super-Admin-precreated placeholder never
+    // assigned an admin). Every other admin action keeps treating drafts
+    // as not-found.
+    const organisation = await this.prisma.organisation.findUnique({ where: { id } });
+    if (!organisation) {
+      throw new NotFoundException('Organisation not found');
+    }
 
     // users.orgId only SET NULLs on delete by default — deleting the org
     // alone would leave its accounts orphaned but still able to log in.
