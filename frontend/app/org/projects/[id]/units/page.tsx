@@ -804,7 +804,7 @@ export default function OrgProjectUnitsPage() {
                 ) : (
                   visibleUnits.map((row) => (
                     <tr key={row.id}>
-                      <td className="mono">{row.unitNo}</td>
+                      <td className="">{row.unitNo}</td>
                       <td>{row.tower ?? "—"}</td>
                       <td>{row.configuration ?? "—"}</td>
                       <td>
@@ -1085,7 +1085,7 @@ export default function OrgProjectUnitsPage() {
                 <div className="field">
                   <label>Unit number <span className="req">*</span></label>
                   <input
-                    className="inp mono"
+                    className="inp"
                     placeholder="B-1204"
                     value={unitForm.unitNo}
                     onChange={(e) =>

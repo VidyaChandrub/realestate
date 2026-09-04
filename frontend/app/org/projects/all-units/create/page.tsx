@@ -339,7 +339,7 @@ export default function UnitCreatePage() {
                     Unit number <span className="req">*</span>
                   </label>
                   <input
-                    className="inp mono"
+                    className="inp"
                     placeholder="B-1204"
                     value={unitNo}
                     onChange={(e) => setUnitNo(e.target.value)}
