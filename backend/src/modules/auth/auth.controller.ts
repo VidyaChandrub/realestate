@@ -10,6 +10,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { OnboardingAccountDto } from './dto/onboarding-account.dto';
 import { OnboardingOrganisationDto } from './dto/onboarding-organisation.dto';
 import { ResumeSignupDto } from './dto/resume-signup.dto';
+import { ResolveDraftDto } from './dto/resolve-draft.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
@@ -35,6 +36,21 @@ export class AuthController {
   @HttpCode(200)
   resumeSignup(@Body() dto: ResumeSignupDto) {
     return this.authService.resumeSignup(dto);
+  }
+
+  // "You already started this" popup — one of these two fires once the
+  // caller picks an option, see AuthService.resumeExistingDraft /
+  // restartExistingDraft.
+  @Post('signup/step1/resume')
+  @HttpCode(200)
+  resumeExistingDraft(@Body() dto: ResolveDraftDto) {
+    return this.authService.resumeExistingDraft(dto);
+  }
+
+  @Post('signup/step1/restart')
+  @HttpCode(200)
+  restartExistingDraft(@Body() dto: ResolveDraftDto) {
+    return this.authService.restartExistingDraft(dto);
   }
 
   @UseGuards(JwtAuthGuard)

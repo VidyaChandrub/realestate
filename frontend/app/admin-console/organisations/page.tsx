@@ -12,16 +12,21 @@ import type { OrganisationListResponse, OrganisationListRow, OrganisationSummary
 import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RowActionsMenu, type RowAction } from "@/components/superadmin/row-actions-menu";
+import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 
 // The "Disabled" tab's status param covers both admin-disabled and
 // rejected orgs (see the backend's list() query) — labelled to match.
-const STATUS_TABS = ["All", "Active", "Pending", "Rejected/Disabled"] as const;
+// "Draft" is a separate bucket for abandoned self-serve signups and any
+// Super-Admin-precreated org never assigned an admin. Drafts also appear in
+// "All" so incomplete onboarding attempts remain visible to Super Admin.
+const STATUS_TABS = ["All", "Active", "Pending", "Rejected/Disabled", "Draft"] as const;
 const LIMIT = 20;
 
-function statusParamFor(tabIndex: number): "all" | "active" | "pending" | "disabled" {
+function statusParamFor(tabIndex: number): "all" | "active" | "pending" | "disabled" | "draft" {
   if (tabIndex === 1) return "active";
   if (tabIndex === 2) return "pending";
   if (tabIndex === 3) return "disabled";
+  if (tabIndex === 4) return "draft";
   return "all";
 }
 
@@ -212,6 +217,12 @@ export default function SuperAdminOrganisationsPage() {
   // behaviour is unchanged, only the presentation moved.
   const rowActionsFor = (o: OrganisationListRow): RowAction[] => {
     const rowBusy = actionBusy === o.id;
+    // A draft never went through review — not a real org yet — so the
+    // only thing worth doing here is deleting it (or reaching out using
+    // the contact details already shown in the row).
+    if (o.status === "draft") {
+      return [{ key: "delete", label: "Delete", danger: true, onClick: () => handleDelete(o.id), disabled: rowBusy }];
+    }
     const actions: RowAction[] = [];
     if (o.status === "pending") {
       actions.push({ key: "approve", label: "Approve", onClick: () => handleApprove(o.id), disabled: rowBusy });
@@ -292,7 +303,7 @@ export default function SuperAdminOrganisationsPage() {
 
       {/* Stat tiles */}
       <div style={{ marginBottom: 18 }}>
-        <Reveal delay={2} className="grid g4">
+        <Reveal delay={2} className="grid g5">
           <div className="stat">
             <div className="top">
               <span className="label">Total organisations</span>
@@ -330,6 +341,16 @@ export default function SuperAdminOrganisationsPage() {
               {summary ? <CountUp value={summary.disabled ?? 0} /> : "—"}
             </div>
             <div className="delta">Rejected registrations + disabled orgs</div>
+          </div>
+          <div className="stat">
+            <div className="top">
+              <span className="label">Draft signups</span>
+              <span className="ic ic-violet"><Icon name="edit" size={16} /></span>
+            </div>
+            <div className="value">
+              {summary ? <CountUp value={summary.draft ?? 0} /> : "—"}
+            </div>
+            <div className="delta">Abandoned mid-signup</div>
           </div>
         </Reveal>
       </div>
@@ -376,14 +397,27 @@ export default function SuperAdminOrganisationsPage() {
                   rows.map((o) => (
                     <tr key={o.id}>
                       <td>
-                        <Link className="u" href={`/admin-console/organisation-detail/${o.id}`}>
-                          <span className="av">{initials(o.name)}</span>
-                          <span>
-                            <span className="nm">{o.name}</span>
-                            <br />
-                            <span className="sm">{o.city} · {o.slug}</span>
+                        {o.status === "draft" ? (
+                          // Drafts have no detail page (getById 404s on
+                          // them server-side) — plain text, not a dead link.
+                          <span className="u" style={{ cursor: "default" }}>
+                            <span className="av">{initials(o.name)}</span>
+                            <span>
+                              <span className="nm">{o.name}</span>
+                              <br />
+                              <span className="sm">{o.city} · {o.slug}</span>
+                            </span>
                           </span>
-                        </Link>
+                        ) : (
+                          <Link className="u" href={`/admin-console/organisation-detail/${o.id}`}>
+                            <span className="av">{initials(o.name)}</span>
+                            <span>
+                              <span className="nm">{o.name}</span>
+                              <br />
+                              <span className="sm">{o.city} · {o.slug}</span>
+                            </span>
+                          </Link>
+                        )}
                       </td>
                       <td>
                         <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
@@ -409,17 +443,12 @@ export default function SuperAdminOrganisationsPage() {
                       <td>{o.mrr ? `₹${o.mrr.toLocaleString("en-IN")}` : "—"}</td>
                       <td>
                         <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                          <span className={`badge ${o.status === "active" ? "b-green" : o.status === "pending" ? "b-amber" : "b-rose"}`}>
+                          <span className={`badge ${o.status === "active" ? "b-green" : o.status === "pending" ? "b-amber" : o.status === "draft" ? "b-gray" : "b-rose"}`}>
                             <span className="dot" style={{ background: "currentColor" }} />
-                            {o.status === "active" ? "Active" : o.status === "pending" ? "Pending" : o.status === "rejected" ? "Rejected" : "Disabled"}
+                            {o.status === "active" ? "Active" : o.status === "pending" ? "Pending" : o.status === "rejected" ? "Rejected" : o.status === "draft" ? "Draft" : "Disabled"}
                           </span>
                           {o.status === "rejected" && o.rejectionReason ? (
-                            <span
-                              title={`Rejection reason: ${o.rejectionReason}`}
-                              style={{ display:"inline-flex", color:"var(--rose)", cursor:"help" }}
-                            >
-                              <Icon name="info" size={14} />
-                            </span>
+                            <ReasonInfoPopover reason={o.rejectionReason} />
                           ) : null}
                         </div>
                       </td>

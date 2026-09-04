@@ -15,7 +15,8 @@ import {
   completeOnboardingStep,
   createOrganisationStep,
   getLogoUploadUrl,
-  resumeSignup,
+  resumeExistingDraft,
+  restartExistingDraft,
   saveBusinessDetailsStep,
   saveInviteStep,
   saveModulesStep,
@@ -25,7 +26,7 @@ import {
 } from "@/lib/api";
 import { subdomainPreviewHost, suggestSubdomainsFromName } from "@/lib/domain";
 import { callingCodeForCountry, validatePhoneForCountry } from "@/lib/phone";
-import type { OnboardingStep, OrgIndustry, Plan, SubdomainAvailability } from "@/lib/types";
+import type { OnboardingStep, OrgIndustry, Plan, ResumeSignupResponse, SubdomainAvailability } from "@/lib/types";
 import { COUNTRY_META, COUNTRIES } from "@/lib/countries";
 
 const FIELD_KEYS = [
@@ -85,6 +86,15 @@ const ONBOARDING_ORDER: OnboardingStep[] = [
 function uiStepForOnboardingStep(step: OnboardingStep): number {
   const idx = ONBOARDING_ORDER.indexOf(step);
   return Math.min(Math.max(idx + 1, 1), TOTAL);
+}
+
+// Label of the furthest step a draft has actually completed — for the
+// "you already started this" popup's message. STEPS and ONBOARDING_ORDER
+// share the same 0-indexed ordering for every step short of 'completed'
+// (which a draft, by definition, never has).
+function completedStepLabel(step: OnboardingStep): string {
+  const idx = ONBOARDING_ORDER.indexOf(step);
+  return STEPS[idx]?.label ?? "your account";
 }
 
 const ORG_TYPES: { v: string; ic: IconName; b: string; s: string }[] = [
@@ -168,6 +178,17 @@ export default function RegisterPage() {
   // approved — dashboard access is blocked server-side regardless of this
   // screen (OrgApprovedGuard), this is just honest UX instead of 403s.
   const [pendingApproval, setPendingApproval] = useState(false);
+  // Set when Step 1's email or mobile matches someone's still-in-progress
+  // signup — the popup asks whether to continue that draft or start fresh
+  // with whatever was just typed, see handleContinueDraft/handleStartFreshDraft.
+  const [draftCollision, setDraftCollision] = useState<{
+    existingUserId: string;
+    firstName: string | null;
+    lastName: string | null;
+    onboardingStep: OnboardingStep;
+  } | null>(null);
+  const [draftBusy, setDraftBusy] = useState<"resume" | "restart" | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
 
   // package & template selection
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -387,34 +408,16 @@ export default function RegisterPage() {
         return false;
       }
       if (res.status === "exists_incomplete") {
-        // Silently resume — no password re-entry, see AuthService.resumeSignup.
-        const resumed = await resumeSignup(form.work_email);
-        applyTokens(resumed.user, resumed);
-        setForm((prev) => ({
-          ...prev,
-          company_name: resumed.organisation?.name ?? prev.company_name,
-          subdomain: resumed.organisation?.subdomain ?? prev.subdomain,
-          country: resumed.organisation?.country ?? prev.country,
-          city: resumed.organisation?.city ?? prev.city,
-        }));
-        if (resumed.organisation) {
-          setRera(resumed.organisation.rera_license_no ?? "");
-          setGstin(resumed.organisation.gstin ?? "");
-          setBrandColour(resumed.organisation.brand_colour ?? "#4f46e5");
-          setLogoUrl(resumed.organisation.logo_url ?? null);
-          // industry was already being persisted (Step 2) but never restored
-          // here — same class of bug as teamSize, fixing both together.
-          if (resumed.organisation.industry) setOrgType(resumed.organisation.industry);
-          if (resumed.organisation.team_size) setTeamSize(resumed.organisation.team_size);
-        }
-        if (resumed.subscription) {
-          setSelectedPlanId(resumed.subscription.planId);
-          setBillingCycle((resumed.subscription.billingCycle as "monthly" | "yearly") ?? "monthly");
-        }
-        setSelectedTemplateIds(resumed.templateIds ?? []);
-        setCur(uiStepForOnboardingStep(resumed.nextStep) - 1);
-        window.scrollTo(0, 0);
-        return false; // step already advanced cur directly — skip the +1 below
+        // Don't silently resume — that used to discard whatever was just
+        // retyped above (see AuthService.resumeExistingDraft). Ask instead.
+        setDraftError(null);
+        setDraftCollision({
+          existingUserId: res.existingUserId,
+          firstName: res.firstName,
+          lastName: res.lastName,
+          onboardingStep: res.onboardingStep,
+        });
+        return false;
       }
       applyTokens(res.user, res);
       return true;
@@ -472,6 +475,108 @@ export default function RegisterPage() {
     }
 
     return true;
+  }
+
+  // Shared by handleContinueDraft (and, previously, the old silent-resume
+  // branch) — restores every downstream step's local state from whatever
+  // the backend has saved for this draft.
+  function applyResumedState(resumed: ResumeSignupResponse) {
+    applyTokens(resumed.user, resumed);
+    setForm((prev) => ({
+      ...prev,
+      company_name: resumed.organisation?.name ?? prev.company_name,
+      subdomain: resumed.organisation?.subdomain ?? prev.subdomain,
+      country: resumed.organisation?.country ?? prev.country,
+      city: resumed.organisation?.city ?? prev.city,
+    }));
+    if (resumed.organisation) {
+      setRera(resumed.organisation.rera_license_no ?? "");
+      setGstin(resumed.organisation.gstin ?? "");
+      setBrandColour(resumed.organisation.brand_colour ?? "#4f46e5");
+      setLogoUrl(resumed.organisation.logo_url ?? null);
+      if (resumed.organisation.industry) setOrgType(resumed.organisation.industry);
+      if (resumed.organisation.team_size) setTeamSize(resumed.organisation.team_size);
+    }
+    if (resumed.subscription) {
+      setSelectedPlanId(resumed.subscription.planId);
+      setBillingCycle((resumed.subscription.billingCycle as "monthly" | "yearly") ?? "monthly");
+    }
+    setSelectedTemplateIds(resumed.templateIds ?? []);
+    setCur(uiStepForOnboardingStep(resumed.nextStep) - 1);
+    window.scrollTo(0, 0);
+  }
+
+  // "Continue previous setup" — updates the old draft's identity fields
+  // with whatever's currently typed (name/email/phone/password may all
+  // have changed on this retry) and picks up wherever it left off.
+  async function handleContinueDraft() {
+    if (!draftCollision) return;
+    setDraftError(null);
+    setDraftBusy("resume");
+    try {
+      const resumed = await resumeExistingDraft({
+        existingUserId: draftCollision.existingUserId,
+        first_name: form.first_name,
+        last_name: form.last_name,
+        work_email: form.work_email,
+        phone_number: phoneCallingCode ? `${phoneCallingCode} ${form.phone_number}` : form.phone_number,
+        password: form.password,
+      });
+      applyResumedState(resumed);
+      setDraftCollision(null);
+    } catch (err) {
+      const { general } = mapApiFieldErrors(err, FIELD_KEYS);
+      setDraftError(general ?? "Couldn't continue that setup — please try again.");
+    } finally {
+      setDraftBusy(null);
+    }
+  }
+
+  // "Start fresh instead" — same identity update, but the wizard restarts
+  // at Step 2 with a clean slate rather than resuming; every downstream
+  // local field is reset so nothing from the abandoned draft lingers on
+  // screen (the backend leaves the old org row in place and it gets
+  // overwritten in place as these steps are re-submitted).
+  async function handleStartFreshDraft() {
+    if (!draftCollision) return;
+    setDraftError(null);
+    setDraftBusy("restart");
+    try {
+      const res = await restartExistingDraft({
+        existingUserId: draftCollision.existingUserId,
+        first_name: form.first_name,
+        last_name: form.last_name,
+        work_email: form.work_email,
+        phone_number: phoneCallingCode ? `${phoneCallingCode} ${form.phone_number}` : form.phone_number,
+        password: form.password,
+      });
+      if (res.status !== "created") {
+        // Shouldn't happen — restart always creates a fresh 'account' step —
+        // but keep the popup open with a message rather than silently no-op.
+        setDraftError("Couldn't start a fresh setup — please try again.");
+        return;
+      }
+      applyTokens(res.user, res);
+      setForm((prev) => ({ ...prev, company_name: "", subdomain: "", city: "" }));
+      setOrgType("developer");
+      setTeamSize("2–10");
+      setRera("");
+      setGstin("");
+      setBrandColour("#4f46e5");
+      setLogoUrl(null);
+      setSelectedPlanId("");
+      setBillingCycle("monthly");
+      setSelectedTemplateIds([]);
+      setAgreedToTerms(false);
+      setDraftCollision(null);
+      setCur(uiStepForOnboardingStep(res.nextStep) - 1);
+      window.scrollTo(0, 0);
+    } catch (err) {
+      const { general } = mapApiFieldErrors(err, FIELD_KEYS);
+      setDraftError(general ?? "Couldn't start a fresh setup — please try again.");
+    } finally {
+      setDraftBusy(null);
+    }
   }
 
   // Modules/Invite/Connect are skippable — "Skip" still advances
@@ -1160,6 +1265,89 @@ export default function RegisterPage() {
           </p>
         </form>
       </div>
+
+      {draftCollision ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 400,
+            padding: 20,
+          }}
+          onClick={() => {
+            if (!draftBusy) setDraftCollision(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--surface)",
+              borderRadius: 20,
+              padding: 28,
+              width: 460,
+              maxWidth: "100%",
+              boxShadow: "var(--sh-lg)",
+              position: "relative",
+            }}
+          >
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => { if (!draftBusy) setDraftCollision(null); }}
+              disabled={!!draftBusy}
+              style={{
+                position: "absolute",
+                top: 18,
+                right: 18,
+                border: "none",
+                background: "none",
+                color: "var(--muted)",
+                fontSize: 15,
+                cursor: draftBusy ? "not-allowed" : "pointer",
+                lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
+            <h2 style={{ margin: "0 0 6px", fontSize: 19, fontWeight: 800, color: "var(--ink)" }}>
+              Welcome back
+            </h2>
+            <p style={{ margin: "0 0 20px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
+              Looks like {draftCollision.firstName ? <b>{draftCollision.firstName}</b> : "someone"} already
+              started setting up a workspace with this email or mobile number — it got as far as{" "}
+              <b>{completedStepLabel(draftCollision.onboardingStep)}</b>. Want to continue where that setup
+              left off, or start fresh with what you just entered?
+            </p>
+            {draftError ? (
+              <p role="alert" className="help" style={{ color: "var(--rose)", borderColor: "var(--rose-050)", background: "var(--rose-050)", marginBottom: 16 }}>
+                {draftError}
+              </p>
+            ) : null}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                className="btn btn-primary btn-block"
+                type="button"
+                onClick={handleContinueDraft}
+                disabled={!!draftBusy}
+              >
+                {draftBusy === "resume" ? "Continuing…" : "Continue previous setup →"}
+              </button>
+              <button
+                className="btn btn-ghost btn-block"
+                type="button"
+                onClick={handleStartFreshDraft}
+                disabled={!!draftBusy}
+              >
+                {draftBusy === "restart" ? "Starting fresh…" : "Start fresh instead"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

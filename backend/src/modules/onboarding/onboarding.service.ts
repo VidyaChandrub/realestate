@@ -8,6 +8,8 @@ import { toSafeOrganisation } from '../../common/utils/mappers.util';
 import { assertTemplateQuota } from '../../common/utils/plan-quota.util';
 import { assertEligibleTemplateIds } from '../../common/utils/template-eligibility.util';
 import { furthestOnboardingStep, nextOnboardingStep } from '../../common/utils/onboarding.util';
+import { subdomainHost } from '../../common/utils/domain.util';
+import { buildNotificationData } from '../../common/utils/notifications.util';
 import { BusinessDetailsDto } from './dto/business-details.dto';
 import { LogoUploadUrlDto } from './dto/logo-upload-url.dto';
 import { SubscriptionStepDto } from './dto/subscription-step.dto';
@@ -249,15 +251,55 @@ export class OnboardingService {
 
     const onboardingStep = await this.advanceStep(actor.sub, 'completed');
 
+    // The org sits at 'draft' for the whole wizard (see
+    // AuthService.createOrganisationStep) — this is the point it actually
+    // becomes a real candidate for Super Admin review, so the "awaiting
+    // approval" audit log/notification fires here, not at Step 2, and the
+    // status flips to 'pending' only now.
+    let organisation = await this.prisma.organisation.findUniqueOrThrow({
+      where: { id: orgId },
+    });
+
+    if (organisation.status === 'draft') {
+      organisation = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.organisation.update({
+          where: { id: orgId },
+          data: { status: 'pending' },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            orgId: updated.id,
+            actorId: actor.sub,
+            action: 'org_registered_pending',
+            entity: 'Organisation',
+            entityId: updated.id,
+            metadata: {
+              subdomain: updated.subdomain,
+              customDomain: updated.customDomain,
+            } as any,
+          },
+        });
+
+        await tx.notification.create({
+          data: buildNotificationData({
+            orgId: updated.id,
+            type: 'organisation_registration',
+            title: `New organisation awaiting approval: ${updated.name}`,
+            body: `${updated.name} (${updated.slug}) completed setup${updated.subdomain ? ` and requested subdomain ${subdomainHost(updated.subdomain)}` : ''}${updated.customDomain ? ` and/or custom domain ${updated.customDomain}` : ''}. Review and approve or reject from the admin console.`,
+            entity: 'Organisation',
+            entityId: updated.id,
+          }),
+        });
+
+        return updated;
+      });
+    }
+
     // Tell the frontend whether the org is actually usable yet — finishing
     // the wizard and being approved are two different gates (see
     // OrgApprovedGuard). A still-pending org should land on a holding
     // screen, not a dashboard that 403s on its first real request.
-    const organisation = await this.prisma.organisation.findUniqueOrThrow({
-      where: { id: orgId },
-      select: { status: true },
-    });
-
     return { onboardingStep, organisationStatus: organisation.status };
   }
 
