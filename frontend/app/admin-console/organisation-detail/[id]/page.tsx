@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
+import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 import type {
   CreateOrgUserInput,
   OrganisationActivityRow,
@@ -889,12 +890,7 @@ export default function SuperAdminOrganisationDetailPage() {
                             {orgStatusMeta(org.status).label}
                           </span>
                           {org.status === "rejected" && org.rejectionReason ? (
-                            <span
-                              title={`Rejection reason: ${org.rejectionReason}`}
-                              style={{ display: "inline-flex", color: "var(--rose)", cursor: "help" }}
-                            >
-                              <Icon name="info" size={14} />
-                            </span>
+                            <ReasonInfoPopover reason={org.rejectionReason} />
                           ) : null}
                         </div>
                       </div>

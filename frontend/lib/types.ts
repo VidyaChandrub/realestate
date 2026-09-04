@@ -118,8 +118,21 @@ export type SignupStep1Response =
         onboardingStep: OnboardingStep;
         nextStep: OnboardingStep;
       })
-  | { status: "exists_incomplete"; onboardingStep: OnboardingStep }
+  | {
+      status: "exists_incomplete";
+      existingUserId: string;
+      firstName: string | null;
+      lastName: string | null;
+      onboardingStep: OnboardingStep;
+    }
   | { status: "exists_completed" };
+
+// "You already started this" popup — resolves an exists_incomplete match by
+// either continuing the old draft or restarting it, both with whatever was
+// just retyped on Step 1. See AuthService.resumeExistingDraft/restartExistingDraft.
+export interface ResolveDraftInput extends OnboardingAccountInput {
+  existingUserId: string;
+}
 
 export interface ResumeSignupResponse extends AuthTokens {
   user: SafeUser;
@@ -325,7 +338,7 @@ export interface OrganisationListRow {
   adminName: string | null;
   adminEmail: string | null;
   adminPhone: string | null;
-  status: "active" | "disabled" | "pending" | "rejected";
+  status: "active" | "disabled" | "pending" | "rejected" | "draft";
   rejectionReason?: string | null;
   createdAt: string;
   userCount: number;
@@ -347,6 +360,7 @@ export interface OrganisationSummary {
   active: number;
   pending?: number;
   disabled?: number;
+  draft?: number;
   onTrial: null;
   suspended: null;
 }
