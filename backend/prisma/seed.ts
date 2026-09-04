@@ -665,10 +665,56 @@ async function seedDemoOrg() {
   );
 }
 
+async function seedEmailTables() {
+  await prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS identity;`);
+  await prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS audit;`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS identity.email_configs (
+      id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      host TEXT NOT NULL,
+      port INTEGER NOT NULL DEFAULT 587,
+      secure BOOLEAN NOT NULL DEFAULT false,
+      "user" TEXT NOT NULL DEFAULT '',
+      password TEXT NOT NULL DEFAULT '',
+      from_email TEXT NOT NULL,
+      from_name TEXT NOT NULL DEFAULT 'iPixxel Realty',
+      reply_to TEXT,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      invite_subject TEXT,
+      invite_body TEXT,
+      reset_subject TEXT,
+      reset_body TEXT,
+      created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS invite_subject TEXT;`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS invite_body TEXT;`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS reset_subject TEXT;`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS reset_body TEXT;`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS audit.email_logs (
+      id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      "to" TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      template TEXT,
+      status TEXT NOT NULL,
+      error TEXT,
+      metadata JSONB,
+      sent_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS email_logs_to_idx ON audit.email_logs("to");`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS email_logs_status_idx ON audit.email_logs(status);`);
+  await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS email_logs_sent_at_idx ON audit.email_logs(sent_at);`);
+  console.log('Email configuration & audit log tables initialized successfully.');
+}
+
 async function main() {
   await seedRoles();
   await seedSuperAdmin();
   await seedDemoOrg();
+  await seedEmailTables();
 }
 
 main()

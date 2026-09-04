@@ -1173,3 +1173,50 @@ model OrgCatalogOption {
   @@map("org_catalog_options")
   @@schema("projects")
 }
+
+// ---------------------------------------------------------------------------
+// System Email / SMTP Configuration & Audit Logging
+// Managed globally by Super Admin
+// ---------------------------------------------------------------------------
+
+model EmailConfig {
+  id        String   @id @default(uuid())
+  host      String
+  port      Int      @default(587)
+  secure    Boolean  @default(false)
+  user      String   @default("")
+  password  String   @default("")
+  fromEmail String   @map("from_email")
+  fromName  String   @default("iPixxel Realty") @map("from_name")
+  replyTo   String?  @map("reply_to")
+  isActive  Boolean  @default(true) @map("is_active")
+
+  // Customizable message templates
+  inviteSubject String? @map("invite_subject")
+  inviteBody    String? @map("invite_body")
+  resetSubject  String? @map("reset_subject")
+  resetBody     String? @map("reset_body")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("email_configs")
+  @@schema("identity")
+}
+
+model EmailLog {
+  id         String    @id @default(uuid())
+  to         String
+  subject    String
+  template   String?   // 'invite' | 'password_reset' | 'test' | 'notification' | 'system'
+  status     String    // 'sent' | 'failed'
+  error      String?
+  metadata   Json?
+  sentAt     DateTime  @default(now()) @map("sent_at")
+
+  @@index([to])
+  @@index([status])
+  @@index([sentAt])
+  @@map("email_logs")
+  @@schema("audit")
+}

@@ -1,40 +1,82 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
 import { Icon } from "@/components/icons";
-
-export const metadata: Metadata = {
-  title: "Dashboard · iPixxel Realty Super Admin",
-};
-
-const REVENUE = [
-  { m: "Mar", h: "48%", g: "linear-gradient(180deg,#a5b4fc,#6366f1)" },
-  { m: "Apr", h: "58%", g: "linear-gradient(180deg,#a5b4fc,#6366f1)" },
-  { m: "May", h: "66%", g: "linear-gradient(180deg,#a5b4fc,#6366f1)" },
-  { m: "Jun", h: "74%", g: "linear-gradient(180deg,#818cf8,#4f46e5)" },
-  { m: "Jul", h: "86%", g: "linear-gradient(180deg,#818cf8,#4f46e5)" },
-  { m: "Aug", h: "100%", g: "linear-gradient(180deg,#6366f1,#4338ca)" },
-];
-
-const ORGS: { av: string; tone: string; name: string; sm: string; plan: string; planTxt: string; users: number; status: string; statusTxt: string; joined: string }[] = [];
-
-const PAYMENTS: { name: string; amt: string; desc: string }[] = [];
+import { useAuth } from "@/lib/auth-context";
+import { getAdminDashboard } from "@/lib/api";
+import type { AdminDashboardResponse } from "@/lib/types";
 
 export default function SuperAdminDashboardPage() {
+  const { user, accessToken, isLoading: authLoading } = useAuth();
+  const [data, setData] = useState<AdminDashboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [revenueMetric, setRevenueMetric] = useState<"MRR" | "Total">("Total");
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!accessToken || user?.role !== "super_admin") {
+      setLoading(false);
+      return;
+    }
+    loadDashboard();
+  }, [authLoading, accessToken, user]);
+
+  async function loadDashboard() {
+    setLoading(true);
+    try {
+      const res = await getAdminDashboard();
+      setData(res);
+    } catch (err) {
+      console.error("Failed to load Super Admin dashboard data:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const firstName = user?.first_name || (user?.email ? user.email.split("@")[0] : "Admin");
+
+  const stats = data?.stats ?? {
+    totalOrgs: 0,
+    activeOrgs: 0,
+    newOrgsThisMonth: 0,
+    newOrgsLastMonth: 0,
+    activeSubscriptions: 0,
+    paidPercentage: 0,
+    platformMrr: 0,
+    platformMrrLakhs: 0,
+    templatesLive: 0,
+    templatesTotal: 0,
+    pendingTemplatesCount: 0,
+  };
+
+  const revenueTimeline = data?.revenueTimeline ?? [];
+  const recentOrgs = data?.recentOrganisations ?? [];
+  const pendingRequests = data?.pendingRequests ?? [];
+
+  // Calculate dynamic bar heights based on selected metric (MRR or Total)
+  const maxRevVal = Math.max(
+    ...revenueTimeline.map((r) => (revenueMetric === "MRR" ? r.mrr : r.total)),
+    1000,
+  );
+
   return (
     <>
       <div className="page-head reveal in">
         <div>
           <div className="eyebrow">▲ Platform overview</div>
-          <h1>Welcome back, Pranab</h1>
+          <h1>Welcome back, {firstName}</h1>
           <div className="sub">
             Here&apos;s how the iPixxel Realty platform is performing across all organisations today.
           </div>
         </div>
         <div className="actions">
-          <button className="btn btn-ghost">⤓ Export</button>
+          <button className="btn btn-ghost" onClick={loadDashboard} disabled={loading}>
+            <Icon name="refresh" size={14} /> Refresh
+          </button>
           <Link className="btn btn-primary" href="/admin-console/organisations">
             <Icon name="building" size={14} /> Organisations
           </Link>
@@ -50,11 +92,14 @@ export default function SuperAdminDashboardPage() {
               <span className="ic ic-indigo"><Icon name="building" size={16} /></span>
             </div>
             <div className="value">
-              <CountUp value={0} />
+              <CountUp value={stats.totalOrgs} />
             </div>
-            <div className="delta up">↑ 8 new this month</div>
+            <div className="delta up">
+              ↑ {stats.newOrgsThisMonth} new this month
+            </div>
           </div>
         </Reveal>
+
         <Reveal delay={2}>
           <div className="stat">
             <div className="top">
@@ -62,11 +107,14 @@ export default function SuperAdminDashboardPage() {
               <span className="ic ic-green"><Icon name="billing" size={16} /></span>
             </div>
             <div className="value">
-              <CountUp value={0} />
+              <CountUp value={stats.activeSubscriptions} />
             </div>
-            <div className="delta up">↑ 83% of orgs paid</div>
+            <div className="delta up">
+              ↑ {stats.paidPercentage}% of orgs paid
+            </div>
           </div>
         </Reveal>
+
         <Reveal delay={3}>
           <div className="stat">
             <div className="top">
@@ -74,11 +122,18 @@ export default function SuperAdminDashboardPage() {
               <span className="ic ic-violet"><Icon name="reports" size={16} /></span>
             </div>
             <div className="value">
-              <CountUp value={0} pre="₹" suf="L" dec={1} />
+              {stats.platformMrr >= 100000 ? (
+                <CountUp value={stats.platformMrrLakhs} pre="₹" suf="L" dec={1} />
+              ) : (
+                <CountUp value={stats.platformMrr} pre="₹" />
+              )}
             </div>
-            <div className="delta up">↑ 12% vs last month</div>
+            <div className="delta up">
+              {stats.activeSubscriptions > 0 ? "↑ Active recurring" : "No active subs"}
+            </div>
           </div>
         </Reveal>
+
         <Reveal delay={4}>
           <div className="stat">
             <div className="top">
@@ -86,9 +141,11 @@ export default function SuperAdminDashboardPage() {
               <span className="ic ic-amber"><Icon name="puzzle" size={16} /></span>
             </div>
             <div className="value">
-              <CountUp value={0} />
+              <CountUp value={stats.templatesLive} />
             </div>
-            <div className="delta up">3 pending activation</div>
+            <div className="delta up">
+              {stats.pendingTemplatesCount} draft / scheduled
+            </div>
           </div>
         </Reveal>
       </div>
@@ -99,40 +156,58 @@ export default function SuperAdminDashboardPage() {
           <div className="card hover">
             <div className="card-h">
               <span className="t">Revenue — last 6 months</span>
-              <Seg options={["MRR", "Total"]} defaultIndex={1} />
+              <Seg
+                options={["MRR", "Total"]}
+                defaultIndex={revenueMetric === "MRR" ? 0 : 1}
+                onChange={(idx) => setRevenueMetric(idx === 0 ? "MRR" : "Total")}
+              />
             </div>
             <div className="card-b">
-              <div style={{ display: "flex", alignItems: "flex-end", gap: 16, height: 190 }}>
-                {REVENUE.map((r) => (
-                  <div
-                    key={r.m}
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "flex-end",
-                      alignItems: "center",
-                      height: "100%",
-                    }}
-                  >
-                    <div
-                      className="bar"
-                      style={{
-                        width: "70%",
-                        height: r.h,
-                        background: r.g,
-                        borderRadius: "10px 10px 0 0",
-                      }}
-                    />
-                    <small className="muted" style={{ marginTop: 8 }}>
-                      {r.m}
-                    </small>
-                  </div>
-                ))}
-              </div>
+              {loading && revenueTimeline.length === 0 ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 190, color: "var(--muted)" }}>
+                  Loading revenue analytics...
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 16, height: 190 }}>
+                  {revenueTimeline.map((r) => {
+                    const val = revenueMetric === "MRR" ? r.mrr : r.total;
+                    const heightPct = Math.max(12, Math.round((val / maxRevVal) * 100));
+                    return (
+                      <div
+                        key={r.m}
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "flex-end",
+                          alignItems: "center",
+                          height: "100%",
+                        }}
+                      >
+                        <div
+                          className="bar"
+                          title={`${r.m}: ₹${val.toLocaleString()}`}
+                          style={{
+                            width: "70%",
+                            height: `${heightPct}%`,
+                            background: r.g,
+                            borderRadius: "10px 10px 0 0",
+                            transition: "height 0.4s ease",
+                            cursor: "pointer",
+                          }}
+                        />
+                        <small className="muted" style={{ marginTop: 8 }}>
+                          {r.m}
+                        </small>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </Reveal>
+
         <Reveal delay={2}>
           <div className="card">
             <div className="card-h">
@@ -146,7 +221,10 @@ export default function SuperAdminDashboardPage() {
                 <Icon name="globe" size={14} /> Manage domain requests
               </Link>
               <Link className="btn btn-ghost btn-block" href="/admin-console/templates">
-                <Icon name="puzzle" size={14} /> Create a template
+                <Icon name="puzzle" size={14} /> Template studio
+              </Link>
+              <Link className="btn btn-ghost btn-block" href="/admin-console/email">
+                <Icon name="mail" size={14} /> Email &amp; SMTP delivery
               </Link>
               <Link className="btn btn-ghost btn-block" href="/admin-console/subscriptions">
                 <Icon name="billing" size={14} /> Manage subscriptions
@@ -185,65 +263,80 @@ export default function SuperAdminDashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ORGS.length === 0 ? (
-                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)' }}>No organisations yet — onboard your first organisation.</td></tr>
-                  ) : ORGS.map((o) => (
-                    <tr key={o.name}>
-                      <td>
-                        <Link className="u" href="/admin-console/organisations">
-                          <span className={`av ${o.tone}`}>{o.av}</span>
-                          <span>
-                            <span className="nm">{o.name}</span>
-                            <br />
-                            <span className="sm">{o.sm}</span>
-                          </span>
-                        </Link>
+                  {recentOrgs.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: "center", padding: "24px", color: "var(--muted)" }}>
+                        {loading ? "Loading organisations..." : "No organisations yet — onboard your first organisation."}
                       </td>
-                      <td>
-                        <span className={`badge ${o.plan}`}>{o.planTxt}</span>
-                      </td>
-                      <td>{o.users}</td>
-                      <td>
-                        <span className={`badge ${o.status}`}>
-                          <span className="dot" style={{ background: "currentColor" }} />
-                          {o.statusTxt}
-                        </span>
-                      </td>
-                      <td>{o.joined}</td>
                     </tr>
-                  ))}
+                  ) : (
+                    recentOrgs.map((o) => (
+                      <tr key={o.id}>
+                        <td>
+                          <Link className="u" href={`/admin-console/organisation-detail/${o.id}`}>
+                            <span className={`av ${o.tone}`}>{o.av}</span>
+                            <span>
+                              <span className="nm">{o.name}</span>
+                              <br />
+                              <span className="sm">{o.sm}</span>
+                            </span>
+                          </Link>
+                        </td>
+                        <td>
+                          <span className={`badge ${o.plan}`}>{o.planTxt}</span>
+                        </td>
+                        <td>{o.users}</td>
+                        <td>
+                          <span className={`badge ${o.status}`}>
+                            <span className="dot" style={{ background: "currentColor" }} />
+                            {o.statusTxt}
+                          </span>
+                        </td>
+                        <td>{o.joined}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         </Reveal>
+
         <Reveal delay={2}>
           <div className="card">
             <div className="card-h">
-              <span className="t">Pending template payments</span>
-              <span className="badge b-amber">3</span>
+              <span className="t">Pending domain approvals</span>
+              <span className="badge b-amber">{pendingRequests.length}</span>
             </div>
             <div className="card-b" style={{ padding: "8px 8px" }}>
-              {PAYMENTS.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '24px', color: 'var(--muted)' }}>No pending payments.</div>
-                ) : PAYMENTS.map((p, i) => (
-                <div key={p.name}>
-                  <div className="hov" style={{ padding: 12 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <b>{p.name}</b>
-                      <span className="badge b-amber">{p.amt}</span>
-                    </div>
-                    <div className="muted" style={{ fontSize: 12.5, margin: "3px 0 8px" }}>
-                      {p.desc}
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button className="btn btn-success btn-sm">Verify &amp; activate</button>
-                      <button className="btn btn-ghost btn-sm">View</button>
-                    </div>
-                  </div>
-                  {i < PAYMENTS.length - 1 && <div className="divider" style={{ margin: "6px 0" }} />}
+              {pendingRequests.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px", color: "var(--muted)" }}>
+                  {loading ? "Checking requests..." : "No pending domain requests."}
                 </div>
-              ))}
+              ) : (
+                pendingRequests.map((p, i) => (
+                  <div key={p.id}>
+                    <div className="hov" style={{ padding: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <b>{p.name}</b>
+                        <span className="badge b-amber">{p.amt}</span>
+                      </div>
+                      <div className="muted" style={{ fontSize: 12.5, margin: "3px 0 8px" }}>
+                        {p.desc}
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <Link href={`/admin-console/domains`} className="btn btn-success btn-sm">
+                          Review &amp; Verify
+                        </Link>
+                        <Link href={`/admin-console/organisation-detail/${p.orgId}`} className="btn btn-ghost btn-sm">
+                          Org
+                        </Link>
+                      </div>
+                    </div>
+                    {i < pendingRequests.length - 1 && <div className="divider" style={{ margin: "6px 0" }} />}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </Reveal>

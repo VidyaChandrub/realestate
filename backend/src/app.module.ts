@@ -27,11 +27,13 @@ import { OrgDomainModule } from './modules/org-domain/org-domain.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OrgTrackingModule } from './modules/org-tracking/org-tracking.module';
 import { PublicSiteModule } from './modules/public-site/public-site.module';
+import { EmailModule } from './modules/email/email.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { OrgProjectCatalogModule } from './modules/org-project-catalog/org-project-catalog.module';
 import { OrgPermissionsModule } from './modules/org-permissions/org-permissions.module';
 import { AdminRolesModule } from './modules/admin-roles/admin-roles.module';
 import { OrgDashboardModule } from './modules/org-dashboard/org-dashboard.module';
+import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
 
 @Module({
   imports: [
@@ -66,6 +68,8 @@ import { OrgDashboardModule } from './modules/org-dashboard/org-dashboard.module
     NotificationsModule,
     OrgTrackingModule,
     PublicSiteModule,
+    EmailModule,
+    AdminDashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

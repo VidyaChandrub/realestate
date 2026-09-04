@@ -74,8 +74,8 @@ export default function OrgProjectLeadsPage() {
   const params = useParams<{ id: string }>();
   const projectId = params?.id ?? "";
   const { isOrgAdmin, hasPermission } = useAuth();
-  const canAssign = isOrgAdmin() || hasPermission("crm", "edit");
-  const canAdd = isOrgAdmin() || hasPermission("crm", "add");
+  const canAssign = Boolean(isOrgAdmin?.()) || hasPermission("crm", "edit");
+  const canAdd = Boolean(isOrgAdmin?.()) || hasPermission("crm", "add");
   const [leads, setLeads] = useState<CrmLead[] | null>(null);
   const [assignable, setAssignable] = useState<{ id: string; name: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);

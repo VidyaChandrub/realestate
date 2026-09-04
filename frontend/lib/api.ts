@@ -54,6 +54,12 @@ import type {
   UnreadNotificationsResponse,
   UpdateOrgCatalogOptionInput,
   UserProfile,
+  SmtpConfig,
+  UpdateSmtpConfigInput,
+  SendTestEmailInput,
+  EmailLogsResponse,
+  EmailStatsResponse,
+  AdminDashboardResponse,
 } from "./types";
 
 const API_BASE = "/api";
@@ -631,4 +637,55 @@ export async function getOrgLandingPages(): Promise<LandingPageRow[]> {
     "/org/landing-pages?page=1&limit=100",
   );
   return res.data;
+}
+
+// --- Super Admin Email & SMTP Management ---
+
+export async function getSmtpConfig(): Promise<SmtpConfig> {
+  return apiFetch<SmtpConfig>("/admin/email/config");
+}
+
+export async function updateSmtpConfig(
+  input: UpdateSmtpConfigInput,
+): Promise<SmtpConfig> {
+  return apiFetch<SmtpConfig>("/admin/email/config", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function sendSmtpTestEmail(
+  input: SendTestEmailInput,
+): Promise<{ success: boolean; message: string; messageId?: string }> {
+  return apiFetch<{ success: boolean; message: string; messageId?: string }>(
+    "/admin/email/test",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function getEmailLogs(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+}): Promise<EmailLogsResponse> {
+  const query = new URLSearchParams();
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.status && params.status !== "all") query.set("status", params.status);
+  if (params?.search) query.set("search", params.search);
+
+  const qs = query.toString();
+  return apiFetch<EmailLogsResponse>(`/admin/email/logs${qs ? `?${qs}` : ""}`);
+}
+
+export async function getEmailStats(): Promise<EmailStatsResponse> {
+  return apiFetch<EmailStatsResponse>("/admin/email/stats");
+}
+
+export async function getAdminDashboard(): Promise<AdminDashboardResponse> {
+  return apiFetch<AdminDashboardResponse>("/admin/dashboard");
 }

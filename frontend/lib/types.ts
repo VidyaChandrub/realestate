@@ -1482,3 +1482,125 @@ export interface SubdomainAvailability {
   reasons: string[];
   suggestions: string[];
 }
+
+// --- Super Admin SMTP Email Configuration & Logs ---
+
+export interface SmtpConfig {
+  id: string | null;
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  password?: string;
+  hasPassword?: boolean;
+  fromEmail: string;
+  fromName: string;
+  replyTo?: string | null;
+  isActive: boolean;
+  inviteSubject?: string | null;
+  inviteBody?: string | null;
+  resetSubject?: string | null;
+  resetBody?: string | null;
+  updatedAt?: string;
+}
+
+export interface UpdateSmtpConfigInput {
+  host: string;
+  port: number;
+  secure: boolean;
+  user?: string;
+  password?: string;
+  fromEmail: string;
+  fromName: string;
+  replyTo?: string;
+  isActive?: boolean;
+  inviteSubject?: string;
+  inviteBody?: string;
+  resetSubject?: string;
+  resetBody?: string;
+}
+
+export interface SendTestEmailInput {
+  to: string;
+  subject?: string;
+}
+
+export interface EmailLogEntry {
+  id: string;
+  to: string;
+  subject: string;
+  template: string | null;
+  status: "sent" | "failed";
+  error: string | null;
+  metadata?: any;
+  sentAt: string;
+}
+
+export interface EmailLogsResponse {
+  data: EmailLogEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface EmailStatsResponse {
+  totalSent: number;
+  totalFailed: number;
+  totalDispatched: number;
+  lastDispatchedAt: string | null;
+}
+
+// --- Super Admin Dashboard Data Types ---
+
+export interface AdminDashboardStats {
+  totalOrgs: number;
+  activeOrgs: number;
+  newOrgsThisMonth: number;
+  newOrgsLastMonth: number;
+  activeSubscriptions: number;
+  paidPercentage: number;
+  platformMrr: number;
+  platformMrrLakhs: number;
+  templatesLive: number;
+  templatesTotal: number;
+  pendingTemplatesCount: number;
+}
+
+export interface AdminDashboardRevenueMonth {
+  m: string;
+  mrr: number;
+  total: number;
+  h: string;
+  g: string;
+}
+
+export interface AdminDashboardOrgRow {
+  id: string;
+  name: string;
+  sm: string;
+  av: string;
+  tone: string;
+  plan: string;
+  planTxt: string;
+  users: number;
+  status: string;
+  statusTxt: string;
+  joined: string;
+}
+
+export interface AdminDashboardPendingRequest {
+  id: string;
+  name: string;
+  amt: string;
+  desc: string;
+  orgId: string;
+  status: string;
+}
+
+export interface AdminDashboardResponse {
+  stats: AdminDashboardStats;
+  revenueTimeline: AdminDashboardRevenueMonth[];
+  recentOrganisations: AdminDashboardOrgRow[];
+  pendingRequests: AdminDashboardPendingRequest[];
+}

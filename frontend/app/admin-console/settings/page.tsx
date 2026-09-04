@@ -99,7 +99,7 @@ export default function SuperAdminSettingsPage() {
       <div className="grid g3" style={{ marginBottom: 28 }}>
         {INTEGRATIONS.map((it, i) => (
           <Reveal key={it.name} delay={i + 1}>
-            <div className="card hover">
+            <div className="card hover" style={it.name === "SMTP Email" ? { border: "1px solid var(--brand, #6366f1)" } : undefined}>
               <div className="card-b">
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                   <span
@@ -108,17 +108,28 @@ export default function SuperAdminSettingsPage() {
                   >
                     {it.emoji}
                   </span>
-                  <Switch defaultOn={it.on} />
+                  {it.name === "SMTP Email" ? (
+                    <a href="/admin-console/email" className="btn btn-ghost btn-sm" style={{ padding: "4px 10px", fontSize: 12 }}>
+                      Configure →
+                    </a>
+                  ) : (
+                    <Switch defaultOn={it.on} />
+                  )}
                 </div>
                 <h3 style={{ margin: "14px 0 4px" }}>{it.name}</h3>
                 <div className="muted" style={{ fontSize: 12.5 }}>
                   {it.desc}
                 </div>
-                <div style={{ marginTop: 12 }}>
+                <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <span className={`badge ${it.badge}`}>
                     <span className="dot" style={{ background: "currentColor" }} />
                     {it.badgeTxt}
                   </span>
+                  {it.name === "SMTP Email" && (
+                    <a href="/admin-console/email" style={{ fontSize: 12, color: "var(--brand, #6366f1)", fontWeight: 600, textDecoration: "none" }}>
+                      Manage SMTP
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

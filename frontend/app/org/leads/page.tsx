@@ -79,7 +79,9 @@ function sourceBadgeClass(source: string | null): string {
 
 export default function OrgLeadsPage() {
   const { isOrgAdmin, hasPermission } = useAuth();
-  const canAssign = isOrgAdmin() || hasPermission("crm", "edit");
+  const admin = Boolean(isOrgAdmin?.());
+  const canAssign = admin || hasPermission("crm", "edit");
+  const canAdd = admin || hasPermission("crm", "add");
 
   const [leads, setLeads] = useState<CrmLead[] | null>(null);
   const [assignable, setAssignable] = useState<
@@ -155,7 +157,7 @@ export default function OrgLeadsPage() {
         setSavingId(null);
       }
     },
-    [admin, savingId],
+    [canAssign, savingId],
   );
 
   const assigneeOptions = useMemo(
@@ -168,7 +170,7 @@ export default function OrgLeadsPage() {
       <LeadsPageHead
         active="lead-center"
         actions={
-          admin ? (
+          admin || canAdd ? (
             <>
               <button className="btn btn-ghost">Import</button>
               <button className="btn btn-primary">＋ Add lead</button>

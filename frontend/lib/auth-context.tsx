@@ -26,6 +26,7 @@ import {
   dashboardPathFor,
   findMockAccount,
 } from "./mock/sessions";
+import { isOrgAdmin as isOrgAdminSession } from "./session";
 
 const STORAGE_KEYS = {
   accessToken: "be.access_token",
@@ -68,6 +69,7 @@ interface AuthContextValue {
     module: string,
     action: "view" | "add" | "edit" | "delete",
   ) => boolean;
+  isOrgAdmin: () => boolean;
   refreshPermissions: () => Promise<Permissions | null>;
 }
 
@@ -309,6 +311,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshPermissions = useCallback(async (): Promise<Permissions | null> => {
+    // Super admins have global access and do not belong to an organisation org-permissions matrix
+    if (user?.role === "super_admin" || (user && !user.org_id)) return null;
+
     const token = accessToken ?? (typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.accessToken) : null);
     if (!token || token.startsWith("mock-access-")) return null;
     try {
@@ -332,7 +337,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ignore
     }
     return null;
-  }, [accessToken]);
+  }, [accessToken, user]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -357,6 +362,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [accessToken, refreshPermissions]);
 
+  const isOrgAdmin = useCallback((): boolean => {
+    if (!user) return false;
+    if (user.role === "admin" || user.role === "super_admin") return true;
+    return isOrgAdminSession();
+  }, [user]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -373,6 +384,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       completeOnboarding,
       getOrgSetup,
       hasPermission,
+      isOrgAdmin,
       refreshPermissions,
     }),
     [
@@ -389,6 +401,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       completeOnboarding,
       getOrgSetup,
       hasPermission,
+      isOrgAdmin,
       refreshPermissions,
     ],
   );

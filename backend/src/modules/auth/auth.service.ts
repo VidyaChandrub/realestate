@@ -49,6 +49,7 @@ import {
   mergeRolePermissions,
   SYSTEM_ORG_ID,
 } from '../../common/utils/permissions.util';
+import { EmailService } from '../email/email.service';
 
 const BCRYPT_COST_FACTOR = 12;
 
@@ -910,7 +911,22 @@ export class AuthService {
       email: user.email,
       expires: Date.now() + 1000 * 60 * 60,
     });
-    // TODO: send a real email; for now return the token so local dev can complete the flow.
+
+    try {
+      const emailService = new EmailService(this.prisma);
+      const recipientName = [user.firstName, user.lastName]
+        .filter(Boolean)
+        .join(' ');
+      await emailService.sendPasswordResetEmail({
+        to: user.email,
+        recipientName: recipientName || undefined,
+        resetToken: token,
+      });
+    } catch (err: any) {
+      // Fallback logging so developer can still access token in local mode
+      console.error(`[Forgot Password] Could not deliver email: ${err.message}`);
+    }
+
     return { success: true, resetToken: token };
   }
 
