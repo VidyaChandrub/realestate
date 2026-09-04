@@ -12,6 +12,7 @@ import type { OrganisationListResponse, OrganisationListRow, OrganisationSummary
 import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RowActionsMenu, type RowAction } from "@/components/superadmin/row-actions-menu";
+import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 
 // The "Disabled" tab's status param covers both admin-disabled and
 // rejected orgs (see the backend's list() query) — labelled to match.
@@ -414,12 +415,7 @@ export default function SuperAdminOrganisationsPage() {
                             {o.status === "active" ? "Active" : o.status === "pending" ? "Pending" : o.status === "rejected" ? "Rejected" : "Disabled"}
                           </span>
                           {o.status === "rejected" && o.rejectionReason ? (
-                            <span
-                              title={`Rejection reason: ${o.rejectionReason}`}
-                              style={{ display:"inline-flex", color:"var(--rose)", cursor:"help" }}
-                            >
-                              <Icon name="info" size={14} />
-                            </span>
+                            <ReasonInfoPopover reason={o.rejectionReason} />
                           ) : null}
                         </div>
                       </td>
