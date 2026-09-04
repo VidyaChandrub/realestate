@@ -173,13 +173,14 @@ export class OrgDashboardService {
               price: true,
               carpetSqft: true,
               builtupSqft: true,
-              units: {
-                select: {
-                  id: true,
-                  status: true,
-                  price: true,
-                },
-              },
+            },
+          },
+          units: {
+            select: {
+              id: true,
+              configuration: true,
+              status: true,
+              price: true,
             },
           },
         },
@@ -350,18 +351,20 @@ export class OrgDashboardService {
 
       for (const ut of p.unitTypes) {
         pTotalPlanned += ut.totalUnits ?? 0;
-        for (const u of ut.units) {
-          pUnitsCreated += 1;
-          const uPrice = u.price ?? ut.price ?? 0;
-          if (u.status === 'available') {
-            pAvailable += 1;
-            pAvailValue += uPrice;
-          } else if (u.status === 'booked') {
-            pBooked += 1;
-            pSoldValue += uPrice;
-          } else if (u.status === 'held') {
-            pHeld += 1;
-          }
+      }
+
+      for (const u of p.units) {
+        pUnitsCreated += 1;
+        const plannedType = p.unitTypes.find((ut) => ut.name === u.configuration);
+        const uPrice = u.price ?? plannedType?.price ?? 0;
+        if (u.status === 'available') {
+          pAvailable += 1;
+          pAvailValue += uPrice;
+        } else if (u.status === 'booked') {
+          pBooked += 1;
+          pSoldValue += uPrice;
+        } else if (u.status === 'held') {
+          pHeld += 1;
         }
       }
 
