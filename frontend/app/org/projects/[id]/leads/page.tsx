@@ -8,7 +8,7 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
 import { assignCrmLead, getCrmAssignableUsers, getCrmLeads } from "@/lib/api";
-import { isOrgAdmin } from "@/lib/session";
+import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import "@/app/org/org.css";
 
@@ -73,7 +73,9 @@ function sourceBadgeClass(source: string | null): string {
 export default function OrgProjectLeadsPage() {
   const params = useParams<{ id: string }>();
   const projectId = params?.id ?? "";
-  const admin = isOrgAdmin();
+  const { isOrgAdmin, hasPermission } = useAuth();
+  const canAssign = isOrgAdmin() || hasPermission("crm", "edit");
+  const canAdd = isOrgAdmin() || hasPermission("crm", "add");
   const [leads, setLeads] = useState<CrmLead[] | null>(null);
   const [assignable, setAssignable] = useState<{ id: string; name: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,13 +96,13 @@ export default function OrgProjectLeadsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (admin) {
+    if (canAssign) {
       getCrmAssignableUsers()
         .then((res) => { if (!cancelled) setAssignable(res.data); })
         .catch(() => { if (!cancelled) setAssignable([]); });
     }
     return () => { cancelled = true; };
-  }, [admin]);
+  }, [canAssign]);
 
   const stats = useMemo(() => {
     const current = leads ?? [];
@@ -113,7 +115,7 @@ export default function OrgProjectLeadsPage() {
   }, [leads]);
 
   const handleAssign = useCallback(async (lead: CrmLead, assignedToId: string | null, status?: CrmLeadStatus) => {
-    if (!admin || savingId) return;
+    if (!canAssign || savingId) return;
     setSavingId(lead.id);
     setError(null);
     try {
@@ -132,7 +134,7 @@ export default function OrgProjectLeadsPage() {
     } finally {
       setSavingId(null);
     }
-  }, [admin, savingId]);
+  }, [canAssign, savingId]);
 
   const assigneeOptions = useMemo(
     () => assignable?.map((a) => ({ id: a.id, name: a.name })) ?? [],
@@ -141,7 +143,7 @@ export default function OrgProjectLeadsPage() {
 
   return (
     <>
-      <ProjectPageHead active="leads" actions={admin ? <button className="btn btn-primary">＋ Add lead</button> : undefined} />
+      <ProjectPageHead active="leads" actions={canAdd ? <button className="btn btn-primary">＋ Add lead</button> : undefined} />
       <Reveal delay={1}>
         <div className="mb-20">
           <div className="seg-wrap"><div className="seg">
@@ -175,7 +177,7 @@ export default function OrgProjectLeadsPage() {
           ) : (
             <div className="tbl-wrap">
               <table className="tbl">
-                <thead><tr><th>Lead</th><th>Source</th><th>Assigned To</th><th>Status</th>{admin ? <th>Actions</th> : null}</tr></thead>
+                <thead><tr><th>Lead</th><th>Source</th><th>Assigned To</th><th>Status</th>{canAssign ? <th>Actions</th> : null}</tr></thead>
                 <tbody>{leads.map((lead) => {
                   const name = leadName(lead);
                   const phone = leadPhone(lead);
@@ -184,8 +186,8 @@ export default function OrgProjectLeadsPage() {
                       <td><span className="u"><span className={`av ${phone ? "a2" : ""}`}>{initialsFor(name)}</span><span><Link className="nm" href={`/org/leads/${lead.id}`}>{name}</Link>{phone ? <br /> : null}{phone ? <span className="sm">{phone}</span> : null}</span></span></td>
                       <td><span className={`badge ${sourceBadgeClass(lead.source)}`}>{lead.source ?? "website"}</span></td>
                       <td>{lead.assignedTo ? <span className="u"><span className="av a3">{initialsFor(lead.assignedTo.name)}</span><span className="nm">{lead.assignedTo.name}</span></span> : <span className="muted">Unassigned</span>}</td>
-                      <td>{admin ? <select className="inp" style={{ width: "auto" }} value={lead.status} disabled={savingId === lead.id} onChange={(e) => handleAssign(lead, lead.assignedTo?.id ?? null, e.target.value as CrmLeadStatus)}>{ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select> : <span className={`badge ${STATUS_BADGE[lead.status]}`}>{STATUS_LABEL[lead.status]}</span>}</td>
-                      {admin ? <td><select className="inp" style={{ width: "auto" }} value={lead.assignedTo?.id ?? ""} disabled={savingId === lead.id} onChange={(e) => handleAssign(lead, e.target.value || null)}><option value="">Unassigned</option>{assigneeOptions.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></td> : null}
+                      <td>{canAssign ? <select className="inp" style={{ width: "auto" }} value={lead.status} disabled={savingId === lead.id} onChange={(e) => handleAssign(lead, lead.assignedTo?.id ?? null, e.target.value as CrmLeadStatus)}>{ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select> : <span className={`badge ${STATUS_BADGE[lead.status]}`}>{STATUS_LABEL[lead.status]}</span>}</td>
+                      {canAssign ? <td><select className="inp" style={{ width: "auto" }} value={lead.assignedTo?.id ?? ""} disabled={savingId === lead.id} onChange={(e) => handleAssign(lead, e.target.value || null)}><option value="">Unassigned</option>{assigneeOptions.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></td> : null}
                     </tr>
                   );
                 })}</tbody>

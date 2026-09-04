@@ -15,6 +15,8 @@ import {
 import {
   assertPermission,
   computeEffectivePermissions,
+  mergeRolePermissions,
+  SYSTEM_ORG_ID,
 } from '../utils/permissions.util';
 
 /**
@@ -76,13 +78,14 @@ export class PermissionGuard implements CanActivate {
       return true;
     }
 
-    const [rolePermissions, userOverrides] = await Promise.all([
+    const [rawRolePermissions, userOverrides] = await Promise.all([
       this.prisma.roleModulePermission.findMany({
         where: {
-          orgId,
+          orgId: { in: [orgId, SYSTEM_ORG_ID] },
           role: { key: { in: roleKeys } },
         },
         select: {
+          orgId: true,
           moduleKey: true,
           canView: true,
           canAdd: true,
@@ -103,6 +106,8 @@ export class PermissionGuard implements CanActivate {
         },
       }),
     ]);
+
+    const rolePermissions = mergeRolePermissions(rawRolePermissions);
 
     const effective = computeEffectivePermissions({
       roleKeys,

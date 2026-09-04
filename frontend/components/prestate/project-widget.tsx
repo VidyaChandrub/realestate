@@ -151,14 +151,14 @@ export function ProjectEnquiryModal({
         </button>
         {!done ? (
           <>
-            <div style={{ background: `linear-gradient(135deg, ${W.primary} 0%, #6366f1 100%)`, padding: "22px 24px", color: "#fff" }}>
+            <div style={{ background: `linear-gradient(135deg, ${W.primary} 0%, #6366f1 100%)`, padding: "16px 20px", color: "#fff" }}>
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", opacity: 0.9, display: "flex", alignItems: "center", gap: 6 }}>
                 <Building2 size={12} /> {project.name}
               </div>
-              <div style={{ fontSize: 20, fontWeight: 900, marginTop: 6, lineHeight: 1.2 }}>{heading || `Enquire About ${project.name}`}</div>
-              {text ? <p style={{ fontSize: 13, opacity: 0.9, marginTop: 8, lineHeight: 1.5 }}>{text}</p> : null}
+              <div style={{ fontSize: 18, fontWeight: 900, marginTop: 4, lineHeight: 1.2 }}>{heading || `Enquire About ${project.name}`}</div>
+              {text ? <p style={{ fontSize: 12.5, opacity: 0.9, marginTop: 6, lineHeight: 1.45 }}>{text}</p> : null}
             </div>
-            <div style={{ padding: "22px 22px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
               {units.length > 0 ? (
                 <div>
                   <label style={{ fontSize: 11.5, fontWeight: 700, color: W.slate, marginBottom: 5, display: "block" }}>

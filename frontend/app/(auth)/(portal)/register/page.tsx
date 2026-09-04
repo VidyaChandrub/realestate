@@ -254,12 +254,10 @@ export default function RegisterPage() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await apiFetch<any[]>("/admin/roles");
+        const data = await apiFetch<{ v: string; label: string; description?: string }[]>("/onboarding/roles");
         if (Array.isArray(data) && data.length > 0) {
-          const mapped = data
-            .filter((r) => r.key !== "super_admin" && r.key !== "admin" && r.status === "active")
-            .map((r) => ({ v: r.key, label: r.name }));
-          if (mapped.length > 0) setAvailableRoles(mapped);
+          setAvailableRoles(data);
+          return;
         }
       } catch {
         // Fallback: try org permissions catalog if logged in
@@ -272,17 +270,17 @@ export default function RegisterPage() {
               if (mapped.length > 0) setAvailableRoles(mapped);
             }
           })
-          .catch(() => {});
+          .catch(() => { });
       }
     })();
-  }, []);
+  }, [cur]);
 
   useEffect(() => {
     (async () => {
       try {
         const data = await apiFetch<Plan[]>("/plans");
         setPlans(Array.isArray(data) ? data : []);
-      } catch {}
+      } catch { }
       finally { setLoadingPlans(false); }
     })();
   }, []);
@@ -840,7 +838,7 @@ export default function RegisterPage() {
                       aria-label="Mobile number"
                     />
                   </div>
-                {/*<div className="hint">{phoneCallingCode ? "Auto-set from Country." : "Select a country to set the code."}</div>*/}
+                  {/*<div className="hint">{phoneCallingCode ? "Auto-set from Country." : "Select a country to set the code."}</div>*/}
                   {fieldErrors.phone_number ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.phone_number}</div> : null}
                 </div>
               </div>
@@ -874,66 +872,66 @@ export default function RegisterPage() {
                   ))}
                 </div>
               </div>
-                <div className="field">
-                  <label>Company name <span className="req">*</span></label>
-                  <input className="inp" value={form.company_name} onChange={updateCompany} placeholder="Skyline Developers" />
-                </div>
-                <div className="field">
-                  <label>Subdomain <span className="req">*</span></label>
-                  <input className="inp" value={subdomain} onChange={update("subdomain")} placeholder="skylinedev" />
-                  {!checkingSubdomain && !subdomainCheck && companySubdomainSuggestions.length > 0 ? (
-                    <div className="hint" style={{ display: "block", color: "var(--muted)" }}>
-                      Suggestions:{" "}
-                      {companySubdomainSuggestions.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          className="chip"
-                          style={{ cursor: "pointer", margin: "2px 4px 2px 0" }}
-                          onClick={() => setForm((prev) => ({ ...prev, subdomain: s }))}
-                        >
-                          {subdomainPreviewHost(s)}
-                        </button>
-                      ))}
+              <div className="field">
+                <label>Company name <span className="req">*</span></label>
+                <input className="inp" value={form.company_name} onChange={updateCompany} placeholder="Skyline Developers" />
+              </div>
+              <div className="field">
+                <label>Subdomain <span className="req">*</span></label>
+                <input className="inp" value={subdomain} onChange={update("subdomain")} placeholder="skylinedev" />
+                {!checkingSubdomain && !subdomainCheck && companySubdomainSuggestions.length > 0 ? (
+                  <div className="hint" style={{ display: "block", color: "var(--muted)" }}>
+                    Suggestions:{" "}
+                    {companySubdomainSuggestions.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        className="chip"
+                        style={{ cursor: "pointer", margin: "2px 4px 2px 0" }}
+                        onClick={() => setForm((prev) => ({ ...prev, subdomain: s }))}
+                      >
+                        {subdomainPreviewHost(s)}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {checkingSubdomain ? (
+                  <div className="hint">Checking availability…</div>
+                ) : subdomainCheck ? (
+                  subdomainCheck.available ? (
+                    <div className="hint" style={{ color: "var(--green)" }}>
+                      ✅ {subdomainCheck.host} is available
                     </div>
-                  ) : null}
-                  {checkingSubdomain ? (
-                    <div className="hint">Checking availability…</div>
-                  ) : subdomainCheck ? (
-                    subdomainCheck.available ? (
-                      <div className="hint" style={{ color: "var(--green)" }}>
-                        ✅ {subdomainCheck.host} is available
-                      </div>
-                    ) : (
-                      <div className="hint" style={{ color: "var(--rose)" }}>
-                        ❌ {subdomainCheck.host} is already taken. Please choose another.
-                        {subdomainCheck.suggestions.length ? (
-                          <span style={{ display: "block", marginTop: 6, color: "var(--muted)" }}>
-                            Suggestions:{" "}
-                            {subdomainCheck.suggestions.map((s) => (
-                              <button
-                                key={s}
-                                type="button"
-                                className="chip"
-                                style={{ cursor: "pointer", margin: "2px 4px 2px 0" }}
-                                onClick={() => {
-                                  setForm((prev) => ({ ...prev, subdomain: s }));
-                                  setSubdomainCheck(null);
-                                }}
-                              >
-                                {subdomainPreviewHost(s)}
-                              </button>
-                            ))}
-                          </span>
-                        ) : null}
-                      </div>
-                    )
-                  ) : subdomain ? (
-                    <div className="hint">✅ {subdomainPreviewHost(subdomain)} is available</div>
                   ) : (
-                    <div className="hint">You&apos;ll get <b>{subdomainPreviewHost("yourco")}</b></div>
-                  )}
-                </div>
+                    <div className="hint" style={{ color: "var(--rose)" }}>
+                      ❌ {subdomainCheck.host} is already taken. Please choose another.
+                      {subdomainCheck.suggestions.length ? (
+                        <span style={{ display: "block", marginTop: 6, color: "var(--muted)" }}>
+                          Suggestions:{" "}
+                          {subdomainCheck.suggestions.map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              className="chip"
+                              style={{ cursor: "pointer", margin: "2px 4px 2px 0" }}
+                              onClick={() => {
+                                setForm((prev) => ({ ...prev, subdomain: s }));
+                                setSubdomainCheck(null);
+                              }}
+                            >
+                              {subdomainPreviewHost(s)}
+                            </button>
+                          ))}
+                        </span>
+                      ) : null}
+                    </div>
+                  )
+                ) : subdomain ? (
+                  <div className="hint">✅ {subdomainPreviewHost(subdomain)} is available</div>
+                ) : (
+                  <div className="hint">You&apos;ll get <b>{subdomainPreviewHost("yourco")}</b></div>
+                )}
+              </div>
               <div className="row2">
                 <div className="field" style={{ marginBottom: form.country ? 0 : undefined }}>
                   <label>Team size</label>

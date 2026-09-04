@@ -483,6 +483,42 @@ export interface OrgDashboardKpiData {
   projectMetrics: { projectId: string; projectName: string; leadsCount: number; wonCount: number; revenue: number }[];
   agentLeaderboard: { userId: string; name: string; email: string; role: string; leadsCount: number; wonCount: number; revenue: number; callsCount: number; conversionRate: number }[];
   recentActivity: { id: string; type: string; text: string; createdAt: string }[];
+  inventorySummary?: {
+    totalProjects: number;
+    activeProjects: number;
+    totalUnits: number;
+    unitsAvailable: number;
+    unitsBooked: number;
+    unitsHeld: number;
+    portfolioOccupancyRate: number;
+    inventoryValueAvailable: number;
+    inventoryValueSold: number;
+    projects: {
+      id: string;
+      name: string;
+      status: string;
+      location: string;
+      priceMin?: number | null;
+      priceMax?: number | null;
+      currency: string;
+      towerCount?: number | null;
+      floorsDescription?: string | null;
+      landArea?: number | null;
+      possession?: string | null;
+      reraId?: string | null;
+      coverImageUrl?: string | null;
+      totalUnitsPlanned: number;
+      unitsCreated: number;
+      unitsAvailable: number;
+      unitsBooked: number;
+      unitsHeld: number;
+      occupancyPct: number;
+      inventoryValueAvailable: number;
+      inventoryValueSold: number;
+      unitTypesCount: number;
+      configurations: string;
+    }[];
+  };
 }
 
 export interface OrganisationActivityRow {

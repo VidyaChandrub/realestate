@@ -65,7 +65,13 @@ export class OrgDashboardService {
       callWhere.agentId = actor.sub;
     } else if (isManager) {
       const managedProjects = await this.prisma.project.findMany({
-        where: { orgId, managerId: actor.sub },
+        where: {
+          orgId,
+          OR: [
+            { managerId: actor.sub },
+            { salesAgents: { some: { userId: actor.sub } } },
+          ],
+        },
         select: { id: true },
       });
       const projIds = managedProjects.map((p) => p.id);
@@ -132,8 +138,51 @@ export class OrgDashboardService {
         select: { id: true, type: true, text: true, createdAt: true },
       }),
       this.prisma.project.findMany({
-        where: { orgId },
-        select: { id: true, name: true },
+        where: {
+          orgId,
+          ...(isLimitedRole
+            ? { salesAgents: { some: { userId: actor.sub } } }
+            : isManager
+            ? {
+                OR: [
+                  { managerId: actor.sub },
+                  { salesAgents: { some: { userId: actor.sub } } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          location: true,
+          priceMin: true,
+          priceMax: true,
+          currency: true,
+          towerCount: true,
+          floorsDescription: true,
+          landArea: true,
+          possession: true,
+          reraId: true,
+          coverImageUrl: true,
+          unitTypes: {
+            select: {
+              id: true,
+              name: true,
+              totalUnits: true,
+              price: true,
+              carpetSqft: true,
+              builtupSqft: true,
+              units: {
+                select: {
+                  id: true,
+                  status: true,
+                  price: true,
+                },
+              },
+            },
+          },
+        },
       }),
       this.prisma.user.findMany({
         where: { orgId },
@@ -208,6 +257,16 @@ export class OrgDashboardService {
       { projectId: string; projectName: string; leadsCount: number; wonCount: number; revenue: number }
     >();
 
+    for (const p of orgProjects) {
+      projectStatsMap.set(p.id, {
+        projectId: p.id,
+        projectName: p.name,
+        leadsCount: 0,
+        wonCount: 0,
+        revenue: 0,
+      });
+    }
+
     for (const l of leads) {
       if (!l.projectId) continue;
       const projName = projectMap.get(l.projectId) ?? 'Unknown Project';
@@ -273,6 +332,76 @@ export class OrgDashboardService {
         stat.leadsCount > 0 ? parseFloat(((stat.wonCount / stat.leadsCount) * 100).toFixed(1)) : 0;
     }
 
+    let totalInventoryUnits = 0;
+    let totalUnitsAvailable = 0;
+    let totalUnitsBooked = 0;
+    let totalUnitsHeld = 0;
+    let inventoryValueAvailable = 0;
+    let inventoryValueSold = 0;
+
+    const projectSummaries = orgProjects.map((p) => {
+      let pTotalPlanned = 0;
+      let pUnitsCreated = 0;
+      let pAvailable = 0;
+      let pBooked = 0;
+      let pHeld = 0;
+      let pAvailValue = 0;
+      let pSoldValue = 0;
+
+      for (const ut of p.unitTypes) {
+        pTotalPlanned += ut.totalUnits ?? 0;
+        for (const u of ut.units) {
+          pUnitsCreated += 1;
+          const uPrice = u.price ?? ut.price ?? 0;
+          if (u.status === 'available') {
+            pAvailable += 1;
+            pAvailValue += uPrice;
+          } else if (u.status === 'booked') {
+            pBooked += 1;
+            pSoldValue += uPrice;
+          } else if (u.status === 'held') {
+            pHeld += 1;
+          }
+        }
+      }
+
+      totalInventoryUnits += (pUnitsCreated > 0 ? pUnitsCreated : pTotalPlanned);
+      totalUnitsAvailable += pAvailable;
+      totalUnitsBooked += pBooked;
+      totalUnitsHeld += pHeld;
+      inventoryValueAvailable += pAvailValue;
+      inventoryValueSold += pSoldValue;
+
+      const effectiveTotal = pUnitsCreated > 0 ? pUnitsCreated : pTotalPlanned;
+      const occupancyPct = effectiveTotal > 0 ? Math.round((pBooked / effectiveTotal) * 100) : 0;
+
+      return {
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        location: p.location ?? '',
+        priceMin: p.priceMin,
+        priceMax: p.priceMax,
+        currency: p.currency ?? 'INR',
+        towerCount: p.towerCount,
+        floorsDescription: p.floorsDescription,
+        landArea: p.landArea,
+        possession: p.possession,
+        reraId: p.reraId,
+        coverImageUrl: p.coverImageUrl,
+        totalUnitsPlanned: pTotalPlanned,
+        unitsCreated: pUnitsCreated,
+        unitsAvailable: pAvailable,
+        unitsBooked: pBooked,
+        unitsHeld: pHeld,
+        occupancyPct,
+        inventoryValueAvailable: pAvailValue,
+        inventoryValueSold: pSoldValue,
+        unitTypesCount: p.unitTypes.length,
+        configurations: p.unitTypes.map((ut) => ut.name).join(', '),
+      };
+    });
+
     const primaryRole = actor.roles[0] ?? 'admin';
 
     return {
@@ -290,6 +419,21 @@ export class OrgDashboardService {
         callConnectRate,
         totalTalkTimeSeconds,
         siteVisitsBooked,
+      },
+      inventorySummary: {
+        totalProjects: orgProjects.length,
+        activeProjects: orgProjects.filter((p) => p.status === 'active').length,
+        totalUnits: totalInventoryUnits,
+        unitsAvailable: totalUnitsAvailable,
+        unitsBooked: totalUnitsBooked,
+        unitsHeld: totalUnitsHeld,
+        portfolioOccupancyRate:
+          totalInventoryUnits > 0
+            ? Math.round((totalUnitsBooked / totalInventoryUnits) * 100)
+            : 0,
+        inventoryValueAvailable,
+        inventoryValueSold,
+        projects: projectSummaries,
       },
       pipelineBreakdown: [
         { status: 'new', label: 'New', count: statusCounts['new'] ?? 0 },

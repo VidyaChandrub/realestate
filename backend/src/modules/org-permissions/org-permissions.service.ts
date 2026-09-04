@@ -12,7 +12,9 @@ import {
   computeEffectivePermissions,
   emptyModulePermission,
   loadRolePermissions,
+  mergeRolePermissions,
   modulePermissionUpsertData,
+  SYSTEM_ORG_ID,
   type ModulePermission,
   type PermissionAction,
 } from '../../common/utils/permissions.util';
@@ -298,9 +300,13 @@ export class OrgPermissionsService {
     }
 
     const roleKeys = user.userRoles.map((ur) => ur.role.key);
-    const rolePermissions = await this.prisma.roleModulePermission.findMany({
-      where: { orgId, role: { key: { in: roleKeys } } },
+    const rawRolePermissions = await this.prisma.roleModulePermission.findMany({
+      where: {
+        orgId: { in: [orgId, SYSTEM_ORG_ID] },
+        role: { key: { in: roleKeys } },
+      },
       select: {
+        orgId: true,
         role: { select: { key: true } },
         moduleKey: true,
         canView: true,
@@ -310,6 +316,7 @@ export class OrgPermissionsService {
         canApprove: true,
       },
     });
+    const rolePermissions = mergeRolePermissions(rawRolePermissions);
 
     const effective = computeEffectivePermissions({
       roleKeys,
@@ -364,9 +371,13 @@ export class OrgPermissionsService {
     }
 
     const roleKeys = user.userRoles.map((ur) => ur.role.key);
-    const rolePermissions = await this.prisma.roleModulePermission.findMany({
-      where: { orgId, role: { key: { in: roleKeys } } },
+    const rawRolePermissions = await this.prisma.roleModulePermission.findMany({
+      where: {
+        orgId: { in: [orgId, SYSTEM_ORG_ID] },
+        role: { key: { in: roleKeys } },
+      },
       select: {
+        orgId: true,
         role: { select: { key: true } },
         moduleKey: true,
         canView: true,
@@ -376,6 +387,7 @@ export class OrgPermissionsService {
         canApprove: true,
       },
     });
+    const rolePermissions = mergeRolePermissions(rawRolePermissions);
 
     const effective = computeEffectivePermissions({
       roleKeys,

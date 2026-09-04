@@ -51,7 +51,8 @@ export default function OrgLeadDetailPage() {
   const [reminderAt, setReminderAt] = useState("");
   const [actionNote, setActionNote] = useState("");
   const [savingAction, setSavingAction] = useState(false);
-  const canEditLead = hasPermission("leads", "edit") || isOrgAdmin();
+  const canEditLead = hasPermission("crm", "edit") || isOrgAdmin();
+  const canAddNote = hasPermission("crm", "add") || canEditLead;
 
   useEffect(() => {
     if (!id || authLoading || !user) return;
@@ -65,7 +66,7 @@ export default function OrgLeadDetailPage() {
   }, [id, authLoading, user]);
 
   async function updateStatus(status: CrmLeadStatus) {
-    if (!lead || !hasPermission("leads", "edit")) return;
+    if (!lead || !canEditLead) return;
     setSaving(true);
     try {
       const result = await assignCrmLead(lead.id, { assignedToId: lead.assignedTo?.id ?? null, status });
@@ -79,7 +80,7 @@ export default function OrgLeadDetailPage() {
 
   async function addNote() {
     const text = note.trim();
-    if (!lead || !text || addingNote || !hasPermission("leads", "edit")) return;
+    if (!lead || !text || addingNote || !canAddNote) return;
     setAddingNote(true);
     setError("");
     try {
@@ -154,7 +155,7 @@ export default function OrgLeadDetailPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <Reveal delay={1}><div className="card"><div className="card-b">
             <div className="prof"><div className="av av-lg a4">{name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase()}</div><div className="mono">{phone}</div><div className="muted" style={{ fontSize: 13 }}>{email}</div></div>
-            <div className="field" style={{ marginTop: 14 }}><label>Pipeline status</label><select className="inp" value={lead.status} disabled={saving || !hasPermission("leads", "edit")} onChange={(event) => void updateStatus(event.target.value as CrmLeadStatus)}>{statuses.map((status) => <option key={status} value={status}>{status.replace("_", " ")}</option>)}</select></div>
+            <div className="field" style={{ marginTop: 14 }}><label>Pipeline status</label><select className="inp" value={lead.status} disabled={saving || !canEditLead} onChange={(event) => void updateStatus(event.target.value as CrmLeadStatus)}>{statuses.map((status) => <option key={status} value={status}>{status.replace("_", " ")}</option>)}</select></div>
           </div></div></Reveal>
           <Reveal delay={2}><div className="card"><div className="card-h"><span className="t">Lead source</span></div><div className="card-b"><div className="kv">
             <div className="row"><span className="k">Source</span><span className="v"><span className="badge b-indigo">{lead.source ?? "website"}</span></span></div>
@@ -165,7 +166,7 @@ export default function OrgLeadDetailPage() {
 
         <Reveal delay={2}><div className="card"><div className="card-h" style={{ paddingBottom: 0 }}><div style={{ display: "flex", gap: 18, overflowX: "auto" }}>{(["activity", "requirements", "communications", "documents", "deal"] as const).map((tab) => <button key={tab} className="x" style={{ border: 0, background: "transparent", padding: "0 0 14px", color: activeTab === tab ? "var(--brand)" : undefined, borderBottom: activeTab === tab ? "2px solid var(--brand)" : "2px solid transparent", cursor: "pointer" }} onClick={() => setActiveTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}</div></div><div className="card-b">
           {activeTab === "activity" && <>
-          {hasPermission("leads", "edit") && <div className="field" style={{ marginBottom: 16 }}><label htmlFor="lead-note">Add note</label><textarea id="lead-note" className="inp" rows={3} value={note} maxLength={2000} placeholder="Add a note about this lead..." onChange={(event) => setNote(event.target.value)} /><button className="btn btn-primary" style={{ marginTop: 8 }} disabled={!note.trim() || addingNote} onClick={() => void addNote()}>{addingNote ? "Saving..." : "Add note"}</button></div>}
+          {canAddNote && <div className="field" style={{ marginBottom: 16 }}><label htmlFor="lead-note">Add note</label><textarea id="lead-note" className="inp" rows={3} value={note} maxLength={2000} placeholder="Add a note about this lead..." onChange={(event) => setNote(event.target.value)} /><button className="btn btn-primary" style={{ marginTop: 8 }} disabled={!note.trim() || addingNote} onClick={() => void addNote()}>{addingNote ? "Saving..." : "Add note"}</button></div>}
           {timeline.length ? <ul className="timeline">{timeline.map((event) => <li key={event.id}><b><Icon name={icons[event.type] ?? "refresh"} size={14} /> {event.type.replaceAll("_", " ")}</b> — {event.text}<div className="tt">{formatDate(event.createdAt)}</div></li>)}</ul> : <div className="empty" style={{ padding: 20 }}>No activity recorded yet.</div>}
           </>}
           {activeTab === "requirements" && <DataRows entries={requirements} empty="No requirement details captured." />}

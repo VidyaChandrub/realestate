@@ -207,6 +207,31 @@ export class OnboardingService {
     return { sent, failed, onboardingStep, nextStep: nextOnboardingStep(onboardingStep) };
   }
 
+  // Active roles available for team invitation during onboarding
+  async listAvailableRoles(actor: JwtPayload) {
+    const orgId = actor.orgId;
+    const roles = await this.prisma.role.findMany({
+      where: {
+        status: 'active',
+        scope: { in: ['organisation', 'team'] },
+        OR: [{ orgId: null }, ...(orgId ? [{ orgId }] : [])],
+      },
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        key: true,
+        name: true,
+        description: true,
+      },
+    });
+
+    const filtered = roles.filter((r) => r.key !== 'admin' && r.key !== 'super_admin');
+    return filtered.map((r) => ({
+      v: r.key,
+      label: r.name,
+      description: r.description,
+    }));
+  }
+
   // Step 8 — Connect channels (still a placeholder, no backend
   // integration). Reaching or skipping it is what marks onboarding
   // 'completed' — gated on the two actually-mandatory steps having real

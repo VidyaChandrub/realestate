@@ -1,11 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
+import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -177,15 +179,26 @@ export class ProjectsService {
     return this.getById(orgId, project.id);
   }
 
-  async list(orgId: string, query: ListProjectsQueryDto) {
+  async list(orgId: string, query: ListProjectsQueryDto, actor?: JwtPayload) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
-    const where: Prisma.ProjectWhereInput = { orgId };
-    if (query.status) where.status = query.status;
+    const andConditions: Prisma.ProjectWhereInput[] = [{ orgId }];
+    if (query.status) andConditions.push({ status: query.status });
     if (query.search) {
-      where.name = { contains: query.search, mode: 'insensitive' };
+      andConditions.push({ name: { contains: query.search, mode: 'insensitive' } });
     }
+
+    if (actor && !actor.roles?.includes('admin') && !actor.roles?.includes('super_admin')) {
+      andConditions.push({
+        OR: [
+          { managerId: actor.sub },
+          { salesAgents: { some: { userId: actor.sub } } },
+        ],
+      });
+    }
+
+    const where: Prisma.ProjectWhereInput = andConditions.length > 1 ? { AND: andConditions } : andConditions[0]!;
 
     const [rows, total] = await Promise.all([
       this.prisma.project.findMany({
@@ -209,8 +222,8 @@ export class ProjectsService {
     return { data, total, page, limit };
   }
 
-  async getById(orgId: string, id: string) {
-    const project = await this.getOwnedProject(orgId, id);
+  async getById(orgId: string, id: string, actor?: JwtPayload) {
+    const project = await this.getOwnedProject(orgId, id, actor);
 
     const unitTypes = await this.prisma.unitType.findMany({
       where: { projectId: id },
@@ -249,8 +262,8 @@ export class ProjectsService {
     };
   }
 
-  async update(orgId: string, id: string, dto: UpdateProjectDto) {
-    await this.getOwnedProject(orgId, id);
+  async update(orgId: string, id: string, dto: UpdateProjectDto, actor?: JwtPayload) {
+    await this.getOwnedProject(orgId, id, actor);
     if (dto.managerId) await this.assertOrgUser(orgId, dto.managerId);
 
     const data: Prisma.ProjectUncheckedUpdateInput = {};
@@ -293,8 +306,8 @@ export class ProjectsService {
     return this.getById(orgId, id);
   }
 
-  async remove(orgId: string, id: string) {
-    await this.getOwnedProject(orgId, id);
+  async remove(orgId: string, id: string, actor?: JwtPayload) {
+    await this.getOwnedProject(orgId, id, actor);
     // Hard delete — no soft-delete anywhere in this codebase. Child
     // unit_types and units cascade via the FK ON DELETE CASCADE.
     await this.prisma.$transaction(async (tx) => {
@@ -655,12 +668,24 @@ export class ProjectsService {
   // same as a non-existent id, so existence never leaks across tenants.
   // -------------------------------------------------------------------------
 
-  private async getOwnedProject(orgId: string, id: string) {
+  private async getOwnedProject(orgId: string, id: string, actor?: JwtPayload) {
     const project = await this.prisma.project.findFirst({
       where: { id, orgId },
       include: PROJECT_INCLUDE,
     });
     if (!project) throw new NotFoundException('Project not found');
+
+    if (actor && !actor.roles?.includes('admin') && !actor.roles?.includes('super_admin')) {
+      const isManager = project.managerId === actor.sub;
+      const isSales = await this.prisma.projectSalesAgent.findFirst({
+        where: { projectId: id, userId: actor.sub },
+        select: { userId: true },
+      });
+      if (!isManager && !isSales) {
+        throw new ForbiddenException('You do not have access to this project');
+      }
+    }
+
     return project;
   }
 

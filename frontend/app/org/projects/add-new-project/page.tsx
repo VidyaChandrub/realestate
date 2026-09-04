@@ -9,6 +9,13 @@ import { CURRENCY_LABELS, formatMoneyRange, PROJECT_CURRENCIES } from "@/lib/mon
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import { CatalogOptions, MoneyInput } from "@/components/org/project-form-fields";
 import { Reveal } from "@/components/superadmin/reveal";
+import {
+  PREDEFINED_PROJECT_TEMPLATES,
+  ProjectTemplate,
+  buildCustomizedProjectSections,
+} from "@/lib/project-templates";
+import { defaultSiteConfig } from "@/lib/prestate/site-config";
+import { orgBuilderPath } from "@/lib/prestate/paths";
 import "@/app/org/org.css";
 import type {
   CreateProjectInput,
@@ -117,6 +124,10 @@ interface WizardDraft {
   managerId: string; salesTeam: string; agentAssign: string[];
   requireApproval: boolean; visibleTele: boolean; publishWeb: boolean;
   coverImageUrl: string | null; galleryUrls: string[]; brochureUrl: string | null; reraCertificateUrl: string | null;
+  customLandingPageId?: string | null;
+  customLandingPageSlug?: string | null;
+  customLandingPageName?: string | null;
+  selectedTemplateId?: string | null;
 }
 
 // "They actually started" — decides whether a stored draft is worth a
@@ -263,6 +274,58 @@ export default function AddNewProjectPage() {
   // so a partial failure never strands the user on the wizard.
   const [publishedProjectId, setPublishedProjectId] = useState<string | null>(null);
 
+  // Template selection & Instant landing page publishing
+  const [selectedTemplate, setSelectedTemplate] = useState<ProjectTemplate | null>(PREDEFINED_PROJECT_TEMPLATES[0]);
+  const [templateAppliedToast, setTemplateAppliedToast] = useState<string | null>(null);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [publishLandingPageNow, setPublishLandingPageNow] = useState(true);
+  const [landingPageTitle, setLandingPageTitle] = useState("");
+  const [createdLandingPage, setCreatedLandingPage] = useState<{ id: string; slug: string; name: string } | null>(null);
+  const [orgDbTemplates, setOrgDbTemplates] = useState<any[]>([]);
+
+  // Visual Builder Customization state
+  const [customLandingPageId, setCustomLandingPageId] = useState<string | null>(null);
+  const [customLandingPageSlug, setCustomLandingPageSlug] = useState<string | null>(null);
+  const [customLandingPageName, setCustomLandingPageName] = useState<string | null>(null);
+  const [customizingInBuilder, setCustomizingInBuilder] = useState(false);
+
+  const applyTemplate = useCallback((tpl: ProjectTemplate) => {
+    setSelectedTemplate(tpl);
+    setCustomLandingPageId(null);
+    setCustomLandingPageSlug(null);
+    setCustomLandingPageName(null);
+    setName((cur) => cur.trim() ? cur : tpl.defaultData.name);
+    setTagline(tpl.defaultData.tagline);
+    setProjectType(tpl.defaultData.projectType);
+    setSelectedConfigs(tpl.defaultData.selectedConfigs);
+    setTowerCount(tpl.defaultData.towerCount);
+    setFloorsDescription(tpl.defaultData.floorsDescription);
+    setLandArea(tpl.defaultData.landArea);
+    setCarpetRange(tpl.defaultData.carpetRange);
+    setHighlights(tpl.defaultData.highlights);
+    setPriceMin(tpl.defaultData.priceMin);
+    setPriceMax(tpl.defaultData.priceMax);
+    setBaseRate(tpl.defaultData.baseRate);
+    setBookingAmount(tpl.defaultData.bookingAmount);
+    setPriceIncludes(tpl.defaultData.priceIncludes);
+    setPaymentPlan(tpl.defaultData.paymentPlan);
+    setOffers(tpl.defaultData.offers);
+    setAmenities(tpl.defaultData.amenities);
+    setUnitTypes(tpl.defaultData.unitTypes.map((u) => ({ ...u, key: Date.now() + Math.random() })));
+    setFlooring(tpl.defaultData.flooring);
+    setKitchen(tpl.defaultData.kitchen);
+    setDoorsWindows(tpl.defaultData.doorsWindows);
+    setFittings(tpl.defaultData.fittings);
+    setSpecNotes(tpl.defaultData.specNotes);
+    if (tpl.defaultData.coverImageUrl) setCoverImageUrl(tpl.defaultData.coverImageUrl);
+    if (tpl.defaultData.galleryUrls?.length) setGalleryUrls(tpl.defaultData.galleryUrls);
+    setPublishWeb(true);
+    setPublishLandingPageNow(true);
+    setTemplateAppliedToast(`"${tpl.name}" applied! Default configurations, specifications & images loaded.`);
+    setShowTemplateModal(false);
+    setTimeout(() => setTemplateAppliedToast(null), 4000);
+  }, []);
+
   // Draft persistence (localStorage stopgap — see notes above the component).
   // `hydrated` gates auto-save so we never write over a stored draft before
   // the user has chosen to resume or discard it.
@@ -290,6 +353,11 @@ export default function AddNewProjectPage() {
     getOrgLandingPages()
       .then((rows) => setOrgLandingPages(rows.filter((lp) => lp.pageType === "landing")))
       .catch(() => setOrgLandingPages([]));
+    apiFetch<any>("/org/templates?limit=20", auth)
+      .then((res) => {
+        if (res?.data) setOrgDbTemplates(res.data);
+      })
+      .catch(() => setOrgDbTemplates([]));
   }, [accessToken]);
 
   useEffect(() => {
@@ -334,6 +402,8 @@ export default function AddNewProjectPage() {
       metaAds, googleAds, linkedinAds, portalAds, monthlyBudget, targetCpl, leadGoal, landingPage, aiCalling, whatsappAuto, roundRobin, aiKnowledgeBase,
       managerId, salesTeam, agentAssign, requireApproval, visibleTele, publishWeb,
       coverImageUrl, galleryUrls, brochureUrl, reraCertificateUrl,
+      customLandingPageId, customLandingPageSlug, customLandingPageName,
+      selectedTemplateId: selectedTemplate?.id ?? null,
     }),
     [
       step, name, projectType, tagline, reraId, status, launchDate, possession, constructionStage,
@@ -344,6 +414,7 @@ export default function AddNewProjectPage() {
       metaAds, googleAds, linkedinAds, portalAds, monthlyBudget, targetCpl, leadGoal, landingPage, aiCalling, whatsappAuto, roundRobin, aiKnowledgeBase,
       managerId, salesTeam, agentAssign, requireApproval, visibleTele, publishWeb,
       coverImageUrl, galleryUrls, brochureUrl, reraCertificateUrl,
+      customLandingPageId, customLandingPageSlug, customLandingPageName, selectedTemplate,
     ],
   );
 
@@ -424,6 +495,13 @@ export default function AddNewProjectPage() {
     setRequireApproval(d.requireApproval ?? true); setVisibleTele(d.visibleTele ?? true); setPublishWeb(d.publishWeb ?? false);
     setCoverImageUrl(d.coverImageUrl ?? null); setGalleryUrls(d.galleryUrls ?? []);
     setBrochureUrl(d.brochureUrl ?? null); setReraCertificateUrl(d.reraCertificateUrl ?? null);
+    if (d.customLandingPageId) setCustomLandingPageId(d.customLandingPageId);
+    if (d.customLandingPageSlug) setCustomLandingPageSlug(d.customLandingPageSlug);
+    if (d.customLandingPageName) setCustomLandingPageName(d.customLandingPageName);
+    if (d.selectedTemplateId) {
+      const match = PREDEFINED_PROJECT_TEMPLATES.find((t) => t.id === d.selectedTemplateId);
+      if (match) setSelectedTemplate(match);
+    }
   }
 
   function resumeDraft() {
@@ -442,6 +520,108 @@ export default function AddNewProjectPage() {
 
   const pct = Math.round(((step + 1) / STEPS.length) * 100);
   const selectedManager = managers.find((m) => m.id === managerId) ?? null;
+
+  const openTemplateInVisualBuilder = useCallback(async (tplTarget?: ProjectTemplate) => {
+    if (!accessToken) return;
+    const tpl = tplTarget || selectedTemplate || PREDEFINED_PROJECT_TEMPLATES[0];
+    setCustomizingInBuilder(true);
+    setError(null);
+    try {
+      if (customLandingPageId) {
+        router.push(orgBuilderPath(customLandingPageId, "/org/projects/add-new-project"));
+        return;
+      }
+
+      const lpName = landingPageTitle.trim() || (name.trim() ? `${name.trim()} — Official Landing Page` : `${tpl.name} — Project Landing Page`);
+      const customSections = buildCustomizedProjectSections(tpl.id, {
+        name: name.trim() || tpl.defaultData.name || "Luxury Project",
+        tagline: tagline.trim() || tpl.defaultData.tagline,
+        projectType: projectType || tpl.defaultData.projectType,
+        reraId: reraId.trim() || undefined,
+        priceMin: priceMin || tpl.defaultData.priceMin,
+        priceMax: priceMax || tpl.defaultData.priceMax,
+        currency,
+        address: address.trim() || tpl.defaultData.address,
+        city: city.trim() || tpl.defaultData.city,
+        locality: locality.trim() || tpl.defaultData.locality,
+        amenities: amenities.length ? amenities : tpl.defaultData.amenities,
+        highlights: highlights.trim() || tpl.defaultData.highlights,
+        coverImageUrl: coverImageUrl || tpl.defaultData.coverImageUrl,
+        galleryUrls: galleryUrls.length ? galleryUrls : tpl.defaultData.galleryUrls,
+        unitTypes: unitTypes.filter((u) => u.name.trim()).map((u) => ({
+          name: u.name.trim(),
+          carpetSqft: u.carpetSqft,
+          builtupSqft: u.builtupSqft,
+          price: u.price,
+        })),
+      });
+
+      const lp = await apiFetch<any>("/org/landing-pages", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          name: lpName,
+          content: {
+            sections: customSections,
+            config: defaultSiteConfig({
+              name: lpName,
+              slug: (name.trim() || tpl.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project",
+              primary: tpl.accent || "#4f46e5",
+              accent: tpl.accent || "#cda45e",
+            }),
+          },
+        }),
+      });
+
+      if (lp?.id) {
+        setCustomLandingPageId(lp.id);
+        setCustomLandingPageSlug(lp.slug);
+        setCustomLandingPageName(lpName);
+        setPublishLandingPageNow(true);
+
+        if (orgId) {
+          const updatedDraft = {
+            ...collectDraft(),
+            customLandingPageId: lp.id,
+            customLandingPageSlug: lp.slug,
+            customLandingPageName: lpName,
+            selectedTemplateId: tpl.id,
+          };
+          try {
+            window.localStorage.setItem(draftKey(orgId), JSON.stringify(updatedDraft));
+          } catch {}
+        }
+
+        router.push(orgBuilderPath(lp.id, "/org/projects/add-new-project"));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to open visual builder for this template.");
+      setCustomizingInBuilder(false);
+    }
+  }, [
+    accessToken,
+    selectedTemplate,
+    customLandingPageId,
+    landingPageTitle,
+    name,
+    tagline,
+    projectType,
+    reraId,
+    priceMin,
+    priceMax,
+    currency,
+    address,
+    city,
+    locality,
+    amenities,
+    highlights,
+    coverImageUrl,
+    galleryUrls,
+    unitTypes,
+    orgId,
+    collectDraft,
+    router,
+  ]);
 
   async function submit() {
     if (!accessToken) return;
@@ -563,15 +743,127 @@ export default function AddNewProjectPage() {
         }
       }
 
+      // Automatically create and publish project landing page if enabled
+      let publishedLp: { id: string; slug: string; name: string } | null = null;
+      if (publishLandingPageNow) {
+        try {
+          const lpName = landingPageTitle.trim() || `${project.name} — Official Landing Page`;
+
+          if (customLandingPageId) {
+            // Already customized in the visual builder! Publish directly.
+            await apiFetch(`/org/landing-pages/${customLandingPageId}/publish`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+
+            await apiFetch(`/org/projects/${project.id}`, {
+              method: "PATCH",
+              headers: { Authorization: `Bearer ${accessToken}` },
+              body: JSON.stringify({
+                publishedToWebsite: true,
+                marketing: {
+                  ...marketing,
+                  landingPageId: customLandingPageId,
+                  landingPageSlug: customLandingPageSlug,
+                  landingPageChoice: customLandingPageName || lpName,
+                },
+              }),
+            });
+
+            publishedLp = {
+              id: customLandingPageId,
+              slug: customLandingPageSlug || "project",
+              name: customLandingPageName || lpName,
+            };
+            setCreatedLandingPage(publishedLp);
+          } else {
+            const customSections = buildCustomizedProjectSections(
+              selectedTemplate?.id || "tpl-estatepro-luxury",
+              {
+                name: project.name,
+                tagline: tagline.trim() || undefined,
+                projectType: projectType || undefined,
+                reraId: reraId.trim() || undefined,
+                priceMin: priceMin || undefined,
+                priceMax: priceMax || undefined,
+                currency,
+                address: address.trim() || undefined,
+                city: city.trim() || undefined,
+                locality: locality.trim() || undefined,
+                amenities: amenities.length ? amenities : undefined,
+                highlights: highlights.trim() || undefined,
+                coverImageUrl,
+                galleryUrls,
+                unitTypes: unitTypes.filter((u) => u.name.trim()).map((u) => ({
+                  name: u.name.trim(),
+                  carpetSqft: u.carpetSqft,
+                  builtupSqft: u.builtupSqft,
+                  price: u.price,
+                })),
+              },
+            );
+
+            const lp = await apiFetch<any>("/org/landing-pages", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${accessToken}` },
+              body: JSON.stringify({
+                name: lpName,
+                content: {
+                  sections: customSections,
+                  config: defaultSiteConfig({
+                    name: lpName,
+                    slug: project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project",
+                    primary: selectedTemplate?.accent || "#4f46e5",
+                    accent: selectedTemplate?.accent || "#cda45e",
+                  }),
+                },
+              }),
+            });
+
+            if (lp?.id) {
+              await apiFetch(`/org/landing-pages/${lp.id}/publish`, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${accessToken}` },
+              });
+
+              await apiFetch(`/org/projects/${project.id}`, {
+                method: "PATCH",
+                headers: { Authorization: `Bearer ${accessToken}` },
+                body: JSON.stringify({
+                  publishedToWebsite: true,
+                  marketing: {
+                    ...marketing,
+                    landingPageId: lp.id,
+                    landingPageSlug: lp.slug,
+                    landingPageChoice: lpName,
+                  },
+                }),
+              });
+
+              publishedLp = { id: lp.id, slug: lp.slug, name: lpName };
+              setCreatedLandingPage(publishedLp);
+            }
+          }
+        } catch (lpErr) {
+          console.warn("Landing page generation failed:", lpErr);
+        }
+      }
+
       if (orgId) {
         try { window.localStorage.removeItem(draftKey(orgId)); } catch { /* ignore */ }
       }
 
+      setPublishedProjectId(project.id);
+
       if (agentsFailed) {
-        setPublishedProjectId(project.id);
         setError(
           "Project published, but assigning sales agents failed. You can add them from the project's Team section.",
         );
+        setSubmitting(false);
+        return;
+      }
+
+      if (publishedLp) {
         setSubmitting(false);
         return;
       }
@@ -633,6 +925,37 @@ export default function AddNewProjectPage() {
                 ))}
               </div>
             </div>
+
+            {/* Selected Template Badge in Rail */}
+            <div className="card pad-14 mt-14" style={{ background: "var(--surface-2, #f8fafc)", border: "1px solid var(--line)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: "var(--muted)", letterSpacing: ".05em" }}>
+                  Active Template
+                </div>
+                {customLandingPageId && <span className="badge b-green" style={{ fontSize: 10, padding: "1px 6px" }}>Edited</span>}
+              </div>
+              <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                <span>✨</span> {selectedTemplate ? selectedTemplate.name : "None"}
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm btn-block mt-8"
+                onClick={() => openTemplateInVisualBuilder()}
+                disabled={customizingInBuilder}
+                style={{ fontSize: 11.5 }}
+              >
+                ✏️ {customLandingPageId ? "Re-open in Builder" : "Customize in Builder"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm btn-block mt-6"
+                onClick={() => setShowTemplateModal(true)}
+                style={{ fontSize: 11.5 }}
+              >
+                Change Template 🔄
+              </button>
+            </div>
+
             <div className="help mt-14">
               💡 <b>Tip:</b> Fields marked <span className="req">*</span> are required to publish. You can save a draft anytime and finish later.
             </div>
@@ -645,6 +968,95 @@ export default function AddNewProjectPage() {
             {step === 0 && (
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 1 of 9</div><h2>Project basics</h2><div className="sub">The essentials that identify this development across the CRM, website and ads.</div></div>
+
+                {/* PREDEFINED TEMPLATE SELECTOR BANNER */}
+                <div
+                  className="card pad-16 mb-20"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(79, 70, 229, 0.03) 100%)",
+                    border: "1.5px solid var(--brand, #4f46e5)",
+                    borderRadius: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <div
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: 10,
+                          overflow: "hidden",
+                          flexShrink: 0,
+                          border: "1px solid rgba(0,0,0,0.1)",
+                          background: "#fff",
+                        }}
+                      >
+                        {selectedTemplate?.thumbnail ? (
+                          <img
+                            src={selectedTemplate.thumbnail}
+                            alt={selectedTemplate.name}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 26, display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>🏛️</span>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--brand, #4f46e5)" }}>
+                            Selected Project Template
+                          </span>
+                          {selectedTemplate?.badge ? <span className="badge b-blue">{selectedTemplate.badge}</span> : null}
+                          {customLandingPageId ? (
+                            <span className="badge b-green">✨ Visually Edited in Builder</span>
+                          ) : null}
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 700, marginTop: 1 }}>
+                          {selectedTemplate ? selectedTemplate.name : "None selected"}
+                        </div>
+                        <div className="muted fs-12-5" style={{ maxWidth: 460 }}>
+                          {customLandingPageId
+                            ? "This template has been customized in the visual builder. Any canvas edits, custom sections and layouts will be published with this project."
+                            : selectedTemplate
+                            ? selectedTemplate.description
+                            : "Choose a predefined real estate template to automatically pre-populate specifications, configurations, images & landing page."}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="row gap-8" style={{ alignItems: "center", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => openTemplateInVisualBuilder()}
+                        disabled={customizingInBuilder}
+                        style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}
+                      >
+                        <span>✏️</span> {customizingInBuilder ? "Opening Builder…" : customLandingPageId ? "Re-open in Visual Builder" : "Customize in Visual Builder"}
+                      </button>
+                      {customLandingPageId && (
+                        <a
+                          href={`/preview/${customLandingPageId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-ghost btn-sm"
+                          style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}
+                        >
+                          <span>👁️</span> Preview
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setShowTemplateModal(true)}
+                        style={{ display: "flex", alignItems: "center", gap: 6 }}
+                      >
+                        <span>🎨</span> Change Template
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="q-sec">
                   <div className="lbl">📋 Identity</div>
                   <div className="grid g2">
@@ -844,6 +1256,69 @@ export default function AddNewProjectPage() {
                     </select>
                     {orgLandingPages.length === 0 ? <div className="hint">No landing pages yet — create one from Landing Pages.</div> : null}
                   </div>
+
+                  <div className="card pad-14 mt-16" style={{ background: "var(--surface-2, #f8fafc)", border: "1.5px solid var(--line)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700 }}>🚀 Publish Live Landing Page</span>
+                          <span className="badge b-green">Instant Go-Live</span>
+                          {customLandingPageId && <span className="badge b-blue">✨ Visually Edited in Builder</span>}
+                        </div>
+                        <div className="muted fs-12" style={{ marginTop: 2 }}>
+                          {customLandingPageId
+                            ? `Visual customisations made to "${customLandingPageName || selectedTemplate?.name}" will be published live with this project.`
+                            : `Automatically create and publish a dynamic landing page using "${selectedTemplate?.name || "the selected template"}".`}
+                        </div>
+                      </div>
+                      <div className={`switch ${publishLandingPageNow ? "on" : ""}`} onClick={() => setPublishLandingPageNow(!publishLandingPageNow)} />
+                    </div>
+
+                    {publishLandingPageNow && (
+                      <>
+                        <div className="grid g2 mt-12">
+                          <div className="field mb-0">
+                            <label style={{ fontSize: 12 }}>Landing Page Title</label>
+                            <input
+                              className="inp"
+                              value={landingPageTitle}
+                              placeholder={`${name.trim() || "Project"} — Official Launch`}
+                              onChange={(e) => setLandingPageTitle(e.target.value)}
+                            />
+                          </div>
+                          <div className="field mb-0">
+                            <label style={{ fontSize: 12 }}>Live Web URL Preview</label>
+                            <div style={{ height: 38, background: "#fff", border: "1px solid var(--line)", borderRadius: 6, display: "flex", alignItems: "center", padding: "0 10px", fontSize: 12, color: "var(--muted)" }}>
+                              /p/{name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project-slug"}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => openTemplateInVisualBuilder()}
+                            disabled={customizingInBuilder}
+                            style={{ display: "flex", alignItems: "center", gap: 6 }}
+                          >
+                            <span>✏️</span> {customizingInBuilder ? "Opening Builder…" : customLandingPageId ? "Re-open in Visual Builder" : "Customize Template in Visual Builder"}
+                          </button>
+                          {customLandingPageId && (
+                            <a
+                              href={`/preview/${customLandingPageId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-ghost btn-sm"
+                              style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}
+                            >
+                              <span>👁️</span> Preview
+                            </a>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="q-sec">
                   <div className="lbl">🤖 Automation &amp; assignment</div>
@@ -957,6 +1432,44 @@ export default function AddNewProjectPage() {
                         <div className="sp"><span className="k">WhatsApp welcome</span><span className="v"><span className={`badge ${whatsappAuto ? "b-green" : "b-gray"}`}>{whatsappAuto ? "On" : "Off"}</span></span></div>
                         <div className="sp"><span className="k">Round-robin</span><span className="v"><span className={`badge ${roundRobin ? "b-green" : "b-gray"}`}>{roundRobin ? "On" : "Off"}</span></span></div>
                       </div>
+                      <div className="q-sec"><div className="lbl">🌐 Project Template &amp; Website</div>
+                        <div className="sp"><span className="k">Template</span><span className="v">{selectedTemplate?.name || "Standard Template"}</span></div>
+                        <div className="sp">
+                          <span className="k">Customization</span>
+                          <span className="v">
+                            {customLandingPageId ? (
+                              <span className="badge b-green">✨ Visually Customized in Builder</span>
+                            ) : (
+                              <span className="badge b-gray">Default Presets</span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="sp"><span className="k">Live landing page</span><span className="v"><span className={`badge ${publishLandingPageNow ? "b-green" : "b-gray"}`}>{publishLandingPageNow ? "Yes — Auto Publish" : "Disabled"}</span></span></div>
+                        {publishLandingPageNow && (
+                          <div className="sp"><span className="k">Target URL</span><span className="v mono">/p/{name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project-slug"}</span></div>
+                        )}
+                        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => openTemplateInVisualBuilder()}
+                            disabled={customizingInBuilder}
+                          >
+                            ✏️ {customLandingPageId ? "Re-open in Visual Builder" : "Customize Template in Visual Builder"}
+                          </button>
+                          {customLandingPageId && (
+                            <a
+                              href={`/preview/${customLandingPageId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-ghost btn-sm"
+                              style={{ textDecoration: "none" }}
+                            >
+                              👁️ Preview
+                            </a>
+                          )}
+                        </div>
+                      </div>
                       <div className="q-sec"><div className="lbl">👤 Team &amp; access</div>
                         <div className="sp"><span className="k">Manager</span><span className="v">{selectedManager ? userLabel(selectedManager) : "Unassigned"}</span></div>
                         <div className="sp"><span className="k">Agents</span><span className="v">{agentAssign.length} assigned</span></div>
@@ -1003,7 +1516,7 @@ export default function AddNewProjectPage() {
                 {step < STEPS.length - 1 && <button className="btn btn-ghost" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Skip</button>}
                 {step < STEPS.length - 1 ? (
                   <button className="btn btn-primary" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Continue →</button>
-                ) : publishedProjectId ? (
+                ) : publishedProjectId && !createdLandingPage ? (
                   <button className="btn btn-primary" onClick={() => router.push(`/org/projects/${publishedProjectId}`)}>Go to project →</button>
                 ) : (
                   <button className="btn btn-primary" disabled={submitting} onClick={() => void submit()}>{submitting ? "Publishing…" : "🚀 Publish project"}</button>
@@ -1013,6 +1526,233 @@ export default function AddNewProjectPage() {
           </div>
         </div>
       </Reveal>
+
+      {/* TEMPLATE PICKER MODAL */}
+      {showTemplateModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={() => setShowTemplateModal(false)}
+        >
+          <div
+            className="card pad-26 reveal in"
+            style={{
+              maxWidth: 960,
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              background: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--brand, #4f46e5)" }}>
+                  Predefined Project Templates
+                </div>
+                <h2 style={{ margin: "4px 0 6px", fontSize: 22 }}>Select a Project Template</h2>
+                <p className="muted fs-13" style={{ margin: 0 }}>
+                  Choosing a template automatically applies default configurations, unit types, lifestyle amenities, architectural images, and prepares a fully dynamic landing page.
+                </p>
+              </div>
+              <button className="btn btn-ghost" onClick={() => setShowTemplateModal(false)} style={{ fontSize: 18, padding: "4px 10px" }}>
+                ✕
+              </button>
+            </div>
+
+            <div className="grid g2" style={{ gap: 20 }}>
+              {PREDEFINED_PROJECT_TEMPLATES.map((tpl) => {
+                const isSelected = selectedTemplate?.id === tpl.id;
+                return (
+                  <div
+                    key={tpl.id}
+                    style={{
+                      border: isSelected ? "2px solid var(--brand, #4f46e5)" : "1px solid var(--line, #e2e8f0)",
+                      borderRadius: 14,
+                      overflow: "hidden",
+                      background: isSelected ? "rgba(79, 70, 229, 0.02)" : "#fff",
+                      display: "flex",
+                      flexDirection: "column",
+                      transition: "all 0.2s ease",
+                      boxShadow: isSelected ? "0 4px 20px rgba(79, 70, 229, 0.15)" : "none",
+                    }}
+                  >
+                    <div style={{ height: 160, position: "relative", overflow: "hidden", background: "#1e293b" }}>
+                      <img
+                        src={tpl.thumbnail}
+                        alt={tpl.name}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          background: "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.6) 100%)",
+                        }}
+                      />
+                      <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6 }}>
+                        <span className="badge b-teal" style={{ background: "rgba(0,0,0,0.6)", color: "#fff", backdropFilter: "blur(4px)" }}>
+                          {tpl.category}
+                        </span>
+                        {tpl.badge && <span className="badge b-amber">{tpl.badge}</span>}
+                      </div>
+                      <div style={{ position: "absolute", bottom: 12, left: 12, right: 12 }}>
+                        <b style={{ color: "#fff", fontSize: 16, textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{tpl.name}</b>
+                      </div>
+                    </div>
+
+                    <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1 }}>
+                      <p className="muted fs-12-5" style={{ margin: "0 0 12px", lineHeight: 1.5, flex: 1 }}>
+                        {tpl.description}
+                      </p>
+
+                      <div style={{ background: "var(--surface-2, #f8fafc)", padding: "8px 12px", borderRadius: 8, fontSize: 11.5, marginBottom: 16, color: "var(--fg)" }}>
+                        <b>Includes Sections:</b> Hero Banner • Highlights • Amenities Grid • Gallery • Floorplans • Pricing Cards • Location Map • Lead Capture Form
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                        <span className="muted fs-12">
+                          Default: {tpl.defaultData.selectedConfigs.join(", ")}
+                        </span>
+                        <div className="row gap-8">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              applyTemplate(tpl);
+                              openTemplateInVisualBuilder(tpl);
+                            }}
+                            disabled={customizingInBuilder}
+                            style={{ display: "flex", alignItems: "center", gap: 4 }}
+                          >
+                            <span>✏️</span> Customize in Builder
+                          </button>
+                          <button
+                            type="button"
+                            className={`btn ${isSelected ? "btn-secondary" : "btn-primary"} btn-sm`}
+                            onClick={() => applyTemplate(tpl)}
+                          >
+                            {isSelected ? "✓ Active Template" : "Apply Template →"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LAUNCH CELEBRATION MODAL */}
+      {createdLandingPage && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.8)",
+            backdropFilter: "blur(6px)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            className="card pad-26 reveal in"
+            style={{
+              maxWidth: 520,
+              width: "100%",
+              background: "#fff",
+              borderRadius: 16,
+              textAlign: "center",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+            }}
+          >
+            <div style={{ fontSize: 52, marginBottom: 12, lineHeight: 1 }}>🚀</div>
+            <h2 style={{ fontSize: 24, margin: "0 0 8px" }}>Project Published Successfully!</h2>
+            <p className="muted fs-13" style={{ margin: "0 0 20px", lineHeight: 1.6 }}>
+              <b>{name}</b> is now live. Its dedicated landing page has been generated using <b>{selectedTemplate?.name || "the selected template"}</b> and is immediately accessible.
+            </p>
+
+            <div
+              className="card pad-16"
+              style={{
+                background: "var(--surface-2, #f8fafc)",
+                border: "1px solid var(--line, #e2e8f0)",
+                borderRadius: 12,
+                textAlign: "left",
+                marginBottom: 24,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--muted)", letterSpacing: ".05em" }}>
+                  Public Landing Page
+                </span>
+                <span className="badge b-green">● Published</span>
+              </div>
+              <a
+                href={`/p/${createdLandingPage.slug}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  color: "var(--brand, #4f46e5)",
+                  fontWeight: 600,
+                  fontSize: 14,
+                  wordBreak: "break-all",
+                  display: "inline-block",
+                }}
+              >
+                {typeof window !== "undefined" ? window.location.origin : ""}/p/{createdLandingPage.slug} ↗
+              </a>
+              <div className="muted fs-11" style={{ marginTop: 6 }}>
+                💡 You can edit, add, or remove any sections anytime without affecting the original master template.
+              </div>
+            </div>
+
+            <div className="col gap-10">
+              <a
+                href={`/p/${createdLandingPage.slug}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary btn-block"
+                style={{ textDecoration: "none" }}
+              >
+                🌐 View Live Landing Page
+              </a>
+              <button
+                type="button"
+                className="btn btn-secondary btn-block"
+                onClick={() => router.push(`/org-builder?id=${createdLandingPage.id}`)}
+              >
+                ✏️ Customize in Visual Builder
+              </button>
+              {publishedProjectId && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-block"
+                  onClick={() => router.push(`/org/projects/${publishedProjectId}`)}
+                >
+                  🏗️ Go to Project Dashboard →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

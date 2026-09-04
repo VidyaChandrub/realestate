@@ -326,6 +326,23 @@ export type PermissionsPrisma = Pick<
   'role' | 'roleModulePermission' | 'userModulePermission' | 'user'
 >;
 
+export const SYSTEM_ORG_ID = 'system';
+
+export function mergeRolePermissions<T extends { orgId?: string; moduleKey: string }>(rows: T[]): T[] {
+  const map = new Map<string, T>();
+  for (const row of rows) {
+    if (row.orgId === SYSTEM_ORG_ID) {
+      map.set(row.moduleKey, row);
+    }
+  }
+  for (const row of rows) {
+    if (row.orgId !== SYSTEM_ORG_ID) {
+      map.set(row.moduleKey, row);
+    }
+  }
+  return Array.from(map.values());
+}
+
 export async function loadRolePermissions(
   prisma: PermissionsPrisma,
   orgId: string,
@@ -342,28 +359,55 @@ export async function loadRolePermissions(
     orderBy: { sortOrder: 'asc' },
   });
 
-  const rows = await prisma.roleModulePermission.findMany({
-    where: { orgId, roleId: { in: roles.map((r) => r.id) } },
-    orderBy: { moduleKey: 'asc' },
-  });
+  const [orgRows, systemRows] = await Promise.all([
+    prisma.roleModulePermission.findMany({
+      where: { orgId, roleId: { in: roles.map((r) => r.id) } },
+      orderBy: { moduleKey: 'asc' },
+    }),
+    prisma.roleModulePermission.findMany({
+      where: { orgId: SYSTEM_ORG_ID, roleId: { in: roles.map((r) => r.id) } },
+      orderBy: { moduleKey: 'asc' },
+    }),
+  ]);
 
   const byRole = new Map<string, Map<string, ModulePermission>>();
-  for (const row of rows) {
+  const systemByRole = new Map<string, Map<string, ModulePermission>>();
+
+  for (const row of systemRows) {
+    if (!systemByRole.has(row.roleId)) systemByRole.set(row.roleId, new Map());
+    systemByRole.get(row.roleId)!.set(row.moduleKey, dtoToModulePermission(row.moduleKey, row));
+  }
+
+  for (const row of orgRows) {
     if (!byRole.has(row.roleId)) byRole.set(row.roleId, new Map());
     byRole.get(row.roleId)!.set(row.moduleKey, dtoToModulePermission(row.moduleKey, row));
   }
 
   return roles.map((role) => {
-    const map = byRole.get(role.id) ?? new Map<string, ModulePermission>();
-    // Unrestricted roles (org admin / platform) are always full-access — the
-    // rows may be absent; the UI shows them as locked.
+    const orgMap = byRole.get(role.id) ?? new Map<string, ModulePermission>();
+    const systemMap = systemByRole.get(role.id) ?? new Map<string, ModulePermission>();
     const unrestricted = UNRESTRICTED_ROLES.has(role.key);
-    const permissions = PERMISSION_MODULES.map((def) =>
-      map.get(def.key) ??
-      (unrestricted
-        ? { ...emptyModulePermission(def.key), canView: true, canAdd: true, canEdit: true, canDelete: true, canApprove: true }
-        : dtoToModulePermission(def.key, defaultForRole(role.key, def.key))),
-    );
+    const permissions = PERMISSION_MODULES.map((def) => {
+      if (unrestricted) {
+        return {
+          ...emptyModulePermission(def.key),
+          canView: true,
+          canAdd: true,
+          canEdit: true,
+          canDelete: true,
+          canApprove: true,
+        };
+      }
+      // 1. Org-specific customization
+      const orgPerm = orgMap.get(def.key);
+      if (orgPerm) return orgPerm;
+      // 2. Superadmin-configured system default
+      const systemPerm = systemMap.get(def.key);
+      if (systemPerm) return systemPerm;
+      // 3. Built-in hardcoded fallback
+      return dtoToModulePermission(def.key, defaultForRole(role.key, def.key));
+    });
+
     return {
       roleKey: role.key,
       roleName: role.name,

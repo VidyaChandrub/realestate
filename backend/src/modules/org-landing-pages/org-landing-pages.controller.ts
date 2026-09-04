@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -72,6 +73,7 @@ export class OrgLandingPagesController {
 
   @RequirePermission('websites', 'edit')
   @Post(':id/publish')
+  @Put(':id/publish')
   @HttpCode(200)
   publish(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.publish(user.orgId as string, id);
@@ -79,6 +81,7 @@ export class OrgLandingPagesController {
 
   @RequirePermission('websites', 'edit')
   @Post(':id/unpublish')
+  @Put(':id/unpublish')
   @HttpCode(200)
   unpublish(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.unpublish(user.orgId as string, id);

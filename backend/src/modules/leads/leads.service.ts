@@ -93,9 +93,8 @@ export class LeadsService {
   }
 
   private canSeeAllRoles(roles: string[]): boolean {
-    // super_admin or admin sees all; manager/sales are scoped
-    if (roles.includes('super_admin') || roles.includes('admin')) return true;
-    return !LIMITED_ROLES.some((role) => roles.includes(role));
+    // super_admin or admin sees all; all other roles (manager, sales, telecaller, custom) are scoped
+    return roles.includes('super_admin') || roles.includes('admin');
   }
 
   private async buildListWhere(
@@ -424,9 +423,8 @@ export class LeadsService {
   }
 
   /**
-   * Admin-only: org members eligible as lead assignees (manager/sales), so the
-   * assignment dropdown is a real query, not a hardcoded list. Only active
-   * users appear.
+   * Org members eligible as lead assignees (manager/sales/telecaller/custom roles).
+   * Only active users with team roles appear.
    */
   async listAssignableUsers(orgId: string) {
     const users = await this.prisma.user.findMany({
@@ -434,7 +432,12 @@ export class LeadsService {
         orgId,
         status: 'active',
         userRoles: {
-          some: { role: { key: { in: ['manager', 'sales'] } } },
+          some: {
+            role: {
+              status: 'active',
+              key: { notIn: ['super_admin', 'admin'] },
+            },
+          },
         },
       },
       select: {

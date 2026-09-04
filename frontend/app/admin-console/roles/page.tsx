@@ -49,6 +49,22 @@ export default function SuperAdminRolesPage() {
   const [confirmDeleteState, setConfirmDeleteState] = useState<DynamicRole | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
+  // Default permissions configuration modal state
+  const [permissionsModalRole, setPermissionsModalRole] = useState<DynamicRole | null>(null);
+  const [permissionsData, setPermissionsData] = useState<{
+    moduleKey: string;
+    label: string;
+    description: string;
+    canView: boolean;
+    canAdd: boolean;
+    canEdit: boolean;
+    canDelete: boolean;
+    canApprove: boolean;
+  }[]>([]);
+  const [permLoading, setPermLoading] = useState(false);
+  const [permSaving, setPermSaving] = useState(false);
+  const [permError, setPermError] = useState<string | null>(null);
+
   const notify = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
@@ -141,6 +157,98 @@ export default function SuperAdminRolesPage() {
     }
   };
 
+  const openPermissionsModal = async (role: DynamicRole) => {
+    if (!accessToken) return;
+    setPermissionsModalRole(role);
+    setPermLoading(true);
+    setPermError(null);
+    try {
+      const res = await apiFetch<{
+        permissions: {
+          moduleKey: string;
+          label: string;
+          description: string;
+          canView: boolean;
+          canAdd: boolean;
+          canEdit: boolean;
+          canDelete: boolean;
+          canApprove: boolean;
+        }[];
+      }>(`/admin/roles/${role.id}/permissions`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setPermissionsData(res.permissions || []);
+    } catch (err: any) {
+      setPermError(err.message || "Failed to load default permissions for role");
+    } finally {
+      setPermLoading(false);
+    }
+  };
+
+  const togglePerm = (moduleKey: string, action: "canView" | "canAdd" | "canEdit" | "canDelete" | "canApprove") => {
+    setPermissionsData((prev) =>
+      prev.map((item) => {
+        if (item.moduleKey !== moduleKey) return item;
+        const nextVal = !item[action];
+        const updated = { ...item, [action]: nextVal };
+        // If enabling add, edit, delete, or approve, ensure canView is also true
+        if (nextVal && action !== "canView") {
+          updated.canView = true;
+        }
+        // If disabling canView, disable other actions too
+        if (!nextVal && action === "canView") {
+          updated.canAdd = false;
+          updated.canEdit = false;
+          updated.canDelete = false;
+          updated.canApprove = false;
+        }
+        return updated;
+      }),
+    );
+  };
+
+  const setAllPerms = (grantAll: boolean, viewOnly: boolean = false) => {
+    setPermissionsData((prev) =>
+      prev.map((item) => ({
+        ...item,
+        canView: grantAll || viewOnly,
+        canAdd: grantAll && !viewOnly,
+        canEdit: grantAll && !viewOnly,
+        canDelete: grantAll && !viewOnly,
+        canApprove: grantAll && !viewOnly,
+      })),
+    );
+  };
+
+  const handlePermissionsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accessToken || !permissionsModalRole) return;
+    setPermSaving(true);
+    setPermError(null);
+    try {
+      await apiFetch(`/admin/roles/${permissionsModalRole.id}/permissions`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          permissions: permissionsData.map((p) => ({
+            moduleKey: p.moduleKey,
+            canView: p.canView,
+            canAdd: p.canAdd,
+            canEdit: p.canEdit,
+            canDelete: p.canDelete,
+            canApprove: p.canApprove,
+          })),
+        }),
+      });
+      notify(`Default module permissions updated for ${permissionsModalRole.name}`);
+      setPermissionsModalRole(null);
+    } catch (err: any) {
+      setPermError(err.message || "Failed to save permissions");
+    } finally {
+      setPermSaving(false);
+    }
+  };
+
   const isSystemRole = (key: string) =>
     ["super_admin", "admin", "manager", "sales", "telecaller"].includes(key);
 
@@ -229,7 +337,15 @@ export default function SuperAdminRolesPage() {
                         </span>
                       </td>
                       <td>
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            type="button"
+                            style={{ color: "var(--indigo, #4f46e5)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}
+                            onClick={() => openPermissionsModal(r)}
+                          >
+                            <Icon name="shield" size={13} /> Permissions
+                          </button>
                           <button
                             className="btn btn-ghost btn-sm"
                             type="button"
@@ -461,6 +577,178 @@ export default function SuperAdminRolesPage() {
             </button>
             <button className="btn btn-primary" type="submit" disabled={editSubmitting}>
               {editSubmitting ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Permissions Matrix Modal */}
+      <Modal
+        open={permissionsModalRole !== null}
+        onClose={() => setPermissionsModalRole(null)}
+        title={`Default Module Permissions: ${permissionsModalRole?.name ?? ""}`}
+        description="Configure default module access and actions granted automatically when this role is assigned to team members across organisations."
+        size="lg"
+      >
+        <form onSubmit={handlePermissionsSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {permError ? <div className="form-alert">{permError}</div> : null}
+
+          {permissionsModalRole?.key === "super_admin" || permissionsModalRole?.key === "admin" ? (
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: "rgba(99, 102, 241, 0.08)",
+                border: "1px solid rgba(99, 102, 241, 0.2)",
+                fontSize: 13,
+                color: "var(--fg)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Icon name="shield" size={16} />
+              <span>
+                <strong>System Note:</strong> The <code>{permissionsModalRole.name}</code> role inherently possesses unrestricted access across all modules and actions.
+              </span>
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ fontSize: 13, color: "var(--muted, #64748b)" }}>
+              Check modules and capabilities that should be available by default:
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 12, padding: "3px 8px" }}
+                onClick={() => setAllPerms(true, false)}
+                disabled={permLoading || permSaving}
+              >
+                Grant All
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 12, padding: "3px 8px" }}
+                onClick={() => setAllPerms(false, true)}
+                disabled={permLoading || permSaving}
+              >
+                View Only
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 12, padding: "3px 8px", color: "var(--rose, #e11d48)" }}
+                onClick={() => setAllPerms(false, false)}
+                disabled={permLoading || permSaving}
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              maxHeight: "440px",
+              overflowY: "auto",
+              border: "1px solid var(--line, #e2e8f0)",
+              borderRadius: "8px",
+            }}
+          >
+            {permLoading ? (
+              <div style={{ padding: 24, textAlign: "center", color: "var(--muted)" }}>
+                Loading module permissions…
+              </div>
+            ) : (
+              <table className="tbl" style={{ margin: 0 }}>
+                <thead style={{ position: "sticky", top: 0, background: "var(--surface, #fff)", zIndex: 2 }}>
+                  <tr>
+                    <th style={{ minWidth: 160 }}>Module</th>
+                    <th style={{ textAlign: "center", width: 70 }}>View</th>
+                    <th style={{ textAlign: "center", width: 70 }}>Add</th>
+                    <th style={{ textAlign: "center", width: 70 }}>Edit</th>
+                    <th style={{ textAlign: "center", width: 70 }}>Delete</th>
+                    <th style={{ textAlign: "center", width: 70 }}>Approve</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {permissionsData.map((item) => (
+                    <tr key={item.moduleKey}>
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{item.label}</div>
+                        <div style={{ fontSize: 11.5, color: "var(--muted, #64748b)" }}>
+                          {item.description}
+                        </div>
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={item.canView}
+                          onChange={() => togglePerm(item.moduleKey, "canView")}
+                          disabled={permSaving}
+                          style={{ cursor: "pointer", width: 16, height: 16 }}
+                        />
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={item.canAdd}
+                          onChange={() => togglePerm(item.moduleKey, "canAdd")}
+                          disabled={permSaving}
+                          style={{ cursor: "pointer", width: 16, height: 16 }}
+                        />
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={item.canEdit}
+                          onChange={() => togglePerm(item.moduleKey, "canEdit")}
+                          disabled={permSaving}
+                          style={{ cursor: "pointer", width: 16, height: 16 }}
+                        />
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={item.canDelete}
+                          onChange={() => togglePerm(item.moduleKey, "canDelete")}
+                          disabled={permSaving}
+                          style={{ cursor: "pointer", width: 16, height: 16 }}
+                        />
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={item.canApprove}
+                          onChange={() => togglePerm(item.moduleKey, "canApprove")}
+                          disabled={permSaving}
+                          style={{ cursor: "pointer", width: 16, height: 16 }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => setPermissionsModalRole(null)}
+              disabled={permSaving}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={permSaving || permLoading}
+            >
+              {permSaving ? "Saving…" : "Save Default Permissions"}
             </button>
           </div>
         </form>

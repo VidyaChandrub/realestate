@@ -9,7 +9,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -50,10 +49,11 @@ export class LeadsController {
   }
 
   /**
-   * Admin-only: org members eligible as assignees (manager/sales) for the
-   * assignment UI. Must be before :id to avoid route collision.
+   * Org members eligible as assignees for the assignment UI.
+   * Open to any member with crm:edit permission (e.g. managers, admins).
+   * Must be before :id to avoid route collision.
    */
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
   @RequirePermission('crm', 'edit')
   @Get('assignable')
   listAssignableUsers(@CurrentUser() user: JwtPayload) {
@@ -93,9 +93,10 @@ export class LeadsController {
   }
 
   /**
-   * Admin-only: (re)assign a lead to an org member and/or move its stage.
+   * (Re)assign a lead to an org member and/or move its stage.
+   * Open to any member with crm:edit permission.
    */
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
   @RequirePermission('crm', 'edit')
   @Patch(':id/assign')
   assign(

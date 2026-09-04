@@ -243,7 +243,10 @@ function devFontSize(s: SectionInstance, device: Device): number | string | unde
 
 function sectionStyle(s: SectionInstance, device: Device = "desktop"): CSSProperties {
   const st = styleForDevice(s, device);
-  const pad = st.spacing?.padding ?? { top: 64, right: 24, bottom: 64, left: 24 };
+  const defaultPad = s.type === "lead-form"
+    ? { top: device === "mobile" ? 20 : 28, right: device === "mobile" ? 12 : 18, bottom: device === "mobile" ? 20 : 28, left: device === "mobile" ? 12 : 18 }
+    : { top: 64, right: 24, bottom: 64, left: 24 };
+  const pad = st.spacing?.padding ?? defaultPad;
   const mar = st.spacing?.margin ?? { top: 0, right: 0, bottom: 0, left: 0 };
   const shrink = device === "mobile" ? 0.55 : device === "tablet" ? 0.78 : 1;
   const bg = st.colors?.bg ?? (isStructural(s.type) ? "transparent" : "transparent");
@@ -550,6 +553,13 @@ function GateForm({
     firePrestateLead();
     if (pageId) bumpTracking(pageId, "form");
     if (pageId) bumpTracking(pageId, "brochure");
+    void submitLead({
+      landingPageId: pageId,
+      formName: textOf(heading || "Brochure Gate"),
+      source: "brochure_gate",
+      fields: values,
+    }).catch(() => {});
+    window.dispatchEvent(new CustomEvent(LEAD_SUCCESS_EVENT));
     window.setTimeout(() => {
       downloadFile(file);
       onClose();
@@ -557,7 +567,7 @@ function GateForm({
   };
 
   return (
-    <div onClick={(e) => e.stopPropagation()} className="ps-fade-in" style={{ position: "relative", width: 460, maxWidth: "100%", ...wtCard({ padding: "34px 30px 30px", boxShadow: "0 30px 80px rgba(8,10,20,.45)" }) }}>
+    <div onClick={(e) => e.stopPropagation()} className="ps-fade-in ps-gate-card" style={{ position: "relative", width: 460, maxWidth: "100%", ...wtCard({ padding: "34px 30px 30px", boxShadow: "0 30px 80px rgba(8,10,20,.45)" }) }}>
       <button type="button" aria-label="Close" onClick={onClose} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", border: "none", background: WT.surfaceMuted, color: WT.slate, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
         <X size={16} />
       </button>
@@ -574,14 +584,25 @@ function GateForm({
                     </label>
                   ) : null}
                   {f.type === "select" && Array.isArray((f as unknown as { options?: string[] }).options) ? (
-                    <select className="ps-input" value={values[f.label] ?? ""} onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))} style={{ padding: "11px 12px" }}>
-                      <option value="">Choose</option>
+                    <select
+                      className="ps-input"
+                      value={values[f.label] ?? ""}
+                      onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
+                      style={{ padding: "11px 12px", color: "#0f172a", backgroundColor: "#ffffff", border: "1.5px solid #cbd5e1", borderRadius: "8px" }}
+                    >
+                      <option value="" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>Choose</option>
                       {((f as unknown as { options: string[] }).options).map((o) => (
-                        <option key={o} value={o}>{o}</option>
+                        <option key={o} value={o} style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>{o}</option>
                       ))}
                     </select>
                   ) : f.type === "textarea" ? (
-                    <textarea className="ps-input" placeholder={f.placeholder} value={values[f.label] ?? ""} onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))} style={{ minHeight: 80, padding: "11px 12px" }} />
+                    <textarea
+                      className="ps-input"
+                      placeholder={f.placeholder}
+                      value={values[f.label] ?? ""}
+                      onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
+                      style={{ minHeight: 80, padding: "11px 12px", color: "#0f172a", backgroundColor: "#ffffff", border: "1.5px solid #cbd5e1", borderRadius: "8px" }}
+                    />
                   ) : f.type === "checkbox" ? (
                     <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "var(--ps-slate)" }}>
                       <input type="checkbox" checked={(values[f.label] ?? "") === "yes"} onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.checked ? "yes" : ""))} />
@@ -594,7 +615,7 @@ function GateForm({
                       placeholder={f.placeholder}
                       value={values[f.label] ?? ""}
                       onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
-                      style={{ padding: "11px 12px" }}
+                      style={{ padding: "11px 12px", color: "#0f172a", backgroundColor: "#ffffff", border: "1.5px solid #cbd5e1", borderRadius: "8px" }}
                     />
                   )}
                 </div>
@@ -3236,7 +3257,7 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
     const ty = (effectiveForm as unknown as { thankYouPage?: { heading?: string; description?: string; text?: string; image?: string; icon?: string; buttons?: { label: string; href: string; variant: string }[]; html?: string; showPdfConfirmation?: boolean; enabled?: boolean; alignment?: string; background?: string; typography?: { fontFamily?: string; fontSize?: string | number; textColor?: string }; colors?: { bg?: string; text?: string; accent?: string } } })?.thankYouPage;
     const useCustomThankYou = Boolean(ty?.enabled !== false && (ty?.heading || ty?.description));
     return (
-      <div id="lead-form" style={{ maxWidth: 640, margin: "0 auto", textAlign: (ty?.alignment as never) ?? "center", padding: device === "mobile" ? "32px 16px" : "48px 24px", background: ty?.background ?? undefined, borderRadius: 16 }}>
+      <div id="lead-form" style={{ maxWidth: 640, margin: "0 auto", textAlign: (ty?.alignment as never) ?? "center", padding: device === "mobile" ? "20px 14px" : "28px 20px", background: ty?.background ?? undefined, borderRadius: 16 }}>
         {useCustomThankYou ? (
           <>
             {ty?.image ? <img src={ty.image} alt="" style={{ width: "100%", maxWidth: 420, borderRadius: 14, margin: "0 auto 14px", display: "block" }} /> : null}
@@ -3290,11 +3311,11 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
   // Premium conversion-focused card with trust header
   return (
     <div id="lead-form" style={{ maxWidth: 520, margin: "0 auto", width: "100%" }}>
-      <div style={{ textAlign: "center", marginBottom: 16 }}>
+      <div style={{ textAlign: "center", marginBottom: 12 }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: wt.primarySoft, border: `1px solid ${hexToSoft(wt.primary, 0.22)}`, padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 800, color: wt.primary, letterSpacing: 0.6, textTransform: "uppercase" }}>
           <ShieldCheck size={12} /> RERA Approved · Trusted by 1200+ buyers
         </div>
-        <div style={{ fontSize: 12, color: wt.muted, marginTop: 8, fontWeight: 600 }}>Get price sheet, floor plans & brochure on WhatsApp instantly</div>
+        <div style={{ fontSize: 12, color: wt.muted, marginTop: 6, fontWeight: 600 }}>Get price sheet, floor plans & brochure on WhatsApp instantly</div>
       </div>
       <form
         className="ps-card"
@@ -3304,32 +3325,32 @@ function LeadFormSection({ s, device }: { s: SectionInstance; device: Device }) 
           submit();
         }}
       >
-        <div style={{ background: `linear-gradient(135deg, ${wt.primary} 0%, #6366f1 100%)`, padding: "18px 24px", color: "#fff", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.22)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-            <Send size={16} />
+        <div style={{ background: `linear-gradient(135deg, ${wt.primary} 0%, #6366f1 100%)`, padding: "14px 20px", color: "#fff", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.22)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <Send size={15} />
           </span>
           <div>
             <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: -0.2 }}>Enquire Now</div>
             <div style={{ fontSize: 11.5, opacity: 0.85, marginTop: 1 }}>Response within 15 mins · No spam</div>
           </div>
-          <span style={{ marginLeft: "auto", background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)", padding: "5px 10px", borderRadius: 999, fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <span style={{ marginLeft: "auto", background: "rgba(255,255,255,.14)", border: "1px solid rgba(255,255,255,.22)", padding: "4px 9px", borderRadius: 999, fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", gap: 5 }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 0 4px rgba(34,197,94,.22)" }} /> Live
           </span>
         </div>
-        <div style={{ padding: 24 }}>
+        <div style={{ padding: "18px 20px" }}>
         {multi ? (
           <>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <span style={{ fontSize: 13, fontWeight: 800, color: wt.ink }}>Step {step + 1} of {steps}</span>
             </div>
-            <div style={{ display: "flex", gap: 5, marginBottom: 22 }}>
+            <div style={{ display: "flex", gap: 5, marginBottom: 16 }}>
               {Array.from({ length: steps }).map((_, i) => (
                 <span key={i} style={{ flex: 1, height: 5, borderRadius: 999, background: i <= step ? wt.primary : wt.surfaceMuted }} />
               ))}
             </div>
           </>
         ) : null}
-        <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {visible.map((f, i) => {
             const key = (f as { id?: string }).id || f.label;
             const val = values[key] ?? "";
@@ -4911,6 +4932,16 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
     if (!live) return;
     firePrestateLead();
     if (pageId) bumpTracking(pageId, "form");
+    const leadFields: Record<string, string> = {};
+    for (const f of popupFields) {
+      leadFields[f.label] = values[f.label] ?? "";
+    }
+    void submitLead({
+      landingPageId: pageId,
+      formName: textOf(heading || "Popup Lead Form"),
+      source: "popup_form",
+      fields: leadFields,
+    }).catch(() => {});
     window.dispatchEvent(new CustomEvent(LEAD_SUCCESS_EVENT));
     const deliverable = textOf(st.pdfUrl || formCfg?.deliverableUrl || "").trim();
     if (deliverable) window.setTimeout(() => downloadFile(deliverable), 800);
@@ -4967,7 +4998,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                       placeholder={f.label}
                       value={values[f.label] ?? ""}
                       onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
-                      style={{ padding: "9px 12px", fontSize: 13 }}
+                      style={{ padding: "10px 12px", fontSize: 13, color: "#0f172a", backgroundColor: "#ffffff", border: "1.5px solid #cbd5e1", borderRadius: "8px" }}
                     />
                   ))}
                   {formError ? <div style={{ fontSize: 11.5, color: wt.danger, fontWeight: 600 }}>{formError}</div> : null}
@@ -5019,7 +5050,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                     {popupFields.map((f, i) => (
                       <div key={f.id || f.label || i}>
                         {f.type !== "checkbox" && (
-                          <label style={{ fontSize: 11.5, fontWeight: 700, color: wt.slate, marginBottom: 4, display: "block" }}>{f.label}</label>
+                          <label style={{ fontSize: 11.5, fontWeight: 700, color: "#1e293b", marginBottom: 4, display: "block" }}>{f.label}</label>
                         )}
                         <input
                           className="ps-input"
@@ -5027,7 +5058,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                           placeholder={f.placeholder}
                           value={values[f.label] ?? ""}
                           onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
-                          style={{ padding: "10px 12px" }}
+                          style={{ padding: "10px 12px", color: "#0f172a", backgroundColor: "#ffffff", border: "1.5px solid #cbd5e1", borderRadius: "8px" }}
                         />
                       </div>
                     ))}
@@ -5072,14 +5103,20 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                 {popupFields.map((f, i) => (
                   <div key={f.id || f.label || i}>
                     {f.type !== "checkbox" ? (
-                      <label style={{ fontSize: 11.5, fontWeight: 700, color: wt.slate, marginBottom: 5, display: "block" }}>
+                      <label style={{ fontSize: 11.5, fontWeight: 700, color: "#1e293b", marginBottom: 5, display: "block" }}>
                         {f.label} {f.required !== false ? "*" : ""}
                       </label>
                     ) : null}
                     {f.type === "textarea" ? (
-                      <textarea className="ps-input" placeholder={f.placeholder} value={values[f.label] ?? ""} onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))} style={{ minHeight: 74, padding: "11px 12px" }} />
+                      <textarea
+                        className="ps-input"
+                        placeholder={f.placeholder}
+                        value={values[f.label] ?? ""}
+                        onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
+                        style={{ minHeight: 74, padding: "11px 12px", color: "#0f172a", backgroundColor: "#ffffff", border: "1.5px solid #cbd5e1", borderRadius: "8px" }}
+                      />
                     ) : f.type === "checkbox" ? (
-                  <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: wt.slate }}>
+                      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "#1e293b" }}>
                         <input type="checkbox" checked={(values[f.label] ?? "") === "yes"} onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.checked ? "yes" : ""))} />
                         {f.label}
                       </label>
@@ -5090,7 +5127,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                         placeholder={f.placeholder}
                         value={values[f.label] ?? ""}
                         onChange={(e) => setValues((p) => withFieldValue(p, f, e.target.value))}
-                        style={{ padding: "11px 12px" }}
+                        style={{ padding: "11px 12px", color: "#0f172a", backgroundColor: "#ffffff", border: "1.5px solid #cbd5e1", borderRadius: "8px" }}
                       />
                     )}
                   </div>

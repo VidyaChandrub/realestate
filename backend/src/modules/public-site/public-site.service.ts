@@ -157,4 +157,64 @@ export class PublicSiteService {
     }
     return null;
   }
+
+  async resolveBySlug(slug: string) {
+    const raw = (slug ?? '').trim().toLowerCase();
+    const hyphenated = raw.replace(/\s+/g, '-');
+    const page = await this.prisma.landingPage.findFirst({
+      where: {
+        OR: [
+          { slug: { equals: raw, mode: 'insensitive' } },
+          { slug: { equals: hyphenated, mode: 'insensitive' } },
+        ],
+        status: 'published',
+      },
+      include: {
+        organisation: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            brandColour: true,
+            subdomain: true,
+            customDomain: true,
+          },
+        },
+        sourceTemplate: {
+          select: { id: true, name: true, baseDesignName: true },
+        },
+      },
+    });
+    if (!page) {
+      const draft = await this.prisma.landingPage.findFirst({
+        where: {
+          OR: [
+            { slug: { equals: raw, mode: 'insensitive' } },
+            { slug: { equals: hyphenated, mode: 'insensitive' } },
+          ],
+        },
+        include: {
+          organisation: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              logoUrl: true,
+              brandColour: true,
+              subdomain: true,
+              customDomain: true,
+            },
+          },
+          sourceTemplate: {
+            select: { id: true, name: true, baseDesignName: true },
+          },
+        },
+      });
+      if (draft) return draft;
+
+      throw new NotFoundException('Landing page not found or not published');
+    }
+    return page;
+  }
 }

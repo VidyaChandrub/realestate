@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
@@ -269,6 +270,131 @@ export default function OrgDashboardPage() {
           </div>
         </div>
       </Reveal>
+
+      {/* Project Portfolio & Inventory Hub Widget */}
+      {data?.inventorySummary && data.inventorySummary.projects.length > 0 ? (
+        <Reveal delay={3} style={{ marginBottom: 18 }}>
+          <div className="card">
+            <div className="card-h">
+              <span className="t" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                🏙️ Project Portfolio &amp; Inventory Hub
+              </span>
+              <Link className="x brand-link" href="/org/projects">
+                Manage All Projects ({data.inventorySummary.totalProjects}) →
+              </Link>
+            </div>
+            <div className="card-b col gap-16">
+              {/* Portfolio Aggregate KPI Strip */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                <div style={{ padding: "12px 14px", borderRadius: 10, background: "var(--surface-2, #f8fafc)", border: "1px solid var(--line)" }}>
+                  <div style={{ fontSize: 11.5, color: "var(--muted, #64748b)", fontWeight: 600 }}>Total Projects</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, marginTop: 3 }}>{data.inventorySummary.totalProjects}</div>
+                  <div style={{ fontSize: 11, color: "var(--green, #10b981)", marginTop: 2 }}>{data.inventorySummary.activeProjects} active listings</div>
+                </div>
+
+                <div style={{ padding: "12px 14px", borderRadius: 10, background: "var(--surface-2, #f8fafc)", border: "1px solid var(--line)" }}>
+                  <div style={{ fontSize: 11.5, color: "var(--muted, #64748b)", fontWeight: 600 }}>Total Portfolio Units</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, marginTop: 3 }}>{data.inventorySummary.totalUnits}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Planned across projects</div>
+                </div>
+
+                <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
+                  <div style={{ fontSize: 11.5, color: "var(--green, #10b981)", fontWeight: 600 }}>Available Units</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "var(--green, #10b981)", marginTop: 3 }}>
+                    {data.inventorySummary.unitsAvailable}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Ready for booking</div>
+                </div>
+
+                <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.2)" }}>
+                  <div style={{ fontSize: 11.5, color: "var(--indigo, #6366f1)", fontWeight: 600 }}>Sold / Booked</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "var(--indigo, #6366f1)", marginTop: 3 }}>
+                    {data.inventorySummary.unitsBooked}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                    {data.inventorySummary.portfolioOccupancyRate}% occupancy rate
+                  </div>
+                </div>
+
+                {data.inventorySummary.inventoryValueAvailable > 0 ? (
+                  <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.2)" }}>
+                    <div style={{ fontSize: 11.5, color: "var(--amber, #f59e0b)", fontWeight: 600 }}>Available Inventory Value</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "var(--amber, #f59e0b)", marginTop: 4 }}>
+                      {formatCurrency(data.inventorySummary.inventoryValueAvailable)}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>Unsold stock value</div>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Dynamic Project Cards Grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+                {data.inventorySummary.projects.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/org/projects/${p.id}`}
+                    style={{
+                      textDecoration: "none",
+                      color: "inherit",
+                      border: "1px solid var(--line, #e2e8f0)",
+                      borderRadius: 12,
+                      padding: "16px",
+                      background: "var(--surface, #fff)",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                      transition: "all 0.15s ease",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
+                        <span className={`badge ${p.status === "active" ? "b-green" : "b-gray"}`} style={{ fontSize: 11 }}>
+                          {p.status}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: 12.5, color: "var(--muted, #64748b)", marginBottom: 10 }}>
+                        📍 {p.location || "Location not set"}
+                        {p.towerCount ? ` · ${p.towerCount} Towers` : ""}
+                        {p.floorsDescription ? ` · ${p.floorsDescription}` : ""}
+                      </div>
+
+                      {p.configurations ? (
+                        <div style={{ fontSize: 12, color: "var(--indigo, #4f46e5)", background: "rgba(99, 102, 241, 0.06)", padding: "4px 8px", borderRadius: 6, display: "inline-block", marginBottom: 12 }}>
+                          📐 {p.configurations}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                        <span style={{ color: "var(--muted)" }}>Occupancy</span>
+                        <span style={{ fontWeight: 600 }}>{p.occupancyPct}% sold ({p.unitsBooked}/{p.unitsCreated || p.totalUnitsPlanned || 0})</span>
+                      </div>
+                      <div style={{ height: 6, borderRadius: 3, background: "var(--surface-2, #e2e8f0)", overflow: "hidden", marginBottom: 10 }}>
+                        <div style={{ height: "100%", width: `${p.occupancyPct}%`, background: "var(--indigo, #6366f1)", borderRadius: 3 }} />
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+                        <span style={{ color: "var(--green, #10b981)", fontWeight: 600 }}>
+                          {p.unitsAvailable} Available
+                        </span>
+                        {p.possession ? (
+                          <span style={{ color: "var(--muted)", fontSize: 11 }}>
+                            Possession: {p.possession}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Reveal>
+      ) : null}
 
       {/* Grid: Projects & Agent Leaderboard */}
       <div className="grid g2" style={{ marginBottom: 18, gap: 18 }}>
