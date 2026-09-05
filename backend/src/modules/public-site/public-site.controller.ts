@@ -16,6 +16,11 @@ export class PublicSiteController {
     return this.service.resolveByHost(host);
   }
 
+  @Get('portal/:host')
+  portal(@Param('host') host: string) {
+    return this.service.resolvePortal(host);
+  }
+
   @Get('projects/:landingPageId')
   projects(@Param('landingPageId') landingPageId: string) {
     return this.service.projectsForLandingPage(landingPageId);

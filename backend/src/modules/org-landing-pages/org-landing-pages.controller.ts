@@ -12,7 +12,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -26,7 +25,7 @@ import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 
 // Every route derives orgId from the JWT — never from a client-supplied
 // param — so one org can never read or touch another org's pages.
-@UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
 @Controller('org/landing-pages')
 export class OrgLandingPagesController {
   constructor(private readonly service: OrgLandingPagesService) {}

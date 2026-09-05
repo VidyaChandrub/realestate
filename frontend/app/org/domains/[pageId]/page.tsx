@@ -53,7 +53,12 @@ export default function DomainDetailPage(){
           <h1>{data.domain}</h1>
           <div className="sub">Isolated to this website only. Status: <strong>{data.status}</strong> · DNS: {data.dnsStatus} · SSL: {data.sslStatus}</div>
         </div>
-        <div className="actions"><Link className="btn btn-ghost" href="/org/domains">Back to domains</Link><button className="btn btn-primary" onClick={verify}>Verify DNS</button></div>
+        <div className="actions">
+          <Link className="btn btn-ghost" href="/org/domains">Back to domains</Link>
+          {["dns_required", "verification_pending", "verification_failed", "approved"].includes(data.status) ? (
+            <button className="btn btn-primary" onClick={verify}>Verify DNS</button>
+          ) : null}
+        </div>
       </div>
       {msg? <div className="card" style={{ padding:"12px 16px", marginBottom:12, background:"#eef6ff" }}>{msg}</div>:null}
       {data.status==="rejected" && data.rejectionReason? <div className="card" style={{ padding:16, background:"var(--rose-050)", border:"1px solid var(--rose)", color:"var(--rose)", marginBottom:12 }}><strong>Rejected:</strong> {data.rejectionReason}</div>:null}

@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -10,7 +9,7 @@ import { OrgSettingsService } from './org-settings.service';
 import { UpdateOrganisationDto } from '../admin-organisations/dto/update-organisation.dto';
 import { AssetUploadUrlDto } from './dto/asset-upload-url.dto';
 
-@UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
 @Controller('org/settings')
 export class OrgSettingsController {
   constructor(private readonly orgSettingsService: OrgSettingsService) {}

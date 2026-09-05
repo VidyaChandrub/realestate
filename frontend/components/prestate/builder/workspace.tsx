@@ -16,7 +16,7 @@ import {
   defaultHeaderStyle,
   labelsFromLinks,
 } from "@/lib/prestate/chrome-presets";
-import { buildTemplateSections, WIDGETS } from "@/lib/prestate/data";
+import { WIDGETS } from "@/lib/prestate/data";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
 import type { DesignBundle } from "./canvas";
 import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts, loadGlobalSets, type GlobalStyleSet } from "@/lib/prestate/design-system";
@@ -69,7 +69,8 @@ function seedSections(page: LandingPageData): SectionInstance[] {
     // Migrate legacy widget ids (merged library) so old pages keep editing.
     return migrateSections(JSON.parse(JSON.stringify(page.sections)) as SectionInstance[]);
   }
-  return page.pageType === "thank-you" ? buildThankYouSections() : buildTemplateSections(page.template);
+  if (page.pageType === "thank-you") return buildThankYouSections();
+  return [];
 }
 
 // Flatten every section id (including nested children) in render order so the

@@ -278,6 +278,219 @@ export default function SuperAdminRolesPage() {
         </div>
       </div>
 
+      {permissionsModalRole ? (
+        <Reveal delay={1}>
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setPermissionsModalRole(null)}
+                  disabled={permSaving}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+                >
+                  ← Back to Roles
+                </button>
+                <div style={{ height: 18, width: 1, background: "var(--line, #e2e8f0)" }} />
+                <span className="t" style={{ fontSize: 16 }}>
+                  Default Permissions: <strong>{permissionsModalRole.name}</strong>
+                </span>
+                <span className="badge b-indigo" style={{ textTransform: "capitalize" }}>
+                  {permissionsModalRole.scope}
+                </span>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  onClick={() => setPermissionsModalRole(null)}
+                  disabled={permSaving}
+                >
+                  Cancel
+                </button>
+                {permissionsModalRole.key !== "super_admin" ? (
+                  <button
+                    className="btn btn-primary btn-sm"
+                    type="button"
+                    onClick={handlePermissionsSubmit}
+                    disabled={permSaving || permLoading}
+                  >
+                    {permSaving ? "Saving…" : "Save Default Permissions"}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {permError ? <div className="form-alert">{permError}</div> : null}
+
+              {permissionsModalRole.key === "super_admin" || permissionsModalRole.key === "admin" ? (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    background: "rgba(99, 102, 241, 0.08)",
+                    border: "1px solid rgba(99, 102, 241, 0.2)",
+                    fontSize: 13,
+                    color: "var(--fg)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <Icon name="shield" size={16} />
+                  <span>
+                    <strong>System Note:</strong> The <code>{permissionsModalRole.name}</code> role inherently possesses unrestricted access across all modules and actions.
+                  </span>
+                </div>
+              ) : null}
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ fontSize: 13, color: "var(--muted, #64748b)" }}>
+                  Configure module access and action capabilities granted by default for this role:
+                </div>
+                {permissionsModalRole.key !== "super_admin" ? (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: 12, padding: "3px 8px" }}
+                      onClick={() => setAllPerms(true, false)}
+                      disabled={permLoading || permSaving}
+                    >
+                      Grant All
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: 12, padding: "3px 8px" }}
+                      onClick={() => setAllPerms(false, true)}
+                      disabled={permLoading || permSaving}
+                    >
+                      View Only
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: 12, padding: "3px 8px", color: "var(--rose, #e11d48)" }}
+                      onClick={() => setAllPerms(false, false)}
+                      disabled={permLoading || permSaving}
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid var(--line, #e2e8f0)",
+                  borderRadius: "8px",
+                  overflowX: "auto",
+                }}
+              >
+                {permLoading ? (
+                  <div style={{ padding: 36, textAlign: "center", color: "var(--muted)" }}>
+                    Loading module permissions…
+                  </div>
+                ) : (
+                  <table className="tbl" style={{ margin: 0 }}>
+                    <thead style={{ position: "sticky", top: 0, background: "var(--surface, #fff)", zIndex: 2 }}>
+                      <tr>
+                        <th style={{ minWidth: 200 }}>Module</th>
+                        <th style={{ textAlign: "center", width: 90 }}>View</th>
+                        <th style={{ textAlign: "center", width: 90 }}>Add</th>
+                        <th style={{ textAlign: "center", width: 90 }}>Edit</th>
+                        <th style={{ textAlign: "center", width: 90 }}>Delete</th>
+                        <th style={{ textAlign: "center", width: 90 }}>Approve</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {permissionsData.map((item) => (
+                        <tr key={item.moduleKey}>
+                          <td>
+                            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{item.label}</div>
+                            <div style={{ fontSize: 12, color: "var(--muted, #64748b)" }}>
+                              {item.description}
+                            </div>
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              checked={permissionsModalRole.key === "super_admin" ? true : item.canView}
+                              onChange={() => togglePerm(item.moduleKey, "canView")}
+                              disabled={permSaving || permissionsModalRole.key === "super_admin"}
+                              style={{ cursor: permissionsModalRole.key === "super_admin" ? "not-allowed" : "pointer", width: 18, height: 18 }}
+                            />
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              checked={permissionsModalRole.key === "super_admin" ? true : item.canAdd}
+                              onChange={() => togglePerm(item.moduleKey, "canAdd")}
+                              disabled={permSaving || permissionsModalRole.key === "super_admin"}
+                              style={{ cursor: permissionsModalRole.key === "super_admin" ? "not-allowed" : "pointer", width: 18, height: 18 }}
+                            />
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              checked={permissionsModalRole.key === "super_admin" ? true : item.canEdit}
+                              onChange={() => togglePerm(item.moduleKey, "canEdit")}
+                              disabled={permSaving || permissionsModalRole.key === "super_admin"}
+                              style={{ cursor: permissionsModalRole.key === "super_admin" ? "not-allowed" : "pointer", width: 18, height: 18 }}
+                            />
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              checked={permissionsModalRole.key === "super_admin" ? true : item.canDelete}
+                              onChange={() => togglePerm(item.moduleKey, "canDelete")}
+                              disabled={permSaving || permissionsModalRole.key === "super_admin"}
+                              style={{ cursor: permissionsModalRole.key === "super_admin" ? "not-allowed" : "pointer", width: 18, height: 18 }}
+                            />
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              checked={permissionsModalRole.key === "super_admin" ? true : item.canApprove}
+                              onChange={() => togglePerm(item.moduleKey, "canApprove")}
+                              disabled={permSaving || permissionsModalRole.key === "super_admin"}
+                              style={{ cursor: permissionsModalRole.key === "super_admin" ? "not-allowed" : "pointer", width: 18, height: 18 }}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => setPermissionsModalRole(null)}
+                  disabled={permSaving}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={handlePermissionsSubmit}
+                  disabled={permSaving || permLoading}
+                >
+                  {permSaving ? "Saving…" : "Save Default Permissions"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Reveal>
+      ) : null}
+
       <Reveal delay={1}>
         <div className="card">
           <div className="card-h">
@@ -338,14 +551,34 @@ export default function SuperAdminRolesPage() {
                       </td>
                       <td>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            type="button"
-                            style={{ color: "var(--indigo, #4f46e5)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}
-                            onClick={() => openPermissionsModal(r)}
-                          >
-                            <Icon name="shield" size={13} /> Permissions
-                          </button>
+                          {r.key === "super_admin" ? (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              type="button"
+                              disabled
+                              title="Super Admin possesses full system access and permissions cannot be altered"
+                              style={{
+                                color: "var(--muted, #94a3b8)",
+                                cursor: "not-allowed",
+                                opacity: 0.65,
+                                fontWeight: 500,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                              }}
+                            >
+                              <Icon name="lock" size={13} /> Full Access (Locked)
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              type="button"
+                              style={{ color: "var(--indigo, #4f46e5)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}
+                              onClick={() => openPermissionsModal(r)}
+                            >
+                              <Icon name="shield" size={13} /> Permissions
+                            </button>
+                          )}
                           <button
                             className="btn btn-ghost btn-sm"
                             type="button"
@@ -366,12 +599,22 @@ export default function SuperAdminRolesPage() {
                             <button
                               className="btn btn-ghost btn-sm"
                               type="button"
-                              style={{ color: "var(--rose, #e11d48)" }}
+                              style={{ color: "var(--rose, #e11d48)", fontWeight: 500 }}
                               onClick={() => setConfirmDeleteState(r)}
                             >
                               Delete
                             </button>
-                          ) : null}
+                          ) : (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              type="button"
+                              disabled
+                              title="System roles are core platform presets and cannot be deleted"
+                              style={{ color: "var(--muted, #94a3b8)", cursor: "not-allowed", opacity: 0.5 }}
+                            >
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -391,21 +634,42 @@ export default function SuperAdminRolesPage() {
         description="Add a new role definition that organisations can assign to their team members."
         size="lg"
       >
-        <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: 18, background: "#ffffff", padding: "4px 0" }}>
           {createError ? <div className="form-alert">{createError}</div> : null}
 
-          {/* Quick Presets */}
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted, #64748b)", marginBottom: 6 }}>
-              Quick Presets (Click to pre-fill):
+          {/* Quick Presets with fresh light styling */}
+          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+              <span>✨ Quick Presets</span>
+              <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>(Click to pre-fill)</span>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {ROLE_PRESETS.map((p) => (
                 <button
                   key={p.key}
                   type="button"
-                  className="btn btn-ghost btn-sm"
-                  style={{ fontSize: 12, padding: "3px 10px", background: "var(--surface-2, #f8fafc)", border: "1px solid var(--line, #e2e8f0)" }}
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    padding: "5px 12px",
+                    background: "#ffffff",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    color: "#334155",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "#6366f1";
+                    e.currentTarget.style.color = "#4f46e5";
+                    e.currentTarget.style.background = "#eef2ff";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "#cbd5e1";
+                    e.currentTarget.style.color = "#334155";
+                    e.currentTarget.style.background = "#ffffff";
+                  }}
                   onClick={() =>
                     setCreateForm({
                       name: p.name,
@@ -422,11 +686,16 @@ export default function SuperAdminRolesPage() {
           </div>
 
           {/* Grid layout for Name & Key */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div className="field">
-              <label>Role Name *</label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Role Name *</label>
               <input
                 className="inp"
+                style={{
+                  background: "#ffffff",
+                  borderColor: "#cbd5e1",
+                  color: "#0f172a",
+                }}
                 placeholder="e.g. Senior Property Specialist"
                 required
                 value={createForm.name}
@@ -435,14 +704,19 @@ export default function SuperAdminRolesPage() {
             </div>
 
             <div className="field">
-              <label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>
                 Role Key / Slug{" "}
-                <span style={{ fontSize: 11, color: "var(--muted, #64748b)", fontWeight: 400 }}>
+                <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>
                   (Auto-generated if empty)
                 </span>
               </label>
               <input
                 className="inp"
+                style={{
+                  background: "#ffffff",
+                  borderColor: "#cbd5e1",
+                  color: "#0f172a",
+                }}
                 placeholder="e.g. senior_property_specialist"
                 value={createForm.key}
                 onChange={(e) => setCreateForm((f) => ({ ...f, key: e.target.value }))}
@@ -450,46 +724,56 @@ export default function SuperAdminRolesPage() {
             </div>
           </div>
 
-          {/* Scope selection as visual cards */}
+          {/* Scope selection as light, clean visual cards */}
           <div className="field">
-            <label style={{ marginBottom: 6 }}>Role Scope *</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 8 }}>Role Scope *</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div
                 style={{
-                  padding: "12px 14px",
-                  borderRadius: "10px",
-                  border: createForm.scope === "team" ? "2px solid #6366f1" : "1px solid var(--line, #e2e8f0)",
-                  background: createForm.scope === "team" ? "rgba(99, 102, 241, 0.05)" : "var(--surface, #fff)",
+                  padding: "14px 16px",
+                  borderRadius: "12px",
+                  border: createForm.scope === "team" ? "2px solid #6366f1" : "1px solid #e2e8f0",
+                  background: createForm.scope === "team" ? "#f5f7ff" : "#ffffff",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
+                  boxShadow: createForm.scope === "team" ? "0 2px 8px rgba(99, 102, 241, 0.12)" : "0 1px 2px rgba(0,0,0,0.02)",
                 }}
                 onClick={() => setCreateForm((f) => ({ ...f, scope: "team" }))}
               >
-                <div style={{ fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 6, color: createForm.scope === "team" ? "#4f46e5" : "inherit" }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6, color: createForm.scope === "team" ? "#4338ca" : "#1e293b" }}>
                   <span>👥 Team Scope</span>
-                  {createForm.scope === "team" ? <span style={{ marginLeft: "auto", fontSize: 11, background: "#6366f1", color: "#fff", padding: "1px 6px", borderRadius: 4 }}>Selected</span> : null}
+                  {createForm.scope === "team" ? (
+                    <span style={{ marginLeft: "auto", fontSize: 11, background: "#e0e7ff", color: "#4338ca", fontWeight: 600, padding: "2px 8px", borderRadius: 6 }}>
+                      Selected
+                    </span>
+                  ) : null}
                 </div>
-                <div style={{ fontSize: 12, color: "var(--muted, #64748b)", marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
                   Assignable to team members, sales agents, and telecallers.
                 </div>
               </div>
 
               <div
                 style={{
-                  padding: "12px 14px",
-                  borderRadius: "10px",
-                  border: createForm.scope === "organisation" ? "2px solid #6366f1" : "1px solid var(--line, #e2e8f0)",
-                  background: createForm.scope === "organisation" ? "rgba(99, 102, 241, 0.05)" : "var(--surface, #fff)",
+                  padding: "14px 16px",
+                  borderRadius: "12px",
+                  border: createForm.scope === "organisation" ? "2px solid #6366f1" : "1px solid #e2e8f0",
+                  background: createForm.scope === "organisation" ? "#f5f7ff" : "#ffffff",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
+                  boxShadow: createForm.scope === "organisation" ? "0 2px 8px rgba(99, 102, 241, 0.12)" : "0 1px 2px rgba(0,0,0,0.02)",
                 }}
                 onClick={() => setCreateForm((f) => ({ ...f, scope: "organisation" }))}
               >
-                <div style={{ fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 6, color: createForm.scope === "organisation" ? "#4f46e5" : "inherit" }}>
+                <div style={{ fontWeight: 600, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6, color: createForm.scope === "organisation" ? "#4338ca" : "#1e293b" }}>
                   <span>🏢 Organisation Scope</span>
-                  {createForm.scope === "organisation" ? <span style={{ marginLeft: "auto", fontSize: 11, background: "#6366f1", color: "#fff", padding: "1px 6px", borderRadius: 4 }}>Selected</span> : null}
+                  {createForm.scope === "organisation" ? (
+                    <span style={{ marginLeft: "auto", fontSize: 11, background: "#e0e7ff", color: "#4338ca", fontWeight: 600, padding: "2px 8px", borderRadius: 6 }}>
+                      Selected
+                    </span>
+                  ) : null}
                 </div>
-                <div style={{ fontSize: 12, color: "var(--muted, #64748b)", marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
                   Organisation-wide scope for admin or executive roles.
                 </div>
               </div>
@@ -497,9 +781,14 @@ export default function SuperAdminRolesPage() {
           </div>
 
           <div className="field">
-            <label>Description</label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Description</label>
             <textarea
               className="inp"
+              style={{
+                background: "#ffffff",
+                borderColor: "#cbd5e1",
+                color: "#0f172a",
+              }}
               rows={3}
               placeholder="Describe the responsibilities and access level of this role…"
               value={createForm.description}
@@ -507,11 +796,16 @@ export default function SuperAdminRolesPage() {
             />
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
             <button className="btn btn-ghost" type="button" onClick={() => setCreateModalOpen(false)} disabled={createSubmitting}>
               Cancel
             </button>
-            <button className="btn btn-primary" type="submit" disabled={createSubmitting || !createForm.name.trim()}>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={createSubmitting || !createForm.name.trim()}
+              style={{ padding: "8px 20px" }}
+            >
               {createSubmitting ? "Creating…" : "Create Role"}
             </button>
           </div>
@@ -577,178 +871,6 @@ export default function SuperAdminRolesPage() {
             </button>
             <button className="btn btn-primary" type="submit" disabled={editSubmitting}>
               {editSubmitting ? "Saving…" : "Save Changes"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Permissions Matrix Modal */}
-      <Modal
-        open={permissionsModalRole !== null}
-        onClose={() => setPermissionsModalRole(null)}
-        title={`Default Module Permissions: ${permissionsModalRole?.name ?? ""}`}
-        description="Configure default module access and actions granted automatically when this role is assigned to team members across organisations."
-        size="lg"
-      >
-        <form onSubmit={handlePermissionsSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {permError ? <div className="form-alert">{permError}</div> : null}
-
-          {permissionsModalRole?.key === "super_admin" || permissionsModalRole?.key === "admin" ? (
-            <div
-              style={{
-                padding: "10px 14px",
-                borderRadius: 8,
-                background: "rgba(99, 102, 241, 0.08)",
-                border: "1px solid rgba(99, 102, 241, 0.2)",
-                fontSize: 13,
-                color: "var(--fg)",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <Icon name="shield" size={16} />
-              <span>
-                <strong>System Note:</strong> The <code>{permissionsModalRole.name}</code> role inherently possesses unrestricted access across all modules and actions.
-              </span>
-            </div>
-          ) : null}
-
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-            <div style={{ fontSize: 13, color: "var(--muted, #64748b)" }}>
-              Check modules and capabilities that should be available by default:
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ fontSize: 12, padding: "3px 8px" }}
-                onClick={() => setAllPerms(true, false)}
-                disabled={permLoading || permSaving}
-              >
-                Grant All
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ fontSize: 12, padding: "3px 8px" }}
-                onClick={() => setAllPerms(false, true)}
-                disabled={permLoading || permSaving}
-              >
-                View Only
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ fontSize: 12, padding: "3px 8px", color: "var(--rose, #e11d48)" }}
-                onClick={() => setAllPerms(false, false)}
-                disabled={permLoading || permSaving}
-              >
-                Clear All
-              </button>
-            </div>
-          </div>
-
-          <div
-            style={{
-              maxHeight: "440px",
-              overflowY: "auto",
-              border: "1px solid var(--line, #e2e8f0)",
-              borderRadius: "8px",
-            }}
-          >
-            {permLoading ? (
-              <div style={{ padding: 24, textAlign: "center", color: "var(--muted)" }}>
-                Loading module permissions…
-              </div>
-            ) : (
-              <table className="tbl" style={{ margin: 0 }}>
-                <thead style={{ position: "sticky", top: 0, background: "var(--surface, #fff)", zIndex: 2 }}>
-                  <tr>
-                    <th style={{ minWidth: 160 }}>Module</th>
-                    <th style={{ textAlign: "center", width: 70 }}>View</th>
-                    <th style={{ textAlign: "center", width: 70 }}>Add</th>
-                    <th style={{ textAlign: "center", width: 70 }}>Edit</th>
-                    <th style={{ textAlign: "center", width: 70 }}>Delete</th>
-                    <th style={{ textAlign: "center", width: 70 }}>Approve</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {permissionsData.map((item) => (
-                    <tr key={item.moduleKey}>
-                      <td>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{item.label}</div>
-                        <div style={{ fontSize: 11.5, color: "var(--muted, #64748b)" }}>
-                          {item.description}
-                        </div>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={item.canView}
-                          onChange={() => togglePerm(item.moduleKey, "canView")}
-                          disabled={permSaving}
-                          style={{ cursor: "pointer", width: 16, height: 16 }}
-                        />
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={item.canAdd}
-                          onChange={() => togglePerm(item.moduleKey, "canAdd")}
-                          disabled={permSaving}
-                          style={{ cursor: "pointer", width: 16, height: 16 }}
-                        />
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={item.canEdit}
-                          onChange={() => togglePerm(item.moduleKey, "canEdit")}
-                          disabled={permSaving}
-                          style={{ cursor: "pointer", width: 16, height: 16 }}
-                        />
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={item.canDelete}
-                          onChange={() => togglePerm(item.moduleKey, "canDelete")}
-                          disabled={permSaving}
-                          style={{ cursor: "pointer", width: 16, height: 16 }}
-                        />
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={item.canApprove}
-                          onChange={() => togglePerm(item.moduleKey, "canApprove")}
-                          disabled={permSaving}
-                          style={{ cursor: "pointer", width: 16, height: 16 }}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
-            <button
-              className="btn btn-ghost"
-              type="button"
-              onClick={() => setPermissionsModalRole(null)}
-              disabled={permSaving}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              type="submit"
-              disabled={permSaving || permLoading}
-            >
-              {permSaving ? "Saving…" : "Save Default Permissions"}
             </button>
           </div>
         </form>

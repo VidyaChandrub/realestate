@@ -29,7 +29,10 @@ export default function AdminDomainsPage(){
   const review = async(id:string, action:"approve"|"reject")=>{
     try{
       const body:any={ action };
-      if(action==="reject") body.reason = reason[id]||"";
+      if(action==="reject") {
+        if(!(reason[id]||"").trim()) { setMsg("Enter a rejection reason first."); return; }
+        body.reason = reason[id];
+      }
       await apiFetch(`/admin/domain-requests/${id}/review`, { method:"POST", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify(body)});
       setMsg(action==="approve"? "Approved — DNS instructions generated":"Rejected");
       fetchAll();

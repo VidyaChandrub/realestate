@@ -1,6 +1,5 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -16,7 +15,7 @@ export class SalesAgentsController {
    * Org-admin team dashboard: every sales agent in the org with their live
    * lead pipeline, closures, conversion and booked revenue.
    */
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard, PermissionGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
   @RequirePermission('sales_agents', 'view')
   @Get()
   list(@CurrentUser() user: JwtPayload) {

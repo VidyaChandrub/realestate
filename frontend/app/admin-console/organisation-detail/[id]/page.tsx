@@ -296,12 +296,18 @@ export default function SuperAdminOrganisationDetailPage() {
 
   const [domainsData, setDomainsData] = useState<any | null>(null);
   const [domainsLoading, setDomainsLoading] = useState(false);
+  const [subdomainDraft, setSubdomainDraft] = useState("");
+  const [subdomainSaving, setSubdomainSaving] = useState(false);
+  const [subdomainMsg, setSubdomainMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accessToken || !params.id) return;
     setDomainsLoading(true);
     apiFetch<any>(`/admin/organisations/${params.id}/domains`, { headers: { Authorization: `Bearer ${accessToken}` } })
-      .then(setDomainsData)
+      .then((data) => {
+        setDomainsData(data);
+        setSubdomainDraft(data?.subdomain ?? "");
+      })
       .catch(() => setDomainsData(null))
       .finally(() => setDomainsLoading(false));
   }, [accessToken, params.id, tab]);
@@ -1031,7 +1037,7 @@ export default function SuperAdminOrganisationDetailPage() {
                       })()} templates — {assignedTemplates.length} already assigned.
                     </div>
                     <div className="grid" style={{ gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:10, maxHeight:360, overflow:"auto"}}>
-                      {allTemplates.filter((t:any)=> !assignedTemplates.some((a:any)=>a.templateId===t.id)).map((tpl:any)=> {
+                      {allTemplates.filter((t:any)=> (t.status==="published" && (t.pageType==="landing" || !t.pageType)) && !assignedTemplates.some((a:any)=>a.templateId===t.id)).map((tpl:any)=> {
                         const sel = selectedNewTemplateIds.includes(tpl.id);
                         const plan = plans.find(p=> p.id===((org as any).plan?.id || (org.subscription as any)?.planId));
                         const raw=(plan?.limits as any)?.templates;
@@ -1117,6 +1123,82 @@ export default function SuperAdminOrganisationDetailPage() {
                     </div>
                     <div className="delta" style={{ fontSize:12, marginTop:2 }}>Mapped to landing pages</div>
                   </div>
+                </div>
+
+                <div className="card" style={{ padding: 16 }}>
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Organisation login subdomain</div>
+                  <div className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
+                    Generated automatically on approval. Users sign in at this host and then reach their dashboard.
+                    The public template site is at <code>/site</code>.
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <input
+                      className="inp"
+                      value={subdomainDraft}
+                      onChange={(e) => setSubdomainDraft(e.target.value)}
+                      placeholder="unique-subdomain"
+                      style={{ maxWidth: 260 }}
+                    />
+                    <button
+                      className="btn btn-primary btn-sm"
+                      disabled={subdomainSaving || !accessToken}
+                      onClick={async () => {
+                        setSubdomainSaving(true);
+                        setSubdomainMsg(null);
+                        try {
+                          const res = await apiFetch<any>(`/admin/organisations/${params.id}/subdomain`, {
+                            method: "POST",
+                            headers: { Authorization: `Bearer ${accessToken}` },
+                            body: JSON.stringify({ subdomain: subdomainDraft.trim() || undefined }),
+                          });
+                          setDomainsData((prev: any) => ({ ...prev, ...res }));
+                          setSubdomainDraft(res.subdomain ?? subdomainDraft);
+                          setSubdomainMsg("Subdomain saved.");
+                        } catch (e) {
+                          setSubdomainMsg(e instanceof Error ? e.message : "Failed to save subdomain");
+                        } finally {
+                          setSubdomainSaving(false);
+                        }
+                      }}
+                    >
+                      {subdomainSaving ? "Saving…" : "Save subdomain"}
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      disabled={subdomainSaving || !accessToken}
+                      onClick={async () => {
+                        setSubdomainSaving(true);
+                        setSubdomainMsg(null);
+                        try {
+                          const res = await apiFetch<any>(`/admin/organisations/${params.id}/subdomain`, {
+                            method: "POST",
+                            headers: { Authorization: `Bearer ${accessToken}` },
+                            body: JSON.stringify({}),
+                          });
+                          setDomainsData((prev: any) => ({ ...prev, ...res }));
+                          setSubdomainDraft(res.subdomain ?? "");
+                          setSubdomainMsg("A unique subdomain was generated.");
+                        } catch (e) {
+                          setSubdomainMsg(e instanceof Error ? e.message : "Failed to generate subdomain");
+                        } finally {
+                          setSubdomainSaving(false);
+                        }
+                      }}
+                    >
+                      Generate unique
+                    </button>
+                    {domainsData?.loginUrl ? (
+                      <a className="btn btn-ghost btn-sm" href={domainsData.loginUrl} target="_blank" rel="noreferrer">
+                        Open login
+                      </a>
+                    ) : null}
+                    {domainsData?.siteUrl ? (
+                      <a className="btn btn-ghost btn-sm" href={domainsData.siteUrl} target="_blank" rel="noreferrer">
+                        Open landing page
+                      </a>
+                    ) : null}
+                  </div>
+                  {subdomainMsg ? <div className="muted" style={{ marginTop: 8 }}>{subdomainMsg}</div> : null}
                 </div>
 
                 <div className="card">

@@ -13,6 +13,8 @@ import {
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
+import { leadDisplayName, leadDisplayPhone } from "@/lib/lead-display";
+import { AddLeadModal } from "@/components/org/add-lead-modal";
 
 const STATUS_BADGE: Record<CrmLeadStatus, string> = {
   new: "b-gray",
@@ -43,25 +45,8 @@ function initialsFor(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function leadName(lead: CrmLead): string {
-  const full =
-    typeof lead.data?.fullName === "string"
-      ? lead.data.fullName
-      : typeof lead.data?.name === "string"
-        ? lead.data.name
-        : null;
-  return full || lead.formName || "Unnamed lead";
-}
-
-function leadPhone(lead: CrmLead): string {
-  const phone =
-    typeof lead.data?.phone === "string"
-      ? lead.data.phone
-      : typeof lead.data?.phoneNumber === "string"
-        ? lead.data.phoneNumber
-        : null;
-  return phone || "";
-}
+const leadName = leadDisplayName;
+const leadPhone = leadDisplayPhone;
 
 function sourceBadgeClass(source: string | null): string {
   switch (source) {
@@ -79,7 +64,9 @@ function sourceBadgeClass(source: string | null): string {
 
 export default function OrgLeadsPage() {
   const { isOrgAdmin, hasPermission } = useAuth();
-  const canAssign = isOrgAdmin() || hasPermission("crm", "edit");
+  const admin = Boolean(isOrgAdmin?.());
+  const canAssign = admin || hasPermission("crm", "edit");
+  const canAdd = admin || hasPermission("crm", "add");
 
   const [leads, setLeads] = useState<CrmLead[] | null>(null);
   const [assignable, setAssignable] = useState<
@@ -88,17 +75,26 @@ export default function OrgLeadsPage() {
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
 
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await getCrmLeads();
+      const res = await getCrmLeads({
+        search: search || undefined,
+        status: (statusFilter || undefined) as CrmLeadStatus | undefined,
+        assignedToId: assigneeFilter || undefined,
+      });
       setLeads(res.data);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Failed to load leads.",
       );
     }
-  }, []);
+  }, [search, statusFilter, assigneeFilter]);
 
   useEffect(() => {
     load();
@@ -143,10 +139,10 @@ export default function OrgLeadsPage() {
         setLeads((prev) =>
           prev
             ? prev.map((l) =>
-                l.id === lead.id
-                  ? { ...l, assignedTo: result.assignedTo, ...(status ? { status } : {}) }
-                  : l,
-              )
+              l.id === lead.id
+                ? { ...l, assignedTo: result.assignedTo, ...(status ? { status } : {}) }
+                : l,
+            )
             : prev,
         );
       } catch (e) {
@@ -155,7 +151,7 @@ export default function OrgLeadsPage() {
         setSavingId(null);
       }
     },
-    [admin, savingId],
+    [canAssign, savingId],
   );
 
   const assigneeOptions = useMemo(
@@ -168,24 +164,45 @@ export default function OrgLeadsPage() {
       <LeadsPageHead
         active="lead-center"
         actions={
-          admin ? (
-            <>
-              <button className="btn btn-ghost">Import</button>
-              <button className="btn btn-primary">＋ Add lead</button>
-            </>
+          admin || canAdd ? (
+            <button className="btn btn-primary" onClick={() => setAddOpen(true)}>＋ Add lead</button>
           ) : undefined
         }
+      />
+      <AddLeadModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreated={(lead) => setLeads((prev) => (prev ? [lead, ...prev] : [lead]))}
       />
 
       <Reveal delay={1}>
         <div style={{ marginBottom: 20 }}>
           <div className="seg-wrap">
             <div className="seg">
-              <button className="active">All Leads</button>
-              <button>Follow Ups</button>
-              <button>Site Visits</button>
-              <button>Closures</button>
-              <button>Settings</button>
+              <button 
+                className={statusFilter === "" ? "on" : ""} 
+                onClick={() => setStatusFilter("")}
+              >
+                All Leads
+              </button>
+              <button 
+                className={statusFilter === "follow_up" ? "on" : ""} 
+                onClick={() => setStatusFilter("follow_up")}
+              >
+                Follow Ups
+              </button>
+              <button 
+                className={statusFilter === "site_visit" ? "on" : ""} 
+                onClick={() => setStatusFilter("site_visit")}
+              >
+                Site Visits
+              </button>
+              <button 
+                className={statusFilter === "won" ? "on" : ""} 
+                onClick={() => setStatusFilter("won")}
+              >
+                Closures
+              </button>
             </div>
           </div>
         </div>
@@ -224,10 +241,46 @@ export default function OrgLeadsPage() {
 
       <Reveal delay={2}>
         <div className="card">
-          <div className="card-h">
+          <div className="card-h" style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
             <div className="tb-search" style={{ maxWidth: 320, position: "static", margin: 0 }}>
               <span className="si"><Icon name="search" size={14} /></span>
-              <input placeholder="Search by name or phone…" />
+              <input
+                placeholder="Search by name or phone…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <select
+                className="inp"
+                style={{ width: "auto" }}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="">All Statuses</option>
+                {ALL_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+
+              {canAssign && (
+                <select
+                  className="inp"
+                  style={{ width: "auto" }}
+                  value={assigneeFilter}
+                  onChange={(e) => setAssigneeFilter(e.target.value)}
+                >
+                  <option value="">All Assignees</option>
+                  {assigneeOptions.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 

@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("admin@skylinedev.com");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,14 +15,11 @@ export default function ForgotPasswordPage() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const res = await apiFetch<{ success: boolean; resetToken?: string }>(
+      await apiFetch<{ success: boolean }>(
         "/auth/forgot-password",
         { method: "POST", body: JSON.stringify({ email }) },
       );
       setSent(true);
-      if (res.resetToken) {
-        router.push(`/reset-password?token=${encodeURIComponent(res.resetToken)}`);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send reset link.");
     } finally {
@@ -100,11 +95,11 @@ export default function ForgotPasswordPage() {
           {sent ? (
             <div className="help reveal in" data-delay="2" style={{ marginTop: 20 }}>
               📩 If an account exists for <b>{email}</b>, a reset link is on its way. The link is valid
-              for <b>30–60 minutes</b>.
+              for <b>60 minutes</b>.
             </div>
           ) : (
             <div className="help reveal in" data-delay="2" style={{ marginTop: 20 }}>
-              📩 The reset link is valid for <b>30–60 minutes</b>. If it expires, just request a new one.
+              📩 The reset link is valid for <b>60 minutes</b>. If it expires, just request a new one.
             </div>
           )}
 

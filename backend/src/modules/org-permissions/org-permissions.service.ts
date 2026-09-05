@@ -282,7 +282,7 @@ export class OrgPermissionsService {
       where: { id: userId },
       select: {
         orgId: true,
-        userRoles: { select: { role: { select: { key: true } } } },
+        userRoles: { select: { role: { select: { key: true, name: true } } } },
         userPermissions: {
           select: {
             moduleKey: true,
@@ -332,6 +332,8 @@ export class OrgPermissionsService {
 
     return {
       role: roleKeys[0] ?? null,
+      roleName: user.userRoles[0]?.role.name ?? null,
+      roles: roleKeys,
       permissions: Object.fromEntries(
         Object.entries(byModule).map(([key, value]) => [
           key,

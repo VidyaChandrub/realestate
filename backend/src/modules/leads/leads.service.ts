@@ -2,15 +2,21 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import type { CreateLeadDto } from './dto/create-lead.dto';
+import type { CreateManualLeadDto } from './dto/create-manual-lead.dto';
 import type { AssignLeadDto } from './dto/assign-lead.dto';
 import type { ListLeadsQueryDto } from './dto/list-leads-query.dto';
 import type { CreateLeadNoteDto } from './dto/create-lead-note.dto';
 import type { UpdateLeadNextActionDto } from './dto/update-lead-next-action.dto';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
-
-/** Org members who manage CRM leads are scoped to only the leads routed to
- *  them. Admins see the whole inbox. */
-const LIMITED_ROLES = ['manager', 'sales'];
+import {
+  leadContactFromData,
+  normalizeLeadData,
+} from '../../common/utils/lead-data.util';
+import {
+  actorLeadOrClauses,
+  canSeeAllLeads,
+  leadMatchesActorScope,
+} from '../../common/utils/lead-scope.util';
 
 @Injectable()
 export class LeadsService {
@@ -47,7 +53,7 @@ export class LeadsService {
     if (dto.projectId) {
       const project = await this.prisma.project.findUnique({
         where: { id: dto.projectId },
-        select: { orgId: true, status: true },
+        select: { orgId: true, status: true, name: true },
       });
       if (!project) {
         throw new NotFoundException('Project not found');
@@ -80,21 +86,246 @@ export class LeadsService {
       throw new NotFoundException('Unable to resolve organisation');
     }
 
-    return this.prisma.lead.create({
+    const projectId =
+      dto.projectId ??
+      (await this.resolveProjectId(orgId, dto.landingPageId, dto.data));
+
+    const data = normalizeLeadData(dto.data ?? {}, { unitId: dto.unitId });
+    const existing = await this.findRecentDuplicate(orgId, projectId, data);
+    if (existing) {
+      return this.prisma.lead.update({
+        where: { id: existing.id },
+        data: {
+          data: data as Prisma.InputJsonValue,
+          landingPageId: dto.landingPageId ?? existing.landingPageId,
+          projectId: projectId ?? existing.projectId,
+          formName: dto.formName ?? existing.formName,
+          source: dto.source ?? existing.source,
+        },
+      });
+    }
+
+    const assignedToId = await this.nextRoundRobinAssignee(orgId, projectId);
+
+    const lead = await this.prisma.lead.create({
       data: {
         orgId,
         landingPageId: dto.landingPageId ?? null,
-        projectId: dto.projectId ?? null,
+        projectId,
         formName: dto.formName ?? null,
         source: dto.source ?? 'website',
-        data: dto.data as Prisma.InputJsonValue,
+        data: data as Prisma.InputJsonValue,
+        ...(assignedToId ? { assignedToId } : {}),
       },
+    });
+
+    if (assignedToId) {
+      await this.prisma.activityEvent.create({
+        data: {
+          orgId,
+          agentId: assignedToId,
+          leadId: lead.id,
+          type: 'status_updated',
+          text: 'Lead captured from website and assigned automatically',
+        },
+      });
+    }
+
+    return lead;
+  }
+
+  async createFromCrm(orgId: string, actor: JwtPayload, dto: CreateManualLeadDto) {
+    const data = normalizeLeadData(dto.data ?? {});
+    const contact = leadContactFromData(data);
+    if (!contact.fullName && !contact.phone && !contact.email) {
+      throw new BadRequestException('Enter a name, phone, or email for the lead');
+    }
+
+    if (dto.projectId) {
+      const project = await this.prisma.project.findFirst({
+        where: { id: dto.projectId, orgId },
+        select: { id: true },
+      });
+      if (!project) throw new NotFoundException('Project not found');
+    }
+
+    if (dto.assignedToId) {
+      const assignee = await this.prisma.user.findFirst({
+        where: { id: dto.assignedToId, orgId },
+        select: { id: true },
+      });
+      if (!assignee) {
+        throw new NotFoundException('Assignee not found in this organisation');
+      }
+    }
+
+    const assignedToId =
+      dto.assignedToId ??
+      (await this.nextRoundRobinAssignee(orgId, dto.projectId ?? null));
+
+    const lead = await this.prisma.lead.create({
+      data: {
+        orgId,
+        projectId: dto.projectId ?? null,
+        formName: dto.formName ?? 'Manual lead',
+        source: dto.source ?? 'crm',
+        data: data as Prisma.InputJsonValue,
+        assignedToId,
+      },
+      include: {
+        assignedTo: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        project: { select: { id: true, name: true } },
+      },
+    });
+
+    await this.prisma.activityEvent.create({
+      data: {
+        orgId,
+        agentId: actor.sub,
+        leadId: lead.id,
+        type: 'status_updated',
+        text: assignedToId
+          ? 'Lead created in CRM and assigned'
+          : 'Lead created in CRM',
+      },
+    });
+
+    return this.toListItem(lead);
+  }
+
+  /** Map a captured lead onto a project via linked landing page or form data. */
+  private async resolveProjectId(
+    orgId: string,
+    landingPageId?: string | null,
+    data?: Record<string, unknown>,
+  ): Promise<string | null> {
+    if (landingPageId) {
+      const linked = await this.prisma.project.findFirst({
+        where: {
+          orgId,
+          marketing: { path: ['landingPageId'], equals: landingPageId },
+        },
+        select: { id: true },
+      });
+      if (linked) return linked.id;
+    }
+
+    const normalized = normalizeLeadData(data ?? {});
+    const projectName =
+      typeof normalized.project === 'string' ? normalized.project.trim() : '';
+    if (projectName) {
+      const byName = await this.prisma.project.findFirst({
+        where: { orgId, name: { equals: projectName, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (byName) return byName.id;
+    }
+
+    return null;
+  }
+
+  private async findRecentDuplicate(
+    orgId: string,
+    projectId: string | null,
+    data: Record<string, unknown>,
+  ) {
+    const contact = leadContactFromData(data);
+    const or: Prisma.LeadWhereInput[] = [];
+    if (contact.phone) {
+      or.push({ data: { path: ['phone'], equals: contact.phone } });
+    }
+    if (contact.email) {
+      or.push({ data: { path: ['email'], equals: contact.email } });
+    }
+    if (or.length === 0) return null;
+
+    const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    return this.prisma.lead.findFirst({
+      where: {
+        orgId,
+        createdAt: { gte: since },
+        ...(projectId ? { projectId } : {}),
+        OR: or,
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  private canSeeAllRoles(roles: string[]): boolean {
-    // super_admin or admin sees all; all other roles (manager, sales, telecaller, custom) are scoped
-    return roles.includes('super_admin') || roles.includes('admin');
+  private async nextRoundRobinAssignee(
+    orgId: string,
+    projectId: string | null,
+  ): Promise<string | null> {
+    if (!projectId) return null;
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, orgId },
+      select: { marketing: true },
+    });
+    const marketing =
+      project?.marketing && typeof project.marketing === 'object'
+        ? (project.marketing as Record<string, unknown>)
+        : {};
+    if (marketing.roundRobinEnabled !== true) return null;
+
+    const agents = await this.prisma.projectSalesAgent.findMany({
+      where: { projectId, user: { orgId, status: 'active' } },
+      select: { userId: true },
+      orderBy: { assignedAt: 'asc' },
+    });
+    if (agents.length === 0) return null;
+
+    const last =
+      typeof marketing.roundRobinIndex === 'number' ? marketing.roundRobinIndex : -1;
+    const next = (last + 1) % agents.length;
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        marketing: { ...marketing, roundRobinIndex: next } as Prisma.InputJsonValue,
+      },
+    });
+    return agents[next].userId;
+  }
+
+  private async projectLeadMatch(
+    orgId: string,
+    projectId: string,
+  ): Promise<Prisma.LeadWhereInput[]> {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, orgId },
+      select: { name: true, marketing: true },
+    });
+    const match: Prisma.LeadWhereInput[] = [{ projectId }];
+    const landingPageId =
+      project?.marketing &&
+      typeof (project.marketing as Record<string, unknown>).landingPageId ===
+        'string'
+        ? ((project.marketing as Record<string, unknown>).landingPageId as string)
+        : null;
+    if (landingPageId) {
+      match.push({ landingPageId });
+    }
+    if (project?.name) {
+      match.push({ data: { path: ['project'], equals: project.name } });
+    }
+    return match;
+  }
+
+  private async assertCanAccessLead(
+    orgId: string,
+    lead: {
+      assignedToId?: string | null;
+      projectId?: string | null;
+      landingPageId?: string | null;
+      data?: unknown;
+    },
+    actor: JwtPayload,
+  ) {
+    if (canSeeAllLeads(actor.roles)) return;
+    const scope = await actorLeadOrClauses(this.prisma, orgId, actor.sub);
+    if (!leadMatchesActorScope(lead, actor.sub, scope)) {
+      throw new NotFoundException('Lead not found');
+    }
   }
 
   private async buildListWhere(
@@ -102,74 +333,44 @@ export class LeadsService {
     actor: JwtPayload,
     query: ListLeadsQueryDto,
   ): Promise<Prisma.LeadWhereInput> {
-    const where: Prisma.LeadWhereInput = { orgId };
+    const and: Prisma.LeadWhereInput[] = [{ orgId }];
 
-    if (query.projectId) where.projectId = query.projectId;
-    if (query.status) where.status = query.status as never;
-    if (query.source) where.source = query.source;
-    if (query.assignedToId) where.assignedToId = query.assignedToId;
+    if (query.projectId) {
+      and.push({ OR: await this.projectLeadMatch(orgId, query.projectId) });
+    }
+    if (query.status) and.push({ status: query.status as never });
+    if (query.source) and.push({ source: query.source });
+    if (query.assignedToId) and.push({ assignedToId: query.assignedToId });
 
     if (query.search) {
       const s = query.search.trim();
       if (s) {
-        // Search over formName, source, and JSON data stringified paths via raw contains on data is not indexed.
-        // We fallback to searching formName + source + data via OR with maybe not super efficient but fine for 200 limit.
-        // Use Prisma's `string_contains` on data is not supported, so we search formName/source and rely on client for data text.
-        where.OR = [
-          { formName: { contains: s, mode: 'insensitive' } },
-          { source: { contains: s, mode: 'insensitive' } },
-        ];
+        and.push({
+          OR: [
+            { formName: { contains: s, mode: 'insensitive' } },
+            { source: { contains: s, mode: 'insensitive' } },
+            { data: { path: ['fullName'], string_contains: s } },
+            { data: { path: ['name'], string_contains: s } },
+            { data: { path: ['Name'], string_contains: s } },
+            { data: { path: ['Full Name'], string_contains: s } },
+            { data: { path: ['phone'], string_contains: s } },
+            { data: { path: ['Phone'], string_contains: s } },
+            { data: { path: ['email'], string_contains: s } },
+          ],
+        });
       }
     }
 
-    // Role scoping: manager/sales see only leads assigned to them OR leads on projects they are assigned to
-    const canSeeAll = this.canSeeAllRoles(actor.roles ?? []);
-    if (!canSeeAll) {
-      const actorId = actor.sub;
-      // Find projectIds where actor is manager or sales agent
-      const [managedIds, salesIds] = await Promise.all([
-        this.prisma.project.findMany({
-          where: { orgId, managerId: actorId },
-          select: { id: true },
-        }),
-        this.prisma.projectSalesAgent.findMany({
-          where: { userId: actorId, project: { orgId } },
-          select: { projectId: true },
-        }),
-      ]);
-      const projectIds = [
-        ...managedIds.map((p) => p.id),
-        ...salesIds.map((p) => p.projectId),
-      ];
-
-      const orClauses: Prisma.LeadWhereInput[] = [
-        { assignedToId: actorId },
-      ];
-      if (projectIds.length > 0) {
-        orClauses.push({ projectId: { in: projectIds } });
-      }
-
-      // Combine with existing filters: need (assignedToId == actor OR projectId in ... ) AND other filters already in where
-      // To do this, we move existing where keys into AND
-      const baseAnd: Prisma.LeadWhereInput[] = [{ orgId }];
-      if (query.projectId) baseAnd.push({ projectId: query.projectId });
-      if (query.status) baseAnd.push({ status: query.status as never });
-      if (query.source) baseAnd.push({ source: query.source });
-      if (query.assignedToId) baseAnd.push({ assignedToId: query.assignedToId });
-      if (where.OR && query.search) baseAnd.push({ OR: where.OR });
-
-      // Replace with AND of base filters + OR clause for scoping
-      return {
-        AND: [...baseAnd, { OR: orClauses }],
-      };
+    if (!canSeeAllLeads(actor.roles ?? [])) {
+      and.push({ OR: await actorLeadOrClauses(this.prisma, orgId, actor.sub) });
     }
 
-    return where;
+    return and.length === 1 ? { orgId } : { AND: and };
   }
 
   /**
    * Org-scoped list for the CRM/lead inbox. Admins see every lead in the org;
-   * manager/sales users are restricted to leads assigned to them or on projects they manage/are assigned to.
+   * other roles are restricted to assigned leads or projects they manage/are on.
    */
   async list(orgId: string, actor: JwtPayload, query: ListLeadsQueryDto = {}) {
     const where = await this.buildListWhere(orgId, actor, query);
@@ -201,27 +402,7 @@ export class LeadsService {
     ]);
 
     return {
-      data: leads.map((lead) => ({
-        id: lead.id,
-        orgId: lead.orgId,
-        landingPageId: lead.landingPageId,
-        projectId: (lead as unknown as { projectId: string | null }).projectId ?? null,
-        project: (lead as unknown as { project: { id: string; name: string } | null }).project ?? null,
-        formName: lead.formName,
-        source: lead.source,
-        data: lead.data,
-        status: lead.status,
-        assignedTo: lead.assignedTo
-          ? {
-              id: lead.assignedTo.id,
-              name:
-                [lead.assignedTo.firstName, lead.assignedTo.lastName]
-                  .filter(Boolean)
-                  .join(' ') || lead.assignedTo.email,
-            }
-          : null,
-        createdAt: lead.createdAt,
-      })),
+      data: leads.map((lead) => this.toListItem(lead)),
       total,
       page,
       limit,
@@ -249,54 +430,10 @@ export class LeadsService {
       },
     });
     if (!lead) throw new NotFoundException('Lead not found');
-
-    // Enforce visibility for limited roles
-    const canSeeAll = this.canSeeAllRoles(actor.roles ?? []);
-    if (!canSeeAll) {
-      const actorId = actor.sub;
-      const isAssigned = lead.assignedToId === actorId;
-      let isProjectMember = false;
-      const pid = (lead as unknown as { projectId: string | null }).projectId;
-      if (pid) {
-        const [isManager, isSales] = await Promise.all([
-          this.prisma.project.findFirst({
-            where: { id: pid, managerId: actorId },
-            select: { id: true },
-          }),
-          this.prisma.projectSalesAgent.findFirst({
-            where: { projectId: pid, userId: actorId },
-            select: { projectId: true },
-          }),
-        ]);
-        isProjectMember = !!isManager || !!isSales;
-      }
-
-      if (!isAssigned && !isProjectMember) {
-        throw new NotFoundException('Lead not found');
-      }
-
-    }
+    await this.assertCanAccessLead(orgId, lead, actor);
 
     return {
-      id: lead.id,
-      orgId: lead.orgId,
-      landingPageId: lead.landingPageId,
-      projectId: (lead as unknown as { projectId: string | null }).projectId ?? null,
-      project: (lead as unknown as { project: { id: string; name: string } | null }).project ?? null,
-      formName: lead.formName,
-      source: lead.source,
-      data: lead.data,
-      status: lead.status,
-      assignedTo: lead.assignedTo
-        ? {
-            id: lead.assignedTo.id,
-            name:
-              [lead.assignedTo.firstName, lead.assignedTo.lastName]
-                .filter(Boolean)
-                .join(' ') || lead.assignedTo.email,
-          }
-        : null,
-      createdAt: lead.createdAt,
+      ...this.toListItem(lead),
       activities: lead.activities,
       callLogs: lead.callLogs,
       nextAction: lead.nextActionType
@@ -368,23 +505,22 @@ export class LeadsService {
   }
 
   /**
-   * Admin-only: (re)assign a lead to an org member and optionally move its
-   * CRM stage. Unassigning is supported (assignedToId === null keeps the lead
-   * in the inbox as "new"). The assignee must belong to the same org — a
-   * tenant-isolation guard, never trusting a cross-org user id.
+   * (Re)assign a lead to an org member and optionally move its CRM stage.
+   * Caller must already be able to see the lead.
    */
-  async assign(orgId: string, leadId: string, dto: AssignLeadDto) {
+  async assign(orgId: string, leadId: string, dto: AssignLeadDto, actor: JwtPayload) {
     const lead = await this.prisma.lead.findFirst({
       where: { id: leadId, orgId },
     });
     if (!lead) {
       throw new NotFoundException('Lead not found');
     }
+    await this.assertCanAccessLead(orgId, lead, actor);
 
     if (dto.assignedToId != null) {
       const assignee = await this.prisma.user.findFirst({
         where: { id: dto.assignedToId, orgId },
-        select: { id: true },
+        select: { id: true, firstName: true, lastName: true, email: true },
       });
       if (!assignee) {
         throw new NotFoundException('Assignee not found in this organisation');
@@ -405,26 +541,35 @@ export class LeadsService {
       },
     });
 
-    return {
-      id: updated.id,
-      status: updated.status,
-      projectId: (updated as unknown as { projectId: string | null }).projectId ?? null,
-      project: (updated as unknown as { project: { id: string; name: string } | null }).project ?? null,
-      assignedTo: updated.assignedTo
-        ? {
-            id: updated.assignedTo.id,
-            name:
-              [updated.assignedTo.firstName, updated.assignedTo.lastName]
-                .filter(Boolean)
-                .join(' ') || updated.assignedTo.email,
-          }
-        : null,
-    };
+    const assigneeName = updated.assignedTo
+      ? [updated.assignedTo.firstName, updated.assignedTo.lastName]
+          .filter(Boolean)
+          .join(' ') || updated.assignedTo.email
+      : 'Unassigned';
+    const parts: string[] = [];
+    if (lead.assignedToId !== updated.assignedToId) {
+      parts.push(`Assigned to ${assigneeName}`);
+    }
+    if (dto.status && dto.status !== lead.status) {
+      parts.push(`Status changed to ${dto.status.replace('_', ' ')}`);
+    }
+    if (parts.length > 0) {
+      await this.prisma.activityEvent.create({
+        data: {
+          orgId,
+          agentId: actor.sub,
+          leadId,
+          type: 'status_updated',
+          text: parts.join(' · '),
+        },
+      });
+    }
+
+    return this.toListItem(updated);
   }
 
   /**
    * Org members eligible as lead assignees (manager/sales/telecaller/custom roles).
-   * Only active users with team roles appear.
    */
   async listAssignableUsers(orgId: string) {
     const users = await this.prisma.user.findMany({
@@ -462,6 +607,47 @@ export class LeadsService {
         role: user.userRoles[0]?.role ?? null,
       })),
       total: users.length,
+    };
+  }
+
+  private toListItem(lead: {
+    id: string;
+    orgId: string;
+    landingPageId?: string | null;
+    projectId?: string | null;
+    project?: { id: string; name: string } | null;
+    formName: string | null;
+    source: string | null;
+    data: unknown;
+    status: string;
+    assignedTo?: {
+      id: string;
+      firstName: string | null;
+      lastName: string | null;
+      email: string;
+    } | null;
+    createdAt: Date;
+  }) {
+    return {
+      id: lead.id,
+      orgId: lead.orgId,
+      landingPageId: lead.landingPageId ?? null,
+      projectId: lead.projectId ?? null,
+      project: lead.project ?? null,
+      formName: lead.formName,
+      source: lead.source,
+      data: lead.data,
+      status: lead.status,
+      assignedTo: lead.assignedTo
+        ? {
+            id: lead.assignedTo.id,
+            name:
+              [lead.assignedTo.firstName, lead.assignedTo.lastName]
+                .filter(Boolean)
+                .join(' ') || lead.assignedTo.email,
+          }
+        : null,
+      createdAt: lead.createdAt,
     };
   }
 }

@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class LoginDto {
   @IsEmail()
@@ -7,4 +7,9 @@ export class LoginDto {
   @IsString()
   @IsNotEmpty()
   password: string;
+
+  /** Browser host when signing in on an organisation subdomain or custom domain. */
+  @IsOptional()
+  @IsString()
+  host?: string;
 }

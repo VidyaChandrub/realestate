@@ -81,6 +81,7 @@ const DEFAULT_BY_KEY: Record<
   manager: {
     dashboard: { view: true },
     crm: { view: true, add: true, edit: true },
+    projects: { view: true, add: true, edit: true },
     sales_agents: { view: true },
     websites: { view: true },
     calling: { view: true, add: true, edit: true },
@@ -236,33 +237,33 @@ export function computeEffectivePermissions(
     });
   }
 
-  const overrideByModule = new Map<string, ModulePermission>();
+  const overrideByModule = new Map<string, PermissionSource['userOverrides'][number]>();
   for (const row of source.userOverrides) {
-    overrideByModule.set(row.moduleKey, {
-      moduleKey: row.moduleKey,
-      canView: row.canView ?? false,
-      canAdd: row.canAdd ?? false,
-      canEdit: row.canEdit ?? false,
-      canDelete: row.canDelete ?? false,
-      canApprove: row.canApprove ?? false,
-    });
+    overrideByModule.set(row.moduleKey, row);
   }
 
   for (const def of PERMISSION_MODULES) {
     const roleRow = roleByModule.get(def.key);
     const overrideRow = overrideByModule.get(def.key);
     if (roleRow && overrideRow) {
-      // Merge: override wins where it's set (true), otherwise role value.
+      // Explicit override values (including false) win; null keeps the role grant.
       byModule[def.key] = {
         moduleKey: def.key,
-        canView: overrideRow.canView || roleRow.canView,
-        canAdd: overrideRow.canAdd || roleRow.canAdd,
-        canEdit: overrideRow.canEdit || roleRow.canEdit,
-        canDelete: overrideRow.canDelete || roleRow.canDelete,
-        canApprove: overrideRow.canApprove || roleRow.canApprove,
+        canView: overrideRow.canView ?? roleRow.canView,
+        canAdd: overrideRow.canAdd ?? roleRow.canAdd,
+        canEdit: overrideRow.canEdit ?? roleRow.canEdit,
+        canDelete: overrideRow.canDelete ?? roleRow.canDelete,
+        canApprove: overrideRow.canApprove ?? roleRow.canApprove,
       };
     } else if (overrideRow) {
-      byModule[def.key] = overrideRow;
+      byModule[def.key] = {
+        moduleKey: def.key,
+        canView: overrideRow.canView ?? false,
+        canAdd: overrideRow.canAdd ?? false,
+        canEdit: overrideRow.canEdit ?? false,
+        canDelete: overrideRow.canDelete ?? false,
+        canApprove: overrideRow.canApprove ?? false,
+      };
     } else if (roleRow) {
       byModule[def.key] = roleRow;
     } else {

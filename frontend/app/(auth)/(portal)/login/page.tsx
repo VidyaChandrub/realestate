@@ -24,6 +24,12 @@ export default function LoginPage() {
   // Read the browser-only query string after hydration so the server and
   // client render the same initial markup.
   const [notice, setNotice] = useState<string | null>(null);
+  const [portal, setPortal] = useState<{
+    name: string;
+    logoUrl?: string | null;
+    brandColour?: string | null;
+    sitePath?: string;
+  } | null>(null);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -32,6 +38,13 @@ export default function LoginPage() {
         "You were signed out because your organisation's access was changed. Contact your administrator if this is unexpected.",
       );
     }
+    const host = window.location.host;
+    fetch(`/api/public/site/portal/${encodeURIComponent(host)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.name) setPortal(data);
+      })
+      .catch(() => undefined);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
@@ -42,6 +55,14 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       const session = await login({ email, password });
+      const resumeOrgSignup =
+        session.role === "organisation_admin" &&
+        session.onboarding_step !== "completed";
+      if (resumeOrgSignup) {
+        router.push("/register");
+        router.refresh();
+        return;
+      }
       router.push(
         session.must_change_password
           ? "/change-password"
@@ -94,10 +115,17 @@ export default function LoginPage() {
       <div className="formside">
         <div className="fw">
           <div className="reveal in">
-            <h2>Sign in to iPixxel Realty</h2>
+            <h2>{portal ? `Sign in to ${portal.name}` : "Sign in to iPixxel Realty"}</h2>
             <p className="muted" style={{ marginTop: 8 }}>
-              One login for Super Admin, Org Admin, Managers &amp; Sales.
+              {portal
+                ? "Use your organisation credentials. After sign-in you will land on your dashboard."
+                : "One login for Super Admin, Org Admin, Managers & Sales."}
             </p>
+            {portal?.sitePath ? (
+              <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+                Looking for the public website? <a href={portal.sitePath} style={{ color: "var(--brand)", fontWeight: 600 }}>Open landing page</a>
+              </p>
+            ) : null}
           </div>
           {notice ? (
             <p role="status" className="help reveal in" style={{ marginTop: 18, borderColor: "var(--rose-050)", background: "var(--rose-050)", color: "var(--rose)" }}>

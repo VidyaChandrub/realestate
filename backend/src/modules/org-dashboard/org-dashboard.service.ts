@@ -3,6 +3,10 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { OrgDashboardQueryDto } from './dto/org-dashboard-query.dto';
+import {
+  actorLeadOrClauses,
+  canSeeAllLeads,
+} from '../../common/utils/lead-scope.util';
 
 function parseBudgetValue(data: unknown): number {
   if (!data || typeof data !== 'object') return 0;
@@ -54,36 +58,32 @@ export class OrgDashboardService {
       prevStartDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
     }
 
-    const isLimitedRole = actor.roles.some((r) => r === 'sales' || r === 'telecaller');
-    const isManager = actor.roles.includes('manager') && !actor.roles.includes('admin');
-
+    const seeAllLeads = canSeeAllLeads(actor.roles);
     const leadWhere: Prisma.LeadWhereInput = { orgId };
     const callWhere: Prisma.CallLogWhereInput = { orgId };
 
-    if (isLimitedRole) {
-      leadWhere.assignedToId = actor.sub;
+    if (!seeAllLeads) {
+      leadWhere.OR = await actorLeadOrClauses(this.prisma, orgId, actor.sub);
       callWhere.agentId = actor.sub;
-    } else if (isManager) {
-      const managedProjects = await this.prisma.project.findMany({
-        where: {
-          orgId,
-          OR: [
-            { managerId: actor.sub },
-            { salesAgents: { some: { userId: actor.sub } } },
-          ],
-        },
-        select: { id: true },
-      });
-      const projIds = managedProjects.map((p) => p.id);
-      if (projIds.length > 0) {
-        leadWhere.OR = [{ assignedToId: actor.sub }, { projectId: { in: projIds } }];
-      } else {
-        leadWhere.assignedToId = actor.sub;
-      }
     }
 
     if (query.projectId) {
-      leadWhere.projectId = query.projectId;
+      const project = await this.prisma.project.findFirst({
+        where: { id: query.projectId, orgId },
+        select: { name: true, marketing: true },
+      });
+      const landingPageId =
+        project?.marketing &&
+        typeof (project.marketing as Record<string, unknown>).landingPageId ===
+          'string'
+          ? ((project.marketing as Record<string, unknown>).landingPageId as string)
+          : null;
+      const projectOr: Prisma.LeadWhereInput[] = [{ projectId: query.projectId }];
+      if (landingPageId) projectOr.push({ landingPageId });
+      if (project?.name) {
+        projectOr.push({ data: { path: ['project'], equals: project.name } });
+      }
+      leadWhere.AND = [...(Array.isArray(leadWhere.AND) ? leadWhere.AND : []), { OR: projectOr }];
     }
     if (query.userId) {
       leadWhere.assignedToId = query.userId;
@@ -120,6 +120,7 @@ export class OrgDashboardService {
           status: true,
           data: true,
           projectId: true,
+          landingPageId: true,
           assignedToId: true,
           createdAt: true,
         },
@@ -132,7 +133,7 @@ export class OrgDashboardService {
         _sum: { durationSeconds: true },
       }),
       this.prisma.activityEvent.findMany({
-        where: { orgId, ...(isLimitedRole ? { agentId: actor.sub } : {}) },
+        where: { orgId, ...(!seeAllLeads ? { agentId: actor.sub } : {}) },
         orderBy: { createdAt: 'desc' },
         take: 10,
         select: { id: true, type: true, text: true, createdAt: true },
@@ -140,9 +141,7 @@ export class OrgDashboardService {
       this.prisma.project.findMany({
         where: {
           orgId,
-          ...(isLimitedRole
-            ? { salesAgents: { some: { userId: actor.sub } } }
-            : isManager
+          ...(!seeAllLeads
             ? {
                 OR: [
                   { managerId: actor.sub },
@@ -165,6 +164,7 @@ export class OrgDashboardService {
           possession: true,
           reraId: true,
           coverImageUrl: true,
+          marketing: true,
           unitTypes: {
             select: {
               id: true,
@@ -268,11 +268,30 @@ export class OrgDashboardService {
       });
     }
 
+    const landingPageToProject = new Map<string, string>();
+    const nameToProject = new Map<string, string>();
+    for (const p of orgProjects) {
+      const lpId = (p.marketing as Record<string, unknown> | null)?.landingPageId;
+      if (typeof lpId === 'string' && lpId) landingPageToProject.set(lpId, p.id);
+      nameToProject.set(p.name.toLowerCase(), p.id);
+    }
+
     for (const l of leads) {
-      if (!l.projectId) continue;
-      const projName = projectMap.get(l.projectId) ?? 'Unknown Project';
-      const existing = projectStatsMap.get(l.projectId) ?? {
-        projectId: l.projectId,
+      let resolvedProjectId = l.projectId;
+      if (!resolvedProjectId && l.landingPageId) {
+        resolvedProjectId = landingPageToProject.get(l.landingPageId) ?? null;
+      }
+      if (!resolvedProjectId) {
+        const named =
+          typeof (l.data as Record<string, unknown> | null)?.project === 'string'
+            ? String((l.data as Record<string, unknown>).project).trim().toLowerCase()
+            : '';
+        if (named) resolvedProjectId = nameToProject.get(named) ?? null;
+      }
+      if (!resolvedProjectId) continue;
+      const projName = projectMap.get(resolvedProjectId) ?? 'Unknown Project';
+      const existing = projectStatsMap.get(resolvedProjectId) ?? {
+        projectId: resolvedProjectId,
         projectName: projName,
         leadsCount: 0,
         wonCount: 0,
@@ -283,7 +302,7 @@ export class OrgDashboardService {
         existing.wonCount += 1;
         existing.revenue += parseBudgetValue(l.data);
       }
-      projectStatsMap.set(l.projectId, existing);
+      projectStatsMap.set(resolvedProjectId, existing);
     }
 
     const agentMap = new Map(orgAgents.map((a) => [a.id, a]));

@@ -19,9 +19,10 @@ describe('LeadsService', () => {
       update: jest.Mock;
     };
     landingPage: { findUnique: jest.Mock };
-    project: { findMany: jest.Mock; findFirst: jest.Mock };
+    project: { findMany: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     projectSalesAgent: { findMany: jest.Mock; findFirst: jest.Mock };
     user: { findFirst: jest.Mock; findMany: jest.Mock };
+    activityEvent: { create: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -36,14 +37,16 @@ describe('LeadsService', () => {
       landingPage: { findUnique: jest.fn() },
       project: {
         findMany: jest.fn().mockResolvedValue([]),
-        findFirst: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
         findUnique: jest.fn(),
+        update: jest.fn(),
       },
       projectSalesAgent: {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
       },
       user: { findFirst: jest.fn(), findMany: jest.fn() },
+      activityEvent: { create: jest.fn().mockResolvedValue({}) },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -145,6 +148,7 @@ describe('LeadsService', () => {
         orgId: 'org-42',
         status: 'published',
       });
+      prisma.lead.findFirst.mockResolvedValue(null);
       prisma.lead.create.mockResolvedValue({ id: 'lead-1' });
 
       const result = await service.createFromPublic({
@@ -161,7 +165,7 @@ describe('LeadsService', () => {
           projectId: null,
           formName: 'enquiry',
           source: 'website',
-          data: { name: 'Aarav' },
+          data: { name: 'Aarav', fullName: 'Aarav' },
         },
       });
       expect(result.id).toBe('lead-1');
@@ -172,6 +176,7 @@ describe('LeadsService', () => {
         orgId: 'org-42',
         status: 'active',
       });
+      prisma.lead.findFirst.mockResolvedValue(null);
       prisma.lead.create.mockResolvedValue({ id: 'lead-2' });
 
       const result = await service.createFromPublic({
@@ -204,7 +209,7 @@ describe('LeadsService', () => {
     it('throws when the lead is not in the org', async () => {
       prisma.lead.findFirst.mockResolvedValue(null);
       await expect(
-        service.assign('org-1', 'lead-1', { assignedToId: null }),
+        service.assign('org-1', 'lead-1', { assignedToId: null }, actor()),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -213,12 +218,12 @@ describe('LeadsService', () => {
       prisma.user.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.assign('org-1', 'lead-1', { assignedToId: 'other-org-user' }),
+        service.assign('org-1', 'lead-1', { assignedToId: 'other-org-user' }, actor()),
       ).rejects.toThrow(NotFoundException);
 
       expect(prisma.user.findFirst).toHaveBeenCalledWith({
         where: { id: 'other-org-user', orgId: 'org-1' },
-        select: { id: true },
+        select: { id: true, firstName: true, lastName: true, email: true },
       });
     });
 
@@ -239,7 +244,7 @@ describe('LeadsService', () => {
       const result = await service.assign('org-1', 'lead-1', {
         assignedToId: 'sales-9',
         status: 'follow_up',
-      });
+      }, actor());
 
       expect(prisma.lead.update).toHaveBeenCalledWith({
         where: { id: 'lead-1' },
@@ -262,7 +267,7 @@ describe('LeadsService', () => {
 
       const result = await service.assign('org-1', 'lead-1', {
         assignedToId: null,
-      });
+      }, actor());
 
       expect(prisma.lead.update).toHaveBeenCalledWith({
         where: { id: 'lead-1' },
@@ -293,7 +298,12 @@ describe('LeadsService', () => {
             orgId: 'org-1',
             status: 'active',
             userRoles: {
-              some: { role: { key: { in: ['manager', 'sales'] } } },
+              some: {
+                role: {
+                  status: 'active',
+                  key: { notIn: ['super_admin', 'admin'] },
+                },
+              },
             },
           },
         }),

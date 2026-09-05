@@ -30,11 +30,11 @@ import { JwtPayload } from '../types/jwt-payload.interface';
 // request.user.orgId already being attached.
 // Use as @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard).
 //
-// Every rejection here carries `error: 'ORG_INACTIVE'` in the response body
-// (alongside the human message, which is unchanged) so the frontend can
+// Disabled/rejected orgs carry `error: 'ORG_INACTIVE'` so the frontend can
 // tell "your org access was revoked mid-session" apart from an ordinary
 // 403 and end the session immediately — e.g. a Super Admin deactivating an
-// org while its admin is still logged in.
+// org while its admin is still logged in. Draft/pending use ORG_NOT_READY
+// instead so signup and holding states never force-logout.
 export const ORG_INACTIVE_ERROR = 'ORG_INACTIVE';
 
 function orgInactive(message: string): ForbiddenException {
@@ -56,7 +56,7 @@ export class OrgApprovedGuard implements CanActivate {
 
     const orgId = request.user?.orgId;
     if (!orgId) {
-      throw orgInactive('Organisation Admin access required');
+      throw new ForbiddenException('Organisation Admin access required');
     }
 
     const organisation = await this.prisma.organisation.findUnique({
@@ -65,21 +65,30 @@ export class OrgApprovedGuard implements CanActivate {
     });
 
     if (!organisation) {
-      throw orgInactive('Organisation not found');
+      throw new ForbiddenException('Organisation not found');
     }
+    // Draft/pending are expected during signup — they must NOT be tagged
+    // ORG_INACTIVE or the frontend will force-logout mid-wizard.
     if (organisation.status === 'pending') {
-      throw orgInactive(
-        'Organisation pending approval — please wait for super admin approval',
-      );
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'ORG_NOT_READY',
+        message:
+          'Organisation pending approval — please wait for super admin approval',
+      });
+    }
+    if (organisation.status === 'draft') {
+      throw new ForbiddenException({
+        statusCode: 403,
+        error: 'ORG_NOT_READY',
+        message: 'Organisation not yet activated',
+      });
     }
     if (organisation.status === 'disabled') {
       throw orgInactive('Organisation is disabled');
     }
     if (organisation.status === 'rejected') {
       throw orgInactive('Organisation registration was rejected');
-    }
-    if (organisation.status === 'draft') {
-      throw orgInactive('Organisation not yet activated');
     }
 
     const user = await this.prisma.user.findUnique({

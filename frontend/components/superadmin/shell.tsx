@@ -56,13 +56,15 @@ const NAV_GROUPS: NavGroup[] = [
         tip: "Template Management",
         activeMatch: ["/admin-console/templates", "/admin-console/template-detail"],
       },
-      { href: "/admin-console/domains", icon: "globe", label: "Domain Requests", tip: "Domain Requests", activeMatch: ["/admin-console/domains"] },
+      { href: "/admin-console/org-domains", icon: "globe", label: "Org Domains", tip: "Organisation subdomains and custom domains", activeMatch: ["/admin-console/org-domains"] },
+      { href: "/admin-console/domains", icon: "globe", label: "Page Domains", tip: "Landing-page domain migrations", activeMatch: ["/admin-console/domains"] },
     ],
   },
   {
     grp: "Billing & System",
     items: [
       { href: "/admin-console/subscriptions", icon: "billing", label: "Subscriptions", tip: "Subscriptions", activeMatch: ["/admin-console/subscriptions"] },
+      { href: "/admin-console/email", icon: "mail", label: "Email & SMTP", tip: "Email & SMTP Management", activeMatch: ["/admin-console/email"] },
       { href: "/admin-console/audit-logs", icon: "shield", label: "Audit Logs", tip: "Audit Logs", activeMatch: ["/admin-console/audit-logs"] },
       { href: "/admin-console/settings", icon: "settings", label: "Settings", tip: "Settings", activeMatch: ["/admin-console/settings"] },
     ],
@@ -80,8 +82,10 @@ const CRUMB_MAP: Record<string, string> = {
   "/admin-console/templates": "Templates",
   "/admin-console/template-detail": "Template",
   "/prestate": "Builder",
-  "/admin-console/domains": "Domain Requests",
+  "/admin-console/org-domains": "Org Domains",
+  "/admin-console/domains": "Page Domains",
   "/admin-console/subscriptions": "Subscriptions",
+  "/admin-console/email": "Email & SMTP",
   "/admin-console/audit-logs": "Audit Logs",
   "/admin-console/settings": "Settings",
 };
@@ -89,14 +93,26 @@ const CRUMB_MAP: Record<string, string> = {
 export function SuperAdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout, accessToken } = useAuth();
+  const { user, logout, accessToken, isLoading: authLoading } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [pendingOrgsBadge, setPendingOrgsBadge] = useState<number | null>(null);
 
+  const adminName = user ? [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email : "Super Admin";
+  const avatarInitials = user?.first_name
+    ? `${user.first_name[0] || ""}${user.last_name?.[0] || ""}`.toUpperCase()
+    : "SA";
+
   useEffect(() => {
-    if (!accessToken) return;
+    if (!authLoading && (!accessToken || user?.role !== "super_admin")) {
+      router.replace("/admin-login");
+    }
+  }, [authLoading, accessToken, user, router]);
+
+  useEffect(() => {
+    if (!accessToken || user?.role !== "super_admin") return;
     let cancelled = false;
     apiFetch<{ pending?: number }>("/admin/organisations/summary", {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -109,7 +125,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, user]);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -190,10 +206,10 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="s-foot">
           <div className="side-user">
-            <div className="av">PP</div>
+            <div className="av">{avatarInitials}</div>
             <div className="meta">
-              <b>Pranab Patel</b>
-              <span>Platform Owner</span>
+              <b>{adminName}</b>
+              <span>Super Administrator</span>
             </div>
             <button
               type="button"
@@ -202,7 +218,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
               className="signout"
               title="Sign out"
             >
-              ⎋
+              <Icon name="logout" size={14} />
             </button>
           </div>
         </div>
@@ -216,19 +232,154 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
                 <path d="M3 6h18M3 12h18M3 18h18" />
               </svg>
             </button>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 9px",
+                borderRadius: 999,
+                background: "linear-gradient(135deg, rgba(79,70,229,0.12), rgba(124,58,237,0.12))",
+                border: "1px solid rgba(79,70,229,0.2)",
+                color: "var(--brand, #6366f1)",
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              Platform
+            </div>
             <div className="crumbs">
               Super Admin · <b>{crumb}</b>
             </div>
           </div>
           <div className="tb-search">
             <span className="si"><Icon name="search" size={14} /></span>
-            <input placeholder="Search organisations, templates, admins…" />
+            <input placeholder="Search organisations, templates, domains, email logs…" />
             <span className="kbd">⌘K</span>
           </div>
-          <div className="tb-right">
+          <div className="tb-right" style={{ position: "relative" }}>
             <NotificationsBell accessToken={accessToken} />
-            <button className="icon-btn"><Icon name="alert" size={16} /></button>
-            <div className="tb-avatar">PP</div>
+            <Link href="/admin-console/email" className="icon-btn" title="Email & SMTP Settings">
+              <Icon name="mail" size={15} />
+            </Link>
+            <Link href="/admin-console/settings" className="icon-btn" title="Platform Settings">
+              <Icon name="settings" size={15} />
+            </Link>
+            <div style={{ position: "relative" }}>
+              <div
+                className="tb-avatar"
+                title={adminName}
+                onClick={() => setProfileOpen((v) => !v)}
+              >
+                {avatarInitials}
+              </div>
+
+              {profileOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 10px)",
+                    right: 0,
+                    width: 230,
+                    background: "var(--surface, #ffffff)",
+                    borderRadius: 14,
+                    border: "1px solid var(--line, #e2e8f0)",
+                    boxShadow: "0 20px 40px rgba(15,23,42,0.15)",
+                    zIndex: 100,
+                    padding: "8px 0",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--line, #e2e8f0)" }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink, #0f172a)" }}>
+                      {adminName}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted, #64748b)", marginTop: 2 }}>
+                      {user?.email || "admin@ipixxelrealty.com"}
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      <span className="badge b-indigo" style={{ fontSize: 10 }}>Super Admin</span>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/admin-console/settings"
+                    onClick={() => setProfileOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "9px 16px",
+                      fontSize: 13,
+                      color: "var(--ink, #0f172a)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <Icon name="settings" size={14} /> Platform Settings
+                  </Link>
+
+                  <Link
+                    href="/admin-console/email"
+                    onClick={() => setProfileOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "9px 16px",
+                      fontSize: 13,
+                      color: "var(--ink, #0f172a)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <Icon name="mail" size={14} /> Email &amp; SMTP
+                  </Link>
+
+                  <Link
+                    href="/admin-console/audit-logs"
+                    onClick={() => setProfileOpen(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "9px 16px",
+                      fontSize: 13,
+                      color: "var(--ink, #0f172a)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <Icon name="shield" size={14} /> Audit Trail
+                  </Link>
+
+                  <div style={{ height: 1, background: "var(--line, #e2e8f0)", margin: "6px 0" }} />
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      void handleSignOut();
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      width: "100%",
+                      padding: "9px 16px",
+                      fontSize: 13,
+                      color: "#ef4444",
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                  >
+                    <Icon name="logout" size={14} />
+                    {isSigningOut ? "Signing out..." : "Sign Out"}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
         <div className="page">{children}</div>

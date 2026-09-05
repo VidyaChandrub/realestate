@@ -54,6 +54,12 @@ import type {
   UnreadNotificationsResponse,
   UpdateOrgCatalogOptionInput,
   UserProfile,
+  SmtpConfig,
+  UpdateSmtpConfigInput,
+  SendTestEmailInput,
+  EmailLogsResponse,
+  EmailStatsResponse,
+  AdminDashboardResponse,
 } from "./types";
 
 const API_BASE = "/api";
@@ -155,10 +161,20 @@ function forceLogoutOrgInactive() {
   // Super Admin has no org_id and must never be redirected to the org login.
   if (!isOrganisationSession) return;
 
-  clearSession();
   if (typeof window === "undefined" || forcedLogoutInFlight) return;
   const path = window.location.pathname;
-  if (path === "/login" || path.startsWith("/admin-login")) return;
+  if (
+    path === "/login" ||
+    path.startsWith("/admin-login") ||
+    path.startsWith("/register") ||
+    path.startsWith("/verify-email") ||
+    path.startsWith("/forgot-password") ||
+    path.startsWith("/reset-password") ||
+    path.startsWith("/onboarding")
+  ) {
+    return;
+  }
+  clearSession();
   forcedLogoutInFlight = true;
   // Hard replace (not router.push): a full reload resets every bit of
   // in-memory auth/React state, and replace() keeps the dead portal page
@@ -182,7 +198,16 @@ export async function apiFetch<T>(
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
-  if (res.status === 401 && !retried && !path.startsWith("/auth/")) {
+  const skipRefresh =
+    path === "/auth/login" ||
+    path === "/auth/signup/step1" ||
+    path.startsWith("/auth/signup/step1/") ||
+    path.startsWith("/auth/forgot-password") ||
+    path.startsWith("/auth/reset-password") ||
+    path.startsWith("/auth/verify-email") ||
+    path.startsWith("/auth/resend-verification") ||
+    path.startsWith("/auth/resume-signup");
+  if (res.status === 401 && !retried && !skipRefresh) {
     const refreshed = await tryRefresh();
     if (refreshed) {
       return apiFetch<T>(path, options, true);
@@ -328,6 +353,25 @@ export async function saveInviteStep(
   });
 }
 
+export async function verifyEmail(
+  email: string,
+  code: string,
+): Promise<{ success: boolean; alreadyVerified?: boolean }> {
+  return apiFetch("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export async function resendVerification(
+  email: string,
+): Promise<{ success: boolean }> {
+  return apiFetch("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
 export async function completeOnboardingStep(): Promise<CompleteOnboardingResult> {
   return apiFetch<CompleteOnboardingResult>("/onboarding/complete", {
     method: "POST",
@@ -362,6 +406,19 @@ export async function submitLead(input: LeadSubmission): Promise<void> {
 }
 
 // --- CRM leads (org-scoped inbox, role-aware) ---
+
+export async function createCrmLead(input: {
+  projectId?: string;
+  assignedToId?: string;
+  formName?: string;
+  source?: string;
+  data: Record<string, unknown>;
+}): Promise<CrmLead> {
+  return apiFetch<CrmLead>("/org/leads/manual", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
 
 export async function getCrmLeads(
   params?: import("./types").GetCrmLeadsParams,
@@ -631,4 +688,55 @@ export async function getOrgLandingPages(): Promise<LandingPageRow[]> {
     "/org/landing-pages?page=1&limit=100",
   );
   return res.data;
+}
+
+// --- Super Admin Email & SMTP Management ---
+
+export async function getSmtpConfig(): Promise<SmtpConfig> {
+  return apiFetch<SmtpConfig>("/admin/email/config");
+}
+
+export async function updateSmtpConfig(
+  input: UpdateSmtpConfigInput,
+): Promise<SmtpConfig> {
+  return apiFetch<SmtpConfig>("/admin/email/config", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function sendSmtpTestEmail(
+  input: SendTestEmailInput,
+): Promise<{ success: boolean; message: string; messageId?: string }> {
+  return apiFetch<{ success: boolean; message: string; messageId?: string }>(
+    "/admin/email/test",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function getEmailLogs(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+}): Promise<EmailLogsResponse> {
+  const query = new URLSearchParams();
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.status && params.status !== "all") query.set("status", params.status);
+  if (params?.search) query.set("search", params.search);
+
+  const qs = query.toString();
+  return apiFetch<EmailLogsResponse>(`/admin/email/logs${qs ? `?${qs}` : ""}`);
+}
+
+export async function getEmailStats(): Promise<EmailStatsResponse> {
+  return apiFetch<EmailStatsResponse>("/admin/email/stats");
+}
+
+export async function getAdminDashboard(): Promise<AdminDashboardResponse> {
+  return apiFetch<AdminDashboardResponse>("/admin/dashboard");
 }

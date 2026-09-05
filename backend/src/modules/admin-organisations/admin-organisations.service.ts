@@ -7,7 +7,12 @@ import {
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.interface';
-import { generateUniqueLandingPageSlug, generateUniqueOrgSlug } from '../../common/utils/slug.util';
+import { generateUniqueOrgSlug } from '../../common/utils/slug.util';
+import {
+  generateUniqueSubdomain,
+  provisionOrgPortal,
+} from '../../common/utils/org-site.util';
+import { isValidSubdomain, normalizeSubdomain } from '../../common/utils/domain.util';
 import { generateTempPassword } from '../../common/utils/tokens.util';
 import {
   buildOrganisationUpdateData,
@@ -36,6 +41,7 @@ import { ListOrgUsersQueryDto } from '../org-users/dto/list-org-users-query.dto'
 import { subdomainHost } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
 import type { Prisma } from '@prisma/client';
+import { EmailService } from '../email/email.service';
 
 const BCRYPT_COST_FACTOR = 12;
 
@@ -50,6 +56,7 @@ export class AdminOrganisationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly emailService: EmailService,
   ) {}
 
   async onboardCompany(dto: OnboardCompanyDto) {
@@ -71,6 +78,7 @@ export class AdminOrganisationsService {
     }
 
     const slug = await generateUniqueOrgSlug(this.prisma, dto.name);
+    const subdomain = await generateUniqueSubdomain(this.prisma, slug);
 
     const adminRole = await this.prisma.role.findFirstOrThrow({
       where: { orgId: null, key: 'admin' },
@@ -89,7 +97,7 @@ export class AdminOrganisationsService {
           slug,
           city: dto.city,
           status: orgStatus as any,
-          subdomain: slug,
+          subdomain,
           subdomainStatus: 'active',
         },
       });
@@ -114,6 +122,16 @@ export class AdminOrganisationsService {
 
       return { organisation, user };
     });
+
+    if (!dto.adminPassword) {
+      void this.emailService.sendInviteEmail({
+        to: user.email,
+        recipientName: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined,
+        orgName: organisation.name,
+        role: 'Organisation Admin',
+        tempPassword: rawPassword,
+      });
+    }
 
     return {
       organisation: toSafeOrganisation(organisation),
@@ -170,6 +188,13 @@ export class AdminOrganisationsService {
     });
 
     this.pendingTempPasswords.set(organisation.id, tempPassword);
+    void this.emailService.sendInviteEmail({
+      to: user.email,
+      recipientName: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined,
+      orgName: organisation.name,
+      role: 'Organisation Admin',
+      tempPassword,
+    });
 
     return toSafeUser(user);
   }
@@ -255,18 +280,24 @@ export class AdminOrganisationsService {
         },
       });
 
-      return { activated, subscription };
+      const portal = await provisionOrgPortal(
+        tx,
+        { id: activated.id, name: activated.name, slug: activated.slug, subdomain: activated.subdomain },
+        actor.sub,
+        dto.templateIds?.[0] ?? null,
+      );
+      return { activated: { ...activated, subdomain: portal.subdomain }, subscription, portal };
     });
 
     const tempPassword = this.pendingTempPasswords.get(organisation.id);
     this.pendingTempPasswords.delete(organisation.id);
-    const loginLink = `${process.env.APP_URL ?? 'http://localhost:3000'}/login`;
-
-    console.log(
-      `[stub email] To: ${admin.email} | Subject: Welcome to BigEstate — your ${result.activated.name} account | ` +
-        `Temporary password: ${tempPassword ?? '(unavailable — server restarted since admin creation)'} | Login: ${loginLink} | ` +
-        `Plan: ${dto.planId ?? 'none'} | Templates: ${(dto.templateIds ?? []).length}`,
-    );
+    void this.emailService.sendInviteEmail({
+      to: admin.email,
+      recipientName: [admin.firstName, admin.lastName].filter(Boolean).join(' ') || undefined,
+      orgName: result.activated.name,
+      role: 'Organisation Admin',
+      tempPassword,
+    });
 
     return {
       organisation: toSafeOrganisation(result.activated),
@@ -609,89 +640,50 @@ export class AdminOrganisationsService {
         data: { orgId: updated.id, actorId: actor.sub, action: 'org_approved', entity: 'Organisation', entityId: updated.id, metadata: dto as any },
       });
 
-      // Auto-activate the organisation's subdomain on approval so it becomes
-      // immediately reachable on the platform wildcard, and provision the
-      // organisation's primary website from the first assigned template so the
-      // subdomain resolves to that template + its data (subdomain -> org ->
-      // template).
-      const primarySubdomain = organisation.subdomain ?? null;
-      if (organisation.subdomain) {
-        await tx.organisation.update({
-          where: { id: orgId },
-          data: { subdomainStatus: 'active' },
-        });
-        await tx.orgDomainRequest.updateMany({
-          where: { orgId, kind: 'subdomain', status: 'pending' },
-          data: {
-            status: 'approved',
-            reviewedAt: new Date(),
-            reviewedBy: actor.sub,
-          },
-        });
-        const primaryTemplateId = dto.templateIds?.[0] ?? null;
-        const existingPrimary = await tx.landingPage.findFirst({
-          where: { orgId, subdomainStatus: { not: 'none' } },
-          select: { id: true },
-        });
-        if (!existingPrimary && primaryTemplateId) {
-          const tpl = await tx.template.findUnique({
-            where: { id: primaryTemplateId },
-            include: { childPages: { where: { pageType: 'thank_you' }, take: 1 } },
-          });
-          if (tpl) {
-            const baseSlug = await generateUniqueLandingPageSlug(
-              tx,
-              orgId,
-              tpl.name,
-            );
-            const primary = await tx.landingPage.create({
-              data: {
-                orgId,
-                sourceTemplateId: tpl.id,
-                name: tpl.name,
-                slug: baseSlug,
-                pageType: 'landing',
-                status: 'published',
-                publishedAt: new Date(),
-                subdomain: primarySubdomain,
-                subdomainStatus: 'active',
-                content: (tpl.content as Prisma.JsonObject) ?? {},
-              },
-            });
-            if (tpl.childPages?.[0]) {
-              await tx.landingPage.create({
-                data: {
-                  orgId,
-                  sourceTemplateId: tpl.childPages[0].id,
-                  name: tpl.childPages[0].name,
-                  slug: `${baseSlug}-thank-you`,
-                  pageType: 'thank_you',
-                  status: 'published',
-                  publishedAt: new Date(),
-                  parentId: primary.id,
-                  content: (tpl.childPages[0].content as Prisma.JsonObject) ?? {},
-                },
-              });
-            }
-          }
-        }
-      }
+      const portal = await provisionOrgPortal(
+        tx,
+        {
+          id: updated.id,
+          name: organisation.name,
+          slug: organisation.slug,
+          subdomain: organisation.subdomain,
+        },
+        actor.sub,
+        dto.templateIds?.[0] ?? null,
+      );
 
       await tx.notification.create({
         data: buildNotificationData({
           orgId: orgId,
           type: 'organisation_approved',
           title: `Organisation approved: ${organisation.name}`,
-          body: `${organisation.name} was approved and activated.${organisation.subdomain ? ` It is now live at ${subdomainHost(organisation.subdomain)}.` : ''}`,
+          body: `${organisation.name} was approved and activated. Login is live at ${portal.host}.`,
           entity: 'Organisation',
           entityId: orgId,
         }),
       });
 
-      return { updated, subscription };
+      return { updated, subscription, portal };
     });
 
-    return { organisation: toSafeOrganisation(result.updated), subscription: result.subscription };
+    const admin = await this.prisma.user.findFirst({
+      where: { orgId, userRoles: { some: { role: { key: 'admin' } } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (admin) {
+      void this.emailService.sendOrgApprovedEmail({
+        to: admin.email,
+        recipientName: [admin.firstName, admin.lastName].filter(Boolean).join(' ') || undefined,
+        orgName: organisation.name,
+      });
+    }
+
+    const latest = await this.prisma.organisation.findUnique({ where: { id: orgId } });
+    return {
+      organisation: toSafeOrganisation(latest ?? result.updated),
+      subscription: result.subscription,
+      portal: result.portal,
+    };
   }
 
   async rejectPending(orgId: string, actor: JwtPayload, reason: string) {
@@ -840,14 +832,51 @@ export class AdminOrganisationsService {
       }),
     ]);
 
+    const host = org.subdomain ? subdomainHost(org.subdomain) : null;
+    const proto = process.env.SUBDOMAIN_MODE === 'localhost' ? 'http' : 'https';
     return {
       subdomain: org.subdomain,
-      subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
+      subdomainHost: host,
+      loginUrl: host ? `${proto}://${host}/login` : null,
+      siteUrl: host ? `${proto}://${host}/site` : null,
       subdomainStatus: org.subdomainStatus,
       customDomain: org.customDomain,
       customDomainStatus: org.customDomainStatus,
       domainRequests,
       landingPages,
+    };
+  }
+
+  async assignSubdomain(id: string, actor: JwtPayload, requested?: string) {
+    const org = await this.getRealOrganisation(id);
+    let label = requested?.trim() ? normalizeSubdomain(requested) : '';
+    if (label) {
+      if (!isValidSubdomain(label)) {
+        throw new BadRequestException('Subdomain is invalid');
+      }
+      const clash = await this.prisma.organisation.findFirst({
+        where: { subdomain: label, id: { not: id } },
+        select: { id: true },
+      });
+      if (clash) throw new ConflictException('That subdomain is already in use');
+    } else {
+      label = await generateUniqueSubdomain(this.prisma, org.slug || org.name, id);
+    }
+
+    const portal = await this.prisma.$transaction((tx) =>
+      provisionOrgPortal(
+        tx,
+        { id: org.id, name: org.name, slug: org.slug, subdomain: label },
+        actor.sub,
+      ),
+    );
+
+    return {
+      subdomain: portal.subdomain,
+      subdomainHost: portal.host,
+      loginUrl: `${process.env.SUBDOMAIN_MODE === 'localhost' ? 'http' : 'https'}://${portal.host}/login`,
+      siteUrl: `${process.env.SUBDOMAIN_MODE === 'localhost' ? 'http' : 'https'}://${portal.host}/site`,
+      subdomainStatus: 'active',
     };
   }
 

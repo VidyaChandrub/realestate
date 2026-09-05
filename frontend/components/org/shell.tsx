@@ -54,9 +54,16 @@ const NAV_GROUPS: NavGroup[] = [
         grp: "Team",
         items: [
           { href: "/org/sales-agents", icon: "users", label: "Sales Agents", tip: "Sales Agents" },
-          { href: "/org/teams", icon: "users", label: "Teams", tip: "Teams" },
+          { href: "/org/teams", icon: "team", label: "Teams", tip: "Teams" },
           { href: "/org/users", icon: "profile", label: "Users", tip: "Users" },
           { href: "/org/roles-permissions", icon: "lock", label: "Roles & Permissions", tip: "Roles & Permissions" },
+        ],
+      },
+      {
+        grp: "Preferences",
+        items: [
+          { href: "/org/integrations", icon: "integrations", label: "Integrations", tip: "Integrations" },
+          { href: "/org/settings", icon: "settings", label: "Settings", tip: "Organisation Settings" },
         ],
       },
 ];
@@ -123,7 +130,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
       router.replace("/change-password");
       return;
     }
-    if (user.role !== "organisation_admin") {
+    if (user.role !== "organisation_admin" && user.role !== "team_member") {
       router.replace(dashboardPathFor(user.role));
     }
   }, [authLoading, accessToken, user, router]);
@@ -229,7 +236,12 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
 
   const unreadNotificationCount = notifications.filter((item) => item.unread).length;
 
-  if (authLoading || !accessToken || !user || user.role !== "organisation_admin") {
+  if (
+    authLoading ||
+    !accessToken ||
+    !user ||
+    (user.role !== "organisation_admin" && user.role !== "team_member")
+  ) {
     return null;
   }
 
@@ -242,7 +254,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
         <div className="s-top">
           <div className="logo">iR</div>
           <div className="s-name">
-            iPixxel Realty<small>Organisation Admin</small>
+            iPixxel Realty<small>{user.roleLabel || "Organisation"}</small>
           </div>
         </div>
         <nav>
@@ -258,8 +270,11 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                 if (item.href.startsWith("/org/domains")) return hasPermission("domains", "view");
                 if (item.href.startsWith("/org/sales-agents")) return hasPermission("sales_agents", "view");
                 if (item.href.startsWith("/org/teams")) return hasPermission("teams", "view");
-                if (item.href.startsWith("/org/users") || item.href.startsWith("/org/roles-permissions")) return hasPermission("users", "view");
-                return true;
+                if (item.href.startsWith("/org/users")) return hasPermission("users", "view");
+                if (item.href.startsWith("/org/roles-permissions")) return user.role === "organisation_admin";
+                if (item.href.startsWith("/org/integrations")) return hasPermission("integrations", "view");
+                if (item.href.startsWith("/org/settings")) return hasPermission("settings", "view");
+                return false;
               });
 
               if (visibleItems.length === 0) return null;
@@ -287,6 +302,24 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
             })}
           </ul>
         </nav>
+        <div className="s-foot">
+          <div className="side-user">
+            <div className="av">{avatarInitials}</div>
+            <div className="meta">
+              <b>{userName}</b>
+              <span>{user?.roleLabel || "Org Admin"}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              disabled={isSigningOut}
+              className="signout"
+              title="Sign out"
+            >
+              ⎋
+            </button>
+          </div>
+        </div>
       </aside>
       <div className="scrim" onClick={() => setDrawerOpen(false)} />
       <main className="main">

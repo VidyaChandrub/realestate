@@ -10,6 +10,8 @@ import { ProjectPageHead } from "@/components/org/project-tabs";
 import { assignCrmLead, getCrmAssignableUsers, getCrmLeads } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
+import { leadDisplayName, leadDisplayPhone } from "@/lib/lead-display";
+import { AddLeadModal } from "@/components/org/add-lead-modal";
 import "@/app/org/org.css";
 
 const STATUS_BADGE: Record<CrmLeadStatus, string> = {
@@ -41,25 +43,8 @@ function initialsFor(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function leadName(lead: CrmLead): string {
-  const full =
-    typeof lead.data?.fullName === "string"
-      ? lead.data.fullName
-      : typeof lead.data?.name === "string"
-        ? lead.data.name
-        : null;
-  return full || lead.formName || "Unnamed lead";
-}
-
-function leadPhone(lead: CrmLead): string {
-  const phone =
-    typeof lead.data?.phone === "string"
-      ? lead.data.phone
-      : typeof lead.data?.phoneNumber === "string"
-        ? lead.data.phoneNumber
-        : null;
-  return phone || "";
-}
+const leadName = leadDisplayName;
+const leadPhone = leadDisplayPhone;
 
 function sourceBadgeClass(source: string | null): string {
   switch (source) {
@@ -74,23 +59,31 @@ export default function OrgProjectLeadsPage() {
   const params = useParams<{ id: string }>();
   const projectId = params?.id ?? "";
   const { isOrgAdmin, hasPermission } = useAuth();
-  const canAssign = isOrgAdmin() || hasPermission("crm", "edit");
-  const canAdd = isOrgAdmin() || hasPermission("crm", "add");
+  const canAssign = Boolean(isOrgAdmin?.()) || hasPermission("crm", "edit");
+  const canAdd = Boolean(isOrgAdmin?.()) || hasPermission("crm", "add");
   const [leads, setLeads] = useState<CrmLead[] | null>(null);
   const [assignable, setAssignable] = useState<{ id: string; name: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const load = useCallback(async () => {
     if (!projectId) return;
     setError(null);
     try {
-      const res = await getCrmLeads({ projectId });
+      const res = await getCrmLeads({
+        projectId,
+        limit: 100,
+        search: search || undefined,
+        status: (statusFilter || undefined) as CrmLeadStatus | undefined,
+      });
       setLeads(res.data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load leads.");
     }
-  }, [projectId]);
+  }, [projectId, search, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -143,14 +136,20 @@ export default function OrgProjectLeadsPage() {
 
   return (
     <>
-      <ProjectPageHead active="leads" actions={canAdd ? <button className="btn btn-primary">＋ Add lead</button> : undefined} />
+      <ProjectPageHead active="leads" actions={canAdd ? <button className="btn btn-primary" onClick={() => setAddOpen(true)}>＋ Add lead</button> : undefined} />
+      <AddLeadModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        projectId={projectId}
+        onCreated={(lead) => setLeads((prev) => (prev ? [lead, ...prev] : [lead]))}
+      />
       <Reveal delay={1}>
         <div className="mb-20">
           <div className="seg-wrap"><div className="seg">
-            <button className="active">All Leads</button>
-            <button>Follow Ups</button>
-            <button>Site Visits</button>
-            <button>Closures</button>
+            <button className={statusFilter === "" ? "on" : ""} onClick={() => setStatusFilter("")}>All Leads</button>
+            <button className={statusFilter === "follow_up" ? "on" : ""} onClick={() => setStatusFilter("follow_up")}>Follow Ups</button>
+            <button className={statusFilter === "site_visit" ? "on" : ""} onClick={() => setStatusFilter("site_visit")}>Site Visits</button>
+            <button className={statusFilter === "won" ? "on" : ""} onClick={() => setStatusFilter("won")}>Closures</button>
           </div></div>
         </div>
       </Reveal>
@@ -163,9 +162,9 @@ export default function OrgProjectLeadsPage() {
       <Reveal delay={2}>
         <div className="card">
           <div className="card-h">
-            <div className="tb-search" style={{ maxWidth: 320, position: "static", margin: 0 }}><span className="si"><Icon name="search" size={14} /></span><input placeholder="Search by name or phone…" /></div>
+            <div className="tb-search" style={{ maxWidth: 320, position: "static", margin: 0 }}><span className="si"><Icon name="search" size={14} /></span><input placeholder="Search by name or phone…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
             <div className="row gap-8 wrap">
-              <select className="inp w-auto" defaultValue="All Statuses"><option>All Statuses</option>{ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select>
+              <select className="inp w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="">All Statuses</option>{ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select>
             </div>
           </div>
           {error ? (

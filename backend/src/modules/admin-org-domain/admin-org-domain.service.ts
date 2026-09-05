@@ -151,6 +151,12 @@ export class AdminOrgDomainService {
           rejectionReason: reason,
         },
       });
+      if (req.kind === 'custom_domain') {
+        await tx.organisation.update({
+          where: { id: req.orgId },
+          data: { customDomain: null, customDomainStatus: 'rejected' },
+        });
+      }
       await tx.auditLog.create({
         data: {
           orgId: req.orgId,

@@ -13,6 +13,7 @@ export function toSafeUser(user: User) {
     must_change_password: user.mustChangePassword,
     created_at: user.createdAt,
     onboarding_step: user.onboardingStep,
+    email_verified_at: user.emailVerifiedAt,
   };
 }
 

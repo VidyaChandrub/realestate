@@ -117,7 +117,7 @@ export function ProjectEnquiryModal({
           landingPageId: pageId,
           projectId: project.id,
           formName: effectiveForm?.name ?? heading,
-          source: "website",
+          source: "project-widget",
           fields: leadFields,
           unitId: selectedUnit?.id,
         });

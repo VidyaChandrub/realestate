@@ -1,4 +1,4 @@
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, randomInt, createHash } from 'crypto';
 
 const DURATION_UNITS_MS: Record<string, number> = {
   ms: 1,
@@ -27,6 +27,11 @@ export function hashToken(token: string): string {
 
 const TEMP_PASSWORD_CHARSET =
   'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+
+export function generateNumericCode(digits = 6): string {
+  const max = 10 ** digits;
+  return randomInt(0, max).toString().padStart(digits, '0');
+}
 
 export function generateTempPassword(length = 12): string {
   const bytes = randomBytes(length);

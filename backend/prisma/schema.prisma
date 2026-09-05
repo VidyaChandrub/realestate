@@ -185,6 +185,7 @@ model User {
   // Defaults to 'account' since a User row is only ever created once Step 1
   // (Account) has actually completed.
   onboardingStep OnboardingStep @default(account) @map("onboarding_step")
+  emailVerifiedAt DateTime? @map("email_verified_at")
 
   organisation    Organisation?          @relation(fields: [orgId], references: [id])
   userRoles       UserRole[]
@@ -192,6 +193,7 @@ model User {
   teamMembers     TeamMember[]
   refreshTokens   RefreshToken[]
   resetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
   auditLogs       AuditLog[]
   managedProjects Project[]
   salesProjects   ProjectSalesAgent[]
@@ -277,6 +279,20 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_tokens")
+  @@schema("identity")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verification_tokens")
   @@schema("identity")
 }
 
@@ -1172,4 +1188,51 @@ model OrgCatalogOption {
   @@index([orgId, category])
   @@map("org_catalog_options")
   @@schema("projects")
+}
+
+// ---------------------------------------------------------------------------
+// System Email / SMTP Configuration & Audit Logging
+// Managed globally by Super Admin
+// ---------------------------------------------------------------------------
+
+model EmailConfig {
+  id        String   @id @default(uuid())
+  host      String
+  port      Int      @default(587)
+  secure    Boolean  @default(false)
+  user      String   @default("")
+  password  String   @default("")
+  fromEmail String   @map("from_email")
+  fromName  String   @default("iPixxel Realty") @map("from_name")
+  replyTo   String?  @map("reply_to")
+  isActive  Boolean  @default(true) @map("is_active")
+
+  // Customizable message templates
+  inviteSubject String? @map("invite_subject")
+  inviteBody    String? @map("invite_body")
+  resetSubject  String? @map("reset_subject")
+  resetBody     String? @map("reset_body")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("email_configs")
+  @@schema("identity")
+}
+
+model EmailLog {
+  id         String    @id @default(uuid())
+  to         String
+  subject    String
+  template   String?   // 'invite' | 'password_reset' | 'test' | 'notification' | 'system'
+  status     String    // 'sent' | 'failed'
+  error      String?
+  metadata   Json?
+  sentAt     DateTime  @default(now()) @map("sent_at")
+
+  @@index([to])
+  @@index([status])
+  @@index([sentAt])
+  @@map("email_logs")
+  @@schema("audit")
 }

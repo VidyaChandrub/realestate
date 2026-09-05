@@ -6,6 +6,8 @@ import { generateTempPassword } from './tokens.util';
 import { toSafeUser } from './mappers.util';
 import { normalizePhoneNumber } from './phone.util';
 
+import { EmailService } from '../../modules/email/email.service';
+
 const BCRYPT_COST_FACTOR = 12;
 
 export const ASSIGNABLE_ROLES = [
@@ -22,7 +24,11 @@ export type OrgUserStatus = (typeof ORG_USER_STATUS_VALUES)[number];
 type OrgUsersPrisma = Pick<
   PrismaService,
   'user' | 'role' | 'userRole' | 'refreshToken' | '$transaction'
->;
+> & {
+  organisation?: { findUnique: (...args: any[]) => Promise<any> };
+  emailConfig?: { findFirst: (...args: any[]) => Promise<any> };
+  emailLog?: { create: (...args: any[]) => Promise<any> };
+};
 
 export interface ProvisionUserInput {
   firstName?: string;
@@ -33,14 +39,37 @@ export interface ProvisionUserInput {
   password?: string;
 }
 
-function sendStubInviteEmail(email: string, tempPassword: string) {
-  // Stub — real email provider not wired up yet. A separate task will
-  // replace this with a "set your password" link; keep the mechanism in
-  // this one place so that change only needs to land here.
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(
-      `[stub email] To: ${email} | Subject: Your BigEstate account | Temporary password: ${tempPassword}`,
-    );
+async function sendInviteEmailNotification(
+  prisma: OrgUsersPrisma,
+  orgId: string,
+  user: { email: string; firstName?: string | null; lastName?: string | null },
+  tempPassword?: string,
+  roleName?: string,
+) {
+  try {
+    let orgName = 'iPixxel Realty';
+    if (prisma.organisation) {
+      const org = await prisma.organisation.findUnique({
+        where: { id: orgId },
+        select: { name: true },
+      });
+      if (org?.name) orgName = org.name;
+    }
+
+    const emailService = new EmailService(prisma as unknown as PrismaService);
+    const recipientName = [user.firstName, user.lastName]
+      .filter(Boolean)
+      .join(' ');
+
+    await emailService.sendInviteEmail({
+      to: user.email,
+      recipientName: recipientName || undefined,
+      orgName,
+      role: roleName || 'Team Member',
+      tempPassword,
+    });
+  } catch (err: any) {
+    console.error(`[Invite Email] Error delivering invite to ${user.email}: ${err.message}`);
   }
 }
 
@@ -114,9 +143,13 @@ export async function provisionInvitedUser(
     return created;
   });
 
-  if (!dto.password) {
-    sendStubInviteEmail(user.email, rawPassword);
-  }
+  sendInviteEmailNotification(
+    prisma,
+    orgId,
+    { email: user.email, firstName: user.firstName, lastName: user.lastName },
+    rawPassword,
+    role.name,
+  );
   return toSafeUser(user);
 }
 
@@ -141,7 +174,12 @@ export async function reissueInvite(
     data: { passwordHash, mustChangePassword: true },
   });
 
-  sendStubInviteEmail(updated.email, tempPassword);
+  sendInviteEmailNotification(
+    prisma,
+    orgId,
+    { email: updated.email, firstName: updated.firstName, lastName: updated.lastName },
+    tempPassword,
+  );
   return toSafeUser(updated);
 }
 

@@ -6,6 +6,6 @@ export default async function DomainPreviewPage({ params }: { params: Promise<{ 
   const hostString = host.join(".");
   const { page } = await resolveOrgSiteHost(hostString);
   // Explicit hostname preview (used by the builder for a page's assigned
-  // domain). The live subdomain is served via /__site instead.
+  // domain). The live subdomain is served via /org-site instead.
   return <LocalSitePreview host={hostString} page={page} />;
 }
