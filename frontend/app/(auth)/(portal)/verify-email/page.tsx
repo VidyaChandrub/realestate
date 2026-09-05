@@ -1,11 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Icon } from "@/components/icons";
+import Link from "next/link";
+import { mapApiFieldErrors } from "@/lib/form-errors";
+import { verifyEmail, resendVerification } from "@/lib/api";
 
 export default function VerifyEmailPage() {
   return (
@@ -18,93 +17,123 @@ export default function VerifyEmailPage() {
 function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { getOrgSetup, completeEmailVerification } = useAuth();
+  const emailFromQuery = searchParams.get("email") ?? "";
 
-  const email = searchParams.get("email") ?? getOrgSetup()?.email ?? "";
-
+  const [email, setEmail] = useState(emailFromQuery);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [resendState, setResendState] = useState<"idle" | "sent">("idle");
 
-  useEffect(() => {
-    const setup = getOrgSetup();
-    if (!setup) {
-      router.replace("/register");
-    }
-  }, [getOrgSetup, router]);
-
-  function handleVerify(event: FormEvent<HTMLFormElement>) {
+  async function handleVerify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (completeEmailVerification(code)) {
-      router.push("/onboarding");
+    setError(null);
+    if (!email.trim()) {
+      setError("Enter the email you registered with.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await verifyEmail(email.trim(), code);
+      router.push("/register");
       router.refresh();
-    } else {
-      setError("That code doesn't look right. Check it and try again.");
+    } catch (err) {
+      const { general } = mapApiFieldErrors(err, ["email", "code"]);
+      setError(general ?? "That code doesn't look right. Check it and try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  function handleResend() {
-    setResendState("sent");
+  async function handleResend() {
+    if (!email.trim()) {
+      setError("Enter the email you registered with.");
+      return;
+    }
     setError(null);
-    window.setTimeout(() => setResendState("idle"), 1500);
+    try {
+      await resendVerification(email.trim());
+      setResendState("sent");
+      window.setTimeout(() => setResendState("idle"), 2000);
+    } catch (err) {
+      const { general } = mapApiFieldErrors(err, ["email"]);
+      setError(general ?? "Couldn't resend the code. Please try again.");
+    }
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-    <div className="text-center">
-      <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-        <Icon name="mail" size={26} />
-      </span>
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-        Verify your email
-      </h1>
-      <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500 dark:text-slate-400">
-        We sent a 6-digit code to{" "}
-        <span className="font-medium text-slate-800 dark:text-slate-100">{email}</span>.
-        Enter it below to activate your organisation.
-      </p>
-
-      <form
-        onSubmit={handleVerify}
-        className="mx-auto mt-6 flex max-w-xs flex-col gap-4"
-      >
-        <Input
-          inputMode="numeric"
-          pattern="[0-9]{6}"
-          maxLength={6}
-          required
-          placeholder="000000"
-          className="h-12 text-center text-lg tracking-[0.5em]"
-          value={code}
-          onChange={(e) => {
-            setCode(e.target.value.replace(/\D/g, ""));
-            setError(null);
-          }}
-          aria-label="Verification code"
-        />
-
-        {error ? (
-          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-300">
-            {error}
+    <div className="auth">
+      <div className="brandside">
+        <div className="glow" />
+        <div className="logo">iR</div>
+        <div>
+          <h1 className="reveal in">Check your inbox.</h1>
+          <p className="reveal in" data-delay="1" style={{ marginTop: 18 }}>
+            Enter the 6-digit code we emailed you to activate your account.
           </p>
-        ) : null}
-
-        <Button type="submit" size="lg" disabled={code.length !== 6}>
-          Verify email
-        </Button>
-      </form>
-
-      <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">
-        Didn&apos;t receive it?{" "}
-        <button
-          type="button"
-          onClick={handleResend}
-          className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-        >
-          {resendState === "sent" ? "Code re-sent " : "Resend code"}
-        </button>
-      </p>
-    </div>
+        </div>
+      </div>
+      <div className="formside">
+        <div className="fw">
+          <h2>Verify your email</h2>
+          <p className="muted" style={{ marginTop: 8 }}>
+            The code expires in 60 minutes.
+          </p>
+          <form style={{ marginTop: 26 }} onSubmit={handleVerify} noValidate>
+            <div className="field">
+              <label>Work email</label>
+              <input
+                className="inp"
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError(null);
+                }}
+                autoComplete="email"
+                placeholder="admin@skylinedev.com"
+              />
+            </div>
+            <div className="field">
+              <label>Verification code</label>
+              <input
+                className="inp"
+                inputMode="numeric"
+                maxLength={6}
+                value={code}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                  setError(null);
+                }}
+                placeholder="000000"
+                aria-label="Verification code"
+                style={{ letterSpacing: "0.35em", textAlign: "center", fontWeight: 700 }}
+              />
+            </div>
+            {error ? (
+              <p role="alert" className="help" style={{ color: "var(--rose)", borderColor: "var(--rose-050)", background: "var(--rose-050)", marginBottom: 14 }}>
+                {error}
+              </p>
+            ) : null}
+            <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={isSubmitting || code.length !== 6}>
+              {isSubmitting ? "Verifying…" : "Verify email →"}
+            </button>
+          </form>
+          <p className="muted" style={{ textAlign: "center", marginTop: 20, fontSize: 13.5 }}>
+            Didn&apos;t receive it?{" "}
+            <button
+              type="button"
+              onClick={handleResend}
+              style={{ color: "var(--brand)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}
+            >
+              {resendState === "sent" ? "Code re-sent" : "Resend code"}
+            </button>
+          </p>
+          <p className="muted" style={{ textAlign: "center", marginTop: 16, fontSize: 13.5 }}>
+            ← Back to <Link href="/login" style={{ color: "var(--brand)", fontWeight: 600 }}>Sign in</Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

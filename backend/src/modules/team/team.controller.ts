@@ -1,6 +1,8 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { TeamService } from './team.service';
@@ -14,7 +16,8 @@ export class TeamController {
   // OnboardingController's own /onboarding/invite, deliberately exempt
   // from OrgApprovedGuard since every org is 'pending' throughout it) —
   // real team invites wait for approval like everything else dashboard-side.
-  @UseGuards(JwtAuthGuard, OrgApprovedGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('users', 'add')
   @Post('invite')
   invite(@CurrentUser() actor: JwtPayload, @Body() dto: InviteDto) {
     return this.teamService.invite(actor, dto);

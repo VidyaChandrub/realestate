@@ -22,6 +22,7 @@ export interface SafeUser {
   must_change_password: boolean;
   created_at: string;
   onboarding_step: OnboardingStep;
+  email_verified_at?: string | null;
 }
 
 export interface SafeOrganisation {
@@ -87,6 +88,8 @@ export interface AuthTokens {
 
 export interface LoginResponse extends AuthTokens {
   user: SafeUser;
+  roles?: string[];
+  onboarding_incomplete?: boolean;
 }
 
 export interface SignupResponse extends Partial<AuthTokens> {
@@ -117,6 +120,7 @@ export type SignupStep1Response =
         user: SafeUser;
         onboardingStep: OnboardingStep;
         nextStep: OnboardingStep;
+        email_verification_required?: boolean;
       })
   | {
       status: "exists_incomplete";
@@ -141,6 +145,7 @@ export interface ResumeSignupResponse extends AuthTokens {
   nextStep: OnboardingStep;
   subscription: { planId: string; billingCycle: string } | null;
   templateIds: string[];
+  email_verification_required?: boolean;
 }
 
 export interface OnboardingOrganisationInput {
@@ -265,7 +270,7 @@ export interface LoginInput {
 
 export type UserRole = "super_admin" | "organisation_admin" | "team_member";
 
-export type PermissionAction = "view" | "add" | "edit" | "delete";
+export type PermissionAction = "view" | "add" | "edit" | "delete" | "approve";
 
 export type Permissions = Record<
   string,

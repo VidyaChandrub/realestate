@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -21,6 +22,7 @@ import {
   furthestOnboardingStep,
 } from '../../common/utils/onboarding.util';
 import {
+  generateNumericCode,
   generateRandomToken,
   hashToken,
   parseDuration,
@@ -40,6 +42,7 @@ import {
   normalizeDomain,
   isValidDomain,
   generateSubdomainSuggestions,
+  extractSubdomainFromHost,
 } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
 import {
@@ -58,10 +61,6 @@ export class AuthService {
   private readonly accessExpiresIn = process.env.JWT_ACCESS_EXPIRES_IN ?? '15m';
   private readonly refreshExpiresIn =
     process.env.JWT_REFRESH_EXPIRES_IN ?? '30d';
-
-  // Ephemeral, single-instance only: password reset tokens. Email sending is
-  // stubbed, so the token is returned to the client for local development.
-  private readonly resetTokens = new Map<string, { email: string; expires: number }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -160,8 +159,17 @@ export class AuthService {
           data: { userId: user.id, roleId: adminRole.id },
         });
 
-        // Subdomain is stored directly on Organisation (subdomain, subdomainStatus: 'pending')
-        // and is auto-activated when the Super Admin approves the organisation.
+        if (subdomain) {
+          await tx.orgDomainRequest.create({
+            data: {
+              orgId: organisation.id,
+              kind: 'subdomain',
+              subdomain,
+              status: 'pending',
+              requestedBy: user.id,
+            },
+          });
+        }
         if (customDomain) {
           await tx.orgDomainRequest.create({
             data: {
@@ -327,12 +335,14 @@ export class AuthService {
     // No roles yet — the admin role is assigned once the organisation
     // exists, at Step 2.
     const tokens = await this.issueTokens(user.id, null, []);
+    await this.issueEmailVerification(user);
 
     return {
       status: 'created' as const,
       user: toSafeUser(user),
       onboardingStep: user.onboardingStep,
       nextStep: nextOnboardingStep(user.onboardingStep),
+      email_verification_required: true,
       ...tokens,
     };
   }
@@ -357,6 +367,10 @@ export class AuthService {
       throw new ConflictException(
         'This account has already finished setup — please sign in instead.',
       );
+    }
+
+    if (!user.emailVerifiedAt) {
+      await this.issueEmailVerification(user);
     }
 
     return this.buildResumePayload(user);
@@ -412,6 +426,10 @@ export class AuthService {
       },
       include: { userRoles: { include: { role: true } } },
     });
+
+    if (!updated.emailVerifiedAt) {
+      await this.issueEmailVerification(updated);
+    }
 
     return this.buildResumePayload(updated);
   }
@@ -487,12 +505,14 @@ export class AuthService {
     });
 
     const tokens = await this.issueTokens(replacement.id, null, []);
+    await this.issueEmailVerification(replacement);
 
     return {
       status: 'created' as const,
       user: toSafeUser(replacement),
       onboardingStep: replacement.onboardingStep,
       nextStep: nextOnboardingStep(replacement.onboardingStep),
+      email_verification_required: true,
       ...tokens,
     };
   }
@@ -532,6 +552,7 @@ export class AuthService {
       nextStep: nextOnboardingStep(user.onboardingStep),
       subscription,
       templateIds,
+      email_verification_required: !user.emailVerifiedAt,
       ...tokens,
     };
   }
@@ -549,6 +570,12 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: actor.sub } });
     if (!user) {
       throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.emailVerifiedAt) {
+      throw new BadRequestException(
+        'Please verify your email before creating an organisation.',
+      );
     }
 
     if (user.orgId) {
@@ -608,6 +635,17 @@ export class AuthService {
         data: { userId: user.id, roleId: adminRole.id },
       });
 
+      if (subdomain) {
+        await tx.orgDomainRequest.create({
+          data: {
+            orgId: organisation.id,
+            kind: 'subdomain',
+            subdomain,
+            status: 'pending',
+            requestedBy: user.id,
+          },
+        });
+      }
       if (customDomain) {
         await tx.orgDomainRequest.create({
           data: {
@@ -687,6 +725,28 @@ export class AuthService {
       },
     });
 
+    if (subdomainUpdate?.subdomain) {
+      const pendingSub = await this.prisma.orgDomainRequest.findFirst({
+        where: { orgId, kind: 'subdomain', status: 'pending' },
+      });
+      if (pendingSub) {
+        await this.prisma.orgDomainRequest.update({
+          where: { id: pendingSub.id },
+          data: { subdomain: subdomainUpdate.subdomain },
+        });
+      } else {
+        await this.prisma.orgDomainRequest.create({
+          data: {
+            orgId,
+            kind: 'subdomain',
+            subdomain: subdomainUpdate.subdomain,
+            status: 'pending',
+            requestedBy: userId,
+          },
+        });
+      }
+    }
+
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId },
       include: { role: true },
@@ -727,10 +787,26 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    // Org approval check — pending organisations cannot log in until super admin approves
+    const roles = user.userRoles.map((userRole) => userRole.role.key);
+    const isSuperAdmin = roles.includes('super_admin');
+
+    if (dto.host && !isSuperAdmin) {
+      const portal = await this.resolveLoginHost(dto.host);
+      if (portal && user.orgId !== portal.id) {
+        throw new UnauthorizedException(
+          'This login page belongs to another organisation. Use your organisation subdomain.',
+        );
+      }
+    }
+
+    // Org approval check — pending organisations cannot use the dashboard
+    // until a Super Admin approves. Draft / incomplete signups are allowed
+    // through so the wizard can be resumed from /register.
+    let orgStatus: string | null = null;
     if (user.orgId) {
       const org = await this.prisma.organisation.findUnique({ where: { id: user.orgId } });
-      if (org && org.status === 'pending') {
+      orgStatus = org?.status ?? null;
+      if (org && org.status === 'pending' && user.onboardingStep === 'completed') {
         throw new UnauthorizedException('Organisation pending approval — please wait for super admin approval');
       }
       if (org && org.status === 'disabled') {
@@ -739,12 +815,8 @@ export class AuthService {
       if (org && org.status === 'rejected') {
         throw new UnauthorizedException('Organisation registration was rejected');
       }
-      if (org && org.status === 'draft') {
-        throw new UnauthorizedException('Organisation not yet activated');
-      }
     }
 
-    const roles = user.userRoles.map((userRole) => userRole.role.key);
     const tokens = await this.issueTokens(user.id, user.orgId, roles);
 
     const safeUser = toSafeUser(user);
@@ -755,7 +827,19 @@ export class AuthService {
       safeUser.must_change_password = false;
     }
 
-    return { user: safeUser, ...tokens };
+    const isOrgAdmin = roles.includes('admin');
+    const stillInDraftSignup =
+      !isSuperAdmin &&
+      isOrgAdmin &&
+      user.onboardingStep !== 'completed' &&
+      (orgStatus === null || orgStatus === 'draft');
+
+    return {
+      user: safeUser,
+      roles,
+      onboarding_incomplete: stillInDraftSignup,
+      ...tokens,
+    };
   }
 
   async refresh(rawToken: string) {
@@ -898,18 +982,25 @@ export class AuthService {
     return { success: true };
   }
 
-  async forgotPassword(
-    email: string,
-  ): Promise<{ success: boolean; resetToken?: string }> {
+  async forgotPassword(email: string): Promise<{ success: boolean }> {
     const user = await this.prisma.user.findUnique({ where: { email } });
     // Always report success to avoid account enumeration.
     if (!user) {
       return { success: true };
     }
+
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
     const token = generateRandomToken(32);
-    this.resetTokens.set(token, {
-      email: user.email,
-      expires: Date.now() + 1000 * 60 * 60,
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashToken(token),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
     });
 
     try {
@@ -917,40 +1008,156 @@ export class AuthService {
       const recipientName = [user.firstName, user.lastName]
         .filter(Boolean)
         .join(' ');
-      await emailService.sendPasswordResetEmail({
+      const result = await emailService.sendPasswordResetEmail({
         to: user.email,
         recipientName: recipientName || undefined,
         resetToken: token,
       });
+      if (!result.success) {
+        console.error(`[Forgot Password] Could not deliver email: ${result.error}`);
+      }
     } catch (err: any) {
-      // Fallback logging so developer can still access token in local mode
       console.error(`[Forgot Password] Could not deliver email: ${err.message}`);
     }
 
-    return { success: true, resetToken: token };
+    return { success: true };
   }
 
   async resetPassword(
     token: string,
     newPassword: string,
   ): Promise<{ success: boolean }> {
-    const entry = this.resetTokens.get(token);
-    if (!entry || entry.expires < Date.now()) {
+    const entry = await this.prisma.passwordResetToken.findFirst({
+      where: {
+        tokenHash: hashToken(token),
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+    if (!entry) {
       throw new UnauthorizedException('Invalid or expired reset token');
     }
     const user = await this.prisma.user.findUnique({
-      where: { email: entry.email },
+      where: { id: entry.userId },
     });
     if (!user) {
       throw new UnauthorizedException('Invalid or expired reset token');
     }
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST_FACTOR);
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash, mustChangePassword: false },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { passwordHash, mustChangePassword: false },
+      });
+      await tx.passwordResetToken.update({
+        where: { id: entry.id },
+        data: { usedAt: new Date() },
+      });
+      await tx.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
     });
-    this.resetTokens.delete(token);
     return { success: true };
+  }
+
+  async verifyEmail(email: string, code: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired verification code');
+    }
+    if (user.emailVerifiedAt) {
+      return { success: true, alreadyVerified: true, user: toSafeUser(user) };
+    }
+
+    const entry = await this.prisma.emailVerificationToken.findFirst({
+      where: {
+        userId: user.id,
+        tokenHash: hashToken(code.trim()),
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!entry) {
+      throw new UnauthorizedException('Invalid or expired verification code');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.emailVerificationToken.update({
+        where: { id: entry.id },
+        data: { usedAt: new Date() },
+      });
+      return tx.user.update({
+        where: { id: user.id },
+        data: { emailVerifiedAt: new Date() },
+      });
+    });
+
+    return { success: true, user: toSafeUser(updated) };
+  }
+
+  async resendVerification(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || user.emailVerifiedAt) {
+      return { success: true };
+    }
+
+    const latest = await this.prisma.emailVerificationToken.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (latest && Date.now() - latest.createdAt.getTime() < 30_000) {
+      return { success: true };
+    }
+
+    await this.issueEmailVerification(user);
+    return { success: true };
+  }
+
+  private async issueEmailVerification(user: User) {
+    if (user.emailVerifiedAt) {
+      return;
+    }
+
+    await this.prisma.emailVerificationToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const code = generateNumericCode(6);
+    await this.prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashToken(code),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      },
+    });
+
+    try {
+      const emailService = new EmailService(this.prisma);
+      const recipientName = [user.firstName, user.lastName]
+        .filter(Boolean)
+        .join(' ');
+      const result = await emailService.sendVerificationEmail({
+        to: user.email,
+        recipientName: recipientName || undefined,
+        code,
+      });
+      if (!result.success) {
+        console.error(
+          `[Email Verification] Could not deliver email to ${user.email}: ${result.error}`,
+        );
+      }
+    } catch (err: any) {
+      console.error(
+        `[Email Verification] Could not deliver email to ${user.email}: ${err.message}`,
+      );
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Email Verification] Code for ${user.email}: ${code}`);
+    }
   }
 
   private async findActiveRefreshToken(rawToken: string) {
@@ -1084,6 +1291,21 @@ export class AuthService {
 
   // A custom domain is unavailable if another organisation already owns it or
   // has a connecting/connected domain for it (globally unique).
+  private async resolveLoginHost(host: string) {
+    const normalized = host.trim().toLowerCase().replace(/:\d+$/, '').replace(/^www\./, '');
+    const label = extractSubdomainFromHost(normalized);
+    if (label) {
+      return this.prisma.organisation.findFirst({
+        where: { subdomain: label, subdomainStatus: 'active', status: 'active' },
+        select: { id: true },
+      });
+    }
+    return this.prisma.organisation.findFirst({
+      where: { customDomain: normalized, customDomainStatus: 'connected', status: 'active' },
+      select: { id: true },
+    });
+  }
+
   private async assertCustomDomainAvailable(domain: string) {
     const host = normalizeDomain(domain);
     const org = await this.prisma.organisation.findFirst({

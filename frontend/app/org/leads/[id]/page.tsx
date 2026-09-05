@@ -10,14 +10,12 @@ import { useAuth } from "@/lib/auth-context";
 import { isOrgAdmin } from "@/lib/session";
 import { addCrmLeadNote, assignCrmLead, getCrmLead, updateCrmLeadNextAction } from "@/lib/api";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
+import { leadField } from "@/lib/lead-display";
 
 const statuses: CrmLeadStatus[] = ["new", "contacted", "follow_up", "site_visit", "negotiation", "won", "lost"];
 const icons: Record<string, IconName> = { call_logged: "phone", whatsapp_sent: "mail", whatsapp_read: "mail", note_added: "document", status_updated: "refresh", site_visit_booked: "home", closed_deal: "star", logged_in: "profile" };
 
-function field(data: Record<string, unknown>, ...keys: string[]) {
-  const key = keys.find((candidate) => data[candidate] != null && String(data[candidate]).trim());
-  return key ? String(data[key]) : "—";
-}
+const field = leadField;
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });

@@ -11,7 +11,17 @@ import {
   getInviteEmailHtml,
   getResetPasswordEmailHtml,
   getTestEmailHtml,
+  getVerificationEmailHtml,
+  getOrgApprovedEmailHtml,
 } from './email.templates';
+
+export function frontendBaseUrl(): string {
+  const raw =
+    process.env.APP_FRONTEND_URL ||
+    process.env.APP_URL ||
+    'http://localhost:3000';
+  return raw.replace(/\/$/, '');
+}
 
 export interface SendMailOptions {
   to: string;
@@ -173,6 +183,9 @@ export class EmailService {
       port,
       secure,
       auth,
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
       tls: {
         rejectUnauthorized: false, // Allows flexible self-signed/testing certs
       },
@@ -376,9 +389,7 @@ export class EmailService {
     loginUrl?: string;
   }) {
     const loginUrl =
-      params.loginUrl ||
-      process.env.APP_FRONTEND_URL ||
-      'http://localhost:3000/auth/login';
+      params.loginUrl || `${frontendBaseUrl()}/login`;
 
     const config = await this.getConfig();
 
@@ -412,11 +423,9 @@ export class EmailService {
     resetToken: string;
     resetUrl?: string;
   }) {
-    const frontendBase =
-      process.env.APP_FRONTEND_URL || 'http://localhost:3000';
     const resetUrl =
       params.resetUrl ||
-      `${frontendBase}/auth/reset-password?token=${params.resetToken}`;
+      `${frontendBaseUrl()}/reset-password?token=${encodeURIComponent(params.resetToken)}`;
 
     const config = await this.getConfig();
 
@@ -435,6 +444,45 @@ export class EmailService {
       html,
       template: 'password_reset',
       metadata: { tokenPrefix: params.resetToken.substring(0, 6) },
+    });
+  }
+
+  async sendVerificationEmail(params: {
+    to: string;
+    recipientName?: string;
+    code: string;
+  }) {
+    const verifyUrl = `${frontendBaseUrl()}/verify-email?email=${encodeURIComponent(params.to)}`;
+    const html = getVerificationEmailHtml({
+      recipientName: params.recipientName,
+      code: params.code,
+      verifyUrl,
+    });
+    return this.sendMail({
+      to: params.to,
+      subject: 'Verify your iPixxel Realty email',
+      html,
+      template: 'notification',
+      metadata: { kind: 'email_verification' },
+    });
+  }
+
+  async sendOrgApprovedEmail(params: {
+    to: string;
+    recipientName?: string;
+    orgName?: string;
+  }) {
+    const html = getOrgApprovedEmailHtml({
+      recipientName: params.recipientName,
+      orgName: params.orgName,
+      loginUrl: `${frontendBaseUrl()}/login`,
+    });
+    return this.sendMail({
+      to: params.to,
+      subject: `${params.orgName || 'Your organisation'} is approved — you can sign in`,
+      html,
+      template: 'notification',
+      metadata: { kind: 'org_approved', orgName: params.orgName },
     });
   }
 }

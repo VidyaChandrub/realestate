@@ -185,6 +185,7 @@ model User {
   // Defaults to 'account' since a User row is only ever created once Step 1
   // (Account) has actually completed.
   onboardingStep OnboardingStep @default(account) @map("onboarding_step")
+  emailVerifiedAt DateTime? @map("email_verified_at")
 
   organisation    Organisation?          @relation(fields: [orgId], references: [id])
   userRoles       UserRole[]
@@ -192,6 +193,7 @@ model User {
   teamMembers     TeamMember[]
   refreshTokens   RefreshToken[]
   resetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
   auditLogs       AuditLog[]
   managedProjects Project[]
   salesProjects   ProjectSalesAgent[]
@@ -277,6 +279,20 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_reset_tokens")
+  @@schema("identity")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verification_tokens")
   @@schema("identity")
 }
 

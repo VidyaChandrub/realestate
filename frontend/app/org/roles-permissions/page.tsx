@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
@@ -60,7 +61,14 @@ const TABS = ["Role Permissions Matrix", "User Permission Overrides"] as const;
 const ACTIONS = ["view", "add", "edit", "delete", "approve"] as const;
 
 export default function OrgRolesPermissionsPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, isOrgAdmin } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (accessToken && !isOrgAdmin()) {
+      router.replace("/org");
+    }
+  }, [accessToken, isOrgAdmin, router]);
 
   const [tabIndex, setTabIndex] = useState(0);
   const [catalog, setCatalog] = useState<PermissionsCatalogResponse | null>(null);
@@ -642,16 +650,17 @@ export default function OrgRolesPermissionsPage() {
               e.preventDefault();
               handleCreateOrgRole();
             }}
-            style={{ display: "flex", flexDirection: "column", gap: 16 }}
+            style={{ display: "flex", flexDirection: "column", gap: 18, background: "#ffffff", padding: "4px 0" }}
           >
             {createRoleError ? <div className="form-alert">{createRoleError}</div> : null}
 
             {/* Quick Presets */}
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted, #64748b)", marginBottom: 6 }}>
-                Quick Presets (Click to pre-fill):
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <span>✨ Quick Presets</span>
+                <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>(Click to pre-fill)</span>
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {[
                   { name: "Senior Telecaller", desc: "Manages lead qualification, calling, and follow-ups" },
                   { name: "Sales Team Lead", desc: "Oversees sales agent pipeline, assignment, and site visits" },
@@ -661,8 +670,28 @@ export default function OrgRolesPermissionsPage() {
                   <button
                     key={preset.name}
                     type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ fontSize: 12, padding: "3px 10px", background: "var(--surface-2, #f8fafc)", border: "1px solid var(--line, #e2e8f0)" }}
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 500,
+                      padding: "5px 12px",
+                      background: "#ffffff",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "8px",
+                      color: "#334155",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = "#6366f1";
+                      e.currentTarget.style.color = "#4f46e5";
+                      e.currentTarget.style.background = "#eef2ff";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = "#cbd5e1";
+                      e.currentTarget.style.color = "#334155";
+                      e.currentTarget.style.background = "#ffffff";
+                    }}
                     onClick={() => {
                       setNewRoleName(preset.name);
                       setNewRoleDescription(preset.desc);
@@ -675,9 +704,14 @@ export default function OrgRolesPermissionsPage() {
             </div>
 
             <div className="field">
-              <label>Role Name *</label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Role Name *</label>
               <input
                 className="inp"
+                style={{
+                  background: "#ffffff",
+                  borderColor: "#cbd5e1",
+                  color: "#0f172a",
+                }}
                 placeholder="e.g. Senior Sales Executive"
                 required
                 autoFocus
@@ -687,9 +721,14 @@ export default function OrgRolesPermissionsPage() {
             </div>
 
             <div className="field">
-              <label>Description</label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Description</label>
               <textarea
                 className="inp"
+                style={{
+                  background: "#ffffff",
+                  borderColor: "#cbd5e1",
+                  color: "#0f172a",
+                }}
                 rows={3}
                 placeholder="Describe the responsibilities and scope of this custom role…"
                 value={newRoleDescription}
@@ -697,7 +736,7 @@ export default function OrgRolesPermissionsPage() {
               />
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
               <button
                 className="btn btn-ghost"
                 type="button"
@@ -706,7 +745,12 @@ export default function OrgRolesPermissionsPage() {
               >
                 Cancel
               </button>
-              <button className="btn btn-primary" type="submit" disabled={creatingRole || !newRoleName.trim()}>
+              <button
+                className="btn btn-primary"
+                type="submit"
+                disabled={creatingRole || !newRoleName.trim()}
+                style={{ padding: "8px 20px" }}
+              >
                 {creatingRole ? "Creating…" : "Create Role"}
               </button>
             </div>

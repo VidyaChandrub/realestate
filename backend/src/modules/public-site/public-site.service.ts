@@ -10,6 +10,31 @@ export class PublicSiteService {
   //  - organisation subdomain: "<sub>.<base>" or "<sub>.localhost" (local dev)
   //  - a custom domain that the org has verified/connected
   // Returns the org + its active, published landing page.
+  async resolvePortal(host: string) {
+    const normalized = (host ?? '').trim().toLowerCase().replace(/:\d+$/, '').replace(/^www\./, '');
+    const subdomain = extractSubdomainFromHost(normalized);
+    const org = subdomain
+      ? await this.prisma.organisation.findFirst({
+          where: { subdomain, subdomainStatus: 'active', status: 'active' },
+        })
+      : await this.prisma.organisation.findFirst({
+          where: { customDomain: normalized, customDomainStatus: 'connected', status: 'active' },
+        });
+    if (!org) throw new NotFoundException('No organisation for host');
+    return {
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      logoUrl: org.logoUrl,
+      brandColour: org.brandColour,
+      subdomain: org.subdomain,
+      subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
+      customDomain: org.customDomain,
+      loginPath: '/login',
+      sitePath: '/site',
+    };
+  }
+
   async resolveByHost(host: string) {
     const normalized = (host ?? '').trim().toLowerCase().replace(/:\d+$/, '').replace(/^www\./, '');
 

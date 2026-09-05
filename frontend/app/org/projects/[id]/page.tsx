@@ -4,15 +4,30 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, getProjectSalesAgents } from "@/lib/api";
+import { apiFetch, getCrmLeads, getProjectSalesAgents } from "@/lib/api";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-import { buildCustomizedProjectSections } from "@/lib/project-templates";
-import { defaultSiteConfig } from "@/lib/prestate/site-config";
 import "@/app/org/org.css";
-import type { ProjectDetail, ProjectSalesAgent } from "@/lib/types";
+import type { OrgTemplatesListResponse, ProjectDetail, ProjectSalesAgent } from "@/lib/types";
+
+async function createLandingPageFromOrgTemplate(accessToken: string, pageName: string) {
+  const list = await apiFetch<OrgTemplatesListResponse>("/org/templates?limit=1", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const templateId = list.data[0]?.id;
+  if (!templateId) {
+    throw new Error(
+      "No Super Admin templates are assigned to this organisation. Assign a template first.",
+    );
+  }
+  return apiFetch<{ id: string; slug: string }>("/org/landing-pages", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ templateId, name: pageName }),
+  });
+}
 
 function managerInitials(name: string | null | undefined): string {
   if (!name) return "—";
@@ -33,6 +48,7 @@ export default function OrgProjectOverviewPage() {
   const [notFound, setNotFound] = useState(false);
   const [publishingPage, setPublishingPage] = useState(false);
   const [pagePublishSuccess, setPagePublishSuccess] = useState<string | null>(null);
+  const [leadCount, setLeadCount] = useState(0);
 
   useEffect(() => {
     if (!accessToken || !id) return;
@@ -52,6 +68,13 @@ export default function OrgProjectOverviewPage() {
       .then(setSalesAgents)
       .catch(() => setSalesAgents([]));
   }, [accessToken, id]);
+
+  useEffect(() => {
+    if (!id) return;
+    getCrmLeads({ projectId: id, limit: 1 })
+      .then((res) => setLeadCount(res.total ?? res.data.length))
+      .catch(() => setLeadCount(0));
+  }, [id]);
 
   if (notFound) {
     return (
@@ -134,7 +157,7 @@ export default function OrgProjectOverviewPage() {
   const hasInventory =
     project.unitTypes.length > 0 || project.rollup.unitsCreated > 0;
 
-  const totalLeads = 0;
+  const totalLeads = leadCount;
 
   const specs: { k: string; v: string; mono?: boolean }[] = [
     { k: "Location", v: project.location || "—" },
@@ -590,39 +613,7 @@ export default function OrgProjectOverviewPage() {
                           setPublishingPage(true);
                           try {
                             const pageName = `${project.name} — Official Landing Page`;
-                            const lp = await apiFetch<any>("/org/landing-pages", {
-                              method: "POST",
-                              headers: { Authorization: `Bearer ${accessToken}` },
-                              body: JSON.stringify({
-                                name: pageName,
-                                content: {
-                                  sections: buildCustomizedProjectSections("tpl-estatepro-luxury", {
-                                    name: project.name,
-                                    priceMin: project.priceMin ? String(project.priceMin) : undefined,
-                                    priceMax: project.priceMax ? String(project.priceMax) : undefined,
-                                    currency: project.currency,
-                                    address: project.addressLine || undefined,
-                                    city: project.city || undefined,
-                                    locality: project.locality || undefined,
-                                    amenities: project.amenities?.map((a: any) => a.name),
-                                    coverImageUrl: project.coverImageUrl,
-                                    galleryUrls: project.galleryUrls,
-                                    unitTypes: project.unitTypes.map((u) => ({
-                                      name: u.name,
-                                      carpetSqft: String(u.carpetSqft || ""),
-                                      builtupSqft: String(u.builtupSqft || ""),
-                                      price: String(u.price || ""),
-                                    })),
-                                  }),
-                                  config: defaultSiteConfig({
-                                    name: pageName,
-                                    slug: project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project",
-                                    primary: "#4f46e5",
-                                    accent: "#cda45e",
-                                  }),
-                                },
-                              }),
-                            });
+                            const lp = await createLandingPageFromOrgTemplate(accessToken, pageName);
 
                             if (lp?.id) {
                               await apiFetch(`/org/projects/${project.id}`, {
@@ -659,39 +650,7 @@ export default function OrgProjectOverviewPage() {
                           setPublishingPage(true);
                           try {
                             const pageName = `${project.name} — Official Landing Page`;
-                            const lp = await apiFetch<any>("/org/landing-pages", {
-                              method: "POST",
-                              headers: { Authorization: `Bearer ${accessToken}` },
-                              body: JSON.stringify({
-                                name: pageName,
-                                content: {
-                                  sections: buildCustomizedProjectSections("tpl-estatepro-luxury", {
-                                    name: project.name,
-                                    priceMin: project.priceMin ? String(project.priceMin) : undefined,
-                                    priceMax: project.priceMax ? String(project.priceMax) : undefined,
-                                    currency: project.currency,
-                                    address: project.addressLine || undefined,
-                                    city: project.city || undefined,
-                                    locality: project.locality || undefined,
-                                    amenities: project.amenities?.map((a: any) => a.name),
-                                    coverImageUrl: project.coverImageUrl,
-                                    galleryUrls: project.galleryUrls,
-                                    unitTypes: project.unitTypes.map((u) => ({
-                                      name: u.name,
-                                      carpetSqft: String(u.carpetSqft || ""),
-                                      builtupSqft: String(u.builtupSqft || ""),
-                                      price: String(u.price || ""),
-                                    })),
-                                  }),
-                                  config: defaultSiteConfig({
-                                    name: pageName,
-                                    slug: project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project",
-                                    primary: "#4f46e5",
-                                    accent: "#cda45e",
-                                  }),
-                                },
-                              }),
-                            });
+                            const lp = await createLandingPageFromOrgTemplate(accessToken, pageName);
 
                             if (lp?.id) {
                               await apiFetch(`/org/landing-pages/${lp.id}/publish`, {

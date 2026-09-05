@@ -308,9 +308,20 @@ function DomainSection() {
               <div className="tx">
                 <b>Subdomain</b>
                 <div className="muted">
-                  {info.subdomain ? host : "No subdomain requested."}
-                  {info.subdomainStatus === "active" ? " — live" : ""}
+                  {info.subdomain ? host : "No subdomain assigned yet."}
+                  {info.subdomainStatus === "active" ? " — organisation login" : ""}
                 </div>
+                {info.subdomainStatus === "active" && host ? (
+                  <div className="muted" style={{ marginTop: 6, fontSize: 12.5 }}>
+                    <a href={`${typeof window !== "undefined" ? window.location.protocol : "http:"}//${host}/login`} style={{ color: "var(--brand)", fontWeight: 600 }}>
+                      Open login
+                    </a>
+                    {" · "}
+                    <a href={`${typeof window !== "undefined" ? window.location.protocol : "http:"}//${host}/site`} style={{ color: "var(--brand)", fontWeight: 600 }}>
+                      Open landing page
+                    </a>
+                  </div>
+                ) : null}
               </div>
               {badge(info.subdomainStatus)}
             </div>
@@ -348,6 +359,20 @@ function DomainSection() {
               </form>
               {sent ? <div className="muted" style={{ color: "var(--green)", marginTop: 8 }}>{sent}</div> : null}
               {error ? <div className="muted" style={{ color: "var(--rose)", marginTop: 8 }}>{error}</div> : null}
+              {info.requests?.length ? (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Recent requests</div>
+                  {info.requests.slice(0, 5).map((req) => (
+                    <div key={req.id} className="swrow" style={{ padding: "8px 0" }}>
+                      <div className="tx">
+                        <b>{req.kind === "custom_domain" ? req.customDomain : req.subdomain}</b>
+                        <div className="muted">{new Date(req.requestedAt).toLocaleDateString()}</div>
+                      </div>
+                      {badge(req.status)}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </>
         )}

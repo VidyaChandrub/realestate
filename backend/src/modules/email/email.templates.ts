@@ -129,6 +129,102 @@ export function getResetPasswordEmailHtml(params: {
 `;
 }
 
+export function getVerificationEmailHtml(params: {
+  recipientName?: string;
+  code: string;
+  verifyUrl: string;
+}): string {
+  const { recipientName, code, verifyUrl } = params;
+  const greeting = recipientName ? `Hello ${recipientName},` : 'Hello,';
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify your email</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #1e293b; }
+    .container { max-width: 580px; margin: 30px auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .header { background: #0f172a; padding: 28px 32px; text-align: left; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .content { padding: 32px; line-height: 1.6; }
+    .code { letter-spacing: 0.35em; font-size: 28px; font-weight: 800; color: #4338ca; background: #eef2ff; border-radius: 10px; padding: 14px 18px; text-align: center; }
+    .btn { display: inline-block; background: #6366f1; color: #ffffff !important; padding: 12px 28px; border-radius: 8px; font-weight: 600; text-decoration: none; margin: 20px 0; }
+    .footer { padding: 20px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>iPixxel Realty</h1>
+    </div>
+    <div class="content">
+      <p style="font-size: 16px;">${greeting}</p>
+      <p>Enter this 6-digit code to verify your email and activate your account.</p>
+      <p class="code">${code}</p>
+      <div style="text-align: center;">
+        <a href="${verifyUrl}" class="btn" target="_blank">Verify email</a>
+      </div>
+      <p style="font-size: 13px; color: #64748b; margin-top: 24px;">This code expires in 60 minutes. If you did not create an account, you can ignore this email.</p>
+    </div>
+    <div class="footer">
+      &copy; ${new Date().getFullYear()} iPixxel Realty. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+`;
+}
+
+export function getOrgApprovedEmailHtml(params: {
+  recipientName?: string;
+  orgName?: string;
+  loginUrl: string;
+}): string {
+  const { recipientName, orgName, loginUrl } = params;
+  const greeting = recipientName ? `Hello ${recipientName},` : 'Hello,';
+  const orgText = orgName ? `<strong>${orgName}</strong>` : 'your organisation';
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organisation approved</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #1e293b; }
+    .container { max-width: 580px; margin: 30px auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .header { background: #0f172a; padding: 28px 32px; text-align: left; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .content { padding: 32px; line-height: 1.6; }
+    .btn { display: inline-block; background: #6366f1; color: #ffffff !important; padding: 12px 28px; border-radius: 8px; font-weight: 600; text-decoration: none; margin: 20px 0; }
+    .footer { padding: 20px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>iPixxel Realty</h1>
+    </div>
+    <div class="content">
+      <p style="font-size: 16px;">${greeting}</p>
+      <p>${orgText} has been approved. You can now sign in and start using your workspace.</p>
+      <div style="text-align: center;">
+        <a href="${loginUrl}" class="btn" target="_blank">Sign in</a>
+      </div>
+    </div>
+    <div class="footer">
+      &copy; ${new Date().getFullYear()} iPixxel Realty. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+`;
+}
+
 export function getTestEmailHtml(params: {
   sentAt: string;
   senderName: string;

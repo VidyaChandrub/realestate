@@ -194,7 +194,7 @@ export default function OrgTemplatesPage() {
             <div className="muted" style={{ fontSize: 13.5 }}>
               {isFiltered
                 ? "Try a different search or category."
-                : "Your platform admin hasn't published any free templates yet — check back soon."}
+                : "No templates have been assigned to your organisation yet. Ask your Super Admin to assign published templates."}
             </div>
           </div>
         </Reveal>

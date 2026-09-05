@@ -62,17 +62,18 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative flex max-h-[90vh] w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900",
+          "relative flex max-h-[90vh] w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl text-slate-900",
           sizes[size],
         )}
+        style={{ background: "#ffffff", color: "#0f172a" }}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-6 pb-4 dark:border-slate-800">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-6 pb-4">
           <div>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+            <h2 className="text-base font-semibold text-slate-900" style={{ color: "#0f172a" }}>
               {title}
             </h2>
             {description ? (
-              <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-0.5 text-sm text-slate-500" style={{ color: "#64748b" }}>
                 {description}
               </p>
             ) : null}
@@ -80,7 +81,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             aria-label="Close"
           >
             <Icon name="close" size={18} />

@@ -16,6 +16,7 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { LeadsService } from './leads.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
+import { CreateManualLeadDto } from './dto/create-manual-lead.dto';
 import { AssignLeadDto } from './dto/assign-lead.dto';
 import { ListLeadsQueryDto } from './dto/list-leads-query.dto';
 import { CreateLeadNoteDto } from './dto/create-lead-note.dto';
@@ -32,6 +33,13 @@ export class LeadsController {
   @Post()
   createPublic(@Body() dto: CreateLeadDto) {
     return this.service.createFromPublic(dto);
+  }
+
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('crm', 'add')
+  @Post('manual')
+  createManual(@CurrentUser() user: JwtPayload, @Body() dto: CreateManualLeadDto) {
+    return this.service.createFromCrm(user.orgId as string, user, dto);
   }
 
   /**
@@ -104,6 +112,6 @@ export class LeadsController {
     @Param('id') id: string,
     @Body() dto: AssignLeadDto,
   ) {
-    return this.service.assign(user.orgId as string, id, dto);
+    return this.service.assign(user.orgId as string, id, dto, user);
   }
 }

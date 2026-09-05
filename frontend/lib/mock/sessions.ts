@@ -120,5 +120,5 @@ export function findMockAccountByEmail(email: string) {
 }
 
 export function dashboardPathFor(role?: UserRole): string {
-  return role === "organisation_admin" ? "/org" : "/admin-console";
+  return role === "super_admin" ? "/admin-console" : "/org";
 }

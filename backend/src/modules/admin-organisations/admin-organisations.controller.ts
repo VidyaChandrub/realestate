@@ -25,6 +25,7 @@ import { UpdateOrganisationDto } from './dto/update-organisation.dto';
 import { UpdateOrganisationStatusDto } from './dto/update-organisation-status.dto';
 import { LogoUploadUrlDto } from './dto/logo-upload-url.dto';
 import { RejectOrganisationDto } from './dto/reject-organisation.dto';
+import { AssignSubdomainDto } from './dto/assign-subdomain.dto';
 import { CreateOrgUserDto } from '../org-users/dto/create-org-user.dto';
 import { UpdateOrgUserStatusDto } from '../org-users/dto/update-org-user-status.dto';
 import { ListOrgUsersQueryDto } from '../org-users/dto/list-org-users-query.dto';
@@ -146,6 +147,15 @@ export class AdminOrganisationsController {
   @Get(':id/domains')
   getDomains(@Param('id') id: string) {
     return this.adminOrganisationsService.getOrgDomains(id);
+  }
+
+  @Post(':id/subdomain')
+  assignSubdomain(
+    @Param('id') id: string,
+    @CurrentUser() actor: JwtPayload,
+    @Body() dto: AssignSubdomainDto,
+  ) {
+    return this.adminOrganisationsService.assignSubdomain(id, actor, dto.subdomain);
   }
 
   @Post(':id/approve')

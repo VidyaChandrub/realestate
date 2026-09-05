@@ -27,6 +27,7 @@ import {
   findMockAccount,
 } from "./mock/sessions";
 import { isOrgAdmin as isOrgAdminSession } from "./session";
+import { sessionRoleFromKeys, sessionRoleFromStoredToken } from "./role-session";
 
 const STORAGE_KEYS = {
   accessToken: "be.access_token",
@@ -139,14 +140,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toSessionUser = useCallback(
-    (safeUser: SafeUser, permissions: Permissions): SessionUser => {
-      const role: UserRole = safeUser.org_id
-        ? "organisation_admin"
-        : "super_admin";
+    (safeUser: SafeUser, permissions: Permissions, roleKeys?: string[]): SessionUser => {
+      const mapped = sessionRoleFromKeys(
+        roleKeys,
+        safeUser.org_id,
+        safeUser.onboarding_step,
+      );
       return {
         ...safeUser,
-        role,
-        roleLabel: role === "super_admin" ? "Super Admin" : "Organisation Admin",
+        role: mapped.role,
+        roleLabel: mapped.roleLabel,
         permissions,
         organisation: null,
       };
@@ -158,40 +161,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (input: LoginInput) => {
       const response = await apiFetch<LoginResponse>("/auth/login", {
         method: "POST",
-        body: JSON.stringify(input),
+        body: JSON.stringify({
+          ...input,
+          host: typeof window !== "undefined" ? window.location.host : undefined,
+        }),
       });
 
-      let permissions: Permissions = {
-        dashboard: { view: true },
-        crm: { view: true, add: true, edit: true, delete: true },
-        projects: { view: true, add: true, edit: true, delete: true },
-        calling: { view: true, add: true, edit: true, delete: true },
-        whatsapp: { view: true, add: true, edit: true, delete: true },
-        websites: { view: true, add: true, edit: true, delete: true },
-        domains: { view: true, add: true, edit: true, delete: true },
-        sales_agents: { view: true, add: true, edit: true, delete: true },
-        teams: { view: true, add: true, edit: true, delete: true },
-        users: { view: true, add: true, edit: true, delete: true },
-        reports: { view: true, add: true, edit: true, delete: true },
-        integrations: { view: true, add: true, edit: true, delete: true },
-        billing: { view: true, add: true, edit: true, delete: true },
-        settings: { view: true, add: true, edit: true, delete: true },
-      };
+      let permissions: Permissions = {};
+      let roleKeys = response.roles ?? [];
 
-      if (response.user.org_id) {
+      if (
+        response.user.org_id &&
+        response.user.onboarding_step === "completed" &&
+        !response.onboarding_incomplete
+      ) {
         try {
-          const meRes = await apiFetch<{ permissions: Permissions }>("/org/permissions/me", {
+          const meRes = await apiFetch<{
+            permissions: Permissions;
+            role?: string | null;
+            roleName?: string | null;
+            roles?: string[];
+          }>("/org/permissions/me", {
             headers: { Authorization: `Bearer ${response.access_token}` },
           });
           if (meRes.permissions) {
             permissions = meRes.permissions;
           }
+          if (meRes.roles?.length) roleKeys = meRes.roles;
+          else if (meRes.role) roleKeys = [meRes.role];
         } catch {
-          // Fallback to default
+          permissions = {};
         }
       }
 
-      const session = toSessionUser(response.user, permissions);
+      const session = toSessionUser(response.user, permissions, roleKeys);
+      if (!response.onboarding_incomplete && session.role !== "super_admin") {
+        session.onboarding_step = "completed";
+      }
       persist(session, response.access_token, response.refresh_token);
       return session;
     },
@@ -224,7 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const session = toSessionUser(safeUser, {
         dashboard: { view: true },
         settings: { view: true, edit: true },
-      });
+      }, ["admin"]);
       persist(session, tokens.access_token, tokens.refresh_token);
       return session;
     },
@@ -301,18 +307,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasPermission = useCallback(
     (module: string, action: "view" | "add" | "edit" | "delete") => {
       if (!user) return false;
-      if (user.role === "super_admin") return true;
-      if (user.permissions && user.permissions[module]) {
-        return user.permissions[module][action] !== false;
-      }
-      return true;
+      if (user.role === "super_admin" || isOrgAdminSession()) return true;
+      return user.permissions?.[module]?.[action] === true;
     },
     [user],
   );
 
   const refreshPermissions = useCallback(async (): Promise<Permissions | null> => {
-    // Super admins have global access and do not belong to an organisation org-permissions matrix
+    // Super admins have global access and do not belong to an organisation org-permissions matrix.
+    // Mid-wizard users (draft org) must not hit /org/permissions/me — that route is
+    // gated by OrgApprovedGuard and used to force-logout with a false ORG_INACTIVE.
     if (user?.role === "super_admin" || (user && !user.org_id)) return null;
+    if (user?.onboarding_step && user.onboarding_step !== "completed") return null;
 
     const token = accessToken ?? (typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.accessToken) : null);
     if (!token || token.startsWith("mock-access-")) return null;
@@ -323,7 +329,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (meRes?.permissions) {
         setUser((prev) => {
           if (!prev) return null;
-          const updated = { ...prev, permissions: meRes.permissions };
+          const mapped = sessionRoleFromStoredToken(prev.org_id, prev.onboarding_step);
+          const updated = {
+            ...prev,
+            permissions: meRes.permissions,
+            role: mapped.role,
+            roleLabel: mapped.roleLabel,
+          };
           try {
             localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(updated));
           } catch {
@@ -364,7 +376,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isOrgAdmin = useCallback((): boolean => {
     if (!user) return false;
-    if (user.role === "admin" || user.role === "super_admin") return true;
+    if (user.role === "super_admin") return true;
     return isOrgAdminSession();
   }, [user]);
 

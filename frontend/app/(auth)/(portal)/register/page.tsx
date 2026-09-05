@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -16,6 +16,7 @@ import {
   createOrganisationStep,
   getLogoUploadUrl,
   resumeExistingDraft,
+  resumeSignup,
   restartExistingDraft,
   saveBusinessDetailsStep,
   saveInviteStep,
@@ -23,6 +24,8 @@ import {
   saveSubscriptionStep,
   saveTemplatesStep,
   signupStep1,
+  verifyEmail,
+  resendVerification,
 } from "@/lib/api";
 import { subdomainPreviewHost, suggestSubdomainsFromName } from "@/lib/domain";
 import { callingCodeForCountry, validatePhoneForCountry } from "@/lib/phone";
@@ -128,7 +131,7 @@ const CHANNELS: { ic: IconName; b: string; s: string }[] = [
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { applyAuthTokens, logout } = useAuth();
+  const { applyAuthTokens, logout, user } = useAuth();
 
   const [cur, setCur] = useState(0);
   const [form, setForm] = useState({
@@ -178,6 +181,12 @@ export default function RegisterPage() {
   // approved — dashboard access is blocked server-side regardless of this
   // screen (OrgApprovedGuard), this is just honest UX instead of 403s.
   const [pendingApproval, setPendingApproval] = useState(false);
+  const [awaitingVerification, setAwaitingVerification] = useState(false);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [resendState, setResendState] = useState<"idle" | "sent">("idle");
+  const [resumeAfterVerify, setResumeAfterVerify] = useState<OnboardingStep | null>(null);
   // Set when Step 1's email or mobile matches someone's still-in-progress
   // signup — the popup asks whether to continue that draft or start fresh
   // with whatever was just typed, see handleContinueDraft/handleStartFreshDraft.
@@ -260,17 +269,8 @@ export default function RegisterPage() {
           return;
         }
       } catch {
-        // Fallback: try org permissions catalog if logged in
-        apiFetch<any>("/org/permissions/modules")
-          .then((res) => {
-            if (res?.roles && res.roles.length > 0) {
-              const mapped = res.roles
-                .filter((r: any) => r.key !== "super_admin" && r.key !== "admin")
-                .map((r: any) => ({ v: r.key, label: r.name }));
-              if (mapped.length > 0) setAvailableRoles(mapped);
-            }
-          })
-          .catch(() => { });
+        // Keep DEFAULT_INVITE_ROLES — do not call /org/permissions/* here.
+        // That route is gated by OrgApprovedGuard and a draft org would 403.
       }
     })();
   }, [cur]);
@@ -420,6 +420,12 @@ export default function RegisterPage() {
         return false;
       }
       applyTokens(res.user, res);
+      if (res.email_verification_required || !res.user.email_verified_at) {
+        setAwaitingVerification(true);
+        setVerifyCode("");
+        setVerifyError(null);
+        return false;
+      }
       return true;
     }
 
@@ -484,6 +490,9 @@ export default function RegisterPage() {
     applyTokens(resumed.user, resumed);
     setForm((prev) => ({
       ...prev,
+      first_name: resumed.user.first_name ?? prev.first_name,
+      last_name: resumed.user.last_name ?? prev.last_name,
+      work_email: resumed.user.email ?? prev.work_email,
       company_name: resumed.organisation?.name ?? prev.company_name,
       subdomain: resumed.organisation?.subdomain ?? prev.subdomain,
       country: resumed.organisation?.country ?? prev.country,
@@ -502,8 +511,65 @@ export default function RegisterPage() {
       setBillingCycle((resumed.subscription.billingCycle as "monthly" | "yearly") ?? "monthly");
     }
     setSelectedTemplateIds(resumed.templateIds ?? []);
+    if (resumed.email_verification_required || !resumed.user.email_verified_at) {
+      setAwaitingVerification(true);
+      setVerifyCode("");
+      setVerifyError(null);
+      setResumeAfterVerify(resumed.nextStep);
+      return;
+    }
     setCur(uiStepForOnboardingStep(resumed.nextStep) - 1);
     window.scrollTo(0, 0);
+  }
+
+  const didResumeRef = useRef(false);
+  useEffect(() => {
+    if (didResumeRef.current) return;
+    if (!user || user.role === "super_admin" || user.role === "team_member") return;
+    if (user.onboarding_step === "completed") return;
+    didResumeRef.current = true;
+    resumeSignup(user.email)
+      .then((resumed) => applyResumedState(resumed))
+      .catch(() => {
+        didResumeRef.current = false;
+      });
+    // Resume once when an incomplete session is already present (e.g. after login).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.onboarding_step]);
+
+  async function handleVerifyEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setVerifyError(null);
+    setVerifyBusy(true);
+    try {
+      await verifyEmail(form.work_email, verifyCode);
+      setAwaitingVerification(false);
+      setVerifyCode("");
+      if (resumeAfterVerify) {
+        setCur(uiStepForOnboardingStep(resumeAfterVerify) - 1);
+        setResumeAfterVerify(null);
+      } else {
+        setCur((c) => Math.max(c, 1));
+      }
+      window.scrollTo(0, 0);
+    } catch (err) {
+      const { general } = mapApiFieldErrors(err, FIELD_KEYS);
+      setVerifyError(general ?? "That code doesn't look right. Check it and try again.");
+    } finally {
+      setVerifyBusy(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    setVerifyError(null);
+    try {
+      await resendVerification(form.work_email);
+      setResendState("sent");
+      window.setTimeout(() => setResendState("idle"), 2000);
+    } catch (err) {
+      const { general } = mapApiFieldErrors(err, FIELD_KEYS);
+      setVerifyError(general ?? "Couldn't resend the code. Please try again.");
+    }
   }
 
   // "Continue previous setup" — updates the old draft's identity fields
@@ -557,6 +623,11 @@ export default function RegisterPage() {
         return;
       }
       applyTokens(res.user, res);
+      if (res.email_verification_required || !res.user.email_verified_at) {
+        setAwaitingVerification(true);
+        setVerifyCode("");
+        setVerifyError(null);
+      }
       setForm((prev) => ({ ...prev, company_name: "", subdomain: "", city: "" }));
       setOrgType("developer");
       setTeamSize("2–10");
@@ -715,6 +786,67 @@ export default function RegisterPage() {
               <Link className="btn btn-primary btn-block" href="/login">Go to sign in</Link>
               <button className="btn btn-ghost" type="button" onClick={() => setAccountExists(false)}>Use a different email</button>
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (awaitingVerification) {
+    return (
+      <div className="auth">
+        <div className="brandside">
+          <div className="glow" />
+          <div className="logo">iR</div>
+          <div>
+            <h1 className="reveal in">Check your inbox.</h1>
+            <p className="reveal in" data-delay="1" style={{ marginTop: 18 }}>
+              We sent a 6-digit code to <b>{form.work_email}</b>. Enter it to activate your account.
+            </p>
+          </div>
+        </div>
+        <div className="formside">
+          <div className="fw">
+            <h2>Verify your email</h2>
+            <p className="muted" style={{ marginTop: 8 }}>
+              The code expires in 60 minutes.
+            </p>
+            <form style={{ marginTop: 26 }} onSubmit={handleVerifyEmail} noValidate>
+              <div className="field">
+                <label>Verification code</label>
+                <input
+                  className="inp"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={verifyCode}
+                  onChange={(e) => {
+                    setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                    setVerifyError(null);
+                  }}
+                  placeholder="000000"
+                  aria-label="Verification code"
+                  style={{ letterSpacing: "0.35em", textAlign: "center", fontWeight: 700 }}
+                />
+              </div>
+              {verifyError ? (
+                <p role="alert" className="help" style={{ color: "var(--rose)", borderColor: "var(--rose-050)", background: "var(--rose-050)", marginBottom: 14 }}>
+                  {verifyError}
+                </p>
+              ) : null}
+              <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={verifyBusy || verifyCode.length !== 6}>
+                {verifyBusy ? "Verifying…" : "Verify email →"}
+              </button>
+            </form>
+            <p className="muted" style={{ textAlign: "center", marginTop: 20, fontSize: 13.5 }}>
+              Didn&apos;t receive it?{" "}
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                style={{ color: "var(--brand)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}
+              >
+                {resendState === "sent" ? "Code re-sent" : "Resend code"}
+              </button>
+            </p>
           </div>
         </div>
       </div>

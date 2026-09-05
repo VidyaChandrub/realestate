@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, ApiError } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
@@ -75,7 +76,14 @@ function formatDate(iso: string): string {
 }
 
 export default function OrgUsersPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission, isOrgAdmin } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (accessToken && !isOrgAdmin() && !hasPermission("users", "view")) {
+      router.replace("/org");
+    }
+  }, [accessToken, hasPermission, isOrgAdmin, router]);
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");

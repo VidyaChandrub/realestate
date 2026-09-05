@@ -553,11 +553,15 @@ function GateForm({
     firePrestateLead();
     if (pageId) bumpTracking(pageId, "form");
     if (pageId) bumpTracking(pageId, "brochure");
+    const leadFields: Record<string, string> = {};
+    for (const f of fields) {
+      leadFields[f.label] = values[f.label] ?? values[(f as { id?: string }).id ?? ""] ?? "";
+    }
     void submitLead({
       landingPageId: pageId,
       formName: textOf(heading || "Brochure Gate"),
       source: "brochure_gate",
-      fields: values,
+      fields: leadFields,
     }).catch(() => {});
     window.dispatchEvent(new CustomEvent(LEAD_SUCCESS_EVENT));
     window.setTimeout(() => {

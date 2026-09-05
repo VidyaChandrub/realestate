@@ -9,12 +9,6 @@ import { CURRENCY_LABELS, formatMoneyRange, PROJECT_CURRENCIES } from "@/lib/mon
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import { CatalogOptions, MoneyInput } from "@/components/org/project-form-fields";
 import { Reveal } from "@/components/superadmin/reveal";
-import {
-  PREDEFINED_PROJECT_TEMPLATES,
-  ProjectTemplate,
-  buildCustomizedProjectSections,
-} from "@/lib/project-templates";
-import { defaultSiteConfig } from "@/lib/prestate/site-config";
 import { orgBuilderPath } from "@/lib/prestate/paths";
 import "@/app/org/org.css";
 import type {
@@ -25,6 +19,8 @@ import type {
   LandingPageRow,
   OrgUser,
   OrgUsersListResponse,
+  OrgTemplateSummary,
+  OrgTemplatesListResponse,
   Project,
   ProjectStatus,
   SafeOrganisation,
@@ -275,13 +271,13 @@ export default function AddNewProjectPage() {
   const [publishedProjectId, setPublishedProjectId] = useState<string | null>(null);
 
   // Template selection & Instant landing page publishing
-  const [selectedTemplate, setSelectedTemplate] = useState<ProjectTemplate | null>(PREDEFINED_PROJECT_TEMPLATES[0]);
+  const [selectedTemplate, setSelectedTemplate] = useState<OrgTemplateSummary | null>(null);
   const [templateAppliedToast, setTemplateAppliedToast] = useState<string | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [publishLandingPageNow, setPublishLandingPageNow] = useState(true);
   const [landingPageTitle, setLandingPageTitle] = useState("");
   const [createdLandingPage, setCreatedLandingPage] = useState<{ id: string; slug: string; name: string } | null>(null);
-  const [orgDbTemplates, setOrgDbTemplates] = useState<any[]>([]);
+  const [orgDbTemplates, setOrgDbTemplates] = useState<OrgTemplateSummary[]>([]);
 
   // Visual Builder Customization state
   const [customLandingPageId, setCustomLandingPageId] = useState<string | null>(null);
@@ -289,39 +285,14 @@ export default function AddNewProjectPage() {
   const [customLandingPageName, setCustomLandingPageName] = useState<string | null>(null);
   const [customizingInBuilder, setCustomizingInBuilder] = useState(false);
 
-  const applyTemplate = useCallback((tpl: ProjectTemplate) => {
+  const applyTemplate = useCallback((tpl: OrgTemplateSummary) => {
     setSelectedTemplate(tpl);
     setCustomLandingPageId(null);
     setCustomLandingPageSlug(null);
     setCustomLandingPageName(null);
-    setName((cur) => cur.trim() ? cur : tpl.defaultData.name);
-    setTagline(tpl.defaultData.tagline);
-    setProjectType(tpl.defaultData.projectType);
-    setSelectedConfigs(tpl.defaultData.selectedConfigs);
-    setTowerCount(tpl.defaultData.towerCount);
-    setFloorsDescription(tpl.defaultData.floorsDescription);
-    setLandArea(tpl.defaultData.landArea);
-    setCarpetRange(tpl.defaultData.carpetRange);
-    setHighlights(tpl.defaultData.highlights);
-    setPriceMin(tpl.defaultData.priceMin);
-    setPriceMax(tpl.defaultData.priceMax);
-    setBaseRate(tpl.defaultData.baseRate);
-    setBookingAmount(tpl.defaultData.bookingAmount);
-    setPriceIncludes(tpl.defaultData.priceIncludes);
-    setPaymentPlan(tpl.defaultData.paymentPlan);
-    setOffers(tpl.defaultData.offers);
-    setAmenities(tpl.defaultData.amenities);
-    setUnitTypes(tpl.defaultData.unitTypes.map((u) => ({ ...u, key: Date.now() + Math.random() })));
-    setFlooring(tpl.defaultData.flooring);
-    setKitchen(tpl.defaultData.kitchen);
-    setDoorsWindows(tpl.defaultData.doorsWindows);
-    setFittings(tpl.defaultData.fittings);
-    setSpecNotes(tpl.defaultData.specNotes);
-    if (tpl.defaultData.coverImageUrl) setCoverImageUrl(tpl.defaultData.coverImageUrl);
-    if (tpl.defaultData.galleryUrls?.length) setGalleryUrls(tpl.defaultData.galleryUrls);
     setPublishWeb(true);
     setPublishLandingPageNow(true);
-    setTemplateAppliedToast(`"${tpl.name}" applied! Default configurations, specifications & images loaded.`);
+    setTemplateAppliedToast(`"${tpl.name}" selected. The Super Admin template will be used for this project's landing page.`);
     setShowTemplateModal(false);
     setTimeout(() => setTemplateAppliedToast(null), 4000);
   }, []);
@@ -353,12 +324,21 @@ export default function AddNewProjectPage() {
     getOrgLandingPages()
       .then((rows) => setOrgLandingPages(rows.filter((lp) => lp.pageType === "landing")))
       .catch(() => setOrgLandingPages([]));
-    apiFetch<any>("/org/templates?limit=20", auth)
+    apiFetch<OrgTemplatesListResponse>("/org/templates?limit=50", auth)
       .then((res) => {
-        if (res?.data) setOrgDbTemplates(res.data);
+        const rows = Array.isArray(res?.data) ? res.data : [];
+        setOrgDbTemplates(rows);
       })
       .catch(() => setOrgDbTemplates([]));
   }, [accessToken]);
+
+  useEffect(() => {
+    if (orgDbTemplates.length === 0) return;
+    setSelectedTemplate((current) => {
+      if (current && orgDbTemplates.some((t) => t.id === current.id)) return current;
+      return orgDbTemplates[0];
+    });
+  }, [orgDbTemplates]);
 
   useEffect(() => {
     if (!accessToken || !CATALOG_STEPS.has(step)) return;
@@ -499,7 +479,7 @@ export default function AddNewProjectPage() {
     if (d.customLandingPageSlug) setCustomLandingPageSlug(d.customLandingPageSlug);
     if (d.customLandingPageName) setCustomLandingPageName(d.customLandingPageName);
     if (d.selectedTemplateId) {
-      const match = PREDEFINED_PROJECT_TEMPLATES.find((t) => t.id === d.selectedTemplateId);
+      const match = orgDbTemplates.find((t) => t.id === d.selectedTemplateId);
       if (match) setSelectedTemplate(match);
     }
   }
@@ -521,9 +501,14 @@ export default function AddNewProjectPage() {
   const pct = Math.round(((step + 1) / STEPS.length) * 100);
   const selectedManager = managers.find((m) => m.id === managerId) ?? null;
 
-  const openTemplateInVisualBuilder = useCallback(async (tplTarget?: ProjectTemplate) => {
+  const openTemplateInVisualBuilder = useCallback(async (tplTarget?: OrgTemplateSummary) => {
     if (!accessToken) return;
-    const tpl = tplTarget || selectedTemplate || PREDEFINED_PROJECT_TEMPLATES[0];
+    const tpl = tplTarget || selectedTemplate;
+    if (!tpl) {
+      setError("Select a Super Admin template first. If none appear, ask an administrator to assign templates to this organisation.");
+      setShowTemplateModal(true);
+      return;
+    }
     setCustomizingInBuilder(true);
     setError(null);
     try {
@@ -533,44 +518,10 @@ export default function AddNewProjectPage() {
       }
 
       const lpName = landingPageTitle.trim() || (name.trim() ? `${name.trim()} — Official Landing Page` : `${tpl.name} — Project Landing Page`);
-      const customSections = buildCustomizedProjectSections(tpl.id, {
-        name: name.trim() || tpl.defaultData.name || "Luxury Project",
-        tagline: tagline.trim() || tpl.defaultData.tagline,
-        projectType: projectType || tpl.defaultData.projectType,
-        reraId: reraId.trim() || undefined,
-        priceMin: priceMin || tpl.defaultData.priceMin,
-        priceMax: priceMax || tpl.defaultData.priceMax,
-        currency,
-        address: address.trim() || tpl.defaultData.address,
-        city: city.trim() || tpl.defaultData.city,
-        locality: locality.trim() || tpl.defaultData.locality,
-        amenities: amenities.length ? amenities : tpl.defaultData.amenities,
-        highlights: highlights.trim() || tpl.defaultData.highlights,
-        coverImageUrl: coverImageUrl || tpl.defaultData.coverImageUrl,
-        galleryUrls: galleryUrls.length ? galleryUrls : tpl.defaultData.galleryUrls,
-        unitTypes: unitTypes.filter((u) => u.name.trim()).map((u) => ({
-          name: u.name.trim(),
-          carpetSqft: u.carpetSqft,
-          builtupSqft: u.builtupSqft,
-          price: u.price,
-        })),
-      });
-
-      const lp = await apiFetch<any>("/org/landing-pages", {
+      const lp = await apiFetch<LandingPageRow>("/org/landing-pages", {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({
-          name: lpName,
-          content: {
-            sections: customSections,
-            config: defaultSiteConfig({
-              name: lpName,
-              slug: (name.trim() || tpl.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project",
-              primary: tpl.accent || "#4f46e5",
-              accent: tpl.accent || "#cda45e",
-            }),
-          },
-        }),
+        body: JSON.stringify({ templateId: tpl.id, name: lpName }),
       });
 
       if (lp?.id) {
@@ -604,20 +555,6 @@ export default function AddNewProjectPage() {
     customLandingPageId,
     landingPageTitle,
     name,
-    tagline,
-    projectType,
-    reraId,
-    priceMin,
-    priceMax,
-    currency,
-    address,
-    city,
-    locality,
-    amenities,
-    highlights,
-    coverImageUrl,
-    galleryUrls,
-    unitTypes,
     orgId,
     collectDraft,
     router,
@@ -793,46 +730,16 @@ export default function AddNewProjectPage() {
             };
             setCreatedLandingPage(publishedLp);
           } else {
-            const customSections = buildCustomizedProjectSections(
-              selectedTemplate?.id || "tpl-estatepro-luxury",
-              {
-                name: project.name,
-                tagline: tagline.trim() || undefined,
-                projectType: projectType || undefined,
-                reraId: reraId.trim() || undefined,
-                priceMin: priceMin || undefined,
-                priceMax: priceMax || undefined,
-                currency,
-                address: address.trim() || undefined,
-                city: city.trim() || undefined,
-                locality: locality.trim() || undefined,
-                amenities: amenities.length ? amenities : undefined,
-                highlights: highlights.trim() || undefined,
-                coverImageUrl,
-                galleryUrls,
-                unitTypes: unitTypes.filter((u) => u.name.trim()).map((u) => ({
-                  name: u.name.trim(),
-                  carpetSqft: u.carpetSqft,
-                  builtupSqft: u.builtupSqft,
-                  price: u.price,
-                })),
-              },
-            );
+            if (!selectedTemplate) {
+              throw new Error("Select a Super Admin template before publishing a landing page.");
+            }
 
-            const lp = await apiFetch<any>("/org/landing-pages", {
+            const lp = await apiFetch<LandingPageRow>("/org/landing-pages", {
               method: "POST",
               headers: { Authorization: `Bearer ${accessToken}` },
               body: JSON.stringify({
+                templateId: selectedTemplate.id,
                 name: lpName,
-                content: {
-                  sections: customSections,
-                  config: defaultSiteConfig({
-                    name: lpName,
-                    slug: project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project",
-                    primary: selectedTemplate?.accent || "#4f46e5",
-                    accent: selectedTemplate?.accent || "#cda45e",
-                  }),
-                },
               }),
             });
 
@@ -861,7 +768,11 @@ export default function AddNewProjectPage() {
             }
           }
         } catch (lpErr) {
-          console.warn("Landing page generation failed:", lpErr);
+          setError(
+            lpErr instanceof Error
+              ? `Project saved, but the landing page was not created: ${lpErr.message}`
+              : "Project saved, but the landing page was not created from the selected template.",
+          );
         }
       }
 
@@ -1022,7 +933,7 @@ export default function AddNewProjectPage() {
                           <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--brand, #4f46e5)" }}>
                             Selected Project Template
                           </span>
-                          {selectedTemplate?.badge ? <span className="badge b-blue">{selectedTemplate.badge}</span> : null}
+                          {selectedTemplate?.category ? <span className="badge b-blue">{selectedTemplate.category}</span> : null}
                           {customLandingPageId ? (
                             <span className="badge b-green">✨ Visually Edited in Builder</span>
                           ) : null}
@@ -1034,8 +945,8 @@ export default function AddNewProjectPage() {
                           {customLandingPageId
                             ? "This template has been customized in the visual builder. Any canvas edits, custom sections and layouts will be published with this project."
                             : selectedTemplate
-                            ? selectedTemplate.description
-                            : "Choose a predefined real estate template to automatically pre-populate specifications, configurations, images & landing page."}
+                            ? (selectedTemplate.category ? `${selectedTemplate.category} · assigned by Super Admin` : "Assigned by Super Admin")
+                            : "Choose a Super Admin template assigned to this organisation. The landing page will use that design."}
                         </div>
                       </div>
                     </div>
@@ -1576,11 +1487,11 @@ export default function AddNewProjectPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--brand, #4f46e5)" }}>
-                  Predefined Project Templates
+                  Super Admin Templates
                 </div>
                 <h2 style={{ margin: "4px 0 6px", fontSize: 22 }}>Select a Project Template</h2>
                 <p className="muted fs-13" style={{ margin: 0 }}>
-                  Choosing a template automatically applies default configurations, unit types, lifestyle amenities, architectural images, and prepares a fully dynamic landing page.
+                  These are the templates Super Admin assigned to your organisation. The selected design is copied onto this project&apos;s landing page.
                 </p>
               </div>
               <button className="btn btn-ghost" onClick={() => setShowTemplateModal(false)} style={{ fontSize: 18, padding: "4px 10px" }}>
@@ -1589,7 +1500,12 @@ export default function AddNewProjectPage() {
             </div>
 
             <div className="grid g2" style={{ gap: 20 }}>
-              {PREDEFINED_PROJECT_TEMPLATES.map((tpl) => {
+              {orgDbTemplates.length === 0 ? (
+                <div className="muted" style={{ gridColumn: "1 / -1", padding: 24, textAlign: "center" }}>
+                  No templates are assigned to this organisation yet. Ask Super Admin to assign templates, or open{" "}
+                  <a href="/org/templates" style={{ color: "var(--brand)", fontWeight: 600 }}>Templates</a>.
+                </div>
+              ) : orgDbTemplates.map((tpl) => {
                 const isSelected = selectedTemplate?.id === tpl.id;
                 return (
                   <div
@@ -1606,11 +1522,17 @@ export default function AddNewProjectPage() {
                     }}
                   >
                     <div style={{ height: 160, position: "relative", overflow: "hidden", background: "#1e293b" }}>
-                      <img
-                        src={tpl.thumbnail}
-                        alt={tpl.name}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
+                      {tpl.thumbnail ? (
+                        <img
+                          src={tpl.thumbnail}
+                          alt={tpl.name}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 28 }}>
+                          🏛️
+                        </div>
+                      )}
                       <div
                         style={{
                           position: "absolute",
@@ -1619,10 +1541,11 @@ export default function AddNewProjectPage() {
                         }}
                       />
                       <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6 }}>
-                        <span className="badge b-teal" style={{ background: "rgba(0,0,0,0.6)", color: "#fff", backdropFilter: "blur(4px)" }}>
-                          {tpl.category}
-                        </span>
-                        {tpl.badge && <span className="badge b-amber">{tpl.badge}</span>}
+                        {tpl.category ? (
+                          <span className="badge b-teal" style={{ background: "rgba(0,0,0,0.6)", color: "#fff", backdropFilter: "blur(4px)" }}>
+                            {tpl.category}
+                          </span>
+                        ) : null}
                       </div>
                       <div style={{ position: "absolute", bottom: 12, left: 12, right: 12 }}>
                         <b style={{ color: "#fff", fontSize: 16, textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{tpl.name}</b>
@@ -1631,24 +1554,17 @@ export default function AddNewProjectPage() {
 
                     <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1 }}>
                       <p className="muted fs-12-5" style={{ margin: "0 0 12px", lineHeight: 1.5, flex: 1 }}>
-                        {tpl.description}
+                        Super Admin template · {tpl.template || "landing"}
                       </p>
 
-                      <div style={{ background: "var(--surface-2, #f8fafc)", padding: "8px 12px", borderRadius: 8, fontSize: 11.5, marginBottom: 16, color: "var(--fg)" }}>
-                        <b>Includes Sections:</b> Hero Banner • Highlights • Amenities Grid • Gallery • Floorplans • Pricing Cards • Location Map • Lead Capture Form
-                      </div>
-
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                        <span className="muted fs-12">
-                          Default: {tpl.defaultData.selectedConfigs.join(", ")}
-                        </span>
+                      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                         <div className="row gap-8">
                           <button
                             type="button"
                             className="btn btn-secondary btn-sm"
                             onClick={() => {
                               applyTemplate(tpl);
-                              openTemplateInVisualBuilder(tpl);
+                              void openTemplateInVisualBuilder(tpl);
                             }}
                             disabled={customizingInBuilder}
                             style={{ display: "flex", alignItems: "center", gap: 4 }}
@@ -1660,7 +1576,7 @@ export default function AddNewProjectPage() {
                             className={`btn ${isSelected ? "btn-secondary" : "btn-primary"} btn-sm`}
                             onClick={() => applyTemplate(tpl)}
                           >
-                            {isSelected ? "✓ Active Template" : "Apply Template →"}
+                            {isSelected ? "✓ Active Template" : "Use this template →"}
                           </button>
                         </div>
                       </div>

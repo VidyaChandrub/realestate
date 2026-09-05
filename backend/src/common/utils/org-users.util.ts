@@ -143,15 +143,13 @@ export async function provisionInvitedUser(
     return created;
   });
 
-  if (!dto.password) {
-    sendInviteEmailNotification(
-      prisma,
-      orgId,
-      { email: user.email, firstName: user.firstName, lastName: user.lastName },
-      rawPassword,
-      role.name,
-    );
-  }
+  sendInviteEmailNotification(
+    prisma,
+    orgId,
+    { email: user.email, firstName: user.firstName, lastName: user.lastName },
+    rawPassword,
+    role.name,
+  );
   return toSafeUser(user);
 }
 
