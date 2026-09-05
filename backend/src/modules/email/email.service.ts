@@ -41,6 +41,47 @@ export class EmailService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Production often never ran seed, so these tables may be missing.
+   * GET /config swallows that and returns env defaults; PUT must create them.
+   */
+  private async ensureEmailTables() {
+    await this.prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS identity;`);
+    await this.prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS audit;`);
+    await this.prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS identity.email_configs (
+        id TEXT PRIMARY KEY,
+        host TEXT NOT NULL,
+        port INTEGER NOT NULL DEFAULT 587,
+        secure BOOLEAN NOT NULL DEFAULT false,
+        "user" TEXT NOT NULL DEFAULT '',
+        password TEXT NOT NULL DEFAULT '',
+        from_email TEXT NOT NULL,
+        from_name TEXT NOT NULL DEFAULT 'iPixxel Realty',
+        reply_to TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        invite_subject TEXT,
+        invite_body TEXT,
+        reset_subject TEXT,
+        reset_body TEXT,
+        created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS invite_subject TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS invite_body TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS reset_subject TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS reset_body TEXT;`,
+    );
+  }
+
+  /**
    * Fetch active config from database, or fallback to environment variables.
    */
   async getConfig() {
@@ -84,6 +125,8 @@ export class EmailService {
    * Update or create the Super Admin's SMTP configuration.
    */
   async updateConfig(dto: UpdateEmailConfigDto) {
+    await this.ensureEmailTables();
+
     let existing: any = null;
     try {
       existing = await this.prisma.emailConfig.findFirst({
