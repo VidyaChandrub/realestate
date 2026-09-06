@@ -1,0 +1,16 @@
+# Production API used by .github/workflows/deploy.yml.
+# Next.js (PM2 realestate-web) proxies /api/* to 127.0.0.1:3000.
+services:
+  api:
+    build:
+      context: ./backend
+      target: prod
+    container_name: realestate-api
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+    ports:
+      - '3000:3000'

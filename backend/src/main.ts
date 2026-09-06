@@ -21,7 +21,7 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  const port = Number(process.env.PORT) || 4000;
+  const port = Number(process.env.PORT) || 3000;
   // Bind IPv4 explicitly. Default Node/Nest `listen(port)` often binds `::`
   // only; Next.js then proxies to 127.0.0.1 and every /api/* returns 500.
   await app.listen(port, '0.0.0.0');
