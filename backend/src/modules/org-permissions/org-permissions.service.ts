@@ -283,16 +283,6 @@ export class OrgPermissionsService {
       select: {
         orgId: true,
         userRoles: { select: { role: { select: { key: true, name: true } } } },
-        userPermissions: {
-          select: {
-            moduleKey: true,
-            canView: true,
-            canAdd: true,
-            canEdit: true,
-            canDelete: true,
-            canApprove: true,
-          },
-        },
       },
     });
     if (!user || user.orgId !== orgId) {
@@ -300,28 +290,64 @@ export class OrgPermissionsService {
     }
 
     const roleKeys = user.userRoles.map((ur) => ur.role.key);
-    const rawRolePermissions = await this.prisma.roleModulePermission.findMany({
-      where: {
-        orgId: { in: [orgId, SYSTEM_ORG_ID] },
-        role: { key: { in: roleKeys } },
-      },
-      select: {
-        orgId: true,
-        role: { select: { key: true } },
-        moduleKey: true,
-        canView: true,
-        canAdd: true,
-        canEdit: true,
-        canDelete: true,
-        canApprove: true,
-      },
-    });
+    let rawRolePermissions: Array<{
+      orgId: string;
+      role: { key: string };
+      moduleKey: string;
+      canView: boolean;
+      canAdd: boolean;
+      canEdit: boolean;
+      canDelete: boolean;
+      canApprove: boolean;
+    }> = [];
+    let userOverrides: Array<{
+      moduleKey: string;
+      canView: boolean | null;
+      canAdd: boolean | null;
+      canEdit: boolean | null;
+      canDelete: boolean | null;
+      canApprove: boolean | null;
+    }> = [];
+    try {
+      if (roleKeys.length) {
+        rawRolePermissions = await this.prisma.roleModulePermission.findMany({
+          where: {
+            orgId: { in: [orgId, SYSTEM_ORG_ID] },
+            role: { key: { in: roleKeys } },
+          },
+          select: {
+            orgId: true,
+            role: { select: { key: true } },
+            moduleKey: true,
+            canView: true,
+            canAdd: true,
+            canEdit: true,
+            canDelete: true,
+            canApprove: true,
+          },
+        });
+      }
+      userOverrides = await this.prisma.userModulePermission.findMany({
+        where: { orgId, userId },
+        select: {
+          moduleKey: true,
+          canView: true,
+          canAdd: true,
+          canEdit: true,
+          canDelete: true,
+          canApprove: true,
+        },
+      });
+    } catch {
+      rawRolePermissions = [];
+      userOverrides = [];
+    }
     const rolePermissions = mergeRolePermissions(rawRolePermissions);
 
     const effective = computeEffectivePermissions({
       roleKeys,
       rolePermissions,
-      userOverrides: user.userPermissions,
+      userOverrides,
     });
 
     const byModule: Record<string, ModulePermission> = {};
