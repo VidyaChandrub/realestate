@@ -1526,7 +1526,7 @@ export interface ReviewOrgDomainRequestInput {
 export interface PlatformConfig {
   id: string | null;
   subdomainMode: string; // localhost | production
-  subdomainBase: string | null; // e.g. "ipixxel.in"
+  subdomainBase: string | null; // e.g. "ipixxel.ae"
   dnsMode: string; // a | cname | ns
   infraIp: string | null; // AWS origin IPv4 (for the wildcard A record)
   infraIpv6: string | null;

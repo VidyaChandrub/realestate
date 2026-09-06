@@ -4,7 +4,7 @@
 // domain.util for the parts the browser needs (display text).
 
 const BASE_DOMAIN =
-  process.env.NEXT_PUBLIC_SUBDOMAIN_BASE_DOMAIN ?? "ipixxel.in";
+  process.env.NEXT_PUBLIC_SUBDOMAIN_BASE_DOMAIN ?? "ipixxel.ae";
 
 // In local dev, subdomains render as "<sub>.localhost" (and the note explains
 // that they resolve to the local machine instead of the real wildcard).
@@ -17,7 +17,7 @@ export function subdomainPreviewHost(subdomain?: string | null): string | null {
   if (!label) return null;
   if (LOCALHOST_MODE) return `${label}.localhost`;
   const base = BASE_DOMAIN.replace(/^\.+/, "");
-  return `${label}.${base}`;
+  return `${label}.${base || "ipixxel.ae"}`;
 }
 
 // Proactive suggestions derived straight from the company name, shown

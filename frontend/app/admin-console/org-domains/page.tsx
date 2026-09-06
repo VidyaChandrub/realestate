@@ -650,7 +650,7 @@ export default function SuperAdminOrgDomainsPage() {
             <label>Subdomain base domain</label>
             <input
               className="inp inp-mono"
-              placeholder="ipixxel.in"
+              placeholder="ipixxel.ae"
               value={config.subdomainBase ?? ""}
               onChange={(e) =>
                 setConfig((p) => ({ ...p, subdomainBase: e.target.value }))
@@ -659,7 +659,7 @@ export default function SuperAdminOrgDomainsPage() {
             <div className="hint">
               Org sites will live at{" "}
               <b style={{ fontFamily: "monospace" }}>
-                {"<sub>." + (config.subdomainBase || "yourdomain.com")}
+                {"<sub>." + (config.subdomainBase || "ipixxel.ae")}
               </b>
             </div>
           </div>

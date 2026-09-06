@@ -1,6 +1,6 @@
 import type { LandingPageData, SectionInstance, SiteConfig } from "./types";
 
-const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:3000";
+const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:4000";
 
 export interface ResolvedOrgLandingPage {
   id: string;

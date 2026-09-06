@@ -52,11 +52,10 @@ export function isValidSubdomain(input: string): boolean {
   return true;
 }
 
-// The platform's wildcard base domain (e.g. "ipixxel.in"). Reads the env var
-// at call time — the PlatformConfigService patches process.env live from the
-// Super Admin console config, so this tracks UI changes without a redeploy.
+// The platform's wildcard base domain. Reads the env var at call time —
+// PlatformConfigService patches process.env live from Super Admin config.
 export function getSubdomainBaseDomain(): string {
-  const base = (process.env.SUBDOMAIN_BASE_DOMAIN ?? 'ipixxel.in')
+  const base = (process.env.SUBDOMAIN_BASE_DOMAIN ?? 'ipixxel.ae')
     .trim()
     .toLowerCase()
     .replace(/^\.+/, '')
@@ -64,8 +63,16 @@ export function getSubdomainBaseDomain(): string {
   return base;
 }
 
+export function getPlatformBaseDomains(): string[] {
+  const extra = (process.env.SUBDOMAIN_BASE_ALIASES ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase().replace(/^\.+/, '').replace(/:\d+$/, ''))
+    .filter(Boolean);
+  return [...new Set([getSubdomainBaseDomain(), ...extra].filter(Boolean))];
+}
+
 // The fully-qualified host name for an organisation subdomain, based on the
-// platform's wildcard base domain (e.g. "<sub>.ipixxel.in"). In local dev
+// platform's wildcard base domain (e.g. "<sub>.ipixxel.ae"). In local dev
 // (SUBDOMAIN_MODE=localhost) it renders "<sub>.localhost" which the OS resolves
 // to 127.0.0.1 (works on mac/linux) so the whole flow works offline.
 export function subdomainHost(subdomain: string): string {
@@ -90,13 +97,15 @@ export function extractSubdomainFromHost(host: string): string | null {
     return isValidSubdomain(label) ? label : null;
   }
 
-  const base = getSubdomainBaseDomain();
-  if (!base) return null;
-  if (!h.endsWith(`.${base}`) || h === base) return null;
-  const label = h.slice(0, h.length - base.length - 1);
-  // Exclude other first-level labels that share the base's parent domain.
-  if (!label || label.includes('.') || !isValidSubdomain(label)) return null;
-  return label;
+  for (const base of getPlatformBaseDomains()) {
+    if (!base) continue;
+    if (!h.endsWith(`.${base}`) || h === base) continue;
+    const label = h.slice(0, h.length - base.length - 1);
+    // Exclude other first-level labels that share the base's parent domain.
+    if (!label || label.includes('.') || !isValidSubdomain(label)) continue;
+    return label;
+  }
+  return null;
 }
 
 export function generateVerificationToken(): string {

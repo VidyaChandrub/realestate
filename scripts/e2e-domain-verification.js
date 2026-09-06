@@ -42,11 +42,11 @@ console.log('Suggestions for taken "skyline":', suggestions);
 
 // 2. SUBDOMAIN & HOST RESOLUTION (PRODUCTION & LOCAL)
 console.log('\n--- [2. Subdomain Host Routing & Multi-Environment Resolution] ---');
-process.env.SUBDOMAIN_BASE_DOMAIN = 'ipixxel.in';
+process.env.SUBDOMAIN_BASE_DOMAIN = 'ipixxel.ae';
 process.env.SUBDOMAIN_MODE = 'production';
-assert(subdomainHost('skylinedev') === 'skylinedev.ipixxel.in', 'subdomainHost resolves FQDN for production (skylinedev.ipixxel.in)');
-assert(extractSubdomainFromHost('skylinedev.ipixxel.in') === 'skylinedev', 'extractSubdomainFromHost extracts org subdomain from request host');
-assert(extractSubdomainFromHost('www.ipixxel.in') === null, 'Base www host excluded from subdomain routing');
+assert(subdomainHost('skylinedev') === 'skylinedev.ipixxel.ae', 'subdomainHost resolves FQDN for production (skylinedev.ipixxel.ae)');
+assert(extractSubdomainFromHost('skylinedev.ipixxel.ae') === 'skylinedev', 'extractSubdomainFromHost extracts org subdomain from request host');
+assert(extractSubdomainFromHost('www.ipixxel.ae') === null, 'Base www host excluded from subdomain routing');
 assert(extractSubdomainFromHost('customdomain.com') === null, 'Non-platform domain returns null for subdomain extraction');
 
 process.env.SUBDOMAIN_MODE = 'localhost';

@@ -127,7 +127,7 @@ model Organisation {
 
   // The organisation's own site identity, chosen at registration and/or later
   // from the Org Settings → Domain screen. subdomain is the organisation's
-  // primary platform address (e.g. skylinedev.ipixxel.in) and is auto-activated
+  // primary platform address (e.g. skylinedev.ipixxel.ae) and is auto-activated
   // once the Super Admin approves the organisation. A custom domain can be
   // requested (added as a pending OrgDomainRequest) and, once a Super Admin
   // approves, is mapped to the organisation's primary site.
@@ -1176,7 +1176,7 @@ model PlatformConfig {
   // localhost | production — production builds "<sub>.base" hosts; localhost
   // dev renders "<sub>.localhost" without needing real DNS.
   subdomainMode String   @default("production") @map("subdomain_mode")
-  // The platform's wildcard base domain (e.g. "ipixxel.in"), no scheme/dots
+  // The platform's wildcard base domain (e.g. "ipixxel.ae"), no scheme/dots
   // prefix. Organisation subdomains resolve to "<sub>.<this>".
   subdomainBase String?  @map("subdomain_base")
   // a | cname | ns — how the wildcard is pointed at the origin on the
