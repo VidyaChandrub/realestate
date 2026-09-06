@@ -1,34 +1,24 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
-import { Seg } from "@/components/superadmin/seg";
 import type { OrganisationListResponse, OrganisationListRow, OrganisationSummary } from "@/lib/types";
 import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RowActionsMenu, type RowAction } from "@/components/superadmin/row-actions-menu";
 import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 
-// The "Disabled" tab's status param covers both admin-disabled and
+// The "Rejected / Disabled" pill's status param covers both admin-disabled and
 // rejected orgs (see the backend's list() query) — labelled to match.
 // "Draft" is a separate bucket for abandoned self-serve signups and any
 // Super-Admin-precreated org never assigned an admin. Drafts also appear in
 // "All" so incomplete onboarding attempts remain visible to Super Admin.
-const STATUS_TABS = ["All", "Active", "Pending", "Rejected/Disabled", "Draft"] as const;
 const LIMIT = 20;
-
-function statusParamFor(tabIndex: number): "all" | "active" | "pending" | "disabled" | "draft" {
-  if (tabIndex === 1) return "active";
-  if (tabIndex === 2) return "pending";
-  if (tabIndex === 3) return "disabled";
-  if (tabIndex === 4) return "draft";
-  return "all";
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -47,11 +37,68 @@ function initials(name: string): string {
     .join("");
 }
 
+function StatTile({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  accent?: string;
+}) {
+  return (
+    <div
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--line-2)",
+        borderRadius: 14,
+        padding: "14px 16px",
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 20,
+          fontWeight: 800,
+          fontFamily: "monospace",
+          color: accent ?? "var(--ink)",
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {value}
+      </div>
+      {sub ? (
+        <div
+          className="muted"
+          style={{ fontSize: 11.5, marginTop: 4, wordBreak: "break-word" }}
+        >
+          {sub}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+const STATUS_PILLS: { value: string; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "pending", label: "Pending" },
+  { value: "disabled", label: "Rejected / Disabled" },
+  { value: "draft", label: "Draft" },
+];
+
 export default function SuperAdminOrganisationsPage() {
   const router = useRouter();
   const { accessToken, isLoading: authLoading } = useAuth();
 
-  const [tabIndex, setTabIndex] = useState(0);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -118,13 +165,13 @@ export default function SuperAdminOrganisationsPage() {
     const params = new URLSearchParams({
       page: String(page),
       limit: String(LIMIT),
-      status: statusParamFor(tabIndex),
+      status: statusFilter,
     });
     if (search) params.set("search", search);
     apiFetch<OrganisationListResponse>(`/admin/organisations?${params.toString()}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     }).then(setResult).catch((err) => setError(err instanceof Error ? err.message : "Failed to load organisations.")).finally(() => setLoading(false));
-  },[accessToken, tabIndex, search, page]);
+  },[accessToken, statusFilter, search, page]);
 
   useEffect(()=>{ fetchSummary(); },[fetchSummary]);
   useEffect(()=>{ fetchList(); },[fetchList]);
@@ -263,6 +310,19 @@ export default function SuperAdminOrganisationsPage() {
         </div>
         <div className="actions">
           <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={() => {
+              fetchSummary();
+              fetchList();
+            }}
+            disabled={loading}
+            title="Refresh"
+          >
+            <Icon name="refresh" size={16} />
+            <span style={{ marginLeft: 6 }}>Refresh</span>
+          </button>
+          <button
             className="btn btn-primary"
             type="button"
             onClick={() => {
@@ -270,96 +330,102 @@ export default function SuperAdminOrganisationsPage() {
               setCreateModalOpen(true);
             }}
           >
-            ＋ Create Organisation
+            <Icon name="plus" size={16} />
+            <span style={{ marginLeft: 6 }}>Create Organisation</span>
           </button>
         </div>
       </div>
 
-      {/* Controls */}
-      <Reveal delay={1}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
-          <Seg
-            options={[...STATUS_TABS]}
-            value={tabIndex}
-            onChange={(i) => {
-              setTabIndex(i);
-              setPage(1);
-            }}
-          />
-          <div style={{ position: "relative", flex: 1, minWidth: 220, maxWidth: 340 }}>
-            <input
-              className="inp"
-              placeholder="Search by name, city or email…"
-              style={{ paddingLeft: 38 }}
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-            <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "var(--faint)" }}>
-              <Icon name="search" size={14} />
-            </span>
-          </div>
-        </div>
-      </Reveal>
+      {/* Summary strip */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: 10,
+          marginBottom: 16,
+        }}
+      >
+        <StatTile label="Total organisations" value={summary ? <CountUp value={summary.total} /> : "—"} />
+        <StatTile label="Active" value={summary ? <CountUp value={summary.active} /> : "—"} accent="#10b981" />
+        <StatTile
+          label="Pending approval"
+          value={summary ? <CountUp value={summary.pending ?? 0} /> : "—"}
+          accent={summary && (summary.pending ?? 0) > 0 ? "#f59e0b" : "var(--ink)"}
+          sub="Awaiting review"
+        />
+        <StatTile
+          label="Rejected / Disabled"
+          value={summary ? <CountUp value={summary.disabled ?? 0} /> : "—"}
+          accent={summary && (summary.disabled ?? 0) > 0 ? "#f43f5e" : "var(--ink)"}
+          sub="Rejected + disabled orgs"
+        />
+        <StatTile
+          label="Draft signups"
+          value={summary ? <CountUp value={summary.draft ?? 0} /> : "—"}
+          accent="#8b5cf6"
+          sub="Abandoned mid-signup"
+        />
+      </div>
 
-      {/* Stat tiles */}
-      <div style={{ marginBottom: 18 }}>
-        <Reveal delay={2} className="grid g5">
-          <div className="stat">
-            <div className="top">
-              <span className="label">Total organisations</span>
-              <span className="ic ic-indigo"><Icon name="building" size={16} /></span>
-            </div>
-            <div className="value">
-              {summary ? <CountUp value={summary.total} /> : "—"}
-            </div>
-          </div>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Active</span>
-              <span className="ic ic-green"><Icon name="check" size={16} /></span>
-            </div>
-            <div className="value">
-              {summary ? <CountUp value={summary.active} /> : "—"}
-            </div>
-          </div>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Pending approval</span>
-              <span className="ic ic-amber"><Icon name="sparkles" size={16} /></span>
-            </div>
-            <div className="value">
-              {summary ? <CountUp value={summary.pending ?? 0} /> : "—"}
-            </div>
-            <div className="delta">Awaiting review</div>
-          </div>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Rejected/Disabled</span>
-              <span className="ic ic-rose"><Icon name="flag" size={16} /></span>
-            </div>
-            <div className="value">
-              {summary ? <CountUp value={summary.disabled ?? 0} /> : "—"}
-            </div>
-            <div className="delta">Rejected registrations + disabled orgs</div>
-          </div>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Draft signups</span>
-              <span className="ic ic-violet"><Icon name="edit" size={16} /></span>
-            </div>
-            <div className="value">
-              {summary ? <CountUp value={summary.draft ?? 0} /> : "—"}
-            </div>
-            <div className="delta">Abandoned mid-signup</div>
-          </div>
-        </Reveal>
+      {/* Filter + search toolbar */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginBottom: 12,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap",
+            background: "var(--surface)",
+            border: "1px solid var(--line-2)",
+            borderRadius: 12,
+            padding: 4,
+          }}
+        >
+          {STATUS_PILLS.map((p) => (
+            <button
+              key={p.value}
+              className={`btn ${statusFilter === p.value ? "btn-primary" : "btn-ghost"} btn-sm`}
+              onClick={() => {
+                setStatusFilter(p.value);
+                setPage(1);
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div style={{ position: "relative", flex: 1, minWidth: 220, maxWidth: 340 }}>
+          <input
+            className="inp"
+            placeholder="Search by name, city or email…"
+            style={{ paddingLeft: 38, height: 34, fontSize: 13 }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "var(--faint)" }}>
+            <Icon name="search" size={14} />
+          </span>
+        </div>
+        <span
+          className="muted"
+          style={{ marginLeft: "auto", alignSelf: "center", fontSize: 12 }}
+        >
+          {loading ? "Loading…" : `${total} organisation${total === 1 ? "" : "s"}`}
+        </span>
       </div>
 
       {/* Table */}
       <Reveal delay={3}>
         <div className="card">
           <div className="card-h">
-            <span className="t">All organisations</span>
+            <span className="t">Organisation Catalogue</span>
             <span className="muted" style={{ fontSize: 12.5 }}>
               {loading ? "Loading…" : `Showing ${from}–${to} of ${total}`}
             </span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -17,6 +17,55 @@ const ROLE_PRESETS = [
   { name: "Project Admin", key: "project_admin", scope: "organisation" as const, desc: "Manages real estate project listings, units, and inventory" },
 ];
 
+function StatTile({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  accent?: string;
+}) {
+  return (
+    <div
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--line-2)",
+        borderRadius: 14,
+        padding: "14px 16px",
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 20,
+          fontWeight: 800,
+          fontFamily: "monospace",
+          color: accent ?? "var(--ink)",
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {value}
+      </div>
+      {sub ? (
+        <div
+          className="muted"
+          style={{ fontSize: 11.5, marginTop: 4, wordBreak: "break-word" }}
+        >
+          {sub}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function SuperAdminRolesPage() {
   const router = useRouter();
   const { accessToken, isLoading: authLoading } = useAuth();
@@ -25,6 +74,10 @@ export default function SuperAdminRolesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  const [scopeFilter, setScopeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState("");
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -39,7 +92,9 @@ export default function SuperAdminRolesPage() {
   const [editingRole, setEditingRole] = useState<DynamicRole | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
+    key: "",
     description: "",
+    scope: "organisation" as "organisation" | "team",
     status: "active" as "active" | "inactive",
     sortOrder: 0,
   });
@@ -91,6 +146,35 @@ export default function SuperAdminRolesPage() {
   useEffect(() => {
     fetchRoles();
   }, [fetchRoles]);
+
+  const SYSTEM_KEYS = ["super_admin", "admin", "manager", "sales", "telecaller"];
+  const isSystemRole = (key: string) => SYSTEM_KEYS.includes(key);
+
+  const stats = useMemo(() => {
+    let system = 0;
+    let custom = 0;
+    let assigned = 0;
+    for (const r of roles) {
+      if (isSystemRole(r.key)) system++;
+      else custom++;
+      assigned += r._count?.userRoles ?? 0;
+    }
+    return { total: roles.length, system, custom, assigned };
+  }, [roles]);
+
+  const visible = useMemo(
+    () =>
+      roles.filter(
+        (r) =>
+          (!scopeFilter || r.scope === scopeFilter) &&
+          (!statusFilter || r.status === statusFilter) &&
+          (!search.trim() ||
+            r.name.toLowerCase().includes(search.trim().toLowerCase()) ||
+            r.key.toLowerCase().includes(search.trim().toLowerCase()) ||
+            (r.description ?? "").toLowerCase().includes(search.trim().toLowerCase())),
+      ),
+    [roles, scopeFilter, statusFilter, search],
+  );
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,9 +333,6 @@ export default function SuperAdminRolesPage() {
     }
   };
 
-  const isSystemRole = (key: string) =>
-    ["super_admin", "admin", "manager", "sales", "telecaller"].includes(key);
-
   if (authLoading || !accessToken) return null;
 
   return (
@@ -259,12 +340,22 @@ export default function SuperAdminRolesPage() {
       <div className="page-head reveal in">
         <div>
           <div className="eyebrow"><Icon name="lock" size={14} /> Security & Access</div>
-          <h1>Dynamic Roles</h1>
+          <h1>Role</h1>
           <div className="sub">
             Manage system and custom roles across the platform. Configured roles can be assigned to organisation members.
           </div>
         </div>
         <div className="actions">
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={() => void fetchRoles()}
+            disabled={loading}
+            title="Refresh"
+          >
+            <Icon name="refresh" size={16} />
+            <span style={{ marginLeft: 6 }}>Refresh</span>
+          </button>
           <button
             className="btn btn-primary"
             type="button"
@@ -273,7 +364,8 @@ export default function SuperAdminRolesPage() {
               setCreateModalOpen(true);
             }}
           >
-            ＋ Create Role
+            <Icon name="plus" size={16} />
+            <span style={{ marginLeft: 6 }}>Create Role</span>
           </button>
         </div>
       </div>
@@ -290,7 +382,7 @@ export default function SuperAdminRolesPage() {
                   disabled={permSaving}
                   style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
                 >
-                  ← Back to Roles
+                  ← Back to Role
                 </button>
                 <div style={{ height: 18, width: 1, background: "var(--line, #e2e8f0)" }} />
                 <span className="t" style={{ fontSize: 16 }}>
@@ -491,12 +583,102 @@ export default function SuperAdminRolesPage() {
         </Reveal>
       ) : null}
 
+      {/* Summary strip */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: 10,
+          marginBottom: 16,
+        }}
+      >
+        <StatTile label="Total roles" value={stats.total} />
+        <StatTile label="System roles" value={stats.system} accent="#4f46e5" />
+        <StatTile
+          label="Custom roles"
+          value={stats.custom}
+          accent={stats.custom ? "#10b981" : "var(--ink)"}
+        />
+        <StatTile label="Assigned users" value={stats.assigned} />
+      </div>
+
+      {/* Filter + search toolbar */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginBottom: 12,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap",
+            background: "var(--surface)",
+            border: "1px solid var(--line-2)",
+            borderRadius: 12,
+            padding: 4,
+          }}
+        >
+          {["", "platform", "organisation", "team"].map((s) => (
+            <button
+              key={s || "all-scope"}
+              className={`btn ${scopeFilter === s ? "btn-primary" : "btn-ghost"} btn-sm`}
+              onClick={() => setScopeFilter(s)}
+            >
+              {s === "organisation"
+                ? "Organisation"
+                : s === "platform"
+                  ? "Platform"
+                  : s || "All scopes"}
+            </button>
+          ))}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap",
+            background: "var(--surface)",
+            border: "1px solid var(--line-2)",
+            borderRadius: 12,
+            padding: 4,
+          }}
+        >
+          {["", "active", "inactive"].map((s) => (
+            <button
+              key={s || "all-status"}
+              className={`btn ${statusFilter === s ? "btn-primary" : "btn-ghost"} btn-sm`}
+              onClick={() => setStatusFilter(s)}
+            >
+              {s || "All statuses"}
+            </button>
+          ))}
+        </div>
+        <input
+          className="inp"
+          placeholder="Search roles…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: 200, height: 34, fontSize: 13 }}
+        />
+        <span
+          className="muted"
+          style={{ marginLeft: "auto", alignSelf: "center", fontSize: 12 }}
+        >
+          {loading ? "Loading…" : `${visible.length} of ${roles.length} roles`}
+        </span>
+      </div>
+
       <Reveal delay={1}>
         <div className="card">
           <div className="card-h">
-            <span className="t">Database Roles Catalogue</span>
+            <span className="t">Role Catalogue</span>
             <span className="muted" style={{ fontSize: 12.5 }}>
-              {loading ? "Loading…" : `${roles.length} total roles`}
+              {loading ? "Loading…" : `${visible.length} roles`}
             </span>
           </div>
           <div className="tbl-wrap">
@@ -521,12 +703,12 @@ export default function SuperAdminRolesPage() {
                   <tr>
                     <td colSpan={7} className="muted">Loading roles…</td>
                   </tr>
-                ) : roles.length === 0 ? (
+                ) : visible.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="muted">No roles found.</td>
+                    <td colSpan={7} className="muted">No roles match the current filters.</td>
                   </tr>
                 ) : (
-                  roles.map((r) => (
+                  visible.map((r) => (
                     <tr key={r.id}>
                       <td>
                         <div style={{ fontWeight: 600 }}>{r.name}</div>
@@ -586,7 +768,9 @@ export default function SuperAdminRolesPage() {
                               setEditingRole(r);
                               setEditForm({
                                 name: r.name,
+                                key: r.key,
                                 description: r.description ?? "",
+                                scope: r.scope === "organisation" ? "organisation" : "team",
                                 status: r.status,
                                 sortOrder: r.sortOrder ?? 0,
                               });
@@ -817,36 +1001,137 @@ export default function SuperAdminRolesPage() {
         open={editingRole !== null}
         onClose={() => setEditingRole(null)}
         title={`Edit Role: ${editingRole?.name ?? ""}`}
-        description="Update role settings and status."
+        description="Update role settings, scope, and status — same fields as creation."
         size="md"
       >
         <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {editError ? <div className="form-alert">{editError}</div> : null}
 
+          {/* Grid layout for Name & Key */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div className="field">
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Role Name *</label>
+              <input
+                className="inp"
+                style={{
+                  background: "#ffffff",
+                  borderColor: "#cbd5e1",
+                  color: "#0f172a",
+                }}
+                placeholder="e.g. Senior Property Specialist"
+                required
+                value={editForm.name}
+                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+
+            <div className="field">
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>
+                Role Key / Slug
+                {editingRole && isSystemRole(editingRole.key) ? (
+                  <span style={{ fontSize: 11, color: "#f59e0b", fontWeight: 500, marginLeft: 4 }}>
+                    (locked for system roles)
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>(System-role keys are locked)</span>
+                )}
+              </label>
+              <input
+                className="inp"
+                style={{
+                  background: editingRole && isSystemRole(editingRole.key) ? "#f1f5f9" : "#ffffff",
+                  borderColor: "#cbd5e1",
+                  color: "#0f172a",
+                }}
+                placeholder="e.g. senior_property_specialist"
+                readOnly={editingRole ? isSystemRole(editingRole.key) : false}
+                value={editForm.key}
+                onChange={(e) => setEditForm((f) => ({ ...f, key: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {/* Scope selection as light, clean visual cards */}
           <div className="field">
-            <label>Role Name *</label>
-            <input
-              className="inp"
-              required
-              value={editForm.name}
-              onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-            />
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 8 }}>Role Scope *</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: "12px",
+                  border: editForm.scope === "team" ? "2px solid #6366f1" : "1px solid #e2e8f0",
+                  background: editForm.scope === "team" ? "#f5f7ff" : "#ffffff",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  boxShadow: editForm.scope === "team" ? "0 2px 8px rgba(99, 102, 241, 0.12)" : "0 1px 2px rgba(0,0,0,0.02)",
+                }}
+                onClick={() => setEditForm((f) => ({ ...f, scope: "team" }))}
+              >
+                <div style={{ fontWeight: 600, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6, color: editForm.scope === "team" ? "#4338ca" : "#1e293b" }}>
+                  <span>👥 Team Scope</span>
+                  {editForm.scope === "team" ? (
+                    <span style={{ marginLeft: "auto", fontSize: 11, background: "#e0e7ff", color: "#4338ca", fontWeight: 600, padding: "2px 8px", borderRadius: 6 }}>
+                      Selected
+                    </span>
+                  ) : null}
+                </div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                  Assignable to team members, sales agents, and telecallers.
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: "12px",
+                  border: editForm.scope === "organisation" ? "2px solid #6366f1" : "1px solid #e2e8f0",
+                  background: editForm.scope === "organisation" ? "#f5f7ff" : "#ffffff",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  boxShadow: editForm.scope === "organisation" ? "0 2px 8px rgba(99, 102, 241, 0.12)" : "0 1px 2px rgba(0,0,0,0.02)",
+                }}
+                onClick={() => setEditForm((f) => ({ ...f, scope: "organisation" }))}
+              >
+                <div style={{ fontWeight: 600, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6, color: editForm.scope === "organisation" ? "#4338ca" : "#1e293b" }}>
+                  <span>🏢 Organisation Scope</span>
+                  {editForm.scope === "organisation" ? (
+                    <span style={{ marginLeft: "auto", fontSize: 11, background: "#e0e7ff", color: "#4338ca", fontWeight: 600, padding: "2px 8px", borderRadius: 6 }}>
+                      Selected
+                    </span>
+                  ) : null}
+                </div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                  Organisation-wide scope for admin or executive roles.
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="field">
-            <label>Description</label>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Description</label>
             <textarea
               className="inp"
+              style={{
+                background: "#ffffff",
+                borderColor: "#cbd5e1",
+                color: "#0f172a",
+              }}
               rows={3}
+              placeholder="Describe the responsibilities and access level of this role…"
               value={editForm.description}
               onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
             />
           </div>
 
-          <div className="row2">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div className="field">
-              <label>Status</label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Status</label>
               <select
+                style={{
+                  background: "#ffffff",
+                  borderColor: "#cbd5e1",
+                  color: "#0f172a",
+                }}
                 value={editForm.status}
                 onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as "active" | "inactive" }))}
               >
@@ -855,9 +1140,14 @@ export default function SuperAdminRolesPage() {
               </select>
             </div>
             <div className="field">
-              <label>Sort Order</label>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Sort Order</label>
               <input
                 className="inp"
+                style={{
+                  background: "#ffffff",
+                  borderColor: "#cbd5e1",
+                  color: "#0f172a",
+                }}
                 type="number"
                 value={editForm.sortOrder}
                 onChange={(e) => setEditForm((f) => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))}
@@ -865,7 +1155,7 @@ export default function SuperAdminRolesPage() {
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
             <button className="btn btn-ghost" type="button" onClick={() => setEditingRole(null)} disabled={editSubmitting}>
               Cancel
             </button>
