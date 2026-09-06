@@ -82,10 +82,10 @@ export class AdminDashboardService {
         },
       }),
 
-      // Pending domain requests
-      this.prisma.domainRequest.findMany({
+      // Pending org domain requests (subdomain + custom domain)
+      this.prisma.orgDomainRequest.findMany({
         where: { status: 'pending' },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { requestedAt: 'desc' },
         take: 4,
         include: {
           organisation: { select: { id: true, name: true, slug: true } },
@@ -197,9 +197,9 @@ export class AdminDashboardService {
     // Format pending requests
     const formattedPendingRequests = pendingDomainRequests.map((req) => ({
       id: req.id,
-      name: req.domain,
-      amt: 'Domain DNS',
-      desc: `Requested by ${req.organisation.name} for landing page "${req.landingPage?.name || 'Main Site'}"`,
+      name: req.kind === 'custom_domain' ? (req.customDomain ?? req.subdomain ?? '') : (req.subdomain ?? req.customDomain ?? ''),
+      amt: req.kind === 'custom_domain' ? 'Custom domain' : 'Subdomain',
+      desc: `Requested by ${req.organisation.name}${req.landingPage ? ` for landing page "${req.landingPage.name}"` : ''}`,
       orgId: req.organisation.id,
       status: req.status,
     }));

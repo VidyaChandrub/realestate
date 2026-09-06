@@ -26,6 +26,7 @@ export class OrgDomainController {
       user.orgId as string,
       user.sub as string,
       dto.domain,
+      dto.landingPageId,
     );
   }
 }

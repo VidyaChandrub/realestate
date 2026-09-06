@@ -13,6 +13,7 @@ import {
   getTestEmailHtml,
   getVerificationEmailHtml,
   getOrgApprovedEmailHtml,
+  getOrgStatusEmailHtml,
 } from './email.templates';
 
 export function frontendBaseUrl(): string {
@@ -526,6 +527,48 @@ export class EmailService {
       html,
       template: 'notification',
       metadata: { kind: 'org_approved', orgName: params.orgName },
+    });
+  }
+
+  /**
+   * Org lifecycle status-change email (submitted / rejected / disabled /
+   * re-enabled). Wired into org registration, wizard completion, rejection
+   * and status toggle flows.
+   */
+  async sendOrgStatusEmail(params: {
+    to: string;
+    recipientName?: string;
+    orgName?: string;
+    status: 'submitted' | 'rejected' | 'disabled' | 'enabled';
+    reason?: string;
+  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const orgName = params.orgName || 'Your organisation';
+
+    const subjects: Record<typeof params.status, string> = {
+      submitted: `${orgName} — application submitted`,
+      rejected: `Update on your ${orgName} application`,
+      disabled: `Your ${orgName} workspace has been disabled`,
+      enabled: `Your ${orgName} workspace has been re-enabled`,
+    };
+
+    const html = getOrgStatusEmailHtml({
+      recipientName: params.recipientName,
+      orgName: params.orgName,
+      status: params.status,
+      reason: params.reason,
+      loginUrl: `${frontendBaseUrl()}/login`,
+    });
+
+    return this.sendMail({
+      to: params.to,
+      subject: subjects[params.status],
+      html,
+      template: 'notification',
+      metadata: {
+        kind: `org_${params.status}`,
+        orgName: params.orgName,
+        reason: params.reason ?? null,
+      },
     });
   }
 }

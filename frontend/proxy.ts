@@ -14,7 +14,7 @@ const PLATFORM_HOSTS = new Set(
     `www.${BASE_DOMAIN}`,
     process.env.NEXT_PUBLIC_APP_HOST,
   ]
-    .filter(Boolean)
+    .filter((host): host is string => Boolean(host))
     .map((host) => host.toLowerCase()),
 );
 

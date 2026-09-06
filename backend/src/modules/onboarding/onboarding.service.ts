@@ -10,6 +10,7 @@ import { assertEligibleTemplateIds } from '../../common/utils/template-eligibili
 import { furthestOnboardingStep, nextOnboardingStep } from '../../common/utils/onboarding.util';
 import { subdomainHost } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
+import { EmailService } from '../email/email.service';
 import { BusinessDetailsDto } from './dto/business-details.dto';
 import { LogoUploadUrlDto } from './dto/logo-upload-url.dto';
 import { SubscriptionStepDto } from './dto/subscription-step.dto';
@@ -23,6 +24,7 @@ export class OnboardingService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly teamService: TeamService,
+    private readonly emailService: EmailService,
   ) {}
 
   // Step 3 — Business Details.
@@ -294,6 +296,21 @@ export class OnboardingService {
 
         return updated;
       });
+
+      // Tell the user their setup is in for review — only fires the first
+      // time (subsequent calls find status != 'draft' and skip this block).
+      const owner = await this.prisma.user.findUnique({
+        where: { id: actor.sub },
+      });
+      if (owner) {
+        void this.emailService.sendOrgStatusEmail({
+          to: owner.email,
+          recipientName:
+            [owner.firstName, owner.lastName].filter(Boolean).join(' ') || undefined,
+          orgName: organisation.name,
+          status: 'submitted',
+        });
+      }
     }
 
     // Tell the frontend whether the org is actually usable yet — finishing

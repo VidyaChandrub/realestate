@@ -47,10 +47,30 @@ const ACCENT_SWATCHES = [
 ] as const;
 
 const PALETTE_PRESETS = [
-  { name: "Royal Prestige", primary: "#6366F1", accent: "#CDA45E", desc: "Vibrant Indigo & Imperial Gold for luxury developments" },
-  { name: "Emerald Oasis", primary: "#0D9488", accent: "#10B981", desc: "Lush eco-residences & nature-themed communities" },
-  { name: "Corporate Sapphire", primary: "#0284C7", accent: "#1E3A5F", desc: "High-trust commercial & ultra-modern tech townships" },
-  { name: "Amber Elegance", primary: "#B45309", accent: "#D4A017", desc: "Warm boutique villas and Mediterranean architecture" },
+  {
+    name: "Royal Prestige",
+    primary: "#6366F1",
+    accent: "#CDA45E",
+    desc: "Vibrant Indigo & Imperial Gold for luxury developments",
+  },
+  {
+    name: "Emerald Oasis",
+    primary: "#0D9488",
+    accent: "#10B981",
+    desc: "Lush eco-residences & nature-themed communities",
+  },
+  {
+    name: "Corporate Sapphire",
+    primary: "#0284C7",
+    accent: "#1E3A5F",
+    desc: "High-trust commercial & ultra-modern tech townships",
+  },
+  {
+    name: "Amber Elegance",
+    primary: "#B45309",
+    accent: "#D4A017",
+    desc: "Warm boutique villas and Mediterranean architecture",
+  },
 ];
 
 const LAYOUT_THEMES: {
@@ -59,9 +79,24 @@ const LAYOUT_THEMES: {
   tagline: string;
   previewRadius: number;
 }[] = [
-  { key: "standard", label: "Standard", tagline: "Clean · Professional · Balanced", previewRadius: 12 },
-  { key: "premium", label: "Premium", tagline: "Elegant · Luxury · High-end", previewRadius: 18 },
-  { key: "modern", label: "Modern", tagline: "Minimal · Bold · Contemporary", previewRadius: 6 },
+  {
+    key: "standard",
+    label: "Standard",
+    tagline: "Clean · Professional · Balanced",
+    previewRadius: 12,
+  },
+  {
+    key: "premium",
+    label: "Premium",
+    tagline: "Elegant · Luxury · High-end",
+    previewRadius: 18,
+  },
+  {
+    key: "modern",
+    label: "Modern",
+    tagline: "Minimal · Bold · Contemporary",
+    previewRadius: 6,
+  },
 ];
 
 export function BrandModule({
@@ -78,7 +113,9 @@ export function BrandModule({
 }) {
   const cfg = ensureConfig(site);
   const { brand } = cfg;
-  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">(
+    "desktop",
+  );
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const patchBrand = (partial: Partial<SiteConfig["brand"]>) =>
@@ -96,7 +133,17 @@ export function BrandModule({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--ps-bg)", color: "var(--ps-ink)", overflow: "hidden", ...siteThemeStyle(brand) }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        background: "var(--ps-bg)",
+        color: "var(--ps-ink)",
+        overflow: "hidden",
+        ...siteThemeStyle(brand),
+      }}
+    >
       {/* Top Action Ribbon */}
       <div
         style={{
@@ -111,16 +158,43 @@ export function BrandModule({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: 7 }}>
-            <Palette size={16} style={{ color: "var(--ps-primary)" }} /> Brand Center & Design Tokens
+          <span
+            style={{
+              fontSize: 13.5,
+              fontWeight: 800,
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+            }}
+          >
+            <Palette size={16} style={{ color: "var(--ps-primary)" }} /> Brand
+            Center & Design Tokens
           </span>
-          <span style={{ fontSize: 11, color: "var(--ps-muted)", borderLeft: "1px solid var(--ps-line-strong)", paddingLeft: 12 }}>
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--ps-muted)",
+              borderLeft: "1px solid var(--ps-line-strong)",
+              paddingLeft: 12,
+            }}
+          >
             Applied across all real estate widgets for {site.name}
           </span>
         </div>
 
         {/* Center Device Switcher */}
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 2, background: "rgba(0, 0, 0, 0.35)", borderRadius: 10, padding: 3, border: "1px solid var(--ps-line-strong)" }}>
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 2,
+            background: "rgba(0, 0, 0, 0.35)",
+            borderRadius: 10,
+            padding: 3,
+            border: "1px solid var(--ps-line-strong)",
+          }}
+        >
           {[
             { key: "desktop", icon: Monitor, label: "Desktop" },
             { key: "tablet", icon: Tablet, label: "Tablet" },
@@ -137,7 +211,8 @@ export function BrandModule({
                 padding: "6px 12px",
                 borderRadius: 7,
                 border: "none",
-                background: device === dev.key ? "var(--ps-panel-raised)" : "transparent",
+                background:
+                  device === dev.key ? "var(--ps-panel-raised)" : "transparent",
                 color: device === dev.key ? "#fff" : "var(--ps-muted)",
                 fontSize: 12,
                 fontWeight: 700,
@@ -161,12 +236,14 @@ export function BrandModule({
             padding: "8px 18px",
             borderRadius: 9,
             border: "none",
-            background: savedSuccess ? "var(--ps-success)" : "var(--ps-primary)",
+            background: savedSuccess
+              ? "var(--ps-success)"
+              : "var(--ps-primary)",
             color: "#fff",
             fontSize: 12.5,
             fontWeight: 700,
             cursor: "pointer",
-            boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
+            boxShadow: "0 4px 14px rgba(109,93,252,0.35)",
             transition: "background 0.2s",
           }}
         >
@@ -192,16 +269,46 @@ export function BrandModule({
           }}
         >
           {/* Section 1: 1-Click Curated Palettes */}
-          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-              <Sparkles size={16} style={{ color: "var(--ps-primary)" }} /> Curated Color Palettes
+          <div
+            style={{
+              background: "var(--ps-panel-raised)",
+              border: "1px solid var(--ps-line-strong)",
+              borderRadius: 14,
+              padding: "16px 16px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: "#fff",
+                marginBottom: 4,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Sparkles size={16} style={{ color: "var(--ps-primary)" }} />{" "}
+              Curated Color Palettes
             </div>
-            <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: "0 0 12px", lineHeight: 1.45 }}>
-              Choose a harmonized palette tailored for luxury property marketing.
+            <p
+              style={{
+                fontSize: 11.5,
+                color: "var(--ps-muted)",
+                margin: "0 0 12px",
+                lineHeight: 1.45,
+              }}
+            >
+              Choose a harmonized palette tailored for luxury property
+              marketing.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+            <div
+              style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}
+            >
               {PALETTE_PRESETS.map((p) => {
-                const active = brand.primary?.toLowerCase() === p.primary.toLowerCase() && brand.accent?.toLowerCase() === p.accent.toLowerCase();
+                const active =
+                  brand.primary?.toLowerCase() === p.primary.toLowerCase() &&
+                  brand.accent?.toLowerCase() === p.accent.toLowerCase();
                 return (
                   <button
                     key={p.name}
@@ -211,8 +318,12 @@ export function BrandModule({
                       textAlign: "left",
                       padding: "10px 12px",
                       borderRadius: 10,
-                      border: active ? "2px solid var(--ps-primary)" : "1px solid var(--ps-line)",
-                      background: active ? "rgba(99, 102, 241, 0.18)" : "var(--ps-bg)",
+                      border: active
+                        ? "2px solid var(--ps-primary)"
+                        : "1px solid var(--ps-line)",
+                      background: active
+                        ? "rgba(109, 93, 252, 0.18)"
+                        : "var(--ps-bg)",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -220,17 +331,50 @@ export function BrandModule({
                       transition: "all 0.12s",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
                       <div style={{ display: "flex", gap: 3 }}>
-                        <span style={{ width: 18, height: 18, borderRadius: "50%", background: p.primary, border: "2px solid rgba(255,255,255,.2)" }} />
-                        <span style={{ width: 18, height: 18, borderRadius: "50%", background: p.accent, border: "2px solid rgba(255,255,255,.2)" }} />
+                        <span
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: "50%",
+                            background: p.primary,
+                            border: "2px solid rgba(255,255,255,.2)",
+                          }}
+                        />
+                        <span
+                          style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: "50%",
+                            background: p.accent,
+                            border: "2px solid rgba(255,255,255,.2)",
+                          }}
+                        />
                       </div>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: active ? "#818cf8" : "#fff" }}>{p.name}</div>
-                        <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>{p.desc}</div>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 800,
+                            color: active ? "#9690ff" : "#fff",
+                          }}
+                        >
+                          {p.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>
+                          {p.desc}
+                        </div>
                       </div>
                     </div>
-                    {active ? <Check size={16} style={{ color: "#818cf8", flexShrink: 0 }} /> : null}
+                    {active ? (
+                      <Check
+                        size={16}
+                        style={{ color: "#9690ff", flexShrink: 0 }}
+                      />
+                    ) : null}
                   </button>
                 );
               })}
@@ -238,32 +382,87 @@ export function BrandModule({
           </div>
 
           {/* Section 2: Custom Primary & Secondary Color Pickers */}
-          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <Palette size={16} style={{ color: "var(--ps-primary)" }} /> Theme Colors
+          <div
+            style={{
+              background: "var(--ps-panel-raised)",
+              border: "1px solid var(--ps-line-strong)",
+              borderRadius: 14,
+              padding: "16px 16px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: "#fff",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Palette size={16} style={{ color: "var(--ps-primary)" }} /> Theme
+              Colors
             </div>
 
             {/* Primary Color */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Primary Brand Color</span>
-                <span style={{ fontSize: 11, color: "var(--ps-muted)", fontFamily: "monospace" }}>{brand.primary || "#6366F1"}</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>
+                  Primary Brand Color
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "var(--ps-muted)",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {brand.primary || "#6366F1"}
+                </span>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <input
                   type="color"
                   value={brand.primary || "#6366F1"}
                   onChange={(e) => patchBrand({ primary: e.target.value })}
-                  style={{ width: 44, height: 36, padding: 0, border: "none", borderRadius: 8, cursor: "pointer", background: "transparent" }}
+                  style={{
+                    width: 44,
+                    height: 36,
+                    padding: 0,
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    background: "transparent",
+                  }}
                 />
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
+                <div
+                  style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}
+                >
                   {PRIMARY_SWATCHES.map(([hex, label]) => (
                     <button
                       key={hex}
                       type="button"
                       title={label}
                       onClick={() => patchBrand({ primary: hex })}
-                      style={{ width: 22, height: 22, borderRadius: "50%", background: hex, border: brand.primary === hex ? "2px solid #fff" : "1px solid rgba(255,255,255,.2)", cursor: "pointer" }}
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: hex,
+                        border:
+                          brand.primary === hex
+                            ? "2px solid #fff"
+                            : "1px solid rgba(255,255,255,.2)",
+                        cursor: "pointer",
+                      }}
                     />
                   ))}
                 </div>
@@ -272,25 +471,62 @@ export function BrandModule({
 
             {/* Secondary / Accent Color */}
             <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>Secondary / Accent Gold</span>
-                <span style={{ fontSize: 11, color: "var(--ps-muted)", fontFamily: "monospace" }}>{brand.accent || "#CDA45E"}</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>
+                  Secondary / Accent Gold
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "var(--ps-muted)",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {brand.accent || "#CDA45E"}
+                </span>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <input
                   type="color"
                   value={brand.accent || "#CDA45E"}
                   onChange={(e) => patchBrand({ accent: e.target.value })}
-                  style={{ width: 44, height: 36, padding: 0, border: "none", borderRadius: 8, cursor: "pointer", background: "transparent" }}
+                  style={{
+                    width: 44,
+                    height: 36,
+                    padding: 0,
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    background: "transparent",
+                  }}
                 />
-                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}>
+                <div
+                  style={{ display: "flex", gap: 4, flexWrap: "wrap", flex: 1 }}
+                >
                   {ACCENT_SWATCHES.map(([hex, label]) => (
                     <button
                       key={hex}
                       type="button"
                       title={label}
                       onClick={() => patchBrand({ accent: hex })}
-                      style={{ width: 22, height: 22, borderRadius: "50%", background: hex, border: brand.accent === hex ? "2px solid #fff" : "1px solid rgba(255,255,255,.2)", cursor: "pointer" }}
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: hex,
+                        border:
+                          brand.accent === hex
+                            ? "2px solid #fff"
+                            : "1px solid rgba(255,255,255,.2)",
+                        cursor: "pointer",
+                      }}
                     />
                   ))}
                 </div>
@@ -299,33 +535,91 @@ export function BrandModule({
           </div>
 
           {/* Section 3: Brand Identity & Media */}
-          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <ImagePlus size={16} style={{ color: "var(--ps-primary)" }} /> Brand Identity & Logo
+          <div
+            style={{
+              background: "var(--ps-panel-raised)",
+              border: "1px solid var(--ps-line-strong)",
+              borderRadius: 14,
+              padding: "16px 16px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: "#fff",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <ImagePlus size={16} style={{ color: "var(--ps-primary)" }} />{" "}
+              Brand Identity & Logo
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Brand / Project Name</label>
+                <label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--ps-muted)",
+                    display: "block",
+                    marginBottom: 4,
+                  }}
+                >
+                  Brand / Project Name
+                </label>
                 <input
                   className="ps-input"
                   value={brand.name || ""}
                   placeholder="e.g. Prestige Green Park"
                   onChange={(e) => patchBrand({ name: e.target.value })}
-                  style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                  style={{
+                    width: "100%",
+                    fontSize: 12.5,
+                    background: "var(--ps-bg)",
+                    color: "#fff",
+                  }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Tagline / Catchphrase</label>
+                <label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--ps-muted)",
+                    display: "block",
+                    marginBottom: 4,
+                  }}
+                >
+                  Tagline / Catchphrase
+                </label>
                 <input
                   className="ps-input"
                   value={brand.tagline || ""}
                   placeholder="e.g. Ultra Luxury Living in South Bangalore"
                   onChange={(e) => patchBrand({ tagline: e.target.value })}
-                  style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                  style={{
+                    width: "100%",
+                    fontSize: 12.5,
+                    background: "var(--ps-bg)",
+                    color: "#fff",
+                  }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Brand Logo</label>
+                <label
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--ps-muted)",
+                    display: "block",
+                    marginBottom: 4,
+                  }}
+                >
+                  Brand Logo
+                </label>
                 <MediaPicker
                   kind="image"
                   label="Upload or select Brand Logo"
@@ -337,11 +631,34 @@ export function BrandModule({
           </div>
 
           {/* Section 4: Widget Design Style */}
-          <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-              <LayoutDashboard size={16} style={{ color: "var(--ps-primary)" }} /> Widget Design Style
+          <div
+            style={{
+              background: "var(--ps-panel-raised)",
+              border: "1px solid var(--ps-line-strong)",
+              borderRadius: 14,
+              padding: "16px 16px",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: "#fff",
+                marginBottom: 10,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <LayoutDashboard
+                size={16}
+                style={{ color: "var(--ps-primary)" }}
+              />{" "}
+              Widget Design Style
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+            <div
+              style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}
+            >
               {LAYOUT_THEMES.map((t) => {
                 const active = (brand.layoutTheme ?? "standard") === t.key;
                 return (
@@ -353,8 +670,12 @@ export function BrandModule({
                       textAlign: "left",
                       padding: "10px 12px",
                       borderRadius: 10,
-                      border: active ? "2px solid var(--ps-primary)" : "1px solid var(--ps-line)",
-                      background: active ? "rgba(99, 102, 241, 0.18)" : "var(--ps-bg)",
+                      border: active
+                        ? "2px solid var(--ps-primary)"
+                        : "1px solid var(--ps-line)",
+                      background: active
+                        ? "rgba(109, 93, 252, 0.18)"
+                        : "var(--ps-bg)",
                       cursor: "pointer",
                       display: "flex",
                       alignItems: "center",
@@ -363,10 +684,25 @@ export function BrandModule({
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: active ? "#818cf8" : "#fff" }}>{t.label}</div>
-                      <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>{t.tagline}</div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: active ? "#9690ff" : "#fff",
+                        }}
+                      >
+                        {t.label}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>
+                        {t.tagline}
+                      </div>
                     </div>
-                    {active ? <Check size={16} style={{ color: "#818cf8", flexShrink: 0 }} /> : null}
+                    {active ? (
+                      <Check
+                        size={16}
+                        style={{ color: "#9690ff", flexShrink: 0 }}
+                      />
+                    ) : null}
                   </button>
                 );
               })}
@@ -389,7 +725,8 @@ export function BrandModule({
           {/* Mockup Card */}
           <div
             style={{
-              width: device === "desktop" ? "100%" : device === "tablet" ? 768 : 390,
+              width:
+                device === "desktop" ? "100%" : device === "tablet" ? 768 : 390,
               maxWidth: "100%",
               background: "#fff",
               borderRadius: device === "desktop" ? 18 : 28,
@@ -411,33 +748,120 @@ export function BrandModule({
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#f87171" }} />
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fbbf24" }} />
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#34d399" }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1", marginLeft: 8 }}>
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: "#f87171",
+                  }}
+                />
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: "#fbbf24",
+                  }}
+                />
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: "#34d399",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#cbd5e1",
+                    marginLeft: 8,
+                  }}
+                >
                   Live Brand Preview & Widget System
                 </span>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "#a5b4fc", background: "rgba(99,102,241,0.2)", padding: "3px 9px", borderRadius: 999 }}>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  color: "#a5b4fc",
+                  background: "rgba(109,93,252,0.2)",
+                  padding: "3px 9px",
+                  borderRadius: 999,
+                }}
+              >
                 {brand.layoutTheme || "standard"} theme
               </span>
             </div>
 
             {/* Specimen Content Sheet */}
-            <div style={{ padding: device === "mobile" ? "30px 20px" : "48px 40px", display: "flex", flexDirection: "column", gap: 32 }}>
+            <div
+              style={{
+                padding: device === "mobile" ? "30px 20px" : "48px 40px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 32,
+              }}
+            >
               {/* Brand Header Banner */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 24, borderBottom: "1px solid #e2e8f0" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingBottom: 24,
+                  borderBottom: "1px solid #e2e8f0",
+                }}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   {brand.logo ? (
-                    <img src={brand.logo} alt={brand.name} style={{ height: 48, objectFit: "contain" }} />
+                    <img
+                      src={brand.logo}
+                      alt={brand.name}
+                      style={{ height: 48, objectFit: "contain" }}
+                    />
                   ) : (
-                    <div style={{ width: 48, height: 48, borderRadius: 12, background: `linear-gradient(135deg, ${brand.primary || "#6366F1"}, ${brand.accent || "#CDA45E"})`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900 }}>
+                    <div
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 12,
+                        background: `linear-gradient(135deg, ${brand.primary || "#6366F1"}, ${brand.accent || "#CDA45E"})`,
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 20,
+                        fontWeight: 900,
+                      }}
+                    >
                       {brand.name?.slice(0, 2).toUpperCase() || "EP"}
                     </div>
                   )}
                   <div>
-                    <h2 style={{ fontSize: 22, fontWeight: 900, color: "#0f172a", margin: 0 }}>{brand.name || "Estate Pro Luxury Residences"}</h2>
-                    <p style={{ fontSize: 12.5, color: "#64748b", margin: "3px 0 0" }}>{brand.tagline || "Super-premium residential enclave"}</p>
+                    <h2
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 900,
+                        color: "#0f172a",
+                        margin: 0,
+                      }}
+                    >
+                      {brand.name || "Estate Pro Luxury Residences"}
+                    </h2>
+                    <p
+                      style={{
+                        fontSize: 12.5,
+                        color: "#64748b",
+                        margin: "3px 0 0",
+                      }}
+                    >
+                      {brand.tagline || "Super-premium residential enclave"}
+                    </p>
                   </div>
                 </div>
 
@@ -447,7 +871,12 @@ export function BrandModule({
                     background: brand.primary || "#6366F1",
                     color: "#fff",
                     border: "none",
-                    borderRadius: brand.layoutTheme === "premium" ? 14 : brand.layoutTheme === "modern" ? 4 : 8,
+                    borderRadius:
+                      brand.layoutTheme === "premium"
+                        ? 14
+                        : brand.layoutTheme === "modern"
+                          ? 4
+                          : 8,
                     padding: "10px 20px",
                     fontSize: 13,
                     fontWeight: 700,
@@ -460,23 +889,66 @@ export function BrandModule({
               </div>
 
               {/* Sample Widgets Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr", gap: 20 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: device === "mobile" ? "1fr" : "1fr 1fr",
+                  gap: 20,
+                }}
+              >
                 {/* Feature Card 1 */}
                 <div
                   style={{
                     background: "#f8fafc",
-                    border: brand.layoutTheme === "premium" ? `1px solid ${brand.accent || "#CDA45E"}40` : "1px solid #e2e8f0",
-                    borderRadius: brand.layoutTheme === "premium" ? 18 : brand.layoutTheme === "modern" ? 6 : 12,
+                    border:
+                      brand.layoutTheme === "premium"
+                        ? `1px solid ${brand.accent || "#CDA45E"}40`
+                        : "1px solid #e2e8f0",
+                    borderRadius:
+                      brand.layoutTheme === "premium"
+                        ? 18
+                        : brand.layoutTheme === "modern"
+                          ? 6
+                          : 12,
                     padding: "24px",
-                    boxShadow: brand.layoutTheme === "premium" ? "0 8px 30px rgba(0,0,0,0.06)" : "none",
+                    boxShadow:
+                      brand.layoutTheme === "premium"
+                        ? "0 8px 30px rgba(0,0,0,0.06)"
+                        : "none",
                   }}
                 >
-                  <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8, color: brand.primary || "#6366F1" }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.8,
+                      color: brand.primary || "#6366F1",
+                    }}
+                  >
                     Primary Token
                   </span>
-                  <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: "8px 0" }}>Infinity Clubhouse</h3>
-                  <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6, margin: 0 }}>
-                    World-class recreational hub featuring temperature-controlled pools, squash courts, and sky lounges.
+                  <h3
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 800,
+                      color: "#0f172a",
+                      margin: "8px 0",
+                    }}
+                  >
+                    Infinity Clubhouse
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#64748b",
+                      lineHeight: 1.6,
+                      margin: 0,
+                    }}
+                  >
+                    World-class recreational hub featuring
+                    temperature-controlled pools, squash courts, and sky
+                    lounges.
                   </p>
                 </div>
 
@@ -484,18 +956,54 @@ export function BrandModule({
                 <div
                   style={{
                     background: "#f8fafc",
-                    border: brand.layoutTheme === "premium" ? `1px solid ${brand.accent || "#CDA45E"}40` : "1px solid #e2e8f0",
-                    borderRadius: brand.layoutTheme === "premium" ? 18 : brand.layoutTheme === "modern" ? 6 : 12,
+                    border:
+                      brand.layoutTheme === "premium"
+                        ? `1px solid ${brand.accent || "#CDA45E"}40`
+                        : "1px solid #e2e8f0",
+                    borderRadius:
+                      brand.layoutTheme === "premium"
+                        ? 18
+                        : brand.layoutTheme === "modern"
+                          ? 6
+                          : 12,
                     padding: "24px",
-                    boxShadow: brand.layoutTheme === "premium" ? "0 8px 30px rgba(0,0,0,0.06)" : "none",
+                    boxShadow:
+                      brand.layoutTheme === "premium"
+                        ? "0 8px 30px rgba(0,0,0,0.06)"
+                        : "none",
                   }}
                 >
-                  <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8, color: brand.accent || "#CDA45E" }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.8,
+                      color: brand.accent || "#CDA45E",
+                    }}
+                  >
                     Accent Highlight
                   </span>
-                  <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: "8px 0" }}>Gold Specification</h3>
-                  <p style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6, margin: 0 }}>
-                    Italian marble flooring, smart automated home access, and imported German sanitary fittings.
+                  <h3
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 800,
+                      color: "#0f172a",
+                      margin: "8px 0",
+                    }}
+                  >
+                    Gold Specification
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#64748b",
+                      lineHeight: 1.6,
+                      margin: 0,
+                    }}
+                  >
+                    Italian marble flooring, smart automated home access, and
+                    imported German sanitary fittings.
                   </p>
                 </div>
               </div>

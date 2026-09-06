@@ -25,7 +25,14 @@ import {
   Tablet,
   Trash2,
 } from "lucide-react";
-import type { Device, FooterDesignId, HeaderDesignId, LandingPageData, MenuLink, SiteConfig } from "@/lib/prestate/types";
+import type {
+  Device,
+  FooterDesignId,
+  HeaderDesignId,
+  LandingPageData,
+  MenuLink,
+  SiteConfig,
+} from "@/lib/prestate/types";
 import {
   FOOTER_DESIGNS,
   HEADER_DESIGNS,
@@ -35,7 +42,10 @@ import {
   defaultHeaderStyle,
 } from "@/lib/prestate/chrome-presets";
 import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
-import { ChromeFooter, ChromeHeader } from "@/components/prestate/builder/chrome-renderers";
+import {
+  ChromeFooter,
+  ChromeHeader,
+} from "@/components/prestate/builder/chrome-renderers";
 import { MediaPicker } from "@/components/media-picker";
 
 function slugHref(label: string): string {
@@ -62,58 +72,248 @@ const DEVICES: { key: Device; icon: typeof Monitor; label: string }[] = [
 function HeaderDiagram({ id }: { id: string }) {
   if (id === "centered") {
     return (
-      <div style={{ height: 28, background: "#0b0f19", borderRadius: 6, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "3px 8px", border: "1px solid rgba(255,255,255,.08)" }}>
-        <div style={{ width: 24, height: 6, background: "var(--ps-primary)", borderRadius: 3 }} />
+      <div
+        style={{
+          height: 28,
+          background: "#0b0f19",
+          borderRadius: 6,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 3,
+          padding: "3px 8px",
+          border: "1px solid rgba(255,255,255,.08)",
+        }}
+      >
+        <div
+          style={{
+            width: 24,
+            height: 6,
+            background: "var(--ps-primary)",
+            borderRadius: 3,
+          }}
+        />
         <div style={{ display: "flex", gap: 4 }}>
-          <div style={{ width: 14, height: 3, background: "rgba(255,255,255,.4)", borderRadius: 2 }} />
-          <div style={{ width: 14, height: 3, background: "rgba(255,255,255,.4)", borderRadius: 2 }} />
-          <div style={{ width: 14, height: 3, background: "rgba(255,255,255,.4)", borderRadius: 2 }} />
+          <div
+            style={{
+              width: 14,
+              height: 3,
+              background: "rgba(255,255,255,.4)",
+              borderRadius: 2,
+            }}
+          />
+          <div
+            style={{
+              width: 14,
+              height: 3,
+              background: "rgba(255,255,255,.4)",
+              borderRadius: 2,
+            }}
+          />
+          <div
+            style={{
+              width: 14,
+              height: 3,
+              background: "rgba(255,255,255,.4)",
+              borderRadius: 2,
+            }}
+          />
         </div>
       </div>
     );
   }
   if (id === "ribbon") {
     return (
-      <div style={{ height: 28, background: "#0b0f19", borderRadius: 6, display: "flex", flexDirection: "column", padding: "2px 6px", gap: 2, border: "1px solid rgba(255,255,255,.08)" }}>
-        <div style={{ width: "100%", height: 4, background: "var(--ps-secondary)", borderRadius: 2 }} />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 }}>
-          <div style={{ width: 18, height: 6, background: "#fff", borderRadius: 2 }} />
-          <div style={{ width: 14, height: 6, background: "var(--ps-primary)", borderRadius: 2 }} />
+      <div
+        style={{
+          height: 28,
+          background: "#0b0f19",
+          borderRadius: 6,
+          display: "flex",
+          flexDirection: "column",
+          padding: "2px 6px",
+          gap: 2,
+          border: "1px solid rgba(255,255,255,.08)",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            height: 4,
+            background: "var(--ps-secondary)",
+            borderRadius: 2,
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flex: 1,
+          }}
+        >
+          <div
+            style={{
+              width: 18,
+              height: 6,
+              background: "#fff",
+              borderRadius: 2,
+            }}
+          />
+          <div
+            style={{
+              width: 14,
+              height: 6,
+              background: "var(--ps-primary)",
+              borderRadius: 2,
+            }}
+          />
         </div>
       </div>
     );
   }
   if (id === "minimal") {
     return (
-      <div style={{ height: 28, background: "#0b0f19", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px", border: "1px solid rgba(255,255,255,.08)" }}>
-        <div style={{ width: 20, height: 6, background: "#fff", borderRadius: 2 }} />
-        <div style={{ width: 12, height: 8, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-          <div style={{ height: 1.5, background: "rgba(255,255,255,.8)", borderRadius: 1 }} />
-          <div style={{ height: 1.5, background: "rgba(255,255,255,.8)", borderRadius: 1 }} />
-          <div style={{ height: 1.5, background: "rgba(255,255,255,.8)", borderRadius: 1 }} />
+      <div
+        style={{
+          height: 28,
+          background: "#0b0f19",
+          borderRadius: 6,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 8px",
+          border: "1px solid rgba(255,255,255,.08)",
+        }}
+      >
+        <div
+          style={{ width: 20, height: 6, background: "#fff", borderRadius: 2 }}
+        />
+        <div
+          style={{
+            width: 12,
+            height: 8,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+          }}
+        >
+          <div
+            style={{
+              height: 1.5,
+              background: "rgba(255,255,255,.8)",
+              borderRadius: 1,
+            }}
+          />
+          <div
+            style={{
+              height: 1.5,
+              background: "rgba(255,255,255,.8)",
+              borderRadius: 1,
+            }}
+          />
+          <div
+            style={{
+              height: 1.5,
+              background: "rgba(255,255,255,.8)",
+              borderRadius: 1,
+            }}
+          />
         </div>
       </div>
     );
   }
   if (id === "overlay") {
     return (
-      <div style={{ height: 28, background: "#0b0f19", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 6px", border: "1px solid rgba(255,255,255,.08)" }}>
-        <div style={{ width: "88%", height: 16, background: "rgba(255,255,255,.12)", borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 6px", border: "1px solid rgba(255,255,255,.2)" }}>
-          <div style={{ width: 12, height: 5, background: "var(--ps-primary)", borderRadius: 2 }} />
-          <div style={{ width: 10, height: 5, background: "var(--ps-secondary)", borderRadius: 999 }} />
+      <div
+        style={{
+          height: 28,
+          background: "#0b0f19",
+          borderRadius: 6,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 6px",
+          border: "1px solid rgba(255,255,255,.08)",
+        }}
+      >
+        <div
+          style={{
+            width: "88%",
+            height: 16,
+            background: "rgba(255,255,255,.12)",
+            borderRadius: 999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 6px",
+            border: "1px solid rgba(255,255,255,.2)",
+          }}
+        >
+          <div
+            style={{
+              width: 12,
+              height: 5,
+              background: "var(--ps-primary)",
+              borderRadius: 2,
+            }}
+          />
+          <div
+            style={{
+              width: 10,
+              height: 5,
+              background: "var(--ps-secondary)",
+              borderRadius: 999,
+            }}
+          />
         </div>
       </div>
     );
   }
   // Default: classic
   return (
-    <div style={{ height: 28, background: "#0b0f19", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px", border: "1px solid rgba(255,255,255,.08)" }}>
-      <div style={{ width: 22, height: 6, background: "#fff", borderRadius: 2 }} />
+    <div
+      style={{
+        height: 28,
+        background: "#0b0f19",
+        borderRadius: 6,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 8px",
+        border: "1px solid rgba(255,255,255,.08)",
+      }}
+    >
+      <div
+        style={{ width: 22, height: 6, background: "#fff", borderRadius: 2 }}
+      />
       <div style={{ display: "flex", gap: 3 }}>
-        <div style={{ width: 8, height: 3, background: "rgba(255,255,255,.4)", borderRadius: 1 }} />
-        <div style={{ width: 8, height: 3, background: "rgba(255,255,255,.4)", borderRadius: 1 }} />
+        <div
+          style={{
+            width: 8,
+            height: 3,
+            background: "rgba(255,255,255,.4)",
+            borderRadius: 1,
+          }}
+        />
+        <div
+          style={{
+            width: 8,
+            height: 3,
+            background: "rgba(255,255,255,.4)",
+            borderRadius: 1,
+          }}
+        />
       </div>
-      <div style={{ width: 14, height: 7, background: "var(--ps-primary)", borderRadius: 3 }} />
+      <div
+        style={{
+          width: 14,
+          height: 7,
+          background: "var(--ps-primary)",
+          borderRadius: 3,
+        }}
+      />
     </div>
   );
 }
@@ -122,65 +322,291 @@ function HeaderDiagram({ id }: { id: string }) {
 function FooterDiagram({ id }: { id: string }) {
   if (id === "centered") {
     return (
-      <div style={{ height: 34, background: "#0b0f19", borderRadius: 6, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, padding: "4px", border: "1px solid rgba(255,255,255,.08)" }}>
-        <div style={{ width: 16, height: 6, background: "var(--ps-primary)", borderRadius: 3 }} />
+      <div
+        style={{
+          height: 34,
+          background: "#0b0f19",
+          borderRadius: 6,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 3,
+          padding: "4px",
+          border: "1px solid rgba(255,255,255,.08)",
+        }}
+      >
+        <div
+          style={{
+            width: 16,
+            height: 6,
+            background: "var(--ps-primary)",
+            borderRadius: 3,
+          }}
+        />
         <div style={{ display: "flex", gap: 3 }}>
-          <div style={{ width: 10, height: 2.5, background: "rgba(255,255,255,.4)", borderRadius: 1 }} />
-          <div style={{ width: 10, height: 2.5, background: "rgba(255,255,255,.4)", borderRadius: 1 }} />
-          <div style={{ width: 10, height: 2.5, background: "rgba(255,255,255,.4)", borderRadius: 1 }} />
+          <div
+            style={{
+              width: 10,
+              height: 2.5,
+              background: "rgba(255,255,255,.4)",
+              borderRadius: 1,
+            }}
+          />
+          <div
+            style={{
+              width: 10,
+              height: 2.5,
+              background: "rgba(255,255,255,.4)",
+              borderRadius: 1,
+            }}
+          />
+          <div
+            style={{
+              width: 10,
+              height: 2.5,
+              background: "rgba(255,255,255,.4)",
+              borderRadius: 1,
+            }}
+          />
         </div>
-        <div style={{ width: 28, height: 2, background: "rgba(255,255,255,.2)", borderRadius: 1 }} />
+        <div
+          style={{
+            width: 28,
+            height: 2,
+            background: "rgba(255,255,255,.2)",
+            borderRadius: 1,
+          }}
+        />
       </div>
     );
   }
   if (id === "newsletter") {
     return (
-      <div style={{ height: 34, background: "#0b0f19", borderRadius: 6, display: "flex", flexDirection: "column", padding: "3px 5px", gap: 3, border: "1px solid rgba(255,255,255,.08)" }}>
-        <div style={{ width: "100%", height: 10, background: "rgba(99,102,241,0.25)", borderRadius: 3, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px" }}>
-          <div style={{ width: 18, height: 3, background: "#fff", borderRadius: 1 }} />
-          <div style={{ width: 10, height: 5, background: "var(--ps-primary)", borderRadius: 2 }} />
+      <div
+        style={{
+          height: 34,
+          background: "#0b0f19",
+          borderRadius: 6,
+          display: "flex",
+          flexDirection: "column",
+          padding: "3px 5px",
+          gap: 3,
+          border: "1px solid rgba(255,255,255,.08)",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            height: 10,
+            background: "rgba(109,93,252,0.25)",
+            borderRadius: 3,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 4px",
+          }}
+        >
+          <div
+            style={{
+              width: 18,
+              height: 3,
+              background: "#fff",
+              borderRadius: 1,
+            }}
+          />
+          <div
+            style={{
+              width: 10,
+              height: 5,
+              background: "var(--ps-primary)",
+              borderRadius: 2,
+            }}
+          />
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 3 }}>
-          <div style={{ flex: 1, height: 10, background: "rgba(255,255,255,.08)", borderRadius: 2 }} />
-          <div style={{ flex: 1, height: 10, background: "rgba(255,255,255,.08)", borderRadius: 2 }} />
-          <div style={{ flex: 1, height: 10, background: "rgba(255,255,255,.08)", borderRadius: 2 }} />
+        <div
+          style={{ display: "flex", justifyContent: "space-between", gap: 3 }}
+        >
+          <div
+            style={{
+              flex: 1,
+              height: 10,
+              background: "rgba(255,255,255,.08)",
+              borderRadius: 2,
+            }}
+          />
+          <div
+            style={{
+              flex: 1,
+              height: 10,
+              background: "rgba(255,255,255,.08)",
+              borderRadius: 2,
+            }}
+          />
+          <div
+            style={{
+              flex: 1,
+              height: 10,
+              background: "rgba(255,255,255,.08)",
+              borderRadius: 2,
+            }}
+          />
         </div>
       </div>
     );
   }
   if (id === "slimbar") {
     return (
-      <div style={{ height: 34, background: "#0b0f19", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px", border: "1px solid rgba(255,255,255,.08)" }}>
-        <div style={{ width: 18, height: 6, background: "#fff", borderRadius: 2 }} />
+      <div
+        style={{
+          height: 34,
+          background: "#0b0f19",
+          borderRadius: 6,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 8px",
+          border: "1px solid rgba(255,255,255,.08)",
+        }}
+      >
+        <div
+          style={{ width: 18, height: 6, background: "#fff", borderRadius: 2 }}
+        />
         <div style={{ display: "flex", gap: 3 }}>
-          <div style={{ width: 8, height: 2.5, background: "rgba(255,255,255,.4)", borderRadius: 1 }} />
-          <div style={{ width: 8, height: 2.5, background: "rgba(255,255,255,.4)", borderRadius: 1 }} />
+          <div
+            style={{
+              width: 8,
+              height: 2.5,
+              background: "rgba(255,255,255,.4)",
+              borderRadius: 1,
+            }}
+          />
+          <div
+            style={{
+              width: 8,
+              height: 2.5,
+              background: "rgba(255,255,255,.4)",
+              borderRadius: 1,
+            }}
+          />
         </div>
-        <div style={{ width: 14, height: 2.5, background: "rgba(255,255,255,.3)", borderRadius: 1 }} />
+        <div
+          style={{
+            width: 14,
+            height: 2.5,
+            background: "rgba(255,255,255,.3)",
+            borderRadius: 1,
+          }}
+        />
       </div>
     );
   }
   if (id === "cards") {
     return (
-      <div style={{ height: 34, background: "#0b0f19", borderRadius: 6, display: "flex", flexDirection: "column", padding: "3px", gap: 3, border: "1px solid rgba(255,255,255,.08)" }}>
+      <div
+        style={{
+          height: 34,
+          background: "#0b0f19",
+          borderRadius: 6,
+          display: "flex",
+          flexDirection: "column",
+          padding: "3px",
+          gap: 3,
+          border: "1px solid rgba(255,255,255,.08)",
+        }}
+      >
         <div style={{ display: "flex", gap: 3 }}>
-          <div style={{ flex: 1, height: 12, background: "rgba(99,102,241,0.2)", borderRadius: 3, border: "1px solid rgba(99,102,241,0.4)" }} />
-          <div style={{ flex: 1, height: 12, background: "rgba(205,164,94,0.2)", borderRadius: 3, border: "1px solid rgba(205,164,94,0.4)" }} />
+          <div
+            style={{
+              flex: 1,
+              height: 12,
+              background: "rgba(109,93,252,0.2)",
+              borderRadius: 3,
+              border: "1px solid rgba(109,93,252,0.4)",
+            }}
+          />
+          <div
+            style={{
+              flex: 1,
+              height: 12,
+              background: "rgba(205,164,94,0.2)",
+              borderRadius: 3,
+              border: "1px solid rgba(205,164,94,0.4)",
+            }}
+          />
         </div>
-        <div style={{ height: 8, background: "rgba(255,255,255,.06)", borderRadius: 2 }} />
+        <div
+          style={{
+            height: 8,
+            background: "rgba(255,255,255,.06)",
+            borderRadius: 2,
+          }}
+        />
       </div>
     );
   }
   // Default: columns
   return (
-    <div style={{ height: 34, background: "#0b0f19", borderRadius: 6, display: "flex", flexDirection: "column", padding: "4px", gap: 3, border: "1px solid rgba(255,255,255,.08)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 3, flex: 1 }}>
-        <div style={{ flex: 1.2, height: "100%", background: "rgba(255,255,255,.15)", borderRadius: 2 }} />
-        <div style={{ flex: 0.9, height: "100%", background: "rgba(255,255,255,.08)", borderRadius: 2 }} />
-        <div style={{ flex: 0.9, height: "100%", background: "rgba(255,255,255,.08)", borderRadius: 2 }} />
-        <div style={{ flex: 0.9, height: "100%", background: "rgba(255,255,255,.08)", borderRadius: 2 }} />
+    <div
+      style={{
+        height: 34,
+        background: "#0b0f19",
+        borderRadius: 6,
+        display: "flex",
+        flexDirection: "column",
+        padding: "4px",
+        gap: 3,
+        border: "1px solid rgba(255,255,255,.08)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 3,
+          flex: 1,
+        }}
+      >
+        <div
+          style={{
+            flex: 1.2,
+            height: "100%",
+            background: "rgba(255,255,255,.15)",
+            borderRadius: 2,
+          }}
+        />
+        <div
+          style={{
+            flex: 0.9,
+            height: "100%",
+            background: "rgba(255,255,255,.08)",
+            borderRadius: 2,
+          }}
+        />
+        <div
+          style={{
+            flex: 0.9,
+            height: "100%",
+            background: "rgba(255,255,255,.08)",
+            borderRadius: 2,
+          }}
+        />
+        <div
+          style={{
+            flex: 0.9,
+            height: "100%",
+            background: "rgba(255,255,255,.08)",
+            borderRadius: 2,
+          }}
+        />
       </div>
-      <div style={{ height: 2, background: "rgba(255,255,255,.15)", borderRadius: 1 }} />
+      <div
+        style={{
+          height: 2,
+          background: "rgba(255,255,255,.15)",
+          borderRadius: 1,
+        }}
+      />
     </div>
   );
 }
@@ -218,7 +644,8 @@ export function HeaderFooterModule({
       ? header.menuLinks
       : (header.menu ?? []).map((label) => ({ label, href: slugHref(label) }));
 
-  const setLinks = (next: MenuLink[]) => patchHeader({ menuLinks: next, menu: next.map((l) => l.label) });
+  const setLinks = (next: MenuLink[]) =>
+    patchHeader({ menuLinks: next, menu: next.map((l) => l.label) });
 
   const setHeaderDesign = (id: string) =>
     onPatch((c) => ({
@@ -243,11 +670,24 @@ export function HeaderFooterModule({
     }));
 
   const footerSettings = footer.settings ?? {};
-  const footerLinkList: MenuLink[] = Array.isArray(footerSettings.links) ? (footerSettings.links as MenuLink[]) : [];
-  const copyrightValue = typeof footerSettings.copyrightText === "string" && footerSettings.copyrightText ? footerSettings.copyrightText : footer.copyright;
-  const reraValue = typeof footerSettings.reraText === "string" && footerSettings.reraText ? footerSettings.reraText : footer.rera;
+  const footerLinkList: MenuLink[] = Array.isArray(footerSettings.links)
+    ? (footerSettings.links as MenuLink[])
+    : [];
+  const copyrightValue =
+    typeof footerSettings.copyrightText === "string" &&
+    footerSettings.copyrightText
+      ? footerSettings.copyrightText
+      : footer.copyright;
+  const reraValue =
+    typeof footerSettings.reraText === "string" && footerSettings.reraText
+      ? footerSettings.reraText
+      : footer.rera;
 
-  const patchFooterText = (settingsKey: "copyrightText" | "reraText", rootKey: "copyright" | "rera", v: string) =>
+  const patchFooterText = (
+    settingsKey: "copyrightText" | "reraText",
+    rootKey: "copyright" | "rera",
+    v: string,
+  ) =>
     onPatch((c) => ({
       ...c,
       footer: {
@@ -264,7 +704,17 @@ export function HeaderFooterModule({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--ps-bg)", color: "var(--ps-ink)", overflow: "hidden", ...siteThemeStyle(brand) }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        background: "var(--ps-bg)",
+        color: "var(--ps-ink)",
+        overflow: "hidden",
+        ...siteThemeStyle(brand),
+      }}
+    >
       {/* Top Action Ribbon */}
       <div
         style={{
@@ -280,7 +730,15 @@ export function HeaderFooterModule({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {/* Segmented header vs footer selector */}
-          <div style={{ display: "inline-flex", background: "rgba(0, 0, 0, 0.35)", borderRadius: 10, padding: 3, border: "1px solid var(--ps-line-strong)" }}>
+          <div
+            style={{
+              display: "inline-flex",
+              background: "rgba(0, 0, 0, 0.35)",
+              borderRadius: 10,
+              padding: 3,
+              border: "1px solid var(--ps-line-strong)",
+            }}
+          >
             <button
               type="button"
               onClick={() => setActiveTab("header")}
@@ -291,7 +749,8 @@ export function HeaderFooterModule({
                 padding: "7px 16px",
                 borderRadius: 8,
                 border: "none",
-                background: activeTab === "header" ? "var(--ps-primary)" : "transparent",
+                background:
+                  activeTab === "header" ? "var(--ps-primary)" : "transparent",
                 color: activeTab === "header" ? "#fff" : "var(--ps-slate)",
                 fontSize: 12.5,
                 fontWeight: 700,
@@ -311,7 +770,8 @@ export function HeaderFooterModule({
                 padding: "7px 16px",
                 borderRadius: 8,
                 border: "none",
-                background: activeTab === "footer" ? "var(--ps-primary)" : "transparent",
+                background:
+                  activeTab === "footer" ? "var(--ps-primary)" : "transparent",
                 color: activeTab === "footer" ? "#fff" : "var(--ps-slate)",
                 fontSize: 12.5,
                 fontWeight: 700,
@@ -326,7 +786,17 @@ export function HeaderFooterModule({
 
         {/* Center: Device Switcher & View Mode Toggle */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 2, background: "rgba(0, 0, 0, 0.35)", borderRadius: 10, padding: 3, border: "1px solid var(--ps-line-strong)" }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 2,
+              background: "rgba(0, 0, 0, 0.35)",
+              borderRadius: 10,
+              padding: 3,
+              border: "1px solid var(--ps-line-strong)",
+            }}
+          >
             {DEVICES.map((dev) => (
               <button
                 key={dev.key}
@@ -340,9 +810,13 @@ export function HeaderFooterModule({
                   padding: "6px 12px",
                   borderRadius: 7,
                   border: "none",
-                  background: device === dev.key ? "var(--ps-panel-raised)" : "transparent",
+                  background:
+                    device === dev.key
+                      ? "var(--ps-panel-raised)"
+                      : "transparent",
                   color: device === dev.key ? "#fff" : "var(--ps-muted)",
-                  boxShadow: device === dev.key ? "0 1px 3px rgba(0,0,0,.4)" : "none",
+                  boxShadow:
+                    device === dev.key ? "0 1px 3px rgba(0,0,0,.4)" : "none",
                   fontSize: 12,
                   fontWeight: 700,
                   cursor: "pointer",
@@ -354,7 +828,17 @@ export function HeaderFooterModule({
             ))}
           </div>
 
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 2, background: "rgba(0, 0, 0, 0.35)", borderRadius: 10, padding: 3, border: "1px solid var(--ps-line-strong)" }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 2,
+              background: "rgba(0, 0, 0, 0.35)",
+              borderRadius: 10,
+              padding: 3,
+              border: "1px solid var(--ps-line-strong)",
+            }}
+          >
             <button
               type="button"
               onClick={() => setViewMode("focused")}
@@ -365,7 +849,10 @@ export function HeaderFooterModule({
                 padding: "6px 10px",
                 borderRadius: 7,
                 border: "none",
-                background: viewMode === "focused" ? "var(--ps-panel-raised)" : "transparent",
+                background:
+                  viewMode === "focused"
+                    ? "var(--ps-panel-raised)"
+                    : "transparent",
                 color: viewMode === "focused" ? "#fff" : "var(--ps-muted)",
                 fontSize: 11.5,
                 fontWeight: 700,
@@ -384,7 +871,10 @@ export function HeaderFooterModule({
                 padding: "6px 10px",
                 borderRadius: 7,
                 border: "none",
-                background: viewMode === "full" ? "var(--ps-panel-raised)" : "transparent",
+                background:
+                  viewMode === "full"
+                    ? "var(--ps-panel-raised)"
+                    : "transparent",
                 color: viewMode === "full" ? "#fff" : "var(--ps-muted)",
                 fontSize: 11.5,
                 fontWeight: 700,
@@ -407,12 +897,14 @@ export function HeaderFooterModule({
             padding: "8px 18px",
             borderRadius: 9,
             border: "none",
-            background: savedSuccess ? "var(--ps-success)" : "var(--ps-primary)",
+            background: savedSuccess
+              ? "var(--ps-success)"
+              : "var(--ps-primary)",
             color: "#fff",
             fontSize: 12.5,
             fontWeight: 700,
             cursor: "pointer",
-            boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
+            boxShadow: "0 4px 14px rgba(109,93,252,0.35)",
             transition: "background 0.2s",
           }}
         >
@@ -440,14 +932,49 @@ export function HeaderFooterModule({
           {activeTab === "header" ? (
             <>
               {/* Section 1: Header Layout Presets */}
-              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                  <PanelsTopLeft size={16} style={{ color: "var(--ps-primary)" }} /> Header Layout Design
+              <div
+                style={{
+                  background: "var(--ps-panel-raised)",
+                  border: "1px solid var(--ps-line-strong)",
+                  borderRadius: 14,
+                  padding: "16px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "#fff",
+                    marginBottom: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <PanelsTopLeft
+                    size={16}
+                    style={{ color: "var(--ps-primary)" }}
+                  />{" "}
+                  Header Layout Design
                 </div>
-                <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: "0 0 12px", lineHeight: 1.45 }}>
-                  Select the structural arrangement for brand logo, menu links, and call-to-actions.
+                <p
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--ps-muted)",
+                    margin: "0 0 12px",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Select the structural arrangement for brand logo, menu links,
+                  and call-to-actions.
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr",
+                    gap: 8,
+                  }}
+                >
                   {HEADER_DESIGNS.map((d) => {
                     const active = (header.design ?? "classic") === d.id;
                     return (
@@ -459,8 +986,12 @@ export function HeaderFooterModule({
                           textAlign: "left",
                           padding: "10px 12px",
                           borderRadius: 10,
-                          border: active ? "2px solid var(--ps-primary)" : "1px solid var(--ps-line)",
-                          background: active ? "rgba(99, 102, 241, 0.18)" : "var(--ps-bg)",
+                          border: active
+                            ? "2px solid var(--ps-primary)"
+                            : "1px solid var(--ps-line)",
+                          background: active
+                            ? "rgba(109, 93, 252, 0.18)"
+                            : "var(--ps-bg)",
                           cursor: "pointer",
                           display: "flex",
                           alignItems: "center",
@@ -472,10 +1003,34 @@ export function HeaderFooterModule({
                           <HeaderDiagram id={d.id} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 800, color: active ? "#818cf8" : "#fff" }}>{d.name}</div>
-                          <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.desc}</div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 800,
+                              color: active ? "#9690ff" : "#fff",
+                            }}
+                          >
+                            {d.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "var(--ps-muted)",
+                              marginTop: 2,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {d.desc}
+                          </div>
                         </div>
-                        {active ? <Check size={16} style={{ color: "#818cf8", flexShrink: 0 }} /> : null}
+                        {active ? (
+                          <Check
+                            size={16}
+                            style={{ color: "#9690ff", flexShrink: 0 }}
+                          />
+                        ) : null}
                       </button>
                     );
                   })}
@@ -483,50 +1038,157 @@ export function HeaderFooterModule({
               </div>
 
               {/* Section 2: Logo & Brand */}
-              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                  <ImagePlus size={16} style={{ color: "var(--ps-primary)" }} /> Header Brand & Logo
+              <div
+                style={{
+                  background: "var(--ps-panel-raised)",
+                  border: "1px solid var(--ps-line-strong)",
+                  borderRadius: 14,
+                  padding: "16px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "#fff",
+                    marginBottom: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <ImagePlus size={16} style={{ color: "var(--ps-primary)" }} />{" "}
+                  Header Brand & Logo
                 </div>
                 <MediaPicker
                   kind="image"
                   label="Upload or paste Logo URL"
-                  value={String((header.settings as Record<string, unknown>)?.logoUrl ?? "")}
+                  value={String(
+                    (header.settings as Record<string, unknown>)?.logoUrl ?? "",
+                  )}
                   onChange={(v) => patchHeaderSettings({ logoUrl: v })}
                 />
-                <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 8, lineHeight: 1.45 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "var(--ps-muted)",
+                    marginTop: 8,
+                    lineHeight: 1.45,
+                  }}
+                >
                   Falls back to Brand Center logo if left blank.
                 </div>
               </div>
 
               {/* Section 3: Navigation Menu Links */}
-              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
-                    <Link2 size={16} style={{ color: "var(--ps-primary)" }} /> Navigation Menu Links
+              <div
+                style={{
+                  background: "var(--ps-panel-raised)",
+                  border: "1px solid var(--ps-line-strong)",
+                  borderRadius: 14,
+                  padding: "16px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Link2 size={16} style={{ color: "var(--ps-primary)" }} />{" "}
+                    Navigation Menu Links
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)" }}>{links.length} links</span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "var(--ps-muted)",
+                    }}
+                  >
+                    {links.length} links
+                  </span>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
                   {links.map((l, i) => (
-                    <div key={`${i}-${l.label}`} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--ps-bg)", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--ps-line)" }}>
+                    <div
+                      key={`${i}-${l.label}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        background: "var(--ps-bg)",
+                        padding: "8px 10px",
+                        borderRadius: 8,
+                        border: "1px solid var(--ps-line)",
+                      }}
+                    >
                       <input
                         className="ps-input"
                         value={l.label}
                         placeholder="Link Name"
-                        onChange={(e) => setLinks(links.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
-                        style={{ flex: 1.2, minWidth: 0, fontSize: 12, padding: "6px 8px", background: "transparent", color: "#fff" }}
+                        onChange={(e) =>
+                          setLinks(
+                            links.map((x, j) =>
+                              j === i ? { ...x, label: e.target.value } : x,
+                            ),
+                          )
+                        }
+                        style={{
+                          flex: 1.2,
+                          minWidth: 0,
+                          fontSize: 12,
+                          padding: "6px 8px",
+                          background: "transparent",
+                          color: "#fff",
+                        }}
                       />
                       <input
                         className="ps-input"
                         value={l.href}
                         placeholder="#section"
-                        onChange={(e) => setLinks(links.map((x, j) => (j === i ? { ...x, href: e.target.value } : x)))}
-                        style={{ flex: 1, minWidth: 0, fontFamily: "monospace", fontSize: 11, padding: "6px 8px", background: "transparent", color: "var(--ps-slate)" }}
+                        onChange={(e) =>
+                          setLinks(
+                            links.map((x, j) =>
+                              j === i ? { ...x, href: e.target.value } : x,
+                            ),
+                          )
+                        }
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          fontFamily: "monospace",
+                          fontSize: 11,
+                          padding: "6px 8px",
+                          background: "transparent",
+                          color: "var(--ps-slate)",
+                        }}
                       />
                       <button
                         type="button"
-                        onClick={() => setLinks(links.filter((_, idx) => idx !== i))}
-                        style={{ background: "none", border: "none", color: "var(--ps-muted)", cursor: "pointer", padding: 4 }}
+                        onClick={() =>
+                          setLinks(links.filter((_, idx) => idx !== i))
+                        }
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--ps-muted)",
+                          cursor: "pointer",
+                          padding: 4,
+                        }}
                         title="Remove link"
                       >
                         <Trash2 size={14} />
@@ -535,17 +1197,26 @@ export function HeaderFooterModule({
                   ))}
                 </div>
 
-                <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 6,
+                    marginTop: 10,
+                    flexWrap: "wrap",
+                  }}
+                >
                   <button
                     type="button"
-                    onClick={() => setLinks([...links, { label: "New link", href: "#" }])}
+                    onClick={() =>
+                      setLinks([...links, { label: "New link", href: "#" }])
+                    }
                     style={{
                       flex: 1,
                       padding: "8px 12px",
                       borderRadius: 8,
                       border: "1px dashed var(--ps-primary)",
-                      background: "rgba(99, 102, 241, 0.12)",
-                      color: "#818cf8",
+                      background: "rgba(109, 93, 252, 0.12)",
+                      color: "#9690ff",
                       fontSize: 12,
                       fontWeight: 700,
                       cursor: "pointer",
@@ -560,8 +1231,23 @@ export function HeaderFooterModule({
                 </div>
 
                 {/* Quick Section Targets */}
-                <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--ps-line)" }}>
-                  <div style={{ fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ps-muted)", marginBottom: 6 }}>
+                <div
+                  style={{
+                    marginTop: 12,
+                    paddingTop: 10,
+                    borderTop: "1px solid var(--ps-line)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                      color: "var(--ps-muted)",
+                      marginBottom: 6,
+                    }}
+                  >
                     Quick Section Presets:
                   </div>
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -593,73 +1279,200 @@ export function HeaderFooterModule({
               </div>
 
               {/* Section 4: Header Actions & CTA Button */}
-              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <Phone size={16} style={{ color: "var(--ps-primary)" }} /> Header Action Button (CTA)
+              <div
+                style={{
+                  background: "var(--ps-panel-raised)",
+                  border: "1px solid var(--ps-line-strong)",
+                  borderRadius: 14,
+                  padding: "16px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "#fff",
+                    marginBottom: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <Phone size={16} style={{ color: "var(--ps-primary)" }} />{" "}
+                  Header Action Button (CTA)
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                >
                   <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Button Label</label>
+                    <label
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "var(--ps-muted)",
+                        display: "block",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Button Label
+                    </label>
                     <input
                       className="ps-input"
                       value={header.cta || ""}
                       placeholder="e.g. Enquire Now / Book Visit"
                       onChange={(e) => patchHeader({ cta: e.target.value })}
-                      style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                      style={{
+                        width: "100%",
+                        fontSize: 12.5,
+                        background: "var(--ps-bg)",
+                        color: "#fff",
+                      }}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Button Target Link</label>
+                    <label
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "var(--ps-muted)",
+                        display: "block",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Button Target Link
+                    </label>
                     <input
                       className="ps-input"
                       value={header.ctaLink || ""}
                       placeholder="e.g. #contact / tel:+919876543210"
                       onChange={(e) => patchHeader({ ctaLink: e.target.value })}
-                      style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                      style={{
+                        width: "100%",
+                        fontSize: 12.5,
+                        background: "var(--ps-bg)",
+                        color: "#fff",
+                      }}
                     />
                   </div>
                 </div>
               </div>
 
               {/* Section 5: Behavior & Display Options */}
-              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <SlidersHorizontal size={16} style={{ color: "var(--ps-primary)" }} /> Behavior & Appearance
+              <div
+                style={{
+                  background: "var(--ps-panel-raised)",
+                  border: "1px solid var(--ps-line-strong)",
+                  borderRadius: 14,
+                  padding: "16px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "#fff",
+                    marginBottom: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <SlidersHorizontal
+                    size={16}
+                    style={{ color: "var(--ps-primary)" }}
+                  />{" "}
+                  Behavior & Appearance
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
                     <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Sticky Header</div>
-                      <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>Pins navigation to the top when scrolling</div>
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          color: "#fff",
+                        }}
+                      >
+                        Sticky Header
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>
+                        Pins navigation to the top when scrolling
+                      </div>
                     </div>
                     <input
                       type="checkbox"
                       checked={header.sticky ?? true}
-                      onChange={(e) => patchHeader({ sticky: e.target.checked })}
+                      onChange={(e) =>
+                        patchHeader({ sticky: e.target.checked })
+                      }
                       style={{ width: 18, height: 18, cursor: "pointer" }}
                     />
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
                     <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Transparent Over Hero</div>
-                      <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>Blends background seamlessly over top hero banner</div>
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          color: "#fff",
+                        }}
+                      >
+                        Transparent Over Hero
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>
+                        Blends background seamlessly over top hero banner
+                      </div>
                     </div>
                     <input
                       type="checkbox"
                       checked={header.transparent ?? false}
-                      onChange={(e) => patchHeader({ transparent: e.target.checked })}
+                      onChange={(e) =>
+                        patchHeader({ transparent: e.target.checked })
+                      }
                       style={{ width: 18, height: 18, cursor: "pointer" }}
                     />
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
                     <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Top Announcement Strip</div>
-                      <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>Displays phone number and quick offer strip above header</div>
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          color: "#fff",
+                        }}
+                      >
+                        Top Announcement Strip
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>
+                        Displays phone number and quick offer strip above header
+                      </div>
                     </div>
                     <input
                       type="checkbox"
                       checked={header.showTopbar ?? true}
-                      onChange={(e) => patchHeader({ showTopbar: e.target.checked })}
+                      onChange={(e) =>
+                        patchHeader({ showTopbar: e.target.checked })
+                      }
                       style={{ width: 18, height: 18, cursor: "pointer" }}
                     />
                   </div>
@@ -667,19 +1480,55 @@ export function HeaderFooterModule({
               </div>
 
               {/* Section 6: Floating Quick-Contact Dock */}
-              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <MessageCircle size={16} style={{ color: "var(--ps-primary)" }} /> Floating Quick-Contact Dock
+              <div
+                style={{
+                  background: "var(--ps-panel-raised)",
+                  border: "1px solid var(--ps-line-strong)",
+                  borderRadius: 14,
+                  padding: "16px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "#fff",
+                    marginBottom: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <MessageCircle
+                    size={16}
+                    style={{ color: "var(--ps-primary)" }}
+                  />{" "}
+                  Floating Quick-Contact Dock
                 </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 12,
+                  }}
+                >
                   <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Enable Floating Dock</div>
-                    <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>Pins WhatsApp & Call icons on screen corner</div>
+                    <div
+                      style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}
+                    >
+                      Enable Floating Dock
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--ps-muted)" }}>
+                      Pins WhatsApp & Call icons on screen corner
+                    </div>
                   </div>
                   <input
                     type="checkbox"
                     checked={header.floatEnabled ?? true}
-                    onChange={(e) => patchHeader({ floatEnabled: e.target.checked })}
+                    onChange={(e) =>
+                      patchHeader({ floatEnabled: e.target.checked })
+                    }
                     style={{ width: 18, height: 18, cursor: "pointer" }}
                   />
                 </div>
@@ -691,8 +1540,24 @@ export function HeaderFooterModule({
                     ["floatEmail", "Direct Email Link"],
                   ] as const
                 ).map(([key, label]) => (
-                  <div key={key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ps-slate)" }}>{label}</span>
+                  <div
+                    key={key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "6px 0",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "var(--ps-slate)",
+                      }}
+                    >
+                      {label}
+                    </span>
                     <input
                       type="checkbox"
                       checked={header[key] ?? true}
@@ -706,14 +1571,49 @@ export function HeaderFooterModule({
           ) : (
             <>
               {/* Section 1: Footer Layout Presets with Visual Diagram Previews */}
-              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                  <PanelBottom size={16} style={{ color: "var(--ps-primary)" }} /> Footer Layout Design
+              <div
+                style={{
+                  background: "var(--ps-panel-raised)",
+                  border: "1px solid var(--ps-line-strong)",
+                  borderRadius: 14,
+                  padding: "16px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "#fff",
+                    marginBottom: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <PanelBottom
+                    size={16}
+                    style={{ color: "var(--ps-primary)" }}
+                  />{" "}
+                  Footer Layout Design
                 </div>
-                <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: "0 0 12px", lineHeight: 1.45 }}>
-                  Choose the structural arrangement for columns, legal disclaimers, and social links.
+                <p
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--ps-muted)",
+                    margin: "0 0 12px",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Choose the structural arrangement for columns, legal
+                  disclaimers, and social links.
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr",
+                    gap: 8,
+                  }}
+                >
                   {FOOTER_DESIGNS.map((d) => {
                     const active = (footer.design ?? "columns") === d.id;
                     return (
@@ -725,8 +1625,12 @@ export function HeaderFooterModule({
                           textAlign: "left",
                           padding: "10px 12px",
                           borderRadius: 10,
-                          border: active ? "2px solid var(--ps-primary)" : "1px solid var(--ps-line)",
-                          background: active ? "rgba(99, 102, 241, 0.18)" : "var(--ps-bg)",
+                          border: active
+                            ? "2px solid var(--ps-primary)"
+                            : "1px solid var(--ps-line)",
+                          background: active
+                            ? "rgba(109, 93, 252, 0.18)"
+                            : "var(--ps-bg)",
                           cursor: "pointer",
                           display: "flex",
                           alignItems: "center",
@@ -738,10 +1642,34 @@ export function HeaderFooterModule({
                           <FooterDiagram id={d.id} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 800, color: active ? "#818cf8" : "#fff" }}>{d.name}</div>
-                          <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.desc}</div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 800,
+                              color: active ? "#9690ff" : "#fff",
+                            }}
+                          >
+                            {d.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "var(--ps-muted)",
+                              marginTop: 2,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {d.desc}
+                          </div>
                         </div>
-                        {active ? <Check size={16} style={{ color: "#818cf8", flexShrink: 0 }} /> : null}
+                        {active ? (
+                          <Check
+                            size={16}
+                            style={{ color: "#9690ff", flexShrink: 0 }}
+                          />
+                        ) : null}
                       </button>
                     );
                   })}
@@ -749,9 +1677,27 @@ export function HeaderFooterModule({
               </div>
 
               {/* Section 2: Footer Brand & Logo */}
-              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                  <ImagePlus size={16} style={{ color: "var(--ps-primary)" }} /> Footer Brand Logo
+              <div
+                style={{
+                  background: "var(--ps-panel-raised)",
+                  border: "1px solid var(--ps-line-strong)",
+                  borderRadius: 14,
+                  padding: "16px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "#fff",
+                    marginBottom: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <ImagePlus size={16} style={{ color: "var(--ps-primary)" }} />{" "}
+                  Footer Brand Logo
                 </div>
                 <MediaPicker
                   kind="image"
@@ -762,58 +1708,181 @@ export function HeaderFooterModule({
               </div>
 
               {/* Section 3: Compliance & Legal Information */}
-              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                  <ShieldCheck size={16} style={{ color: "var(--ps-primary)" }} /> Compliance & RERA Badging
+              <div
+                style={{
+                  background: "var(--ps-panel-raised)",
+                  border: "1px solid var(--ps-line-strong)",
+                  borderRadius: 14,
+                  padding: "16px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: "#fff",
+                    marginBottom: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <ShieldCheck
+                    size={16}
+                    style={{ color: "var(--ps-primary)" }}
+                  />{" "}
+                  Compliance & RERA Badging
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                >
                   <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>RERA Registration Number</label>
+                    <label
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "var(--ps-muted)",
+                        display: "block",
+                        marginBottom: 4,
+                      }}
+                    >
+                      RERA Registration Number
+                    </label>
                     <input
                       className="ps-input"
                       value={reraValue || ""}
                       placeholder="e.g. PRM/KA/RERA/1251/310/PR/170916/000000"
-                      onChange={(e) => patchFooterText("reraText", "rera", e.target.value)}
-                      style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                      onChange={(e) =>
+                        patchFooterText("reraText", "rera", e.target.value)
+                      }
+                      style={{
+                        width: "100%",
+                        fontSize: 12.5,
+                        background: "var(--ps-bg)",
+                        color: "#fff",
+                      }}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)", display: "block", marginBottom: 4 }}>Copyright Text</label>
+                    <label
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: "var(--ps-muted)",
+                        display: "block",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Copyright Text
+                    </label>
                     <input
                       className="ps-input"
                       value={copyrightValue || ""}
                       placeholder={`© ${new Date().getFullYear()} ${site.name}. All rights reserved.`}
-                      onChange={(e) => patchFooterText("copyrightText", "copyright", e.target.value)}
-                      style={{ width: "100%", fontSize: 12.5, background: "var(--ps-bg)", color: "#fff" }}
+                      onChange={(e) =>
+                        patchFooterText(
+                          "copyrightText",
+                          "copyright",
+                          e.target.value,
+                        )
+                      }
+                      style={{
+                        width: "100%",
+                        fontSize: 12.5,
+                        background: "var(--ps-bg)",
+                        color: "#fff",
+                      }}
                     />
                   </div>
                 </div>
               </div>
 
               {/* Section 4: Footer Navigation Links */}
-              <div style={{ background: "var(--ps-panel-raised)", border: "1px solid var(--ps-line-strong)", borderRadius: 14, padding: "16px 16px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
-                    <Link2 size={16} style={{ color: "var(--ps-primary)" }} /> Custom Footer Links
+              <div
+                style={{
+                  background: "var(--ps-panel-raised)",
+                  border: "1px solid var(--ps-line-strong)",
+                  borderRadius: 14,
+                  padding: "16px 16px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Link2 size={16} style={{ color: "var(--ps-primary)" }} />{" "}
+                    Custom Footer Links
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ps-muted)" }}>{footerLinkList.length} links</span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "var(--ps-muted)",
+                    }}
+                  >
+                    {footerLinkList.length} links
+                  </span>
                 </div>
-                <p style={{ fontSize: 11.5, color: "var(--ps-muted)", margin: "0 0 10px", lineHeight: 1.45 }}>
-                  Leave empty to automatically reuse the primary header menu links.
+                <p
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--ps-muted)",
+                    margin: "0 0 10px",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Leave empty to automatically reuse the primary header menu
+                  links.
                 </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
                   {footerLinkList.map((l, i) => (
-                    <div key={`${i}-${l.label}`} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--ps-bg)", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--ps-line)" }}>
+                    <div
+                      key={`${i}-${l.label}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        background: "var(--ps-bg)",
+                        padding: "8px 10px",
+                        borderRadius: 8,
+                        border: "1px solid var(--ps-line)",
+                      }}
+                    >
                       <input
                         className="ps-input"
                         value={l.label}
                         placeholder="Link Name"
                         onChange={(e) =>
                           patchFooterSettings({
-                            links: footerLinkList.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)),
+                            links: footerLinkList.map((x, j) =>
+                              j === i ? { ...x, label: e.target.value } : x,
+                            ),
                           })
                         }
-                        style={{ flex: 1.2, minWidth: 0, fontSize: 12, padding: "6px 8px", background: "transparent", color: "#fff" }}
+                        style={{
+                          flex: 1.2,
+                          minWidth: 0,
+                          fontSize: 12,
+                          padding: "6px 8px",
+                          background: "transparent",
+                          color: "#fff",
+                        }}
                       />
                       <input
                         className="ps-input"
@@ -821,15 +1890,35 @@ export function HeaderFooterModule({
                         placeholder="#section"
                         onChange={(e) =>
                           patchFooterSettings({
-                            links: footerLinkList.map((x, j) => (j === i ? { ...x, href: e.target.value } : x)),
+                            links: footerLinkList.map((x, j) =>
+                              j === i ? { ...x, href: e.target.value } : x,
+                            ),
                           })
                         }
-                        style={{ flex: 1, minWidth: 0, fontFamily: "monospace", fontSize: 11, padding: "6px 8px", background: "transparent", color: "var(--ps-slate)" }}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          fontFamily: "monospace",
+                          fontSize: 11,
+                          padding: "6px 8px",
+                          background: "transparent",
+                          color: "var(--ps-slate)",
+                        }}
                       />
                       <button
                         type="button"
-                        onClick={() => patchFooterSettings({ links: footerLinkList.filter((_, idx) => idx !== i) })}
-                        style={{ background: "none", border: "none", color: "var(--ps-muted)", cursor: "pointer", padding: 4 }}
+                        onClick={() =>
+                          patchFooterSettings({
+                            links: footerLinkList.filter((_, idx) => idx !== i),
+                          })
+                        }
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--ps-muted)",
+                          cursor: "pointer",
+                          padding: 4,
+                        }}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -838,15 +1927,22 @@ export function HeaderFooterModule({
                 </div>
                 <button
                   type="button"
-                  onClick={() => patchFooterSettings({ links: [...footerLinkList, { label: "New link", href: "#" }] })}
+                  onClick={() =>
+                    patchFooterSettings({
+                      links: [
+                        ...footerLinkList,
+                        { label: "New link", href: "#" },
+                      ],
+                    })
+                  }
                   style={{
                     width: "100%",
                     marginTop: 10,
                     padding: "8px 12px",
                     borderRadius: 8,
                     border: "1px dashed var(--ps-primary)",
-                    background: "rgba(99, 102, 241, 0.12)",
-                    color: "#818cf8",
+                    background: "rgba(109, 93, 252, 0.12)",
+                    color: "#9690ff",
                     fontSize: 12,
                     fontWeight: 700,
                     cursor: "pointer",
@@ -878,7 +1974,8 @@ export function HeaderFooterModule({
           {/* Browser Container Frame */}
           <div
             style={{
-              width: device === "desktop" ? "100%" : device === "tablet" ? 768 : 390,
+              width:
+                device === "desktop" ? "100%" : device === "tablet" ? 768 : 390,
               maxWidth: "100%",
               background: "#fff",
               borderRadius: device === "desktop" ? 16 : 28,
@@ -900,9 +1997,30 @@ export function HeaderFooterModule({
               }}
             >
               <div style={{ display: "flex", gap: 6 }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#f87171" }} />
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fbbf24" }} />
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#34d399" }} />
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: "#f87171",
+                  }}
+                />
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: "#fbbf24",
+                  }}
+                />
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: "#34d399",
+                  }}
+                />
               </div>
               <div
                 style={{
@@ -919,10 +2037,27 @@ export function HeaderFooterModule({
                 }}
               >
                 <Globe size={12} style={{ color: "#94a3b8" }} />
-                <span>{site.domain ? `https://${site.domain}` : `https://preview.estatepro.com/${site.slug}`}</span>
+                <span>
+                  {site.domain
+                    ? `https://${site.domain}`
+                    : `https://preview.estatepro.com/${site.slug}`}
+                </span>
               </div>
-              <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", background: "rgba(99,102,241,0.25)", color: "#a5b4fc", padding: "2px 8px", borderRadius: 999 }}>
-                {activeTab === "footer" ? `${footer.design ?? "columns"} footer` : `${header.design ?? "classic"} header`}
+              <span
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 800,
+                  letterSpacing: 0.5,
+                  textTransform: "uppercase",
+                  background: "rgba(109,93,252,0.25)",
+                  color: "#a5b4fc",
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                }}
+              >
+                {activeTab === "footer"
+                  ? `${footer.design ?? "columns"} footer`
+                  : `${header.design ?? "classic"} header`}
               </span>
             </div>
 
@@ -930,40 +2065,107 @@ export function HeaderFooterModule({
             {viewMode === "focused" && activeTab === "footer" ? (
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {/* Simulated Content Divider */}
-                <div style={{ padding: "16px 20px", background: "#f1f5f9", borderBottom: "1px dashed #cbd5e1", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", display: "flex", alignItems: "center", gap: 6 }}>
-                    <Sparkles size={14} style={{ color: "var(--ps-primary)" }} /> Live Footer Preview Stage ({footer.design ?? "columns"})
+                <div
+                  style={{
+                    padding: "16px 20px",
+                    background: "#f1f5f9",
+                    borderBottom: "1px dashed #cbd5e1",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: "#475569",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <Sparkles
+                      size={14}
+                      style={{ color: "var(--ps-primary)" }}
+                    />{" "}
+                    Live Footer Preview Stage ({footer.design ?? "columns"})
                   </span>
-                  <span style={{ fontSize: 11, color: "#64748b" }}>Live Real-Time Rendering</span>
+                  <span style={{ fontSize: 11, color: "#64748b" }}>
+                    Live Real-Time Rendering
+                  </span>
                 </div>
 
                 {/* Primary Live Footer */}
-                <ChromeFooter footer={footer} header={header} brand={brand} device={device} live={false} />
+                <ChromeFooter
+                  footer={footer}
+                  header={header}
+                  brand={brand}
+                  device={device}
+                  live={false}
+                />
               </div>
             ) : viewMode === "focused" && activeTab === "header" ? (
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {/* Primary Live Header */}
                 <div style={{ position: "relative", zIndex: 10 }}>
-                  <ChromeHeader header={header} brand={brand} device={device} live={false} />
+                  <ChromeHeader
+                    header={header}
+                    brand={brand}
+                    device={device}
+                    live={false}
+                  />
                 </div>
 
                 {/* Simulated Hero Section Banner */}
                 <div
                   style={{
                     padding: device === "mobile" ? "60px 20px" : "80px 40px",
-                    background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
+                    background:
+                      "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
                     textAlign: "center",
                     borderTop: "1px dashed #e2e8f0",
                   }}
                 >
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#fff", border: "1px solid var(--ps-line)", borderRadius: 999, padding: "5px 14px", fontSize: 11.5, fontWeight: 800, color: "var(--ps-primary)", boxShadow: "0 2px 8px rgba(0,0,0,.04)" }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      background: "#fff",
+                      border: "1px solid var(--ps-line)",
+                      borderRadius: 999,
+                      padding: "5px 14px",
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      color: "var(--ps-primary)",
+                      boxShadow: "0 2px 8px rgba(0,0,0,.04)",
+                    }}
+                  >
                     <Sparkles size={13} /> {site.name} Header Preview
                   </span>
-                  <h2 style={{ fontSize: device === "mobile" ? 22 : 30, fontWeight: 900, color: "#0f172a", margin: "14px 0 8px", letterSpacing: -0.5 }}>
+                  <h2
+                    style={{
+                      fontSize: device === "mobile" ? 22 : 30,
+                      fontWeight: 900,
+                      color: "#0f172a",
+                      margin: "14px 0 8px",
+                      letterSpacing: -0.5,
+                    }}
+                  >
                     Live Navigation & Action Bar
                   </h2>
-                  <p style={{ fontSize: 13, color: "#64748b", maxWidth: 460, margin: "0 auto", lineHeight: 1.6 }}>
-                    Test responsive mobile drawer, logo display, and CTA button actions in real time.
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "#64748b",
+                      maxWidth: 460,
+                      margin: "0 auto",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    Test responsive mobile drawer, logo display, and CTA button
+                    actions in real time.
                   </p>
                 </div>
               </div>
@@ -971,21 +2173,44 @@ export function HeaderFooterModule({
               /* Full Page View */
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <div style={{ position: "relative", zIndex: 10 }}>
-                  <ChromeHeader header={header} brand={brand} device={device} live={false} />
+                  <ChromeHeader
+                    header={header}
+                    brand={brand}
+                    device={device}
+                    live={false}
+                  />
                 </div>
                 <div
                   style={{
                     padding: "70px 30px",
-                    background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
+                    background:
+                      "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
                     textAlign: "center",
                     borderTop: "1px dashed #e2e8f0",
                     borderBottom: "1px dashed #e2e8f0",
                   }}
                 >
-                  <h3 style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", margin: 0 }}>Full Page Flow</h3>
-                  <p style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>Scroll down to view footer in page context.</p>
+                  <h3
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 800,
+                      color: "#0f172a",
+                      margin: 0,
+                    }}
+                  >
+                    Full Page Flow
+                  </h3>
+                  <p style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                    Scroll down to view footer in page context.
+                  </p>
                 </div>
-                <ChromeFooter footer={footer} header={header} brand={brand} device={device} live={false} />
+                <ChromeFooter
+                  footer={footer}
+                  header={header}
+                  brand={brand}
+                  device={device}
+                  live={false}
+                />
               </div>
             )}
           </div>

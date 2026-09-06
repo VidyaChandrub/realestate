@@ -249,6 +249,7 @@ function DomainSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [customDomain, setCustomDomain] = useState("");
+  const [landingPageId, setLandingPageId] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
@@ -258,6 +259,7 @@ function DomainSection() {
     try {
       const data = await getOrgDomainInfo();
       setInfo(data);
+      setLandingPageId((prev) => prev || data.customDomainLandingPageId || data.landingPages?.[0]?.id || "");
       setError(null);
     } catch (e: any) {
       setError(e?.message ?? "Could not load domain settings");
@@ -278,7 +280,10 @@ function DomainSection() {
     setSent(null);
     setError(null);
     try {
-      await requestCustomDomain({ domain: customDomain.trim() });
+      await requestCustomDomain({
+        domain: customDomain.trim(),
+        landingPageId: landingPageId || undefined,
+      });
       setCustomDomain("");
       setSent("Custom domain request submitted for review.");
       await load();
@@ -332,30 +337,65 @@ function DomainSection() {
                   {info.customDomain ?? "No custom domain mapped yet."}
                   {info.customDomainStatus === "connected" ? " — pointing to your site" : ""}
                 </div>
+                {info.landingPages.length > 0 ? (
+                  <div className="muted" style={{ marginTop: 4, fontSize: 12.5 }}>
+                    {info.customDomainLandingPageId
+                      ? `Serves: ${info.landingPages.find((p) => p.id === info.customDomainLandingPageId)?.name ?? "selected landing page"}`
+                      : info.customDomain
+                        ? "No landing page selected yet — will serve your primary published page."
+                        : null}
+                  </div>
+                ) : null}
               </div>
               {badge(info.customDomainStatus)}
             </div>
 
             <div style={{ padding: "4px 16px 16px" }}>
               <div className="os-card-x" style={{ margin: "12px 0 8px", fontWeight: 600, color: "var(--fg)" }}>
-                Map a custom domain
+                Request a primary custom domain
               </div>
               <div className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
-                Bring your own domain (e.g. homes.skylinedev.com). A super admin reviews and approves it
-                before it goes live. Only available once your organisation is active.
+                Bring your own domain (e.g. homes.skylinedev.com). Once a super admin approves it, it is
+                mapped to the landing page you pick below. Only available once your organisation is active.
               </div>
-              <form onSubmit={handleRequest} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                <div className="field" style={{ flex: 1, marginBottom: 0 }}>
-                  <input
+              <form onSubmit={handleRequest} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label>Landing page to serve</label>
+                  <select
                     className="inp"
-                    placeholder="example.com"
-                    value={customDomain}
-                    onChange={(e) => setCustomDomain(e.target.value)}
-                  />
+                    value={landingPageId}
+                    onChange={(e) => setLandingPageId(e.target.value)}
+                    disabled={info.landingPages.length === 0}
+                  >
+                    {info.landingPages.length === 0 ? (
+                      <option value="">No landing pages yet</option>
+                    ) : (
+                      info.landingPages.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                          {p.pageType === "thank_you" ? " (thank-you)" : ""}
+                          {p.status === "published" ? "" : " — " + p.status}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <div className="hint">
+                    The custom domain will load this landing page (and its children) at your domain.
+                  </div>
                 </div>
-                <button className="btn btn-primary" type="submit" disabled={sending || info.subdomainStatus !== "active"}>
-                  {sending ? "Submitting…" : "Request"}
-                </button>
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                    <input
+                      className="inp"
+                      placeholder="example.com"
+                      value={customDomain}
+                      onChange={(e) => setCustomDomain(e.target.value)}
+                    />
+                  </div>
+                  <button className="btn btn-primary" type="submit" disabled={sending || info.subdomainStatus !== "active" || info.landingPages.length === 0}>
+                    {sending ? "Submitting…" : "Request"}
+                  </button>
+                </div>
               </form>
               {sent ? <div className="muted" style={{ color: "var(--green)", marginTop: 8 }}>{sent}</div> : null}
               {error ? <div className="muted" style={{ color: "var(--rose)", marginTop: 8 }}>{error}</div> : null}
@@ -366,7 +406,12 @@ function DomainSection() {
                     <div key={req.id} className="swrow" style={{ padding: "8px 0" }}>
                       <div className="tx">
                         <b>{req.kind === "custom_domain" ? req.customDomain : req.subdomain}</b>
-                        <div className="muted">{new Date(req.requestedAt).toLocaleDateString()}</div>
+                        <div className="muted">
+                          {new Date(req.requestedAt).toLocaleDateString()}
+                          {req.kind === "custom_domain" && req.landingPage?.name
+                            ? ` · ${req.landingPage.name}`
+                            : ""}
+                        </div>
                       </div>
                       {badge(req.status)}
                     </div>

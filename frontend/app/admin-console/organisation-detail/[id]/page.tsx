@@ -1101,7 +1101,7 @@ export default function SuperAdminOrganisationDetailPage() {
                   <div className="card" style={{ padding:16 }}>
                     <div className="muted" style={{ fontSize:11.5, fontWeight:700, textTransform:"uppercase" }}>Total Configured Domains</div>
                     <div style={{ fontSize:22, fontWeight:800, color:"var(--ink)", marginTop:4 }}>
-                      {(domainsData?.subdomain ? 1 : 0) + (domainsData?.customDomain ? 1 : 0) + (domainsData?.domainRequests?.length ?? 0)}
+                      {(domainsData?.subdomain ? 1 : 0) + (domainsData?.customDomain ? 1 : 0)}
                     </div>
                     <div className="delta" style={{ fontSize:12, marginTop:2 }}>Subdomains &amp; Custom Domains</div>
                   </div>
@@ -1117,11 +1117,11 @@ export default function SuperAdminOrganisationDetailPage() {
                     </div>
                   </div>
                   <div className="card" style={{ padding:16 }}>
-                    <div className="muted" style={{ fontSize:11.5, fontWeight:700, textTransform:"uppercase" }}>Website Custom Domains</div>
+                    <div className="muted" style={{ fontSize:11.5, fontWeight:700, textTransform:"uppercase" }}>Custom Domain Site</div>
                     <div style={{ fontSize:22, fontWeight:800, color:"var(--ink)", marginTop:4 }}>
-                      {domainsData?.domainRequests?.length ?? 0}
+                      {domainsData?.customDomain ? 1 : 0}
                     </div>
-                    <div className="delta" style={{ fontSize:12, marginTop:2 }}>Mapped to landing pages</div>
+                    <div className="delta" style={{ fontSize:12, marginTop:2 }}>Mapped to a landing page</div>
                   </div>
                 </div>
 
@@ -1205,7 +1205,7 @@ export default function SuperAdminOrganisationDetailPage() {
                   <div className="card-h">
                     <span className="t">All Domains &amp; Subdomains</span>
                     <span className="chip">
-                      {(domainsData?.subdomain ? 1 : 0) + (domainsData?.customDomain ? 1 : 0) + (domainsData?.domainRequests?.length ?? 0)} total
+                      {(domainsData?.subdomain ? 1 : 0) + (domainsData?.customDomain ? 1 : 0)} total
                     </span>
                   </div>
                   <div className="tbl-wrap">
@@ -1268,23 +1268,27 @@ export default function SuperAdminOrganisationDetailPage() {
                               </tr>
                             ) : null}
 
-                            {/* 3. Website / Landing Page Custom Domains */}
-                            {(domainsData?.domainRequests ?? []).map((dr: any) => (
-                              <tr key={dr.id}>
+                            {/* 3. Landing page served by the primary custom domain */}
+                            {domainsData?.customDomainLandingPageId ? (
+                              <tr style={{ background:"var(--surface-2)" }}>
                                 <td>
-                                  <span style={{ fontWeight:700 }}>{dr.landingPage?.name ?? "Website"}</span>
-                                  <br /><span className="muted sm">{dr.landingPage?.slug}</span>
+                                  <span style={{ fontWeight:800, color:"var(--brand)" }}>Landing Page</span>
+                                  <br /><span className="muted sm">Served at the custom domain</span>
                                 </td>
-                                <td style={{ fontFamily:"monospace", fontWeight:700 }}>{dr.domain}</td>
-                                <td><span className="badge b-sky">Website Domain</span></td>
-                                <td><span className={`badge ${dr.status === "connected" ? "b-green" : dr.status === "pending" ? "b-amber" : "b-gray"}`}>{dr.status}</span></td>
-                                <td><span className="badge b-gray">{dr.dnsStatus}</span></td>
-                                <td><span className="badge b-gray">{dr.sslStatus}</span></td>
-                                <td className="muted" style={{ fontSize:12 }}>{new Date(dr.createdAt ?? dr.requestedAt).toLocaleDateString()}</td>
+                                <td style={{ fontFamily:"monospace", fontWeight:800 }}>
+                                  {domainsData.landingPages?.find((p: any) => p.id === domainsData.customDomainLandingPageId)?.name ??
+                                    domainsData.landingPages?.[0]?.name ??
+                                    "—"}
+                                </td>
+                                <td><span className="badge b-sky">Mapped Page</span></td>
+                                <td><span className="badge b-green">Connected</span></td>
+                                <td><span className="badge b-gray">Active</span></td>
+                                <td><span className="badge b-gray">Active</span></td>
+                                <td className="muted" style={{ fontSize:12 }}>via org custom domain</td>
                               </tr>
-                            ))}
+                            ) : null}
 
-                            {!domainsData?.subdomain && !domainsData?.customDomain && (!domainsData?.domainRequests || domainsData.domainRequests.length === 0) ? (
+                            {!domainsData?.subdomain && !domainsData?.customDomain ? (
                               <tr><td colSpan={7} className="muted">No domains configured for this organisation.</td></tr>
                             ) : null}
                           </>

@@ -47,7 +47,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/org/landing-pages", icon: "document", label: "Landing Pages", tip: "Landing Pages" },
       { href: "/org/templates", icon: "puzzle", label: "Templates", tip: "Templates" },
-      { href: "/org/domains", icon: "globe", label: "Domains & DNS", tip: "Domains & DNS" },
     ],
   },
       {
@@ -89,7 +88,6 @@ const CRUMB_MAP: Record<string, string> = {
   "/org/websites": "Websites",
   "/org/landing-pages": "Landing Pages",
   "/org/templates": "Templates",
-  "/org/domains": "Domains & DNS",
   "/org/integrations": "Integrations",
   "/org/sales-agents": "Sales Agents",
   "/org/teams": "Teams",
@@ -267,7 +265,6 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                 if (item.href.startsWith("/org/calling")) return hasPermission("calling", "view");
                 if (item.href.startsWith("/org/whatsapp")) return hasPermission("whatsapp", "view");
                 if (item.href.startsWith("/org/landing-pages") || item.href.startsWith("/org/templates")) return hasPermission("websites", "view");
-                if (item.href.startsWith("/org/domains")) return hasPermission("domains", "view");
                 if (item.href.startsWith("/org/sales-agents")) return hasPermission("sales_agents", "view");
                 if (item.href.startsWith("/org/teams")) return hasPermission("teams", "view");
                 if (item.href.startsWith("/org/users")) return hasPermission("users", "view");

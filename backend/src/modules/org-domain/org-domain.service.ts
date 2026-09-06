@@ -13,6 +13,10 @@ function toView(req: any) {
     kind: req.kind,
     subdomain: req.subdomain,
     customDomain: req.customDomain,
+    landingPageId: req.landingPageId,
+    landingPage: req.landingPage
+      ? { id: req.landingPage.id, name: req.landingPage.name, slug: req.landingPage.slug }
+      : null,
     status: req.status,
     requestedAt: req.requestedAt,
     reviewedAt: req.reviewedAt,
@@ -30,10 +34,25 @@ export class OrgDomainService {
     const org = await this.prisma.organisation.findUnique({ where: { id: orgId } });
     if (!org) throw new BadRequestException('Organisation not found');
 
-    const requests = await this.prisma.orgDomainRequest.findMany({
-      where: { orgId },
-      orderBy: { requestedAt: 'desc' },
-    });
+    const [requests, landingPages] = await Promise.all([
+      this.prisma.orgDomainRequest.findMany({
+        where: { orgId },
+        orderBy: { requestedAt: 'desc' },
+        include: { landingPage: { select: { id: true, name: true, slug: true } } },
+      }),
+      this.prisma.landingPage.findMany({
+        where: { orgId },
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          status: true,
+          pageType: true,
+          sourceTemplate: { select: { name: true } },
+        },
+      }),
+    ]);
 
     return {
       subdomain: org.subdomain,
@@ -41,14 +60,23 @@ export class OrgDomainService {
       subdomainStatus: org.subdomainStatus,
       customDomain: org.customDomain,
       customDomainStatus: org.customDomainStatus,
+      customDomainLandingPageId: org.customDomainLandingPageId,
+      landingPages,
       requests: requests.map(toView),
     };
   }
 
   // Submit a custom-domain request for review by a Super Admin. The org's
   // customDomain is staked as pending immediately so the Settings screen can
-  // display "Pending approval"; it only becomes connected once approved.
-  async requestCustomDomain(orgId: string, userId: string, domain: string) {
+  // display "Pending approval"; it only becomes connected once approved. The
+  // optional landingPageId selects which of the org's landing pages the custom
+  // domain maps to (defaults to the primary published page at approval).
+  async requestCustomDomain(
+    orgId: string,
+    userId: string,
+    domain: string,
+    landingPageId?: string,
+  ) {
     const host = normalizeDomain(domain);
     if (!isValidDomain(host)) {
       throw new BadRequestException('Invalid domain format. Example: example.com');
@@ -57,6 +85,17 @@ export class OrgDomainService {
 
     const org = await this.prisma.organisation.findUnique({ where: { id: orgId } });
     if (!org) throw new BadRequestException('Organisation not found');
+
+    let targetPageId: string | null = landingPageId ?? null;
+    if (targetPageId) {
+      const page = await this.prisma.landingPage.findFirst({
+        where: { id: targetPageId, orgId },
+        select: { id: true },
+      });
+      if (!page) {
+        throw new BadRequestException('Landing page not found for this organisation');
+      }
+    }
 
     const existing = await this.prisma.orgDomainRequest.findFirst({
       where: { orgId, kind: 'custom_domain', status: { in: ['pending', 'approved', 'connected'] } },
@@ -71,9 +110,11 @@ export class OrgDomainService {
           orgId,
           kind: 'custom_domain',
           customDomain: host,
+          landingPageId: targetPageId,
           status: 'pending',
           requestedBy: userId,
         },
+        include: { landingPage: { select: { id: true, name: true, slug: true } } },
       });
       await tx.organisation.update({
         where: { id: orgId },

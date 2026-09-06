@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -28,14 +36,20 @@ export class AdminOrgDomainController {
     });
   }
 
+  @Get(':id/verify')
+  verify(@Param('id') id: string) {
+    return this.service.verify(id);
+  }
+
   @Post(':id/review')
   review(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
     @Body() dto: ReviewOrgDomainRequestDto,
   ) {
-    if (dto.action === 'approve') return this.service.approve(id, user.sub as string);
-    if (dto.action === 'reject') return this.service.reject(id, user.sub as string, dto.reason);
+    if (dto.action === 'approve') return this.service.approve(id, user.sub);
+    if (dto.action === 'reject')
+      return this.service.reject(id, user.sub, dto.reason);
     throw new Error('Unsupported action');
   }
 }

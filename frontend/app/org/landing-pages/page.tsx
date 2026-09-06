@@ -318,7 +318,6 @@ export default function OrgLandingPagesPage() {
                             </button>
                           )}
                           <button className="btn btn-ghost btn-sm" disabled={busyId === row.id} onClick={() => duplicatePage(row.id)}>Duplicate</button>
-                          <Link className="btn btn-ghost btn-sm" href={`/org/domains/${row.id}`}>Domain</Link>
                           <button
                             className="btn btn-ghost btn-sm"
                             style={{ color: "var(--rose)" }}

@@ -257,7 +257,7 @@ export interface SignupInput {
   timezone: string;
   password: string;
   planId?: string;
-  billingCycle?: 'monthly' | 'yearly';
+  billingCycle?: "monthly" | "yearly";
   templateIds?: string[];
   subdomain?: string;
   custom_domain?: string;
@@ -349,7 +349,14 @@ export interface OrganisationListRow {
   userCount: number;
   teamCount: number;
   templatesCount: number;
-  plan: { id: string; name: string; slug: string; badge: string; billingCycle?: string; amount?: number } | null;
+  plan: {
+    id: string;
+    name: string;
+    slug: string;
+    badge: string;
+    billingCycle?: string;
+    amount?: number;
+  } | null;
   mrr: number | null;
 }
 
@@ -486,9 +493,30 @@ export interface OrgDashboardKpiData {
   };
   pipelineBreakdown: { status: string; label: string; count: number }[];
   callOutcomes: { outcome: string; label: string; count: number }[];
-  projectMetrics: { projectId: string; projectName: string; leadsCount: number; wonCount: number; revenue: number }[];
-  agentLeaderboard: { userId: string; name: string; email: string; role: string; leadsCount: number; wonCount: number; revenue: number; callsCount: number; conversionRate: number }[];
-  recentActivity: { id: string; type: string; text: string; createdAt: string }[];
+  projectMetrics: {
+    projectId: string;
+    projectName: string;
+    leadsCount: number;
+    wonCount: number;
+    revenue: number;
+  }[];
+  agentLeaderboard: {
+    userId: string;
+    name: string;
+    email: string;
+    role: string;
+    leadsCount: number;
+    wonCount: number;
+    revenue: number;
+    callsCount: number;
+    conversionRate: number;
+  }[];
+  recentActivity: {
+    id: string;
+    type: string;
+    text: string;
+    createdAt: string;
+  }[];
   inventorySummary?: {
     totalProjects: number;
     activeProjects: number;
@@ -576,8 +604,8 @@ export interface Subscription {
   id: string;
   orgId: string;
   planId: string;
-  billingCycle: 'monthly' | 'yearly';
-  status: 'active' | 'past_due' | 'trial' | 'cancelled' | 'paused';
+  billingCycle: "monthly" | "yearly";
+  status: "active" | "past_due" | "trial" | "cancelled" | "paused";
   amount: number;
   currency: string;
   mrr: number | null;
@@ -587,7 +615,16 @@ export interface Subscription {
   createdAt: string;
   updatedAt: string;
   organisation: { id: string; name: string; city: string; slug: string } | null;
-  plan: { id: string; name: string; slug: string; priceMonthly: number; priceYearly: number; color: string; badge: string; isPopular: boolean } | null;
+  plan: {
+    id: string;
+    name: string;
+    slug: string;
+    priceMonthly: number;
+    priceYearly: number;
+    color: string;
+    badge: string;
+    isPopular: boolean;
+  } | null;
 }
 
 export interface SubscriptionsListResponse {
@@ -604,7 +641,13 @@ export interface BillingOverview {
   activeSubscriptions: number;
   totalSubscriptions: number;
   churnRate: number;
-  distribution: { planId: string; planName: string; badge: string; count: number; pct: number }[];
+  distribution: {
+    planId: string;
+    planName: string;
+    badge: string;
+    count: number;
+    pct: number;
+  }[];
   mrrHistory: { month: string; mrr: number }[];
 }
 
@@ -628,7 +671,7 @@ export interface UpdatePlanInput extends Partial<CreatePlanInput> {
 export interface CreateSubscriptionInput {
   orgId: string;
   planId: string;
-  billingCycle?: 'monthly' | 'yearly';
+  billingCycle?: "monthly" | "yearly";
   status?: string;
   currency?: string;
   renewsAt?: string;
@@ -636,20 +679,20 @@ export interface CreateSubscriptionInput {
 
 export interface UpdateSubscriptionInput {
   planId?: string;
-  billingCycle?: 'monthly' | 'yearly';
-  status?: 'active' | 'past_due' | 'trial' | 'cancelled' | 'paused';
+  billingCycle?: "monthly" | "yearly";
+  status?: "active" | "past_due" | "trial" | "cancelled" | "paused";
   currency?: string;
   renewsAt?: string;
 }
 
 // --- Landing pages: org-owned copies made from an assigned template ---
 export type LandingPageStatus =
-  | 'draft'
-  | 'pending_approval'
-  | 'approved'
-  | 'rejected'
-  | 'published'
-  | 'unpublished';
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "rejected"
+  | "published"
+  | "unpublished";
 
 export interface LandingPageRow {
   id: string;
@@ -657,7 +700,7 @@ export interface LandingPageRow {
   slug: string;
   status: LandingPageStatus;
   thumbnail: string | null;
-  pageType: 'landing' | 'thank_you';
+  pageType: "landing" | "thank_you";
   parentId?: string | null;
   publishedAt: string | null;
   createdAt: string;
@@ -704,8 +747,8 @@ export interface OrgBillingPlan {
 }
 
 export interface OrgBillingSubscription {
-  status: 'active' | 'past_due' | 'trial' | 'cancelled' | 'paused';
-  billingCycle: 'monthly' | 'yearly';
+  status: "active" | "past_due" | "trial" | "cancelled" | "paused";
+  billingCycle: "monthly" | "yearly";
   amount: number;
   currency: string;
   startedAt: string;
@@ -728,14 +771,14 @@ export interface OrgBillingSummary {
 // POST /org/billing/plan — org-self-service upgrade / downgrade
 export interface ChangePlanInput {
   planId: string;
-  billingCycle?: 'monthly' | 'yearly';
+  billingCycle?: "monthly" | "yearly";
 }
 
 export interface ChangePlanResult {
   id: string;
   planId: string;
   planName: string;
-  billingCycle: 'monthly' | 'yearly';
+  billingCycle: "monthly" | "yearly";
   status: string;
   amount: number;
   currency: string;
@@ -752,8 +795,8 @@ export interface InvoiceRow {
   dueAt: string;
   amount: number;
   currency: string;
-  billingCycle: 'monthly' | 'yearly';
-  status: 'paid' | 'pending';
+  billingCycle: "monthly" | "yearly";
+  status: "paid" | "pending";
   planName: string;
 }
 
@@ -1039,10 +1082,7 @@ export interface UpdateProjectInput {
 // project's own fields at creation time; nothing references these rows, so
 // editing or deleting one never affects an existing project.
 export type OrgCatalogCategory =
-  | "project_type"
-  | "unit_type"
-  | "connectivity"
-  | "amenity";
+  "project_type" | "unit_type" | "connectivity" | "amenity";
 
 export interface OrgCatalogOption {
   id: string;
@@ -1204,8 +1244,19 @@ export interface CrmLead {
   status: CrmLeadStatus;
   assignedTo: CrmAssignee | null;
   createdAt: string;
-  activities?: Array<{ id: string; type: string; text: string; createdAt: string }>;
-  callLogs?: Array<{ id: string; direction: string; outcome: string; durationSeconds: number; createdAt: string }>;
+  activities?: Array<{
+    id: string;
+    type: string;
+    text: string;
+    createdAt: string;
+  }>;
+  callLogs?: Array<{
+    id: string;
+    direction: string;
+    outcome: string;
+    durationSeconds: number;
+    createdAt: string;
+  }>;
   nextAction?: {
     type: string;
     scheduledAt: string | null;
@@ -1337,12 +1388,7 @@ export interface SalesAgentCall {
   leadName: string | null;
   direction: SalesAgentCallDirection;
   outcome:
-    | "connected"
-    | "booked_visit"
-    | "callback"
-    | "no_answer"
-    | "missed"
-    | "busy";
+    "connected" | "booked_visit" | "callback" | "no_answer" | "missed" | "busy";
   durationSeconds: number;
   createdAt: string;
 }
@@ -1394,18 +1440,31 @@ export interface SalesAgentDetailResponse {
 
 // --- Organisation domain identity (subdomain + custom domain) ---
 
-export type OrgDomainKind = 'subdomain' | 'custom_domain';
-export type OrgDomainRequestStatus = 'pending' | 'approved' | 'rejected' | 'connected';
+export type OrgDomainKind = "subdomain" | "custom_domain";
+export type OrgDomainRequestStatus =
+  "pending" | "approved" | "rejected" | "connected";
 
 export interface OrgDomainRequest {
   id: string;
   kind: OrgDomainKind;
   subdomain: string | null;
   customDomain: string | null;
+  landingPageId: string | null;
+  landingPage?: { id: string; name: string; slug: string } | null;
   status: OrgDomainRequestStatus;
   requestedAt: string;
   reviewedAt: string | null;
   rejectionReason: string | null;
+}
+
+/** A landing page the org can target with its primary custom domain. */
+export interface OrgDomainLandingPage {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  pageType?: string;
+  sourceTemplate?: { name: string } | null;
 }
 
 /** GET /org/domain — the organisation's own subdomain/custom-domain identity. */
@@ -1415,15 +1474,30 @@ export interface OrgDomainInfo {
   subdomainStatus: string;
   customDomain: string | null;
   customDomainStatus: string;
+  customDomainLandingPageId: string | null;
+  landingPages: OrgDomainLandingPage[];
   requests: OrgDomainRequest[];
 }
 
 export interface RequestCustomDomainInput {
   domain: string;
+  /** Which landing page (template) the custom domain should serve. */
+  landingPageId?: string;
+}
+
+/** A DNS record pair shown to the Super Admin (e.g. the wildcard A record). */
+export interface DnsRecordSpec {
+  type: string;
+  host: string;
+  value: string;
+  ttl: string;
+  purpose: string;
 }
 
 /** GET /admin/org-domain-requests row (subdomain or custom-domain request). */
 export interface AdminOrgDomainRequest extends OrgDomainRequest {
+  subdomainHost?: string | null;
+  dnsInstructions?: DnsRecordSpec[] | null;
   organisation: {
     id: string;
     name: string;
@@ -1438,21 +1512,79 @@ export interface AdminOrgDomainRequestListResponse {
   total: number;
   page: number;
   limit: number;
+  baseDomain?: string;
+  dnsInstructions?: DnsRecordSpec[];
+  dnsMode?: string;
 }
 
 export interface ReviewOrgDomainRequestInput {
-  action: 'approve' | 'reject';
+  action: "approve" | "reject";
   reason?: string;
+}
+
+/** GET /admin/platform-config — Super Admin platform subdomain / DNS config. */
+export interface PlatformConfig {
+  id: string | null;
+  subdomainMode: string; // localhost | production
+  subdomainBase: string | null; // e.g. "ipixxel.in"
+  dnsMode: string; // a | cname | ns
+  infraIp: string | null; // AWS origin IPv4 (for the wildcard A record)
+  infraIpv6: string | null;
+  infraCname: string | null;
+  infraNs1: string | null;
+  infraNs2: string | null;
+  updatedAt: string | null;
+}
+
+export interface UpdatePlatformConfigInput {
+  subdomainMode?: "localhost" | "production";
+  subdomainBase?: string;
+  dnsMode?: "a" | "cname" | "ns";
+  infraIp?: string;
+  infraIpv6?: string;
+  infraCname?: string;
+  infraNs1?: string;
+  infraNs2?: string;
+}
+
+/** GET /admin/org-domain-requests/:id/verify — live DNS + site check for an org subdomain. */
+export interface SubdomainVerifyResult {
+  id: string;
+  subdomain: string;
+  host: string;
+  baseDomain: string;
+  dnsMode: string;
+  expectedIp: string | null;
+  organisation: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+    subdomainStatus: string;
+  };
+  dns: {
+    status: "ok" | "mismatch" | "unresolved";
+    hostIps: string[];
+    baseIps: string[];
+    expectedIp: string | null;
+  };
+  landingPage: {
+    id: string;
+    slug: string;
+    name: string;
+    status: string;
+  } | null;
+  live: boolean;
 }
 
 // --- In-app notifications (Super Admin bell) ---
 
 export type NotificationType =
-  | 'organisation_registration'
-  | 'subdomain_request'
-  | 'custom_domain_request'
-  | 'organisation_approved'
-  | 'organisation_rejected';
+  | "organisation_registration"
+  | "subdomain_request"
+  | "custom_domain_request"
+  | "organisation_approved"
+  | "organisation_rejected";
 
 export interface AppNotification {
   id: string;
@@ -1465,7 +1597,12 @@ export interface AppNotification {
   entityId: string | null;
   readAt: string | null;
   createdAt: string;
-  organisation: { id: string; name: string; slug: string; subdomain: string | null } | null;
+  organisation: {
+    id: string;
+    name: string;
+    slug: string;
+    subdomain: string | null;
+  } | null;
 }
 
 export interface NotificationsListResponse {
