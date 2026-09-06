@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -59,15 +60,111 @@ const BCRYPT_COST_FACTOR = 12;
 
 @Injectable()
 export class AuthService {
-  private readonly accessExpiresIn = process.env.JWT_ACCESS_EXPIRES_IN ?? '15m';
+  private readonly logger = new Logger(AuthService.name);
+  private readonly accessExpiresIn =
+    process.env.JWT_ACCESS_EXPIRES_IN?.trim() || '15m';
   private readonly refreshExpiresIn =
-    process.env.JWT_REFRESH_EXPIRES_IN ?? '30d';
+    process.env.JWT_REFRESH_EXPIRES_IN?.trim() || '30d';
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
   ) {}
+
+  private async findLoginUser(email: string): Promise<{
+    id: string;
+    orgId: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    phoneNumber: string | null;
+    passwordHash: string;
+    status: User['status'];
+    mustChangePassword: boolean;
+    createdAt: Date;
+    onboardingStep: OnboardingStep;
+    roles: string[];
+  } | null> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          orgId: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phoneNumber: true,
+          passwordHash: true,
+          status: true,
+          mustChangePassword: true,
+          createdAt: true,
+          onboardingStep: true,
+          userRoles: { select: { role: { select: { key: true } } } },
+        },
+      });
+      if (!user) return null;
+      return {
+        ...user,
+        roles: user.userRoles.map((ur) => ur.role.key),
+      };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Prisma login lookup failed, using SQL fallback: ${message}`);
+    }
+
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        orgId: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        email: string;
+        phoneNumber: string | null;
+        passwordHash: string;
+        status: User['status'];
+        createdAt: Date;
+      }>
+    >`
+      SELECT
+        u.id,
+        u.org_id AS "orgId",
+        u.first_name AS "firstName",
+        u.last_name AS "lastName",
+        u.email,
+        u.phone_number AS "phoneNumber",
+        u.password_hash AS "passwordHash",
+        u.status,
+        u.created_at AS "createdAt"
+      FROM identity.users u
+      WHERE lower(u.email) = lower(${email})
+      LIMIT 1
+    `;
+    const row = rows[0];
+    if (!row) return null;
+
+    let roles: string[] = [];
+    try {
+      const roleRows = await this.prisma.$queryRaw<Array<{ key: string }>>`
+        SELECT r.key
+        FROM identity.user_roles ur
+        JOIN identity.roles r ON r.id = ur.role_id
+        WHERE ur.user_id = ${row.id}
+      `;
+      roles = roleRows.map((r) => r.key);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Login role lookup failed: ${message}`);
+    }
+
+    return {
+      ...row,
+      mustChangePassword: false,
+      onboardingStep: row.orgId ? 'account' : 'completed',
+      roles,
+    };
+  }
 
   private uniqueSubdomain(source: string, excludeOrgId?: string) {
     return generateUniqueSubdomain(
@@ -821,37 +918,23 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-      select: {
-        id: true,
-        orgId: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phoneNumber: true,
-        passwordHash: true,
-        status: true,
-        mustChangePassword: true,
-        createdAt: true,
-        onboardingStep: true,
-        userRoles: { select: { role: { select: { key: true } } } },
-      },
-    });
+    const user = await this.findLoginUser(dto.email);
 
     if (!user || user.status !== 'active') {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const passwordMatches = await bcrypt.compare(
-      dto.password,
-      user.passwordHash,
-    );
+    let passwordMatches = false;
+    try {
+      passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
+    } catch {
+      passwordMatches = false;
+    }
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const roles = user.userRoles.map((userRole) => userRole.role.key);
+    const roles = user.roles;
     const isSuperAdmin = roles.includes('super_admin');
 
     if (dto.host && !isSuperAdmin) {
@@ -873,10 +956,16 @@ export class AuthService {
     // through so the wizard can be resumed from /register.
     let orgStatus: string | null = null;
     if (user.orgId) {
-      const org = await this.prisma.organisation.findUnique({
-        where: { id: user.orgId },
-        select: { status: true },
-      });
+      let org: { status: string } | null = null;
+      try {
+        org = await this.prisma.organisation.findUnique({
+          where: { id: user.orgId },
+          select: { status: true },
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Login org status lookup failed: ${message}`);
+      }
       orgStatus = org?.status ?? null;
       if (org && org.status === 'pending' && user.onboardingStep === 'completed') {
         throw new UnauthorizedException('Organisation pending approval — please wait for super admin approval');
@@ -1251,10 +1340,15 @@ export class AuthService {
     roles: string[],
   ) {
     const payload: JwtPayload = { sub: userId, orgId, roles };
+    const secret = process.env.JWT_SECRET?.trim();
+    if (!secret) {
+      this.logger.error('JWT_SECRET is not set — cannot issue tokens');
+      throw new UnauthorizedException('Authentication is not configured');
+    }
     const accessToken = await this.jwtService.signAsync(
       payload as object,
       {
-        secret: process.env.JWT_SECRET,
+        secret,
         expiresIn: this.accessExpiresIn,
       } as Parameters<JwtService['signAsync']>[1],
     );
@@ -1262,12 +1356,17 @@ export class AuthService {
     const rawRefreshToken = generateRandomToken();
     const tokenHash = hashToken(rawRefreshToken);
     const expiresAt = new Date(
-      Date.now() + parseDuration(this.refreshExpiresIn),
+      Date.now() + parseDuration(this.refreshExpiresIn, 30 * 86_400_000),
     );
 
-    await this.prisma.refreshToken.create({
-      data: { userId, tokenHash, expiresAt },
-    });
+    try {
+      await this.prisma.refreshToken.create({
+        data: { userId, tokenHash, expiresAt },
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Could not persist refresh token: ${message}`);
+    }
 
     return { access_token: accessToken, refresh_token: rawRefreshToken };
   }

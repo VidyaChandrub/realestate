@@ -29,6 +29,8 @@ export class PrismaService
       `CREATE SCHEMA IF NOT EXISTS "identity"`,
       `CREATE SCHEMA IF NOT EXISTS "access"`,
       `ALTER TABLE "identity"."users" ADD COLUMN IF NOT EXISTS "email_verified_at" TIMESTAMP(3)`,
+      `ALTER TABLE "identity"."users" ADD COLUMN IF NOT EXISTS "onboarding_step" TEXT`,
+      `ALTER TABLE "identity"."users" ADD COLUMN IF NOT EXISTS "must_change_password" BOOLEAN NOT NULL DEFAULT false`,
       `DO $$ BEGIN CREATE TYPE "identity"."RoleStatus" AS ENUM ('active', 'inactive'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
       `ALTER TABLE "identity"."roles" ADD COLUMN IF NOT EXISTS "org_id" TEXT`,
       `ALTER TABLE "identity"."roles" ADD COLUMN IF NOT EXISTS "status" "identity"."RoleStatus" NOT NULL DEFAULT 'active'`,

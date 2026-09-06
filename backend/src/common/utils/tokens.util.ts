@@ -9,12 +9,28 @@ const DURATION_UNITS_MS: Record<string, number> = {
 };
 
 // Parses simple durations like "15m", "30d", "1h" into milliseconds.
-export function parseDuration(value: string): number {
-  const match = /^(\d+)\s*(ms|s|m|h|d)$/.exec(value.trim());
+export function parseDuration(value: string, fallbackMs = 30 * 86_400_000): number {
+  const raw = (value ?? '').trim().toLowerCase();
+  const match = /^(\d+)\s*(ms|s|m|h|d|min|mins|minutes|hr|hrs|hours|day|days|w|week|weeks)$/.exec(
+    raw,
+  );
   if (!match) {
-    throw new Error(`Invalid duration string: "${value}"`);
+    return fallbackMs;
   }
-  return Number(match[1]) * DURATION_UNITS_MS[match[2]];
+  const amount = Number(match[1]);
+  const unit = match[2];
+  const key =
+    unit === 'min' || unit === 'mins' || unit === 'minutes'
+      ? 'm'
+      : unit === 'hr' || unit === 'hrs' || unit === 'hours'
+        ? 'h'
+        : unit === 'day' || unit === 'days'
+          ? 'd'
+          : unit === 'w' || unit === 'week' || unit === 'weeks'
+            ? 'd'
+            : unit;
+  const factor = unit === 'w' || unit === 'week' || unit === 'weeks' ? 7 : 1;
+  return amount * factor * (DURATION_UNITS_MS[key] ?? fallbackMs);
 }
 
 export function generateRandomToken(bytes = 64): string {
