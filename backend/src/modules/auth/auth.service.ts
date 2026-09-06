@@ -114,6 +114,7 @@ export class AuthService {
       this.logger.warn(`Prisma login lookup failed, using SQL fallback: ${message}`);
     }
 
+    try {
     const rows = await this.prisma.$queryRaw<
       Array<{
         id: string;
@@ -164,6 +165,11 @@ export class AuthService {
       onboardingStep: row.orgId ? 'account' : 'completed',
       roles,
     };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`SQL login fallback failed: ${message}`);
+      return null;
+    }
   }
 
   private uniqueSubdomain(source: string, excludeOrgId?: string) {
