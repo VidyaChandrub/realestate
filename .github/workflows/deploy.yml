@@ -101,7 +101,8 @@ jobs:
 
           REPO="$HOME/realestate"
           COMPOSE="$REPO/docker-compose.prod.yml"
-          PM2_APP="realestate-web"
+          PM2_WEB="realestate-web"
+          PM2_API="realestate-api"
 
           echo "=== Pre-flight ==="
           cd "$REPO"
@@ -117,24 +118,39 @@ jobs:
           git pull --ff-only
           echo "Now at: $(git rev-parse --short HEAD)"
 
-          echo "=== Backend: build image ==="
-          docker compose -f "$COMPOSE" build api
+          echo "=== Backend: install, generate, build ==="
+          cd "$REPO/backend"
+          npm ci
+          npx prisma generate
+          npm run build
+          npx prisma migrate deploy
 
-          echo "=== Backend: start containers ==="
-          docker compose -f "$COMPOSE" up -d
-          sleep 5
+          echo "=== Backend: start API on :3000 (PM2) ==="
+          cd "$REPO"
+          if pm2 describe "$PM2_API" >/dev/null 2>&1; then
+            PORT=3000 NODE_ENV=production pm2 restart "$PM2_API" --update-env
+          else
+            PORT=3000 NODE_ENV=production pm2 start "$REPO/backend/dist/main.js" \
+              --name "$PM2_API" --cwd "$REPO/backend"
+          fi
+          pm2 save
 
-          if ! docker compose -f "$COMPOSE" ps api | grep -q "Up"; then
-            echo "ERROR: api container is not running. Recent logs:"
-            docker compose -f "$COMPOSE" logs api --tail 40
-            exit 1
+          if [ -f "$COMPOSE" ] && ! curl -fsS -o /dev/null http://127.0.0.1:3000/health; then
+            echo "=== Backend: start Docker API fallback ==="
+            docker compose -f "$COMPOSE" build api
+            docker compose -f "$COMPOSE" up -d
           fi
 
-          echo "=== Database migrations ==="
-          docker compose -f "$COMPOSE" exec -T api npx prisma migrate deploy
+          echo "=== Verify API ==="
+          sleep 3
+          curl -fsS http://127.0.0.1:3000/health && echo " API OK" || {
+            echo "ERROR: nothing listening on 127.0.0.1:3000"
+            pm2 logs "$PM2_API" --lines 40 --nostream || true
+            exit 1
+          }
 
           echo "=== Frontend: stop to free memory ==="
-          pm2 stop "$PM2_APP" 2>/dev/null || echo "(not running yet)"
+          pm2 stop "$PM2_WEB" 2>/dev/null || echo "(not running yet)"
 
           echo "=== Frontend: install and build ==="
           cd "$REPO/frontend"
@@ -151,14 +167,14 @@ jobs:
 
           echo "=== Frontend: restart ==="
           cd "$REPO"
-          pm2 restart "$PM2_APP" --update-env
+          pm2 restart "$PM2_WEB" --update-env
           pm2 save
 
           echo "=== Verify ==="
           sleep 5
           curl -fsS -o /dev/null http://localhost:3001 && echo "Frontend OK" || {
             echo "ERROR: frontend not responding. Recent logs:"
-            pm2 logs "$PM2_APP" --lines 30 --nostream
+            pm2 logs "$PM2_WEB" --lines 30 --nostream
             exit 1
           }
 
