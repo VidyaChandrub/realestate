@@ -89,17 +89,28 @@ export async function provisionOrgPortal(
     data: { subdomain, subdomainStatus: 'active' },
   });
 
-  const pending = await tx.orgDomainRequest.findFirst({
-    where: { orgId: org.id, kind: 'subdomain', status: 'pending' },
+  // Reuse an existing subdomain request (pending OR already-approved) rather
+  // than inserting a fresh row on every call — otherwise repeated approvals
+  // or subdomain reassigns accumulate duplicate history rows. Pending rows
+  // get upgraded to approved; approved rows keep their original review
+  // metadata and only have the subdomain label refreshed.
+  const existing = await tx.orgDomainRequest.findFirst({
+    where: {
+      orgId: org.id,
+      kind: 'subdomain',
+      status: { in: ['pending', 'approved'] },
+    },
+    orderBy: { requestedAt: 'desc' },
   });
-  if (pending) {
+  if (existing) {
     await tx.orgDomainRequest.update({
-      where: { id: pending.id },
+      where: { id: existing.id },
       data: {
         subdomain,
         status: 'approved',
-        reviewedAt: new Date(),
-        reviewedBy: actorId,
+        ...(existing.status === 'pending'
+          ? { reviewedAt: new Date(), reviewedBy: actorId }
+          : {}),
       },
     });
   } else {
