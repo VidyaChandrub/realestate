@@ -924,6 +924,22 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    try {
+      return await this.authenticate(dto);
+    } catch (err) {
+      if (
+        err instanceof UnauthorizedException ||
+        err instanceof BadRequestException
+      ) {
+        throw err;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Login failed unexpectedly: ${message}`);
+      throw new UnauthorizedException('Invalid email or password');
+    }
+  }
+
+  private async authenticate(dto: LoginDto) {
     const user = await this.findLoginUser(dto.email);
 
     if (!user || user.status !== 'active') {
@@ -1351,13 +1367,20 @@ export class AuthService {
       this.logger.error('JWT_SECRET is not set — cannot issue tokens');
       throw new UnauthorizedException('Authentication is not configured');
     }
-    const accessToken = await this.jwtService.signAsync(
-      payload as object,
-      {
-        secret,
-        expiresIn: this.accessExpiresIn,
-      } as Parameters<JwtService['signAsync']>[1],
-    );
+    let accessToken: string;
+    try {
+      accessToken = await this.jwtService.signAsync(
+        payload as object,
+        {
+          secret,
+          expiresIn: this.accessExpiresIn,
+        } as Parameters<JwtService['signAsync']>[1],
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`JWT sign failed: ${message}`);
+      throw new UnauthorizedException('Authentication is not configured');
+    }
 
     const rawRefreshToken = generateRandomToken();
     const tokenHash = hashToken(rawRefreshToken);

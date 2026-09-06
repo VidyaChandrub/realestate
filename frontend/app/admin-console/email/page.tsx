@@ -78,6 +78,7 @@ export default function SuperAdminEmailPage() {
         getSmtpConfig(),
         getEmailStats(),
       ]);
+      void loadLogs(1, logsFilter, logsSearch);
 
       if (configRes.status === "fulfilled" && configRes.value) {
         const c = configRes.value;
@@ -123,6 +124,8 @@ export default function SuperAdminEmailPage() {
       setTotalPages(res.totalPages || 1);
     } catch (err: any) {
       console.error("Failed to load logs:", err);
+      setLogs([]);
+      setFeedback({ type: "error", msg: err.message || "Failed to load email logs." });
     } finally {
       setLogsLoading(false);
     }
@@ -160,6 +163,7 @@ export default function SuperAdminEmailPage() {
       // Refresh stats
       const statsRes = await getEmailStats();
       setStats(statsRes);
+      await loadLogs(1, logsFilter, logsSearch);
     } catch (err: any) {
       setTestResult({ success: false, msg: err.message || "Failed to send test email." });
     } finally {

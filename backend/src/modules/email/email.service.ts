@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { PrismaService } from '../../database/prisma.service';
@@ -34,18 +39,30 @@ export interface SendMailOptions {
 }
 
 @Injectable()
-export class EmailService {
+export class EmailService implements OnApplicationBootstrap {
   private readonly logger = new Logger(EmailService.name);
   private transporter: Transporter | null = null;
   private cachedConfig: any = null;
+  private tablesReady = false;
 
   constructor(private readonly prisma: PrismaService) {}
 
+  async onApplicationBootstrap() {
+    try {
+      await this.ensureEmailTables();
+    } catch (err: any) {
+      this.logger.warn(`Could not ensure email tables on boot: ${err.message}`);
+    }
+  }
+
   /**
-   * Production often never ran seed, so these tables may be missing.
-   * GET /config swallows that and returns env defaults; PUT must create them.
+   * Production often never ran seed/migrations, so these tables may be missing.
+   * GET /config swallows that and returns env defaults; PUT, stats, and logs
+   * must create both SMTP config and the dispatch audit table.
    */
   private async ensureEmailTables() {
+    if (this.tablesReady) return;
+
     await this.prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS identity;`);
     await this.prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS audit;`);
     await this.prisma.$executeRawUnsafe(`
@@ -80,6 +97,28 @@ export class EmailService {
     await this.prisma.$executeRawUnsafe(
       `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS reset_body TEXT;`,
     );
+    await this.prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS audit.email_logs (
+        id TEXT PRIMARY KEY,
+        "to" TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        template TEXT,
+        status TEXT NOT NULL,
+        error TEXT,
+        metadata JSONB,
+        sent_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await this.prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS email_logs_to_idx ON audit.email_logs("to");`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS email_logs_status_idx ON audit.email_logs(status);`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS email_logs_sent_at_idx ON audit.email_logs(sent_at);`,
+    );
+    this.tablesReady = true;
   }
 
   /**
@@ -87,6 +126,7 @@ export class EmailService {
    */
   async getConfig() {
     try {
+      await this.ensureEmailTables();
       const config = await this.prisma.emailConfig.findFirst({
         orderBy: { updatedAt: 'desc' },
       });
@@ -98,8 +138,9 @@ export class EmailService {
           hasPassword: Boolean(config.password),
         };
       }
-    } catch (err) {
-      this.logger.warn(`Could not read EmailConfig from DB: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Could not read EmailConfig from DB: ${message}`);
     }
 
     // Default fallback from environment variables
@@ -345,6 +386,7 @@ export class EmailService {
     }
 
     try {
+      await this.ensureEmailTables();
       const [logs, total] = await Promise.all([
         this.prisma.emailLog.findMany({
           where,
@@ -362,8 +404,9 @@ export class EmailService {
         limit,
         totalPages: Math.ceil(total / limit),
       };
-    } catch (err) {
-      this.logger.warn(`Could not load email logs: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Could not load email logs: ${message}`);
       return { data: [], total: 0, page: 1, limit, totalPages: 0 };
     }
   }
@@ -373,6 +416,7 @@ export class EmailService {
    */
   async getStats() {
     try {
+      await this.ensureEmailTables();
       const [totalSent, totalFailed, lastLog] = await Promise.all([
         this.prisma.emailLog.count({ where: { status: 'sent' } }),
         this.prisma.emailLog.count({ where: { status: 'failed' } }),
@@ -407,6 +451,7 @@ export class EmailService {
     metadata?: any;
   }) {
     try {
+      await this.ensureEmailTables();
       await this.prisma.emailLog.create({
         data: {
           to: data.to,
@@ -417,8 +462,9 @@ export class EmailService {
           metadata: data.metadata ? JSON.parse(JSON.stringify(data.metadata)) : undefined,
         },
       });
-    } catch (e) {
-      this.logger.warn(`Could not record EmailLog entry: ${e.message}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      this.logger.warn(`Could not record EmailLog entry: ${message}`);
     }
   }
 
