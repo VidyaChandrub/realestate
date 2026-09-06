@@ -9,8 +9,18 @@ export class UpdateRoleDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(50)
+  key?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(255)
   description?: string;
+
+  @IsOptional()
+  @IsIn(['organisation', 'team'])
+  scope?: 'organisation' | 'team';
 
   @IsOptional()
   @IsIn(['active', 'inactive'])

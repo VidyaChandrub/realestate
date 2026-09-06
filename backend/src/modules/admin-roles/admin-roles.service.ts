@@ -64,11 +64,31 @@ export class AdminRolesService {
       throw new NotFoundException('Role not found');
     }
 
+    const rawKey = dto.key
+      ? dto.key.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
+      : undefined;
+
+    if (rawKey !== undefined && rawKey !== role.key) {
+      if (SYSTEM_ROLES.has(role.key)) {
+        throw new BadRequestException(
+          `System role '${role.name}' key cannot be changed`,
+        );
+      }
+      const existing = await this.prisma.role.findFirst({
+        where: { orgId: null, key: rawKey },
+      });
+      if (existing) {
+        throw new ConflictException(`Role key '${rawKey}' already exists`);
+      }
+    }
+
     return this.prisma.role.update({
       where: { id },
       data: {
         ...(dto.name ? { name: dto.name } : {}),
+        ...(rawKey !== undefined ? { key: rawKey } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
+        ...(dto.scope ? { scope: dto.scope } : {}),
         ...(dto.status ? { status: dto.status } : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
       },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -132,6 +132,55 @@ function formatActionLabel(action: string): string {
     .split("_")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
+}
+
+function StatTile({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  accent?: string;
+}) {
+  return (
+    <div
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--line-2)",
+        borderRadius: 14,
+        padding: "14px 16px",
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 20,
+          fontWeight: 800,
+          fontFamily: "monospace",
+          color: accent ?? "var(--ink)",
+          letterSpacing: "-0.02em",
+        }}
+      >
+        {value}
+      </div>
+      {sub ? (
+        <div
+          className="muted"
+          style={{ fontSize: 11.5, marginTop: 4, wordBreak: "break-word" }}
+        >
+          {sub}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 // Image field with inline preview + upload + remove — used for both the
@@ -542,49 +591,27 @@ export default function SuperAdminOrganisationDetailPage() {
         </div>
       </div>
 
-      <div className="grid g4" style={{ marginBottom: 20 }}>
-        <Reveal delay={1}>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Users</span>
-              <span className="ic ic-indigo"><Icon name="profile" size={16} /></span>
-            </div>
-            <div className="value">
-              <CountUp value={org.userCount} />
-            </div>
-            <div className="delta">{org.teamCount} teams</div>
-          </div>
-        </Reveal>
-        <Reveal delay={2}>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Sites</span>
-              <span className="ic ic-sky"><Icon name="document" size={16} /></span>
-            </div>
-            <div className="value">—</div>
-            <div className="delta">—</div>
-          </div>
-        </Reveal>
-        <Reveal delay={3}>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Leads captured</span>
-              <span className="ic ic-green"><Icon name="target" size={16} /></span>
-            </div>
-            <div className="value">—</div>
-            <div className="delta">—</div>
-          </div>
-        </Reveal>
-        <Reveal delay={4}>
-          <div className="stat">
-            <div className="top">
-              <span className="label">Plan value</span>
-              <span className="ic ic-violet"><Icon name="billing" size={16} /></span>
-            </div>
-            <div className="value">{org.plan?.name ?? "—"}</div>
-            <div className="delta">{org.planValue != null ? `₹${org.planValue.toLocaleString("en-IN")}` : "—"}</div>
-          </div>
-        </Reveal>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: 10,
+          marginBottom: 16,
+        }}
+      >
+        <StatTile
+          label="Users"
+          value={org.userCount != null ? <CountUp value={org.userCount} /> : "—"}
+          sub={`${org.teamCount} teams`}
+        />
+        <StatTile label="Sites" value="—" sub="—" />
+        <StatTile label="Leads captured" value="—" sub="—" accent="#10b981" />
+        <StatTile
+          label="Plan value"
+          value={org.plan?.name ?? "—"}
+          accent={org.plan ? "#4f46e5" : "var(--ink)"}
+          sub={org.planValue != null ? `₹${org.planValue.toLocaleString("en-IN")}` : "—"}
+        />
       </div>
 
       <div className="tabs reveal in">
@@ -1097,32 +1124,39 @@ export default function SuperAdminOrganisationDetailPage() {
           {tab === "Domains" ? (
             <Reveal delay={2}>
               <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-                <div className="grid g3" style={{ gap:14 }}>
-                  <div className="card" style={{ padding:16 }}>
-                    <div className="muted" style={{ fontSize:11.5, fontWeight:700, textTransform:"uppercase" }}>Total Configured Domains</div>
-                    <div style={{ fontSize:22, fontWeight:800, color:"var(--ink)", marginTop:4 }}>
-                      {(domainsData?.subdomain ? 1 : 0) + (domainsData?.customDomain ? 1 : 0)}
-                    </div>
-                    <div className="delta" style={{ fontSize:12, marginTop:2 }}>Subdomains &amp; Custom Domains</div>
-                  </div>
-                  <div className="card" style={{ padding:16 }}>
-                    <div className="muted" style={{ fontSize:11.5, fontWeight:700, textTransform:"uppercase" }}>Primary Subdomain</div>
-                    <div style={{ fontSize:15, fontWeight:800, fontFamily:"monospace", color:"var(--ink)", marginTop:6, overflow:"hidden", textOverflow:"ellipsis" }}>
-                      {domainsData?.subdomainHost ?? (domainsData?.subdomain ? `${domainsData.subdomain}.localhost` : "—")}
-                    </div>
-                    <div style={{ marginTop:4 }}>
-                      <span className={`badge ${domainsData?.subdomainStatus === "active" ? "b-green" : "b-gray"}`}>
-                        {domainsData?.subdomainStatus ?? "none"}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                    gap: 10,
+                  }}
+                >
+                  <StatTile
+                    label="Total configured domains"
+                    value={(domainsData?.subdomain ? 1 : 0) + (domainsData?.customDomain ? 1 : 0)}
+                    sub="Subdomains & custom domains"
+                  />
+                  <StatTile
+                    label="Primary subdomain"
+                    value={
+                      <span style={{ fontSize: 14, letterSpacing: "0em" }}>
+                        {domainsData?.subdomainHost ?? (domainsData?.subdomain ? `${domainsData.subdomain}.localhost` : "—")}
                       </span>
-                    </div>
-                  </div>
-                  <div className="card" style={{ padding:16 }}>
-                    <div className="muted" style={{ fontSize:11.5, fontWeight:700, textTransform:"uppercase" }}>Custom Domain Site</div>
-                    <div style={{ fontSize:22, fontWeight:800, color:"var(--ink)", marginTop:4 }}>
-                      {domainsData?.customDomain ? 1 : 0}
-                    </div>
-                    <div className="delta" style={{ fontSize:12, marginTop:2 }}>Mapped to a landing page</div>
-                  </div>
+                    }
+                    accent="#10b981"
+                    sub={
+                      domainsData ? (
+                        <span className={`badge ${domainsData.subdomainStatus === "active" ? "b-green" : "b-gray"}`} style={{ fontSize: 10 }}>
+                          {domainsData.subdomainStatus ?? "none"}
+                        </span>
+                      ) : undefined
+                    }
+                  />
+                  <StatTile
+                    label="Custom domain sites"
+                    value={domainsData?.customDomain ? 1 : 0}
+                    sub="Mapped to a landing page"
+                  />
                 </div>
 
                 <div className="card" style={{ padding: 16 }}>
