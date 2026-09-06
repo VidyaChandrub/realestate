@@ -1,7 +1,23 @@
 import { Organisation, OrgIndustry, Prisma, User } from '@prisma/client';
 
+type SafeUserSource = Pick<
+  User,
+  | 'id'
+  | 'orgId'
+  | 'firstName'
+  | 'lastName'
+  | 'email'
+  | 'phoneNumber'
+  | 'status'
+  | 'mustChangePassword'
+  | 'createdAt'
+  | 'onboardingStep'
+> & {
+  emailVerifiedAt?: Date | null;
+};
+
 // Strips password_hash and other internal fields before a user ever reaches a response.
-export function toSafeUser(user: User) {
+export function toSafeUser(user: SafeUserSource) {
   return {
     id: user.id,
     org_id: user.orgId,
@@ -13,7 +29,7 @@ export function toSafeUser(user: User) {
     must_change_password: user.mustChangePassword,
     created_at: user.createdAt,
     onboarding_step: user.onboardingStep,
-    email_verified_at: user.emailVerifiedAt,
+    email_verified_at: user.emailVerifiedAt ?? null,
   };
 }
 

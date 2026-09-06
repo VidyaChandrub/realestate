@@ -69,6 +69,14 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {}
 
+  private uniqueSubdomain(source: string, excludeOrgId?: string) {
+    return generateUniqueSubdomain(
+      this.prisma as unknown as Parameters<typeof generateUniqueSubdomain>[0],
+      source,
+      excludeOrgId,
+    );
+  }
+
   async signup(dto: SignupDto) {
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.work_email },
@@ -115,7 +123,7 @@ export class AuthService {
       subdomain = normalizeSubdomain(dto.subdomain);
       await this.assertSubdomainAvailable(subdomain);
     } else {
-      subdomain = await generateUniqueSubdomain(this.prisma, slug);
+      subdomain = await this.uniqueSubdomain(slug);
       subdomainAuto = true;
     }
 
@@ -615,7 +623,7 @@ export class AuthService {
       subdomain = normalizeSubdomain(dto.subdomain);
       await this.assertSubdomainAvailable(subdomain);
     } else {
-      subdomain = await generateUniqueSubdomain(this.prisma, slug);
+      subdomain = await this.uniqueSubdomain(slug);
       subdomainAuto = true;
     }
 
@@ -739,7 +747,7 @@ export class AuthService {
     } else if (!current.subdomain) {
       // Auto-assign a unique subdomain the first time (resumed/organisation
       // step with no subdomain yet) — it becomes the org's default login URL.
-      const auto = await generateUniqueSubdomain(this.prisma, current.slug, orgId);
+      const auto = await this.uniqueSubdomain(current.slug, orgId);
       subdomainUpdate = { subdomain: auto, subdomainStatus: 'active', auto: true };
     }
 
@@ -815,7 +823,20 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      include: { userRoles: { include: { role: true } } },
+      select: {
+        id: true,
+        orgId: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phoneNumber: true,
+        passwordHash: true,
+        status: true,
+        mustChangePassword: true,
+        createdAt: true,
+        onboardingStep: true,
+        userRoles: { select: { role: { select: { key: true } } } },
+      },
     });
 
     if (!user || user.status !== 'active') {
@@ -834,11 +855,16 @@ export class AuthService {
     const isSuperAdmin = roles.includes('super_admin');
 
     if (dto.host && !isSuperAdmin) {
-      const portal = await this.resolveLoginHost(dto.host);
-      if (portal && user.orgId !== portal.id) {
-        throw new UnauthorizedException(
-          'This login page belongs to another organisation. Use your organisation subdomain.',
-        );
+      try {
+        const portal = await this.resolveLoginHost(dto.host);
+        if (portal && user.orgId !== portal.id) {
+          throw new UnauthorizedException(
+            'This login page belongs to another organisation. Use your organisation subdomain.',
+          );
+        }
+      } catch (err) {
+        if (err instanceof UnauthorizedException) throw err;
+        // Host lookup must not take login down if domain tables are incomplete.
       }
     }
 
@@ -847,7 +873,10 @@ export class AuthService {
     // through so the wizard can be resumed from /register.
     let orgStatus: string | null = null;
     if (user.orgId) {
-      const org = await this.prisma.organisation.findUnique({ where: { id: user.orgId } });
+      const org = await this.prisma.organisation.findUnique({
+        where: { id: user.orgId },
+        select: { status: true },
+      });
       orgStatus = org?.status ?? null;
       if (org && org.status === 'pending' && user.onboardingStep === 'completed') {
         throw new UnauthorizedException('Organisation pending approval — please wait for super admin approval');

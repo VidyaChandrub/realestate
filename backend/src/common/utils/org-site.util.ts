@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
 import type { Prisma } from '@prisma/client';
+import type { PrismaService } from '../../database/prisma.service';
 import { generateUniqueLandingPageSlug } from './slug.util';
 import {
   generateSubdomainSuggestions,
@@ -9,12 +10,10 @@ import {
 } from './domain.util';
 
 type Tx = Prisma.TransactionClient;
+type SubdomainLookup = PrismaService | Prisma.TransactionClient;
 
 export async function generateUniqueSubdomain(
-  prisma: {
-    organisation: { findFirst: (args: unknown) => Promise<{ id: string } | null> };
-    orgDomainRequest: { findFirst: (args: unknown) => Promise<{ id: string } | null> };
-  },
+  prisma: SubdomainLookup,
   source: string,
   excludeOrgId?: string,
 ): Promise<string> {
@@ -37,10 +36,7 @@ export async function generateUniqueSubdomain(
 }
 
 async function isSubdomainAvailable(
-  prisma: {
-    organisation: { findFirst: (args: unknown) => Promise<{ id: string } | null> };
-    orgDomainRequest: { findFirst: (args: unknown) => Promise<{ id: string } | null> };
-  },
+  prisma: SubdomainLookup,
   label: string,
   excludeOrgId?: string,
 ): Promise<boolean> {
@@ -51,7 +47,7 @@ async function isSubdomainAvailable(
       ...(excludeOrgId ? { id: { not: excludeOrgId } } : {}),
     },
     select: { id: true },
-  } as never);
+  });
   if (org) return false;
   const pending = await prisma.orgDomainRequest.findFirst({
     where: {
@@ -61,7 +57,7 @@ async function isSubdomainAvailable(
       ...(excludeOrgId ? { orgId: { not: excludeOrgId } } : {}),
     },
     select: { id: true },
-  } as never);
+  });
   return !pending;
 }
 
