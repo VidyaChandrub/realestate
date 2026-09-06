@@ -12,6 +12,12 @@ import { UpdatePlatformConfigDto } from './dto/update-platform-config.dto';
 // The single global config row id. Only one row is ever used.
 const PLATFORM_CONFIG_ID = 'platform';
 
+function migrateLegacyBase(base: string | null | undefined): string {
+  const normalized = base ? normalizeDomain(base) : '';
+  if (!normalized || normalized === 'ipixxel.in') return 'ipixxel.ae';
+  return normalized;
+}
+
 // Environment keys patched live from the DB row so the existing sync
 // domain.utils (subdomainHost / extractSubdomainFromHost / DNS generators)
 // pick up Super Admin console changes without a redeploy or process restart.
@@ -74,10 +80,22 @@ export class PlatformConfigService implements OnApplicationBootstrap {
       this.logger.warn(`Could not read PlatformConfig row: ${err.message}`);
     }
     if (!row) return;
+    const subdomainBase = migrateLegacyBase(row.subdomainBase);
+    if (subdomainBase && subdomainBase !== row.subdomainBase) {
+      try {
+        row = await this.prisma.platformConfig.update({
+          where: { id: PLATFORM_CONFIG_ID },
+          data: { subdomainBase },
+        });
+        this.logger.log(`Updated platform subdomain base to ${subdomainBase}`);
+      } catch (err: any) {
+        this.logger.warn(`Could not persist subdomain base: ${err.message}`);
+      }
+    }
     patchEnv({
       SUBDOMAIN_MODE: row.subdomainMode || null,
-      SUBDOMAIN_BASE_DOMAIN: row.subdomainBase
-        ? normalizeDomain(row.subdomainBase)
+      SUBDOMAIN_BASE_DOMAIN: subdomainBase
+        ? normalizeDomain(subdomainBase)
         : null,
       DNS_MODE: row.dnsMode || null,
       INFRA_IP: row.infraIp || null,
@@ -95,7 +113,10 @@ export class PlatformConfigService implements OnApplicationBootstrap {
         where: { id: PLATFORM_CONFIG_ID },
       });
       if (config) {
-        return this.toView(config);
+        return this.toView({
+          ...config,
+          subdomainBase: migrateLegacyBase(config.subdomainBase),
+        });
       }
     } catch (err: any) {
       this.logger.warn(`Could not read PlatformConfig from DB: ${err.message}`);
@@ -106,7 +127,7 @@ export class PlatformConfigService implements OnApplicationBootstrap {
       id: null,
       subdomainMode:
         process.env.SUBDOMAIN_MODE === 'localhost' ? 'localhost' : 'production',
-      subdomainBase: process.env.SUBDOMAIN_BASE_DOMAIN || null,
+      subdomainBase: process.env.SUBDOMAIN_BASE_DOMAIN || 'ipixxel.ae',
       dnsMode: process.env.DNS_MODE || 'cname',
       infraIp: process.env.INFRA_IP || null,
       infraIpv6: process.env.INFRA_IPV6 || null,
@@ -173,7 +194,7 @@ export class PlatformConfigService implements OnApplicationBootstrap {
     return {
       id: config.id,
       subdomainMode: config.subdomainMode,
-      subdomainBase: config.subdomainBase,
+      subdomainBase: migrateLegacyBase(config.subdomainBase),
       dnsMode: config.dnsMode,
       infraIp: config.infraIp,
       infraIpv6: config.infraIpv6,

@@ -101,7 +101,7 @@ export class AuthService {
 
     // --- Organisation domain identity (subdomain / custom domain) ---
     // Every organisation is automatically assigned a unique platform
-    // subdomain (its default login URL, e.g. "<slug>.ipixxel.in"). If the
+    // subdomain (its default login URL, e.g. "<slug>.ipixxel.ae"). If the
     // registrant typed one it's used instead and kept pending for Super Admin
     // approval — but an auto-generated one is active immediately.
     let subdomain: string | null = null;

@@ -2,17 +2,25 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const MODE = process.env.NEXT_PUBLIC_SUBDOMAIN_MODE || "";
-const BASE_DOMAIN =
+const CONFIGURED_BASE =
   process.env.NEXT_PUBLIC_SUBDOMAIN_BASE_DOMAIN ||
-  (MODE === "localhost" ? "localhost" : "ipixxel.in");
+  (MODE === "localhost" ? "localhost" : "ipixxel.ae");
+
+const PLATFORM_BASES = [
+  ...new Set(
+    [CONFIGURED_BASE, MODE === "localhost" ? "localhost" : ""]
+      .filter((host): host is string => Boolean(host))
+      .map((host) => host.toLowerCase().replace(/^www\./, "")),
+  ),
+];
 
 const PLATFORM_HOSTS = new Set(
   [
     "localhost",
     "127.0.0.1",
-    BASE_DOMAIN,
-    `www.${BASE_DOMAIN}`,
     process.env.NEXT_PUBLIC_APP_HOST,
+    ...PLATFORM_BASES,
+    ...PLATFORM_BASES.map((base) => `www.${base}`),
   ]
     .filter((host): host is string => Boolean(host))
     .map((host) => host.toLowerCase()),
@@ -32,9 +40,7 @@ function subdomainLabel(host: string, base: string): string | null {
 }
 
 function isPlatformSubdomain(host: string): boolean {
-  if (subdomainLabel(host, BASE_DOMAIN)) return true;
-  if (MODE === "localhost" && subdomainLabel(host, "localhost")) return true;
-  return false;
+  return PLATFORM_BASES.some((base) => Boolean(subdomainLabel(host, base)));
 }
 
 function isOrgSiteHost(host: string): boolean {
