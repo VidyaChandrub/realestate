@@ -49,16 +49,37 @@ const WT_STANDARD = {
   muted: "#94a3b8",
   faint: "#cbd5e1",
 
-  // Brand — indigo primary + warm gold
-  primary: "#4f46e5",
-  primaryHover: "#4338ca",
-  primarySoft: "rgba(79,70,229,.10)",
-  primarySoft2: "rgba(79,70,229,.06)",
-  primaryGlow: "rgba(79,70,229,.22)",
-  gold: "#c4a46a",
+  // Brand — indigo primary + warm gold (platform defaults match BRAND/site-config)
+  primary: "#6d5dfc",
+  primaryHover: "#5c55ee",
+  primaryDark: "#5448e8",
+  primaryLite: "#9690ff",
+  primarySoft: "rgba(109,93,252,.10)",
+  primarySoft2: "rgba(109,93,252,.06)",
+  primaryGlow: "rgba(109,93,252,.22)",
+  gold: "#cda45e",
   goldHover: "#b8893b",
-  goldSoft: "rgba(196,164,106,.12)",
-  goldSoft2: "rgba(196,164,106,.07)",
+  goldSoft: "rgba(205,164,94,.12)",
+  goldSoft2: "rgba(205,164,94,.07)",
+
+  // Dark ink surfaces (hero/band backgrounds over images)
+  inkDark: "#090d16",
+  inkDeep: "#0b1220",
+
+  // Form fields — single input language for every widget
+  fieldBg: "#ffffff",
+  fieldBgDark: "rgba(6,10,18,.45)",
+  fieldBorder: "#cbd5e1",
+  fieldBorderDark: "rgba(255,255,255,.18)",
+  fieldRadius: 10,
+  fieldPadX: 13,
+  fieldPadY: 11,
+  fieldFont: 13.5,
+  fieldText: "#0f172a",
+  fieldTextDark: "#ffffff",
+  fieldPlaceholder: "#94a3b8",
+  fieldFocus: "#6d5dfc",
+  fieldFocusRing: "0 0 0 3px rgba(109,93,252,.16)",
 
   // Status
   success: "#0f9d58",
@@ -77,8 +98,9 @@ const WT_STANDARD = {
 
   // Typography
   font: 'var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-  serif: 'var(--font-playfair), "Playfair Display", Georgia, "Times New Roman", serif',
-  mono: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  serif:
+    'var(--font-playfair), "Playfair Display", Georgia, "Times New Roman", serif',
+  mono: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 
   // Spacing
   spaceXs: 8,
@@ -169,7 +191,7 @@ const WT_MODERN_TOKENS = {
   border: "1px solid rgba(16,24,40,.12)",
   borderStrong: "1px solid rgba(16,24,40,.20)",
   borderFaint: "1px solid rgba(16,24,40,.07)",
-  borderHover: "1px solid rgba(79,70,229,.40)",
+  borderHover: "1px solid rgba(109,93,252,.40)",
 
   // Text — pure black/dark for bold contrast
   ink: "#080d18",
@@ -178,8 +200,8 @@ const WT_MODERN_TOKENS = {
   muted: "#6b7280",
 
   // Brand — vibrant indigo, strong contrast
-  primarySoft: "rgba(79,70,229,.08)",
-  primarySoft2: "rgba(79,70,229,.04)",
+  primarySoft: "rgba(109,93,252,.08)",
+  primarySoft2: "rgba(109,93,252,.04)",
 
   // Minimal shadows — flat, clean
   shadow: "0 1px 2px rgba(16,24,40,.06), 0 4px 12px rgba(16,24,40,.06)",
@@ -233,20 +255,30 @@ export function hexToSoft(color: string, alpha = 0.12): string {
   const c = (color || "").trim();
   if (c.startsWith("#")) {
     const h = c.slice(1);
-    const full = h.length === 3 ? h.split("").map((x) => x + x).join("") : h;
+    const full =
+      h.length === 3
+        ? h
+            .split("")
+            .map((x) => x + x)
+            .join("")
+        : h;
     const r = parseInt(full.slice(0, 2), 16);
     const g = parseInt(full.slice(2, 4), 16);
     const b = parseInt(full.slice(4, 6), 16);
-    if ([r, g, b].every((n) => !Number.isNaN(n))) return `rgba(${r},${g},${b},${alpha})`;
+    if ([r, g, b].every((n) => !Number.isNaN(n)))
+      return `rgba(${r},${g},${b},${alpha})`;
   }
-  return `rgba(79,70,229,${alpha})`;
+  return `rgba(109,93,252,${alpha})`;
 }
 
 // ---------------------------------------------------------------------------
 // Cards
 // ---------------------------------------------------------------------------
 
-export function wtCard(extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtCard(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   return {
     background: wt.surface,
     border: wt.border,
@@ -256,7 +288,10 @@ export function wtCard(extra?: CSSProperties, wt: WtTokens = WT): CSSProperties 
   };
 }
 
-export function wtCardMuted(extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtCardMuted(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   return {
     background: wt.surfaceMuted,
     border: wt.borderFaint,
@@ -267,7 +302,10 @@ export function wtCardMuted(extra?: CSSProperties, wt: WtTokens = WT): CSSProper
 }
 
 /** Card for use on dark/image backgrounds — translucent, luminous. */
-export function wtCardGlass(extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtCardGlass(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   return {
     background: "rgba(255,255,255,.10)",
     border: "1px solid rgba(255,255,255,.22)",
@@ -280,7 +318,10 @@ export function wtCardGlass(extra?: CSSProperties, wt: WtTokens = WT): CSSProper
 }
 
 /** Premium elevated card with hover lift — conversion focused. */
-export function wtCardPremium(extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtCardPremium(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   return {
     background: wt.surface,
     border: wt.border,
@@ -300,7 +341,10 @@ export function wtCardHover(wt: WtTokens = WT): CSSProperties {
 }
 
 /** Image treatment — consistent radius + shadow */
-export function wtImage(extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtImage(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   return {
     borderRadius: wt.radius,
     overflow: "hidden",
@@ -333,9 +377,9 @@ export function wtButton(o: BtnOpts = {}, wt: WtTokens = WT): CSSProperties {
   const accent = accentColor(o, wt);
   const size =
     o.size === "lg"
-      ? { padding: "13px 24px", fontSize: 14.5 }
+      ? { padding: "14px 28px", fontSize: 14.5 }
       : o.size === "sm"
-        ? { padding: "8px 14px", fontSize: 12.5 }
+        ? { padding: "9px 16px", fontSize: 12.5 }
         : { padding: "11px 20px", fontSize: 13.5 };
   if (o.outline) {
     return {
@@ -375,12 +419,15 @@ export function wtButton(o: BtnOpts = {}, wt: WtTokens = WT): CSSProperties {
 }
 
 /** Light/ghost button used on dark backgrounds. */
-export function wtButtonLight(o: BtnOpts = {}, wt: WtTokens = WT): CSSProperties {
+export function wtButtonLight(
+  o: BtnOpts = {},
+  wt: WtTokens = WT,
+): CSSProperties {
   const size =
     o.size === "lg"
-      ? { padding: "13px 24px", fontSize: 14.5 }
+      ? { padding: "14px 28px", fontSize: 14.5 }
       : o.size === "sm"
-        ? { padding: "8px 14px", fontSize: 12.5 }
+        ? { padding: "9px 16px", fontSize: 12.5 }
         : { padding: "11px 20px", fontSize: 13.5 };
   return {
     display: "inline-flex",
@@ -403,10 +450,63 @@ export function wtButtonLight(o: BtnOpts = {}, wt: WtTokens = WT): CSSProperties
 }
 
 // ---------------------------------------------------------------------------
+// Form fields
+// ---------------------------------------------------------------------------
+
+/** Standard light input — used on white/muted surfaces across every widget. */
+export function wtField(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
+  return {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: `${wt.fieldPadY}px ${wt.fieldPadX}px`,
+    fontSize: wt.fieldFont,
+    fontWeight: 500,
+    lineHeight: 1.5,
+    color: wt.fieldText,
+    backgroundColor: wt.fieldBg,
+    border: `1.5px solid ${wt.fieldBorder}`,
+    borderRadius: wt.fieldRadius,
+    outline: "none",
+    transition: wt.transition,
+    ...extra,
+  };
+}
+
+/** Glossy dark input — used on hero forms over images. */
+export function wtFieldDark(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
+  return {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: `${wt.fieldPadY}px ${wt.fieldPadX}px`,
+    fontSize: wt.fieldFont,
+    fontWeight: 500,
+    lineHeight: 1.5,
+    color: wt.fieldTextDark,
+    backgroundColor: wt.fieldBgDark,
+    border: `1px solid ${wt.fieldBorderDark}`,
+    borderRadius: wt.fieldRadius,
+    outline: "none",
+    transition: wt.transition,
+    ...extra,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Pills / badges / icon badges
 // ---------------------------------------------------------------------------
 
-export function wtPill(bg: string, color: string, extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtPill(
+  bg: string,
+  color: string,
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   return {
     display: "inline-flex",
     alignItems: "center",
@@ -421,7 +521,11 @@ export function wtPill(bg: string, color: string, extra?: CSSProperties, wt: WtT
   };
 }
 
-export function wtBadge(o: AccentOpts = {}, extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtBadge(
+  o: AccentOpts = {},
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   const accent = accentColor(o, wt);
   return {
     display: "inline-flex",
@@ -437,7 +541,10 @@ export function wtBadge(o: AccentOpts = {}, extra?: CSSProperties, wt: WtTokens 
   };
 }
 
-export function wtIconBadge(o: AccentOpts & { size?: number } = {}, wt: WtTokens = WT): CSSProperties {
+export function wtIconBadge(
+  o: AccentOpts & { size?: number } = {},
+  wt: WtTokens = WT,
+): CSSProperties {
   const accent = accentColor(o, wt);
   const s = o.size ?? 42;
   return {
@@ -472,7 +579,11 @@ export function wtIconBadgeGlass(size = 42, wt: WtTokens = WT): CSSProperties {
 // Typography helpers
 // ---------------------------------------------------------------------------
 
-export function wtEyebrow(o: AccentOpts = {}, extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtEyebrow(
+  o: AccentOpts = {},
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   const accent = accentColor(o, wt);
   return {
     display: "inline-flex",
@@ -491,7 +602,10 @@ export function wtEyebrow(o: AccentOpts = {}, extra?: CSSProperties, wt: WtToken
   };
 }
 
-export function wtSectionTitle(extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtSectionTitle(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   return {
     fontFamily: wt.serif,
     fontSize: "clamp(24px, 3.2vw, 34px)",
@@ -504,7 +618,10 @@ export function wtSectionTitle(extra?: CSSProperties, wt: WtTokens = WT): CSSPro
   };
 }
 
-export function wtSectionLede(extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtSectionLede(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   return {
     fontSize: 14.5,
     lineHeight: 1.7,
@@ -513,7 +630,10 @@ export function wtSectionLede(extra?: CSSProperties, wt: WtTokens = WT): CSSProp
   };
 }
 
-export function wtStatValue(extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtStatValue(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   return {
     fontFamily: wt.serif,
     fontSize: "clamp(24px, 3vw, 32px)",
@@ -526,6 +646,9 @@ export function wtStatValue(extra?: CSSProperties, wt: WtTokens = WT): CSSProper
 }
 
 /** Subtle divider used between list/grid items. */
-export function wtDivider(extra?: CSSProperties, wt: WtTokens = WT): CSSProperties {
+export function wtDivider(
+  extra?: CSSProperties,
+  wt: WtTokens = WT,
+): CSSProperties {
   return { height: 1, background: wt.border, ...extra };
 }

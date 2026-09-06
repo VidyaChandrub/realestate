@@ -13,6 +13,7 @@ import {
   getTestEmailHtml,
   getVerificationEmailHtml,
   getOrgApprovedEmailHtml,
+  getOrgStatusEmailHtml,
 } from './email.templates';
 
 export function frontendBaseUrl(): string {
@@ -39,6 +40,47 @@ export class EmailService {
   private cachedConfig: any = null;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Production often never ran seed, so these tables may be missing.
+   * GET /config swallows that and returns env defaults; PUT must create them.
+   */
+  private async ensureEmailTables() {
+    await this.prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS identity;`);
+    await this.prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS audit;`);
+    await this.prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS identity.email_configs (
+        id TEXT PRIMARY KEY,
+        host TEXT NOT NULL,
+        port INTEGER NOT NULL DEFAULT 587,
+        secure BOOLEAN NOT NULL DEFAULT false,
+        "user" TEXT NOT NULL DEFAULT '',
+        password TEXT NOT NULL DEFAULT '',
+        from_email TEXT NOT NULL,
+        from_name TEXT NOT NULL DEFAULT 'iPixxel Realty',
+        reply_to TEXT,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        invite_subject TEXT,
+        invite_body TEXT,
+        reset_subject TEXT,
+        reset_body TEXT,
+        created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS invite_subject TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS invite_body TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS reset_subject TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS reset_body TEXT;`,
+    );
+  }
 
   /**
    * Fetch active config from database, or fallback to environment variables.
@@ -84,6 +126,8 @@ export class EmailService {
    * Update or create the Super Admin's SMTP configuration.
    */
   async updateConfig(dto: UpdateEmailConfigDto) {
+    await this.ensureEmailTables();
+
     let existing: any = null;
     try {
       existing = await this.prisma.emailConfig.findFirst({
@@ -483,6 +527,48 @@ export class EmailService {
       html,
       template: 'notification',
       metadata: { kind: 'org_approved', orgName: params.orgName },
+    });
+  }
+
+  /**
+   * Org lifecycle status-change email (submitted / rejected / disabled /
+   * re-enabled). Wired into org registration, wizard completion, rejection
+   * and status toggle flows.
+   */
+  async sendOrgStatusEmail(params: {
+    to: string;
+    recipientName?: string;
+    orgName?: string;
+    status: 'submitted' | 'rejected' | 'disabled' | 'enabled';
+    reason?: string;
+  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const orgName = params.orgName || 'Your organisation';
+
+    const subjects: Record<typeof params.status, string> = {
+      submitted: `${orgName} — application submitted`,
+      rejected: `Update on your ${orgName} application`,
+      disabled: `Your ${orgName} workspace has been disabled`,
+      enabled: `Your ${orgName} workspace has been re-enabled`,
+    };
+
+    const html = getOrgStatusEmailHtml({
+      recipientName: params.recipientName,
+      orgName: params.orgName,
+      status: params.status,
+      reason: params.reason,
+      loginUrl: `${frontendBaseUrl()}/login`,
+    });
+
+    return this.sendMail({
+      to: params.to,
+      subject: subjects[params.status],
+      html,
+      template: 'notification',
+      metadata: {
+        kind: `org_${params.status}`,
+        orgName: params.orgName,
+        reason: params.reason ?? null,
+      },
     });
   }
 }

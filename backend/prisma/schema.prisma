@@ -137,6 +137,12 @@ model Organisation {
   subdomainStatus    String  @default("pending") @map("subdomain_status") // none | pending | active | rejected
   customDomain       String? @unique @map("custom_domain")
   customDomainStatus String  @default("none") @map("custom_domain_status") // none | pending | approved | connected | rejected
+  // The org's PRIMARY landing page that its custom domain serves. When the org
+  // requests/connects a custom domain it picks one of its landing pages (its
+  // selected template); the approved custom domain is mapped to exactly that
+  // page. Defaults to the org's first published page when not explicitly set.
+  customDomainLandingPageId String?     @map("custom_domain_landing_page_id")
+  customDomainLandingPage   LandingPage? @relation("OrgCustomDomainLandingPage", fields: [customDomainLandingPageId], references: [id], onDelete: SetNull)
 
   // Set by AdminOrganisationsService.rejectPending when a Super Admin
   // rejects a pending registration — the mandatory reason they entered.
@@ -154,7 +160,6 @@ model Organisation {
   organisationTemplates OrganisationTemplate[]
   landingPages          LandingPage[]
   typographySets        TypographySet[]
-  domainRequests        DomainRequest[]
   orgDomainRequests     OrgDomainRequest[]
   trackingEvents        TrackingEvent[]
   projects              Project[]
@@ -617,11 +622,6 @@ model LandingPage {
   thumbnail        String?
   pageType         TemplatePageType  @default(landing) @map("page_type")
   parentId         String?           @map("parent_id") // thank-you companion linkage, among the org's own pages
-  // Optional per-website subdomain (e.g. abc.platform.com). A website can have
-  // EITHER a subdomain OR a custom domain (via DomainRequest), mapped
-  // Subdomain/Domain -> Organisation -> LandingPage.
-  subdomain        String?           @unique
-  subdomainStatus  String            @default("none") @map("subdomain_status") // none | pending | active | rejected
   submittedAt      DateTime?         @map("submitted_at")
   reviewedAt       DateTime?         @map("reviewed_at")
   reviewedById     String?           @map("reviewed_by_id")
@@ -630,12 +630,13 @@ model LandingPage {
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
 
-  organisation   Organisation    @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  sourceTemplate Template?       @relation(fields: [sourceTemplateId], references: [id], onDelete: SetNull)
-  parent         LandingPage?    @relation("LandingPageCompanion", fields: [parentId], references: [id], onDelete: SetNull)
-  children       LandingPage[]   @relation("LandingPageCompanion")
-  domainRequest  DomainRequest?
-  trackingEvents TrackingEvent[]
+  organisation    Organisation    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  sourceTemplate  Template?       @relation(fields: [sourceTemplateId], references: [id], onDelete: SetNull)
+  parent          LandingPage?    @relation("LandingPageCompanion", fields: [parentId], references: [id], onDelete: SetNull)
+  children        LandingPage[]   @relation("LandingPageCompanion")
+  customDomainOrgs Organisation[] @relation("OrgCustomDomainLandingPage")
+  orgDomainRequests OrgDomainRequest[]
+  trackingEvents  TrackingEvent[]
 
   @@unique([orgId, slug])
   @@index([orgId])
@@ -693,15 +694,19 @@ enum OrgDomainRequestStatus {
 // lists and approves/rejects across all organisations. Approval writes the
 // ground truth onto Organisation:
 //   - subdomain     -> Organisation.subdomain + subdomainStatus = active
-//   - custom_domain -> Organisation.customDomain + customDomainStatus = connected
-// This is distinct from DomainRequest/LandingPage, which handle per-website
-// custom-domain mapping for a specific landing page.
+//   - custom_domain -> Organisation.customDomain + customDomainStatus = connected,
+//                      mapped to the org's selected landing page
+//                      (Organisation.customDomainLandingPageId).
 model OrgDomainRequest {
   id              String                 @id @default(uuid())
   orgId           String                 @map("org_id")
   kind            OrgDomainRequestKind
   subdomain       String?
   customDomain    String?                @map("custom_domain")
+  // For custom_domain requests: the org's chosen landing page (template) that
+  // the custom domain should serve. Optional — defaults to the org's first
+  // published page at approval time.
+  landingPageId   String?                @map("landing_page_id")
   status          OrgDomainRequestStatus @default(pending)
   requestedBy     String?                @map("requested_by")
   requestedAt     DateTime               @default(now()) @map("requested_at")
@@ -711,95 +716,12 @@ model OrgDomainRequest {
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
 
-  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  organisation Organisation  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  landingPage  LandingPage?  @relation(fields: [landingPageId], references: [id], onDelete: SetNull)
 
   @@index([orgId])
   @@index([status])
   @@map("org_domain_requests")
-  @@schema("templates")
-}
-
-enum DomainRequestStatus {
-  pending
-  approved
-  rejected
-  dns_required
-  verification_pending
-  verified
-  ssl_pending
-  connected
-  verification_failed
-  connection_failed
-
-  @@schema("templates")
-}
-
-enum DnsStatus {
-  pending
-  verified
-  failed
-
-  @@schema("templates")
-}
-
-enum SslStatus {
-  pending
-  active
-  failed
-  expired
-
-  @@schema("templates")
-}
-
-model DomainRequest {
-  id                 String              @id @default(uuid())
-  orgId              String              @map("org_id")
-  landingPageId      String              @unique @map("landing_page_id")
-  domain             String
-  status             DomainRequestStatus @default(pending)
-  requestedBy        String?             @map("requested_by")
-  requestedAt        DateTime            @default(now()) @map("requested_at")
-  reviewedAt         DateTime?           @map("reviewed_at")
-  reviewedBy         String?             @map("reviewed_by")
-  rejectionReason    String?             @map("rejection_reason")
-  dnsStatus          DnsStatus           @default(pending) @map("dns_status")
-  sslStatus          SslStatus           @default(pending) @map("ssl_status")
-  verificationToken  String              @map("verification_token")
-  dnsInstructions    Json?               @map("dns_instructions")
-  expectedRecords    Json?               @map("expected_records")
-  detectedRecords    Json?               @map("detected_records")
-  lastVerificationAt DateTime?           @map("last_verification_at")
-  verifiedAt         DateTime?           @map("verified_at")
-  sslIssuedAt        DateTime?           @map("ssl_issued_at")
-  sslExpiresAt       DateTime?           @map("ssl_expires_at")
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
-
-  organisation Organisation         @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  landingPage  LandingPage          @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
-  logs         DnsVerificationLog[]
-
-  @@index([orgId])
-  @@index([domain])
-  @@index([status])
-  @@map("domain_requests")
-  @@schema("templates")
-}
-
-model DnsVerificationLog {
-  id              String   @id @default(uuid())
-  domainRequestId String   @map("domain_request_id")
-  checkedAt       DateTime @default(now()) @map("checked_at")
-  success         Boolean
-  expected        Json?
-  detected        Json?
-  message         String?
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  domainRequest DomainRequest @relation(fields: [domainRequestId], references: [id], onDelete: Cascade)
-
-  @@index([domainRequestId])
-  @@map("dns_verification_logs")
   @@schema("templates")
 }
 
@@ -1235,4 +1157,39 @@ model EmailLog {
   @@index([sentAt])
   @@map("email_logs")
   @@schema("audit")
+}
+
+// ---------------------------------------------------------------------------
+// Platform subdomain / DNS configuration — single global row (id "platform")
+// managed by the Super Admin from the admin console "Org Domains" screen.
+// Without this there's no way to point an organisation's <sub>.base subdomain
+// at the AWS origin without SSH-ing in to rewrite env vars. The service
+// mirrors the EmailConfig pattern: table is auto-created at runtime for
+// prod installs where migrations never ran, and on load/update it patches
+// process.env so the existing sync domain.utils pick the values up live.
+// Environment variables (SUBDOMAIN_BASE_DOMAIN, SUBDOMAIN_MODE, INFRA_IP,
+// DNS_MODE, ...) remain as non-DB fallbacks / dev overrides.
+// ---------------------------------------------------------------------------
+
+model PlatformConfig {
+  id            String   @id @default("platform")
+  // localhost | production — production builds "<sub>.base" hosts; localhost
+  // dev renders "<sub>.localhost" without needing real DNS.
+  subdomainMode String   @default("production") @map("subdomain_mode")
+  // The platform's wildcard base domain (e.g. "ipixxel.in"), no scheme/dots
+  // prefix. Organisation subdomains resolve to "<sub>.<this>".
+  subdomainBase String?  @map("subdomain_base")
+  // a | cname | ns — how the wildcard is pointed at the origin on the
+  // DNS provider (default a = A record to the AWS server IP).
+  dnsMode String @default("a") @map("dns_mode")
+  // Origin target(s) used for the DNS instructions + "verify" checks.
+  infraIp    String? @map("infra_ip") // AWS/EC2 IPv4 the server is on
+  infraIpv6  String? @map("infra_ipv6")
+  infraCname String? @map("infra_cname")
+  infraNs1   String? @map("infra_ns1")
+  infraNs2   String? @map("infra_ns2")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_configs")
+  @@schema("identity")
 }

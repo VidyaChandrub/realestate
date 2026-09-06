@@ -60,6 +60,9 @@ import type {
   EmailLogsResponse,
   EmailStatsResponse,
   AdminDashboardResponse,
+  PlatformConfig,
+  UpdatePlatformConfigInput,
+  SubdomainVerifyResult,
 } from "./types";
 
 const API_BASE = "/api";
@@ -89,7 +92,10 @@ function errorMessage(body: ApiErrorBody | null, status: number): string {
   return `Request failed with status ${status}`;
 }
 
-function readTokens(): { accessToken: string | null; refreshToken: string | null } {
+function readTokens(): {
+  accessToken: string | null;
+  refreshToken: string | null;
+} {
   if (typeof window === "undefined") {
     return { accessToken: null, refreshToken: null };
   }
@@ -263,7 +269,9 @@ export async function signupStep1(
   });
 }
 
-export async function resumeSignup(email: string): Promise<ResumeSignupResponse> {
+export async function resumeSignup(
+  email: string,
+): Promise<ResumeSignupResponse> {
   return apiFetch<ResumeSignupResponse>("/auth/resume-signup", {
     method: "POST",
     body: JSON.stringify({ email }),
@@ -435,7 +443,9 @@ export async function getCrmLeads(
   return apiFetch<CrmLeadListResponse>(`/org/leads${s ? `?${s}` : ""}`);
 }
 
-export async function getCrmLead(id: string): Promise<import("./types").CrmLead> {
+export async function getCrmLead(
+  id: string,
+): Promise<import("./types").CrmLead> {
   return apiFetch<import("./types").CrmLead>(`/org/leads/${id}`);
 }
 
@@ -451,8 +461,17 @@ export async function addCrmLeadNote(
 
 export async function updateCrmLeadNextAction(
   id: string,
-  input: { actionType: "site_visit" | "follow_up"; scheduledAt: string; note?: string; reminderAt?: string },
-): Promise<NonNullable<import("./types").CrmLead["nextAction"]> & { activity: import("./types").CrmLeadActivity }> {
+  input: {
+    actionType: "site_visit" | "follow_up";
+    scheduledAt: string;
+    note?: string;
+    reminderAt?: string;
+  },
+): Promise<
+  NonNullable<import("./types").CrmLead["nextAction"]> & {
+    activity: import("./types").CrmLeadActivity;
+  }
+> {
   return apiFetch(`/org/leads/${id}/next-action`, {
     method: "PATCH",
     body: JSON.stringify(input),
@@ -498,10 +517,13 @@ export async function getOrgDomainInfo(): Promise<OrgDomainInfo> {
 export async function requestCustomDomain(
   input: RequestCustomDomainInput,
 ): Promise<OrgDomainInfo["requests"][number]> {
-  return apiFetch<OrgDomainInfo["requests"][number]>("/org/domain/custom-domain", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  return apiFetch<OrgDomainInfo["requests"][number]>(
+    "/org/domain/custom-domain",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 // --- Super Admin: org subdomain / custom-domain request review ---
@@ -535,6 +557,30 @@ export async function reviewOrgDomainRequest(
   );
 }
 
+/** Live DNS + site check for an approved org subdomain. */
+export async function verifyOrgDomainRequest(
+  id: string,
+): Promise<SubdomainVerifyResult> {
+  return apiFetch<SubdomainVerifyResult>(
+    `/admin/org-domain-requests/${id}/verify`,
+  );
+}
+
+// --- Super Admin: platform subdomain / DNS configuration ---
+
+export async function getPlatformConfig(): Promise<PlatformConfig> {
+  return apiFetch<PlatformConfig>("/admin/platform-config");
+}
+
+export async function updatePlatformConfig(
+  input: UpdatePlatformConfigInput,
+): Promise<PlatformConfig> {
+  return apiFetch<PlatformConfig>("/admin/platform-config", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
 // --- In-app notifications (Super Admin bell) ---
 
 export async function getNotifications(params?: {
@@ -553,16 +599,22 @@ export async function getNotifications(params?: {
 }
 
 export async function getUnreadNotifications(): Promise<UnreadNotificationsResponse> {
-  return apiFetch<UnreadNotificationsResponse>("/admin/notifications/unread-count");
+  return apiFetch<UnreadNotificationsResponse>(
+    "/admin/notifications/unread-count",
+  );
 }
 
-export async function markNotificationRead(id: string): Promise<{ id: string }> {
+export async function markNotificationRead(
+  id: string,
+): Promise<{ id: string }> {
   return apiFetch<{ id: string }>(`/admin/notifications/${id}/read`, {
     method: "PATCH",
   });
 }
 
-export async function markAllNotificationsRead(): Promise<{ success: boolean }> {
+export async function markAllNotificationsRead(): Promise<{
+  success: boolean;
+}> {
   return apiFetch<{ success: boolean }>("/admin/notifications/read-all", {
     method: "POST",
   });
@@ -668,7 +720,9 @@ export async function deleteStandaloneUnit(
 export async function getProjectSalesAgents(
   projectId: string,
 ): Promise<ProjectSalesAgent[]> {
-  return apiFetch<ProjectSalesAgent[]>(`/org/projects/${projectId}/sales-agents`);
+  return apiFetch<ProjectSalesAgent[]>(
+    `/org/projects/${projectId}/sales-agents`,
+  );
 }
 
 /** Full-set replace — pass every assigned user id; re-submitting is idempotent. */
@@ -726,7 +780,8 @@ export async function getEmailLogs(params?: {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
   if (params?.limit) query.set("limit", String(params.limit));
-  if (params?.status && params.status !== "all") query.set("status", params.status);
+  if (params?.status && params.status !== "all")
+    query.set("status", params.status);
   if (params?.search) query.set("search", params.search);
 
   const qs = query.toString();

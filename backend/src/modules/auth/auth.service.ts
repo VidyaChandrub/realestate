@@ -45,6 +45,7 @@ import {
   extractSubdomainFromHost,
 } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
+import { generateUniqueSubdomain } from '../../common/utils/org-site.util';
 import {
   PERMISSION_MODULES,
   computeEffectivePermissions,
@@ -65,6 +66,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   async signup(dto: SignupDto) {
@@ -98,10 +100,12 @@ export class AuthService {
     });
 
     // --- Organisation domain identity (subdomain / custom domain) ---
-    // The requested subdomain is validated and reserved on a pending
-    // OrgDomainRequest here; it only becomes an active Organisation.subdomain
-    // once the Super Admin approves the organisation.
+    // Every organisation is automatically assigned a unique platform
+    // subdomain (its default login URL, e.g. "<slug>.ipixxel.in"). If the
+    // registrant typed one it's used instead and kept pending for Super Admin
+    // approval — but an auto-generated one is active immediately.
     let subdomain: string | null = null;
+    let subdomainAuto = false;
     if (dto.subdomain) {
       if (!isValidSubdomain(dto.subdomain)) {
         throw new ConflictException(
@@ -110,6 +114,9 @@ export class AuthService {
       }
       subdomain = normalizeSubdomain(dto.subdomain);
       await this.assertSubdomainAvailable(subdomain);
+    } else {
+      subdomain = await generateUniqueSubdomain(this.prisma, slug);
+      subdomainAuto = true;
     }
 
     let customDomain: string | null = null;
@@ -134,11 +141,12 @@ export class AuthService {
             country: dto.country ?? null,
             currency: dto.currency ?? 'INR',
             timezone: dto.timezone ?? 'Asia/Kolkata',
-            // Subdomain only becomes active on approval; reserve the column so
-            // external tooling can read the intended value early.
+            // Auto-assigned subdomains are active immediately (they're the
+            // org's default login URL); user-requested ones stay pending until
+            // a Super Admin approves the label.
             subdomain,
             customDomain,
-            subdomainStatus: subdomain ? 'pending' : 'none',
+            subdomainStatus: subdomainAuto ? 'active' : 'pending',
             customDomainStatus: customDomain ? 'pending' : 'none',
           },
         });
@@ -165,8 +173,10 @@ export class AuthService {
               orgId: organisation.id,
               kind: 'subdomain',
               subdomain,
-              status: 'pending',
+              status: subdomainAuto ? 'approved' : 'pending',
               requestedBy: user.id,
+              reviewedAt: subdomainAuto ? new Date() : undefined,
+              reviewedBy: subdomainAuto ? user.id : undefined,
             },
           });
         }
@@ -246,6 +256,13 @@ export class AuthService {
     );
 
     // Do NOT issue tokens — organisation is pending approval, user cannot log in yet
+    void this.emailService.sendOrgStatusEmail({
+      to: dto.work_email,
+      recipientName: [dto.first_name, dto.last_name].filter(Boolean).join(' ') || undefined,
+      orgName: dto.company_name,
+      status: 'submitted',
+    });
+
     return {
       organisation: toSafeOrganisation(organisation),
       user: toSafeUser(user),
@@ -584,7 +601,11 @@ export class AuthService {
 
     const slug = await generateUniqueOrgSlug(this.prisma, dto.company_name);
 
+    // Every organisation gets a unique platform subdomain as its default login
+    // URL. A user-typed subdomain stays pending for Super Admin approval; an
+    // auto-generated one (from the org slug) is active immediately.
     let subdomain: string | null = null;
+    let subdomainAuto = false;
     if (dto.subdomain) {
       if (!isValidSubdomain(dto.subdomain)) {
         throw new ConflictException(
@@ -593,6 +614,9 @@ export class AuthService {
       }
       subdomain = normalizeSubdomain(dto.subdomain);
       await this.assertSubdomainAvailable(subdomain);
+    } else {
+      subdomain = await generateUniqueSubdomain(this.prisma, slug);
+      subdomainAuto = true;
     }
 
     let customDomain: string | null = null;
@@ -626,7 +650,7 @@ export class AuthService {
           timezone: dto.timezone ?? 'Asia/Kolkata',
           subdomain,
           customDomain,
-          subdomainStatus: subdomain ? 'pending' : 'none',
+          subdomainStatus: subdomainAuto ? 'active' : 'pending',
           customDomainStatus: customDomain ? 'pending' : 'none',
         },
       });
@@ -641,8 +665,10 @@ export class AuthService {
             orgId: organisation.id,
             kind: 'subdomain',
             subdomain,
-            status: 'pending',
+            status: subdomainAuto ? 'approved' : 'pending',
             requestedBy: user.id,
+            reviewedAt: subdomainAuto ? new Date() : undefined,
+            reviewedBy: subdomainAuto ? user.id : undefined,
           },
         });
       }
@@ -694,7 +720,7 @@ export class AuthService {
       where: { id: orgId },
     });
 
-    let subdomainUpdate: { subdomain: string | null; subdomainStatus: string } | null = null;
+    let subdomainUpdate: { subdomain: string | null; subdomainStatus: string; auto?: boolean } | null = null;
     if (dto.subdomain !== undefined) {
       if (dto.subdomain) {
         if (!isValidSubdomain(dto.subdomain)) {
@@ -710,6 +736,11 @@ export class AuthService {
       } else {
         subdomainUpdate = { subdomain: null, subdomainStatus: 'none' };
       }
+    } else if (!current.subdomain) {
+      // Auto-assign a unique subdomain the first time (resumed/organisation
+      // step with no subdomain yet) — it becomes the org's default login URL.
+      const auto = await generateUniqueSubdomain(this.prisma, current.slug, orgId);
+      subdomainUpdate = { subdomain: auto, subdomainStatus: 'active', auto: true };
     }
 
     const organisation = await this.prisma.organisation.update({
@@ -733,6 +764,18 @@ export class AuthService {
         await this.prisma.orgDomainRequest.update({
           where: { id: pendingSub.id },
           data: { subdomain: subdomainUpdate.subdomain },
+        });
+      } else if (subdomainUpdate.auto) {
+        await this.prisma.orgDomainRequest.create({
+          data: {
+            orgId,
+            kind: 'subdomain',
+            subdomain: subdomainUpdate.subdomain,
+            status: 'approved',
+            requestedBy: userId,
+            reviewedAt: new Date(),
+            reviewedBy: userId,
+          },
         });
       } else {
         await this.prisma.orgDomainRequest.create({

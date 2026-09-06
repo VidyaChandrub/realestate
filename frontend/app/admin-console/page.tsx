@@ -217,7 +217,7 @@ export default function SuperAdminDashboardPage() {
               <Link className="btn btn-soft btn-block" href="/admin-console/organisations">
                 <Icon name="building" size={14} /> Manage organisations
               </Link>
-              <Link className="btn btn-ghost btn-block" href="/admin-console/domains">
+              <Link className="btn btn-ghost btn-block" href="/admin-console/org-domains">
                 <Icon name="globe" size={14} /> Manage domain requests
               </Link>
               <Link className="btn btn-ghost btn-block" href="/admin-console/templates">
@@ -325,7 +325,7 @@ export default function SuperAdminDashboardPage() {
                         {p.desc}
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
-                        <Link href={`/admin-console/domains`} className="btn btn-success btn-sm">
+                        <Link href={`/admin-console/org-domains`} className="btn btn-success btn-sm">
                           Review &amp; Verify
                         </Link>
                         <Link href={`/admin-console/organisation-detail/${p.orgId}`} className="btn btn-ghost btn-sm">

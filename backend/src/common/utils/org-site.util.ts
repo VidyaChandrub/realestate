@@ -68,7 +68,14 @@ async function isSubdomainAvailable(
 /** Ensures an active unique subdomain and a published landing page from assigned templates. */
 export async function provisionOrgPortal(
   tx: Tx,
-  org: { id: string; name: string; slug: string; subdomain: string | null },
+  org: {
+    id: string;
+    name: string;
+    slug: string;
+    subdomain: string | null;
+    customDomain?: string | null;
+    customDomainLandingPageId?: string | null;
+  },
   actorId: string,
   preferredTemplateId?: string | null,
 ): Promise<{ subdomain: string; host: string; landingPageId: string | null }> {
@@ -141,8 +148,6 @@ export async function provisionOrgPortal(
             pageType: 'landing',
             status: 'published',
             publishedAt: new Date(),
-            subdomain,
-            subdomainStatus: 'active',
             content: (tpl.content as Prisma.JsonObject) ?? {},
           },
         });
@@ -164,10 +169,17 @@ export async function provisionOrgPortal(
         }
       }
     }
-  } else {
-    await tx.landingPage.updateMany({
-      where: { orgId: org.id, subdomainStatus: { not: 'none' } },
-      data: { subdomain, subdomainStatus: 'active' },
+  }
+  // If the org has an approved/connected custom domain but no explicit landing
+  // page selected yet, default it to the primary published page.
+  if (
+    org.customDomainLandingPageId == null &&
+    org.customDomain &&
+    landingPageId
+  ) {
+    await tx.organisation.update({
+      where: { id: org.id },
+      data: { customDomainLandingPageId: landingPageId },
     });
   }
 

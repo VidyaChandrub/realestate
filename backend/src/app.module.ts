@@ -21,8 +21,6 @@ import { AdminTypographySetsModule } from './modules/admin-typography-sets/admin
 import { OrgBillingModule } from './modules/org-billing/org-billing.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { SalesAgentsModule } from './modules/sales-agents/sales-agents.module';
-import { OrgDomainRequestsModule } from './modules/org-domain-requests/org-domain-requests.module';
-import { AdminDomainRequestsModule } from './modules/admin-domain-requests/admin-domain-requests.module';
 import { AdminOrgDomainModule } from './modules/admin-org-domain/admin-org-domain.module';
 import { OrgDomainModule } from './modules/org-domain/org-domain.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -35,6 +33,7 @@ import { OrgPermissionsModule } from './modules/org-permissions/org-permissions.
 import { AdminRolesModule } from './modules/admin-roles/admin-roles.module';
 import { OrgDashboardModule } from './modules/org-dashboard/org-dashboard.module';
 import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
+import { PlatformConfigModule } from './modules/platform-config/platform-config.module';
 
 @Module({
   imports: [
@@ -63,8 +62,6 @@ import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.
     OrgPermissionsModule,
     AdminRolesModule,
     OrgDashboardModule,
-    OrgDomainRequestsModule,
-    AdminDomainRequestsModule,
     AdminOrgDomainModule,
     OrgDomainModule,
     NotificationsModule,
@@ -72,6 +69,7 @@ import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.
     PublicSiteModule,
     EmailModule,
     AdminDashboardModule,
+    PlatformConfigModule,
   ],
   controllers: [AppController],
   providers: [AppService],

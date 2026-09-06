@@ -57,24 +57,24 @@ export class PublicSiteService {
       return this.buildOrgSite(custom, host);
     }
 
-    // 3) Legacy per-landing-page custom domain (existing behaviour).
-    const req = await this.prisma.domainRequest.findFirst({
-      where: { domain: normalized, status: 'connected' },
-      include: { landingPage: true },
-    });
-    if (req && req.landingPage.status === 'published') {
-      return { type: 'legacy', domain: req.domain, landingPage: req.landingPage, ssl: req.sslStatus, verifiedAt: req.verifiedAt };
-    }
-
     throw new NotFoundException('No site for host');
   }
 
   private async buildOrgSite(org: any, host: string) {
-    // The org's primary published landing page (first published one, else null).
-    const landingPage = await this.prisma.landingPage.findFirst({
-      where: { orgId: org.id, status: 'published' },
-      orderBy: { updatedAt: 'desc' },
-    }) ?? null;
+    // The org's PRIMARY landing page: an explicitly selected one (its custom
+    // domain target), else the most recently published page.
+    let landingPage: any = null;
+    if (org.customDomainLandingPageId) {
+      landingPage = await this.prisma.landingPage.findFirst({
+        where: { id: org.customDomainLandingPageId, orgId: org.id, status: 'published' },
+      }) ?? null;
+    }
+    if (!landingPage) {
+      landingPage = await this.prisma.landingPage.findFirst({
+        where: { orgId: org.id, status: 'published' },
+        orderBy: { updatedAt: 'desc' },
+      }) ?? null;
+    }
     return {
       type: org.customDomain && host.replace(/^www\./, '') === org.customDomain ? 'custom' : 'subdomain',
       organisation: {
@@ -85,6 +85,7 @@ export class PublicSiteService {
         subdomainStatus: org.subdomainStatus,
         customDomain: org.customDomain,
         customDomainStatus: org.customDomainStatus,
+        customDomainLandingPageId: org.customDomainLandingPageId,
         logoUrl: org.logoUrl,
         brandColour: org.brandColour,
         defaultLanguage: org.defaultLanguage,
@@ -148,11 +149,15 @@ export class PublicSiteService {
 
   async resolveByDomain(domain: string) {
     const normalized = domain.toLowerCase().replace(/^www\./, '');
-    const req = await this.prisma.domainRequest.findFirst({ where: { domain: normalized, status: 'connected' }, include: { landingPage: true } });
-    if (!req) throw new NotFoundException('No site for domain');
-    // ensure landing page is published
-    if (req.landingPage.status !== 'published') throw new NotFoundException('Site not published');
-    return { domain: req.domain, landingPage: req.landingPage, ssl: req.sslStatus, verifiedAt: req.verifiedAt };
+    const org = await this.prisma.organisation.findFirst({ where: { customDomain: normalized, customDomainStatus: 'connected', status: 'active' } });
+    if (!org) throw new NotFoundException('No site for domain');
+
+    const landingPage = org.customDomainLandingPageId
+      ? await this.prisma.landingPage.findFirst({ where: { id: org.customDomainLandingPageId, orgId: org.id, status: 'published' } })
+      : null;
+    const page = landingPage ?? (await this.prisma.landingPage.findFirst({ where: { orgId: org.id, status: 'published' }, orderBy: { updatedAt: 'desc' } }));
+    if (!page) throw new NotFoundException('Site not published');
+    return { domain: org.customDomain, landingPage: page, organisation: org };
   }
 
   async sitemapForDomain(domain: string): Promise<string> {
@@ -161,8 +166,6 @@ export class PublicSiteService {
     const base = `https://${site.domain}`;
     // Includes only published pages for that website - currently single page + children (thank-you) excluded if not published
     const pages = await this.prisma.landingPage.findMany({ where: { orgId: site.landingPage.orgId, status: 'published' } });
-    // Filter to those that belong to same website group? For now return all published for that org that share domain?
-    // Better: return just this landing page + its published children that have same domain via domainRequest? Simulate isolated.
     const urls = pages
       .filter((p) => p.id === site.landingPage.id || p.parentId === site.landingPage.id)
       .map((p) => `${base}/${p.slug === site.landingPage.slug ? '' : p.slug}`.replace(/\/$/, '/'));
@@ -183,9 +186,17 @@ export class PublicSiteService {
   }
 
   async canonicalForPage(landingPageId: string, slug?: string) {
-    const page = await this.prisma.landingPage.findUnique({ where: { id: landingPageId }, include: { domainRequest: true } });
+    const page = await this.prisma.landingPage.findUnique({ where: { id: landingPageId }, select: { id: true, slug: true, orgId: true } });
     if (!page) throw new NotFoundException('Page not found');
-    const domain = page.domainRequest?.status === 'connected' ? page.domainRequest.domain : null;
+    const org = await this.prisma.organisation.findFirst({
+      where: {
+        id: page.orgId,
+        customDomain: { not: null },
+        customDomainStatus: 'connected',
+        OR: [{ customDomainLandingPageId: page.id }, { customDomainLandingPageId: null }],
+      },
+    });
+    const domain = org?.customDomain ?? null;
     if (domain) {
       const path = slug ? `/${slug}` : page.slug ? `/${page.slug}` : '/';
       return `https://${domain}${path === '/' ? '/' : path}`;

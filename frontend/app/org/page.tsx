@@ -273,7 +273,8 @@ export default function OrgDashboardPage() {
 
       {/* Project Portfolio & Inventory Hub Widget */}
       {data?.inventorySummary && data.inventorySummary.projects.length > 0 ? (
-        <Reveal delay={3} style={{ marginBottom: 18 }}>
+        <div style={{ marginBottom: 18 }}>
+        <Reveal delay={3}>
           <div className="card">
             <div className="card-h">
               <span className="t" style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -394,6 +395,7 @@ export default function OrgDashboardPage() {
             </div>
           </div>
         </Reveal>
+        </div>
       ) : null}
 
       {/* Grid: Projects & Agent Leaderboard */}

@@ -1,9 +1,9 @@
 .ps-app {
-  --ps-primary: #6366f1;
-  --ps-primary-dark: #4f46e5;
-  --ps-primary-soft: rgba(99, 102, 241, 0.16);
-  --ps-primary-mist: rgba(99, 102, 241, 0.09);
-  --ps-primary-glow: rgba(99, 102, 241, 0.35);
+  --ps-primary: #6d5dfc;
+  --ps-primary-dark: #5448e8;
+  --ps-primary-soft: rgba(109, 93, 252, 0.16);
+  --ps-primary-mist: rgba(109, 93, 252, 0.09);
+  --ps-primary-glow: rgba(109, 93, 252, 0.35);
   --ps-secondary: #cda45e;
   --ps-secondary-soft: rgba(205, 164, 94, 0.15);
   --ps-secondary-dark: #cda45e;
@@ -29,8 +29,13 @@
   --ps-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
   --ps-shadow-md: 0 4px 20px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.25);
   --ps-shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.55);
-  --ps-grad-primary: linear-gradient(135deg, #6366f1 0%, #4f46e5 55%, #3730a3 100%);
-  --ps-grad-brand: linear-gradient(135deg, #6366f1 0%, #cda45e 100%);
+  --ps-grad-primary: linear-gradient(
+    135deg,
+    #6d5dfc 0%,
+    #5448e8 55%,
+    #3730a3 100%
+  );
+  --ps-grad-brand: linear-gradient(135deg, #6d5dfc 0%, #cda45e 100%);
   --ps-canvas-bg: #0b0f19;
   --ps-canvas-ink: #0a0c10;
   --ps-gold: #cda45e;
@@ -45,7 +50,10 @@
 
 .ps-canvas-dots {
   background-color: #0b0f19;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.08) 1px,
+    transparent 1px
+  );
   background-size: 20px 20px;
 }
 
@@ -92,11 +100,13 @@
   background: var(--ps-bg);
   border: 1px solid var(--ps-line-strong);
   border-radius: var(--ps-radius-sm);
-  padding: 8px 11px;
+  padding: 11px 12px;
   font-size: 13px;
   color: var(--ps-ink);
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   box-sizing: border-box;
 }
 .ps-input::placeholder {
@@ -261,7 +271,9 @@
   cursor: pointer;
   background: var(--ps-panel-raised);
   color: var(--ps-ink);
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 .ps-topnav-btn:hover {
   background: rgba(255, 255, 255, 0.06);
@@ -289,7 +301,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 .ps-topnav-icon-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.06);
@@ -330,7 +344,9 @@
 .ps-device-toggle button[data-active="true"] {
   background: var(--ps-panel-raised);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 .ps-device-label {
   font-size: 11px;
@@ -373,12 +389,16 @@
 
 /* ---- Modern Section Outline & Floating Toolbar ---- */
 .ps-sec-holder {
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
 }
 .ps-sec-holder[data-selected="true"] {
   outline: 2px solid var(--ps-primary) !important;
   outline-offset: -1px;
-  box-shadow: 0 0 0 4px var(--ps-primary-mist), 0 12px 36px rgba(0, 0, 0, 0.25) !important;
+  box-shadow:
+    0 0 0 4px var(--ps-primary-mist),
+    0 12px 36px rgba(0, 0, 0, 0.25) !important;
 }
 .ps-sec-holder:hover:not([data-selected="true"]) {
   outline: 1.5px dashed rgba(109, 93, 252, 0.45);
@@ -392,7 +412,9 @@
   border: 1px solid rgba(255, 255, 255, 0.14) !important;
   border-radius: 10px !important;
   padding: 3px 5px !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
 .ps-artboard-chrome {
@@ -614,7 +636,9 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 .ps-inspector-tab[data-active="true"] {
   color: var(--ps-primary);
@@ -632,7 +656,11 @@
 /* ---- canvas chrome ---- */
 .ps-canvas-dots {
   background-color: #080a10;
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.06) 1px,
+    transparent 1px
+  );
   background-size: 18px 18px;
 }
 
@@ -1017,8 +1045,17 @@
   animation: ps-float-pulse 2s ease-in-out infinite;
 }
 @keyframes ps-float-pulse {
-  0%, 100% { box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28), 0 0 0 0 rgba(37, 211, 102, 0.45); }
-  50% { box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28), 0 0 0 10px rgba(37, 211, 102, 0); }
+  0%,
+  100% {
+    box-shadow:
+      0 10px 24px rgba(15, 23, 42, 0.28),
+      0 0 0 0 rgba(37, 211, 102, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 10px 24px rgba(15, 23, 42, 0.28),
+      0 0 0 10px rgba(37, 211, 102, 0);
+  }
 }
 .ps-fab {
   pointer-events: auto;

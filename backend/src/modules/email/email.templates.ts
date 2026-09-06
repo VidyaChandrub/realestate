@@ -225,6 +225,100 @@ export function getOrgApprovedEmailHtml(params: {
 `;
 }
 
+type OrgStatusKind = 'submitted' | 'rejected' | 'disabled' | 'enabled';
+
+function orgStatusBody(kind: OrgStatusKind, orgName?: string, reason?: string, loginUrl?: string): string {
+  const orgText = orgName ? `<strong>${orgName}</strong>` : 'your organisation';
+
+  const signInBtn = `
+    <div style="text-align: center;">
+      <a href="${loginUrl}" class="btn" target="_blank">Sign In</a>
+    </div>`;
+
+  switch (kind) {
+    case 'submitted':
+      return `
+        <p>Thank you for registering ${orgText} on the <strong>iPixxel Realty</strong> platform.</p>
+        <p>Your application has been received and is currently under review. We'll email you as soon as your organisation has been approved.</p>
+        <p style="font-size: 13px; color: #64748b; margin-top: 24px;">Until your application is approved, you won't be able to sign in to your workspace.</p>`;
+    case 'rejected':
+      return `
+        <p>We're sorry — ${orgText} couldn't be approved at this time.</p>
+        ${
+          reason
+            ? `<div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px 18px; margin: 20px 0;">
+              <p style="margin: 0 0 4px; font-size: 13px; font-weight: 600; color: #b91c1c;">Reason for rejection</p>
+              <p style="margin: 0; font-size: 14px; color: #1e293b;">${reason}</p>
+             </div>`
+            : ''
+        }
+        <p style="font-size: 13px; color: #64748b; margin-top: 24px;">You're welcome to update the details and re-submit your application, or contact our support team for help.</p>`;
+    case 'disabled':
+      return `
+        <p>${orgText} has been disabled, so sign-in has been temporarily paused.</p>
+        <p style="font-size: 13px; color: #64748b; margin-top: 24px;">If you believe this is a mistake, contact our support team.</p>`;
+    case 'enabled':
+      return `
+        <p>${orgText} has been re-enabled. You can sign in to your workspace again.</p>
+        ${signInBtn}`;
+  }
+}
+
+export function getOrgStatusEmailHtml(params: {
+  recipientName?: string;
+  orgName?: string;
+  status: OrgStatusKind;
+  reason?: string;
+  loginUrl?: string;
+}): string {
+  const { recipientName, orgName, status, reason, loginUrl } = params;
+  const greeting = recipientName ? `Hello ${recipientName},` : 'Hello,';
+
+  const titles: Record<OrgStatusKind, string> = {
+    submitted: 'Application submitted',
+    rejected: 'Update on your application',
+    disabled: 'Workspace disabled',
+    enabled: 'Workspace re-enabled',
+  };
+
+  const body = orgStatusBody(status, orgName, reason, loginUrl);
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${titles[status]}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #1e293b; }
+    .container { max-width: 580px; margin: 30px auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .header { background: #0f172a; padding: 28px 32px; text-align: left; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .content { padding: 32px; line-height: 1.6; }
+    .btn { display: inline-block; background: #6366f1; color: #ffffff !important; padding: 12px 28px; border-radius: 8px; font-weight: 600; text-decoration: none; margin: 20px 0; }
+    .footer { padding: 20px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>iPixxel Realty</h1>
+    </div>
+    <div class="content">
+      <p style="font-size: 16px;">${greeting}</p>
+      ${body}
+      <p style="font-size: 13px; color: #64748b; margin-top: 24px;">If you weren't expecting this email, you can safely ignore it.</p>
+    </div>
+    <div class="footer">
+      &copy; ${new Date().getFullYear()} iPixxel Realty. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+`;
+}
+
 export function getTestEmailHtml(params: {
   sentAt: string;
   senderName: string;

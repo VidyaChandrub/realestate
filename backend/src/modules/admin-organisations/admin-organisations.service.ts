@@ -588,6 +588,21 @@ export class AdminOrganisationsService {
       });
     }
 
+    // Keep the org admins informed when the workspace is toggled off/on.
+    const admin = await this.prisma.user.findFirst({
+      where: { orgId: id, userRoles: { some: { role: { key: 'admin' } } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (admin) {
+      void this.emailService.sendOrgStatusEmail({
+        to: admin.email,
+        recipientName:
+          [admin.firstName, admin.lastName].filter(Boolean).join(' ') || undefined,
+        orgName: existing.name,
+        status: dto.status === 'active' ? 'enabled' : 'disabled',
+      });
+    }
+
     return toSafeOrganisation(updated);
   }
 
@@ -724,6 +739,22 @@ export class AdminOrganisationsService {
         entityId: orgId,
       }),
     });
+
+    const admin = await this.prisma.user.findFirst({
+      where: { orgId, userRoles: { some: { role: { key: 'admin' } } } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (admin) {
+      void this.emailService.sendOrgStatusEmail({
+        to: admin.email,
+        recipientName:
+          [admin.firstName, admin.lastName].filter(Boolean).join(' ') || undefined,
+        orgName: org.name,
+        status: 'rejected',
+        reason,
+      });
+    }
+
     return toSafeOrganisation(updated);
   }
 
@@ -809,14 +840,10 @@ export class AdminOrganisationsService {
   async getOrgDomains(id: string) {
     const org = await this.getRealOrganisation(id);
 
-    const [domainRequests, landingPages] = await Promise.all([
-      this.prisma.domainRequest.findMany({
+    const [requests, landingPages] = await Promise.all([
+      this.prisma.orgDomainRequest.findMany({
         where: { orgId: id },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          landingPage: { select: { id: true, name: true, slug: true, status: true } },
-          logs: { orderBy: { checkedAt: 'desc' }, take: 5 },
-        },
+        orderBy: { requestedAt: 'desc' },
       }),
       this.prisma.landingPage.findMany({
         where: { orgId: id },
@@ -825,8 +852,6 @@ export class AdminOrganisationsService {
           name: true,
           slug: true,
           status: true,
-          subdomain: true,
-          subdomainStatus: true,
           sourceTemplate: { select: { id: true, name: true } },
         },
       }),
@@ -842,7 +867,8 @@ export class AdminOrganisationsService {
       subdomainStatus: org.subdomainStatus,
       customDomain: org.customDomain,
       customDomainStatus: org.customDomainStatus,
-      domainRequests,
+      customDomainLandingPageId: org.customDomainLandingPageId,
+      orgDomainRequests: requests,
       landingPages,
     };
   }
