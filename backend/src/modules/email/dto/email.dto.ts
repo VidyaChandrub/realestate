@@ -61,6 +61,22 @@ export class UpdateEmailConfigDto {
   @IsString()
   @IsOptional()
   resetBody?: string;
+
+  @IsString()
+  @IsOptional()
+  accountActivatedSubject?: string;
+
+  @IsString()
+  @IsOptional()
+  accountActivatedBody?: string;
+
+  @IsString()
+  @IsOptional()
+  accountDeactivatedSubject?: string;
+
+  @IsString()
+  @IsOptional()
+  accountDeactivatedBody?: string;
 }
 
 export class SendTestEmailDto {

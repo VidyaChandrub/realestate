@@ -28,6 +28,12 @@ enum OrgStatus {
 enum UserStatus {
   active
   disabled
+  // Organisation Admin-provisioned members start here: they cannot log in
+  // until the Org Admin approves them (approvedAt is set), and only reach
+  // the forced change-password flow until they set their own password, at
+  // which point they flip to `active`. Super Admin / Org Admin accounts are
+  // never created in this state.
+  pending
 
   @@schema("identity")
 }
@@ -183,6 +189,16 @@ model User {
   failedLoginAttempts Int        @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime?  @map("locked_until")
   createdAt           DateTime   @default(now()) @map("created_at")
+
+  // Set when an Organisation Admin approves a pending member. Null = still
+  // awaiting approval (login denied). Backfilled to created_at for every
+  // pre-existing user by the migration, so nobody is locked out.
+  approvedAt          DateTime?  @map("approved_at")
+  // Any access token whose `iat` predates this instant is rejected by
+  // OrgApprovedGuard (fresh per-request check — the only access-token
+  // invalidation mechanism). Stamped on disapproval, admin password
+  // reset/edit, resend-credentials, and self password change/reset.
+  tokenInvalidBefore  DateTime?  @map("token_invalid_before")
 
   // Signup-wizard resume tracking. Lives on User (not Organisation) for the
   // whole flow, including after the org exists — simplest single source of
@@ -1134,6 +1150,10 @@ model EmailConfig {
   inviteBody    String? @map("invite_body")
   resetSubject  String? @map("reset_subject")
   resetBody     String? @map("reset_body")
+  accountActivatedSubject   String? @map("account_activated_subject")
+  accountActivatedBody      String? @map("account_activated_body")
+  accountDeactivatedSubject String? @map("account_deactivated_subject")
+  accountDeactivatedBody    String? @map("account_deactivated_body")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

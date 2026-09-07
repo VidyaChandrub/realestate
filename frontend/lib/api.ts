@@ -144,13 +144,16 @@ function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
-// Backend guards on /org/* dashboard routes re-check the organisation's
-// status from the DB on every request. When a Super Admin deactivates an
-// org whose admin/users are still logged in, their very next action gets a
-// 403 tagged `error: "ORG_INACTIVE"` — end the session and bounce to login
-// straight away rather than leaving a half-dead portal open.
+// Backend guards on /org/* dashboard routes re-check status from the DB on
+// every request:
+//   - ORG_INACTIVE  — a Super Admin deactivated the whole organisation.
+//   - USER_INACTIVE — this member was disapproved/deactivated, or their
+//     access token predates an admin password reset / session invalidation.
+// Either way the member's very next action gets a tagged 403 — end the
+// session and bounce to login straight away rather than leaving a half-dead
+// portal open.
 let forcedLogoutInFlight = false;
-function forceLogoutOrgInactive() {
+function forceSessionEnd(reason: "org_inactive" | "account_revoked") {
   let isOrganisationSession = false;
   if (typeof window !== "undefined") {
     try {
@@ -163,7 +166,7 @@ function forceLogoutOrgInactive() {
     }
   }
 
-  // ORG_INACTIVE is only actionable for an organisation session. A platform
+  // These tags are only actionable for an organisation session. A platform
   // Super Admin has no org_id and must never be redirected to the org login.
   if (!isOrganisationSession) return;
 
@@ -185,7 +188,7 @@ function forceLogoutOrgInactive() {
   // Hard replace (not router.push): a full reload resets every bit of
   // in-memory auth/React state, and replace() keeps the dead portal page
   // out of history.
-  window.location.replace("/login?reason=org_inactive");
+  window.location.replace(`/login?reason=${reason}`);
 }
 
 export async function apiFetch<T>(
@@ -226,12 +229,13 @@ export async function apiFetch<T>(
     ? await res.json()
     : null;
 
-  if (
-    res.status === 403 &&
-    (body as ApiErrorBody | null)?.error === "ORG_INACTIVE" &&
-    !path.startsWith("/auth/")
-  ) {
-    forceLogoutOrgInactive();
+  if (res.status === 403 && !path.startsWith("/auth/")) {
+    const tag = (body as ApiErrorBody | null)?.error;
+    if (tag === "ORG_INACTIVE") {
+      forceSessionEnd("org_inactive");
+    } else if (tag === "USER_INACTIVE") {
+      forceSessionEnd("account_revoked");
+    }
   }
 
   if (!res.ok) {

@@ -418,7 +418,7 @@ export interface OrganisationDetail {
 }
 
 export type OrgUserAssignableRole = string;
-export type OrgUserStatus = "active" | "disabled";
+export type OrgUserStatus = "active" | "disabled" | "pending";
 
 export interface OrgUserRole {
   key: string;
@@ -433,6 +433,7 @@ export interface OrgUser {
   phoneNumber: string | null;
   role: OrgUserRole | null;
   status: OrgUserStatus;
+  approvedAt?: string | null;
   createdAt: string;
   mustChangePassword: boolean;
   // Always false today — Teams have no creation/membership UI yet.
@@ -1643,6 +1644,10 @@ export interface SmtpConfig {
   inviteBody?: string | null;
   resetSubject?: string | null;
   resetBody?: string | null;
+  accountActivatedSubject?: string | null;
+  accountActivatedBody?: string | null;
+  accountDeactivatedSubject?: string | null;
+  accountDeactivatedBody?: string | null;
   updatedAt?: string;
 }
 
@@ -1660,6 +1665,10 @@ export interface UpdateSmtpConfigInput {
   inviteBody?: string;
   resetSubject?: string;
   resetBody?: string;
+  accountActivatedSubject?: string;
+  accountActivatedBody?: string;
+  accountDeactivatedSubject?: string;
+  accountDeactivatedBody?: string;
 }
 
 export interface SendTestEmailInput {

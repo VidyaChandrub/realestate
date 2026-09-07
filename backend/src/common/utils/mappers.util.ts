@@ -14,6 +14,7 @@ type SafeUserSource = Pick<
   | 'onboardingStep'
 > & {
   emailVerifiedAt?: Date | null;
+  approvedAt?: Date | null;
 };
 
 // Strips password_hash and other internal fields before a user ever reaches a response.
@@ -27,6 +28,7 @@ export function toSafeUser(user: SafeUserSource) {
     phone_number: user.phoneNumber,
     status: user.status,
     must_change_password: user.mustChangePassword,
+    approved_at: user.approvedAt ?? null,
     created_at: user.createdAt,
     onboarding_step: user.onboardingStep,
     email_verified_at: user.emailVerifiedAt ?? null,

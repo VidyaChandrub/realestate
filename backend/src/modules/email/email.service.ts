@@ -19,13 +19,17 @@ import {
   getVerificationEmailHtml,
   getOrgApprovedEmailHtml,
   getOrgStatusEmailHtml,
+  getUserAccountStatusEmailHtml,
 } from './email.templates';
 
 export function frontendBaseUrl(): string {
   const raw =
+    process.env.FRONTEND_URL ||
     process.env.APP_FRONTEND_URL ||
-    process.env.APP_URL ||
-    'http://localhost:3000';
+    process.env.APP_URL;
+  if (!raw) {
+    throw new Error('FRONTEND_URL is not configured');
+  }
   return raw.replace(/\/$/, '');
 }
 
@@ -34,7 +38,14 @@ export interface SendMailOptions {
   subject: string;
   html: string;
   text?: string;
-  template?: 'invite' | 'password_reset' | 'test' | 'notification' | 'system';
+  template?:
+    | 'invite'
+    | 'password_reset'
+    | 'user_account_activated'
+    | 'user_account_deactivated'
+    | 'test'
+    | 'notification'
+    | 'system';
   metadata?: Record<string, any>;
 }
 
@@ -81,6 +92,10 @@ export class EmailService implements OnApplicationBootstrap {
         invite_body TEXT,
         reset_subject TEXT,
         reset_body TEXT,
+        account_activated_subject TEXT,
+        account_activated_body TEXT,
+        account_deactivated_subject TEXT,
+        account_deactivated_body TEXT,
         created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
@@ -96,6 +111,18 @@ export class EmailService implements OnApplicationBootstrap {
     );
     await this.prisma.$executeRawUnsafe(
       `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS reset_body TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS account_activated_subject TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS account_activated_body TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS account_deactivated_subject TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS account_deactivated_body TEXT;`,
     );
     await this.prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS audit.email_logs (
@@ -160,6 +187,10 @@ export class EmailService implements OnApplicationBootstrap {
       inviteBody: null,
       resetSubject: null,
       resetBody: null,
+      accountActivatedSubject: null,
+      accountActivatedBody: null,
+      accountDeactivatedSubject: null,
+      accountDeactivatedBody: null,
     };
   }
 
@@ -198,10 +229,14 @@ export class EmailService implements OnApplicationBootstrap {
           fromName: dto.fromName,
           replyTo: dto.replyTo || null,
           isActive: dto.isActive ?? true,
-          inviteSubject: dto.inviteSubject || null,
-          inviteBody: dto.inviteBody || null,
-          resetSubject: dto.resetSubject || null,
-          resetBody: dto.resetBody || null,
+          inviteSubject: dto.inviteSubject === undefined ? existing.inviteSubject : dto.inviteSubject || null,
+          inviteBody: dto.inviteBody === undefined ? existing.inviteBody : dto.inviteBody || null,
+          resetSubject: dto.resetSubject === undefined ? existing.resetSubject : dto.resetSubject || null,
+          resetBody: dto.resetBody === undefined ? existing.resetBody : dto.resetBody || null,
+          accountActivatedSubject: dto.accountActivatedSubject === undefined ? existing.accountActivatedSubject : dto.accountActivatedSubject || null,
+          accountActivatedBody: dto.accountActivatedBody === undefined ? existing.accountActivatedBody : dto.accountActivatedBody || null,
+          accountDeactivatedSubject: dto.accountDeactivatedSubject === undefined ? existing.accountDeactivatedSubject : dto.accountDeactivatedSubject || null,
+          accountDeactivatedBody: dto.accountDeactivatedBody === undefined ? existing.accountDeactivatedBody : dto.accountDeactivatedBody || null,
         },
       });
     } else {
@@ -220,6 +255,10 @@ export class EmailService implements OnApplicationBootstrap {
           inviteBody: dto.inviteBody || null,
           resetSubject: dto.resetSubject || null,
           resetBody: dto.resetBody || null,
+          accountActivatedSubject: dto.accountActivatedSubject || null,
+          accountActivatedBody: dto.accountActivatedBody || null,
+          accountDeactivatedSubject: dto.accountDeactivatedSubject || null,
+          accountDeactivatedBody: dto.accountDeactivatedBody || null,
         },
       });
     }
@@ -487,6 +526,7 @@ export class EmailService implements OnApplicationBootstrap {
       recipientName: params.recipientName,
       orgName: params.orgName,
       role: params.role,
+      loginEmail: params.to,
       tempPassword: params.tempPassword,
       loginUrl,
       customBody: config.inviteBody || undefined,
@@ -554,6 +594,36 @@ export class EmailService implements OnApplicationBootstrap {
       html,
       template: 'notification',
       metadata: { kind: 'email_verification' },
+    });
+  }
+
+  async sendUserAccountStatusEmail(params: {
+    to: string;
+    recipientName?: string;
+    status: 'activated' | 'deactivated';
+  }) {
+    const config = await this.getConfig();
+    const activated = params.status === 'activated';
+    const subject = (
+      (activated ? config.accountActivatedSubject : config.accountDeactivatedSubject) ||
+      (activated
+        ? 'Your iPixxel Realty Account Has Been Activated'
+        : 'Your iPixxel Realty Account Has Been Deactivated')
+    ).replace(/{recipientName}/g, params.recipientName || 'there');
+    const html = getUserAccountStatusEmailHtml({
+      recipientName: params.recipientName,
+      status: params.status,
+      customBody: activated
+        ? config.accountActivatedBody || undefined
+        : config.accountDeactivatedBody || undefined,
+      loginUrl: activated ? `${frontendBaseUrl()}/login` : undefined,
+    });
+
+    return this.sendMail({
+      to: params.to,
+      subject,
+      html,
+      template: activated ? 'user_account_activated' : 'user_account_deactivated',
     });
   }
 

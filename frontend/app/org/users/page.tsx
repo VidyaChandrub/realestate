@@ -37,6 +37,23 @@ function roleBadgeClass(roleKey: string): string {
   }
 }
 
+function statusBadgeClass(status: OrgUser["status"]): string {
+  switch (status) {
+    case "active":
+      return "b-green";
+    case "pending":
+      return "b-amber";
+    default:
+      return "b-rose";
+  }
+}
+
+function statusLabel(user: Pick<OrgUser, "status" | "approvedAt">): string {
+  if (user.status === "active") return "Active";
+  if (user.status === "disabled") return "Disabled";
+  return user.approvedAt ? "Awaiting first login" : "Pending";
+}
+
 interface UserFormData {
   firstName: string;
   lastName: string;
@@ -88,7 +105,9 @@ export default function OrgUsersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<"active" | "disabled" | "">("");
+  const [statusFilter, setStatusFilter] = useState<
+    "active" | "disabled" | "pending" | ""
+  >("");
   const [page, setPage] = useState(1);
   const [dynamicRoles, setDynamicRoles] = useState<{ value: string; label: string }[]>(DEFAULT_ROLE_OPTIONS);
 
@@ -122,6 +141,17 @@ export default function OrgUsersPage() {
     message: string;
   } | null>(null);
   const [resentId, setResentId] = useState<string | null>(null);
+
+  // Confirmation dialog for sensitive actions (approve / disapprove /
+  // deactivate / admin password reset).
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    danger?: boolean;
+    run: () => void | Promise<void>;
+  } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -187,28 +217,45 @@ export default function OrgUsersPage() {
     setFormError(null);
   }
 
-  async function submitForm() {
+  async function submitForm(opts?: { confirmed?: boolean }) {
     if (!accessToken || !formMode) return;
-    setFormSubmitting(true);
-    setFormError(null);
+
     const email = form.email.trim();
     const phoneNumber = form.phoneNumber.trim();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setFormError("Please enter a valid email address.");
-      setFormSubmitting(false);
       return;
     }
     if (!phoneNumber) {
       setFormError("Mobile number is required.");
-      setFormSubmitting(false);
       return;
     }
     const phoneDigits = phoneNumber.replace(/\D/g, "");
     if (phoneDigits.length < 7 || phoneDigits.length > 15) {
       setFormError("Please enter a valid mobile number.");
-      setFormSubmitting(false);
       return;
     }
+
+    // Changing a user's password from the edit form is a sensitive action —
+    // confirm before it ends their sessions and forces a re-login.
+    if (
+      formMode === "edit" &&
+      (form.password ?? "").trim() &&
+      !opts?.confirmed
+    ) {
+      setConfirm({
+        title: "Change this user's password?",
+        message:
+          "They'll be signed out everywhere and must set a new password the next time they sign in. An email with the new temporary password will be sent to them.",
+        confirmLabel: "Change password",
+        danger: true,
+        run: () => submitForm({ confirmed: true }),
+      });
+      return;
+    }
+
+    setFormSubmitting(true);
+    setFormError(null);
     try {
       if (formMode === "create") {
         const body: CreateOrgUserInput = {
@@ -249,16 +296,18 @@ export default function OrgUsersPage() {
     }
   }
 
-  async function toggleStatus(user: OrgUser) {
+  async function runRowAction(
+    user: OrgUser,
+    path: string,
+    fallbackMessage: string,
+  ) {
     if (!accessToken) return;
     setBusyId(user.id);
     setRowError(null);
-    const nextStatus = user.status === "active" ? "disabled" : "active";
     try {
-      await apiFetch(`/org/users/${user.id}/status`, {
-        method: "PATCH",
+      await apiFetch(`/org/users/${user.id}/${path}`, {
+        method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ status: nextStatus }),
       });
       reload();
     } catch (err) {
@@ -267,11 +316,32 @@ export default function OrgUsersPage() {
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Failed to update status.";
+            : fallbackMessage;
       setRowError({ id: user.id, message });
     } finally {
       setBusyId(null);
     }
+  }
+
+  function askApprove(user: OrgUser) {
+    setConfirm({
+      title: "Approve user?",
+      message: `${fullName(user.firstName, user.lastName, user.email)} will be able to sign in and will be asked to set a new password on first login.`,
+      confirmLabel: "Approve",
+      run: () => runRowAction(user, "approve", "Failed to approve user."),
+    });
+  }
+
+  function askDisapprove(user: OrgUser) {
+    const isActive = user.status === "active";
+    setConfirm({
+      title: isActive ? "Deactivate user?" : "Disapprove user?",
+      message: `${fullName(user.firstName, user.lastName, user.email)} will be signed out on their next action and won't be able to log in until re-approved.`,
+      confirmLabel: isActive ? "Deactivate" : "Disapprove",
+      danger: true,
+      run: () =>
+        runRowAction(user, "disapprove", "Failed to update user access."),
+    });
   }
 
   async function resendInvite(user: OrgUser) {
@@ -495,11 +565,14 @@ export default function OrgUsersPage() {
               style={{ width: 160, flexShrink: 0 }}
               value={statusFilter}
               onChange={(e) => {
-                setStatusFilter(e.target.value as "active" | "disabled" | "");
+                setStatusFilter(
+                  e.target.value as "active" | "disabled" | "pending" | "",
+                );
                 setPage(1);
               }}
             >
               <option value="">All statuses</option>
+              <option value="pending">Pending</option>
               <option value="active">Active</option>
               <option value="disabled">Disabled</option>
             </select>
@@ -572,13 +645,13 @@ export default function OrgUsersPage() {
                         </td>
                         <td>
                           <span
-                            className={`badge ${user.status === "active" ? "b-green" : "b-rose"}`}
+                            className={`badge ${statusBadgeClass(user.status)}`}
                           >
                             <span
                               className="dot"
                               style={{ background: "currentColor" }}
                             />
-                            {user.status === "active" ? "Active" : "Disabled"}
+                            {statusLabel(user)}
                           </span>
                         </td>
                         <td>{formatDate(user.createdAt)}</td>
@@ -598,24 +671,42 @@ export default function OrgUsersPage() {
                             >
                               Edit
                             </button>
-                            {user.role?.key === "admin" && user.status === "active" ? null : (
+                            {user.status === "pending" ||
+                            user.status === "disabled" ? (
                               <button
                                 className="btn btn-ghost btn-sm"
                                 type="button"
                                 disabled={busyId === user.id}
-                                onClick={() => void toggleStatus(user)}
+                                onClick={() => askApprove(user)}
                               >
-                                {user.status === "active" ? "Deactivate" : "Activate"}
+                                Approve
                               </button>
-                            )}
-                            {user.mustChangePassword ? (
+                            ) : null}
+                            {(user.status === "pending" ||
+                              user.status === "active") &&
+                            !(
+                              user.role?.key === "admin" &&
+                              user.status === "active"
+                            ) ? (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                type="button"
+                                disabled={busyId === user.id}
+                                onClick={() => askDisapprove(user)}
+                              >
+                                {user.status === "active"
+                                  ? "Deactivate"
+                                  : "Disapprove"}
+                              </button>
+                            ) : null}
+                            {user.status !== "active" && user.mustChangePassword ? (
                               <button
                                 className="btn btn-ghost btn-sm"
                                 type="button"
                                 disabled={busyId === user.id}
                                 onClick={() => void resendInvite(user)}
                               >
-                                {resentId === user.id ? "Sent " : "Resend"}
+                                {resentId === user.id ? "Sent " : "Resend Mail"}
                               </button>
                             ) : null}
                           </div>
@@ -672,6 +763,63 @@ export default function OrgUsersPage() {
             ) : null}
           </div>
         </Reveal>
+      ) : null}
+
+      {confirm ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => (confirmBusy ? null : setConfirm(null))}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 80,
+            padding: 20,
+          }}
+        >
+          <div
+            className="card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 440, width: "100%" }}
+          >
+            <div className="card-h">
+              <span className="t">{confirm.title}</span>
+            </div>
+            <div className="card-b">
+              <p style={{ margin: 0, lineHeight: 1.55 }}>{confirm.message}</p>
+              <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                <button
+                  className={`btn ${confirm.danger ? "btn-danger" : "btn-primary"}`}
+                  type="button"
+                  disabled={confirmBusy}
+                  onClick={async () => {
+                    setConfirmBusy(true);
+                    try {
+                      await confirm.run();
+                      setConfirm(null);
+                    } finally {
+                      setConfirmBusy(false);
+                    }
+                  }}
+                >
+                  {confirmBusy ? "Working…" : confirm.confirmLabel}
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  disabled={confirmBusy}
+                  onClick={() => setConfirm(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
     </>
   );

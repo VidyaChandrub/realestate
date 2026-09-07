@@ -42,7 +42,7 @@ interface AgentRow {
   lastName: string | null;
   email: string;
   phoneNumber: string | null;
-  status: 'active' | 'disabled';
+  status: 'active' | 'disabled' | 'pending';
   createdAt: Date;
   userRoles: {
     role: { key: string; name: string };

@@ -33,9 +33,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
-    if (new URLSearchParams(window.location.search).get("reason") === "org_inactive") {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "org_inactive") {
       setNotice(
         "You were signed out because your organisation's access was changed. Contact your administrator if this is unexpected.",
+      );
+    } else if (reason === "account_revoked") {
+      setNotice(
+        "Your account access has been revoked. Please contact your administrator.",
       );
     }
     const host = window.location.host;

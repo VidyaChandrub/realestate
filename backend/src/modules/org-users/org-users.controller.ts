@@ -74,6 +74,29 @@ export class OrgUsersController {
     );
   }
 
+  // Approve a pending member so they can authenticate (they are still forced
+  // through the change-password flow before getting normal access). Also
+  // re-approves a previously disapproved member.
+  @RequirePermission('users', 'approve')
+  @Post(':id/approve')
+  @HttpCode(200)
+  approve(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {
+    return this.orgUsersService.approve(actor.orgId as string, id);
+  }
+
+  // Disapprove / deactivate a member: revokes login and invalidates any live
+  // session on the member's next authenticated request.
+  @RequirePermission('users', 'edit')
+  @Post(':id/disapprove')
+  @HttpCode(200)
+  disapprove(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {
+    return this.orgUsersService.disapprove(
+      actor.orgId as string,
+      id,
+      actor.sub,
+    );
+  }
+
   @RequirePermission('users', 'edit')
   @Post(':id/resend-invite')
   @HttpCode(200)
