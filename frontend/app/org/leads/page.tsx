@@ -13,7 +13,7 @@ import {
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
-import { leadDisplayName, leadDisplayPhone } from "@/lib/lead-display";
+import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
 import { AddLeadModal } from "@/components/org/add-lead-modal";
 import { LeadStatusSelect } from "@/components/org/lead-status-select";
 
@@ -357,7 +357,7 @@ export default function OrgLeadsPage() {
                         </td>
                         <td>
                           <span className={`badge ${sourceBadgeClass(lead.source)}`}>
-                            {lead.source ?? "website"}
+                            {leadDisplaySource(lead)}
                           </span>
                         </td>
                         <td>

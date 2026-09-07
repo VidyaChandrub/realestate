@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 import { isOrgAdmin } from "@/lib/session";
 import { addCrmLeadNote, assignCrmLead, getCrmLead, updateCrmLeadNextAction } from "@/lib/api";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
-import { leadField } from "@/lib/lead-display";
+import { leadField, leadDisplaySource } from "@/lib/lead-display";
 
 const icons: Record<string, IconName> = {
   call_logged: "phone",
@@ -154,15 +154,15 @@ export default function OrgLeadDetailPage() {
     ...(lead?.activities ?? []).map((event) => ({ id: event.id, type: event.type, text: event.text, createdAt: event.createdAt })),
     ...(lead?.callLogs ?? []).map((call) => ({ id: call.id, type: "call_logged", text: `${call.outcome.replace("_", " ")}${call.durationSeconds ? ` · ${Math.floor(call.durationSeconds / 60)}m ${call.durationSeconds % 60}s` : ""}`, createdAt: call.createdAt })),
   ].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)), [lead]);
-  const requirements = Object.entries(lead?.data ?? {}).filter(([key]) => /budget|bhk|bed|area|require|preference|timeline/i.test(key));
+  const requirements = Object.entries(lead?.data ?? {}).filter(([key]) => /budget|bhk|bed|area|require|preference|timeline|interest/i.test(key));
   const documents = Object.entries(lead?.data ?? {}).filter(([key]) => /brochure|document|floor|pan|aadhaar|proof/i.test(key));
 
   if (loading || authLoading) return <div className="empty">Loading lead…</div>;
   if (loadError || !lead) return <div className="empty">{loadError || "Lead not found."}</div>;
 
-  const name = field(lead.data, "Full Name", "fullName", "Name") === "—" ? "Unknown lead" : field(lead.data, "Full Name", "fullName", "Name");
-  const phone = field(lead.data, "Phone", "phone", "Mobile");
-  const email = field(lead.data, "Email", "email");
+  const name = field(lead.data, "Full Name", "Full name", "fullName", "Name") === "—" ? "Unknown lead" : field(lead.data, "Full Name", "Full name", "fullName", "Name");
+  const phone = field(lead.data, "Phone", "Phone number", "phone", "Mobile");
+  const email = field(lead.data, "Email", "Email address", "email");
   const project = lead.project?.name ?? field(lead.data, "Project", "project");
   const unit = field(lead.data, "Unit", "unit");
   const nextActionLabel = lead.nextAction?.type === "site_visit" ? "Site visit" : "Follow-up";
@@ -190,7 +190,7 @@ export default function OrgLeadDetailPage() {
             </div>
           </div></div></Reveal>
           <Reveal delay={2}><div className="card"><div className="card-h"><span className="t">Lead source</span></div><div className="card-b"><div className="kv">
-            <div className="row"><span className="k">Source</span><span className="v"><span className="badge b-indigo">{lead.source ?? "website"}</span></span></div>
+            <div className="row"><span className="k">Source</span><span className="v"><span className="badge b-indigo">{leadDisplaySource(lead)}</span></span></div>
             <div className="row"><span className="k">Project</span><span className="v">{project}</span></div><div className="row"><span className="k">Unit</span><span className="v">{unit}</span></div>
             <div className="row"><span className="k">Form</span><span className="v">{lead.formName ?? "—"}</span></div><div className="row"><span className="k">Assigned agent</span><span className="v"><span className="badge b-violet">{lead.assignedTo?.name ?? "Unassigned"}</span></span></div>
           </div></div></div></Reveal>

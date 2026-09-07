@@ -18,6 +18,7 @@ import {
   Monitor,
   Move,
   Palette,
+  PanelRight,
   Plus,
   SlidersHorizontal,
   Smartphone,
@@ -616,7 +617,7 @@ export function SettingsPanel({
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--ps-slate)", lineHeight: 1.6 }}>
               <li><strong>Click any section</strong> on the canvas to open its design layouts, copy, and style controls.</li>
-              <li>Use <strong>🪟 Float</strong> in the header to make this panel movable anywhere and view full-width canvas.</li>
+              <li>Use <strong>Float</strong> in the inspector header to make this panel movable and view a full-width canvas.</li>
               <li>Press <kbd style={{ background: "var(--ps-line)", padding: "1px 5px", borderRadius: 4, fontSize: 10.5 }}>Ctrl + K</kbd> to quick-add widgets anywhere.</li>
             </ul>
           </div>
@@ -725,20 +726,12 @@ export function SettingsPanel({
             {onToggleMode ? (
               <button
                 type="button"
-                title={mode === "floating" ? "Dock to right sidebar" : "Float panel over canvas (see full width canvas)"}
+                className="ps-inspector-mode-btn"
+                data-active={mode === "floating" ? "true" : "false"}
+                title={mode === "floating" ? "Dock to right sidebar" : "Float panel over canvas"}
                 onClick={() => onToggleMode(mode === "floating" ? "docked" : "floating")}
-                style={{
-                  background: mode === "floating" ? "var(--ps-primary-mist)" : "var(--ps-bg)",
-                  border: "1px solid var(--ps-line)",
-                  color: mode === "floating" ? "var(--ps-primary)" : "var(--ps-muted)",
-                  borderRadius: 6,
-                  padding: "3px 7px",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
               >
-                {mode === "floating" ? "📌 Dock" : "🪟 Float"}
+                {mode === "floating" ? <><PanelRight size={12} /> Dock</> : <><Move size={12} /> Float</>}
               </button>
             ) : null}
             {onClose ? (
@@ -1660,23 +1653,12 @@ function PanelHead({
         {onToggleMode ? (
           <button
             type="button"
-            title={mode === "floating" ? "Dock inspector to right sidebar" : "Float inspector over canvas (see full width canvas)"}
+            className="ps-inspector-mode-btn"
+            data-active={mode === "floating" ? "true" : "false"}
+            title={mode === "floating" ? "Dock inspector to right sidebar" : "Float inspector over canvas"}
             onClick={() => onToggleMode(mode === "floating" ? "docked" : "floating")}
-            style={{
-              background: mode === "floating" ? "var(--ps-primary-mist)" : "var(--ps-bg)",
-              border: "1px solid var(--ps-line)",
-              color: mode === "floating" ? "var(--ps-primary)" : "var(--ps-muted)",
-              borderRadius: 6,
-              padding: "3px 7px",
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-            }}
           >
-            {mode === "floating" ? "📌 Dock" : "🪟 Float"}
+            {mode === "floating" ? <><PanelRight size={12} /> Dock</> : <><Move size={12} /> Float</>}
           </button>
         ) : null}
         {onClose ? (

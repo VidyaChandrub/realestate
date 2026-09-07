@@ -35,6 +35,7 @@ export class LeadsService {
     }
 
     let orgId: string | null = null;
+    let projectName: string | null = null;
 
     if (dto.landingPageId) {
       const page = await this.prisma.landingPage.findUnique({
@@ -67,6 +68,7 @@ export class LeadsService {
         );
       }
       orgId = project.orgId;
+      projectName = project.name;
     }
 
     if (dto.unitId) {
@@ -90,7 +92,10 @@ export class LeadsService {
       dto.projectId ??
       (await this.resolveProjectId(orgId, dto.landingPageId, dto.data));
 
-    const data = normalizeLeadData(dto.data ?? {}, { unitId: dto.unitId });
+    const data = normalizeLeadData(dto.data ?? {}, {
+      unitId: dto.unitId,
+      projectName,
+    });
     const existing = await this.findRecentDuplicate(orgId, projectId, data);
     if (existing) {
       return this.prisma.lead.update({

@@ -140,6 +140,7 @@ import {
 import { bumpTracking } from "@/lib/prestate/tracking";
 import { firePrestateLead } from "@/components/prestate/tracking-scripts";
 import { submitLead } from "@/lib/api";
+import { composeLeadSource } from "@/lib/lead-display";
 import { ProjectSection } from "@/components/prestate/project-widget";
 
 type CanvasTheme = {
@@ -861,7 +862,7 @@ function GateForm({
     void submitLead({
       landingPageId: pageId,
       formName: textOf(heading || "Brochure Gate"),
-      source: "brochure_gate",
+      source: composeLeadSource({ place: "Brochure gate" }),
       fields: leadFields,
     }).catch(() => {});
     window.dispatchEvent(new CustomEvent(LEAD_SUCCESS_EVENT));
@@ -1344,6 +1345,9 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
   const live = useContext(SiteLiveContext);
   const pageId = useContext(SitePageIdContext);
   const wt = useContext(SiteLayoutThemeContext);
+  const pageForm = useContext(SiteFormContext);
+  const interestField = pageForm?.fields?.find((f) => f.type === "select");
+  const interestOptions = (interestField?.options ?? []).map(String).filter(Boolean);
   const T = typoCss(s, device);
   const design = String(s.settings.design ?? "split");
   const primaryAction = textOf(st.primaryAction ?? "link") as CtaAction;
@@ -1374,6 +1378,9 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
   const [slideIndex, setSlideIndex] = useState(0);
   const [heroPhone, setHeroPhone] = useState("");
   const [heroPhoneError, setHeroPhoneError] = useState("");
+  const [heroName, setHeroName] = useState("");
+  const [heroEmail, setHeroEmail] = useState("");
+  const [heroInterest, setHeroInterest] = useState("");
   const handle = useCtaHandlers(live);
   const gateFields =
     Array.isArray(st.gateFields) && st.gateFields.length
@@ -2143,11 +2150,37 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
+                      if (!heroName.trim()) {
+                        setHeroPhoneError("Enter your full name.");
+                        return;
+                      }
                       if (!isValidPhone(heroPhone)) {
                         setHeroPhoneError("Enter a valid phone number.");
                         return;
                       }
                       setHeroPhoneError("");
+                      if (live && pageId) {
+                        const interest = heroInterest.trim();
+                        void submitLead({
+                          landingPageId: pageId,
+                          formName: textOf(st.formTitle || "Hero enquiry"),
+                          source: composeLeadSource({
+                            place: "Hero section",
+                            interest,
+                          }),
+                          fields: {
+                            "Full name": heroName.trim(),
+                            "Phone number": heroPhone.trim(),
+                            "Email address": heroEmail.trim(),
+                            "Interested in": interest,
+                            fullName: heroName.trim(),
+                            name: heroName.trim(),
+                            phone: heroPhone.trim(),
+                            email: heroEmail.trim(),
+                            interestedIn: interest,
+                          },
+                        }).catch(() => {});
+                      }
                       setFormSubmitted(true);
                     }}
                     style={{
@@ -2194,6 +2227,8 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
                       <input
                         placeholder="Your Full Name *"
                         required
+                        value={heroName}
+                        onChange={(e) => setHeroName(e.target.value)}
                         style={{ ...wtFieldDark(undefined, wt) }}
                       />
                     </div>
@@ -2235,12 +2270,18 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
                       <input
                         type="email"
                         placeholder="Email Address"
+                        value={heroEmail}
+                        onChange={(e) => setHeroEmail(e.target.value)}
                         style={{ ...wtFieldDark(undefined, wt) }}
                       />
                     </div>
 
+                    {interestOptions.length > 0 ? (
                     <div>
                       <select
+                        value={heroInterest}
+                        required={interestField?.required}
+                        onChange={(e) => setHeroInterest(e.target.value)}
                         style={{
                           ...wtFieldDark(
                             { background: "rgba(15,23,42,.95)" },
@@ -2248,12 +2289,17 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
                           ),
                         }}
                       >
-                        <option>Interested in 2 BHK Luxury</option>
-                        <option selected>Interested in 3 BHK Premium</option>
-                        <option>Interested in 4 BHK Sky Villa</option>
-                        <option>Interested in Penthouse</option>
+                        <option value="" disabled>
+                          {interestField?.placeholder || interestField?.label || "Choose an option"}
+                        </option>
+                        {interestOptions.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
                       </select>
                     </div>
+                    ) : null}
 
                     <button
                       type="submit"
@@ -4848,6 +4894,7 @@ function FloorPlanGallerySection({
     }
     setFormError("");
     setSubmitting(true);
+    const plan = popupIndex !== null ? plans[popupIndex] : null;
     if (live) {
       firePrestateLead();
       if (pageId) bumpTracking(pageId, "form");
@@ -4855,8 +4902,20 @@ function FloorPlanGallerySection({
       void submitLead({
         landingPageId: pageId,
         formName: "Floor Plan Gallery",
-        source: "floorplan",
-        fields: { Name: n, Phone: p, Email: em },
+        source: composeLeadSource({
+          place: "Floor plan",
+          interest: plan?.name,
+        }),
+        fields: {
+          Name: n,
+          Phone: p,
+          Email: em,
+          fullName: n,
+          phone: p,
+          email: em,
+          "Interested in": plan?.name ?? "",
+          interestedIn: plan?.name ?? "",
+        },
       }).catch(() => {});
     }
     // Unlock the selected plan
@@ -8056,11 +8115,22 @@ function LeadFormSection({
       const key = (f as { id?: string }).id || f.label;
       leadFields[f.label] = String(values[key] ?? "");
     }
+    const interest =
+      leadFields.interestedIn ||
+      leadFields["Interested in"] ||
+      leadFields.Configuration ||
+      "";
     void submitLead({
       landingPageId: pageId,
       formName: effectiveForm?.name,
-      source: "website",
-      fields: leadFields,
+      source: composeLeadSource({
+        place: s.label || "Page form",
+        interest,
+      }),
+      fields: {
+        ...leadFields,
+        ...(interest ? { interestedIn: interest } : {}),
+      },
     }).catch(() => {});
     // Conditional action: open a popup (offer / thank-you / download gate).
     const popupAfterSubmit = String(effectiveForm?.openPopupId ?? "").trim();
@@ -11896,7 +11966,10 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
     void submitLead({
       landingPageId: pageId,
       formName: textOf(heading || "Popup Lead Form"),
-      source: "popup_form",
+      source: composeLeadSource({
+        place: "Popup",
+        interest: leadFields["Interested in"] || leadFields.interestedIn,
+      }),
       fields: leadFields,
     }).catch(() => {});
     window.dispatchEvent(new CustomEvent(LEAD_SUCCESS_EVENT));

@@ -197,7 +197,7 @@ export function FormsModule({
       required: type === "phone" || type === "text",
       options:
         type === "select" || type === "radio"
-          ? ["2 BHK Luxury", "3 BHK Premium", "4 BHK Sky Villa"]
+          ? []
           : undefined,
     };
     setFields((f) => [...f, newFld]);

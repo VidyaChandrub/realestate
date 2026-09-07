@@ -193,6 +193,7 @@ export function TopNav({
   onSignOut,
   settingsHref,
   homeHref,
+  unsaved,
 }: {
   module: ModuleKey;
   setModule?: (m: ModuleKey) => void;
@@ -219,6 +220,7 @@ export function TopNav({
   onSignOut: () => void;
   settingsHref?: string;
   homeHref?: string;
+  unsaved?: boolean;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
@@ -241,9 +243,7 @@ export function TopNav({
   return (
     <header className="ps-topnav ps-glass">
       {/* Logo & Page Breadcrumbs */}
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}
-      >
+      <div className="ps-topnav-left">
         {onMenu ? (
           <button
             type="button"
@@ -301,228 +301,157 @@ export function TopNav({
           </div>
         </div>
 
-        <div className="ps-vdiv" style={{ height: 20, margin: "0 2px" }} />
+        <div
+          className="ps-vdiv"
+          style={{ height: 20, margin: "0 2px" }}
+        />
 
-        {module !== "builder" ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {setModule && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            minWidth: 0,
+          }}
+        >
+          {module !== "builder" && setModule ? (
+            <button
+              type="button"
+              onClick={() => setModule("builder")}
+              className="ps-topnav-btn ps-topnav-btn--publish"
+              style={{ padding: "5px 10px", fontSize: 12 }}
+            >
+              <ArrowLeft size={13} /> Canvas
+            </button>
+          ) : null}
+          {pageName ? (
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: "var(--ps-ink)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: 200,
+              }}
+            >
+              {pageName}
+            </span>
+          ) : null}
+          {pageStatus ? (
+            <span
+              className={`ps-draft-pill ${published ? "ps-pill--published" : "ps-pill--draft"}`}
+            >
+              <span
+                className="ps-dot"
+                style={{ background: published ? "#34d399" : "#fbbf24" }}
+              />
+              {pageStatus}
+            </span>
+          ) : null}
+          {unsaved ? <span className="ps-unsaved-pill">Unsaved</span> : null}
+
+          {setModule ? (
+            <div style={{ position: "relative" }} data-module-menu>
               <button
                 type="button"
-                onClick={() => setModule("builder")}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  background: "var(--ps-primary)",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 8,
-                  padding: "5px 11px",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
+                onClick={() => setModuleMenuOpen((v) => !v)}
+                className="ps-topnav-btn"
+                style={{ padding: "4px 10px" }}
               >
-                <ArrowLeft size={13} /> Back to Canvas
+                <span>{module === "builder" ? "Page tools" : MODULE_LABELS[module]}</span>
+                <ChevronDown size={13} style={{ color: "#94a3b8" }} />
               </button>
-            )}
-            <span
-              style={{ fontSize: 13, fontWeight: 800, color: "var(--ps-ink)" }}
-            >
-              {MODULE_LABELS[module]}
-            </span>
-          </div>
-        ) : (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              minWidth: 0,
-            }}
-          >
-            {pageName ? (
-              <span
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: "var(--ps-ink)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  maxWidth: 220,
-                }}
-              >
-                {pageName}
-              </span>
-            ) : null}
-            {pageStatus ? (
-              <span
-                className={`ps-draft-pill ${published ? "ps-pill--published" : "ps-pill--draft"}`}
-              >
-                <span
-                  className="ps-dot"
-                  style={{ background: published ? "#34d399" : "#fbbf24" }}
-                />
-                {pageStatus}
-              </span>
-            ) : null}
-
-            {/* Module Switcher Dropdown */}
-            {setModule && (
-              <div style={{ position: "relative" }} data-module-menu>
-                <button
-                  type="button"
-                  onClick={() => setModuleMenuOpen((v) => !v)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: "rgba(255, 255, 255, 0.08)",
-                    border: "1px solid rgba(255, 255, 255, 0.16)",
-                    borderRadius: 8,
-                    padding: "4px 10px",
-                    color: "#ffffff",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  <span>Page Tools</span>
-                  <ChevronDown size={13} style={{ color: "#94a3b8" }} />
-                </button>
-                {moduleMenuOpen && (
+              {moduleMenuOpen ? (
+                <div className="ps-module-menu">
                   <div
                     style={{
-                      position: "absolute",
-                      top: "calc(100% + 6px)",
-                      left: 0,
-                      zIndex: 100,
-                      width: 290,
-                      background: "#161922",
-                      border: "1px solid rgba(255, 255, 255, 0.14)",
-                      borderRadius: 14,
-                      boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
-                      padding: "8px 6px",
+                      padding: "4px 10px 8px",
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.8,
+                      color: "#94a3b8",
                     }}
                   >
-                    <div
-                      style={{
-                        padding: "4px 10px 8px",
-                        fontSize: 10.5,
-                        fontWeight: 800,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.8,
-                        color: "#94a3b8",
-                      }}
-                    >
-                      Studio Modules
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 2,
-                      }}
-                    >
-                      {MODULE_OPTIONS.map((m) => {
-                        const Icon = m.icon;
-                        const active = module === m.key;
-                        return (
-                          <button
-                            key={m.key}
-                            type="button"
-                            onClick={() => {
-                              setModule(m.key);
-                              setModuleMenuOpen(false);
-                            }}
+                    Studio modules
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {MODULE_OPTIONS.map((m) => {
+                      const Icon = m.icon;
+                      const active = module === m.key;
+                      return (
+                        <button
+                          key={m.key}
+                          type="button"
+                          onClick={() => {
+                            setModule(m.key);
+                            setModuleMenuOpen(false);
+                          }}
+                          className="ps-module-menu-item"
+                          style={{
+                            width: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            padding: "8px 10px",
+                            borderRadius: 10,
+                            border: "none",
+                            background: active ? "rgba(109, 93, 252, 0.22)" : "transparent",
+                            color: active ? "#c4bfff" : "#ffffff",
+                            cursor: "pointer",
+                            textAlign: "left",
+                          }}
+                        >
+                          <span
                             style={{
-                              width: "100%",
-                              display: "flex",
+                              width: 34,
+                              height: 34,
+                              borderRadius: 9,
+                              background: m.bg,
+                              color: m.color,
+                              display: "inline-flex",
                               alignItems: "center",
-                              gap: 12,
-                              padding: "8px 10px",
-                              borderRadius: 10,
-                              border: "none",
-                              background: active
-                                ? "rgba(109, 93, 252, 0.22)"
-                                : "transparent",
-                              color: active ? "#9690ff" : "#ffffff",
-                              cursor: "pointer",
-                              textAlign: "left",
-                              transition: "background 0.12s",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!active)
-                                e.currentTarget.style.background =
-                                  "rgba(255, 255, 255, 0.07)";
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!active)
-                                e.currentTarget.style.background =
-                                  "transparent";
+                              justifyContent: "center",
+                              flexShrink: 0,
                             }}
                           >
-                            <span
+                            <Icon size={17} />
+                          </span>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>
+                              {m.label}
+                            </div>
+                            <div
                               style={{
-                                width: 34,
-                                height: 34,
-                                borderRadius: 9,
-                                background: m.bg,
-                                color: m.color,
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
+                                fontSize: 11,
+                                color: "#94a3b8",
+                                marginTop: 1,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
                               }}
                             >
-                              <Icon size={17} />
-                            </span>
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <div
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: 700,
-                                  color: active ? "#9690ff" : "#ffffff",
-                                }}
-                              >
-                                {m.label}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  color: "#94a3b8",
-                                  marginTop: 1,
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                }}
-                              >
-                                {m.desc}
-                              </div>
+                              {m.desc}
                             </div>
-                            {active ? (
-                              <Check
-                                size={16}
-                                style={{ color: "#9690ff", flexShrink: 0 }}
-                              />
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
+                          </div>
+                          {active ? <Check size={16} style={{ color: "#9690ff", flexShrink: 0 }} /> : null}
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* Center Device Viewport Switcher */}
       <div
+        className="ps-topnav-center"
         style={{
-          flex: 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -547,7 +476,7 @@ export function TopNav({
       </div>
 
       {/* Right controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="ps-topnav-right" style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {module === "builder" ? (
           <>
             <div
@@ -592,7 +521,7 @@ export function TopNav({
                 type="button"
                 onClick={onPreview}
                 className="ps-topnav-btn"
-                title="Open live preview in new tab"
+                title="Preview this page"
               >
                 <Eye size={14} /> <span className="ps-btn-label">Preview</span>
               </button>
@@ -638,18 +567,6 @@ export function TopNav({
           style={{ ...iconBtn(true), position: "relative" }}
         >
           <Bell size={16} />
-          <span
-            style={{
-              position: "absolute",
-              top: 3,
-              right: 3,
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "var(--ps-danger)",
-              border: "2px solid var(--ps-panel)",
-            }}
-          />
         </button>
         <button
           type="button"

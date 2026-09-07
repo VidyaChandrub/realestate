@@ -15,6 +15,7 @@ import type { Project, PublicProject, EnquiryUnit } from "@/lib/types";
 import { apiFetch, submitLead } from "@/lib/api";
 import { isFieldVisible } from "@/lib/prestate/form-logic";
 import { bumpTracking } from "@/lib/prestate/tracking";
+import { composeLeadSource } from "@/lib/lead-display";
 import { firePrestateLead } from "@/components/prestate/tracking-scripts";
 
 function isValidEmail(v: string): boolean {
@@ -144,10 +145,24 @@ export function ProjectEnquiryModal({
     const leadFields: Record<string, string> = {};
     for (const f of visible) {
       const key = (f as { id?: string }).id || f.label;
-      leadFields[f.label] = String(values[key] ?? "");
+      const value = String(values[key] ?? "").trim();
+      leadFields[f.label] = value;
+      const type = String(f.type ?? "").toLowerCase();
+      const label = f.label.toLowerCase();
+      if (type === "phone" || /phone|mobile|whatsapp/.test(label)) {
+        leadFields.phone = value;
+        leadFields.phoneNumber = value;
+      } else if (type === "email" || /email/.test(label)) {
+        leadFields.email = value;
+      } else if ((type === "text" || type === "name") && /name/.test(label) && !leadFields.fullName) {
+        leadFields.fullName = value;
+        leadFields.name = value;
+      } else if (type === "select" || /interest|config|bhk/.test(label)) {
+        leadFields.interestedIn = value;
+      }
     }
-    // Include project name for convenience in data
-    leadFields["Project"] = project.name;
+    leadFields.Project = project.name;
+    leadFields.project = project.name;
     const selectedUnit = units.find((unit) => unit.id === values.unitId);
     leadFields["Unit"] = selectedUnit?.unitNo ?? "Any available unit";
     if (selectedUnit) leadFields["Unit ID"] = selectedUnit.id;
@@ -159,7 +174,11 @@ export function ProjectEnquiryModal({
           landingPageId: pageId,
           projectId: project.id,
           formName: effectiveForm?.name ?? heading,
-          source: "project-widget",
+          source: composeLeadSource({
+            place: "Project widget",
+            project: project.name,
+            interest: leadFields.interestedIn,
+          }),
           fields: leadFields,
           unitId: selectedUnit?.id,
         });
@@ -189,6 +208,17 @@ export function ProjectEnquiryModal({
   };
 
   const W = wt();
+  const fieldStyle = {
+    width: "100%",
+    boxSizing: "border-box" as const,
+    padding: "11px 12px",
+    borderRadius: 10,
+    border: `1.5px solid ${W.borderStrong}`,
+    backgroundColor: "#fff",
+    color: W.ink,
+    fontSize: 13.5,
+    outline: "none",
+  };
 
   return (
     <div
@@ -206,12 +236,14 @@ export function ProjectEnquiryModal({
       }}
     >
       <div
+        className="ps-lead-modal"
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
           width: 480,
           maxWidth: "100%",
           background: "#fff",
+          color: W.ink,
           borderRadius: 18,
           boxShadow: "0 30px 80px rgba(8,10,20,.45)",
           overflow: "hidden",
@@ -312,13 +344,7 @@ export function ProjectEnquiryModal({
                     onChange={(e) =>
                       setValues((p) => ({ ...p, unitId: e.target.value }))
                     }
-                    style={{
-                      width: "100%",
-                      padding: "11px 12px",
-                      borderRadius: 10,
-                      border: `1px solid ${W.borderStrong}`,
-                      fontSize: 13.5,
-                    }}
+                    style={fieldStyle}
                   >
                     <option value="">Any available unit</option>
                     {units.map((unit) => (
@@ -358,13 +384,7 @@ export function ProjectEnquiryModal({
                         onChange={(e) =>
                           setValues((p) => ({ ...p, [key]: e.target.value }))
                         }
-                        style={{
-                          width: "100%",
-                          padding: "11px 12px",
-                          borderRadius: 10,
-                          border: `1px solid ${W.borderStrong}`,
-                          fontSize: 13.5,
-                        }}
+                        style={fieldStyle}
                       >
                         <option value="">Choose</option>
                         {(f as unknown as { options: string[] }).options.map(
@@ -382,14 +402,7 @@ export function ProjectEnquiryModal({
                         onChange={(e) =>
                           setValues((p) => ({ ...p, [key]: e.target.value }))
                         }
-                        style={{
-                          width: "100%",
-                          minHeight: 80,
-                          padding: "11px 12px",
-                          borderRadius: 10,
-                          border: `1px solid ${W.borderStrong}`,
-                          fontSize: 13.5,
-                        }}
+                        style={{ ...fieldStyle, minHeight: 80 }}
                       />
                     ) : f.type === "checkbox" ? (
                       <label
@@ -427,13 +440,7 @@ export function ProjectEnquiryModal({
                         onChange={(e) =>
                           setValues((p) => ({ ...p, [key]: e.target.value }))
                         }
-                        style={{
-                          width: "100%",
-                          padding: "11px 12px",
-                          borderRadius: 10,
-                          border: `1px solid ${W.borderStrong}`,
-                          fontSize: 13.5,
-                        }}
+                        style={fieldStyle}
                       />
                     )}
                   </div>

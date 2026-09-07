@@ -10,7 +10,7 @@ import { ProjectPageHead } from "@/components/org/project-tabs";
 import { assignCrmLead, getCrmAssignableUsers, getCrmLeads } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
-import { leadDisplayName, leadDisplayPhone } from "@/lib/lead-display";
+import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
 import { AddLeadModal } from "@/components/org/add-lead-modal";
 import { LeadStatusSelect } from "@/components/org/lead-status-select";
 import "@/app/org/org.css";
@@ -184,7 +184,7 @@ export default function OrgProjectLeadsPage() {
                   return (
                     <tr key={lead.id}>
                       <td><span className="u"><span className={`av ${phone ? "a2" : ""}`}>{initialsFor(name)}</span><span><Link className="nm" href={`/org/leads/${lead.id}`}>{name}</Link>{phone ? <br /> : null}{phone ? <span className="sm">{phone}</span> : null}</span></span></td>
-                      <td><span className={`badge ${sourceBadgeClass(lead.source)}`}>{lead.source ?? "website"}</span></td>
+                      <td><span className={`badge ${sourceBadgeClass(lead.source)}`}>{leadDisplaySource(lead)}</span></td>
                       <td>{lead.assignedTo ? <span className="u"><span className="av a3">{initialsFor(lead.assignedTo.name)}</span><span className="nm">{lead.assignedTo.name}</span></span> : <span className="muted">Unassigned</span>}</td>
                       <td>{canAssign ? <LeadStatusSelect value={lead.status} disabled={savingId === lead.id} onConfirm={(status, note) => handleAssign(lead, lead.assignedTo?.id ?? null, status, note)} /> : <span className={`badge ${STATUS_BADGE[lead.status]}`}>{STATUS_LABEL[lead.status]}</span>}</td>
                       {canAssign ? <td><select className="inp" style={{ width: "auto" }} value={lead.assignedTo?.id ?? ""} disabled={savingId === lead.id} onChange={(e) => handleAssign(lead, e.target.value || null)}><option value="">Unassigned</option>{assigneeOptions.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></td> : null}

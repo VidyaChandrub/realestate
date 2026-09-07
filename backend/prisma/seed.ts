@@ -1,5 +1,10 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import {
+  bindLandingPageContent,
+  snapshotFromProject,
+} from '../src/common/utils/landing-page-property.util';
+import { asTemplateJson, builderTemplateContent } from './seed-builder-page';
 
 // Place this at: prisma/seed.ts
 // Run with: npx prisma db seed
@@ -213,6 +218,11 @@ async function seedDemoOrg() {
           pincode: '400051',
           connectivity: ['Metro', 'School', 'Hospital', 'Airport'],
           publishedToWebsite: true,
+          projectType: 'Apartment',
+          constructionStage: 'Under construction',
+          tagline: 'Residences in Bandra East',
+          highlights: 'RERA registered\nMetro connected\nClubhouse and pool',
+          carpetRange: '1,250 – 2,450 sq.ft',
         },
       })
     : await prisma.project.create({
@@ -240,6 +250,11 @@ async function seedDemoOrg() {
           pincode: '400051',
           connectivity: ['Metro', 'School', 'Hospital', 'Airport'],
           publishedToWebsite: true,
+          projectType: 'Apartment',
+          constructionStage: 'Under construction',
+          tagline: 'Residences in Bandra East',
+          highlights: 'RERA registered\nMetro connected\nClubhouse and pool',
+          carpetRange: '1,250 – 2,450 sq.ft',
         },
       });
 
@@ -248,6 +263,93 @@ async function seedDemoOrg() {
   });
   console.log(
     `Demo project seeded: ${project.name} — manager: rohan@skylinedev.in.`,
+  );
+
+  const unitTypes = [
+    { name: '3 BHK', carpetSqft: 1450, builtupSqft: 1850, price: 12500000, totalUnits: 80 },
+    { name: '4 BHK', carpetSqft: 2100, builtupSqft: 2650, price: 19800000, totalUnits: 40 },
+  ];
+  for (const ut of unitTypes) {
+    const existing = await prisma.unitType.findFirst({
+      where: { projectId: project.id, name: ut.name },
+      select: { id: true },
+    });
+    if (existing) {
+      await prisma.unitType.update({ where: { id: existing.id }, data: ut });
+    } else {
+      await prisma.unitType.create({ data: { projectId: project.id, ...ut } });
+    }
+  }
+
+  // --- Builder template + org page bound to the project --------------------
+  const templateSource = builderTemplateContent();
+  const form = templateSource.config.form as { fields?: Array<{ id?: string; options?: string[] }> };
+  const interest = form.fields?.find((f) => f.id === 'f4');
+  if (interest) interest.options = unitTypes.map((u) => u.name);
+
+  const template = await prisma.template.upsert({
+    where: { slug: 'skyline-heights-builder' },
+    update: {
+      name: 'Project launch (builder)',
+      status: 'published',
+      kind: 'preset',
+      pageType: 'landing',
+      designId: 'tpl-estatepro',
+      baseDesignName: 'Builder',
+      category: 'Real Estate',
+      content: asTemplateJson(templateSource),
+    },
+    create: {
+      name: 'Project launch (builder)',
+      slug: 'skyline-heights-builder',
+      status: 'published',
+      kind: 'preset',
+      pageType: 'landing',
+      designId: 'tpl-estatepro',
+      baseDesignName: 'Builder',
+      category: 'Real Estate',
+      content: asTemplateJson(templateSource),
+    },
+  });
+  await prisma.organisationTemplate.upsert({
+    where: { orgId_templateId: { orgId: org.id, templateId: template.id } },
+    update: {},
+    create: { orgId: org.id, templateId: template.id },
+  });
+
+  const unitCount = await prisma.unit.count({ where: { projectId: project.id } });
+  const bound = bindLandingPageContent(
+    templateSource,
+    { kind: 'project', projectId: project.id },
+    snapshotFromProject({
+      orgName: org.name,
+      project,
+      unitCount,
+    }),
+  );
+
+  await prisma.landingPage.upsert({
+    where: { orgId_slug: { orgId: org.id, slug: 'skyline-heights' } },
+    update: {
+      name: 'Skyline Heights',
+      status: 'published',
+      sourceTemplateId: template.id,
+      content: bound as Prisma.InputJsonValue,
+      publishedAt: new Date(),
+    },
+    create: {
+      orgId: org.id,
+      name: 'Skyline Heights',
+      slug: 'skyline-heights',
+      status: 'published',
+      sourceTemplateId: template.id,
+      content: bound as Prisma.InputJsonValue,
+      pageType: 'landing',
+      publishedAt: new Date(),
+    },
+  });
+  console.log(
+    `Builder template seeded (${template.slug}) and org page bound to ${project.name}.`,
   );
 
   // --- Landing pages --------------------------------------------------------
