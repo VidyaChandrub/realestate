@@ -401,12 +401,11 @@ export default function OrgAgentDetailPage() {
           <Link className="btn btn-ghost" href="/org/sales-agents">
             ← Back
           </Link>
-          <button className="btn btn-ghost">
-            <Icon name="mail" size={15} /> Message
-          </button>
-          <button className="btn btn-primary">
-            <Icon name="edit" size={15} /> Edit agent
-          </button>
+          {agent ? (
+            <Link className="btn btn-primary" href="/org/users">
+              <Icon name="edit" size={15} /> Manage in Users
+            </Link>
+          ) : null}
         </div>
       </div>
 

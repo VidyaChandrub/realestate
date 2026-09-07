@@ -52,9 +52,13 @@ export function Modal({
     : "superadmin org";
 
   return createPortal(
-    <div className={cn("fixed inset-0 z-50 flex items-center justify-center p-4", scopeClass, containerClassName)}>
+    <div
+      className={cn("fixed inset-0 z-50 flex items-center justify-center p-4", containerClassName)}
+      style={{ background: "transparent" }}
+    >
       <div
-        className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
+        className="absolute inset-0"
+        style={{ background: "rgba(15, 23, 42, 0.45)" }}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -64,8 +68,9 @@ export function Modal({
         className={cn(
           "relative flex max-h-[90vh] w-full flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl text-slate-900",
           sizes[size],
+          scopeClass,
         )}
-        style={{ background: "#ffffff", color: "#0f172a" }}
+        style={{ background: "#ffffff", color: "#0f172a", minHeight: "auto" }}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-6 pb-4">
           <div>

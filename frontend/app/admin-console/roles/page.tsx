@@ -10,11 +10,11 @@ import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { DynamicRole } from "@/lib/types";
 
-const ROLE_PRESETS = [
-  { name: "Senior Telecaller", key: "senior_telecaller", scope: "team" as const, desc: "Manages lead qualification, calling, and follow-ups" },
-  { name: "Sales Team Lead", key: "sales_team_lead", scope: "team" as const, desc: "Oversees sales agent pipeline, assignment, and site visits" },
-  { name: "Site Visit Manager", key: "site_visit_manager", scope: "team" as const, desc: "Coordinates property site tours and customer feedback" },
-  { name: "Project Admin", key: "project_admin", scope: "organisation" as const, desc: "Manages real estate project listings, units, and inventory" },
+const ORG_PRESETS = [
+  { name: "Senior Telecaller", key: "senior_telecaller", desc: "Manages lead qualification, calling, and follow-ups" },
+  { name: "Sales Team Lead", key: "sales_team_lead", desc: "Oversees sales agent pipeline, assignment, and site visits" },
+  { name: "Site Visit Manager", key: "site_visit_manager", desc: "Coordinates property site tours and customer feedback" },
+  { name: "Project Admin", key: "project_admin", desc: "Manages real estate project listings, units, and inventory" },
 ];
 
 function StatTile({
@@ -75,8 +75,6 @@ export default function SuperAdminRolesPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const [scopeFilter, setScopeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -84,7 +82,7 @@ export default function SuperAdminRolesPage() {
     name: "",
     key: "",
     description: "",
-    scope: "team" as "organisation" | "team",
+    scope: "organisation" as "organisation" | "platform",
   });
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSubmitting, setCreateSubmitting] = useState(false);
@@ -94,7 +92,7 @@ export default function SuperAdminRolesPage() {
     name: "",
     key: "",
     description: "",
-    scope: "organisation" as "organisation" | "team",
+    scope: "organisation" as "organisation" | "platform",
     status: "active" as "active" | "inactive",
     sortOrder: 0,
   });
@@ -166,14 +164,12 @@ export default function SuperAdminRolesPage() {
     () =>
       roles.filter(
         (r) =>
-          (!scopeFilter || r.scope === scopeFilter) &&
-          (!statusFilter || r.status === statusFilter) &&
           (!search.trim() ||
             r.name.toLowerCase().includes(search.trim().toLowerCase()) ||
             r.key.toLowerCase().includes(search.trim().toLowerCase()) ||
             (r.description ?? "").toLowerCase().includes(search.trim().toLowerCase())),
       ),
-    [roles, scopeFilter, statusFilter, search],
+    [roles, search],
   );
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -189,11 +185,15 @@ export default function SuperAdminRolesPage() {
       await apiFetch("/admin/roles", {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify(createForm),
+        body: JSON.stringify({
+          name: createForm.name,
+          key: createForm.key || undefined,
+          description: createForm.description,
+        }),
       });
       notify("Role created successfully");
       setCreateModalOpen(false);
-      setCreateForm({ name: "", key: "", description: "", scope: "team" });
+      setCreateForm({ name: "", key: "", description: "", scope: "organisation" });
       fetchRoles();
     } catch (err: any) {
       setCreateError(err.message || "Failed to create role");
@@ -208,10 +208,11 @@ export default function SuperAdminRolesPage() {
     setEditSubmitting(true);
     setEditError(null);
     try {
+      const { scope: _scope, ...rest } = editForm;
       await apiFetch(`/admin/roles/${editingRole.id}`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(rest),
       });
       notify("Role updated successfully");
       setEditingRole(null);
@@ -340,9 +341,9 @@ export default function SuperAdminRolesPage() {
       <div className="page-head reveal in">
         <div>
           <div className="eyebrow"><Icon name="lock" size={14} /> Security & Access</div>
-          <h1>Role</h1>
+          <h1>Organisation roles</h1>
           <div className="sub">
-            Manage system and custom roles across the platform. Configured roles can be assigned to organisation members.
+            Default roles and module permissions for organisation members. Super Admin console users and roles are managed under Platform Team.
           </div>
         </div>
         <div className="actions">
@@ -602,7 +603,6 @@ export default function SuperAdminRolesPage() {
         <StatTile label="Assigned users" value={stats.assigned} />
       </div>
 
-      {/* Filter + search toolbar */}
       <div
         style={{
           display: "flex",
@@ -612,58 +612,12 @@ export default function SuperAdminRolesPage() {
           alignItems: "center",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap",
-            background: "var(--surface)",
-            border: "1px solid var(--line-2)",
-            borderRadius: 12,
-            padding: 4,
-          }}
-        >
-          {["", "platform", "organisation", "team"].map((s) => (
-            <button
-              key={s || "all-scope"}
-              className={`btn ${scopeFilter === s ? "btn-primary" : "btn-ghost"} btn-sm`}
-              onClick={() => setScopeFilter(s)}
-            >
-              {s === "organisation"
-                ? "Organisation"
-                : s === "platform"
-                  ? "Platform"
-                  : s || "All scopes"}
-            </button>
-          ))}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap",
-            background: "var(--surface)",
-            border: "1px solid var(--line-2)",
-            borderRadius: 12,
-            padding: 4,
-          }}
-        >
-          {["", "active", "inactive"].map((s) => (
-            <button
-              key={s || "all-status"}
-              className={`btn ${statusFilter === s ? "btn-primary" : "btn-ghost"} btn-sm`}
-              onClick={() => setStatusFilter(s)}
-            >
-              {s || "All statuses"}
-            </button>
-          ))}
-        </div>
         <input
           className="inp"
           placeholder="Search roles…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ width: 200, height: 34, fontSize: 13 }}
+          style={{ width: 240, height: 34, fontSize: 13 }}
         />
         <span
           className="muted"
@@ -687,7 +641,6 @@ export default function SuperAdminRolesPage() {
                 <tr>
                   <th>Role Name</th>
                   <th>Key / Slug</th>
-                  <th>Scope</th>
                   <th>Description</th>
                   <th>Assigned Users</th>
                   <th>Status</th>
@@ -697,15 +650,15 @@ export default function SuperAdminRolesPage() {
               <tbody>
                 {error ? (
                   <tr>
-                    <td colSpan={7} className="muted">{error}</td>
+                    <td colSpan={6} className="muted">{error}</td>
                   </tr>
                 ) : loading ? (
                   <tr>
-                    <td colSpan={7} className="muted">Loading roles…</td>
+                    <td colSpan={6} className="muted">Loading roles…</td>
                   </tr>
                 ) : visible.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="muted">No roles match the current filters.</td>
+                    <td colSpan={6} className="muted">No organisation roles yet.</td>
                   </tr>
                 ) : (
                   visible.map((r) => (
@@ -719,9 +672,6 @@ export default function SuperAdminRolesPage() {
                         )}
                       </td>
                       <td><code>{r.key}</code></td>
-                      <td>
-                        <span className="badge b-violet" style={{ textTransform: "capitalize" }}>{r.scope}</span>
-                      </td>
                       <td style={{ maxWidth: 260, fontSize: 13, color: "var(--fg-subtle)" }}>
                         {r.description || "—"}
                       </td>
@@ -770,7 +720,7 @@ export default function SuperAdminRolesPage() {
                                 name: r.name,
                                 key: r.key,
                                 description: r.description ?? "",
-                                scope: r.scope === "organisation" ? "organisation" : "team",
+                                scope: r.scope === "platform" ? "platform" : "organisation",
                                 status: r.status,
                                 sortOrder: r.sortOrder ?? 0,
                               });
@@ -815,7 +765,7 @@ export default function SuperAdminRolesPage() {
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         title="Create Custom Role"
-        description="Add a new role definition that organisations can assign to their team members."
+        description="Add an organisation role that customer workspaces can assign to their members."
         size="lg"
       >
         <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: 18, background: "#ffffff", padding: "4px 0" }}>
@@ -828,7 +778,7 @@ export default function SuperAdminRolesPage() {
               <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>(Click to pre-fill)</span>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {ROLE_PRESETS.map((p) => (
+              {ORG_PRESETS.map((p) => (
                 <button
                   key={p.key}
                   type="button"
@@ -858,7 +808,7 @@ export default function SuperAdminRolesPage() {
                     setCreateForm({
                       name: p.name,
                       key: p.key,
-                      scope: p.scope,
+                      scope: "organisation",
                       description: p.desc,
                     })
                   }
@@ -908,58 +858,20 @@ export default function SuperAdminRolesPage() {
             </div>
           </div>
 
-          {/* Scope selection as light, clean visual cards */}
           <div className="field">
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 8 }}>Role Scope *</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div
-                style={{
-                  padding: "14px 16px",
-                  borderRadius: "12px",
-                  border: createForm.scope === "team" ? "2px solid #6366f1" : "1px solid #e2e8f0",
-                  background: createForm.scope === "team" ? "#f5f7ff" : "#ffffff",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  boxShadow: createForm.scope === "team" ? "0 2px 8px rgba(99, 102, 241, 0.12)" : "0 1px 2px rgba(0,0,0,0.02)",
-                }}
-                onClick={() => setCreateForm((f) => ({ ...f, scope: "team" }))}
-              >
-                <div style={{ fontWeight: 600, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6, color: createForm.scope === "team" ? "#4338ca" : "#1e293b" }}>
-                  <span>👥 Team Scope</span>
-                  {createForm.scope === "team" ? (
-                    <span style={{ marginLeft: "auto", fontSize: 11, background: "#e0e7ff", color: "#4338ca", fontWeight: 600, padding: "2px 8px", borderRadius: 6 }}>
-                      Selected
-                    </span>
-                  ) : null}
-                </div>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-                  Assignable to team members, sales agents, and telecallers.
-                </div>
-              </div>
-
-              <div
-                style={{
-                  padding: "14px 16px",
-                  borderRadius: "12px",
-                  border: createForm.scope === "organisation" ? "2px solid #6366f1" : "1px solid #e2e8f0",
-                  background: createForm.scope === "organisation" ? "#f5f7ff" : "#ffffff",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  boxShadow: createForm.scope === "organisation" ? "0 2px 8px rgba(99, 102, 241, 0.12)" : "0 1px 2px rgba(0,0,0,0.02)",
-                }}
-                onClick={() => setCreateForm((f) => ({ ...f, scope: "organisation" }))}
-              >
-                <div style={{ fontWeight: 600, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6, color: createForm.scope === "organisation" ? "#4338ca" : "#1e293b" }}>
-                  <span>🏢 Organisation Scope</span>
-                  {createForm.scope === "organisation" ? (
-                    <span style={{ marginLeft: "auto", fontSize: 11, background: "#e0e7ff", color: "#4338ca", fontWeight: 600, padding: "2px 8px", borderRadius: 6 }}>
-                      Selected
-                    </span>
-                  ) : null}
-                </div>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-                  Organisation-wide scope for admin or executive roles.
-                </div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 8 }}>Scope</label>
+            <div
+              style={{
+                padding: "14px 16px",
+                borderRadius: "12px",
+                border: "2px solid #6366f1",
+                background: "#f5f7ff",
+                boxShadow: "0 2px 8px rgba(99, 102, 241, 0.12)",
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: "#4338ca" }}>🏢 Organisation Scope</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                These roles apply inside customer organisations — not the Super Admin console.
               </div>
             </div>
           </div>
@@ -1001,7 +913,7 @@ export default function SuperAdminRolesPage() {
         open={editingRole !== null}
         onClose={() => setEditingRole(null)}
         title={`Edit Role: ${editingRole?.name ?? ""}`}
-        description="Update role settings, scope, and status — same fields as creation."
+        description="Update role settings and status — same fields as creation."
         size="md"
       >
         <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -1051,58 +963,22 @@ export default function SuperAdminRolesPage() {
             </div>
           </div>
 
-          {/* Scope selection as light, clean visual cards */}
           <div className="field">
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 8 }}>Role Scope *</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div
-                style={{
-                  padding: "14px 16px",
-                  borderRadius: "12px",
-                  border: editForm.scope === "team" ? "2px solid #6366f1" : "1px solid #e2e8f0",
-                  background: editForm.scope === "team" ? "#f5f7ff" : "#ffffff",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  boxShadow: editForm.scope === "team" ? "0 2px 8px rgba(99, 102, 241, 0.12)" : "0 1px 2px rgba(0,0,0,0.02)",
-                }}
-                onClick={() => setEditForm((f) => ({ ...f, scope: "team" }))}
-              >
-                <div style={{ fontWeight: 600, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6, color: editForm.scope === "team" ? "#4338ca" : "#1e293b" }}>
-                  <span>👥 Team Scope</span>
-                  {editForm.scope === "team" ? (
-                    <span style={{ marginLeft: "auto", fontSize: 11, background: "#e0e7ff", color: "#4338ca", fontWeight: 600, padding: "2px 8px", borderRadius: 6 }}>
-                      Selected
-                    </span>
-                  ) : null}
-                </div>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-                  Assignable to team members, sales agents, and telecallers.
-                </div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 8 }}>Scope</label>
+            <div
+              style={{
+                padding: "14px 16px",
+                borderRadius: "12px",
+                border: "2px solid #6366f1",
+                background: "#f5f7ff",
+                boxShadow: "0 2px 8px rgba(99, 102, 241, 0.12)",
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: "#4338ca" }}>
+                {editingRole?.scope === "team" ? "👥 Team Scope" : "🏢 Organisation Scope"}
               </div>
-
-              <div
-                style={{
-                  padding: "14px 16px",
-                  borderRadius: "12px",
-                  border: editForm.scope === "organisation" ? "2px solid #6366f1" : "1px solid #e2e8f0",
-                  background: editForm.scope === "organisation" ? "#f5f7ff" : "#ffffff",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  boxShadow: editForm.scope === "organisation" ? "0 2px 8px rgba(99, 102, 241, 0.12)" : "0 1px 2px rgba(0,0,0,0.02)",
-                }}
-                onClick={() => setEditForm((f) => ({ ...f, scope: "organisation" }))}
-              >
-                <div style={{ fontWeight: 600, fontSize: 13.5, display: "flex", alignItems: "center", gap: 6, color: editForm.scope === "organisation" ? "#4338ca" : "#1e293b" }}>
-                  <span>🏢 Organisation Scope</span>
-                  {editForm.scope === "organisation" ? (
-                    <span style={{ marginLeft: "auto", fontSize: 11, background: "#e0e7ff", color: "#4338ca", fontWeight: 600, padding: "2px 8px", borderRadius: 6 }}>
-                      Selected
-                    </span>
-                  ) : null}
-                </div>
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-                  Organisation-wide scope for admin or executive roles.
-                </div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                Organisation-role scope cannot be switched to the Super Admin console.
               </div>
             </div>
           </div>

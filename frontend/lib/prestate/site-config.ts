@@ -307,6 +307,9 @@ function hydrateConfig(raw: SiteConfig, page: LandingPageData): SiteConfig {
       customActions: raw.form?.customActions ?? fallback.form.customActions ?? [],
     },
     media: { ...fallback.media, ...raw.media },
+    ...(raw.propertyBinding ? { propertyBinding: raw.propertyBinding } : {}),
+    ...(raw.vars ? { vars: raw.vars } : {}),
+    ...(raw.property ? { property: raw.property } : {}),
     ...(raw.designSystem ? { designSystem: raw.designSystem } : {}),
   };
 }

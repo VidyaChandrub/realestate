@@ -23,27 +23,27 @@ export class AdminRolesController {
 
   @Get()
   list() {
-    return this.adminRolesService.list();
+    return this.adminRolesService.listOrgRoles();
   }
 
   @Post()
   create(@Body() dto: CreateRoleDto) {
-    return this.adminRolesService.create(dto);
+    return this.adminRolesService.createOrgRole(dto);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
-    return this.adminRolesService.update(id, dto);
+    return this.adminRolesService.updateOrgRole(id, dto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.adminRolesService.remove(id);
+    return this.adminRolesService.removeOrgRole(id);
   }
 
   @Get(':id/permissions')
   getPermissions(@Param('id') id: string) {
-    return this.adminRolesService.getRolePermissions(id);
+    return this.adminRolesService.getOrgRolePermissions(id);
   }
 
   @Put(':id/permissions')
@@ -51,6 +51,6 @@ export class AdminRolesController {
     @Param('id') id: string,
     @Body() dto: UpdateRolePermissionsDto,
   ) {
-    return this.adminRolesService.updateRolePermissions(id, dto);
+    return this.adminRolesService.updateOrgRolePermissions(id, dto);
   }
 }

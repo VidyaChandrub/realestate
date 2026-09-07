@@ -48,6 +48,59 @@ export type PermissionModuleKey = (typeof PERMISSION_MODULES)[number]['key'];
 
 export const PERMISSION_MODULE_KEYS = PERMISSION_MODULES.map((m) => m.key);
 
+/** Super Admin console catalog — never mixed with organisation modules. */
+export const PLATFORM_PERMISSION_MODULES: ModuleDefinition[] = [
+  { key: 'admin_dashboard', label: 'Dashboard', description: 'Platform overview and KPIs' },
+  { key: 'admin_notifications', label: 'Notifications', description: 'Platform notification inbox' },
+  { key: 'admin_organisations', label: 'Organisations', description: 'Onboard, approve and manage organisations' },
+  { key: 'admin_org_roles', label: 'Organisation roles', description: 'Default roles and permissions for organisations' },
+  { key: 'admin_platform_team', label: 'Platform team', description: 'Invite and manage Super Admin console users' },
+  { key: 'admin_platform_roles', label: 'Platform roles', description: 'Create platform roles and their console permissions' },
+  { key: 'admin_templates', label: 'Templates', description: 'Site templates, typography and landing pages' },
+  { key: 'admin_domains', label: 'Domains', description: 'Platform domains and organisation domain requests' },
+  { key: 'admin_subscriptions', label: 'Subscriptions', description: 'Plans, billing and subscriptions' },
+  { key: 'admin_email', label: 'Email & SMTP', description: 'Platform email delivery and logs' },
+  { key: 'admin_audit_logs', label: 'Audit logs', description: 'Platform audit history' },
+  { key: 'admin_settings', label: 'Settings', description: 'Platform configuration' },
+];
+
+export const PLATFORM_PERMISSION_MODULE_KEYS = PLATFORM_PERMISSION_MODULES.map(
+  (m) => m.key,
+);
+
+export const PLATFORM_ROUTE_MODULES: Array<{ prefix: string; module: string }> = [
+  { prefix: '/admin/platform-roles', module: 'admin_platform_roles' },
+  { prefix: '/admin/platform-team', module: 'admin_platform_team' },
+  { prefix: '/admin/platform-config', module: 'admin_settings' },
+  { prefix: '/admin/organisations', module: 'admin_organisations' },
+  { prefix: '/admin/org-domain-requests', module: 'admin_domains' },
+  { prefix: '/admin/landing-pages', module: 'admin_templates' },
+  { prefix: '/admin/typography-sets', module: 'admin_templates' },
+  { prefix: '/admin/templates', module: 'admin_templates' },
+  { prefix: '/admin/subscriptions', module: 'admin_subscriptions' },
+  { prefix: '/admin/plans', module: 'admin_subscriptions' },
+  { prefix: '/admin/email', module: 'admin_email' },
+  { prefix: '/admin/notifications', module: 'admin_notifications' },
+  { prefix: '/admin/dashboard', module: 'admin_dashboard' },
+  { prefix: '/admin/roles', module: 'admin_org_roles' },
+];
+
+export function platformModuleForPath(path: string): string | null {
+  const normalized = path.split('?')[0];
+  const hit = PLATFORM_ROUTE_MODULES.find((row) =>
+    normalized === row.prefix || normalized.startsWith(`${row.prefix}/`),
+  );
+  return hit?.module ?? null;
+}
+
+export function actionFromHttpMethod(method: string): PermissionAction {
+  const verb = method.toUpperCase();
+  if (verb === 'GET' || verb === 'HEAD') return 'view';
+  if (verb === 'POST') return 'add';
+  if (verb === 'DELETE') return 'delete';
+  return 'edit';
+}
+
 /** A single module's permission row as stored/returned by the API. */
 export interface ModulePermission {
   moduleKey: string;

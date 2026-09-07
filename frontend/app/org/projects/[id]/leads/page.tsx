@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadDisplayName, leadDisplayPhone } from "@/lib/lead-display";
 import { AddLeadModal } from "@/components/org/add-lead-modal";
+import { LeadStatusSelect } from "@/components/org/lead-status-select";
 import "@/app/org/org.css";
 
 const STATUS_BADGE: Record<CrmLeadStatus, string> = {
@@ -62,6 +63,7 @@ export default function OrgProjectLeadsPage() {
   const canAssign = Boolean(isOrgAdmin?.()) || hasPermission("crm", "edit");
   const canAdd = Boolean(isOrgAdmin?.()) || hasPermission("crm", "add");
   const [leads, setLeads] = useState<CrmLead[] | null>(null);
+  const [kpi, setKpi] = useState({ total: 0, new: 0, siteVisits: 0, won: 0 });
   const [assignable, setAssignable] = useState<{ id: string; name: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -80,6 +82,12 @@ export default function OrgProjectLeadsPage() {
         status: (statusFilter || undefined) as CrmLeadStatus | undefined,
       });
       setLeads(res.data);
+      setKpi({
+        total: res.stats?.total ?? res.total,
+        new: res.stats?.new ?? res.data.filter((l) => l.status === "new").length,
+        siteVisits: res.stats?.siteVisit ?? res.data.filter((l) => l.status === "site_visit").length,
+        won: res.stats?.won ?? res.data.filter((l) => l.status === "won").length,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load leads.");
     }
@@ -97,22 +105,14 @@ export default function OrgProjectLeadsPage() {
     return () => { cancelled = true; };
   }, [canAssign]);
 
-  const stats = useMemo(() => {
-    const current = leads ?? [];
-    return {
-      total: current.length,
-      new: current.filter((l) => l.status === "new").length,
-      siteVisits: current.filter((l) => l.status === "site_visit").length,
-      won: current.filter((l) => l.status === "won").length,
-    };
-  }, [leads]);
+  const stats = kpi;
 
-  const handleAssign = useCallback(async (lead: CrmLead, assignedToId: string | null, status?: CrmLeadStatus) => {
+  const handleAssign = useCallback(async (lead: CrmLead, assignedToId: string | null, status?: CrmLeadStatus, note?: string) => {
     if (!canAssign || savingId) return;
     setSavingId(lead.id);
     setError(null);
     try {
-      const result = await assignCrmLead(lead.id, { assignedToId, status });
+      const result = await assignCrmLead(lead.id, { assignedToId, status, note });
       setLeads((prev) =>
         prev
           ? prev.map((l) =>
@@ -124,6 +124,7 @@ export default function OrgProjectLeadsPage() {
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update lead.");
+      throw e;
     } finally {
       setSavingId(null);
     }
@@ -185,7 +186,7 @@ export default function OrgProjectLeadsPage() {
                       <td><span className="u"><span className={`av ${phone ? "a2" : ""}`}>{initialsFor(name)}</span><span><Link className="nm" href={`/org/leads/${lead.id}`}>{name}</Link>{phone ? <br /> : null}{phone ? <span className="sm">{phone}</span> : null}</span></span></td>
                       <td><span className={`badge ${sourceBadgeClass(lead.source)}`}>{lead.source ?? "website"}</span></td>
                       <td>{lead.assignedTo ? <span className="u"><span className="av a3">{initialsFor(lead.assignedTo.name)}</span><span className="nm">{lead.assignedTo.name}</span></span> : <span className="muted">Unassigned</span>}</td>
-                      <td>{canAssign ? <select className="inp" style={{ width: "auto" }} value={lead.status} disabled={savingId === lead.id} onChange={(e) => handleAssign(lead, lead.assignedTo?.id ?? null, e.target.value as CrmLeadStatus)}>{ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select> : <span className={`badge ${STATUS_BADGE[lead.status]}`}>{STATUS_LABEL[lead.status]}</span>}</td>
+                      <td>{canAssign ? <LeadStatusSelect value={lead.status} disabled={savingId === lead.id} onConfirm={(status, note) => handleAssign(lead, lead.assignedTo?.id ?? null, status, note)} /> : <span className={`badge ${STATUS_BADGE[lead.status]}`}>{STATUS_LABEL[lead.status]}</span>}</td>
                       {canAssign ? <td><select className="inp" style={{ width: "auto" }} value={lead.assignedTo?.id ?? ""} disabled={savingId === lead.id} onChange={(e) => handleAssign(lead, e.target.value || null)}><option value="">Unassigned</option>{assigneeOptions.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></td> : null}
                     </tr>
                   );

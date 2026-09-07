@@ -1,5 +1,6 @@
 import type { LandingPageData, SectionInstance, SiteConfig } from "./types";
 import { PAGES } from "./data";
+import { applyLandingPagePropertyFromConfig } from "./data";
 import { BLANK_TEMPLATE, buildTemplateSections, buildThankYouSections, inferDesignId } from "./page-templates";
 import { ensureConfig } from "./site-config";
 import { apiFetch } from "../api";
@@ -307,9 +308,12 @@ export async function loadTemplate(id: string, resource: Resource = "template"):
   try {
     if (resource === "landing-page") {
       const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}`);
-      return fromApiLandingPage(raw);
+      const page = fromApiLandingPage(raw);
+      applyLandingPagePropertyFromConfig(page.config);
+      return page;
     }
     const raw = await apiFetch<ApiTemplate>(`${TEMPLATES_PATH}/${encodeURIComponent(id)}`);
+    applyLandingPagePropertyFromConfig(null);
     return fromApiTemplate(raw);
   } catch {
     return null;

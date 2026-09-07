@@ -17,13 +17,17 @@ export type { CreateTemplateInput, Resource } from "./persist";
 import { apiFetch } from "../api";
 import { inferDesignId } from "./page-templates";
 import { ensureConfig } from "./site-config";
+import { applyLandingPagePropertyFromConfig } from "./data";
 
 export async function findPageBySlug(slug: string, pages?: LandingPageData[]): Promise<LandingPageData | undefined> {
   const rawKey = decodeURIComponent(slug).trim().toLowerCase();
   const key = rawKey.replace(/\s+/g, "-");
   const list = pages ?? (typeof window === "undefined" ? [] : loadPages());
   const local = list.find((p) => p.slug.toLowerCase() === key || p.slug.toLowerCase() === rawKey);
-  if (local) return local;
+  if (local) {
+    applyLandingPagePropertyFromConfig(local.config);
+    return local;
+  }
 
 
   try {
@@ -51,6 +55,7 @@ export async function findPageBySlug(slug: string, pages?: LandingPageData[]): P
       isPaid: false,
       category: null,
     };
+    applyLandingPagePropertyFromConfig(mapped.config);
     return mapped;
   } catch {
     return undefined;

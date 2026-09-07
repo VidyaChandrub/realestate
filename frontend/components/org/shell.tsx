@@ -21,8 +21,6 @@ type NavGroup = {
   items: NavItem[];
 };
 
-// Templates, Users, and Roles & Permissions are another developer's module —
-// they appear here only as nav entries pointing at "Coming soon" placeholders.
 const NAV_GROUPS: NavGroup[] = [
   {
     grp: "Overview",
@@ -33,6 +31,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/org/leads", icon: "target", label: "Lead Center", tip: "Lead Center" },
       { href: "/org/projects", icon: "building", label: "Projects", tip: "Projects" },
+      { href: "/org/sales-agents", icon: "users", label: "Sales Agents", tip: "Sales Agents" },
     ],
   },
   {
@@ -49,22 +48,21 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/org/templates", icon: "puzzle", label: "Templates", tip: "Templates" },
     ],
   },
-      {
-        grp: "Team",
-        items: [
-          { href: "/org/sales-agents", icon: "users", label: "Sales Agents", tip: "Sales Agents" },
-          { href: "/org/teams", icon: "team", label: "Teams", tip: "Teams" },
-          { href: "/org/users", icon: "profile", label: "Users", tip: "Users" },
-          { href: "/org/roles-permissions", icon: "lock", label: "Roles & Permissions", tip: "Roles & Permissions" },
-        ],
-      },
-      {
-        grp: "Preferences",
-        items: [
-          { href: "/org/integrations", icon: "integrations", label: "Integrations", tip: "Integrations" },
-          { href: "/org/settings", icon: "settings", label: "Settings", tip: "Organisation Settings" },
-        ],
-      },
+  {
+    grp: "Team",
+    items: [
+      { href: "/org/teams", icon: "team", label: "Teams", tip: "Teams" },
+      { href: "/org/users", icon: "profile", label: "Users", tip: "Users" },
+      { href: "/org/roles-permissions", icon: "lock", label: "Roles & Permissions", tip: "Roles & Permissions" },
+    ],
+  },
+  {
+    grp: "System",
+    items: [
+      { href: "/org/integrations", icon: "integrations", label: "Integrations", tip: "Integrations" },
+      { href: "/org/settings", icon: "settings", label: "Settings", tip: "Organisation Settings" },
+    ],
+  },
 ];
 
 const CRUMB_MAP: Record<string, string> = {
@@ -312,8 +310,9 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
               disabled={isSigningOut}
               className="signout"
               title="Sign out"
+              aria-label="Sign out"
             >
-              ⎋
+              <Icon name="logout" size={14} />
             </button>
           </div>
         </div>

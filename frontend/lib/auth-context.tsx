@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -110,6 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const userRef = useRef<SessionUser | null>(null);
+  userRef.current = user;
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -171,6 +174,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let roleKeys = response.roles ?? [];
 
       if (
+        !response.user.org_id &&
+        response.user.onboarding_step === "completed"
+      ) {
+        try {
+          const meRes = await apiFetch<{ permissions: Permissions }>(
+            "/admin/platform-roles/me",
+            { headers: { Authorization: `Bearer ${response.access_token}` } },
+          );
+          if (meRes.permissions) permissions = meRes.permissions;
+        } catch {
+          permissions = {};
+        }
+      } else if (
         response.user.org_id &&
         response.user.onboarding_step === "completed" &&
         !response.onboarding_incomplete
@@ -307,21 +323,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasPermission = useCallback(
     (module: string, action: "view" | "add" | "edit" | "delete") => {
       if (!user) return false;
-      if (user.role === "super_admin" || isOrgAdminSession()) return true;
+      if (!user.org_id) {
+        const loaded = user.permissions && Object.keys(user.permissions).length > 0;
+        if (loaded) return user.permissions[module]?.[action] === true;
+        return user.role === "super_admin";
+      }
+      if (isOrgAdminSession()) return true;
       return user.permissions?.[module]?.[action] === true;
     },
     [user],
   );
 
   const refreshPermissions = useCallback(async (): Promise<Permissions | null> => {
-    // Super admins have global access and do not belong to an organisation org-permissions matrix.
-    // Mid-wizard users (draft org) must not hit /org/permissions/me — that route is
-    // gated by OrgApprovedGuard and used to force-logout with a false ORG_INACTIVE.
-    if (user?.role === "super_admin" || (user && !user.org_id)) return null;
-    if (user?.onboarding_step && user.onboarding_step !== "completed") return null;
+    const currentUser = userRef.current;
+    if (currentUser?.onboarding_step && currentUser.onboarding_step !== "completed") return null;
 
     const token = accessToken ?? (typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.accessToken) : null);
     if (!token || token.startsWith("mock-access-")) return null;
+
+    const applyPermissions = (next: Permissions) => {
+      setUser((prev) => {
+        if (!prev) return null;
+        if (JSON.stringify(prev.permissions ?? {}) === JSON.stringify(next)) {
+          return prev;
+        }
+        const updated = { ...prev, permissions: next };
+        try {
+          localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(updated));
+        } catch {
+          /* ignore */
+        }
+        return updated;
+      });
+      return next;
+    };
+
+    if (currentUser && !currentUser.org_id) {
+      try {
+        const meRes = await apiFetch<{ permissions: Permissions }>("/admin/platform-roles/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (meRes?.permissions) {
+          return applyPermissions(meRes.permissions);
+        }
+      } catch {
+        return null;
+      }
+      return null;
+    }
+
     try {
       const meRes = await apiFetch<{ permissions: Permissions }>("/org/permissions/me", {
         headers: { Authorization: `Bearer ${token}` },
@@ -330,6 +380,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser((prev) => {
           if (!prev) return null;
           const mapped = sessionRoleFromStoredToken(prev.org_id, prev.onboarding_step);
+          if (
+            JSON.stringify(prev.permissions ?? {}) === JSON.stringify(meRes.permissions) &&
+            prev.role === mapped.role
+          ) {
+            return prev;
+          }
           const updated = {
             ...prev,
             permissions: meRes.permissions,
@@ -339,7 +395,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(updated));
           } catch {
-            // ignore
+            /* ignore */
           }
           return updated;
         });
@@ -349,7 +405,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ignore
     }
     return null;
-  }, [accessToken, user]);
+  }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken) return;

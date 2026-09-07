@@ -11,6 +11,7 @@ import { applyDocumentSeo } from "@/lib/prestate/seo";
 import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
 import { bumpTracking } from "@/lib/prestate/tracking";
 import { findPageByDomain, findPageBySlug } from "@/lib/prestate/store";
+import { applyLandingPagePropertyFromConfig } from "@/lib/prestate/data";
 import { builderPath, localDomainPreviewPath } from "@/lib/prestate/paths";
 
 function deviceFromWidth(w: number): Device {
@@ -94,6 +95,7 @@ export function LocalSitePreview({ slug, host, page: serverPage }: { slug?: stri
   const assigned = page.domain.trim();
   const hostHref = assigned ? localDomainPreviewPath(assigned) : "";
   const cfg = ensureConfig(page);
+  applyLandingPagePropertyFromConfig(cfg);
   void ensureDesignSystem(cfg);
   const { typography } = effectiveTypography(cfg, globalSets);
   const fonts = loadFonts();

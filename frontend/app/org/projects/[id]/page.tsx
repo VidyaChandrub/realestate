@@ -13,7 +13,7 @@ import { ProjectPageHead } from "@/components/org/project-tabs";
 import "@/app/org/org.css";
 import type { OrgTemplatesListResponse, ProjectDetail, ProjectSalesAgent } from "@/lib/types";
 
-async function createLandingPageFromOrgTemplate(accessToken: string, pageName: string) {
+async function createLandingPageFromOrgTemplate(accessToken: string, pageName: string, projectId: string) {
   const list = await apiFetch<OrgTemplatesListResponse>("/org/templates?limit=1", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -26,7 +26,7 @@ async function createLandingPageFromOrgTemplate(accessToken: string, pageName: s
   return apiFetch<{ id: string; slug: string }>("/org/landing-pages", {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ templateId, name: pageName }),
+    body: JSON.stringify({ templateId, name: pageName, projectId }),
   });
 }
 
@@ -633,7 +633,7 @@ export default function OrgProjectOverviewPage() {
                           setPublishingPage(true);
                           try {
                             const pageName = `${project.name} — Official Landing Page`;
-                            const lp = await createLandingPageFromOrgTemplate(accessToken, pageName);
+                            const lp = await createLandingPageFromOrgTemplate(accessToken, pageName, project.id);
 
                             if (lp?.id) {
                               await apiFetch(`/org/projects/${project.id}`, {
@@ -670,7 +670,7 @@ export default function OrgProjectOverviewPage() {
                           setPublishingPage(true);
                           try {
                             const pageName = `${project.name} — Official Landing Page`;
-                            const lp = await createLandingPageFromOrgTemplate(accessToken, pageName);
+                            const lp = await createLandingPageFromOrgTemplate(accessToken, pageName, project.id);
 
                             if (lp?.id) {
                               await apiFetch(`/org/landing-pages/${lp.id}/publish`, {

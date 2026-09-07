@@ -25,4 +25,12 @@ export class CreateLandingPageDto {
   @ValidateNested()
   @Type(() => TemplateContentDto)
   content?: TemplateContentDto;
+
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  unitId?: string;
 }

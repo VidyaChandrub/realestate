@@ -10,6 +10,12 @@ import { TemplateCover } from "@/components/superadmin/templates/shared";
 import { Canvas } from "@/components/prestate/builder/canvas";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import { orgBuilderPath } from "@/lib/prestate/paths";
+import {
+  InventoryBindFields,
+  inventoryBindPayload,
+  needsInventorySelection,
+  type InventoryBindValue,
+} from "@/components/org/inventory-bind-fields";
 import type { LandingPageData } from "@/lib/prestate/types";
 import type { LandingPageRow, OrgTemplateSummary, OrgTemplatesListResponse } from "@/lib/types";
 // Canvas renders using the prestate design system's ps-* classes, which only
@@ -26,12 +32,15 @@ export default function OrgTemplatesPage() {
 
   const [useTemplate, setUseTemplate] = useState<{ id: string; name: string } | null>(null);
   const [useName, setUseName] = useState("");
+  const [useBind, setUseBind] = useState<InventoryBindValue>({ kind: "none" });
+  const [useHasInventory, setUseHasInventory] = useState(false);
   const [useSubmitting, setUseSubmitting] = useState(false);
   const [useError, setUseError] = useState<string | null>(null);
 
   function openUseTemplate(id: string, defaultName: string) {
     setUseTemplate({ id, name: defaultName });
     setUseName(defaultName);
+    setUseBind({ kind: "none" });
     setUseError(null);
   }
 
@@ -41,13 +50,22 @@ export default function OrgTemplatesPage() {
       setUseError("Give the page a name");
       return;
     }
+    const missing = needsInventorySelection(useBind, useHasInventory);
+    if (missing) {
+      setUseError(missing);
+      return;
+    }
     setUseSubmitting(true);
     setUseError(null);
     try {
       const created = await apiFetch<LandingPageRow>("/org/landing-pages", {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ templateId: useTemplate.id, name: useName.trim() }),
+        body: JSON.stringify({
+          templateId: useTemplate.id,
+          name: useName.trim(),
+          ...inventoryBindPayload(useBind),
+        }),
       });
       router.push(orgBuilderPath(created.id));
     } catch (err) {
@@ -333,11 +351,11 @@ export default function OrgTemplatesPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 16, padding: 24, width: 420, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.35)" }}
+            style={{ background: "#fff", borderRadius: 16, padding: 24, width: 480, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.35)" }}
           >
             <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Use “{useTemplate.name}”</div>
             <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-              This creates your own editable copy — the shared template is never changed, and other organisations using it are unaffected.
+              This creates your own editable copy — the shared template is never changed. Bind a project or standalone unit so only that listing’s details fill the page.
             </div>
             <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
               Page name
@@ -349,6 +367,14 @@ export default function OrgTemplatesPage() {
               onChange={(e) => setUseName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && confirmUseTemplate()}
               disabled={useSubmitting}
+            />
+            <div style={{ height: 12 }} />
+            <InventoryBindFields
+              accessToken={accessToken}
+              value={useBind}
+              onChange={setUseBind}
+              disabled={useSubmitting}
+              onAvailabilityChange={setUseHasInventory}
             />
             {useError ? (
               <div style={{ color: "var(--rose)", fontSize: 12.5, marginTop: 8 }}>{useError}</div>

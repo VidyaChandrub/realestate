@@ -64,6 +64,17 @@ describe("widget library integrity", () => {
     expect(resolveVars("From {{starting_price}} at {{property_name}}")).toBe("From ₹1.25 Cr at Aurora Residences");
   });
 
+  it("applies bound inventory vars onto the same tokens", async () => {
+    const { applyLandingPagePropertyFromConfig } = await import("@/lib/prestate/data");
+    applyLandingPagePropertyFromConfig({
+      vars: { property_name: "Skyline Heights", starting_price: "₹2 Cr" },
+      property: { name: "Skyline Heights", startingPrice: "₹2 Cr" },
+    });
+    expect(resolveVars("{{property_name}} {{starting_price}}")).toBe("Skyline Heights ₹2 Cr");
+    applyLandingPagePropertyFromConfig(null);
+    expect(resolveVars("{{property_name}}")).toBe("Aurora Residences");
+  });
+
   it("normalizes old left-aligned sections to centered defaults", () => {
     const hero = WIDGETS.find((w) => w.id === "hero")!.make();
     const migrated = migrateSections([

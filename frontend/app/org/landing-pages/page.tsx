@@ -14,6 +14,12 @@ import { Canvas } from "@/components/prestate/builder/canvas";
 import { Icon } from "@/components/icons";
 import type { LandingPageRow, LandingPageStatus, OrgLandingPagesListResponse } from "@/lib/types";
 import type { SectionInstance, SiteConfig } from "@/lib/prestate/types";
+import {
+  InventoryBindFields,
+  inventoryBindPayload,
+  needsInventorySelection,
+  type InventoryBindValue,
+} from "@/components/org/inventory-bind-fields";
 // Canvas renders using the prestate design system's ps-* classes, which only
 // this route needs — same pattern /org/templates already uses (those rules
 // are all ps-prefixed, so importing it here can't leak into the org shell).
@@ -63,6 +69,8 @@ export default function OrgLandingPagesPage() {
 
   const [scratchOpen, setScratchOpen] = useState(false);
   const [scratchName, setScratchName] = useState("");
+  const [scratchBind, setScratchBind] = useState<InventoryBindValue>({ kind: "none" });
+  const [scratchHasInventory, setScratchHasInventory] = useState(false);
   const [scratchSubmitting, setScratchSubmitting] = useState(false);
   const [scratchError, setScratchError] = useState<string | null>(null);
 
@@ -170,6 +178,11 @@ export default function OrgLandingPagesPage() {
       setScratchError("Give the page a name");
       return;
     }
+    const missing = needsInventorySelection(scratchBind, scratchHasInventory);
+    if (missing) {
+      setScratchError(missing);
+      return;
+    }
     setScratchSubmitting(true);
     setScratchError(null);
     try {
@@ -179,6 +192,7 @@ export default function OrgLandingPagesPage() {
         headers: { Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
           name: scratchName.trim(),
+          ...inventoryBindPayload(scratchBind),
           // Same blank-page factories the Super Admin builder's "create
           // blank template" flow uses — no server-side reimplementation.
           content: {
@@ -228,6 +242,7 @@ export default function OrgLandingPagesPage() {
             type="button"
             onClick={() => {
               setScratchName("");
+              setScratchBind({ kind: "none" });
               setScratchError(null);
               setScratchOpen(true);
             }}
@@ -410,11 +425,11 @@ export default function OrgLandingPagesPage() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 16, padding: 24, width: 420, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.35)" }}
+            style={{ background: "#fff", borderRadius: 16, padding: 24, width: 480, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.35)" }}
           >
             <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Create a blank page</div>
             <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-              Starts with an empty canvas — no template involved. Build it in the builder, then publish it like any other page.
+              Starts with an empty canvas — no template involved. Bind a project or standalone unit so that listing’s details fill the page tokens.
             </div>
             <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
               Page name
@@ -426,6 +441,14 @@ export default function OrgLandingPagesPage() {
               onChange={(e) => setScratchName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && confirmCreateFromScratch()}
               disabled={scratchSubmitting}
+            />
+            <div style={{ height: 12 }} />
+            <InventoryBindFields
+              accessToken={accessToken}
+              value={scratchBind}
+              onChange={setScratchBind}
+              disabled={scratchSubmitting}
+              onAvailabilityChange={setScratchHasInventory}
             />
             {scratchError ? (
               <div style={{ color: "var(--rose)", fontSize: 12.5, marginTop: 8 }}>{scratchError}</div>

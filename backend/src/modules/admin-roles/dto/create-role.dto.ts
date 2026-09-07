@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateRoleDto {
   @IsString()
@@ -15,8 +15,4 @@ export class CreateRoleDto {
   @IsString()
   @MaxLength(255)
   description?: string;
-
-  @IsOptional()
-  @IsIn(['organisation', 'team'])
-  scope?: 'organisation' | 'team';
 }

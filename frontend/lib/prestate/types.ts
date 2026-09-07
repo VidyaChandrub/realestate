@@ -386,6 +386,27 @@ export interface SiteConfig {
   media: {
     notes: string;
   };
+  /** Bound inventory snapshot applied at landing-page create. */
+  propertyBinding?: { kind: "project"; projectId: string } | { kind: "unit"; unitId: string };
+  vars?: Record<string, string>;
+  property?: {
+    name: string;
+    builder: string;
+    type: string;
+    status: string;
+    description: string;
+    startingPrice: string;
+    carpetArea: string;
+    reraNumber: string;
+    location: string;
+    possession: string;
+    amenities: string[];
+    features: string[];
+    gallery: string[];
+    landArea: string;
+    towers: string;
+    units: string;
+  };
   /** Per-template design system — typography scope (template/global) + tokens. */
   designSystem?: DesignSystemState;
 }

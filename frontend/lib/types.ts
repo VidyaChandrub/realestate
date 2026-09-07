@@ -479,6 +479,26 @@ export interface DynamicRole {
   _count?: { userRoles: number };
 }
 
+export interface PlatformTeamRole {
+  id?: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  scope: "platform";
+}
+
+export interface PlatformTeamMember {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  phoneNumber: string | null;
+  status: "active" | "disabled" | string;
+  createdAt: string;
+  role: PlatformTeamRole | null;
+  roles: PlatformTeamRole[];
+}
+
 export interface OrgDashboardKpiData {
   role: string;
   period: string;
@@ -1343,6 +1363,14 @@ export interface CrmLeadListResponse {
   total: number;
   page?: number;
   limit?: number;
+  stats?: {
+    total: number;
+    unassigned: number;
+    new: number;
+    followUp: number;
+    siteVisit: number;
+    won: number;
+  };
 }
 
 export interface GetCrmLeadsParams {
@@ -1372,6 +1400,7 @@ export interface CrmAssignableResponse {
 export interface AssignLeadInput {
   assignedToId?: string | null;
   status?: CrmLeadStatus;
+  note?: string;
 }
 
 // --- Sales agents (org CRM team dashboard) ---

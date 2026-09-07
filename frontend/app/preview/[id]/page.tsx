@@ -9,6 +9,7 @@ import type { LandingPageRow } from "@/lib/types";
 import type { LandingPageData } from "@/lib/prestate/types";
 import type { SectionInstance, SiteConfig } from "@/lib/prestate/types";
 import { applyDocumentSeo } from "@/lib/prestate/seo";
+import { applyLandingPagePropertyFromConfig } from "@/lib/prestate/data";
 import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
 import { bumpTracking } from "@/lib/prestate/tracking";
 import "@/app/prestate/prestate.css";
@@ -33,7 +34,10 @@ export default function PreviewLandingPage() {
     apiFetch<LandingPageDetail>(`/org/landing-pages/${encodeURIComponent(id)}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-      .then(setData)
+      .then((page) => {
+        applyLandingPagePropertyFromConfig(page.content?.config);
+        setData(page);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load page."))
       .finally(() => setLoading(false));
   }, [id, accessToken]);

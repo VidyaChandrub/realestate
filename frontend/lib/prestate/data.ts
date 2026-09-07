@@ -344,7 +344,69 @@ const VARS: Record<string, string> = {
   carpet_area: PROPERTY.carpetArea,
   location: PROPERTY.location,
   description: PROPERTY.description,
+  tagline: PROPERTY.description,
+  land_area: PROPERTY.landArea,
+  towers: PROPERTY.towers,
+  units: PROPERTY.units,
 };
+
+const DEFAULT_PROPERTY: PropertyData = JSON.parse(JSON.stringify(PROPERTY)) as PropertyData;
+const DEFAULT_VARS: Record<string, string> = { ...VARS };
+
+function syncVarsFromProperty() {
+  VARS.property_name = PROPERTY.name;
+  VARS.builder_name = PROPERTY.builder;
+  VARS.starting_price = PROPERTY.startingPrice;
+  VARS.rera_number = PROPERTY.reraNumber;
+  VARS.possession_date = PROPERTY.possession;
+  VARS.carpet_area = PROPERTY.carpetArea;
+  VARS.location = PROPERTY.location;
+  VARS.description = PROPERTY.description;
+  VARS.tagline = PROPERTY.description;
+  VARS.land_area = PROPERTY.landArea;
+  VARS.towers = PROPERTY.towers;
+  VARS.units = PROPERTY.units;
+}
+
+/** Apply a landing page's bound project/unit snapshot to the builder tokens and PROPERTY mock. */
+export function applyLandingPagePropertyFromConfig(
+  config?: {
+    vars?: Record<string, string>;
+    property?: Partial<PropertyData> & {
+      startingPrice?: string;
+      carpetArea?: string;
+      reraNumber?: string;
+      landArea?: string;
+    };
+  } | null,
+) {
+  Object.assign(PROPERTY, JSON.parse(JSON.stringify(DEFAULT_PROPERTY)));
+  Object.assign(VARS, DEFAULT_VARS);
+  if (!config?.property && !config?.vars) return;
+  if (config.property) {
+    const p = config.property;
+    if (p.name) PROPERTY.name = p.name;
+    if (p.builder) PROPERTY.builder = p.builder;
+    if (p.type) PROPERTY.type = p.type;
+    if (p.status) PROPERTY.status = p.status;
+    if (p.description != null) PROPERTY.description = p.description;
+    if (p.startingPrice) PROPERTY.startingPrice = p.startingPrice;
+    if (p.carpetArea) PROPERTY.carpetArea = p.carpetArea;
+    if (p.reraNumber != null) PROPERTY.reraNumber = p.reraNumber;
+    if (p.location != null) PROPERTY.location = p.location;
+    if (p.possession != null) PROPERTY.possession = p.possession;
+    if (Array.isArray(p.amenities)) PROPERTY.amenities = p.amenities;
+    if (Array.isArray(p.features)) PROPERTY.features = p.features;
+    if (p.landArea) PROPERTY.landArea = p.landArea;
+    if (p.towers) PROPERTY.towers = p.towers;
+    if (p.units) PROPERTY.units = p.units;
+  }
+  if (config.vars) {
+    Object.assign(VARS, config.vars);
+  } else {
+    syncVarsFromProperty();
+  }
+}
 
 
 

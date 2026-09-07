@@ -89,6 +89,23 @@ enum OrgIndustry {
   @@schema("identity")
 }
 
+// Lookup of organisation kinds (developer, broker, …). Lives in the DB so
+// Super Admin / seed can change labels without a code deploy. Organisations
+// still store `industry` as OrgIndustry; this table is the display catalog.
+model OrgType {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("org_types")
+  @@schema("identity")
+}
+
 // ---------------------------------------------------------------------------
 // identity — organisations, users, roles, auth tokens
 // (Same idea as QuesPro's "admin" schema — the core identity/account layer)

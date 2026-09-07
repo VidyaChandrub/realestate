@@ -6,6 +6,8 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch, ApiError } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { PasswordInput } from "@/components/auth/password-input";
+import { Modal } from "@/components/ui/modal";
+import { Icon } from "@/components/icons";
 import type {
   CreateOrgUserInput,
   OrgUser,
@@ -109,7 +111,7 @@ export default function OrgUsersPage() {
     "active" | "disabled" | "pending" | ""
   >("");
   const [page, setPage] = useState(1);
-  const [dynamicRoles, setDynamicRoles] = useState<{ value: string; label: string }[]>(DEFAULT_ROLE_OPTIONS);
+  const [dynamicRoles, setDynamicRoles] = useState<{ value: string; label: string }[]>([]);
 
   const [result, setResult] = useState<OrgUsersListResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -130,9 +132,13 @@ export default function OrgUsersPage() {
       .then((res) => {
         if (res.roles && res.roles.length > 0) {
           setDynamicRoles(res.roles.map((r) => ({ value: r.key, label: r.name })));
+        } else {
+          setDynamicRoles(DEFAULT_ROLE_OPTIONS);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        setDynamicRoles(DEFAULT_ROLE_OPTIONS);
+      });
   }, [accessToken]);
 
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -387,129 +393,168 @@ export default function OrgUsersPage() {
             type="button"
             onClick={openCreate}
           >
-            ＋ Create user
+            <Icon name="plus" size={15} /> Create user
           </button>
         </div>
       </div>
 
-      {formMode ? (
-        <Reveal delay={1}>
-          <div className="card" style={{ marginBottom: 18 }}>
-            <div className="card-h">
-              <span className="t">
-                {formMode === "create" ? "Create user" : "Edit user"}
-              </span>
+      <Modal
+        open={formMode !== null}
+        onClose={closeForm}
+        size="lg"
+        title={formMode === "edit" ? "Edit user" : "Create user"}
+        description={
+          formMode === "edit"
+            ? "Update this person’s profile, role, or password."
+            : "Add a person who can sign in to this organisation."
+        }
+      >
+        <form
+          className="stack"
+          style={{ display: "grid", gap: 14 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submitForm();
+          }}
+        >
+          {formError ? <div className="form-alert">{formError}</div> : null}
+          <div className="row2">
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="user-first-name">First name</label>
+              <input
+                id="user-first-name"
+                className="inp"
+                name="firstName"
+                autoComplete="given-name"
+                placeholder="e.g. Ananya"
+                value={form.firstName}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, firstName: e.target.value }))
+                }
+              />
             </div>
-            <div className="card-b">
-              {formError ? <div className="form-alert">{formError}</div> : null}
-              <div className="row2">
-                <div className="field">
-                  <label>First name</label>
-                  <input
-                    className="inp"
-                    value={form.firstName}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, firstName: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="field">
-                  <label>Last name</label>
-                  <input
-                    className="inp"
-                    value={form.lastName}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, lastName: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-              <div className="row2">
-                <div className="field">
-                  <label>Email <span aria-hidden="true">*</span></label>
-                  <input
-                    className="inp"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, email: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="field">
-                  <label>Mobile Number <span aria-hidden="true">*</span></label>
-                  <input
-                    className="inp"
-                    required
-                    value={form.phoneNumber}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, phoneNumber: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-              <div className="row2">
-                <div className="field">
-                  <label>Role</label>
-                  <select
-                    value={form.role}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        role: e.target.value,
-                      }))
-                    }
-                  >
-                    {dynamicRoles.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field">
-                  <label>{formMode === "create" ? "Password (optional)" : "New Password (optional)"}</label>
-                  <PasswordInput
-                    placeholder={formMode === "create" ? "Auto-generates temp password if blank" : "Leave blank to keep current password"}
-                    value={form.password ?? ""}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, password: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-              <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
-                Role determines what this person can do. Access to features and pages is governed by organisation dynamic roles & permissions.
-              </div>
-              <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  disabled={formSubmitting}
-                  onClick={() => void submitForm()}
-                >
-                  {formSubmitting
-                    ? "Saving…"
-                    : formMode === "create"
-                      ? "Create user"
-                      : "Save changes"}
-                </button>
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  onClick={closeForm}
-                  disabled={formSubmitting}
-                >
-                  Cancel
-                </button>
-              </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="user-last-name">Last name</label>
+              <input
+                id="user-last-name"
+                className="inp"
+                name="lastName"
+                autoComplete="family-name"
+                placeholder="e.g. Sharma"
+                value={form.lastName}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, lastName: e.target.value }))
+                }
+              />
             </div>
           </div>
-        </Reveal>
-      ) : null}
+          <div className="row2">
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="user-email">Email <span aria-hidden="true">*</span></label>
+              <input
+                id="user-email"
+                className="inp"
+                type="email"
+                name="email"
+                required
+                autoComplete="email"
+                placeholder="name@company.com"
+                value={form.email}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, email: e.target.value }))
+                }
+              />
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="user-phone">Mobile number <span aria-hidden="true">*</span></label>
+              <input
+                id="user-phone"
+                className="inp"
+                type="tel"
+                name="phone"
+                required
+                autoComplete="tel"
+                inputMode="tel"
+                placeholder="+91 98765 43210"
+                value={form.phoneNumber}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, phoneNumber: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <div className="row2">
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="user-role">Role</label>
+              <select
+                id="user-role"
+                className="inp"
+                name="role"
+                value={form.role}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    role: e.target.value,
+                  }))
+                }
+              >
+                {dynamicRoles.length === 0 ? (
+                  <option value="">Select a role</option>
+                ) : null}
+                {dynamicRoles.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label htmlFor="user-password">
+                {formMode === "edit" ? "New password (optional)" : "Password (optional)"}
+              </label>
+              <PasswordInput
+                id="user-password"
+                autoComplete="new-password"
+                placeholder={
+                  formMode === "edit"
+                    ? "Leave blank to keep current password"
+                    : "Leave blank to email a temporary password"
+                }
+                value={form.password ?? ""}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, password: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+            Role controls what they can do. Permissions come from organisation roles.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={closeForm}
+              disabled={formSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              type="submit"
+              disabled={formSubmitting}
+            >
+              {formSubmitting
+                ? "Saving…"
+                : formMode === "edit"
+                  ? "Save changes"
+                  : "Create user"}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
-      {!formMode ? (
-        <Reveal delay={1}>
+      <Reveal delay={1}>
           <div
             style={{
               display: "flex",
@@ -578,10 +623,8 @@ export default function OrgUsersPage() {
             </select>
           </div>
         </Reveal>
-      ) : null}
 
-      {!formMode ? (
-        <Reveal delay={2}>
+      <Reveal delay={2}>
           <div className="card">
             <div className="card-h">
               <span className="t">All users</span>
@@ -763,7 +806,6 @@ export default function OrgUsersPage() {
             ) : null}
           </div>
         </Reveal>
-      ) : null}
 
       {confirm ? (
         <div

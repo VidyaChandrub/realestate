@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { LeadsService } from './leads.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -14,6 +14,7 @@ describe('LeadsService', () => {
     lead: {
       findMany: jest.Mock;
       count: jest.Mock;
+      groupBy: jest.Mock;
       findFirst: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
@@ -30,6 +31,7 @@ describe('LeadsService', () => {
       lead: {
         findMany: jest.fn(),
         count: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -240,10 +242,17 @@ describe('LeadsService', () => {
           email: 'r@x.com',
         },
       });
+      prisma.activityEvent.create.mockResolvedValue({
+        id: 'act-1',
+        type: 'status_updated',
+        text: 'Assigned to Rohit Menon · Status changed from new to follow up — Called, interested',
+        createdAt: new Date(),
+      });
 
       const result = await service.assign('org-1', 'lead-1', {
         assignedToId: 'sales-9',
         status: 'follow_up',
+        note: 'Called, interested',
       }, actor());
 
       expect(prisma.lead.update).toHaveBeenCalledWith({
@@ -251,7 +260,28 @@ describe('LeadsService', () => {
         data: { assignedToId: 'sales-9', status: 'follow_up' },
         include: expect.anything() as never,
       });
+      expect(prisma.activityEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'status_updated',
+            text: expect.stringContaining('Called, interested'),
+          }),
+        }),
+      );
       expect(result.assignedTo?.name).toBe('Rohit Menon');
+    });
+
+    it('rejects a pipeline status change without a note', async () => {
+      prisma.lead.findFirst.mockResolvedValue(foundLead);
+      prisma.user.findFirst.mockResolvedValue({ id: 'sales-9' });
+
+      await expect(
+        service.assign('org-1', 'lead-1', {
+          assignedToId: 'sales-9',
+          status: 'follow_up',
+        }, actor()),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.lead.update).not.toHaveBeenCalled();
     });
 
     it('unassigns a lead when assignedToId is null', async () => {

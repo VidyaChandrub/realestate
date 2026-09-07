@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   getNotifications,
@@ -12,6 +11,8 @@ import {
 import type { AppNotification } from "@/lib/types";
 import { Icon } from "@/components/icons";
 
+const PAGE_SIZE = 25;
+
 const TYPE_LABEL: Record<string, string> = {
   organisation_registration: "New registration",
   subdomain_request: "Subdomain",
@@ -20,7 +21,7 @@ const TYPE_LABEL: Record<string, string> = {
   organisation_rejected: "Rejection",
 };
 
-const TYPE_ICON: Record<string, any> = {
+const TYPE_ICON: Record<string, string> = {
   organisation_registration: "building",
   subdomain_request: "globe",
   custom_domain_request: "link",
@@ -47,7 +48,7 @@ function getNotificationLink(n: AppNotification): string {
   if (n.type === "organisation_approved" || n.type === "organisation_rejected") {
     return n.entityId ? `/admin-console/organisation-detail/${n.entityId}` : "/admin-console/organisations";
   }
-  return "/admin-console/notifications";
+  return "/admin-console";
 }
 
 export function NotificationsBell({ accessToken }: { accessToken: string | null }) {
@@ -55,25 +56,35 @@ export function NotificationsBell({ accessToken }: { accessToken: string | null 
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<AppNotification[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<"all" | "unread">("all");
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  async function refresh() {
+  async function loadPage(nextPage: number, replace: boolean) {
     if (!accessToken) return;
-    const [count, list] = await Promise.all([
-      getUnreadNotifications().catch(() => ({ count: 0 })),
-      getNotifications({ limit: 8 }).catch(() => ({ data: [] })),
-    ]);
+    const list = await getNotifications({
+      page: nextPage,
+      limit: PAGE_SIZE,
+      unreadOnly: filter === "unread",
+    }).catch(() => ({ data: [] as AppNotification[], total: 0 }));
+    setTotal(list.total ?? list.data.length);
+    setItems((prev) => (replace ? list.data ?? [] : [...prev, ...(list.data ?? [])]));
+    setPage(nextPage);
+  }
+
+  async function refreshCount() {
+    if (!accessToken) return;
+    const count = await getUnreadNotifications().catch(() => ({ count: 0 }));
     setUnread(count.count ?? 0);
-    setItems(list.data ?? []);
   }
 
   useEffect(() => {
-    if (accessToken) {
-      void refresh();
-      const id = window.setInterval(() => void refresh(), 30000);
-      return () => window.clearInterval(id);
-    }
+    if (!accessToken) return;
+    void refreshCount();
+    const id = window.setInterval(() => void refreshCount(), 30000);
+    return () => window.clearInterval(id);
   }, [accessToken]);
 
   useEffect(() => {
@@ -85,21 +96,38 @@ export function NotificationsBell({ accessToken }: { accessToken: string | null 
   }, []);
 
   async function openPanel() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
     setLoading(true);
-    await refresh();
+    setOpen(true);
+    await Promise.all([refreshCount(), loadPage(1, true)]);
     setLoading(false);
-    setOpen((v) => !v);
+  }
+
+  async function changeFilter(next: "all" | "unread") {
+    setFilter(next);
+    setLoading(true);
+    const list = await getNotifications({
+      page: 1,
+      limit: PAGE_SIZE,
+      unreadOnly: next === "unread",
+    }).catch(() => ({ data: [] as AppNotification[], total: 0 }));
+    setTotal(list.total ?? list.data.length);
+    setItems(list.data ?? []);
+    setPage(1);
+    setLoading(false);
   }
 
   async function handleItemClick(n: AppNotification) {
     if (!n.readAt) {
       await markNotificationRead(n.id).catch(() => null);
-      setItems((prev) => prev.map((item) => item.id === n.id ? { ...item, readAt: new Date().toISOString() } : item));
+      setItems((prev) => prev.map((item) => (item.id === n.id ? { ...item, readAt: new Date().toISOString() } : item)));
       setUnread((prev) => Math.max(0, prev - 1));
     }
     setOpen(false);
-    const link = getNotificationLink(n);
-    router.push(link);
+    router.push(getNotificationLink(n));
   }
 
   async function markAll() {
@@ -108,9 +136,11 @@ export function NotificationsBell({ accessToken }: { accessToken: string | null 
     setUnread(0);
   }
 
+  const canLoadMore = items.length < total;
+
   return (
     <div className="nb-wrap" ref={ref}>
-      <button className="icon-btn" onClick={openPanel} aria-label="Notifications" title="Notifications">
+      <button className="icon-btn" onClick={() => void openPanel()} aria-label="Notifications" title="Notifications">
         <Icon name="bell" size={16} />
         {unread > 0 ? <span className="nb-count">{unread > 9 ? "9+" : unread}</span> : null}
       </button>
@@ -125,43 +155,63 @@ export function NotificationsBell({ accessToken }: { accessToken: string | null 
                 </span>
               ) : null}
             </div>
-            <button
-              className="nb-link"
-              onClick={markAll}
-              disabled={unread === 0}
-            >
+            <button className="nb-link" onClick={() => void markAll()} disabled={unread === 0}>
               Mark all read
             </button>
           </div>
+          <div style={{ display: "flex", gap: 6, padding: "8px 14px", borderBottom: "1px solid var(--line)" }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${filter === "all" ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => void changeFilter("all")}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${filter === "unread" ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => void changeFilter("unread")}
+            >
+              Unread
+            </button>
+          </div>
           <div className="nb-list">
-            {loading ? (
+            {loading && items.length === 0 ? (
               <div className="nb-empty">Loading…</div>
             ) : items.length === 0 ? (
               <div className="nb-empty">No notifications</div>
             ) : (
-              items.map((n) => (
-                <button
-                  key={n.id}
-                  className={`nb-item${n.readAt ? "" : " unread"}`}
-                  onClick={() => void handleItemClick(n)}
-                >
-                  <div className="nb-item-top">
-                    <span className={`nb-type ${n.readAt ? "" : " unread"}`} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                      <Icon name={TYPE_ICON[n.type] ?? "bell"} size={11} />
-                      {TYPE_LABEL[n.type] ?? n.type}
-                    </span>
-                    <span className="nb-meta">{relativeTime(n.createdAt)}</span>
-                  </div>
-                  <div className="nb-title">{n.title}</div>
-                  {n.body ? <div className="nb-body">{n.body}</div> : null}
-                </button>
-              ))
+              <>
+                {items.map((n) => (
+                  <button
+                    key={n.id}
+                    className={`nb-item${n.readAt ? "" : " unread"}`}
+                    onClick={() => void handleItemClick(n)}
+                  >
+                    <div className="nb-item-top">
+                      <span className={`nb-type ${n.readAt ? "" : " unread"}`} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <Icon name={TYPE_ICON[n.type] ?? "bell"} size={11} />
+                        {TYPE_LABEL[n.type] ?? n.type}
+                      </span>
+                      <span className="nb-meta">{relativeTime(n.createdAt)}</span>
+                    </div>
+                    <div className="nb-title">{n.title}</div>
+                    {n.body ? <div className="nb-body">{n.body}</div> : null}
+                  </button>
+                ))}
+                {canLoadMore ? (
+                  <button
+                    type="button"
+                    className="nb-link"
+                    style={{ padding: "12px 16px", width: "100%", textAlign: "center" }}
+                    onClick={() => void loadPage(page + 1, false)}
+                    disabled={loading}
+                  >
+                    {loading ? "Loading…" : "Load more"}
+                  </button>
+                ) : null}
+              </>
             )}
-          </div>
-          <div className="nb-foot">
-            <Link href="/admin-console/notifications" onClick={() => setOpen(false)}>
-              View all notifications →
-            </Link>
           </div>
         </div>
       ) : null}

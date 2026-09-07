@@ -5,21 +5,92 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { PrismaService } from '../../database/prisma.service';
 import { JwtPayload } from '../types/jwt-payload.interface';
+import {
+  PLATFORM_PERMISSION_MODULES,
+  SYSTEM_ORG_ID,
+  actionFromHttpMethod,
+  platformModuleForPath,
+} from '../utils/permissions.util';
 
-// Must run after JwtAuthGuard — relies on it having already attached
-// request.user. Use as @UseGuards(JwtAuthGuard, SuperAdminGuard).
 @Injectable()
 export class SuperAdminGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context
       .switchToHttp()
       .getRequest<Request & { user: JwtPayload }>();
 
-    if (!request.user?.roles?.includes('super_admin')) {
+    const actor = request.user;
+    const roleKeys = actor?.roles ?? [];
+    if (!actor?.sub) {
       throw new ForbiddenException('Super Admin access required');
     }
 
-    return true;
+    if (roleKeys.includes('super_admin')) {
+      return true;
+    }
+
+    const platformRoles = await this.prisma.role.findMany({
+      where: {
+        orgId: null,
+        scope: 'platform',
+        status: 'active',
+        key: { in: roleKeys },
+      },
+      select: { id: true, key: true },
+    });
+
+    if (actor.orgId !== null || platformRoles.length === 0) {
+      throw new ForbiddenException('Super Admin access required');
+    }
+
+    const path = request.path || request.url.split('?')[0];
+    if (path === '/admin/platform-roles/me') {
+      return true;
+    }
+    if (
+      request.method === 'GET' &&
+      (path === '/admin/notifications' || path.startsWith('/admin/notifications/'))
+    ) {
+      return true;
+    }
+
+    const moduleKey = platformModuleForPath(path);
+    if (!moduleKey) {
+      return true;
+    }
+
+    const action = actionFromHttpMethod(request.method);
+    const rows = await this.prisma.roleModulePermission.findMany({
+      where: {
+        orgId: SYSTEM_ORG_ID,
+        roleId: { in: platformRoles.map((r) => r.id) },
+        moduleKey,
+      },
+    });
+
+    const granted = rows.some((row) => {
+      if (action === 'view') return row.canView;
+      if (action === 'add') return row.canAdd;
+      if (action === 'edit') return row.canEdit;
+      if (action === 'delete') return row.canDelete;
+      return row.canApprove;
+    });
+
+    if (granted) {
+      return true;
+    }
+
+    const known = PLATFORM_PERMISSION_MODULES.some((m) => m.key === moduleKey);
+    if (!known) {
+      return true;
+    }
+
+    throw new ForbiddenException(
+      `Missing platform permission: ${moduleKey}:${action}`,
+    );
   }
 }

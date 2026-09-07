@@ -34,6 +34,7 @@ import { AdminRolesModule } from './modules/admin-roles/admin-roles.module';
 import { OrgDashboardModule } from './modules/org-dashboard/org-dashboard.module';
 import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
 import { PlatformConfigModule } from './modules/platform-config/platform-config.module';
+import { AdminPlatformTeamModule } from './modules/admin-platform-team/admin-platform-team.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { PlatformConfigModule } from './modules/platform-config/platform-config.
     EmailModule,
     AdminDashboardModule,
     PlatformConfigModule,
+    AdminPlatformTeamModule,
   ],
   controllers: [AppController],
   providers: [AppService],

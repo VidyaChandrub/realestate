@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../../database/prisma.service';
@@ -429,9 +429,15 @@ export async function updateOrgUser(
   id: string,
   dto: UpdateOrgUserInput,
 ) {
-  const existing = await prisma.user.findFirst({ where: { id, orgId } });
+  const existing = await prisma.user.findFirst({
+    where: { id, orgId },
+    include: { userRoles: { include: { role: true } } },
+  });
   if (!existing) {
     throw new NotFoundException('User not found');
+  }
+  if (existing.userRoles.some(({ role }) => role.key === 'admin')) {
+    throw new ForbiddenException('Organisation admins cannot be edited.');
   }
 
   if (dto.email && dto.email !== existing.email) {

@@ -63,6 +63,10 @@ import type {
   PlatformConfig,
   UpdatePlatformConfigInput,
   SubdomainVerifyResult,
+  PlatformTeamMember,
+  PlatformTeamRole,
+  DynamicRole,
+  Permissions,
 } from "./types";
 
 const API_BASE = "/api";
@@ -798,4 +802,62 @@ export async function getEmailStats(): Promise<EmailStatsResponse> {
 
 export async function getAdminDashboard(): Promise<AdminDashboardResponse> {
   return apiFetch<AdminDashboardResponse>("/admin/dashboard");
+}
+
+export async function getPlatformTeam(): Promise<PlatformTeamMember[]> {
+  return apiFetch<PlatformTeamMember[]>("/admin/platform-team");
+}
+
+export async function getPlatformTeamRoles(): Promise<PlatformTeamRole[]> {
+  return apiFetch<PlatformTeamRole[]>("/admin/platform-team/roles");
+}
+
+export async function createPlatformTeamMember(input: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  role: string;
+  password?: string;
+}): Promise<PlatformTeamMember> {
+  return apiFetch<PlatformTeamMember>("/admin/platform-team", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updatePlatformTeamMember(
+  id: string,
+  input: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phoneNumber?: string;
+    role?: string;
+    status?: "active" | "disabled";
+    password?: string;
+  },
+): Promise<PlatformTeamMember> {
+  return apiFetch<PlatformTeamMember>(`/admin/platform-team/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deletePlatformTeamMember(id: string): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(`/admin/platform-team/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getPlatformRoles(): Promise<DynamicRole[]> {
+  return apiFetch<DynamicRole[]>("/admin/platform-roles");
+}
+
+export async function getMyPlatformPermissions(): Promise<{
+  unrestricted: boolean;
+  roles: { key: string; name: string }[];
+  permissions: Permissions;
+}> {
+  return apiFetch("/admin/platform-roles/me");
 }
