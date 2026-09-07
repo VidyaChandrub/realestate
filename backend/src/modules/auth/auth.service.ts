@@ -82,6 +82,7 @@ export class AuthService {
     passwordHash: string;
     status: User['status'];
     mustChangePassword: boolean;
+    approvedAt: Date | null;
     createdAt: Date;
     onboardingStep: OnboardingStep;
     roles: string[];
@@ -99,6 +100,7 @@ export class AuthService {
           passwordHash: true,
           status: true,
           mustChangePassword: true,
+          approvedAt: true,
           createdAt: true,
           onboardingStep: true,
           userRoles: { select: { role: { select: { key: true } } } },
@@ -162,6 +164,9 @@ export class AuthService {
     return {
       ...row,
       mustChangePassword: false,
+      // Fallback path (Prisma unavailable) — treat as long-approved so a DB
+      // hiccup never locks a legitimate user out. `status` is still enforced.
+      approvedAt: new Date(0),
       onboardingStep: row.orgId ? 'account' : 'completed',
       roles,
     };
@@ -942,7 +947,7 @@ export class AuthService {
   private async authenticate(dto: LoginDto) {
     const user = await this.findLoginUser(dto.email);
 
-    if (!user || user.status !== 'active') {
+    if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -954,6 +959,24 @@ export class AuthService {
     }
     if (!passwordMatches) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Account-state messaging only AFTER the password is verified, so a wrong
+    // password never reveals whether an account is pending/disabled.
+    //   disabled                      -> disapproved / deactivated
+    //   pending + approvedAt == null   -> awaiting Org Admin approval
+    //   pending + approvedAt != null   -> approved; allowed in, but forced
+    //                                     straight to change-password
+    //   active                         -> normal
+    if (user.status === 'disabled') {
+      throw new UnauthorizedException(
+        'Your account access has been revoked. Please contact your administrator.',
+      );
+    }
+    if (user.status === 'pending' && !user.approvedAt) {
+      throw new UnauthorizedException(
+        'Your account is pending approval by your organisation administrator.',
+      );
     }
 
     const roles = user.roles;
@@ -1032,7 +1055,10 @@ export class AuthService {
       where: { id: existing.userId },
       include: { userRoles: { include: { role: true } } },
     });
-    if (!user || user.status !== 'active') {
+    // `disabled` = disapproved/deactivated — refuse. `pending` is allowed here
+    // because an approved member mid-first-login (still mustChangePassword)
+    // holds a valid refresh token and may legitimately rotate it.
+    if (!user || user.status === 'disabled') {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
@@ -1160,7 +1186,17 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.new_password, BCRYPT_COST_FACTOR);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordHash, mustChangePassword: false },
+      data: {
+        passwordHash,
+        mustChangePassword: false,
+        // First-time password setup completes the approval lifecycle: a
+        // `pending` (already-approved) member becomes a full `active` member.
+        // No effect on Super Admins / already-active users.
+        ...(user.status === 'pending' ? { status: 'active' as const } : {}),
+        // Invalidate the pre-change access token; the fresh login the user
+        // makes next gets a newer `iat`.
+        tokenInvalidBefore: new Date(),
+      },
     });
     return { success: true };
   }
@@ -1230,7 +1266,11 @@ export class AuthService {
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: user.id },
-        data: { passwordHash, mustChangePassword: false },
+        data: {
+          passwordHash,
+          mustChangePassword: false,
+          tokenInvalidBefore: new Date(),
+        },
       });
       await tx.passwordResetToken.update({
         where: { id: entry.id },

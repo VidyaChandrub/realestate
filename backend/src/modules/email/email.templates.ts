@@ -2,11 +2,12 @@ export function getInviteEmailHtml(params: {
   recipientName?: string;
   orgName?: string;
   role: string;
+  loginEmail: string;
   tempPassword?: string;
   loginUrl: string;
   customBody?: string;
 }): string {
-  const { recipientName, orgName, role, tempPassword, loginUrl, customBody } = params;
+  const { recipientName, orgName, role, loginEmail, tempPassword, loginUrl, customBody } = params;
   const greeting = recipientName ? `Hello ${recipientName},` : 'Hello,';
   const orgText = orgName ? `<strong>${orgName}</strong>` : 'your organization';
 
@@ -51,6 +52,7 @@ export function getInviteEmailHtml(params: {
       ${
         tempPassword
           ? `<div class="creds-box">
+              <p><strong>Login Email:</strong> <code style="font-size:15px; color:#4338ca; font-weight:bold;">${loginEmail}</code></p>
               <p><strong>Your Temporary Password:</strong> <code style="font-size:15px; color:#4338ca; font-weight:bold;">${tempPassword}</code></p>
               <p style="color:#64748b; font-size:13px;">You will be prompted to set a permanent password upon first signing in.</p>
              </div>`
@@ -123,6 +125,44 @@ export function getResetPasswordEmailHtml(params: {
     <div class="footer">
       &copy; ${new Date().getFullYear()} iPixxel Realty. All rights reserved.
     </div>
+  </div>
+</body>
+</html>
+`;
+}
+
+export function getUserAccountStatusEmailHtml(params: {
+  recipientName?: string;
+  status: 'activated' | 'deactivated';
+  customBody?: string;
+  loginUrl?: string;
+}): string {
+  const { recipientName, status, customBody, loginUrl } = params;
+  const activated = status === 'activated';
+  const greeting = recipientName ? `Hello ${recipientName},` : 'Hello,';
+  const defaultBody = activated
+    ? '<p>Your account has been activated by your Organisation Administrator.</p><p>You can now sign in to your account and access the iPixxel Realty platform.</p>'
+    : '<p>Your account has been deactivated by your Organisation Administrator.</p><p>You no longer have access to the iPixxel Realty platform.</p><p>If you believe this was done in error or you need your account reactivated, please contact your Organisation Administrator.</p>';
+  const body = customBody
+    ? customBody
+        .replace(/{recipientName}/g, recipientName || 'there')
+        .replace(/{loginUrl}/g, loginUrl || '')
+        .replace(/\n/g, '<br/>')
+    : defaultBody;
+
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Account ${activated ? 'activated' : 'deactivated'}</title></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #1e293b;">
+  <div style="max-width: 580px; margin: 30px auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden;">
+    <div style="background: #0f172a; padding: 28px 32px;"><h1 style="margin: 0; color: #ffffff; font-size: 20px;">iPixxel Realty</h1></div>
+    <div style="padding: 32px; line-height: 1.6;">
+      <p style="font-size: 16px;">${greeting}</p>
+      ${body}
+      ${activated && loginUrl ? `<div style="text-align: center;"><a href="${loginUrl}" style="display: inline-block; background: #6366f1; color: #ffffff; padding: 12px 28px; border-radius: 8px; font-weight: 600; text-decoration: none; margin: 20px 0;" target="_blank">Sign In to Your Account</a></div>` : ''}
+    </div>
+    <div style="padding: 20px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center;">&copy; ${new Date().getFullYear()} iPixxel Realty. All rights reserved.</div>
   </div>
 </body>
 </html>

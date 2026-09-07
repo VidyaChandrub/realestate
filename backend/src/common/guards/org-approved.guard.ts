@@ -37,10 +37,25 @@ import { JwtPayload } from '../types/jwt-payload.interface';
 // instead so signup and holding states never force-logout.
 export const ORG_INACTIVE_ERROR = 'ORG_INACTIVE';
 
+// Member-level counterpart of ORG_INACTIVE. Raised when the authenticated
+// user's own account has been disapproved/deactivated, or when a stale access
+// token predates a password reset / session-invalidation stamp. The frontend
+// (lib/api.ts) treats it exactly like ORG_INACTIVE — clear the session and
+// bounce to the login page with an "access revoked" notice.
+export const USER_INACTIVE_ERROR = 'USER_INACTIVE';
+
 function orgInactive(message: string): ForbiddenException {
   return new ForbiddenException({
     statusCode: 403,
     error: ORG_INACTIVE_ERROR,
+    message,
+  });
+}
+
+function userInactive(message: string): ForbiddenException {
+  return new ForbiddenException({
+    statusCode: 403,
+    error: USER_INACTIVE_ERROR,
     message,
   });
 }
@@ -93,8 +108,36 @@ export class OrgApprovedGuard implements CanActivate {
 
     const user = await this.prisma.user.findUnique({
       where: { id: request.user.sub },
-      select: { mustChangePassword: true },
+      select: {
+        status: true,
+        mustChangePassword: true,
+        tokenInvalidBefore: true,
+      },
     });
+
+    // Account disapproved / deactivated after this token was issued — reject
+    // immediately so a still-valid access JWT cannot keep working (mirrors the
+    // Super Admin -> deactivate-Organisation model).
+    if (user?.status === 'disabled') {
+      throw userInactive(
+        'Your account access has been revoked. Please contact your administrator.',
+      );
+    }
+
+    // Access token predates a password reset / forced session invalidation.
+    const iatMs = request.user.iat ? request.user.iat * 1000 : null;
+    if (
+      user?.tokenInvalidBefore &&
+      iatMs !== null &&
+      iatMs < user.tokenInvalidBefore.getTime()
+    ) {
+      throw userInactive('Your session has ended. Please sign in again.');
+    }
+
+    // Approved member who still has to set their own password: allowed to
+    // reach /auth/change-password (JwtAuthGuard only), but not normal
+    // dashboard APIs. Plain 403 (not USER_INACTIVE) — the frontend shell
+    // routes them to the change-password screen rather than force-logging out.
     if (user?.mustChangePassword) {
       throw new ForbiddenException(
         'Password change required before accessing the organisation',

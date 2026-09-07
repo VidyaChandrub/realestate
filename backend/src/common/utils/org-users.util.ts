@@ -2,14 +2,15 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../../database/prisma.service';
-import { generateTempPassword } from './tokens.util';
+import {
+  generateTempPassword,
+} from './tokens.util';
 import { toSafeUser } from './mappers.util';
 import { normalizePhoneNumber } from './phone.util';
 
 import { EmailService } from '../../modules/email/email.service';
 
 const BCRYPT_COST_FACTOR = 12;
-
 export const ASSIGNABLE_ROLES = [
   'admin',
   'manager',
@@ -18,12 +19,21 @@ export const ASSIGNABLE_ROLES = [
 ] as const;
 export type AssignableRole = string;
 
-export const ORG_USER_STATUS_VALUES = ['active', 'disabled'] as const;
+export const ORG_USER_STATUS_VALUES = [
+  'active',
+  'disabled',
+  'pending',
+] as const;
 export type OrgUserStatus = (typeof ORG_USER_STATUS_VALUES)[number];
 
 type OrgUsersPrisma = Pick<
   PrismaService,
-  'user' | 'role' | 'userRole' | 'refreshToken' | '$transaction'
+  | 'user'
+  | 'role'
+  | 'userRole'
+  | 'refreshToken'
+  | 'passwordResetToken'
+  | '$transaction'
 > & {
   organisation?: { findUnique: (...args: any[]) => Promise<any> };
   emailConfig?: { findFirst: (...args: any[]) => Promise<any> };
@@ -70,6 +80,28 @@ async function sendInviteEmailNotification(
     });
   } catch (err: any) {
     console.error(`[Invite Email] Error delivering invite to ${user.email}: ${err.message}`);
+  }
+}
+
+async function sendUserAccountStatusNotification(
+  prisma: OrgUsersPrisma,
+  user: { email: string; firstName?: string | null; lastName?: string | null },
+  status: 'activated' | 'deactivated',
+) {
+  try {
+    const emailService = new EmailService(prisma as unknown as PrismaService);
+    const recipientName = [user.firstName, user.lastName]
+      .filter(Boolean)
+      .join(' ');
+    await emailService.sendUserAccountStatusEmail({
+      to: user.email,
+      recipientName: recipientName || undefined,
+      status,
+    });
+  } catch (err: any) {
+    console.error(
+      `[User Account ${status}] Error delivering notification to ${user.email}: ${err.message}`,
+    );
   }
 }
 
@@ -130,7 +162,11 @@ export async function provisionInvitedUser(
         email: dto.email,
         phoneNumber,
         passwordHash,
-        status: 'active',
+        // Starts life awaiting Org Admin approval — cannot authenticate until
+        // approvedAt is set (see AuthService.authenticate), then must complete
+        // the forced change-password flow before flipping to `active`.
+        status: 'pending',
+        approvedAt: null,
         mustChangePassword,
         onboardingStep: 'completed',
       },
@@ -169,9 +205,25 @@ export async function reissueInvite(
   const tempPassword = generateTempPassword();
   const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_COST_FACTOR);
 
-  const updated = await prisma.user.update({
-    where: { id: userId },
-    data: { passwordHash, mustChangePassword: true },
+  // Issuing a fresh temp password invalidates any earlier one (the hash is
+  // overwritten) and must also end any live sessions: revoke refresh tokens
+  // and stamp tokenInvalidBefore so a still-valid access token is rejected on
+  // its next request (OrgApprovedGuard).
+  const now = new Date();
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        mustChangePassword: true,
+        tokenInvalidBefore: now,
+      },
+    });
+    await tx.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: now },
+    });
+    return result;
   });
 
   sendInviteEmailNotification(
@@ -181,6 +233,87 @@ export async function reissueInvite(
     tempPassword,
   );
   return toSafeUser(updated);
+}
+
+// "Resend Mail" for any Organisation Admin-created member. Never reads or
+// re-sends the stored password (only its hash is kept) — instead picks the
+// safest existing mechanism for the member's current state:
+//
+//   - not yet onboarded (mustChangePassword, or status !== 'active')
+//       -> reissueInvite(): brand-new temp password, old one invalidated,
+//          live sessions killed, credentials email re-sent.
+//   - fully onboarded active member -> rejected; password reset remains
+//     available through the self-serve forgot-password flow.
+export async function resendCredentials(
+  prisma: OrgUsersPrisma,
+  orgId: string,
+  id: string,
+) {
+  const user = await prisma.user.findFirst({ where: { id, orgId } });
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  if (user.mustChangePassword || user.status !== 'active') {
+    return reissueInvite(prisma, id, orgId);
+  }
+
+  throw new ConflictException(
+    'Resend Mail is only available until the user completes onboarding.',
+  );
+}
+
+// Org Admin approves a pending member. Idempotent. Sets `approvedAt` so the
+// member may authenticate; they still land in the forced change-password flow
+// until they set their own password (which flips them to `active`, see
+// AuthService.changePassword). Re-approving a previously disapproved
+// (`disabled`) member restores access.
+export async function approveOrgUser(
+  prisma: OrgUsersPrisma,
+  orgId: string,
+  id: string,
+) {
+  const user = await prisma.user.findFirst({ where: { id, orgId } });
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+
+  if (user.status === 'active' && user.approvedAt) {
+    // Nothing to do — already a fully active member.
+    return toSafeUser(user);
+  }
+
+  const nextStatus: OrgUserStatus = user.mustChangePassword
+    ? 'pending'
+    : 'active';
+
+  const updated = await prisma.user.update({
+    where: { id },
+    data: {
+      status: nextStatus,
+      approvedAt: user.approvedAt ?? new Date(),
+    },
+  });
+
+  if (user.status !== nextStatus || !user.approvedAt) {
+    sendUserAccountStatusNotification(prisma, updated, 'activated');
+  }
+
+  return toSafeUser(updated);
+}
+
+// Org Admin disapproves / deactivates a member. Mirrors the Super Admin ->
+// deactivate-Organisation security model: flip status, revoke refresh tokens,
+// and stamp tokenInvalidBefore so any already-issued access token is rejected
+// on its next authenticated request (OrgApprovedGuard -> USER_INACTIVE ->
+// frontend force-logout). Re-uses setOrgUserStatus for the shared guards
+// (blocks disabling `admin`-role members).
+export async function disapproveOrgUser(
+  prisma: OrgUsersPrisma,
+  orgId: string,
+  id: string,
+) {
+  return setOrgUserStatus(prisma, orgId, id, 'disabled', true);
 }
 
 export interface OrgUsersQuery {
@@ -242,6 +375,7 @@ export async function listOrgUsers(
         ? { key: user.userRoles[0].role.key, name: user.userRoles[0].role.name }
         : null,
       status: user.status,
+      approvedAt: user.approvedAt,
       createdAt: user.createdAt,
       mustChangePassword: user.mustChangePassword,
       // Teams have no creation/membership UI yet, so this is always false in
@@ -326,6 +460,8 @@ export async function updateOrgUser(
     }
   }
 
+  const passwordChanged = Boolean(dto.password);
+
   await prisma.$transaction(async (tx) => {
     const dataToUpdate: Prisma.UserUpdateInput = {
       firstName: dto.firstName,
@@ -340,12 +476,22 @@ export async function updateOrgUser(
         BCRYPT_COST_FACTOR,
       );
       dataToUpdate.mustChangePassword = true;
+      // An admin-set password must end existing sessions immediately: revoke
+      // refresh tokens and stamp tokenInvalidBefore (mirrors resetPassword).
+      dataToUpdate.tokenInvalidBefore = new Date();
     }
 
     await tx.user.update({
       where: { id },
       data: dataToUpdate,
     });
+
+    if (dto.password) {
+      await tx.refreshToken.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
 
     if (dto.role) {
       const role = await tx.role.findFirst({
@@ -363,7 +509,27 @@ export async function updateOrgUser(
     }
   });
 
-  return getOrgUserById(prisma, orgId, id);
+  const result = await getOrgUserById(prisma, orgId, id);
+
+  // Notify the user their password was changed by an admin — same secure
+  // channel as a fresh invite (temp password + "set a permanent password on
+  // first sign-in"). Never emails the stored hash; only the value the admin
+  // just typed. Fire-and-forget, failures are logged not thrown.
+  if (passwordChanged && dto.password) {
+    sendInviteEmailNotification(
+      prisma,
+      orgId,
+      {
+        email: result.email,
+        firstName: result.first_name,
+        lastName: result.last_name,
+      },
+      dto.password,
+      result.role?.name,
+    );
+  }
+
+  return result;
 }
 
 // Shared by the Org Admin's own PATCH /org/users/:id/status (which also
@@ -373,6 +539,7 @@ export async function setOrgUserStatus(
   orgId: string,
   id: string,
   status: OrgUserStatus,
+  notifyUser = false,
 ) {
   const user = await prisma.user.findFirst({
     where: { id, orgId },
@@ -389,15 +556,33 @@ export async function setOrgUserStatus(
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    const result = await tx.user.update({ where: { id }, data: { status } });
+    const now = new Date();
+    const result = await tx.user.update({
+      where: { id },
+      // Disabling must also invalidate already-issued access tokens: stamp
+      // tokenInvalidBefore so OrgApprovedGuard rejects them on the next
+      // request (USER_INACTIVE -> frontend force-logout).
+      data:
+        status === 'disabled'
+          ? { status, tokenInvalidBefore: now }
+          : { status },
+    });
     if (status === 'disabled') {
       await tx.refreshToken.updateMany({
         where: { userId: id, revokedAt: null },
-        data: { revokedAt: new Date() },
+        data: { revokedAt: now },
       });
     }
     return result;
   });
+
+  if (notifyUser && user.status !== status && (status === 'disabled' || status === 'active')) {
+    sendUserAccountStatusNotification(
+      prisma,
+      updated,
+      status === 'active' ? 'activated' : 'deactivated',
+    );
+  }
 
   return toSafeUser(updated);
 }

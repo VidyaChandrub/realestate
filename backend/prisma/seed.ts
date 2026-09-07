@@ -686,6 +686,10 @@ async function seedEmailTables() {
       invite_body TEXT,
       reset_subject TEXT,
       reset_body TEXT,
+      account_activated_subject TEXT,
+      account_activated_body TEXT,
+      account_deactivated_subject TEXT,
+      account_deactivated_body TEXT,
       created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -694,6 +698,10 @@ async function seedEmailTables() {
   await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS invite_body TEXT;`);
   await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS reset_subject TEXT;`);
   await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS reset_body TEXT;`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS account_activated_subject TEXT;`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS account_activated_body TEXT;`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS account_deactivated_subject TEXT;`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS account_deactivated_body TEXT;`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS audit.email_logs (
       id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,

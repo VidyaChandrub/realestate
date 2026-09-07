@@ -588,19 +588,37 @@ export class AdminOrganisationsService {
       });
     }
 
-    // Keep the org admins informed when the workspace is toggled off/on.
-    const admin = await this.prisma.user.findFirst({
-      where: { orgId: id, userRoles: { some: { role: { key: 'admin' } } } },
-      orderBy: { createdAt: 'asc' },
-    });
-    if (admin) {
-      void this.emailService.sendOrgStatusEmail({
-        to: admin.email,
-        recipientName:
-          [admin.firstName, admin.lastName].filter(Boolean).join(' ') || undefined,
-        orgName: existing.name,
-        status: dto.status === 'active' ? 'enabled' : 'disabled',
+    // Notify every organisation member when the workspace is suspended so
+    // users who are not currently signed in also understand why access stops.
+    if (existing.status !== dto.status && dto.status === 'disabled') {
+      const users = await this.prisma.user.findMany({
+        where: { orgId: id },
+        select: { email: true, firstName: true, lastName: true },
       });
+      for (const user of users) {
+        void this.emailService.sendOrgStatusEmail({
+          to: user.email,
+          recipientName:
+            [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined,
+          orgName: existing.name,
+          status: 'disabled',
+        });
+      }
+    } else if (existing.status !== dto.status) {
+      // Preserve the existing reactivation notification for the primary org admin.
+      const admin = await this.prisma.user.findFirst({
+        where: { orgId: id, userRoles: { some: { role: { key: 'admin' } } } },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (admin) {
+        void this.emailService.sendOrgStatusEmail({
+          to: admin.email,
+          recipientName:
+            [admin.firstName, admin.lastName].filter(Boolean).join(' ') || undefined,
+          orgName: existing.name,
+          status: 'enabled',
+        });
+      }
     }
 
     return toSafeOrganisation(updated);

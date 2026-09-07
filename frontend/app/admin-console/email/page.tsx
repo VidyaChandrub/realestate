@@ -39,6 +39,10 @@ export default function SuperAdminEmailPage() {
     inviteBody: "You have been invited to join {orgName} on the iPixxel Realty platform as a {role}.",
     resetSubject: "Reset your iPixxel Realty password",
     resetBody: "We received a request to reset the password for your account. Click the button below to choose a new password.",
+    accountActivatedSubject: "Your iPixxel Realty Account Has Been Activated",
+    accountActivatedBody: "Your account has been activated by your Organisation Administrator.\n\nYou can now sign in to your account and access the iPixxel Realty platform.",
+    accountDeactivatedSubject: "Your iPixxel Realty Account Has Been Deactivated",
+    accountDeactivatedBody: "Your account has been deactivated by your Organisation Administrator.\n\nYou no longer have access to the iPixxel Realty platform.\n\nIf you believe this was done in error or you need your account reactivated, please contact your Organisation Administrator.",
   });
   const [hasPassword, setHasPassword] = useState(false);
 
@@ -96,6 +100,10 @@ export default function SuperAdminEmailPage() {
           inviteBody: c.inviteBody || "You have been invited to join {orgName} on the iPixxel Realty platform as a {role}.",
           resetSubject: c.resetSubject || "Reset your iPixxel Realty password",
           resetBody: c.resetBody || "We received a request to reset the password for your account. Click the button below to choose a new password.",
+          accountActivatedSubject: c.accountActivatedSubject || "Your iPixxel Realty Account Has Been Activated",
+          accountActivatedBody: c.accountActivatedBody || "Your account has been activated by your Organisation Administrator.\n\nYou can now sign in to your account and access the iPixxel Realty platform.",
+          accountDeactivatedSubject: c.accountDeactivatedSubject || "Your iPixxel Realty Account Has Been Deactivated",
+          accountDeactivatedBody: c.accountDeactivatedBody || "Your account has been deactivated by your Organisation Administrator.\n\nYou no longer have access to the iPixxel Realty platform.\n\nIf you believe this was done in error or you need your account reactivated, please contact your Organisation Administrator.",
         });
         setHasPassword(Boolean(c.hasPassword));
       }
@@ -514,6 +522,38 @@ export default function SuperAdminEmailPage() {
                   Available placeholders: <code>{`{recipientName}`}</code>, <code>{`{resetUrl}`}</code>.
                   (The secure 60-minute password reset button is automatically included below the message).
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card reveal in" style={{ marginBottom: 22 }}>
+            <div className="card-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <span className="t">User Account Status Emails</span>
+                <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                  Sent when an organisation user is activated or deactivated
+                </div>
+              </div>
+              <span className="badge b-teal">templates: account status</span>
+            </div>
+            <div className="card-b">
+              <div className="field">
+                <label>Account Activated Subject</label>
+                <input className="inp" value={form.accountActivatedSubject || ""} onChange={(e) => setForm({ ...form, accountActivatedSubject: e.target.value })} />
+              </div>
+              <div className="field">
+                <label>Account Activated Body</label>
+                <textarea rows={4} className="inp" style={{ resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }} value={form.accountActivatedBody || ""} onChange={(e) => setForm({ ...form, accountActivatedBody: e.target.value })} />
+                <div className="hint">Available placeholders: <code>{`{recipientName}`}</code>, <code>{`{loginUrl}`}</code>. The sign-in button is included automatically.</div>
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Account Deactivated Subject</label>
+                <input className="inp" value={form.accountDeactivatedSubject || ""} onChange={(e) => setForm({ ...form, accountDeactivatedSubject: e.target.value })} />
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Account Deactivated Body</label>
+                <textarea rows={5} className="inp" style={{ resize: "vertical", fontFamily: "inherit", lineHeight: 1.6 }} value={form.accountDeactivatedBody || ""} onChange={(e) => setForm({ ...form, accountDeactivatedBody: e.target.value })} />
+                <div className="hint">Available placeholder: <code>{`{recipientName}`}</code>. No sign-in button is included.</div>
               </div>
             </div>
           </div>
