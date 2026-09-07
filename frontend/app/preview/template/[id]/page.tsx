@@ -88,6 +88,7 @@ export default function TemplatePreviewPage() {
           layoutTheme: cfg.brand.layoutTheme,
         }}
         form={cfg.form}
+        forms={cfg.forms}
         chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}
         onSelect={() => {}}
         onMutate={() => {}}

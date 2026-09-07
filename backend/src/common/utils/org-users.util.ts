@@ -75,6 +75,7 @@ async function sendInviteEmailNotification(
       to: user.email,
       recipientName: recipientName || undefined,
       orgName,
+      orgId,
       role: roleName || 'Team Member',
       tempPassword,
     });
@@ -85,6 +86,7 @@ async function sendInviteEmailNotification(
 
 async function sendUserAccountStatusNotification(
   prisma: OrgUsersPrisma,
+  orgId: string,
   user: { email: string; firstName?: string | null; lastName?: string | null },
   status: 'activated' | 'deactivated',
 ) {
@@ -97,6 +99,7 @@ async function sendUserAccountStatusNotification(
       to: user.email,
       recipientName: recipientName || undefined,
       status,
+      orgId,
     });
   } catch (err: any) {
     console.error(
@@ -296,7 +299,7 @@ export async function approveOrgUser(
   });
 
   if (user.status !== nextStatus || !user.approvedAt) {
-    sendUserAccountStatusNotification(prisma, updated, 'activated');
+    sendUserAccountStatusNotification(prisma, orgId, updated, 'activated');
   }
 
   return toSafeUser(updated);
@@ -585,6 +588,7 @@ export async function setOrgUserStatus(
   if (notifyUser && user.status !== status && (status === 'disabled' || status === 'active')) {
     sendUserAccountStatusNotification(
       prisma,
+      orgId,
       updated,
       status === 'active' ? 'activated' : 'deactivated',
     );

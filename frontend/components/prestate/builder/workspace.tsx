@@ -803,6 +803,7 @@ export function BuilderWorkspace({
           layoutTheme: ensureConfig(page).brand.layoutTheme,
         }}
         form={ensureConfig(page).form}
+        forms={ensureConfig(page).forms}
         chrome={{
           header: ensureConfig(page).header,
           footer: ensureConfig(page).footer,

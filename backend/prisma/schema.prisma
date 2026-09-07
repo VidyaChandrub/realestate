@@ -201,6 +201,7 @@ model Organisation {
   projects              Project[]
   catalogOptions        OrgCatalogOption[]
   units                 Unit[]
+  emailConfig           EmailConfig?
 
   @@map("organisations")
   @@schema("identity")
@@ -1211,11 +1212,12 @@ model OrgCatalogOption {
 
 // ---------------------------------------------------------------------------
 // System Email / SMTP Configuration & Audit Logging
-// Managed globally by Super Admin
+// orgId null = platform (Super Admin). One optional row per organisation.
 // ---------------------------------------------------------------------------
 
 model EmailConfig {
   id        String   @id @default(uuid())
+  orgId     String?  @unique @map("org_id")
   host      String
   port      Int      @default(587)
   secure    Boolean  @default(false)
@@ -1225,6 +1227,8 @@ model EmailConfig {
   fromName  String   @default("iPixxel Realty") @map("from_name")
   replyTo   String?  @map("reply_to")
   isActive  Boolean  @default(true) @map("is_active")
+
+  organisation Organisation? @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   // Customizable message templates
   inviteSubject String? @map("invite_subject")
@@ -1245,6 +1249,7 @@ model EmailConfig {
 
 model EmailLog {
   id         String    @id @default(uuid())
+  orgId      String?   @map("org_id")
   to         String
   subject    String
   template   String?   // 'invite' | 'password_reset' | 'test' | 'notification' | 'system'
@@ -1253,6 +1258,7 @@ model EmailLog {
   metadata   Json?
   sentAt     DateTime  @default(now()) @map("sent_at")
 
+  @@index([orgId])
   @@index([to])
   @@index([status])
   @@index([sentAt])

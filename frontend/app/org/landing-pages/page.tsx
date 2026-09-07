@@ -407,6 +407,7 @@ export default function OrgLandingPagesPage() {
                       logo: viewData.content.config.brand.logo,
                     }}
                     form={viewData.content.config.form}
+                    forms={viewData.content.config.forms}
                     chrome={{ header: viewData.content.config.header, footer: viewData.content.config.footer, brand: viewData.content.config.brand }}
                     onSelect={() => {}}
                     onMutate={() => {}}

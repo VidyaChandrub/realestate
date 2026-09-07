@@ -111,6 +111,7 @@ export default function PreviewLandingPage() {
           logo: data.content.config.brand.logo,
         }}
         form={data.content.config.form}
+        forms={data.content.config.forms}
         chrome={{ header: data.content.config.header, footer: data.content.config.footer, brand: data.content.config.brand }}
         onSelect={() => {}}
         onMutate={() => {}}

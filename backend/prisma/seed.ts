@@ -283,9 +283,18 @@ async function seedDemoOrg() {
 
   // --- Builder template + org page bound to the project --------------------
   const templateSource = builderTemplateContent();
-  const form = templateSource.config.form as { fields?: Array<{ id?: string; options?: string[] }> };
-  const interest = form.fields?.find((f) => f.id === 'f4');
-  if (interest) interest.options = unitTypes.map((u) => u.name);
+  const configChoices = unitTypes.map((u) => u.name);
+  const applyChoices = (form: { fields?: Array<{ id?: string; label?: string; options?: string[] }> } | undefined) => {
+    for (const field of form?.fields ?? []) {
+      if (field.id === 'sv-interest' || field.label === 'Interested in') {
+        field.options = configChoices;
+      }
+    }
+  };
+  applyChoices(templateSource.config.form as { fields?: Array<{ id?: string; label?: string; options?: string[] }> });
+  for (const form of (templateSource.config.forms as Array<{ fields?: Array<{ id?: string; label?: string; options?: string[] }> }> | undefined) ?? []) {
+    applyChoices(form);
+  }
 
   const template = await prisma.template.upsert({
     where: { slug: 'skyline-heights-builder' },

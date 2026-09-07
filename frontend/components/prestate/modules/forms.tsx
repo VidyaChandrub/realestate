@@ -59,6 +59,8 @@ import {
   embedSnippet as libEmbedSnippet,
 } from "@/lib/prestate/forms-store";
 import type { FormDefinition } from "@/lib/prestate/forms-store";
+import { mergeFormLibraries } from "@/lib/prestate/resolve-form";
+import { sampleBuilderForms } from "@/lib/prestate/sample-forms";
 import type {
   Device,
   FieldLogicOp,
@@ -160,12 +162,19 @@ export function FormsModule({
     setFields((f) => f.map((x) => (x.id === id ? { ...x, ...patch } : x)));
 
   // Form library management
+  const persistLibrary = (next: FormDefinition[]) => {
+    saveFormLibrary(next);
+    setLibrary(next);
+    onPatch((c) => ({ ...c, forms: next }));
+  };
+
   const [library, setLibrary] = useState<FormDefinition[]>(() =>
-    loadFormLibrary(),
+    mergeFormLibraries(cfg.forms as FormDefinition[] | undefined, loadFormLibrary(), sampleBuilderForms()),
   );
   const [newFormName, setNewFormName] = useState("");
 
-  const refreshLibrary = () => setLibrary(loadFormLibrary());
+  const refreshLibrary = () =>
+    setLibrary(mergeFormLibraries(ensureConfig(site).forms as FormDefinition[] | undefined, loadFormLibrary(), sampleBuilderForms()));
   useEffect(() => {
     refreshLibrary();
   }, [site.id]);
@@ -173,11 +182,9 @@ export function FormsModule({
   const createNewForm = () => {
     const name = newFormName.trim() || `Form — ${library.length + 1}`;
     const def = newFormDefinition(site.id, name);
-    const next = [...library, def];
-    saveFormLibrary(next);
-    setLibrary(next);
+    persistLibrary([...library, def]);
     setNewFormName("");
-    onToast(`Created template “${name}”`);
+    onToast(`Created form “${name}” in Form Builder`);
   };
 
   const addField = (type: FieldType) => {

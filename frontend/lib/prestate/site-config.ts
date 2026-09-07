@@ -147,6 +147,7 @@ export function defaultSiteConfig(input: {
       openPopupId: "",
       customActions: [],
     },
+    forms: [],
     media: { notes: "" },
     designSystem: { scope: "template", typography: defaultTypography() },
   };
@@ -306,6 +307,7 @@ function hydrateConfig(raw: SiteConfig, page: LandingPageData): SiteConfig {
       fields: raw.form?.fields?.length ? raw.form.fields : fallback.form.fields,
       customActions: raw.form?.customActions ?? fallback.form.customActions ?? [],
     },
+    forms: Array.isArray(raw.forms) ? raw.forms : (fallback.forms ?? []),
     media: { ...fallback.media, ...raw.media },
     ...(raw.propertyBinding ? { propertyBinding: raw.propertyBinding } : {}),
     ...(raw.vars ? { vars: raw.vars } : {}),

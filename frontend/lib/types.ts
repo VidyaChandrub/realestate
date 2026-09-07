@@ -1724,6 +1724,9 @@ export interface SubdomainAvailability {
 
 export interface SmtpConfig {
   id: string | null;
+  orgId?: string | null;
+  usingPlatformFallback?: boolean;
+  platformConfigured?: boolean;
   host: string;
   port: number;
   secure: boolean;

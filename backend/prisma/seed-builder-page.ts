@@ -82,6 +82,7 @@ export function builderTemplateContent(): {
         formTitle: 'Book a site visit',
         formSubtitle: 'Share your details and our team will call you back.',
         formButton: 'Book Site Visit',
+        formId: 'form-site-visit',
       },
       {
         colors: { bg: '#090d16', overlay: 'rgba(10,13,28,0.52)', text: '#ffffff' },
@@ -202,6 +203,7 @@ export function builderTemplateContent(): {
         enquiryFormHeading: 'Enquire about this project',
         enquiryFormText: 'Share your details and our team will get back to you.',
         enquiryButtonLabel: 'Submit enquiry',
+        formId: 'form-site-visit',
       },
     ),
     sec(
@@ -221,12 +223,67 @@ export function builderTemplateContent(): {
       },
     ),
     sec(
+      'sec-floor-plans',
+      'floor-plan-gallery',
+      'Floor Plan Gallery',
+      'Grid',
+      {
+        formId: 'form-floor-plan',
+        eyebrow: 'Floor plans',
+        heading: 'Explore our floor plans',
+        text: 'Submit your details to unlock detailed floor plan images.',
+        formHeading: 'Unlock floor plan',
+        formButton: 'View floor plan',
+        plans: [
+          { name: '3 BHK', beds: '3', area: '1,450 sq.ft', price: '₹1.25 Cr', image: '' },
+          { name: '4 BHK', beds: '4', area: '2,100 sq.ft', price: '₹1.98 Cr', image: '' },
+        ],
+      },
+    ),
+    sec(
+      'sec-brochure',
+      'brochure',
+      'Brochure Download',
+      'FileText',
+      {
+        design: 'centered',
+        formId: 'form-brochure',
+        heading: 'Download brochure',
+        title: 'Download brochure',
+        file: '',
+        text: 'Get the full project kit — plans, specs and pricing.',
+        gateEnabled: true,
+        gateHeading: 'Get the brochure',
+        gateText: 'Share your details and the download starts instantly.',
+        gateButton: 'Submit & download',
+        gateSuccessMessage: 'Verified — your brochure is downloading.',
+      },
+    ),
+    sec(
       'lead-form',
       'lead-form',
       'Form',
       'Send',
-      { fields: ['name', 'phone'] },
+      { formId: 'form-site-visit' },
       { colors: { bg: '#ffffff', text: '#111827' } },
+    ),
+    sec(
+      'sec-popup',
+      'popup',
+      'Conditional Popup',
+      'PartyPopper',
+      {
+        popupId: 'offer-popup',
+        formId: 'form-brochure',
+        heading: 'Get the brochure',
+        text: 'Share your details to download the kit.',
+        cta: 'Download',
+        link: '',
+        showForm: true,
+        trigger: 'delay',
+        delaySeconds: 8,
+        oncePerSession: true,
+      },
     ),
   ];
 
@@ -278,33 +335,124 @@ export function builderTemplateContent(): {
         ],
       },
       footer: { rera: '{{rera_number}}', copyright: '' },
-      form: {
-        name: 'Project enquiry',
-        description: 'Leads from the project landing page.',
-        submitLabel: 'Submit',
-        multiStep: false,
-        saveToCrm: true,
-        sendEmail: false,
-        sendWhatsapp: false,
-        successAction: 'message',
-        successTitle: 'Thanks — our team will call you shortly.',
-        errorMessage: 'Please fill in the required fields.',
-        fields: [
-          { id: 'f1', type: 'text', label: 'Full name', placeholder: 'Your name', required: true },
-          { id: 'f2', type: 'phone', label: 'Phone number', placeholder: 'Phone', required: true },
-          { id: 'f3', type: 'email', label: 'Email address', placeholder: 'you@email.com', required: false },
-          {
-            id: 'f4',
-            type: 'select',
-            label: 'Interested in',
-            placeholder: 'Choose a configuration',
-            required: false,
-            options: [],
-          },
-        ],
-      },
+      form: seedSiteVisitForm(),
+      forms: seedBuilderForms(),
     },
   };
+}
+
+function seedFormShell(
+  id: string,
+  embedId: string,
+  name: string,
+  description: string,
+  submitLabel: string,
+  fields: Array<Record<string, unknown>>,
+  extra: Record<string, unknown> = {},
+) {
+  return {
+    id,
+    createdAt: '2026-09-07T00:00:00.000Z',
+    updatedAt: '2026-09-07T00:00:00.000Z',
+    name,
+    description,
+    embed: { id: embedId, allowExternal: true },
+    pdf: { enabled: false, url: '', filename: 'brochure.pdf', autoDownload: true },
+    thankYouPage: {
+      enabled: true,
+      heading: 'Thank you',
+      description: 'Our team will call you shortly.',
+      successMessage: 'Thanks — our team will call you shortly.',
+      showPdfConfirmation: false,
+    },
+    notifyEmail: '',
+    whatsapp: '',
+    thankYou: 'Thanks — our team will call you shortly.',
+    multiStep: false,
+    templateId: 'custom',
+    saveToCrm: true,
+    sendEmail: false,
+    sendWhatsapp: false,
+    redirectThankYou: false,
+    submitLabel,
+    deliverableUrl: '',
+    deliverableLabel: '',
+    fields,
+    successAction: 'message',
+    successUrl: '',
+    successTitle: '',
+    errorMessage: 'Please fill in the required fields.',
+    openPopupId: '',
+    customActions: [],
+    ...extra,
+  };
+}
+
+function seedSiteVisitForm() {
+  return seedFormShell(
+    'form-site-visit',
+    'emb-site-visit',
+    'Site visit enquiry',
+    'Form Builder sample — used on hero, page form, and project widget.',
+    'Book site visit',
+    [
+      { id: 'sv-name', type: 'text', label: 'Full name', placeholder: 'Your name', required: true },
+      { id: 'sv-phone', type: 'phone', label: 'Phone number', placeholder: 'Phone', required: true },
+      { id: 'sv-email', type: 'email', label: 'Email address', placeholder: 'you@email.com', required: false },
+      {
+        id: 'sv-interest',
+        type: 'select',
+        label: 'Interested in',
+        placeholder: 'Choose a configuration',
+        required: false,
+        options: [],
+      },
+      {
+        id: 'sv-when',
+        type: 'select',
+        label: 'Preferred visit',
+        placeholder: 'Choose a slot',
+        required: false,
+        options: ['Weekday', 'Weekend'],
+      },
+    ],
+  );
+}
+
+export function seedBuilderForms() {
+  return [
+    seedSiteVisitForm(),
+    seedFormShell(
+      'form-brochure',
+      'emb-brochure',
+      'Brochure download',
+      'Form Builder sample — brochure and gated downloads.',
+      'Submit & download',
+      [
+        { id: 'br-name', type: 'text', label: 'Full name', placeholder: 'Your name', required: true },
+        { id: 'br-phone', type: 'phone', label: 'Phone number', placeholder: 'Phone', required: true },
+        { id: 'br-email', type: 'email', label: 'Email address', placeholder: 'you@email.com', required: true },
+      ],
+      {
+        pdf: { enabled: true, url: '', filename: 'brochure.pdf', autoDownload: true },
+        thankYou: 'Verified — your brochure is downloading.',
+        deliverableLabel: 'Brochure',
+      },
+    ),
+    seedFormShell(
+      'form-floor-plan',
+      'emb-floor-plan',
+      'Floor plan unlock',
+      'Form Builder sample — unlock floor plans after enquiry.',
+      'View floor plan',
+      [
+        { id: 'fp-name', type: 'text', label: 'Full name', placeholder: 'Your name', required: true },
+        { id: 'fp-phone', type: 'phone', label: 'Phone number', placeholder: 'Phone', required: true },
+        { id: 'fp-email', type: 'email', label: 'Email address', placeholder: 'you@email.com', required: false },
+      ],
+      { thankYou: 'Unlocked — view the floor plan.' },
+    ),
+  ];
 }
 
 export function asTemplateJson(content: {

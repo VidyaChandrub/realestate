@@ -198,6 +198,7 @@ export function LocalSitePreview({ slug, host, page: serverPage }: { slug?: stri
           layoutTheme: cfg.brand.layoutTheme,
         }}
         form={cfg.form}
+        forms={cfg.forms}
         chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}
         pageId={page.id}
         onSelect={() => {}}

@@ -800,6 +800,50 @@ export async function getEmailStats(): Promise<EmailStatsResponse> {
   return apiFetch<EmailStatsResponse>("/admin/email/stats");
 }
 
+export async function getOrgSmtpConfig(): Promise<SmtpConfig> {
+  return apiFetch<SmtpConfig>("/org/email/config");
+}
+
+export async function updateOrgSmtpConfig(
+  input: UpdateSmtpConfigInput,
+): Promise<SmtpConfig> {
+  return apiFetch<SmtpConfig>("/org/email/config", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function sendOrgSmtpTestEmail(
+  input: SendTestEmailInput,
+): Promise<{ success: boolean; message: string; messageId?: string }> {
+  return apiFetch<{ success: boolean; message: string; messageId?: string }>(
+    "/org/email/test",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function getOrgEmailLogs(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+}): Promise<EmailLogsResponse> {
+  const query = new URLSearchParams();
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.status && params.status !== "all") query.set("status", params.status);
+  if (params?.search) query.set("search", params.search);
+  const qs = query.toString();
+  return apiFetch<EmailLogsResponse>(`/org/email/logs${qs ? `?${qs}` : ""}`);
+}
+
+export async function getOrgEmailStats(): Promise<EmailStatsResponse> {
+  return apiFetch<EmailStatsResponse>("/org/email/stats");
+}
+
 export async function getAdminDashboard(): Promise<AdminDashboardResponse> {
   return apiFetch<AdminDashboardResponse>("/admin/dashboard");
 }

@@ -333,6 +333,7 @@ export default function OrgTemplatesPage() {
                       logo: previewCfg.brand.logo,
                     }}
                     form={previewCfg.form}
+                    forms={previewCfg.forms}
                     chrome={{ header: previewCfg.header, footer: previewCfg.footer, brand: previewCfg.brand }}
                     onSelect={() => {}}
                     onMutate={() => {}}

@@ -1,3 +1,4 @@
+import { describe, expect, it } from '@jest/globals';
 import { normalizeLeadData } from './lead-data.util';
 
 describe('normalizeLeadData', () => {

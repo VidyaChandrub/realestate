@@ -383,6 +383,8 @@ export interface SiteConfig {
     /** Extensible submission pipeline */
     customActions?: FormCustomAction[];
   };
+  /** Form Builder library persisted with the page (not only localStorage). */
+  forms?: Array<SiteConfig["form"] & { id: string; pageId?: string; createdAt?: string; updatedAt?: string }>;
   media: {
     notes: string;
   };

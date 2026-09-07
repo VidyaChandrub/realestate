@@ -671,6 +671,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
                         logo: cfg.brand.logo,
                       }}
                       form={cfg.form}
+                      forms={cfg.forms}
                       chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}
                       onSelect={() => {}}
                       onMutate={() => {}}

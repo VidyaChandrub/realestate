@@ -73,6 +73,7 @@ export default function EmbedFormPage({ params }: { params: Promise<{ embedId: s
         design={{ css: "", bundle: { tokens: {} as never, fonts: [] } }}
         theme={{ primary: "#6D5DFC", accent: "#CDA45E", font: "Inter", name: form.name }}
         form={form}
+        forms={form.id ? [{ ...(form as never), id: form.id }] : []}
         chrome={{ header: {} as never, footer: {} as never, brand: {} as never }}
         pageId={`embed_${embedId}`}
         onSelect={() => {}}
