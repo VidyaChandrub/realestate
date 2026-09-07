@@ -9,6 +9,8 @@ import {
 } from 'class-validator';
 
 const INDUSTRIES = ['developer', 'broker', 'channel', 'mixed'] as const;
+// Mirrors the Prisma UnitPriceBasis enum. Carpet is the RERA-standard default.
+const UNIT_PRICE_BASIS_VALUES = ['carpet', 'builtup'] as const;
 
 // Shared by both the Super Admin PATCH /admin/organisations/:id and the Org
 // Admin PATCH /org/settings — same editable-profile-fields set. slug and
@@ -108,6 +110,11 @@ export class UpdateOrganisationDto {
   @IsOptional()
   @IsIn(INDUSTRIES)
   industry?: (typeof INDUSTRIES)[number];
+
+  // Denominator for every "₹ x / sqft" figure shown for this org's units.
+  @IsOptional()
+  @IsIn(UNIT_PRICE_BASIS_VALUES)
+  unitPriceBasis?: (typeof UNIT_PRICE_BASIS_VALUES)[number];
 
   @IsOptional()
   @IsEmail()

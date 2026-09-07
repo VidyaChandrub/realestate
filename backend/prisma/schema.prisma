@@ -69,6 +69,17 @@ enum RoleScope {
 // signup wizard (previously collected in the UI but discarded, never
 // persisted) and editable later from Org Settings → General. Fixed,
 // app-controlled list, hence an enum rather than free text.
+// Which area a unit's price-per-sqft is divided by. Carpet is the default and
+// the RERA-standard basis in India; some orgs quote on built-up instead. Set
+// per organisation — a figure on the wrong denominator is a real commercial
+// error, so every surface that shows it also names the basis.
+enum UnitPriceBasis {
+  carpet
+  builtup
+
+  @@schema("identity")
+}
+
 enum OrgIndustry {
   developer
   broker
@@ -124,6 +135,8 @@ model Organisation {
   // have these on day one, and existing rows backfill to null.
   legalName    String?      @map("legal_name")
   industry     OrgIndustry?
+  // Denominator for every "₹ x / sqft" figure shown for this org's units.
+  unitPriceBasis UnitPriceBasis @default(carpet) @map("unit_price_basis")
   supportEmail String?      @map("support_email")
   supportPhone String?      @map("support_phone")
 
@@ -222,6 +235,8 @@ model User {
   callLogs        CallLog[]
   activityEvents  ActivityEvent[]
   notifications   Notification[]
+  createdUnits    Unit[]                 @relation("UnitCreatedBy")
+  updatedUnits    Unit[]                 @relation("UnitUpdatedBy")
 
   @@map("users")
   @@schema("identity")
@@ -909,15 +924,26 @@ enum UnitStatus {
   @@schema("projects")
 }
 
-// The four org-managed catalogs the project onboarding wizard picks from.
-// All four are structurally identical (an org-scoped, orderable label), so
-// one table keyed by this discriminator beats four near-identical tables —
-// see OrgCatalogOption.
+// The org-managed catalogs the project onboarding wizard picks from. All are
+// structurally identical (an org-scoped, orderable label), so one table keyed
+// by this discriminator beats several near-identical tables — see
+// OrgCatalogOption.
 enum OrgCatalogCategory {
   project_type
   unit_type
   connectivity
   amenity
+  // Step 3's "What's included in the price?" (multi-select) and "Payment plan
+  // → Plan type" (single-select). Fixed frontend lists until they were brought
+  // under the same org-managed catalog as the four above.
+  price_includes
+  payment_plan
+  facing
+  parking
+  // The unit's optional variant label ("Type A", "Corner"). Was free text on
+  // the unit form, confusingly labelled "Unit type" next to the actual unit
+  // types — now an org-managed list like facing and parking.
+  unit_variant
 
   @@schema("projects")
 }
@@ -948,6 +974,24 @@ model Project {
   // null for now — amenity-icon upload is out of scope (blocked on S3).
   amenities         Json          @default("[]")
 
+  // --- Identity & timeline fields from wizard Steps 1-2. These were
+  // collected by the create wizard from the start but had nowhere to land, so
+  // they were silently dropped on publish and the edit page couldn't show
+  // them. Added as plain optional columns so both pages round-trip them. ---
+  // A `project_type` catalog label, copied at write time. Same "copy, don't
+  // reference" rule as amenities/connectivity: no FK back to the catalog, so
+  // renaming or deleting an option never rewrites an existing project.
+  projectType       String?       @map("project_type")
+  tagline           String?
+  // ISO "YYYY-MM-DD" exactly as an <input type="date"> produces it. Kept as
+  // text on purpose: it's a plain calendar date with no time or zone, and a
+  // DateTime would invite an off-by-one on the way in or out.
+  launchDate        String?       @map("launch_date")
+  constructionStage String?       @map("construction_stage")
+  // Free text, one selling point per line — as typed in the wizard textarea.
+  highlights        String?
+  salesTeam         String?       @map("sales_team")
+
   // --- Onboarding-wizard fields (Steps 3-8), added by Piece A. All optional;
   // the wizard wires them progressively in Pieces B-E. `specifications` and
   // `marketing` are deliberately loose preference blobs — their inner shape
@@ -961,11 +1005,18 @@ model Project {
   city                   String?
   locality               String?
   pincode                String? // kept as text — leading zeros matter
+  // No longer collected by the create/edit forms (the map inputs were
+  // removed); kept so existing values survive and a future map picker has
+  // somewhere to write.
   latitude               Float?
   longitude              Float?
   connectivity           String[] @default([]) // labels copied from the org "connectivity" catalog
   landmarks              String?
-  specifications         Json? // { flooring, kitchen, doorsWindows, fittings, notes }
+  // { items: [{ label, value }], notes }. Older rows hold the original
+  // fixed-key shape ({ flooring, kitchen, doorsWindows, fittings, notes });
+  // both are read by normalizeSpecifications on the client, so nothing has to
+  // be migrated in place.
+  specifications         Json?
   marketing              Json? // { adSources, monthlyBudget, targetCpl, leadGoal, landingPageChoice, aiCallingEnabled, whatsappWelcomeEnabled, roundRobinEnabled, aiKnowledgeBaseEnabled }
   requireBookingApproval Boolean  @default(false) @map("require_booking_approval")
   visibleToTelecallers   Boolean  @default(true) @map("visible_to_telecallers")
@@ -974,6 +1025,10 @@ model Project {
   galleryUrls            String[] @default([]) @map("gallery_urls")
   brochureUrl            String?  @map("brochure_url")
   reraCertificateUrl     String?  @map("rera_certificate_url")
+  // Overall project floor / site plans, collected in wizard Step 8. Distinct
+  // from UnitType.floorPlanUrl, which is the plan for one configuration and
+  // can only exist once unit types are created after publish.
+  floorPlanUrls          String[] @default([]) @map("floor_plan_urls")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1089,11 +1144,20 @@ model Unit {
   galleryUrls  String[] @default([]) @map("gallery_urls")
 
   status    UnitStatus @default(available)
+  // Who created / last touched this unit, from the JWT. Nullable: rows written
+  // before these columns existed have no actor, and ON DELETE SET NULL keeps a
+  // unit when the user is removed. Complements the audit_logs trail (which
+  // records what changed and when) by making "who owns this row now" a cheap
+  // join for the list and detail views.
+  createdById String?  @map("created_by_id")
+  updatedById String?  @map("updated_by_id")
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
 
   organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
   project      Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("UnitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?        @relation("UnitUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
   @@index([orgId])
   @@index([projectId])

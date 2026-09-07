@@ -9,7 +9,10 @@ import { ProjectsService } from './projects.service';
 
 @Module({
   imports: [AuthModule],
-  controllers: [ProjectsController],
+  // OrgUnitsController serves the standalone-unit API (/org/units) the
+  // all-units pages call. It was imported but never registered, so every one
+  // of those routes 404d.
+  controllers: [ProjectsController, OrgUnitsController],
   providers: [ProjectsService, OrgAdminGuard, OrgApprovedGuard, PermissionGuard],
 })
 export class ProjectsModule {}

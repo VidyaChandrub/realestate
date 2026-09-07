@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgUnits } from "@/lib/api";
 import { formatMoney } from "@/lib/money";
+import { formatUpdatedAt, PRICE_BASIS_LABEL } from "@/components/org/project-form-fields";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
@@ -113,11 +114,6 @@ export default function AllUnitsPage() {
   const total = result?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
-  const pricePerSqft = useMemo(
-    () => (price: number | null, carpet: number | null) =>
-      price && carpet ? Math.round(price / carpet) : null,
-    [],
-  );
 
   return (
     <>
@@ -242,13 +238,14 @@ export default function AllUnitsPage() {
                 <tr>
                   <th>Unit</th>
                   <th>Project</th>
-                  <th>Type</th>
+                  <th>Configuration</th>
                   <th>Carpet</th>
                   <th>Tower</th>
                   <th>Floor</th>
                   <th>Facing</th>
                   <th>Parking</th>
                   <th>Price</th>
+                  <th>Updated by</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -256,20 +253,20 @@ export default function AllUnitsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={11} className="muted">
+                    <td colSpan={12} className="muted">
                       Loading…
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="muted">
+                    <td colSpan={12} className="muted">
                       No units match this filter.
                     </td>
                   </tr>
                 ) : (
                   rows.map((u) => {
                     const ccy = u.project?.currency ?? "INR";
-                    const psf = pricePerSqft(u.price, u.carpetSqft);
+                    const psf = u.pricePerSqft;
                     const detailHref = u.project
                       ? `/org/projects/${u.project.id}/units/${u.id}`
                       : `/org/units/${u.id}`;
@@ -306,8 +303,23 @@ export default function AllUnitsPage() {
                           {u.price != null
                             ? formatMoney(u.price, ccy)
                             : psf != null
-                              ? `${formatMoney(psf, ccy)}/sqft`
+                              ? `${formatMoney(psf, ccy)}/sqft (${PRICE_BASIS_LABEL[u.pricePerSqftBasis]})`
                               : "—"}
+                          {u.price != null && psf != null ? (
+                            <div className="hint">
+                              {formatMoney(psf, ccy)}/sqft ({PRICE_BASIS_LABEL[u.pricePerSqftBasis]})
+                            </div>
+                          ) : null}
+                        </td>
+                        <td>
+                          {u.updatedBy ? (
+                            <>
+                              <div>{u.updatedBy.name}</div>
+                              <div className="hint">{formatUpdatedAt(u.updatedAt)}</div>
+                            </>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
                         </td>
                         <td>
                           <span className={`badge ${STATUS_BADGE[u.status]}`}>

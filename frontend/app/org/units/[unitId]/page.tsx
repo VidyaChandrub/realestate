@@ -16,10 +16,11 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import {
   ConfigurationSelect,
-  FACING_OPTIONS,
-  PARKING_OPTIONS,
   UnitMediaFields,
-  pricePerSqftCarpet,
+  formatUpdatedAt,
+  pricePerSqftLabel,
+  PRICE_BASIS_LABEL,
+  UnitAttributeSelect,
 } from "@/components/org/project-form-fields";
 import "@/app/org/org.css";
 import type { OrgCatalogOption, Unit, UnitStatus } from "@/lib/types";
@@ -111,10 +112,10 @@ export default function StandaloneUnitPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    getOrgCatalogOptions("unit_type")
+    getOrgCatalogOptions()
       .then((rows) =>
         setCatalog(
-          [...rows].sort(
+          rows.sort(
             (a, b) =>
               a.sortOrder - b.sortOrder || a.label.localeCompare(b.label),
           ),
@@ -126,6 +127,10 @@ export default function StandaloneUnitPage() {
         ),
       );
   }, [accessToken]);
+
+  const facingOptions = (catalog ?? []).filter((option) => option.category === "facing");
+  const parkingOptions = (catalog ?? []).filter((option) => option.category === "parking");
+  const variantOptions = (catalog ?? []).filter((option) => option.category === "unit_variant");
 
   function patch(p: Partial<Form>) {
     setForm((f) => (f ? { ...f, ...p } : f));
@@ -204,14 +209,19 @@ export default function StandaloneUnitPage() {
     );
   }
 
-  const psqft = pricePerSqftCarpet(
+  // The unit response carries the org's basis, so the live edit figure and the
+  // stored one can't disagree.
+  const basis = unit.pricePerSqftBasis;
+  const psqft = pricePerSqftLabel(
     parseAmount(form.price),
     parseCount(form.carpetSqft),
+    parseCount(form.builtupSqft),
+    basis,
   );
 
   const specs: { k: string; v: string }[] = [
     { k: "Configuration", v: unit.configuration ?? "—" },
-    { k: "Unit type", v: unit.variantLabel ?? "—" },
+    { k: "Unit variant", v: unit.variantLabel ?? "—" },
     {
       k: "Carpet area",
       v: unit.carpetSqft != null ? `${unit.carpetSqft.toLocaleString("en-IN")} sqft` : "—",
@@ -224,11 +234,23 @@ export default function StandaloneUnitPage() {
     { k: "Parking", v: unit.parking ?? "—" },
     { k: "Price", v: unit.price != null ? formatMoney(unit.price, "INR") : "—" },
     {
-      k: "₹/sqft",
-      v: pricePerSqftCarpet(unit.price, unit.carpetSqft) || "—",
+      k: `₹/sqft (${PRICE_BASIS_LABEL[basis]})`,
+      v: pricePerSqftLabel(unit.price, unit.carpetSqft, unit.builtupSqft, basis) || "—",
     },
     { k: "Location / address", v: unit.addressLine ?? "—" },
     { k: "Owner / seller", v: unit.ownerName ?? "—" },
+    {
+      k: "Created by",
+      v: unit.createdBy
+        ? `${unit.createdBy.name} · ${formatUpdatedAt(unit.createdAt)}`
+        : "—",
+    },
+    {
+      k: "Last updated by",
+      v: unit.updatedBy
+        ? `${unit.updatedBy.name} · ${formatUpdatedAt(unit.updatedAt)}`
+        : "—",
+    },
   ];
 
   return (
@@ -320,20 +342,24 @@ export default function StandaloneUnitPage() {
                     Configuration <span className="req">*</span>
                   </label>
                   <ConfigurationSelect
-                    catalog={catalog}
+                    catalog={catalog?.filter((option) => option.category === "unit_type") ?? null}
                     error={catalogError}
                     value={form.configuration}
                     onChange={(v) => patch({ configuration: v })}
                   />
                 </div>
                 <div className="field">
-                  <label>Unit type</label>
-                  <input
-                    className="inp"
-                    placeholder="e.g. Type A (optional)"
+                  <label>Unit variant</label>
+                  <UnitAttributeSelect
+                    options={variantOptions}
+                    loaded={catalog !== null}
+                    error={catalogError}
                     value={form.variantLabel}
-                    onChange={(e) => patch({ variantLabel: e.target.value })}
+                    onChange={(v) => patch({ variantLabel: v })}
+                    placeholder="None"
+                    emptyHint="No unit variants configured yet."
                   />
+                  <div className="hint">Optional — e.g. Type A, Corner.</div>
                 </div>
               </div>
               <div className="grid g3">
@@ -359,36 +385,27 @@ export default function StandaloneUnitPage() {
                 </div>
                 <div className="field">
                   <label>Facing</label>
-                  <select
-                    className="inp"
+                  <UnitAttributeSelect
+                    options={facingOptions}
+                    loaded={catalog !== null}
+                    error={catalogError}
                     value={form.facing}
-                    onChange={(e) => patch({ facing: e.target.value })}
-                  >
-                    <option value="">Select…</option>
-                    {FACING_OPTIONS.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => patch({ facing: v })}
+                    placeholder="Select…"
+                    emptyHint="No facing options configured yet."
+                  />
                 </div>
               </div>
               <div className="field mb-0" style={{ marginTop: 4 }}>
                 <label>Parking</label>
-                <div className="opts">
-                  {PARKING_OPTIONS.map((p) => (
-                    <span
-                      key={p}
-                      className={`opt ${form.parking === p ? "on" : ""}`}
-                      onClick={() =>
-                        patch({ parking: form.parking === p ? "" : p })
-                      }
-                    >
-                      <span className="b">{form.parking === p ? "✓" : ""}</span>
-                      {p}
-                    </span>
-                  ))}
-                </div>
+                <UnitAttributeSelect
+                  options={parkingOptions}
+                  loaded={catalog !== null}
+                  error={catalogError}
+                  value={form.parking}
+                  onChange={(v) => patch({ parking: v })}
+                  emptyHint="No parking options configured yet."
+                />
               </div>
             </div>
 

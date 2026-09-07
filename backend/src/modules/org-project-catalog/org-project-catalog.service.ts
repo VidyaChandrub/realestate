@@ -13,8 +13,8 @@ import { CatalogCategoryValue } from './dto/list-catalog-options-query.dto';
 export class OrgProjectCatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Every option the org owns, across all four categories, ordered ready for
-  // the settings UI (which groups by category itself). An optional `category`
+  // Every option the org owns, across all categories, ordered ready for the
+  // settings UI (which groups by category itself). An optional `category`
   // narrows it to one list. Never returns another org's rows.
   async list(orgId: string, category?: CatalogCategoryValue) {
     return this.prisma.orgCatalogOption.findMany({

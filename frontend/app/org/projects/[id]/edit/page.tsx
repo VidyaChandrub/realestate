@@ -5,9 +5,15 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, setProjectSalesAgents } from "@/lib/api";
-import { parseAmount, parseCoord, parseCount, parseDecimal } from "@/lib/parse";
+import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { CURRENCY_LABELS, PROJECT_CURRENCIES } from "@/lib/money";
-import { CatalogOptions, MoneyInput } from "@/components/org/project-form-fields";
+import { CatalogOptions, MoneyInput, SpecificationRows } from "@/components/org/project-form-fields";
+import { allMissing, projectRequirements } from "@/lib/project-validation";
+import {
+  normalizeSpecifications,
+  serializeSpecifications,
+  type SpecRow,
+} from "@/lib/specifications";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import { ProjectTabs } from "@/components/org/project-tabs";
 import "@/app/org/org.css";
@@ -20,6 +26,7 @@ import type {
   ProjectDetail,
   ProjectStatus,
   SafeOrganisation,
+  UnitType,
   UpdateProjectInput,
 } from "@/lib/types";
 
@@ -31,20 +38,38 @@ function toField(value: number | null | undefined): string {
   return value == null ? "" : String(value);
 }
 
-const PRICE_INCLUDES = [
-  "Floor rise",
-  "1 covered parking",
-  "Club membership",
-  "GST",
-  "Registration & stamp duty",
-];
-const PAYMENT_PLANS = [
-  "Construction-linked",
-  "Down payment",
-  "Flexi (20:80)",
-  "Subvention",
-];
 const AD_SOURCES = ["Meta", "Google", "LinkedIn", "Portals"] as const;
+// Same fixed lists the create wizard offers, so both forms agree. A stored
+// value that isn't in the list stays selectable (see `withCurrent`) so editing
+// an older project can't silently rewrite it.
+const CONSTRUCTION_STAGES = [
+  "Planning",
+  "Excavation",
+  "Under construction",
+  "Finishing",
+  "Ready to move",
+];
+const SALES_TEAMS = ["Ahmedabad — West", "Ahmedabad — Core", "NRI Desk"];
+
+/** The option list plus the current value, when that value has fallen off it. */
+function withCurrent(options: string[], value: string): string[] {
+  return value && !options.includes(value) ? [...options, value] : options;
+}
+
+/**
+ * Which section of this page owns each wizard step's required fields.
+ *
+ * The rules themselves come from lib/project-validation — the same module the
+ * create wizard uses — so the two can't drift. Only the *placement* differs:
+ * this page is one scrolling form, and its project-manager field sits in
+ * Basics rather than in a separate Team step.
+ */
+const STEP_SECTION: Record<number, string> = {
+  0: "sec-basics",
+  2: "sec-pricing",
+  3: "sec-location",
+  6: "sec-basics",
+};
 
 const NAV = [
   ["sec-basics", "Basics"],
@@ -69,6 +94,10 @@ export default function OrgProjectEditPage() {
 
   // --- Basics ---
   const [name, setName] = useState("");
+  const [projectType, setProjectType] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [launchDate, setLaunchDate] = useState("");
+  const [constructionStage, setConstructionStage] = useState("");
   const [reraId, setReraId] = useState("");
   const [possession, setPossession] = useState("");
   const [managerId, setManagerId] = useState("");
@@ -92,21 +121,26 @@ export default function OrgProjectEditPage() {
   const [city, setCity] = useState("");
   const [locality, setLocality] = useState("");
   const [pincode, setPincode] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
   const [connectivity, setConnectivity] = useState<string[]>([]);
   const [landmarks, setLandmarks] = useState("");
 
   // --- Inventory & specs ---
+  // Unit configurations are catalog labels (same `unit_type` list the create
+  // wizard uses), stored as one UnitType row each. `unitTypeRows` is the
+  // loaded server state, kept so the save can tell an untouched placeholder
+  // row from one that has real inventory behind it.
+  const [selectedConfigs, setSelectedConfigs] = useState<string[]>([]);
+  const [highlights, setHighlights] = useState("");
+  const [unitTypeRows, setUnitTypeRows] = useState<UnitType[]>([]);
   const [towerCount, setTowerCount] = useState("");
   const [floorsDescription, setFloorsDescription] = useState("");
   const [carpetRange, setCarpetRange] = useState("");
   const [landArea, setLandArea] = useState("");
   const [amenities, setAmenities] = useState<string[]>([]);
-  const [flooring, setFlooring] = useState("");
-  const [kitchen, setKitchen] = useState("");
-  const [doorsWindows, setDoorsWindows] = useState("");
-  const [fittings, setFittings] = useState("");
+  // Dynamic { label, value } rows. Projects saved before the rework hold the
+  // old fixed-key blob; normalizeSpecifications reads both, so an old project
+  // opens with its data intact as labelled rows.
+  const [specRows, setSpecRows] = useState<SpecRow[]>([]);
   const [specNotes, setSpecNotes] = useState("");
 
   // --- Marketing ---
@@ -122,6 +156,7 @@ export default function OrgProjectEditPage() {
 
   // --- Team & access ---
   const [salesUsers, setSalesUsers] = useState<OrgUser[]>([]);
+  const [salesTeam, setSalesTeam] = useState("");
   const [agentAssign, setAgentAssign] = useState<string[]>([]);
   const [requireBookingApproval, setRequireBookingApproval] = useState(false);
   const [visibleToTelecallers, setVisibleToTelecallers] = useState(true);
@@ -132,8 +167,9 @@ export default function OrgProjectEditPage() {
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [brochureUrl, setBrochureUrl] = useState<string | null>(null);
   const [reraCertificateUrl, setReraCertificateUrl] = useState<string | null>(null);
+  const [floorPlanUrls, setFloorPlanUrls] = useState<string[]>([]);
 
-  // --- Catalogs (connectivity picker) ---
+  // --- Catalogs (option pickers) ---
   const [catalog, setCatalog] = useState<OrgCatalogOption[] | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [orgLandingPages, setOrgLandingPages] = useState<LandingPageRow[]>([]);
@@ -142,6 +178,12 @@ export default function OrgProjectEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Inline field errors appear only once Save has been attempted, so a project
+  // that predates a required field isn't shouting red on first load. The
+  // jump-nav markers are always live, though — those state a fact about the
+  // project rather than complaining about the user.
+  const [attemptedSave, setAttemptedSave] = useState(false);
+  const [jumpWarning, setJumpWarning] = useState<{ to: string; label: string; missing: string[] } | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -153,6 +195,10 @@ export default function OrgProjectEditPage() {
       .then((p) => {
         setProjectName(p.name);
         setName(p.name);
+        setProjectType(p.projectType ?? "");
+        setTagline(p.tagline ?? "");
+        setLaunchDate(p.launchDate ?? "");
+        setConstructionStage(p.constructionStage ?? "");
         setReraId(p.reraId ?? "");
         setPossession(p.possession ?? "");
         setManagerId(p.managerId ?? "");
@@ -173,8 +219,6 @@ export default function OrgProjectEditPage() {
         setCity(p.city ?? "");
         setLocality(p.locality ?? "");
         setPincode(p.pincode ?? "");
-        setLatitude(toField(p.latitude));
-        setLongitude(toField(p.longitude));
         setConnectivity(p.connectivity ?? []);
         setLandmarks(p.landmarks ?? "");
 
@@ -183,13 +227,14 @@ export default function OrgProjectEditPage() {
         setCarpetRange(p.carpetRange ?? "");
         setLandArea(toField(p.landArea));
         setAmenities(p.amenities.map((a) => a.name));
+        setUnitTypeRows(p.unitTypes ?? []);
+        setSelectedConfigs((p.unitTypes ?? []).map((u) => u.name));
+        setHighlights(p.highlights ?? "");
+        setSalesTeam(p.salesTeam ?? "");
 
-        const spec = (p.specifications ?? {}) as Record<string, string>;
-        setFlooring(spec.flooring ?? "");
-        setKitchen(spec.kitchen ?? "");
-        setDoorsWindows(spec.doorsWindows ?? "");
-        setFittings(spec.fittings ?? "");
-        setSpecNotes(spec.notes ?? "");
+        const spec = normalizeSpecifications(p.specifications);
+        setSpecRows(spec.rows);
+        setSpecNotes(spec.notes);
 
         const mkt = (p.marketing ?? {}) as {
           adSources?: string[];
@@ -221,6 +266,7 @@ export default function OrgProjectEditPage() {
         setGalleryUrls(p.galleryUrls ?? []);
         setBrochureUrl(p.brochureUrl);
         setReraCertificateUrl(p.reraCertificateUrl);
+        setFloorPlanUrls(p.floorPlanUrls ?? []);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -269,6 +315,49 @@ export default function OrgProjectEditPage() {
 
   const connectivityOptions = (catalog ?? []).filter((o) => o.category === "connectivity");
   const amenityOptions = (catalog ?? []).filter((o) => o.category === "amenity");
+  // --- Required fields, from the shared rules (see STEP_SECTION) -----------
+  const requirements = projectRequirements({
+    name, projectType, reraId, priceMin, address: addressLine, city, managerId,
+  });
+  const missingFields = allMissing(requirements);
+  /** The inline message for a field, once Save has been attempted. */
+  const fieldError = (id: string) =>
+    (attemptedSave && missingFields.find((f) => f.id === id)?.error) || "";
+  const fieldClass = (id: string) =>
+    `field${fieldError(id) ? " field-invalid" : ""}`;
+  /** How many required fields are still empty in one section of this page. */
+  const sectionMissingCount = (anchor: string) =>
+    missingFields.filter((f) => STEP_SECTION[f.step] === anchor).length;
+
+  function jumpToSection(anchor: string, label: string) {
+    const currentIndex = NAV.findIndex(([current]) => current === activeSection);
+    const targetIndex = NAV.findIndex(([target]) => target === anchor);
+    const missing = missingFields
+      .filter((f) => STEP_SECTION[f.step] === activeSection)
+      .map((f) => f.label);
+
+    if (targetIndex <= currentIndex || missing.length === 0) {
+      setJumpWarning(null);
+      setActiveSection(anchor);
+      document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    setJumpWarning({ to: anchor, label, missing });
+  }
+
+  function confirmSectionJump() {
+    if (!jumpWarning) return;
+    const { to } = jumpWarning;
+    setJumpWarning(null);
+    setActiveSection(to);
+    document.getElementById(to)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const projectTypeOptions = (catalog ?? []).filter((o) => o.category === "project_type");
+  const unitTypeOptions = (catalog ?? []).filter((o) => o.category === "unit_type");
+  const priceIncludeOptions = (catalog ?? []).filter((o) => o.category === "price_includes");
+  const paymentPlanOptions = (catalog ?? []).filter((o) => o.category === "payment_plan");
 
   function toggle(list: string[], v: string): string[] {
     return list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
@@ -280,10 +369,54 @@ export default function OrgProjectEditPage() {
     return selected.filter((s) => !options.some((o) => o.label === s));
   }
 
+  /**
+   * True when this configuration's UnitType row is still the empty placeholder
+   * the create wizard seeds — no sizes, price, planned count, media or actual
+   * units. Only those can be detached by unticking; a row with real inventory
+   * behind it is left alone and has to be removed from the Units page.
+   */
+  function configIsRemovable(label: string): boolean {
+    const row = unitTypeRows.find((u) => u.name === label);
+    if (!row) return true; // added in this session, not saved yet
+    return (
+      row.unitCount === 0 &&
+      row.totalUnits === 0 &&
+      row.carpetSqft == null &&
+      row.builtupSqft == null &&
+      row.price == null &&
+      !row.floorPlanUrl &&
+      !row.brochureUrl &&
+      !row.videoUrl &&
+      row.galleryUrls.length === 0
+    );
+  }
+
+  function toggleConfig(label: string) {
+    setSelectedConfigs((prev) => {
+      if (!prev.includes(label)) return [...prev, label];
+      if (!configIsRemovable(label)) {
+        setNotice(null);
+        setError(
+          `"${label}" has unit inventory behind it — remove it from the project's Units page instead.`,
+        );
+        return prev;
+      }
+      setError(null);
+      return prev.filter((x) => x !== label);
+    });
+  }
+
   async function save() {
     if (!accessToken) return;
-    if (!name.trim()) {
-      setError("Project name is required.");
+    setAttemptedSave(true);
+    // Same required set the create wizard enforces before publishing.
+    if (missingFields.length > 0) {
+      setNotice(null);
+      setError(
+        `Fill in the required field${missingFields.length > 1 ? "s" : ""} first: ${missingFields.map((f) => f.label).join(", ")}.`,
+      );
+      const firstSection = STEP_SECTION[missingFields[0].step];
+      document.getElementById(firstSection)?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
     setSaving(true);
@@ -292,16 +425,9 @@ export default function OrgProjectEditPage() {
     try {
       const amenityPayload: Amenity[] = amenities.map((a) => ({ name: a, iconUrl: null }));
 
-      const specEntries: Record<string, string> = {
-        flooring: flooring.trim(),
-        kitchen: kitchen.trim(),
-        doorsWindows: doorsWindows.trim(),
-        fittings: fittings.trim(),
-        notes: specNotes.trim(),
-      };
-      const specifications = Object.fromEntries(
-        Object.entries(specEntries).filter(([, v]) => v),
-      );
+      // `{}` clears the blob when every row and the notes were emptied —
+      // `serializeSpecifications` returns undefined in that case.
+      const specifications = serializeSpecifications(specRows, specNotes) ?? {};
 
       const marketing = {
         adSources,
@@ -317,6 +443,12 @@ export default function OrgProjectEditPage() {
 
       const body: UpdateProjectInput = {
         name: name.trim(),
+        projectType: projectType || null,
+        tagline: tagline.trim() || null,
+        launchDate: launchDate || null,
+        constructionStage: constructionStage || null,
+        highlights: highlights.trim() || null,
+        salesTeam: salesTeam || null,
         location: location.trim() || null,
         reraId: reraId.trim() || null,
         possession: possession.trim() || null,
@@ -336,8 +468,6 @@ export default function OrgProjectEditPage() {
         city: city.trim() || null,
         locality: locality.trim() || null,
         pincode: pincode.trim() || null,
-        latitude: parseCoord(latitude) ?? null,
-        longitude: parseCoord(longitude) ?? null,
         connectivity,
         landmarks: landmarks.trim() || null,
 
@@ -357,6 +487,7 @@ export default function OrgProjectEditPage() {
         galleryUrls,
         brochureUrl: brochureUrl ?? null,
         reraCertificateUrl: reraCertificateUrl ?? null,
+        floorPlanUrls,
       };
 
       await apiFetch(`/org/projects/${id}`, {
@@ -364,6 +495,37 @@ export default function OrgProjectEditPage() {
         headers: { Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify(body),
       });
+
+      // Unit configurations live as UnitType rows, so they're reconciled with
+      // their own endpoints after the project PATCH. Additions seed an empty
+      // planned type (exactly what the create wizard does); removals only ever
+      // touch placeholder rows — `toggleConfig` refuses to untick anything
+      // with real inventory, so nothing with data can be deleted from here.
+      const auth = { headers: { Authorization: `Bearer ${accessToken}` } };
+      const originalConfigs = unitTypeRows.map((u) => u.name);
+      try {
+        for (const label of selectedConfigs) {
+          if (originalConfigs.includes(label)) continue;
+          await apiFetch(`/org/projects/${id}/unit-types`, {
+            method: "POST",
+            ...auth,
+            body: JSON.stringify({ name: label, totalUnits: 0 }),
+          });
+        }
+        for (const row of unitTypeRows) {
+          if (selectedConfigs.includes(row.name)) continue;
+          await apiFetch(`/org/projects/${id}/unit-types/${row.id}`, {
+            method: "DELETE",
+            ...auth,
+          });
+        }
+      } catch {
+        setSaving(false);
+        setNotice(
+          "Project saved, but updating the unit configurations failed — try that part again from here.",
+        );
+        return;
+      }
 
       // Sales-agent set is a separate endpoint. A failure here shouldn't
       // lose the rest of the save — surface a non-blocking notice.
@@ -452,13 +614,33 @@ export default function OrgProjectEditPage() {
               key={anchor}
               href={`#${anchor}`}
               className={`btn btn-sm ${activeSection === anchor ? "btn-primary" : "btn-ghost"}`}
-              onClick={() => setActiveSection(anchor)}
+              onClick={(event) => {
+                event.preventDefault();
+                jumpToSection(anchor, label);
+              }}
+              title={sectionMissingCount(anchor) > 0 ? `${label} is missing required fields` : undefined}
             >
               {label}
+              {sectionMissingCount(anchor) > 0 ? (
+                <span className="nav-warn" aria-label="missing required fields"> !</span>
+              ) : null}
             </a>
           ))}
         </div>
       </div>
+
+      {jumpWarning ? (
+        <div className="help err mb-20">
+          <b>{activeSection === jumpWarning.to ? jumpWarning.label : "This section"} has missing required fields.</b>
+          <div style={{ marginTop: 4 }}>
+            Still needed here: {jumpWarning.missing.join(", ")}. You can fill them in now, or go to <b>{jumpWarning.label}</b> and come back before saving.
+          </div>
+          <div className="row gap-10 mt-8">
+            <button className="btn btn-primary btn-sm" type="button" onClick={() => setJumpWarning(null)}>Stay and fill it in</button>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={confirmSectionJump}>Go to {jumpWarning.label} anyway →</button>
+          </div>
+        </div>
+      ) : null}
 
       {error ? <div className="form-alert">{error}</div> : null}
       {notice ? <div className="form-alert ok">{notice}</div> : null}
@@ -470,9 +652,10 @@ export default function OrgProjectEditPage() {
             <div className="card-h"><span className="t">Basics</span></div>
             <div className="card-b">
               <div className="row2">
-                <div className="field">
-                  <label>Project name *</label>
+                <div className={fieldClass("name")}>
+                  <label>Project name <span className="req">*</span></label>
                   <input className="inp" value={name} onChange={(e) => setName(e.target.value)} />
+                  {fieldError("name") ? <div className="field-err">{fieldError("name")}</div> : null}
                 </div>
                 <div className="field">
                   <label>Developer / channel partner</label>
@@ -480,19 +663,61 @@ export default function OrgProjectEditPage() {
                   <div className="hint">Your organisation — change it in Settings → General.</div>
                 </div>
               </div>
+              <div className={fieldClass("projectType")}>
+                <label>Project type <span className="req">*</span></label>
+                <CatalogOptions
+                  category="project_type"
+                  options={projectTypeOptions}
+                  loaded={catalog !== null}
+                  error={catalogError}
+                  single
+                  isSelected={(label) => projectType === label}
+                  onToggle={(label) => setProjectType((cur) => (cur === label ? "" : label))}
+                />
+                {projectType && !projectTypeOptions.some((o) => o.label === projectType) ? (
+                  <div className="row gap-8 wrap mt-8">
+                    <span className="chip">
+                      {projectType}
+                      <button type="button" className="x-btn" aria-label={`Remove ${projectType}`} onClick={() => setProjectType("")}>✕</button>
+                    </span>
+                  </div>
+                ) : null}
+                {fieldError("projectType") ? <div className="field-err">{fieldError("projectType")}</div> : null}
+              </div>
+              <div className="field">
+                <label>Short tagline</label>
+                <input className="inp" placeholder="e.g. 2 &amp; 3 BHK homes on SG Highway" value={tagline} onChange={(e) => setTagline(e.target.value)} />
+                <div className="hint">Shown on the public page and ad landing pages.</div>
+              </div>
               <div className="row2">
-                <div className="field">
-                  <label>RERA ID</label>
+                <div className={fieldClass("reraId")}>
+                  <label>RERA ID <span className="req">*</span></label>
                   <input className="inp" value={reraId} onChange={(e) => setReraId(e.target.value)} />
+                  {fieldError("reraId") ? <div className="field-err">{fieldError("reraId")}</div> : null}
                 </div>
                 <div className="field">
                   <label>Possession</label>
                   <input className="inp" placeholder="e.g. Dec 2027" value={possession} onChange={(e) => setPossession(e.target.value)} />
                 </div>
               </div>
-              <div className="row2 mb-0">
+              <div className="row2">
                 <div className="field">
-                  <label>Project manager</label>
+                  <label>Launch date</label>
+                  <input className="inp" type="date" value={launchDate} onChange={(e) => setLaunchDate(e.target.value)} />
+                </div>
+                <div className="field">
+                  <label>Construction stage</label>
+                  <select value={constructionStage} onChange={(e) => setConstructionStage(e.target.value)}>
+                    <option value="">Not set</option>
+                    {withCurrent(CONSTRUCTION_STAGES, constructionStage).map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="row2 mb-0">
+                <div className={fieldClass("managerId")}>
+                  <label>Project manager <span className="req">*</span></label>
                   <select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
                     <option value="">Unassigned</option>
                     {currentManager && !managers.some((u) => u.id === currentManager.id) ? (
@@ -502,6 +727,7 @@ export default function OrgProjectEditPage() {
                       <option key={u.id} value={u.id}>{userLabel(u)}</option>
                     ))}
                   </select>
+                  {fieldError("managerId") ? <div className="field-err">{fieldError("managerId")}</div> : null}
                 </div>
                 <div className="field">
                   <label>Status</label>
@@ -519,7 +745,11 @@ export default function OrgProjectEditPage() {
             <div className="card-h"><span className="t">Pricing &amp; payment</span></div>
             <div className="card-b">
               <div className="row2">
-                <div className="field"><label>Price range — from</label><MoneyInput currency={currency} value={priceMin} onChange={setPriceMin} placeholder="62,00,000" /></div>
+                <div className={fieldClass("priceMin")}>
+                  <label>Price range — from <span className="req">*</span></label>
+                  <MoneyInput currency={currency} value={priceMin} onChange={setPriceMin} placeholder="62,00,000" />
+                  {fieldError("priceMin") ? <div className="field-err">{fieldError("priceMin")}</div> : null}
+                </div>
                 <div className="field"><label>Price range — to</label><MoneyInput currency={currency} value={priceMax} onChange={setPriceMax} placeholder="1,20,00,000" /></div>
               </div>
               <div className="row2">
@@ -536,23 +766,44 @@ export default function OrgProjectEditPage() {
               </div>
               <div className="field">
                 <label>What&apos;s included in the price?</label>
-                <div className="opts">
-                  {PRICE_INCLUDES.map((v) => (
-                    <span key={v} className={`opt ${priceIncludes.includes(v) ? "on" : ""}`} onClick={() => setPriceIncludes((p) => toggle(p, v))}>
-                      <span className="b">{priceIncludes.includes(v) ? "✓" : ""}</span>{v}
-                    </span>
-                  ))}
-                </div>
+                <CatalogOptions
+                  category="price_includes"
+                  options={priceIncludeOptions}
+                  loaded={catalog !== null}
+                  error={catalogError}
+                  isSelected={(label) => priceIncludes.includes(label)}
+                  onToggle={(label) => setPriceIncludes((p) => toggle(p, label))}
+                />
+                {offCatalog(priceIncludes, priceIncludeOptions).length > 0 ? (
+                  <div className="row gap-8 wrap mt-8">
+                    {offCatalog(priceIncludes, priceIncludeOptions).map((v) => (
+                      <span key={v} className="chip">
+                        {v}
+                        <button type="button" className="x-btn" aria-label={`Remove ${v}`} onClick={() => setPriceIncludes((prev) => prev.filter((x) => x !== v))}>✕</button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               <div className="field">
                 <label>Payment plan</label>
-                <div className="opts" data-single>
-                  {PAYMENT_PLANS.map((p) => (
-                    <span key={p} className={`opt rad ${paymentPlan === p ? "on" : ""}`} onClick={() => setPaymentPlan(paymentPlan === p ? "" : p)}>
-                      <span className="b">{paymentPlan === p ? "●" : ""}</span>{p}
+                <CatalogOptions
+                  category="payment_plan"
+                  options={paymentPlanOptions}
+                  loaded={catalog !== null}
+                  error={catalogError}
+                  single
+                  isSelected={(label) => paymentPlan === label}
+                  onToggle={(label) => setPaymentPlan(paymentPlan === label ? "" : label)}
+                />
+                {paymentPlan && !paymentPlanOptions.some((o) => o.label === paymentPlan) ? (
+                  <div className="row gap-8 wrap mt-8">
+                    <span className="chip">
+                      {paymentPlan}
+                      <button type="button" className="x-btn" aria-label={`Remove ${paymentPlan}`} onClick={() => setPaymentPlan("")}>✕</button>
                     </span>
-                  ))}
-                </div>
+                  </div>
+                ) : null}
               </div>
               <div className="field mb-0">
                 <label>Current offers / schemes</label>
@@ -570,18 +821,19 @@ export default function OrgProjectEditPage() {
                 <input className="inp" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="SG Highway, Ahmedabad" />
                 <div className="hint">Shown on project cards and the header. Usually locality + city.</div>
               </div>
-              <div className="field">
-                <label>Full address</label>
+              <div className={fieldClass("address")}>
+                <label>Full address <span className="req">*</span></label>
                 <textarea className="inp" rows={2} value={addressLine} onChange={(e) => setAddressLine(e.target.value)} />
+                {fieldError("address") ? <div className="field-err">{fieldError("address")}</div> : null}
               </div>
               <div className="row3">
-                <div className="field"><label>City</label><input className="inp" value={city} onChange={(e) => setCity(e.target.value)} /></div>
+                <div className={fieldClass("city")}>
+                  <label>City <span className="req">*</span></label>
+                  <input className="inp" value={city} onChange={(e) => setCity(e.target.value)} />
+                  {fieldError("city") ? <div className="field-err">{fieldError("city")}</div> : null}
+                </div>
                 <div className="field"><label>Locality</label><input className="inp" value={locality} onChange={(e) => setLocality(e.target.value)} /></div>
                 <div className="field"><label>Pincode</label><input className="inp" value={pincode} onChange={(e) => setPincode(e.target.value)} /></div>
-              </div>
-              <div className="row2">
-                <div className="field"><label>Map latitude</label><input className="inp" type="number" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} /></div>
-                <div className="field"><label>Map longitude</label><input className="inp" type="number" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} /></div>
               </div>
               <div className="field">
                 <label>Nearby (connectivity)</label>
@@ -615,6 +867,31 @@ export default function OrgProjectEditPage() {
           <div className="card" id="sec-inventory" style={{ scrollMarginTop: 72 }}>
             <div className="card-h"><span className="t">Inventory &amp; specifications</span></div>
             <div className="card-b">
+              <div className="field">
+                <label>Unit configurations</label>
+                <CatalogOptions
+                  category="unit_type"
+                  options={unitTypeOptions}
+                  loaded={catalog !== null}
+                  error={catalogError}
+                  isSelected={(label) => selectedConfigs.includes(label)}
+                  onToggle={toggleConfig}
+                />
+                {offCatalog(selectedConfigs, unitTypeOptions).length > 0 ? (
+                  <div className="row gap-8 wrap mt-8">
+                    {offCatalog(selectedConfigs, unitTypeOptions).map((c) => (
+                      <span key={c} className="chip">
+                        {c}
+                        <button type="button" className="x-btn" aria-label={`Remove ${c}`} onClick={() => toggleConfig(c)}>✕</button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="hint">
+                  Each configuration is a planned unit type. Sizes, pricing and unit counts are set per configuration on the{" "}
+                  <Link className="brand-link" href={`/org/projects/${id}/units`}>Units page</Link>.
+                </div>
+              </div>
               <div className="row3">
                 <div className="field"><label>No. of towers / blocks</label><input className="inp" type="number" min={0} value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /></div>
                 <div className="field"><label>Floors / structure</label><input className="inp" placeholder="G+22" value={floorsDescription} onChange={(e) => setFloorsDescription(e.target.value)} /></div>
@@ -625,6 +902,12 @@ export default function OrgProjectEditPage() {
                 <label>Carpet area range (sqft)</label>
                 <input className="inp" placeholder="640 – 1,850" value={carpetRange} onChange={(e) => setCarpetRange(e.target.value)} />
                 <div className="hint">Whole-project summary. Per-unit-type carpet area is set on each unit type.</div>
+              </div>
+
+              <div className="field">
+                <label>Highlights (one per line)</label>
+                <textarea className="inp" rows={4} placeholder={"Riverfront view\n5 mins from SG Highway\nVastu-compliant layouts"} value={highlights} onChange={(e) => setHighlights(e.target.value)} />
+                <div className="hint">Used across ads, WhatsApp templates and AI-calling scripts.</div>
               </div>
 
               <div className="field">
@@ -649,17 +932,14 @@ export default function OrgProjectEditPage() {
                 ) : null}
               </div>
 
-              <div className="row2">
-                <div className="field"><label>Flooring</label><input className="inp" value={flooring} onChange={(e) => setFlooring(e.target.value)} /></div>
-                <div className="field"><label>Kitchen</label><input className="inp" value={kitchen} onChange={(e) => setKitchen(e.target.value)} /></div>
-              </div>
-              <div className="row2">
-                <div className="field"><label>Doors &amp; windows</label><input className="inp" value={doorsWindows} onChange={(e) => setDoorsWindows(e.target.value)} /></div>
-                <div className="field"><label>Fittings</label><input className="inp" value={fittings} onChange={(e) => setFittings(e.target.value)} /></div>
-              </div>
-              <div className="field mb-0">
-                <label>Additional notes</label>
-                <textarea className="inp" rows={2} value={specNotes} onChange={(e) => setSpecNotes(e.target.value)} />
+              <div className="field">
+                <label>Specifications</label>
+                <SpecificationRows
+                  rows={specRows}
+                  onChange={setSpecRows}
+                  notes={specNotes}
+                  onNotesChange={setSpecNotes}
+                />
               </div>
             </div>
           </div>
@@ -711,6 +991,15 @@ export default function OrgProjectEditPage() {
             <div className="card-h"><span className="t">Team &amp; access</span></div>
             <div className="card-b">
               <div className="field">
+                <label>Sales team</label>
+                <select value={salesTeam} onChange={(e) => setSalesTeam(e.target.value)}>
+                  <option value="">Not set</option>
+                  {withCurrent(SALES_TEAMS, salesTeam).map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
                 <label>Assigned sales agents</label>
                 {salesUsers.length === 0 ? (
                   <div className="hint">No sales-role users in your organisation yet — add them under Users.</div>
@@ -741,9 +1030,19 @@ export default function OrgProjectEditPage() {
                 <MediaUpload field="gallery" label="Cover / elevation image" value={coverImageUrl} onChange={setCoverImageUrl} ctx={{ projectId: id }} />
                 <GalleryUpload value={galleryUrls} onChange={setGalleryUrls} ctx={{ projectId: id }} />
               </div>
-              <div className="row2 mb-0">
+              <div className="row2">
                 <MediaUpload field="brochure" label="Brochure (PDF)" value={brochureUrl} onChange={setBrochureUrl} ctx={{ projectId: id }} />
                 <MediaUpload field="brochure" label="RERA certificate (PDF)" value={reraCertificateUrl} onChange={setReraCertificateUrl} ctx={{ projectId: id }} />
+              </div>
+              <div className="field mb-0">
+                <GalleryUpload
+                  value={floorPlanUrls}
+                  onChange={setFloorPlanUrls}
+                  ctx={{ projectId: id }}
+                  label="Project floor / site plan"
+                  field="floorPlan"
+                />
+                <div className="hint">The overall plan for the development — master site layout, tower plans, podium levels.</div>
               </div>
             </div>
           </div>

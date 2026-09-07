@@ -43,7 +43,7 @@ export class OrgUnitsController {
     @CurrentUser() user: JwtPayload,
     @Body() dto: CreateUnitDto,
   ) {
-    return this.service.createStandaloneUnit(user.orgId as string, dto);
+    return this.service.createStandaloneUnit(user.orgId as string, dto, user.sub);
   }
 
   @RequirePermission('projects', 'view')
@@ -59,7 +59,7 @@ export class OrgUnitsController {
     @Param('id') id: string,
     @Body() dto: UpdateUnitDto,
   ) {
-    return this.service.updateStandaloneUnit(user.orgId as string, id, dto);
+    return this.service.updateStandaloneUnit(user.orgId as string, id, dto, user.sub);
   }
 
   @RequirePermission('projects', 'delete')

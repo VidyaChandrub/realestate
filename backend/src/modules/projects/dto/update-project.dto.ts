@@ -186,6 +186,37 @@ export class UpdateProjectDto {
   @MaxLength(2000)
   landmarks?: string | null;
 
+  // Steps 1-2 — identity & timeline. `null` clears.
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  projectType?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  tagline?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  launchDate?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  constructionStage?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  highlights?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  salesTeam?: string | null;
+
   // Step 5
   @IsOptional()
   @IsObject()
@@ -231,4 +262,12 @@ export class UpdateProjectDto {
   @IsString()
   @MaxLength(2048)
   reraCertificateUrl?: string | null;
+
+  // Overall project floor / site plans (not UnitType.floorPlanUrl).
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(2048, { each: true })
+  floorPlanUrls?: string[];
 }

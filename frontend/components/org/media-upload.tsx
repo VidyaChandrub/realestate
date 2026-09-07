@@ -299,14 +299,23 @@ export function MediaUpload({
 }
 
 /** Multi-image upload for `galleryUrls`. */
+/**
+ * Multi-image upload tile strip. Defaults to the project gallery; `label` and
+ * `field` let the same control serve another multi-image field (e.g. the
+ * project's overall floor / site plans) without a second implementation.
+ */
 export function GalleryUpload({
   value,
   onChange,
   ctx,
+  label = "Gallery images",
+  field = "gallery",
 }: {
   value: string[];
   onChange: (urls: string[]) => void;
   ctx?: Ctx;
+  label?: string;
+  field?: UploadField;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -319,7 +328,7 @@ export function GalleryUpload({
     try {
       const added: string[] = [];
       for (const file of Array.from(files)) {
-        added.push(await uploadFile(file, { field: "gallery", ...ctx }));
+        added.push(await uploadFile(file, { field, ...ctx }));
       }
       onChange([...value, ...added]);
     } catch (err) {
@@ -334,12 +343,12 @@ export function GalleryUpload({
 
   return (
     <div className="field">
-      <label>Gallery images</label>
+      <label>{label}</label>
       <input
         ref={inputRef}
         type="file"
         multiple
-        accept={UPLOAD_RULES.gallery.accept}
+        accept={UPLOAD_RULES[field].accept}
         style={{ display: "none" }}
         onChange={(e) => void handle(e.target.files)}
       />

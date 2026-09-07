@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getCrmLeads, getProjectSalesAgents } from "@/lib/api";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
+import { normalizeSpecifications, specificationRows } from "@/lib/specifications";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { ProjectPageHead } from "@/components/org/project-tabs";
@@ -101,16 +102,11 @@ export default function OrgProjectOverviewPage() {
   );
 
   // Piece A/C preference blobs — loosely typed, may be null or partial.
-  const spec = (project.specifications ?? {}) as {
-    flooring?: string; kitchen?: string; doorsWindows?: string;
-    fittings?: string; notes?: string;
-  };
-  const specRows: [string, string | undefined][] = [
-    ["Flooring", spec.flooring],
-    ["Kitchen", spec.kitchen],
-    ["Doors & windows", spec.doorsWindows],
-    ["Fittings", spec.fittings],
-  ].filter(([, v]) => v) as [string, string][];
+  // Specifications are user-labelled rows now; normalizeSpecifications also
+  // reads the original fixed-key shape, so projects created before that
+  // rework still render their finishes.
+  const spec = normalizeSpecifications(project.specifications);
+  const specRows = specificationRows(project.specifications);
 
   const mkt = (project.marketing ?? {}) as {
     adSources?: string[];
@@ -340,7 +336,7 @@ export default function OrgProjectOverviewPage() {
             </div>
           </Reveal>
 
-          {/* Unit Types & Floor Plan Breakdown Widget */}
+          {/* Configurations & Floor Plan Breakdown Widget */}
           <Reveal delay={3}>
             <div className="card">
               <div className="card-h">
@@ -435,7 +431,7 @@ export default function OrgProjectOverviewPage() {
               <div className="card-b col gap-12">
                 {project.addressLine || project.locality || project.city ? (
                   <div style={{ fontSize: 13, color: "var(--fg)", lineHeight: 1.5 }}>
-                    📍 {[project.addressLine, project.locality, project.city, project.pincode].filter(Boolean).join(", ")}
+                    {[project.addressLine, project.locality, project.city, project.pincode].filter(Boolean).join(", ")}
                   </div>
                 ) : null}
 
@@ -448,7 +444,7 @@ export default function OrgProjectOverviewPage() {
                       <span className="muted fs-13">No connectivity details entered.</span>
                     ) : (
                       project.connectivity.map((c) => (
-                        <span className="chip" key={c}>🚗 {c}</span>
+                        <span className="chip" key={c}>{c}</span>
                       ))
                     )}
                   </div>
@@ -501,6 +497,30 @@ export default function OrgProjectOverviewPage() {
               </div>
             </div>
           </Reveal>
+
+          {/* Project-level floor / site plan. Distinct from a unit type's own
+              floor plan, which is shown on the Units tab. */}
+          {project.floorPlanUrls?.length ? (
+            <Reveal delay={3}>
+              <div className="card">
+                <div className="card-h">
+                  <span className="t">Project Floor &amp; Site Plan</span>
+                  <span className="x muted">{project.floorPlanUrls.length} plan{project.floorPlanUrls.length > 1 ? "s" : ""}</span>
+                </div>
+                <div className="card-b">
+                  <div className="gallery">
+                    {project.floorPlanUrls.map((url) => (
+                      <a key={url} href={url} target="_blank" rel="noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="Project floor plan" className="thumb media" style={{ objectFit: "contain", background: "var(--surface-2)" }} />
+                      </a>
+                    ))}
+                  </div>
+                  <div className="hint mt-8">The plan for the development as a whole. Individual configurations have their own floor plans.</div>
+                </div>
+              </div>
+            </Reveal>
+          ) : null}
 
           {/* Marketing & Automation Widget */}
           <Reveal delay={3}>

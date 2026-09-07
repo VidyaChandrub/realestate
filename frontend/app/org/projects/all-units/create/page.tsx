@@ -15,11 +15,12 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
 import {
   ConfigurationSelect,
-  FACING_OPTIONS,
-  PARKING_OPTIONS,
   TowerCombobox,
   UnitMediaFields,
-  pricePerSqftCarpet,
+  pricePerSqftLabel,
+  PRICE_BASIS_LABEL,
+  PrefillNote,
+  UnitAttributeSelect,
 } from "@/components/org/project-form-fields";
 import "@/app/org/org.css";
 import type {
@@ -27,9 +28,14 @@ import type {
   OrgCatalogOption,
   ProjectsListResponse,
   ProjectListRow,
+  ProjectDetail,
+  SafeOrganisation,
   Unit,
+  UnitPriceBasis,
   UnitStatus,
+  UnitType,
 } from "@/lib/types";
+import { prefillFromUnitType, type PrefillField } from "@/lib/unit-prefill";
 
 const STATUSES: { value: UnitStatus; label: string }[] = [
   { value: "available", label: "Available" },
@@ -57,6 +63,11 @@ export default function UnitCreatePage() {
   const [catalogError, setCatalogError] = useState<string | null>(null);
   // The picked project's units — only to suggest / bound tower names.
   const [projectUnits, setProjectUnits] = useState<Unit[]>([]);
+  const [projectConfigurations, setProjectConfigurations] = useState<OrgCatalogOption[] | null>(null);
+  // The picked project's planned unit types — the source prefill reads.
+  const [projectUnitTypes, setProjectUnitTypes] = useState<UnitType[]>([]);
+  const [priceBasis, setPriceBasis] = useState<UnitPriceBasis>("carpet");
+  const [prefilled, setPrefilled] = useState<PrefillField[]>([]);
   const [ctxLoading, setCtxLoading] = useState(false);
 
   const [configuration, setConfiguration] = useState("");
@@ -93,7 +104,12 @@ export default function UnitCreatePage() {
         if (!cancelled)
           setError("Couldn't load your projects. Reload and try again.");
       });
-    getOrgCatalogOptions("unit_type")
+    // The org's price-per-sqft basis, so the live figure and label match what
+    // the server derives.
+    apiFetch<SafeOrganisation>("/org/settings")
+      .then((org) => { if (!cancelled) setPriceBasis(org.unit_price_basis ?? "carpet"); })
+      .catch(() => { /* keep the carpet default */ });
+    getOrgCatalogOptions()
       .then((rows) => {
         if (cancelled) return;
         setCatalog(
@@ -121,17 +137,43 @@ export default function UnitCreatePage() {
     async (pid: string) => {
       if (!accessToken || !pid) {
         setProjectUnits([]);
+        setProjectConfigurations(null);
+        // No project means no unit types, so no prefill — blank fields.
+        setProjectUnitTypes([]);
+        setPrefilled([]);
         return;
       }
       setCtxLoading(true);
       setError(null);
       try {
-        const rows = await apiFetch<Unit[]>(`/org/projects/${pid}/units`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const headers = { Authorization: `Bearer ${accessToken}` };
+        const [rows, project] = await Promise.all([
+          apiFetch<Unit[]>(`/org/projects/${pid}/units`, { headers }),
+          apiFetch<ProjectDetail>(`/org/projects/${pid}`, { headers }),
+        ]);
         setProjectUnits(rows);
+        setProjectUnitTypes(project.unitTypes ?? []);
+        const labels = [
+          ...new Set([
+            ...project.unitTypes.map((unitType) => unitType.name),
+            ...project.configurations.map((configuration) => configuration.label),
+          ]),
+        ];
+        setProjectConfigurations(
+          labels.map((label, index) => ({
+            id: `${pid}-${index}`,
+            orgId: project.orgId,
+            category: "unit_type",
+            label,
+            sortOrder: index,
+            createdAt: "",
+            updatedAt: "",
+          })),
+        );
       } catch {
         setProjectUnits([]);
+        setProjectConfigurations([]);
+        setProjectUnitTypes([]);
         setError("Couldn't load that project's units.");
       } finally {
         setCtxLoading(false);
@@ -147,6 +189,34 @@ export default function UnitCreatePage() {
 
   const selectedProject = projects.find((p) => p.id === projectId) ?? null;
   const currency = selectedProject?.currency ?? "INR";
+  const standalone = mode === "standalone";
+  const facingOptions = (catalog ?? []).filter((option) => option.category === "facing");
+  const parkingOptions = (catalog ?? []).filter((option) => option.category === "parking");
+  const variantOptions = (catalog ?? []).filter((option) => option.category === "unit_variant");
+
+  /**
+   * Picking a configuration copies the project's matching unit type's carpet /
+   * built-up / price in. Standalone has no project, so `projectUnitTypes` is
+   * empty and nothing is prefilled — blank fields, no error.
+   */
+  function applyConfiguration(next: string) {
+    setConfiguration(next);
+    const { values, filled } = prefillFromUnitType(next, projectUnitTypes);
+    setPrefilled(filled);
+    if (values.carpetSqft !== undefined) setCarpetSqft(values.carpetSqft);
+    if (values.builtupSqft !== undefined) setBuiltupSqft(values.builtupSqft);
+    if (values.price !== undefined) setPrice(values.price);
+  }
+
+  /** The note is only true until the user edits that field. */
+  function clearPrefill(field: PrefillField) {
+    setPrefilled((prev) => (prev.includes(field) ? prev.filter((f) => f !== field) : prev));
+  }
+  const configurationOptions = standalone
+    ? (catalog ?? []).filter((option) => option.category === "unit_type")
+    : projectId
+      ? projectConfigurations
+      : [];
 
   const otherTowers = useMemo(() => {
     const set = new Set<string>();
@@ -158,12 +228,15 @@ export default function UnitCreatePage() {
     );
   }, [projectUnits]);
 
-  const psqft = pricePerSqftCarpet(
+  // Live ₹/sqft on the org's basis — always labelled with it.
+  const psqft = pricePerSqftLabel(
     parseAmount(price),
     parseCount(carpetSqft),
+    parseCount(builtupSqft),
+    priceBasis,
+    currency,
   );
 
-  const standalone = mode === "standalone";
   const fieldsDisabled = !standalone && projectId === "";
 
   const canSave =
@@ -233,7 +306,7 @@ export default function UnitCreatePage() {
         </div>
         <div className="actions">
           <Link href="/org/projects/all-units" className="btn btn-ghost">
-            ✕ Cancel
+              <Icon name="close" size={14} /> Cancel
           </Link>
           <button
             type="button"
@@ -241,7 +314,7 @@ export default function UnitCreatePage() {
             disabled={!canSave}
             onClick={() => void submit()}
           >
-            {saving ? "Saving…" : "💾 Save unit"}
+            {saving ? "Saving…" : <><Icon name="check" size={14} /> Save unit</>}
           </button>
         </div>
       </div>
@@ -256,13 +329,13 @@ export default function UnitCreatePage() {
         <div className="cgrid">
           <div className="card pad-26">
             <div className="sec">
-              <div className="lbl">📦 How do you want to add this unit?</div>
+              <div className="lbl"><Icon name="properties" size={15} /> How do you want to add this unit?</div>
               <div className="mode">
                 <div
                   className={`modecard ${mode === "project" ? "on" : ""}`}
                   onClick={() => setMode("project")}
                 >
-                  <div className="ic">🏗️</div>
+                  <div className="ic"><Icon name="building" size={24} /></div>
                   <b>Inside a project</b>
                   <small>Attach to an existing development &amp; tower.</small>
                 </div>
@@ -270,7 +343,7 @@ export default function UnitCreatePage() {
                   className={`modecard ${mode === "standalone" ? "on" : ""}`}
                   onClick={() => setMode("standalone")}
                 >
-                  <div className="ic">🏠</div>
+                  <div className="ic"><Icon name="home" size={24} /></div>
                   <b>Standalone unit</b>
                   <small>Resale / broker listing — no project needed.</small>
                 </div>
@@ -279,8 +352,8 @@ export default function UnitCreatePage() {
 
             {!standalone ? (
               <div className="sec">
-                <div className="lbl">🏗️ Placement</div>
-                <div className="grid g3">
+                <div className="lbl"><Icon name="map" size={15} /> Placement</div>
+                <div className="grid g4">
                   <div className="field">
                     <label>
                       Project <span className="req">*</span>
@@ -297,6 +370,18 @@ export default function UnitCreatePage() {
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div className="field">
+                    <label>
+                      Configuration <span className="req">*</span>
+                    </label>
+                    <ConfigurationSelect
+                      catalog={configurationOptions}
+                      error={catalogError}
+                      value={configuration}
+                      onChange={applyConfiguration}
+                      disabled={fieldsDisabled}
+                    />
                   </div>
                   <div className="field">
                     <label>Tower / block</label>
@@ -332,8 +417,8 @@ export default function UnitCreatePage() {
             ) : null}
 
             <div className="sec">
-              <div className="lbl">🏠 Unit details</div>
-              <div className="grid g3">
+              <div className="lbl"><Icon name="home" size={15} /> Unit details</div>
+              <div className={`grid ${standalone ? "g3" : "g2"}`}>
                 <div className="field">
                   <label>
                     Unit number <span className="req">*</span>
@@ -346,27 +431,31 @@ export default function UnitCreatePage() {
                     disabled={fieldsDisabled}
                   />
                 </div>
-                <div className="field">
+                {standalone ? <div className="field">
                   <label>
                     Configuration <span className="req">*</span>
                   </label>
                   <ConfigurationSelect
-                    catalog={catalog}
+                    catalog={configurationOptions}
                     error={catalogError}
                     value={configuration}
-                    onChange={setConfiguration}
+                    onChange={applyConfiguration}
                     disabled={fieldsDisabled}
                   />
-                </div>
+                </div> : null}
                 <div className="field">
-                  <label>Unit type</label>
-                  <input
-                    className="inp"
-                    placeholder="e.g. Type A (optional)"
+                  <label>Unit variant</label>
+                  <UnitAttributeSelect
+                    options={variantOptions}
+                    loaded={catalog !== null}
+                    error={catalogError}
                     value={variantLabel}
-                    onChange={(e) => setVariantLabel(e.target.value)}
+                    onChange={setVariantLabel}
                     disabled={fieldsDisabled}
+                    placeholder="None"
+                    emptyHint="No unit variants configured yet."
                   />
+                  <div className="hint">Optional — e.g. Type A, Corner.</div>
                 </div>
               </div>
               <div className="grid g3">
@@ -378,9 +467,10 @@ export default function UnitCreatePage() {
                     min={0}
                     placeholder="1450"
                     value={carpetSqft}
-                    onChange={(e) => setCarpetSqft(e.target.value)}
+                    onChange={(e) => { clearPrefill("carpetSqft"); setCarpetSqft(e.target.value); }}
                     disabled={fieldsDisabled}
                   />
+                  {prefilled.includes("carpetSqft") ? <PrefillNote configuration={configuration} /> : null}
                 </div>
                 <div className="field">
                   <label>Built-up area (sqft)</label>
@@ -390,48 +480,41 @@ export default function UnitCreatePage() {
                     min={0}
                     placeholder="1720"
                     value={builtupSqft}
-                    onChange={(e) => setBuiltupSqft(e.target.value)}
+                    onChange={(e) => { clearPrefill("builtupSqft"); setBuiltupSqft(e.target.value); }}
                     disabled={fieldsDisabled}
                   />
+                  {prefilled.includes("builtupSqft") ? <PrefillNote configuration={configuration} /> : null}
                 </div>
                 <div className="field">
                   <label>Facing</label>
-                  <select
-                    className="inp"
+                  <UnitAttributeSelect
+                    options={facingOptions}
+                    loaded={catalog !== null}
+                    error={catalogError}
                     value={facing}
-                    onChange={(e) => setFacing(e.target.value)}
+                    onChange={setFacing}
                     disabled={fieldsDisabled}
-                  >
-                    <option value="">Select…</option>
-                    {FACING_OPTIONS.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select…"
+                    emptyHint="No facing options configured yet."
+                  />
                 </div>
               </div>
               <div className="field mb-0" style={{ marginTop: 4 }}>
                 <label>Parking</label>
-                <div className="opts">
-                  {PARKING_OPTIONS.map((p) => (
-                    <span
-                      key={p}
-                      className={`opt ${parking === p ? "on" : ""}`}
-                      onClick={() =>
-                        setParking((cur) => (cur === p ? "" : p))
-                      }
-                    >
-                      <span className="b">{parking === p ? "✓" : ""}</span>
-                      {p}
-                    </span>
-                  ))}
-                </div>
+                <UnitAttributeSelect
+                  options={parkingOptions}
+                  loaded={catalog !== null}
+                  error={catalogError}
+                  value={parking}
+                  onChange={setParking}
+                  disabled={fieldsDisabled}
+                  emptyHint="No parking options configured yet."
+                />
               </div>
             </div>
 
             <div className="sec">
-              <div className="lbl">💰 Pricing &amp; status</div>
+              <div className="lbl"><Icon name="billing" size={15} /> Pricing &amp; status</div>
               <div className="grid g3">
                 <div className="field">
                   <label>Price</label>
@@ -441,12 +524,13 @@ export default function UnitCreatePage() {
                     min={0}
                     placeholder="16500000"
                     value={price}
-                    onChange={(e) => setPrice(e.target.value)}
+                    onChange={(e) => { clearPrefill("price"); setPrice(e.target.value); }}
                     disabled={fieldsDisabled}
                   />
+                  {prefilled.includes("price") ? <PrefillNote configuration={configuration} /> : null}
                 </div>
                 <div className="field">
-                  <label>Price / sqft</label>
+                  <label>Price / sqft ({PRICE_BASIS_LABEL[priceBasis]})</label>
                   <input className="inp" placeholder="—" disabled value={psqft} />
                 </div>
                 <div className="field">
@@ -468,7 +552,7 @@ export default function UnitCreatePage() {
             </div>
 
             <div className="sec">
-              <div className="lbl">🖼️ Media &amp; documents</div>
+              <div className="lbl"><Icon name="document" size={15} /> Media &amp; documents</div>
               <UnitMediaFields
                 floorPlanUrl={floorPlanUrl}
                 galleryUrls={galleryUrls}
@@ -480,7 +564,7 @@ export default function UnitCreatePage() {
 
             <div className="sec nb">
               <div className="lbl">
-                📋{" "}
+                <Icon name="document" size={15} />{" "}
                 {standalone
                   ? "Listing details"
                   : "For resale / broker listings (optional)"}
@@ -524,7 +608,7 @@ export default function UnitCreatePage() {
                 <span className="t">Preview</span>
               </div>
               <div className="card-b">
-                <div className="ph-box">📐</div>
+                <div className="ph-box"><Icon name="properties" size={28} /></div>
                 <div className="row between">
                   <b>{unitNo || "New unit"}</b>
                   <span className={`badge ${STATUS_BADGE[status]}`}>
@@ -554,7 +638,7 @@ export default function UnitCreatePage() {
               </div>
             </div>
             <div className="help">
-              💡 Configuration comes from your{" "}
+              <Icon name="info" size={15} /> Configuration comes from your{" "}
               <Link className="brand-link" href="/org/settings?section=catalogs">
                 Project Catalogs
               </Link>
@@ -566,7 +650,7 @@ export default function UnitCreatePage() {
               disabled={!canSave}
               onClick={() => void submit()}
             >
-              {saving ? "Saving…" : "💾 Save unit"}
+              {saving ? "Saving…" : <><Icon name="check" size={14} /> Save unit</>}
             </button>
           </div>
         </div>

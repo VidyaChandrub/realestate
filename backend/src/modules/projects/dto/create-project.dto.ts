@@ -103,6 +103,40 @@ export class CreateProjectDto {
   @Type(() => AmenityDto)
   amenities?: AmenityDto[];
 
+  // --- Wizard Steps 1-2 identity & timeline. Optional free text; the
+  // project-type label is copied from the org catalog, not referenced. ---
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  projectType?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  tagline?: string;
+
+  // ISO "YYYY-MM-DD" from an <input type="date">. Stored as text — see the
+  // schema comment; anything longer is not a date.
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  launchDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  constructionStage?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  highlights?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  salesTeam?: string;
+
   // --- Onboarding-wizard fields (Steps 3-8). All optional; `specifications`
   // and `marketing` are deliberately loose preference blobs — validated only
   // as objects, their inner shape is expected to evolve. ---
@@ -183,7 +217,10 @@ export class CreateProjectDto {
   @MaxLength(2000)
   landmarks?: string;
 
-  // Step 5 — specifications blob: { flooring, kitchen, doorsWindows, fittings, notes }
+  // Step 5 — specifications blob: { items: [{ label, value }], notes }.
+  // Projects created before the dynamic-rows rework hold the original
+  // fixed-key shape ({ flooring, kitchen, doorsWindows, fittings, notes });
+  // both are accepted, and the client normalises on read.
   @IsOptional()
   @IsObject()
   specifications?: Record<string, unknown>;
@@ -230,4 +267,13 @@ export class CreateProjectDto {
   @IsString()
   @MaxLength(2048)
   reraCertificateUrl?: string;
+
+  // Overall project floor / site plans. Not to be confused with
+  // UnitType.floorPlanUrl, which is per-configuration.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(2048, { each: true })
+  floorPlanUrls?: string[];
 }
