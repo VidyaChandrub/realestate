@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, UnitPriceBasis } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
@@ -36,6 +36,13 @@ const PROJECT_SCALARS = [
   'towerCount',
   'floorsDescription',
   'carpetRange',
+  // Wizard Steps 1-2 identity & timeline.
+  'projectType',
+  'tagline',
+  'launchDate',
+  'constructionStage',
+  'highlights',
+  'salesTeam',
   // Onboarding-wizard scalars (Steps 3-8). Arrays (priceIncludes,
   // connectivity, galleryUrls) and Json (specifications, marketing) are
   // handled separately below.
@@ -57,6 +64,19 @@ const PROJECT_SCALARS = [
   'brochureUrl',
   'reraCertificateUrl',
 ] as const;
+
+// Authorship is expanded on every unit response so the units list can show
+// "Updated by X" without a second request or an audit_logs lookup.
+const UNIT_ACTOR_SELECT = {
+  select: { id: true, firstName: true, lastName: true, email: true },
+} as const;
+
+const UNIT_INCLUDE = {
+  createdBy: UNIT_ACTOR_SELECT,
+  updatedBy: UNIT_ACTOR_SELECT,
+} satisfies Prisma.UnitInclude;
+
+type UnitRow = Prisma.UnitGetPayload<{ include: typeof UNIT_INCLUDE }>;
 
 // The manager relation is expanded on every project response so the client
 // never needs a second round-trip just to show a name — same approach as
@@ -138,6 +158,12 @@ export class ProjectsService {
           towerCount: dto.towerCount ?? null,
           floorsDescription: dto.floorsDescription ?? null,
           carpetRange: dto.carpetRange ?? null,
+          projectType: dto.projectType ?? null,
+          tagline: dto.tagline ?? null,
+          launchDate: dto.launchDate ?? null,
+          constructionStage: dto.constructionStage ?? null,
+          highlights: dto.highlights ?? null,
+          salesTeam: dto.salesTeam ?? null,
           amenities: (dto.amenities ?? []) as unknown as Prisma.InputJsonValue,
           // Onboarding-wizard fields (Steps 3-8).
           bookingAmount: dto.bookingAmount ?? null,
@@ -164,6 +190,7 @@ export class ProjectsService {
           galleryUrls: dto.galleryUrls ?? [],
           brochureUrl: dto.brochureUrl ?? null,
           reraCertificateUrl: dto.reraCertificateUrl ?? null,
+          floorPlanUrls: dto.floorPlanUrls ?? [],
         },
       });
 
@@ -322,6 +349,7 @@ export class ProjectsService {
     if (dto.priceIncludes !== undefined) data.priceIncludes = dto.priceIncludes;
     if (dto.connectivity !== undefined) data.connectivity = dto.connectivity;
     if (dto.galleryUrls !== undefined) data.galleryUrls = dto.galleryUrls;
+    if (dto.floorPlanUrls !== undefined) data.floorPlanUrls = dto.floorPlanUrls;
     if (dto.specifications !== undefined) {
       data.specifications =
         dto.specifications as unknown as Prisma.InputJsonValue;
@@ -557,13 +585,18 @@ export class ProjectsService {
   // Units
   // -------------------------------------------------------------------------
 
-  async createUnit(orgId: string, projectId: string, dto: CreateUnitDto) {
+  async createUnit(
+    orgId: string,
+    projectId: string,
+    dto: CreateUnitDto,
+    actorId?: string,
+  ) {
     const project = await this.getOwnedProject(orgId, projectId);
 
-    // `configuration` must be one of the org's own `unit_type` catalog
-    // labels — never trusted from the body, the UI restricting it isn't
-    // enough.
-    await this.assertConfigurationInCatalog(orgId, dto.configuration);
+    // In a project, the configuration must be one the project itself has —
+    // not just anything in the org catalog. Never trusted from the body.
+    await this.assertConfigurationForProject(projectId, dto.configuration);
+    await this.assertVariantInCatalog(orgId, dto.variantLabel);
 
     const tower = dto.tower?.trim() || null;
     await this.assertTowerWithinLimit(projectId, project.towerCount, tower);
@@ -589,11 +622,14 @@ export class ProjectsService {
           floorPlanUrl: dto.floorPlanUrl ?? null,
           galleryUrls: dto.galleryUrls ?? [],
           status: dto.status ?? 'available',
+          createdById: actorId ?? null,
+          updatedById: actorId ?? null,
         },
       });
       await tx.auditLog.create({
         data: {
           orgId,
+          actorId: actorId ?? null,
           action: 'unit_created',
           entity: 'Unit',
           entityId: row.id,
@@ -620,17 +656,24 @@ export class ProjectsService {
       where.unitNo = { contains: query.search, mode: 'insensitive' };
     }
 
-    const rows = await this.prisma.unit.findMany({
-      where,
-      orderBy: [{ unitNo: 'asc' }],
-    });
+    const [rows, basis] = await Promise.all([
+      this.prisma.unit.findMany({
+        where,
+        orderBy: [{ unitNo: 'asc' }],
+        include: UNIT_INCLUDE,
+      }),
+      this.orgPriceBasis(orgId),
+    ]);
 
-    return rows.map((row) => this.serializeUnit(row));
+    return rows.map((row) => this.serializeUnit(row, basis));
   }
 
   async getUnit(orgId: string, projectId: string, id: string) {
-    const row = await this.getOwnedUnit(orgId, projectId, id);
-    return this.serializeUnit(row);
+    const [row, basis] = await Promise.all([
+      this.getOwnedUnit(orgId, projectId, id),
+      this.orgPriceBasis(orgId),
+    ]);
+    return this.serializeUnit(row, basis);
   }
 
   async updateUnit(
@@ -638,12 +681,26 @@ export class ProjectsService {
     projectId: string,
     id: string,
     dto: UpdateUnitDto,
+    actorId?: string,
   ) {
     const project = await this.getOwnedProject(orgId, projectId);
-    await this.getOwnedUnit(orgId, projectId, id);
+    const existing = await this.getOwnedUnit(orgId, projectId, id);
 
     if (dto.configuration !== undefined) {
-      await this.assertConfigurationInCatalog(orgId, dto.configuration);
+      // The unit's own current value stays valid, so an edit never has to
+      // rename a unit whose configuration has since been dropped.
+      await this.assertConfigurationForProject(
+        projectId,
+        dto.configuration,
+        existing.configuration,
+      );
+    }
+    if (dto.variantLabel !== undefined) {
+      await this.assertVariantInCatalog(
+        orgId,
+        dto.variantLabel,
+        existing.variantLabel,
+      );
     }
     if (dto.tower !== undefined && typeof dto.tower === 'string') {
       const nextTower = dto.tower.trim() || null;
@@ -697,11 +754,14 @@ export class ProjectsService {
     if (dto.floorPlanUrl !== undefined) data.floorPlanUrl = dto.floorPlanUrl;
     if (dto.galleryUrls !== undefined) data.galleryUrls = dto.galleryUrls;
 
+    data.updatedById = actorId ?? null;
+
     await this.prisma.$transaction(async (tx) => {
       await tx.unit.update({ where: { id }, data });
       await tx.auditLog.create({
         data: {
           orgId,
+          actorId: actorId ?? null,
           action: 'unit_updated',
           entity: 'Unit',
           entityId: id,
@@ -718,17 +778,23 @@ export class ProjectsService {
     projectId: string,
     id: string,
     dto: UpdateUnitStatusDto,
+    actorId?: string,
   ) {
     const current = await this.getOwnedUnit(orgId, projectId, id);
     if (current.status === dto.status) {
-      return this.serializeUnit(current);
+      return this.serializeUnit(current, await this.orgPriceBasis(orgId));
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.unit.update({ where: { id }, data: { status: dto.status } });
+      await tx.unit.update({
+        where: { id },
+        // A status change is an edit — it counts towards "updated by".
+        data: { status: dto.status, updatedById: actorId ?? null },
+      });
       await tx.auditLog.create({
         data: {
           orgId,
+          actorId: actorId ?? null,
           action: 'unit_status_changed',
           entity: 'Unit',
           entityId: id,
@@ -764,8 +830,14 @@ export class ProjectsService {
   // the non-nested /org/units routes.
   // -------------------------------------------------------------------------
 
-  async createStandaloneUnit(orgId: string, dto: CreateUnitDto) {
+  async createStandaloneUnit(
+    orgId: string,
+    dto: CreateUnitDto,
+    actorId?: string,
+  ) {
+    // Standalone units belong to no project, so the org catalog is the scope.
     await this.assertConfigurationInCatalog(orgId, dto.configuration);
+    await this.assertVariantInCatalog(orgId, dto.variantLabel);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const row = await tx.unit.create({
@@ -788,11 +860,14 @@ export class ProjectsService {
           floorPlanUrl: dto.floorPlanUrl ?? null,
           galleryUrls: dto.galleryUrls ?? [],
           status: dto.status ?? 'available',
+          createdById: actorId ?? null,
+          updatedById: actorId ?? null,
         },
       });
       await tx.auditLog.create({
         data: {
           orgId,
+          actorId: actorId ?? null,
           action: 'standalone_unit_created',
           entity: 'Unit',
           entityId: row.id,
@@ -802,18 +877,34 @@ export class ProjectsService {
       return row;
     });
 
-    return this.serializeUnit(created);
+    return this.getStandaloneUnit(orgId, created.id);
   }
 
   async getStandaloneUnit(orgId: string, id: string) {
-    return this.serializeUnit(await this.getOwnedStandaloneUnit(orgId, id));
+    const [row, basis] = await Promise.all([
+      this.getOwnedStandaloneUnit(orgId, id),
+      this.orgPriceBasis(orgId),
+    ]);
+    return this.serializeUnit(row, basis);
   }
 
-  async updateStandaloneUnit(orgId: string, id: string, dto: UpdateUnitDto) {
-    await this.getOwnedStandaloneUnit(orgId, id);
+  async updateStandaloneUnit(
+    orgId: string,
+    id: string,
+    dto: UpdateUnitDto,
+    actorId?: string,
+  ) {
+    const existing = await this.getOwnedStandaloneUnit(orgId, id);
 
     if (dto.configuration !== undefined) {
       await this.assertConfigurationInCatalog(orgId, dto.configuration);
+    }
+    if (dto.variantLabel !== undefined) {
+      await this.assertVariantInCatalog(
+        orgId,
+        dto.variantLabel,
+        existing.variantLabel,
+      );
     }
 
     const data: Prisma.UnitUncheckedUpdateInput = {};
@@ -852,12 +943,14 @@ export class ProjectsService {
     }
     if (dto.floorPlanUrl !== undefined) data.floorPlanUrl = dto.floorPlanUrl;
     if (dto.galleryUrls !== undefined) data.galleryUrls = dto.galleryUrls;
+    data.updatedById = actorId ?? null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.unit.update({ where: { id }, data });
       await tx.auditLog.create({
         data: {
           orgId,
+          actorId: actorId ?? null,
           action: 'standalone_unit_updated',
           entity: 'Unit',
           entityId: id,
@@ -889,6 +982,7 @@ export class ProjectsService {
   private async getOwnedStandaloneUnit(orgId: string, id: string) {
     const unit = await this.prisma.unit.findFirst({
       where: { id, orgId, projectId: null },
+      include: UNIT_INCLUDE,
     });
     if (!unit) throw new NotFoundException('Unit not found');
     return unit;
@@ -914,13 +1008,14 @@ export class ProjectsService {
       where.unitNo = { contains: query.search, mode: 'insensitive' };
     }
 
-    const [rows, total, grouped] = await Promise.all([
+    const [rows, total, grouped, basis] = await Promise.all([
       this.prisma.unit.findMany({
         where,
         orderBy: [{ createdAt: 'desc' }],
         skip: (page - 1) * limit,
         take: limit,
         include: {
+          ...UNIT_INCLUDE,
           project: { select: { id: true, name: true, currency: true } },
         },
       }),
@@ -930,6 +1025,7 @@ export class ProjectsService {
         where,
         _count: { _all: true },
       }),
+      this.orgPriceBasis(orgId),
     ]);
 
     const counts = { available: 0, booked: 0, held: 0, sold: 0 };
@@ -949,7 +1045,13 @@ export class ProjectsService {
       facing: u.facing,
       parking: u.parking,
       price: u.price,
+      pricePerSqft: this.pricePerSqft(u, basis),
+      pricePerSqftBasis: basis,
       status: u.status,
+      createdById: u.createdById,
+      updatedById: u.updatedById,
+      createdBy: this.serializeActor(u.createdBy),
+      updatedBy: this.serializeActor(u.updatedBy),
       createdAt: u.createdAt,
       updatedAt: u.updatedAt,
       project: u.project
@@ -1010,10 +1112,20 @@ export class ProjectsService {
     return unitType;
   }
 
+  /** The org's price-per-sqft denominator. Defaults to carpet. */
+  private async orgPriceBasis(orgId: string): Promise<UnitPriceBasis> {
+    const org = await this.prisma.organisation.findUnique({
+      where: { id: orgId },
+      select: { unitPriceBasis: true },
+    });
+    return org?.unitPriceBasis ?? 'carpet';
+  }
+
   private async getOwnedUnit(orgId: string, projectId: string, id: string) {
     await this.getOwnedProject(orgId, projectId);
     const unit = await this.prisma.unit.findFirst({
       where: { id, projectId },
+      include: UNIT_INCLUDE,
     });
     if (!unit) throw new NotFoundException('Unit not found');
     return unit;
@@ -1021,6 +1133,75 @@ export class ProjectsService {
 
   // `configuration` must be one of the caller org's `unit_type` catalog
   // labels. Same catalog the wizard and the [id]/units page read.
+  /**
+   * A project unit's configuration must be one the *project* actually has —
+   * not merely something in the org catalog. The allowed set mirrors what the
+   * two unit forms offer: the project's planned UnitType names, plus any
+   * configuration already present on its units (imports and older projects
+   * can carry labels that were never planned), plus the value the unit already
+   * holds, so an edit can never be forced to rename an existing unit.
+   *
+   * The UI restricting the dropdown is not enough — this is the authority.
+   */
+  private async assertConfigurationForProject(
+    projectId: string,
+    configuration: string,
+    currentValue?: string | null,
+  ) {
+    const label = configuration.trim();
+    if (currentValue && label === currentValue) return;
+
+    const [planned, onUnits] = await Promise.all([
+      this.prisma.unitType.findMany({
+        where: { projectId },
+        select: { name: true },
+      }),
+      this.prisma.unit.findMany({
+        where: { projectId, configuration: { not: null } },
+        select: { configuration: true },
+        distinct: ['configuration'],
+      }),
+    ]);
+
+    const allowed = new Set<string>([
+      ...planned.map((p) => p.name),
+      ...onUnits.map((u) => u.configuration as string),
+    ]);
+    if (allowed.has(label)) return;
+
+    throw new BadRequestException(
+      allowed.size === 0
+        ? `This project has no unit configurations yet. Add "${label}" to the project's unit types first.`
+        : `"${label}" is not one of this project's configurations (${[...allowed].sort().join(', ')}).`,
+    );
+  }
+
+  /**
+   * The optional variant label ("Type A", "Corner"). Blank is always valid.
+   * Validated against the org's `unit_variant` catalog, except when it's the
+   * value the unit already carries — units created while this was free text
+   * keep their label and stay editable.
+   */
+  private async assertVariantInCatalog(
+    orgId: string,
+    variantLabel: string | null | undefined,
+    currentValue?: string | null,
+  ) {
+    const label = variantLabel?.trim();
+    if (!label) return;
+    if (currentValue && label === currentValue) return;
+
+    const match = await this.prisma.orgCatalogOption.findFirst({
+      where: { orgId, category: 'unit_variant', label },
+      select: { id: true },
+    });
+    if (!match) {
+      throw new BadRequestException(
+        `"${label}" is not one of your unit variants. Add it in Settings → Project Catalogs first.`,
+      );
+    }
+  }
+
   private async assertConfigurationInCatalog(
     orgId: string,
     configuration: string,
@@ -1159,6 +1340,12 @@ export class ProjectsService {
       towerCount: project.towerCount,
       floorsDescription: project.floorsDescription,
       carpetRange: project.carpetRange,
+      projectType: project.projectType,
+      tagline: project.tagline,
+      launchDate: project.launchDate,
+      constructionStage: project.constructionStage,
+      highlights: project.highlights,
+      salesTeam: project.salesTeam,
       amenities: (project.amenities ?? []) as Array<{
         name: string;
         iconUrl: string | null;
@@ -1186,6 +1373,7 @@ export class ProjectsService {
       galleryUrls: project.galleryUrls,
       brochureUrl: project.brochureUrl,
       reraCertificateUrl: project.reraCertificateUrl,
+      floorPlanUrls: project.floorPlanUrls,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
     };
@@ -1215,7 +1403,37 @@ export class ProjectsService {
     };
   }
 
-  private serializeUnit(unit: Prisma.UnitGetPayload<Record<string, never>>) {
+  /** { id, name, email } for a unit's creator/editor, or null. */
+  private serializeActor(
+    actor: { id: string; firstName: string | null; lastName: string | null; email: string } | null,
+  ) {
+    if (!actor) return null;
+    return {
+      id: actor.id,
+      name:
+        [actor.firstName, actor.lastName].filter(Boolean).join(' ') ||
+        actor.email,
+      email: actor.email,
+    };
+  }
+
+  /**
+   * Price per sqft on the org's chosen denominator. Null (not zero) whenever
+   * the price or the relevant area is missing — a blank cell is honest, a
+   * zero is not. The basis travels with the number so no caller can render an
+   * unlabelled figure: a per-sqft price on the wrong denominator is a real
+   * commercial error.
+   */
+  private pricePerSqft(
+    unit: { price: number | null; carpetSqft: number | null; builtupSqft: number | null },
+    basis: UnitPriceBasis,
+  ): number | null {
+    const area = basis === 'builtup' ? unit.builtupSqft : unit.carpetSqft;
+    if (!unit.price || !area) return null;
+    return Math.round(unit.price / area);
+  }
+
+  private serializeUnit(unit: UnitRow, basis: UnitPriceBasis) {
     return {
       id: unit.id,
       orgId: unit.orgId,
@@ -1230,12 +1448,18 @@ export class ProjectsService {
       facing: unit.facing,
       parking: unit.parking,
       price: unit.price,
+      pricePerSqft: this.pricePerSqft(unit, basis),
+      pricePerSqftBasis: basis,
       addressLine: unit.addressLine,
       ownerName: unit.ownerName,
       notes: unit.notes,
       floorPlanUrl: unit.floorPlanUrl,
       galleryUrls: unit.galleryUrls,
       status: unit.status,
+      createdById: unit.createdById,
+      updatedById: unit.updatedById,
+      createdBy: this.serializeActor(unit.createdBy),
+      updatedBy: this.serializeActor(unit.updatedBy),
       createdAt: unit.createdAt,
       updatedAt: unit.updatedAt,
     };

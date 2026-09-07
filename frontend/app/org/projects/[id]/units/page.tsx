@@ -6,18 +6,22 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions } from "@/lib/api";
 import { parseAmount, parseCount, parseInteger } from "@/lib/parse";
+import { prefillFromUnitType, type PrefillField } from "@/lib/unit-prefill";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
 import {
   ConfigurationSelect,
-  FACING_OPTIONS,
-  PARKING_OPTIONS,
   TowerCombobox,
   UnitMediaFields,
-  pricePerSqftCarpet,
+  formatUpdatedAt,
+  pricePerSqftLabel,
+  PRICE_BASIS_LABEL,
+  PrefillNote,
+  UnitAttributeSelect,
 } from "@/components/org/project-form-fields";
 import "@/app/org/org.css";
 import type {
@@ -25,7 +29,9 @@ import type {
   CreateUnitTypeInput,
   OrgCatalogOption,
   ProjectDetail,
+  SafeOrganisation,
   Unit,
+  UnitPriceBasis,
   UnitStatus,
   UnitType,
 } from "@/lib/types";
@@ -155,12 +161,20 @@ export default function OrgProjectUnitsPage() {
   const [unitTypeCatalogError, setUnitTypeCatalogError] = useState<
     string | null
   >(null);
+  const [unitAttributeCatalog, setUnitAttributeCatalog] = useState<OrgCatalogOption[]>([]);
+  const [unitAttributeCatalogLoaded, setUnitAttributeCatalogLoaded] = useState(false);
+  // The org's price-per-sqft denominator (Settings → Project Catalogs).
+  const [priceBasis, setPriceBasis] = useState<UnitPriceBasis>("carpet");
+  // Which fields the unit type filled in, so the "from X" note can be shown
+  // and then dropped the moment the user edits that field.
+  const [prefilled, setPrefilled] = useState<PrefillField[]>([]);
 
   const [unitMode, setUnitMode] = useState<"create" | "edit" | null>(null);
   const [unitEditingId, setUnitEditingId] = useState<string | null>(null);
   const [unitForm, setUnitForm] = useState<UnitForm>(emptyUnitForm());
   const [unitError, setUnitError] = useState<string | null>(null);
   const [unitBusy, setUnitBusy] = useState(false);
+  const [unitAttempted, setUnitAttempted] = useState(false);
 
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -192,14 +206,29 @@ export default function OrgProjectUnitsPage() {
     void load();
   }, [load]);
 
+  // The org's price-per-sqft basis, so the live figure and its label match
+  // what the server derives.
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
-    getOrgCatalogOptions("unit_type")
+    apiFetch<SafeOrganisation>("/org/settings", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((org) => { if (!cancelled) setPriceBasis(org.unit_price_basis ?? "carpet"); })
+      .catch(() => { /* keep the carpet default */ });
+    return () => { cancelled = true; };
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    let cancelled = false;
+    getOrgCatalogOptions()
       .then((rows) => {
         if (cancelled) return;
+        setUnitAttributeCatalog(rows);
+        setUnitAttributeCatalogLoaded(true);
         setUnitTypeCatalog(
-          [...rows].sort(
+          rows.filter((row) => row.category === "unit_type").sort(
             (a, b) =>
               a.sortOrder - b.sortOrder || a.label.localeCompare(b.label),
           ),
@@ -209,7 +238,7 @@ export default function OrgProjectUnitsPage() {
       .catch((e) => {
         if (!cancelled) {
           setUnitTypeCatalogError(
-            e instanceof Error ? e.message : "Couldn't load unit type options.",
+            e instanceof Error ? e.message : "Couldn't load configuration options.",
           );
         }
       });
@@ -217,6 +246,48 @@ export default function OrgProjectUnitsPage() {
       cancelled = true;
     };
   }, [accessToken]);
+
+  const facingOptions = unitAttributeCatalog.filter((option) => option.category === "facing");
+  const parkingOptions = unitAttributeCatalog.filter((option) => option.category === "parking");
+  const variantOptions = unitAttributeCatalog.filter((option) => option.category === "unit_variant");
+
+  /**
+   * Picking a configuration copies the project's matching unit type's carpet /
+   * built-up / price into the form. A snapshot, not a binding: every value
+   * stays editable, and editing the unit type later never touches this unit.
+   */
+  function applyConfiguration(configuration: string) {
+    const { values, filled } = prefillFromUnitType(
+      configuration,
+      project?.unitTypes,
+    );
+    setPrefilled(filled);
+    setUnitForm((f) => ({ ...f, configuration, ...values }));
+  }
+
+  /** The note is only true until the user edits that field. */
+  function clearPrefill(field: PrefillField) {
+    setPrefilled((prev) => (prev.includes(field) ? prev.filter((f) => f !== field) : prev));
+  }
+
+  // A project unit may only use configurations assigned to this project.
+  // UnitType rows are the planned mix; the rollup and existing units preserve
+  // configurations already present on older projects.
+  const projectConfigurationOptions: OrgCatalogOption[] = project
+    ? [...new Set([
+        ...project.unitTypes.map((unitType) => unitType.name),
+        ...project.configurations.map((configuration) => configuration.label),
+        ...units.map((unit) => unit.configuration).filter((value): value is string => !!value),
+      ])].map((label, index) => ({
+        id: `${project.id}-configuration-${index}`,
+        orgId: project.orgId,
+        category: "unit_type",
+        label,
+        sortOrder: index,
+        createdAt: "",
+        updatedAt: "",
+      }))
+    : [];
 
   // --- unit type handlers ---
   function openUtCreate() {
@@ -240,7 +311,7 @@ export default function OrgProjectUnitsPage() {
   async function submitUt() {
     if (!accessToken) return;
     if (!utForm.name.trim()) {
-      setUtError("Pick a unit type from the list.");
+      setUtError("Pick a configuration from the list.");
       return;
     }
     setUtBusy(true);
@@ -270,7 +341,7 @@ export default function OrgProjectUnitsPage() {
       await load();
     } catch (err) {
       setUtError(
-        err instanceof Error ? err.message : "Failed to save unit type.",
+        err instanceof Error ? err.message : "Failed to save configuration.",
       );
     } finally {
       setUtBusy(false);
@@ -283,6 +354,7 @@ export default function OrgProjectUnitsPage() {
     setUnitEditingId(null);
     setUnitForm(emptyUnitForm());
     setUnitError(null);
+    setUnitAttempted(false);
   }
   function openUnitEdit(unit: Unit) {
     setUnitMode("edit");
@@ -303,9 +375,11 @@ export default function OrgProjectUnitsPage() {
       galleryUrls: unit.galleryUrls ?? [],
     });
     setUnitError(null);
+    setUnitAttempted(false);
   }
   async function submitUnit() {
     if (!accessToken) return;
+    setUnitAttempted(true);
     if (!unitForm.configuration) {
       setUnitError("Pick a configuration for this unit.");
       return;
@@ -489,17 +563,21 @@ export default function OrgProjectUnitsPage() {
     );
   })();
 
-  // Live ₹/sqft for the modal (carpet basis) — never stored, blank when
-  // either input is missing.
-  const modalPricePerSqft = pricePerSqftCarpet(
+  // Live ₹/sqft for the modal, on the org's chosen basis — never stored,
+  // blank when the price or that area is missing. Always labelled with the
+  // basis (the helper has no unlabelled form).
+  const modalPricePerSqft = pricePerSqftLabel(
     parseAmount(unitForm.price),
     parseCount(unitForm.carpetSqft),
+    parseCount(unitForm.builtupSqft),
+    priceBasis,
+    project?.currency,
   );
 
   // Can a unit be created at all? Only when the org has ≥1 unit_type catalog
   // option (or the form already carries a legacy configuration value).
   const canPickConfiguration =
-    (unitTypeCatalog?.length ?? 0) > 0 || unitForm.configuration !== "";
+    projectConfigurationOptions.length > 0 || unitForm.configuration !== "";
 
   // Availability grid: units grouped by the explicit `tower` field. Units
   // with no tower fall into one "All units" bucket. Floor range per tower
@@ -568,7 +646,7 @@ export default function OrgProjectUnitsPage() {
               type="button"
               onClick={openUtCreate}
             >
-              ＋ Add unit type
+              ＋ Add configuration
             </button>
             <button
               className="btn btn-primary"
@@ -602,7 +680,7 @@ export default function OrgProjectUnitsPage() {
               <div className="card-b">
                 <p className="muted">
                   No configurations yet — add a unit, or a planned unit mix
-                  with “＋ Add unit type”.
+                  with “＋ Add configuration”.
                 </p>
               </div>
             </div>
@@ -788,6 +866,7 @@ export default function OrgProjectUnitsPage() {
                   <th>Facing</th>
                   <th>Parking</th>
                   <th>Price ₹</th>
+                  <th>Updated by</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -795,7 +874,7 @@ export default function OrgProjectUnitsPage() {
               <tbody>
                 {visibleUnits.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="muted">
+                    <td colSpan={11} className="muted">
                       {units.length === 0
                         ? "No units yet — add one with “＋ Add unit”."
                         : "No units match this filter."}
@@ -819,6 +898,21 @@ export default function OrgProjectUnitsPage() {
                         {row.price != null
                           ? row.price.toLocaleString("en-IN")
                           : "—"}
+                        {row.pricePerSqft != null ? (
+                          <div className="hint" style={{ marginTop: 2 }}>
+                            {row.pricePerSqft.toLocaleString("en-IN")} / sqft ({PRICE_BASIS_LABEL[row.pricePerSqftBasis]})
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>
+                        {row.updatedBy ? (
+                          <>
+                            <div>{row.updatedBy.name}</div>
+                            <div className="hint">{formatUpdatedAt(row.updatedAt)}</div>
+                          </>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
                       </td>
                       <td>
                         <div className="row gap-6">
@@ -888,7 +982,7 @@ export default function OrgProjectUnitsPage() {
       <Modal
         open={utMode !== null}
         onClose={() => setUtMode(null)}
-        title={utMode === "create" ? "Add unit type" : "Edit unit type"}
+        title={utMode === "create" ? "Add configuration" : "Edit configuration"}
         size="lg"
       >
         <div className="org">
@@ -899,7 +993,7 @@ export default function OrgProjectUnitsPage() {
           ) : null}
           <div className="row2">
             <div className="field">
-              <label>Unit type *</label>
+              <label>Configuration <span className="req">*</span></label>
               {unitTypeCatalogError ? (
                 <div className="hint text-rose">{unitTypeCatalogError}</div>
               ) : unitTypeCatalog === null ? (
@@ -991,9 +1085,9 @@ export default function OrgProjectUnitsPage() {
             />
           </div>
           <div className="muted fs-12 row gap-8 mb-14">
-            <span>📐 Floor plan</span>
-            <span>🎬 Video</span>
-            <span>📄 Brochure</span>
+            <span><Icon name="properties" size={13} /> Floor plan</span>
+            <span><Icon name="camera" size={13} /> Video</span>
+            <span><Icon name="document" size={13} /> Brochure</span>
             <span className="badge b-gray">Coming soon</span>
           </div>
           <div className="row gap-10">
@@ -1042,18 +1136,17 @@ export default function OrgProjectUnitsPage() {
             ) : null}
 
             <div className="sec">
-              <div className="lbl">🏗️ Placement</div>
+              <div className="lbl"><Icon name="map" size={15} /> Placement</div>
               <div className="grid g3">
                 <div className="field">
                   <label>Configuration <span className="req">*</span></label>
                   <ConfigurationSelect
-                    catalog={unitTypeCatalog}
-                    error={unitTypeCatalogError}
+                    catalog={project ? projectConfigurationOptions : null}
+                    error={project ? null : unitTypeCatalogError}
                     value={unitForm.configuration}
-                    onChange={(v) =>
-                      setUnitForm((f) => ({ ...f, configuration: v }))
-                    }
+                    onChange={applyConfiguration}
                   />
+                  {unitAttempted && !unitForm.configuration ? <div className="field-err">Pick a configuration for this unit.</div> : null}
                 </div>
                 <div className="field">
                   <label>Tower / block</label>
@@ -1080,9 +1173,9 @@ export default function OrgProjectUnitsPage() {
             </div>
 
             <div className="sec">
-              <div className="lbl">🏠 Unit details</div>
+              <div className="lbl"><Icon name="home" size={15} /> Unit details</div>
               <div className="grid g3">
-                <div className="field">
+                <div className={`field${unitAttempted && !unitForm.unitNo.trim() ? " field-invalid" : ""}`}>
                   <label>Unit number <span className="req">*</span></label>
                   <input
                     className="inp"
@@ -1092,37 +1185,32 @@ export default function OrgProjectUnitsPage() {
                       setUnitForm((f) => ({ ...f, unitNo: e.target.value }))
                     }
                   />
+                  {unitAttempted && !unitForm.unitNo.trim() ? <div className="field-err">Unit number is required.</div> : null}
                 </div>
                 <div className="field">
-                  <label>Unit type</label>
-                  <input
-                    className="inp"
-                    placeholder="e.g. Type A (optional)"
+                  <label>Unit variant</label>
+                  <UnitAttributeSelect
+                    options={variantOptions}
+                    loaded={unitAttributeCatalogLoaded}
+                    error={unitTypeCatalogError}
                     value={unitForm.variantLabel}
-                    onChange={(e) =>
-                      setUnitForm((f) => ({
-                        ...f,
-                        variantLabel: e.target.value,
-                      }))
-                    }
+                    onChange={(v) => setUnitForm((f) => ({ ...f, variantLabel: v }))}
+                    placeholder="None"
+                    emptyHint="No unit variants configured yet."
                   />
+                  <div className="hint">Optional — e.g. Type A, Corner.</div>
                 </div>
                 <div className="field">
                   <label>Facing</label>
-                  <select
-                    className="inp"
+                  <UnitAttributeSelect
+                    options={facingOptions}
+                    loaded={unitAttributeCatalogLoaded}
+                    error={unitTypeCatalogError}
                     value={unitForm.facing}
-                    onChange={(e) =>
-                      setUnitForm((f) => ({ ...f, facing: e.target.value }))
-                    }
-                  >
-                    <option value="">Select…</option>
-                    {FACING_OPTIONS.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setUnitForm((f) => ({ ...f, facing: v }))}
+                    placeholder="Select…"
+                    emptyHint="No facing options configured yet."
+                  />
                 </div>
               </div>
               <div className="grid g3">
@@ -1134,10 +1222,12 @@ export default function OrgProjectUnitsPage() {
                     min={0}
                     placeholder="1450"
                     value={unitForm.carpetSqft}
-                    onChange={(e) =>
-                      setUnitForm((f) => ({ ...f, carpetSqft: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      clearPrefill("carpetSqft");
+                      setUnitForm((f) => ({ ...f, carpetSqft: e.target.value }));
+                    }}
                   />
+                  {prefilled.includes("carpetSqft") ? <PrefillNote configuration={unitForm.configuration} /> : null}
                 </div>
                 <div className="field">
                   <label>Built-up area (sqft)</label>
@@ -1147,34 +1237,55 @@ export default function OrgProjectUnitsPage() {
                     min={0}
                     placeholder="1720"
                     value={unitForm.builtupSqft}
-                    onChange={(e) =>
-                      setUnitForm((f) => ({
-                        ...f,
-                        builtupSqft: e.target.value,
-                      }))
-                    }
+                    onChange={(e) => {
+                      clearPrefill("builtupSqft");
+                      setUnitForm((f) => ({ ...f, builtupSqft: e.target.value }));
+                    }}
                   />
+                  {prefilled.includes("builtupSqft") ? <PrefillNote configuration={unitForm.configuration} /> : null}
                 </div>
                 <div className="field">
                   <label>Parking</label>
-                  <select
-                    className="inp"
+                  <UnitAttributeSelect
+                    options={parkingOptions}
+                    loaded={unitAttributeCatalogLoaded}
+                    error={unitTypeCatalogError}
                     value={unitForm.parking}
-                    onChange={(e) =>
-                      setUnitForm((f) => ({ ...f, parking: e.target.value }))
-                    }
-                  >
-                    <option value="">Not set</option>
-                    {PARKING_OPTIONS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setUnitForm((f) => ({ ...f, parking: v }))}
+                    emptyHint="No parking options configured yet."
+                  />
                 </div>
               </div>
+            </div>
+
+            <div className="sec">
+              <div className="lbl"><Icon name="billing" size={15} /> Pricing &amp; status</div>
               <div className="grid g3">
-                <div className="field mb-0">
+                <div className="field">
+                  <label>Price (₹)</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    placeholder="16500000"
+                    value={unitForm.price}
+                    onChange={(e) => {
+                      clearPrefill("price");
+                      setUnitForm((f) => ({ ...f, price: e.target.value }));
+                    }}
+                  />
+                  {prefilled.includes("price") ? <PrefillNote configuration={unitForm.configuration} /> : null}
+                </div>
+                <div className="field">
+                  <label>Price / sqft ({PRICE_BASIS_LABEL[priceBasis]})</label>
+                  <input
+                    className="inp"
+                    placeholder="—"
+                    disabled
+                    value={modalPricePerSqft}
+                  />
+                </div>
+                <div className="field">
                   <label>Status</label>
                   <select
                     className="inp"
@@ -1195,36 +1306,8 @@ export default function OrgProjectUnitsPage() {
               </div>
             </div>
 
-            <div className="sec">
-              <div className="lbl">💰 Pricing</div>
-              <div className="grid g2">
-                <div className="field">
-                  <label>Price (₹)</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    min={0}
-                    placeholder="16500000"
-                    value={unitForm.price}
-                    onChange={(e) =>
-                      setUnitForm((f) => ({ ...f, price: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="field">
-                  <label>Price / sqft</label>
-                  <input
-                    className="inp"
-                    placeholder="—"
-                    disabled
-                    value={modalPricePerSqft}
-                  />
-                </div>
-              </div>
-            </div>
-
             <div className="sec nb">
-              <div className="lbl">🖼️ Media &amp; documents</div>
+              <div className="lbl"><Icon name="document" size={15} /> Media &amp; documents</div>
               <UnitMediaFields
                 floorPlanUrl={unitForm.floorPlanUrl}
                 galleryUrls={unitForm.galleryUrls}
@@ -1243,7 +1326,7 @@ export default function OrgProjectUnitsPage() {
             <div className="card">
               <div className="card-h"><span className="t">Preview</span></div>
               <div className="card-b">
-                <div className="ph-box">📐</div>
+                <div className="ph-box"><Icon name="properties" size={28} /></div>
                 <div className="row between">
                   <b>{unitForm.unitNo || "New unit"}</b>
                   <span className={`badge ${STATUS_BADGE[unitForm.status]}`}>
@@ -1268,7 +1351,7 @@ export default function OrgProjectUnitsPage() {
                 </div>
               </div>
             </div>
-            <div className="help">💡 Configuration comes from your Project Catalogs. Tower / floor drive the availability grid.</div>
+            <div className="help"><Icon name="info" size={15} /> Configuration comes from your Project Catalogs. Tower / floor drive the availability grid.</div>
           </div>
         </div>
 
@@ -1276,7 +1359,7 @@ export default function OrgProjectUnitsPage() {
           <button
             className="btn btn-primary"
             type="button"
-            disabled={unitBusy || !canPickConfiguration}
+            disabled={unitBusy}
             onClick={() => void submitUnit()}
           >
             {unitBusy

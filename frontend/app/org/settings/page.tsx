@@ -3,7 +3,7 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, changePlan, createOrgCatalogOption, deleteOrgCatalogOption, getInvoices, getOrgCatalogOptions, getOrgDomainInfo, getPlans, requestCustomDomain } from "@/lib/api";
-import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
+import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { subdomainPreviewHost } from "@/lib/domain";
@@ -81,7 +81,7 @@ const SECTION_META: Record<string, { icon: IconName; title: string; sub: string 
   crm: { icon: "crm", title: "CRM & leads", sub: "How leads are captured and handled" },
   fields: { icon: "puzzle", title: "Custom attributes", sub: "Add your own fields to leads, contacts, projects & bookings" },
   pipeline: { icon: "modules", title: "Pipeline & sources", sub: "Stages, lost reasons and lead sources" },
-  catalogs: { icon: "properties", title: "Project catalogs", sub: "Your own option lists the project onboarding wizard picks from" },
+  catalogs: { icon: "properties", title: "Project catalogs", sub: "Your own option lists, and how unit pricing is measured" },
   scoring: { icon: "star", title: "Scoring & assignment", sub: "Lead scores and distribution rules" },
   automation: { icon: "link", title: "Automation & SLA", sub: "Trigger workflows and response targets" },
   comms: { icon: "phone", title: "Calling & WhatsApp", sub: "Dialler, AI voice and WhatsApp Business" },
@@ -426,8 +426,8 @@ function DomainSection() {
   );
 }
 
-// The four project-wizard catalogs, in the order they appear in the wizard.
-// Each maps to one OrgCatalogCategory; the section renders one card per row.
+// The project-wizard catalogs, in the order they appear in the wizard. Each
+// maps to one OrgCatalogCategory; the section renders one card per row.
 const CATALOG_GROUPS: {
   category: OrgCatalogCategory;
   title: string;
@@ -438,7 +438,88 @@ const CATALOG_GROUPS: {
   { category: "unit_type", title: "Unit types", sub: "Configuration labels — e.g. 2 BHK, 3 BHK, Penthouse, Shop / Office", placeholder: "Add a unit type…" },
   { category: "connectivity", title: "Connectivity & landmarks", sub: "Nearby categories — e.g. Metro / transit, Schools, Hospitals, Airport", placeholder: "Add a connectivity category…" },
   { category: "amenity", title: "Amenities", sub: "Lifestyle features — e.g. Clubhouse, Gymnasium, Swimming pool", placeholder: "Add an amenity…" },
+  { category: "price_includes", title: "Price includes", sub: "What the quoted price covers — e.g. Floor rise, 1 covered parking, Club membership, GST", placeholder: "Add a price inclusion…" },
+  { category: "payment_plan", title: "Payment plans", sub: "Plan types buyers can pick — e.g. Construction-linked, Down payment, Flexi (20:80), Subvention", placeholder: "Add a payment plan…" },
+  { category: "facing", title: "Unit facing", sub: "Directions or views available for units — e.g. East, North, Garden, Sea", placeholder: "Add a facing option…" },
+  { category: "parking", title: "Unit parking", sub: "Parking choices available for units — e.g. 1 covered, 2 covered, Open", placeholder: "Add a parking option…" },
+  { category: "unit_variant", title: "Unit variants", sub: "Optional variant label within a configuration — e.g. Type A, Type B, Corner", placeholder: "Add a unit variant…" },
 ];
+
+/**
+ * Org-level price-per-sqft basis. Lives here rather than under Localization
+ * because carpet-vs-built-up is a commercial (RERA) convention about the
+ * inventory, not a locale format — and this is the page that already owns the
+ * unit configuration list it applies to.
+ */
+function PricingBasisCard() {
+  const [basis, setBasis] = useState<UnitPriceBasis | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState(false);
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    apiFetch<SafeOrganisation>("/org/settings")
+      .then((o) => setBasis(o.unit_price_basis ?? "carpet"))
+      .catch((e) => setErr(e instanceof Error ? e.message : "Failed to load the pricing basis."));
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  async function choose(next: UnitPriceBasis) {
+    if (next === basis || saving) return;
+    const previous = basis;
+    setBasis(next);
+    setSaving(true);
+    setErr(null);
+    setSavedAt(false);
+    try {
+      await apiFetch("/org/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ unitPriceBasis: next }),
+      });
+      setSavedAt(true);
+    } catch (e) {
+      setBasis(previous);
+      setErr(e instanceof Error ? e.message : "Couldn't change the pricing basis.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card
+      icon="properties"
+      title="Pricing basis"
+      sub="Which area a unit's price per sqft is divided by"
+    >
+      {err ? <div className="form-alert">{err}</div> : null}
+      {basis === null ? (
+        <p className="muted" style={{ margin: 0 }}>Loading…</p>
+      ) : (
+        <>
+          <div className="opts" data-single>
+            {(["carpet", "builtup"] as const).map((option) => (
+              <span
+                key={option}
+                className={`opt rad ${basis === option ? "on" : ""}`}
+                onClick={() => void choose(option)}
+                style={{ cursor: saving ? "wait" : "pointer" }}
+              >
+                <span className="b">{basis === option ? "●" : ""}</span>
+                {option === "carpet" ? "Carpet area" : "Built-up area"}
+              </span>
+            ))}
+          </div>
+          <div className="hint" style={{ marginTop: 10 }}>
+            Applies everywhere a per-sqft price is shown, and the figure is always
+            labelled with the basis. Carpet area is the RERA-standard default.
+            {savedAt ? <b> Saved.</b> : null}
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
 
 function CatalogSection() {
   const [options, setOptions] = useState<OrgCatalogOption[] | null>(null);
@@ -982,6 +1063,7 @@ export default function OrgSettingsPage() {
           {/* CATALOGS */}
           <div className={`os-section${section === "catalogs" ? " on" : ""}`}>
             <SectionHead section="catalogs" />
+            <PricingBasisCard />
             <CatalogSection />
           </div>
 

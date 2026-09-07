@@ -4,10 +4,23 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, setProjectSalesAgents } from "@/lib/api";
-import { parseAmount, parseCoord, parseCount, parseDecimal } from "@/lib/parse";
+import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { CURRENCY_LABELS, formatMoneyRange, PROJECT_CURRENCIES } from "@/lib/money";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
-import { CatalogOptions, MoneyInput } from "@/components/org/project-form-fields";
+import { CatalogOptions, MoneyInput, SpecificationRows } from "@/components/org/project-form-fields";
+import {
+  defaultSpecRows,
+  serializeSpecifications,
+  type SpecRow,
+} from "@/lib/specifications";
+import {
+  allMissing,
+  missingOn,
+  projectRequirements,
+  PROJECT_STEPS as STEPS,
+  stepIndicator,
+  stepStatus,
+} from "@/lib/project-validation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { orgBuilderPath } from "@/lib/prestate/paths";
 import "@/app/org/org.css";
@@ -48,25 +61,21 @@ const makeUnitType = (): UnitTypeDraft => ({
   totalUnits: "",
 });
 
-// The four wizard option lists are org-managed catalogs now (Settings →
-// Project Catalogs), fetched per step (see CatalogOptions in
+// The wizard's option lists are org-managed catalogs (Settings → Project
+// Catalogs), fetched per step (see CatalogOptions in
 // components/org/project-form-fields).
 //
 // Wizard steps (0-indexed) that read a catalog — used to refetch on entry so
-// options just added in Settings appear without a full page reload.
-const CATALOG_STEPS = new Set([0, 1, 3, 4]);
+// options just added in Settings appear without a full page reload. Step 2
+// (pricing) joined the list when "Price includes" and "Payment plan" stopped
+// being fixed frontend arrays and became catalogs of their own.
+const CATALOG_STEPS = new Set([0, 1, 2, 3, 4]);
 
-const STEPS = [
-  { label: "Project basics", sub: "Name, type, RERA" },
-  { label: "Inventory & config", sub: "Unit types & sizes" },
-  { label: "Pricing & payment", sub: "Price, plans, offers" },
-  { label: "Location", sub: "Address & connectivity" },
-  { label: "Amenities & specs", sub: "Features & finishes" },
-  { label: "Marketing & leads", sub: "Sources, budget, AI" },
-  { label: "Team & access", sub: "Manager, agents" },
-  { label: "Documents & media", sub: "Brochure, photos" },
-  { label: "Review & launch", sub: "Confirm & publish" },
-];
+// Per-step required-field validation: Continue validates the step you're on and
+// refuses to advance while something's missing, the step rail warns before
+// letting you jump *ahead* out of an incomplete step (jumping back is always
+// free), and Publish re-checks everything. The rules themselves live in
+// lib/project-validation, shared with the edit page.
 
 // 150000 -> "₹ 1,50,000". Unparseable input falls back to the raw text.
 function formatRupees(value: string): string {
@@ -98,7 +107,10 @@ function priceRangeLabel(from: string, to: string, currency: string): string {
 // and when they are they'll round-trip as plain R2 URL strings like any other
 // text field — so restoring a draft never re-triggers an upload.
 // ---------------------------------------------------------------------------
-const DRAFT_KEY_PREFIX = "be.project-draft.v1.";
+// v2: `specifications` became dynamic label/value rows (replacing the fixed
+// flooring / kitchen / doorsWindows / fittings fields) and Step 8 gained
+// project floor plans. sweepOldProjectDrafts drops the v1 drafts.
+const DRAFT_KEY_PREFIX = "be.project-draft.v2.";
 const draftKey = (orgId: string) => `${DRAFT_KEY_PREFIX}${orgId}`;
 
 interface WizardDraft {
@@ -111,15 +123,15 @@ interface WizardDraft {
   priceMin: string; priceMax: string; baseRate: string; bookingAmount: string; currency: string;
   priceIncludes: string[]; paymentPlan: string; offers: string;
   address: string; city: string; locality: string; pincode: string;
-  latitude: string; longitude: string; nearby: string[]; landmarks: string;
-  amenities: string[]; flooring: string; kitchen: string; doorsWindows: string;
-  fittings: string; specNotes: string;
+  nearby: string[]; landmarks: string;
+  amenities: string[]; specRows: SpecRow[]; specNotes: string;
   metaAds: boolean; googleAds: boolean; linkedinAds: boolean; portalAds: boolean;
   monthlyBudget: string; targetCpl: string; leadGoal: string; landingPage: string;
   aiCalling: boolean; whatsappAuto: boolean; roundRobin: boolean; aiKnowledgeBase: boolean;
   managerId: string; salesTeam: string; agentAssign: string[];
   requireApproval: boolean; visibleTele: boolean; publishWeb: boolean;
   coverImageUrl: string | null; galleryUrls: string[]; brochureUrl: string | null; reraCertificateUrl: string | null;
+  floorPlanUrls: string[];
   customLandingPageId?: string | null;
   customLandingPageSlug?: string | null;
   customLandingPageName?: string | null;
@@ -197,8 +209,10 @@ export default function AddNewProjectPage() {
   const [baseRate, setBaseRate] = useState("");
   const [bookingAmount, setBookingAmount] = useState("");
   const [currency, setCurrency] = useState("INR");
-  const [priceIncludes, setPriceIncludes] = useState<string[]>(["Floor rise", "1 covered parking"]);
-  const [paymentPlan, setPaymentPlan] = useState("Construction-linked");
+  // Both now come from the org's catalogs, so neither can be pre-seeded with
+  // a label this org may not have configured.
+  const [priceIncludes, setPriceIncludes] = useState<string[]>([]);
+  const [paymentPlan, setPaymentPlan] = useState("");
   const [offers, setOffers] = useState("");
 
   // Step 4 — location
@@ -206,17 +220,13 @@ export default function AddNewProjectPage() {
   const [city, setCity] = useState("");
   const [locality, setLocality] = useState("");
   const [pincode, setPincode] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
   const [nearby, setNearby] = useState<string[]>([]);
   const [landmarks, setLandmarks] = useState("");
 
-  // Step 5 — amenities
+  // Step 5 — amenities & specifications. A new project starts with the four
+  // rows the old fixed form had, pre-labelled but all deletable.
   const [amenities, setAmenities] = useState<string[]>([]);
-  const [flooring, setFlooring] = useState("");
-  const [kitchen, setKitchen] = useState("");
-  const [doorsWindows, setDoorsWindows] = useState("");
-  const [fittings, setFittings] = useState("");
+  const [specRows, setSpecRows] = useState<SpecRow[]>(() => defaultSpecRows());
   const [specNotes, setSpecNotes] = useState("");
 
   // Step 6 — marketing
@@ -260,9 +270,20 @@ export default function AddNewProjectPage() {
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [brochureUrl, setBrochureUrl] = useState<string | null>(null);
   const [reraCertificateUrl, setReraCertificateUrl] = useState<string | null>(null);
+  // The project's overall floor / site plans. Separate concept from the
+  // per-unit-type floor plan, which can only exist once real unit types are
+  // created after publishing.
+  const [floorPlanUrls, setFloorPlanUrls] = useState<string[]>([]);
 
   // Wizard state
   const [step, setStep] = useState(0);
+  // Steps whose required fields have been checked at least once (by Continue,
+  // a rail jump, or Publish). Only these show inline errors, so a field never
+  // turns red before the user has tried to move past it.
+  const [validatedSteps, setValidatedSteps] = useState<number[]>([]);
+  // Set when a rail click would jump ahead out of an incomplete step — holds
+  // the warning until the user either fixes the step or confirms the jump.
+  const [jumpWarning, setJumpWarning] = useState<{ to: number; missing: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Set once the project is created. If a follow-up call (e.g. sales-agent
@@ -358,6 +379,7 @@ export default function AddNewProjectPage() {
   const catalogByCategory = useMemo(() => {
     const grouped: Record<OrgCatalogCategory, OrgCatalogOption[]> = {
       project_type: [], unit_type: [], connectivity: [], amenity: [],
+      price_includes: [], payment_plan: [], facing: [], parking: [], unit_variant: [],
     };
     for (const opt of catalog ?? []) grouped[opt.category]?.push(opt);
     for (const key of Object.keys(grouped) as OrgCatalogCategory[]) {
@@ -365,6 +387,73 @@ export default function AddNewProjectPage() {
     }
     return grouped;
   }, [catalog]);
+
+  // --- Required fields, per step. The rules live in lib/project-validation
+  // so the edit page enforces exactly the same set. ---
+  const requiredByStep = useMemo(
+    () => projectRequirements({ name, projectType, reraId, priceMin, address, city, managerId }),
+    [name, projectType, reraId, priceMin, address, city, managerId],
+  );
+
+  const missingOnStep = useCallback(
+    (i: number) => missingOn(requiredByStep, i),
+    [requiredByStep],
+  );
+
+  // Every unfilled required field across the whole wizard, in step order —
+  // Publish's own last-line check, and what the Review step lists.
+  const allMissingFields = useMemo(() => allMissing(requiredByStep), [requiredByStep]);
+
+  const currentMissing = missingOnStep(step);
+  const showErrors = validatedSteps.includes(step);
+  // True once this step has been checked and this specific field is still empty.
+  const invalid = (id: string) =>
+    showErrors && currentMissing.some((f) => f.id === id);
+  const fieldClass = (id: string, extra = "") =>
+    `field${extra ? ` ${extra}` : ""}${invalid(id) ? " field-invalid" : ""}`;
+  // The inline message for a field, from the shared rules — never re-typed here.
+  const fieldError = (id: string) =>
+    currentMissing.find((f) => f.id === id)?.error ?? "";
+
+  const markValidated = useCallback((i: number) => {
+    setValidatedSteps((prev) => (prev.includes(i) ? prev : [...prev, i]));
+  }, []);
+
+  // Continue: check this step's own required fields right here. Anything
+  // missing blocks the move and surfaces inline + in the footer summary.
+  function goNext() {
+    markValidated(step);
+    if (missingOnStep(step).length > 0) return;
+    setJumpWarning(null);
+    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  }
+
+  function goBack() {
+    setJumpWarning(null);
+    setStep((s) => Math.max(0, s - 1));
+  }
+
+  // Step-rail navigation. Going back to an earlier (or the current) step is
+  // free. Jumping *ahead* out of a step with missing required fields raises a
+  // warning first rather than silently navigating away from it.
+  function goToStep(target: number) {
+    if (target <= step || missingOnStep(step).length === 0) {
+      setJumpWarning(null);
+      setStep(target);
+      return;
+    }
+    markValidated(step);
+    setJumpWarning({ to: target, missing: missingOnStep(step).map((f) => f.label) });
+  }
+
+  // Filled specification rows, for the Review step's read-only summary.
+  const reviewSpecRows = useMemo(
+    () =>
+      specRows
+        .filter((r) => r.value.trim())
+        .map((r) => [r.label.trim() || "—", r.value.trim()] as [string, string]),
+    [specRows],
+  );
 
   const unitRollup = useMemo(() => {
     const total = unitTypes.reduce((s, u) => s + (parseInt(u.totalUnits, 10) || 0), 0);
@@ -377,11 +466,11 @@ export default function AddNewProjectPage() {
       step, name, projectType, tagline, reraId, status, launchDate, possession, constructionStage,
       selectedConfigs, towerCount, floorsDescription, landArea, carpetRange, highlights, unitTypes,
       priceMin, priceMax, baseRate, bookingAmount, currency, priceIncludes, paymentPlan, offers,
-      address, city, locality, pincode, latitude, longitude, nearby, landmarks,
-      amenities, flooring, kitchen, doorsWindows, fittings, specNotes,
+      address, city, locality, pincode, nearby, landmarks,
+      amenities, specRows, specNotes,
       metaAds, googleAds, linkedinAds, portalAds, monthlyBudget, targetCpl, leadGoal, landingPage, aiCalling, whatsappAuto, roundRobin, aiKnowledgeBase,
       managerId, salesTeam, agentAssign, requireApproval, visibleTele, publishWeb,
-      coverImageUrl, galleryUrls, brochureUrl, reraCertificateUrl,
+      coverImageUrl, galleryUrls, brochureUrl, reraCertificateUrl, floorPlanUrls,
       customLandingPageId, customLandingPageSlug, customLandingPageName,
       selectedTemplateId: selectedTemplate?.id ?? null,
     }),
@@ -389,11 +478,11 @@ export default function AddNewProjectPage() {
       step, name, projectType, tagline, reraId, status, launchDate, possession, constructionStage,
       selectedConfigs, towerCount, floorsDescription, landArea, carpetRange, highlights, unitTypes,
       priceMin, priceMax, baseRate, bookingAmount, currency, priceIncludes, paymentPlan, offers,
-      address, city, locality, pincode, latitude, longitude, nearby, landmarks,
-      amenities, flooring, kitchen, doorsWindows, fittings, specNotes,
+      address, city, locality, pincode, nearby, landmarks,
+      amenities, specRows, specNotes,
       metaAds, googleAds, linkedinAds, portalAds, monthlyBudget, targetCpl, leadGoal, landingPage, aiCalling, whatsappAuto, roundRobin, aiKnowledgeBase,
       managerId, salesTeam, agentAssign, requireApproval, visibleTele, publishWeb,
-      coverImageUrl, galleryUrls, brochureUrl, reraCertificateUrl,
+      coverImageUrl, galleryUrls, brochureUrl, reraCertificateUrl, floorPlanUrls,
       customLandingPageId, customLandingPageSlug, customLandingPageName, selectedTemplate,
     ],
   );
@@ -434,7 +523,20 @@ export default function AddNewProjectPage() {
   }, [hydrated, orgId, collectDraft]);
 
   function toggleConfig(c: string) {
-    setSelectedConfigs((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]);
+    setSelectedConfigs((prev) => {
+      const on = prev.includes(c);
+      // Keep one draft unit type per picked configuration. Entering carpet /
+      // built-up / price here is what lets the unit form prefill from it after
+      // publishing; leaving them blank still creates the planned type.
+      setUnitTypes((rows) =>
+        on
+          ? rows.filter((r) => r.name !== c)
+          : rows.some((r) => r.name === c)
+            ? rows
+            : [...rows, { ...makeUnitType(), name: c }],
+      );
+      return on ? prev.filter((x) => x !== c) : [...prev, c];
+    });
   }
   function toggleAmenity(a: string) {
     setAmenities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]);
@@ -461,11 +563,14 @@ export default function AddNewProjectPage() {
     setHighlights(d.highlights ?? ""); setUnitTypes(d.unitTypes ?? []);
     setPriceMin(d.priceMin ?? ""); setPriceMax(d.priceMax ?? ""); setBaseRate(d.baseRate ?? ""); setBookingAmount(d.bookingAmount ?? "");
     setCurrency(d.currency ?? "INR"); setPriceIncludes(d.priceIncludes ?? []);
-    setPaymentPlan(d.paymentPlan ?? "Construction-linked"); setOffers(d.offers ?? "");
+    setPaymentPlan(d.paymentPlan ?? ""); setOffers(d.offers ?? "");
     setAddress(d.address ?? ""); setCity(d.city ?? ""); setLocality(d.locality ?? ""); setPincode(d.pincode ?? "");
-    setLatitude(d.latitude ?? ""); setLongitude(d.longitude ?? ""); setNearby(d.nearby ?? []); setLandmarks(d.landmarks ?? "");
-    setAmenities(d.amenities ?? []); setFlooring(d.flooring ?? ""); setKitchen(d.kitchen ?? "");
-    setDoorsWindows(d.doorsWindows ?? ""); setFittings(d.fittings ?? ""); setSpecNotes(d.specNotes ?? "");
+    setNearby(d.nearby ?? []); setLandmarks(d.landmarks ?? "");
+    setAmenities(d.amenities ?? []);
+    // A resumed draft keeps exactly the rows it was saved with — including
+    // ones the user deleted — so restoring never re-adds the defaults.
+    setSpecRows(Array.isArray(d.specRows) ? d.specRows : defaultSpecRows());
+    setSpecNotes(d.specNotes ?? "");
     setMetaAds(d.metaAds ?? true); setGoogleAds(d.googleAds ?? true); setLinkedinAds(d.linkedinAds ?? false);
     setPortalAds(d.portalAds ?? true); setMonthlyBudget(d.monthlyBudget ?? ""); setTargetCpl(d.targetCpl ?? "");
     setLeadGoal(d.leadGoal ?? ""); setLandingPage(d.landingPage ?? "Create new from template…");
@@ -475,6 +580,7 @@ export default function AddNewProjectPage() {
     setRequireApproval(d.requireApproval ?? true); setVisibleTele(d.visibleTele ?? true); setPublishWeb(d.publishWeb ?? false);
     setCoverImageUrl(d.coverImageUrl ?? null); setGalleryUrls(d.galleryUrls ?? []);
     setBrochureUrl(d.brochureUrl ?? null); setReraCertificateUrl(d.reraCertificateUrl ?? null);
+    setFloorPlanUrls(d.floorPlanUrls ?? []);
     if (d.customLandingPageId) setCustomLandingPageId(d.customLandingPageId);
     if (d.customLandingPageSlug) setCustomLandingPageSlug(d.customLandingPageSlug);
     if (d.customLandingPageName) setCustomLandingPageName(d.customLandingPageName);
@@ -562,22 +668,25 @@ export default function AddNewProjectPage() {
 
   async function submit() {
     if (!accessToken) return;
-    if (!name.trim()) { setError("Give the project a name."); setStep(0); return; }
+    // Last-line check. Each step already blocks its own Continue, but a draft
+    // resumed straight onto Review — or a rail jump the user confirmed past a
+    // warning — can still reach here incomplete.
+    if (allMissingFields.length > 0) {
+      for (const f of allMissingFields) markValidated(f.step);
+      setError(
+        `Fill in the required field${allMissingFields.length > 1 ? "s" : ""} first: ${allMissingFields.map((f) => f.label).join(", ")}.`,
+      );
+      setJumpWarning(null);
+      setStep(allMissingFields[0].step);
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
     try {
-      // Step 5 — specifications blob. Omitted entirely when nothing was typed.
-      const specEntries: Record<string, string> = {
-        flooring: flooring.trim(),
-        kitchen: kitchen.trim(),
-        doorsWindows: doorsWindows.trim(),
-        fittings: fittings.trim(),
-        notes: specNotes.trim(),
-      };
-      const specifications = Object.values(specEntries).some(Boolean)
-        ? Object.fromEntries(Object.entries(specEntries).filter(([, v]) => v))
-        : undefined;
+      // Step 5 — specifications: dynamic { label, value } rows plus notes.
+      // Omitted entirely when nothing was filled in.
+      const specifications = serializeSpecifications(specRows, specNotes);
 
       // Step 6 — marketing preference blob. Always sent (the toggles have
       // meaningful defaults). `aiKnowledgeBaseEnabled` is collected from
@@ -616,6 +725,12 @@ export default function AddNewProjectPage() {
         towerCount: parseCount(towerCount),
         floorsDescription: floorsDescription.trim() || undefined,
         carpetRange: carpetRange.trim() || undefined,
+        projectType: projectType || undefined,
+        tagline: tagline.trim() || undefined,
+        launchDate: launchDate || undefined,
+        constructionStage: constructionStage || undefined,
+        highlights: highlights.trim() || undefined,
+        salesTeam: salesTeam || undefined,
         amenities: amenities.map((a) => ({ name: a, iconUrl: null })),
         // Step 3 — pricing & payment (remaining fields)
         bookingAmount: parseAmount(bookingAmount),
@@ -628,8 +743,6 @@ export default function AddNewProjectPage() {
         city: city.trim() || undefined,
         locality: locality.trim() || undefined,
         pincode: pincode.trim() || undefined,
-        latitude: parseCoord(latitude),
-        longitude: parseCoord(longitude),
         connectivity: nearby.length ? nearby : undefined,
         landmarks: landmarks.trim() || undefined,
         // Step 5 & 6 — preference blobs
@@ -644,6 +757,7 @@ export default function AddNewProjectPage() {
         galleryUrls: galleryUrls.length ? galleryUrls : undefined,
         brochureUrl: brochureUrl ?? undefined,
         reraCertificateUrl: reraCertificateUrl ?? undefined,
+        floorPlanUrls: floorPlanUrls.length ? floorPlanUrls : undefined,
       };
 
       const project = await apiFetch<Project>("/org/projects", {
@@ -844,12 +958,26 @@ export default function AddNewProjectPage() {
               </div>
               <div className="wz-prog"><i style={{ width: `${pct}%` }} /></div>
               <div className="wz-steps">
-                {STEPS.map((s, i) => (
-                  <button key={i} className={i === step ? "on" : i < step ? "done" : ""} onClick={() => setStep(i)}>
-                    <span className="num">{i < step ? "✓" : i + 1}</span>
-                    <span className="tx"><b>{s.label}</b><small>{s.sub}</small></span>
-                  </button>
-                ))}
+                {STEPS.map((s, i) => {
+                  // A step earns its green tick only by passing its own
+                  // required-field check — one bypassed via "Go to X anyway"
+                  // shows an alert instead, and flips to the tick by itself
+                  // once the user goes back and fills it in.
+                  const status = stepStatus(i, step, requiredByStep);
+                  const { className, glyph } = stepIndicator(status, i);
+                  return (
+                    <button
+                      key={i}
+                      className={className}
+                      onClick={() => goToStep(i)}
+                      title={status === "incomplete" ? `${s.label} is missing required fields` : undefined}
+                    >
+                      <span className="num">{glyph}</span>
+                      <span className="tx"><b>{s.label}</b><small>{s.sub}</small></span>
+                      {status === "incomplete" ? <span className="sr-only"> — incomplete</span> : null}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -884,12 +1012,32 @@ export default function AddNewProjectPage() {
             </div>
 
             <div className="help mt-14">
-              💡 <b>Tip:</b> Fields marked <span className="req">*</span> are required to publish. You can save a draft anytime and finish later.
+              💡 <b>Tip:</b> Fields marked <span className="req">*</span> are checked when you continue past their step. You can save a draft anytime and finish later.
             </div>
           </div>
 
           {/* PANES */}
           <div className="card pad-26">
+
+            {/* Raised when a step-rail click would jump ahead out of a step
+                with required fields still empty. */}
+            {jumpWarning && (
+              <div className="help err mb-20">
+                <b>⚠️ {STEPS[step].label} isn&apos;t complete.</b>
+                <div style={{ marginTop: 4 }}>
+                  Still needed here: {jumpWarning.missing.join(", ")}. You can fill it in now, or skip ahead to <b>{STEPS[jumpWarning.to].label}</b> and come back — the project can&apos;t be published until it&apos;s filled in.
+                </div>
+                <div className="row gap-10 mt-8">
+                  <button className="btn btn-primary btn-sm" onClick={() => setJumpWarning(null)}>Stay and fill it in</button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => { const to = jumpWarning.to; setJumpWarning(null); setStep(to); }}
+                  >
+                    Go to {STEPS[jumpWarning.to].label} anyway →
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* STEP 1 — Basics */}
             {step === 0 && (
@@ -987,10 +1135,10 @@ export default function AddNewProjectPage() {
                 <div className="q-sec">
                   <div className="lbl">📋 Identity</div>
                   <div className="grid g2">
-                    <div className="field"><label>Project name <span className="req">*</span></label><input className="inp" placeholder="e.g. Palm Residency" value={name} onChange={(e) => setName(e.target.value)} /></div>
+                    <div className={fieldClass("name")}><label>Project name <span className="req">*</span></label><input className="inp" placeholder="e.g. Palm Residency" value={name} onChange={(e) => setName(e.target.value)} />{invalid("name") && <div className="field-err">Project name is required.</div>}</div>
                     <div className="field"><label>Developer / channel partner <span className="req">*</span></label><input className="inp" value={orgName} placeholder="Loading…" readOnly /><div className="hint">Your organisation, set during onboarding. Change it in Settings → General.</div></div>
                   </div>
-                  <div className="field"><label>Project type <span className="req">*</span></label>
+                  <div className={fieldClass("projectType")}><label>Project type <span className="req">*</span></label>
                     <CatalogOptions
                       category="project_type"
                       options={catalogByCategory.project_type}
@@ -1000,13 +1148,14 @@ export default function AddNewProjectPage() {
                       isSelected={(label) => projectType === label}
                       onToggle={(label) => setProjectType((cur) => (cur === label ? "" : label))}
                     />
+                    {invalid("projectType") && <div className="field-err">Pick a project type.</div>}
                   </div>
                   <div className="field"><label>Short tagline</label><input className="inp" placeholder="e.g. 2 &amp; 3 BHK homes on SG Highway" value={tagline} onChange={(e) => setTagline(e.target.value)} /><div className="hint">Shown on the public page and ad landing pages.</div></div>
                 </div>
                 <div className="q-sec">
                   <div className="lbl">🏛️ Approvals &amp; timeline</div>
                   <div className="grid g2">
-                    <div className="field"><label>RERA registration no. <span className="req">*</span></label><input className="inp" placeholder="PR/GJ/AHM/2026/00842" value={reraId} onChange={(e) => setReraId(e.target.value)} /></div>
+                    <div className={fieldClass("reraId")}><label>RERA registration no. <span className="req">*</span></label><input className="inp" placeholder="PR/GJ/AHM/2026/00842" value={reraId} onChange={(e) => setReraId(e.target.value)} />{invalid("reraId") && <div className="field-err">RERA registration number is required.</div>}</div>
                     <div className="field"><label>Status</label><select className="inp" value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
                   </div>
                   <div className="grid g3">
@@ -1039,6 +1188,42 @@ export default function AddNewProjectPage() {
                     <div className="field"><label>Floors / structure</label><input className="inp" placeholder="G+22" value={floorsDescription} onChange={(e) => setFloorsDescription(e.target.value)} /></div>
                     <div className="field"><label>Carpet area range (sqft)</label><input className="inp" placeholder="640 – 1,850" value={carpetRange} onChange={(e) => setCarpetRange(e.target.value)} /></div>
                   </div>
+                  {selectedConfigs.length > 0 ? (
+                    <div className="field">
+                      <label>Size &amp; price per configuration</label>
+                      <div className="hint" style={{ marginBottom: 10 }}>
+                        Optional, and editable later on the Units page. Filling these in
+                        means adding a unit prefills its area and price from here instead
+                        of asking for them again.
+                      </div>
+                      <div className="ut-rows">
+                        <div className="ut-row ut-head">
+                          <span>Configuration</span>
+                          <span>Carpet (sqft)</span>
+                          <span>Built-up (sqft)</span>
+                          <span>Price (₹)</span>
+                          <span>Planned units</span>
+                        </div>
+                        {selectedConfigs.map((label) => {
+                          const row = unitTypes.find((r) => r.name === label);
+                          if (!row) return null;
+                          return (
+                            <div className="ut-row" key={row.key}>
+                              <span className="ut-name">{label}</span>
+                              <input className="inp" type="number" min={0} placeholder="1,000" value={row.carpetSqft}
+                                onChange={(e) => updateUnitType(row.key, { carpetSqft: e.target.value })} />
+                              <input className="inp" type="number" min={0} placeholder="1,250" value={row.builtupSqft}
+                                onChange={(e) => updateUnitType(row.key, { builtupSqft: e.target.value })} />
+                              <input className="inp" type="number" min={0} placeholder="64,00,000" value={row.price}
+                                onChange={(e) => updateUnitType(row.key, { price: e.target.value })} />
+                              <input className="inp" type="number" min={0} placeholder="0" value={row.totalUnits}
+                                onChange={(e) => updateUnitType(row.key, { totalUnits: e.target.value })} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="field mb-0"><label>Total land area</label>
                     <div style={{ position: "relative", maxWidth: 260 }}>
                       <input className="inp" type="number" step="0.01" min={0} style={{ paddingRight: 52 }} placeholder="5.2" value={landArea} onChange={(e) => setLandArea(e.target.value)} />
@@ -1061,7 +1246,7 @@ export default function AddNewProjectPage() {
                 <div className="q-sec">
                   <div className="lbl">💰 Pricing</div>
                   <div className="grid g2">
-                    <div className="field"><label>Price range — from <span className="req">*</span></label><MoneyInput placeholder="62,00,000" value={priceMin} onChange={setPriceMin} /></div>
+                    <div className={fieldClass("priceMin")}><label>Price range — from <span className="req">*</span></label><MoneyInput placeholder="62,00,000" value={priceMin} onChange={setPriceMin} />{invalid("priceMin") && <div className="field-err">Enter the starting price.</div>}</div>
                     <div className="field"><label>Price range — to</label><MoneyInput placeholder="1,20,00,000" value={priceMax} onChange={setPriceMax} /></div>
                   </div>
                   <div className="grid g3">
@@ -1070,21 +1255,28 @@ export default function AddNewProjectPage() {
                     <div className="field"><label>Currency</label><select className="inp" value={currency} onChange={(e) => setCurrency(e.target.value)}>{PROJECT_CURRENCIES.map((c) => <option key={c} value={c}>{CURRENCY_LABELS[c]}</option>)}</select></div>
                   </div>
                   <div className="field"><label>What&apos;s included in the price?</label>
-                    <div className="opts">
-                      {["Floor rise", "1 covered parking", "Club membership", "GST", "Registration & stamp duty"].map((v) => (
-                        <span key={v} className={`opt ${priceIncludes.includes(v) ? "on" : ""}`} onClick={() => toggleIncludes(v)}><span className="b">{priceIncludes.includes(v) ? "✓" : ""}</span>{v}</span>
-                      ))}
-                    </div>
+                    <CatalogOptions
+                      category="price_includes"
+                      options={catalogByCategory.price_includes}
+                      loaded={catalog !== null}
+                      error={catalogError}
+                      isSelected={(label) => priceIncludes.includes(label)}
+                      onToggle={toggleIncludes}
+                    />
                   </div>
                 </div>
                 <div className="q-sec">
                   <div className="lbl">📄 Payment plan</div>
                   <div className="field"><label>Plan type</label>
-                    <div className="opts" data-single>
-                      {["Construction-linked", "Down payment", "Flexi (20:80)", "Subvention"].map((p) => (
-                        <span key={p} className={`opt rad ${paymentPlan === p ? "on" : ""}`} onClick={() => setPaymentPlan(p)}><span className="b">{paymentPlan === p ? "●" : ""}</span>{p}</span>
-                      ))}
-                    </div>
+                    <CatalogOptions
+                      category="payment_plan"
+                      options={catalogByCategory.payment_plan}
+                      loaded={catalog !== null}
+                      error={catalogError}
+                      single
+                      isSelected={(label) => paymentPlan === label}
+                      onToggle={(label) => setPaymentPlan((cur) => (cur === label ? "" : label))}
+                    />
                   </div>
                   <div className="field"><label>Current offers / schemes</label><textarea className="inp" rows={3} placeholder={"No floor-rise charges till 30 Sep\nFree modular kitchen on 3 BHK\nAssured rental for 2 years"} value={offers} onChange={(e) => setOffers(e.target.value)} /></div>
                 </div>
@@ -1097,15 +1289,11 @@ export default function AddNewProjectPage() {
                 <div className="q-h"><div className="st">Step 4 of 9</div><h2>Location &amp; connectivity</h2><div className="sub">Where the project is and what surrounds it — powers maps and ad targeting.</div></div>
                 <div className="q-sec">
                   <div className="lbl">📍 Address</div>
-                  <div className="field"><label>Full address <span className="req">*</span></label><textarea className="inp" rows={2} placeholder="Survey No. 214, SG Highway, Bopal, Ahmedabad, Gujarat 380058" value={address} onChange={(e) => setAddress(e.target.value)} /></div>
+                  <div className={fieldClass("address")}><label>Full address <span className="req">*</span></label><textarea className="inp" rows={2} placeholder="Survey No. 214, SG Highway, Bopal, Ahmedabad, Gujarat 380058" value={address} onChange={(e) => setAddress(e.target.value)} />{invalid("address") && <div className="field-err">Full address is required.</div>}</div>
                   <div className="grid g3">
-                    <div className="field"><label>City <span className="req">*</span></label><input className="inp" placeholder="Ahmedabad" value={city} onChange={(e) => setCity(e.target.value)} /></div>
+                    <div className={fieldClass("city")}><label>City <span className="req">*</span></label><input className="inp" placeholder="Ahmedabad" value={city} onChange={(e) => setCity(e.target.value)} />{invalid("city") && <div className="field-err">City is required.</div>}</div>
                     <div className="field"><label>Locality</label><input className="inp" placeholder="SG Highway" value={locality} onChange={(e) => setLocality(e.target.value)} /></div>
                     <div className="field"><label>Pincode</label><input className="inp" placeholder="380058" value={pincode} onChange={(e) => setPincode(e.target.value)} /></div>
-                  </div>
-                  <div className="grid g2">
-                    <div className="field"><label>Map latitude</label><input className="inp" type="number" step="any" placeholder="23.0301" value={latitude} onChange={(e) => setLatitude(e.target.value)} /></div>
-                    <div className="field"><label>Map longitude</label><input className="inp" type="number" step="any" placeholder="72.5100" value={longitude} onChange={(e) => setLongitude(e.target.value)} /></div>
                   </div>
                 </div>
                 <div className="q-sec">
@@ -1144,13 +1332,15 @@ export default function AddNewProjectPage() {
                 </div>
                 <div className="q-sec">
                   <div className="lbl">🧱 Specifications</div>
-                  <div className="grid g2">
-                    <div className="field"><label>Flooring</label><input className="inp" placeholder="Vitrified tiles / marble in living" value={flooring} onChange={(e) => setFlooring(e.target.value)} /></div>
-                    <div className="field"><label>Kitchen</label><input className="inp" placeholder="Granite platform, SS sink" value={kitchen} onChange={(e) => setKitchen(e.target.value)} /></div>
-                    <div className="field"><label>Doors &amp; windows</label><input className="inp" placeholder="UPVC windows, teak main door" value={doorsWindows} onChange={(e) => setDoorsWindows(e.target.value)} /></div>
-                    <div className="field"><label>Fittings</label><input className="inp" placeholder="Branded CP &amp; sanitaryware" value={fittings} onChange={(e) => setFittings(e.target.value)} /></div>
+                  <div className="hint" style={{ marginBottom: 12 }}>
+                    Name each specification and describe it. The four below are just a starting point — rename or remove any of them, and add your own.
                   </div>
-                  <div className="field mb-0"><label>Additional notes</label><textarea className="inp" rows={2} placeholder="Green-building certified, seismic zone-III compliant structure…" value={specNotes} onChange={(e) => setSpecNotes(e.target.value)} /></div>
+                  <SpecificationRows
+                    rows={specRows}
+                    onChange={setSpecRows}
+                    notes={specNotes}
+                    onNotesChange={setSpecNotes}
+                  />
                 </div>
               </div>
             )}
@@ -1263,7 +1453,7 @@ export default function AddNewProjectPage() {
                 <div className="q-sec">
                   <div className="lbl">👤 Ownership</div>
                   <div className="grid g2">
-                    <div className="field"><label>Project manager <span className="req">*</span></label><select className="inp" value={managerId} onChange={(e) => setManagerId(e.target.value)}><option value="">Unassigned</option>{managers.map((u) => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}</select></div>
+                    <div className={fieldClass("managerId")}><label>Project manager <span className="req">*</span></label><select className="inp" value={managerId} onChange={(e) => setManagerId(e.target.value)}><option value="">Unassigned</option>{managers.map((u) => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}</select>{invalid("managerId") && <div className="field-err">Assign a project manager.</div>}</div>
                     <div className="field"><label>Sales team</label><select className="inp" value={salesTeam} onChange={(e) => setSalesTeam(e.target.value)}><option>Ahmedabad — West</option><option>Ahmedabad — Core</option><option>NRI Desk</option></select></div>
                   </div>
                   <div className="field"><label>Assign sales agents</label>
@@ -1306,7 +1496,15 @@ export default function AddNewProjectPage() {
                     <MediaUpload field="gallery" label="Cover / elevation image" value={coverImageUrl} onChange={setCoverImageUrl} />
                     <GalleryUpload value={galleryUrls} onChange={setGalleryUrls} />
                   </div>
-                  <div className="field mb-0"><label>Floor plans</label><div className="drop"><div className="ic">📐</div><div>Added per unit type from the Units section after publishing</div><div className="hint">Not collected in the wizard</div></div></div>
+                  <GalleryUpload
+                    value={floorPlanUrls}
+                    onChange={setFloorPlanUrls}
+                    label="Project floor / site plan"
+                    field="floorPlan"
+                  />
+                  <div className="hint" style={{ marginTop: -4 }}>
+                    The overall plan for the development — master site layout, tower plans, podium levels. Add as many as you need.
+                  </div>
                 </div>
                 <div className="q-sec">
                   <div className="lbl">📄 Documents</div>
@@ -1344,10 +1542,14 @@ export default function AddNewProjectPage() {
                         <div className="sp"><span className="k">Locality</span><span className="v">{locality || "—"}</span></div>
                       </div>
                       <div className="q-sec"><div className="lbl">🧱 Specifications</div>
-                        <div className="sp"><span className="k">Flooring</span><span className="v">{flooring || "—"}</span></div>
-                        <div className="sp"><span className="k">Kitchen</span><span className="v">{kitchen || "—"}</span></div>
-                        <div className="sp"><span className="k">Doors &amp; windows</span><span className="v">{doorsWindows || "—"}</span></div>
-                        <div className="sp"><span className="k">Fittings</span><span className="v">{fittings || "—"}</span></div>
+                        {reviewSpecRows.length === 0 ? (
+                          <div className="sp"><span className="k">Specifications</span><span className="v">—</span></div>
+                        ) : (
+                          reviewSpecRows.map(([label, value], i) => (
+                            <div className="sp" key={`${label}-${i}`}><span className="k">{label}</span><span className="v">{value}</span></div>
+                          ))
+                        )}
+                        <div className="sp"><span className="k">Notes</span><span className="v">{specNotes.trim() || "—"}</span></div>
                       </div>
                     </div>
                     <div>
@@ -1410,6 +1612,7 @@ export default function AddNewProjectPage() {
                         <div className="sp"><span className="k">Gallery</span><span className="v">{galleryUrls.length ? `${galleryUrls.length} photo${galleryUrls.length > 1 ? "s" : ""}` : "—"}</span></div>
                         <div className="sp"><span className="k">Brochure</span><span className="v">{brochureUrl ? "✓ Uploaded" : "—"}</span></div>
                         <div className="sp"><span className="k">RERA certificate</span><span className="v">{reraCertificateUrl ? "✓ Uploaded" : "—"}</span></div>
+                        <div className="sp"><span className="k">Project floor / site plan</span><span className="v">{floorPlanUrls.length ? `${floorPlanUrls.length} plan${floorPlanUrls.length > 1 ? "s" : ""}` : "—"}</span></div>
                         <div className="sp"><span className="k">AI knowledge</span><span className="v"><span className={`badge ${aiKnowledgeBase ? "b-green" : "b-gray"}`}>{aiKnowledgeBase ? "On" : "Off"}</span></span></div>
                       </div>
                     </div>
@@ -1431,19 +1634,46 @@ export default function AddNewProjectPage() {
                       ) : null}
                     </div>
                   )}
-                  <div className="help mt-20">🚀 <b>Ready to go live.</b> Publishing creates the project, wires up the connected ad sources and starts routing new leads immediately.</div>
+                  {allMissingFields.length > 0 ? (
+                    <div className="help err mt-20">
+                      <b>⚠️ {allMissingFields.length} required field{allMissingFields.length > 1 ? "s" : ""} still empty.</b>
+                      <ul>
+                        {allMissingFields.map((f) => (
+                          <li key={f.id}>
+                            {f.label}{" "}
+                            <button className="brand-link" style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }} onClick={() => { setJumpWarning(null); setStep(f.step); }}>
+                              — go to {STEPS[f.step].label} →
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="help mt-20">🚀 <b>Ready to go live.</b> Publishing creates the project, wires up the connected ad sources and starts routing new leads immediately.</div>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* FOOTER NAV */}
+            {/* Blocked-Continue summary — sits directly above the footer so the
+                reason is next to the button that refused. */}
+            {showErrors && currentMissing.length > 0 && step < STEPS.length - 1 ? (
+              <div className="help err mt-16">
+                <b>⚠️ Fill in {currentMissing.length === 1 ? "this field" : "these fields"} to continue:</b>
+                <ul>
+                  {currentMissing.map((f) => <li key={f.id}>{f.label}</li>)}
+                </ul>
+              </div>
+            ) : null}
+
+            {/* FOOTER NAV — no Skip: every step's required fields are checked
+                on Continue, so there's no way past them. */}
             <div className="wz-foot">
-              <button className="btn btn-ghost" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>← Back</button>
+              <button className="btn btn-ghost" disabled={step === 0} onClick={goBack}>← Back</button>
               <span className="save">{savedAt ? `Draft saved · ${formatRelative(savedAt)}` : "Not saved yet"}</span>
               <div className="row gap-10">
-                {step < STEPS.length - 1 && <button className="btn btn-ghost" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Skip</button>}
                 {step < STEPS.length - 1 ? (
-                  <button className="btn btn-primary" onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}>Continue →</button>
+                  <button className="btn btn-primary" onClick={goNext}>Continue →</button>
                 ) : publishedProjectId && !createdLandingPage ? (
                   <button className="btn btn-primary" onClick={() => router.push(`/org/projects/${publishedProjectId}`)}>Go to project →</button>
                 ) : (

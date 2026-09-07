@@ -2866,3 +2866,100 @@
 .org .askill:last-child { margin-bottom: 0; }
 .org .askill .t { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
 .org .askill .t b { font-weight: 600; }
+
+/* ====== Project wizard — dynamic specification rows ====== */
+/* Side-by-side label + value, with a delete control on every row (including
+   the four the wizard pre-fills). Collapses to stacked inputs on narrow
+   screens so the value field never gets squeezed to nothing. */
+.org .spec-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(0, 1.6fr) 32px;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.org .spec-row .inp { margin: 0; }
+.org .spec-row .spec-del {
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+}
+.org .spec-row .spec-del:hover { color: var(--rose); border-color: var(--rose); }
+@media (max-width: 700px) {
+  .org .spec-row { grid-template-columns: 1fr 32px; }
+  .org .spec-row .inp:first-child { grid-column: 1 / -1; }
+}
+
+/* ====== Project wizard — required-field validation ====== */
+/* A field that failed this step's Continue check, plus the summary block
+   shown next to Continue and the warning raised when jumping ahead from an
+   incomplete step via the step rail. */
+.org .inp.inp-invalid,
+.org .field-invalid .inp {
+  border-color: var(--rose);
+}
+.org .field-err {
+  color: var(--rose);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.org .help.err {
+  background: linear-gradient(120deg, rgba(244, 63, 94, .08), #fff);
+  border-color: rgba(244, 63, 94, .35);
+}
+.org .help.err b { color: var(--rose); }
+.org .help.err ul { margin: 6px 0 0; padding-left: 20px; }
+
+/* ====== Project wizard — step-rail status ====== */
+/* A step earns the green tick only by passing its own required-field check.
+   One bypassed via "Go to X anyway" is still incomplete, so it gets an amber
+   alert instead of a tick that would imply work that was never done. */
+.org .wz-steps button.warn { color: var(--ink); }
+.org .wz-steps button.warn .num {
+  background: var(--amber, #f59e0b);
+  border-color: var(--amber, #f59e0b);
+  color: #fff;
+}
+/* Visually hidden, still read by screen readers — the alert glyph alone
+   doesn't say "incomplete". */
+.org .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ====== Wizard Step 2 — size & price per configuration ====== */
+/* One row per picked configuration. These values are what let the unit form
+   prefill later, so they're asked for here rather than only on the Units page. */
+.org .ut-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.org .ut-row .inp { margin: 0; }
+.org .ut-row .ut-name { font-size: 13.5px; font-weight: 600; }
+.org .ut-row.ut-head {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+@media (max-width: 760px) {
+  .org .ut-row { grid-template-columns: 1fr 1fr; }
+  .org .ut-row.ut-head { display: none; }
+  .org .ut-row .ut-name { grid-column: 1 / -1; }
+}

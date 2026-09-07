@@ -27,6 +27,7 @@ export const DEMO_ORGANISATION = {
   industry: null,
   support_email: null,
   support_phone: null,
+  unit_price_basis: "carpet" as const,
   enabled_modules: [],
   subdomain: "acme",
   subdomain_status: "active",

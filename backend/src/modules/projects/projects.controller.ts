@@ -167,7 +167,12 @@ export class ProjectsController {
     @Param('projectId') projectId: string,
     @Body() dto: CreateUnitDto,
   ) {
-    return this.service.createUnit(user.orgId as string, projectId, dto);
+    return this.service.createUnit(
+      user.orgId as string,
+      projectId,
+      dto,
+      user.sub,
+    );
   }
 
   @Get(':projectId/units')
@@ -198,7 +203,13 @@ export class ProjectsController {
     @Param('id') id: string,
     @Body() dto: UpdateUnitDto,
   ) {
-    return this.service.updateUnit(user.orgId as string, projectId, id, dto);
+    return this.service.updateUnit(
+      user.orgId as string,
+      projectId,
+      id,
+      dto,
+      user.sub,
+    );
   }
 
   @Patch(':projectId/units/:id/status')
@@ -214,6 +225,7 @@ export class ProjectsController {
       projectId,
       id,
       dto,
+      user.sub,
     );
   }
 

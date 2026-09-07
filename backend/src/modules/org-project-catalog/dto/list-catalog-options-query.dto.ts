@@ -1,14 +1,19 @@
 import { IsIn, IsOptional } from 'class-validator';
 
-// The four catalog categories, kept as a plain const so this DTO and the
-// create DTO share one source of truth. Mirrors the Prisma
-// OrgCatalogCategory enum exactly (same pattern as PROJECT_STATUS_VALUES in
+// The catalog categories, kept as a plain const so this DTO and the create
+// DTO share one source of truth. Mirrors the Prisma OrgCatalogCategory enum
+// exactly (same pattern as PROJECT_STATUS_VALUES in
 // projects/dto/list-projects-query.dto.ts).
 export const CATALOG_CATEGORY_VALUES = [
   'project_type',
   'unit_type',
   'connectivity',
   'amenity',
+  'price_includes',
+  'payment_plan',
+  'facing',
+  'parking',
+  'unit_variant',
 ] as const;
 
 export type CatalogCategoryValue = (typeof CATALOG_CATEGORY_VALUES)[number];

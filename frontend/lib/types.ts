@@ -49,6 +49,8 @@ export interface SafeOrganisation {
   team_size: string | null;
   legal_name: string | null;
   industry: OrgIndustry | null;
+  /** Denominator for every "₹ x / sqft" figure shown for this org's units. */
+  unit_price_basis: UnitPriceBasis;
   support_email: string | null;
   support_phone: string | null;
   enabled_modules: string[];
@@ -77,6 +79,7 @@ export interface UpdateOrganisationSettingsInput {
   gstin?: string;
   legalName?: string;
   industry?: OrgIndustry;
+  unitPriceBasis?: UnitPriceBasis;
   supportEmail?: string;
   supportPhone?: string;
 }
@@ -842,6 +845,15 @@ export interface Project {
   towerCount: number | null;
   floorsDescription: string | null;
   carpetRange: string | null;
+  /** A `project_type` catalog label, copied at write time (no FK). */
+  projectType: string | null;
+  tagline: string | null;
+  /** ISO "YYYY-MM-DD", as an `<input type="date">` produces it. */
+  launchDate: string | null;
+  constructionStage: string | null;
+  /** Free text, one selling point per line. */
+  highlights: string | null;
+  salesTeam: string | null;
   amenities: Amenity[];
   // --- Onboarding-wizard fields (Steps 3-8). Persisted by the backend as of
   // Piece A; the wizard wires them progressively in Pieces B-E. ---
@@ -858,7 +870,12 @@ export interface Project {
   longitude: number | null;
   connectivity: string[];
   landmarks: string | null;
-  /** Loose preference blob: { flooring, kitchen, doorsWindows, fittings, notes } */
+  /**
+   * Loose preference blob: `{ items: [{ label, value }], notes }`. Projects
+   * created before the dynamic-rows rework hold the original fixed-key shape
+   * (`{ flooring, kitchen, doorsWindows, fittings, notes }`) — read both
+   * through `normalizeSpecifications` in lib/specifications.
+   */
   specifications: Record<string, unknown> | null;
   /** Loose preference blob: ad sources, budgets, lead goal, automation flags */
   marketing: Record<string, unknown> | null;
@@ -869,6 +886,8 @@ export interface Project {
   galleryUrls: string[];
   brochureUrl: string | null;
   reraCertificateUrl: string | null;
+  /** Overall project floor / site plans. Per-unit-type plans live on UnitType. */
+  floorPlanUrls: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -937,7 +956,7 @@ export interface Unit {
   projectId: string | null;
   /** A `unit_type` catalog label. Null only on legacy/imported rows. */
   configuration: string | null;
-  /** Optional free-text variant label ("Type A"). Not a catalog. */
+  /** A `unit_variant` catalog label ("Type A"). Optional — blank is valid. */
   variantLabel: string | null;
   unitNo: string;
   carpetSqft: number | null;
@@ -949,6 +968,9 @@ export interface Unit {
   /** Free text as entered on the form ("1 covered", "2 covered", "Open"). */
   parking: string | null;
   price: number | null;
+  /** Derived server-side on the org's basis. Null when price or that area is missing. */
+  pricePerSqft: number | null;
+  pricePerSqftBasis: UnitPriceBasis;
   /** Standalone-listing-only (null for project units). */
   addressLine: string | null;
   ownerName: string | null;
@@ -957,8 +979,20 @@ export interface Unit {
   floorPlanUrl: string | null;
   galleryUrls: string[];
   status: UnitStatus;
+  createdById: string | null;
+  updatedById: string | null;
+  /** Who created / last edited this unit. Null on rows written before this existed. */
+  createdBy: UnitActor | null;
+  updatedBy: UnitActor | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Minimal identity for a unit's creator / last editor. */
+export interface UnitActor {
+  id: string;
+  name: string;
+  email: string;
 }
 
 /** One configuration present on a project's units, with its status breakdown. */
@@ -1008,6 +1042,12 @@ export interface CreateProjectInput {
   towerCount?: number;
   floorsDescription?: string;
   carpetRange?: string;
+  projectType?: string;
+  tagline?: string;
+  launchDate?: string;
+  constructionStage?: string;
+  highlights?: string;
+  salesTeam?: string;
   amenities?: Amenity[];
   // Onboarding-wizard fields (Steps 3-8) — all optional; wired progressively
   // by Pieces B-E. `null` is accepted on update to clear a field.
@@ -1033,6 +1073,7 @@ export interface CreateProjectInput {
   galleryUrls?: string[];
   brochureUrl?: string;
   reraCertificateUrl?: string;
+  floorPlanUrls?: string[];
 }
 
 // Every field optional. Nullable columns also accept an explicit `null` to
@@ -1052,6 +1093,12 @@ export interface UpdateProjectInput {
   towerCount?: number | null;
   floorsDescription?: string | null;
   carpetRange?: string | null;
+  projectType?: string | null;
+  tagline?: string | null;
+  launchDate?: string | null;
+  constructionStage?: string | null;
+  highlights?: string | null;
+  salesTeam?: string | null;
   amenities?: Amenity[];
   bookingAmount?: number | null;
   currency?: "INR" | "AED" | "USD";
@@ -1075,6 +1122,7 @@ export interface UpdateProjectInput {
   galleryUrls?: string[];
   brochureUrl?: string | null;
   reraCertificateUrl?: string | null;
+  floorPlanUrls?: string[];
 }
 
 // --- Org custom catalogs (project onboarding wizard option lists) ---
@@ -1082,8 +1130,19 @@ export interface UpdateProjectInput {
 // generic row shape keyed by `category`. Picked values are copied onto a
 // project's own fields at creation time; nothing references these rows, so
 // editing or deleting one never affects an existing project.
+/** Which area a "₹ x / sqft" figure is divided by. Carpet is the default. */
+export type UnitPriceBasis = "carpet" | "builtup";
+
 export type OrgCatalogCategory =
-  "project_type" | "unit_type" | "connectivity" | "amenity";
+  | "project_type"
+  | "unit_type"
+  | "connectivity"
+  | "amenity"
+  | "price_includes"
+  | "payment_plan"
+  | "facing"
+  | "parking"
+  | "unit_variant";
 
 export interface OrgCatalogOption {
   id: string;
@@ -1187,7 +1246,13 @@ export interface OrgUnitRow {
   facing: string | null;
   parking: string | null;
   price: number | null;
+  pricePerSqft: number | null;
+  pricePerSqftBasis: UnitPriceBasis;
   status: UnitStatus;
+  createdById: string | null;
+  updatedById: string | null;
+  createdBy: UnitActor | null;
+  updatedBy: UnitActor | null;
   createdAt: string;
   updatedAt: string;
   /** Null for a standalone unit. */
