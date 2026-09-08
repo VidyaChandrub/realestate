@@ -1,6 +1,20 @@
-# Production API used by .github/workflows/deploy.yml.
-# Next.js (PM2 realestate-web) proxies /api/* to 127.0.0.1:3000.
 services:
+  postgres:
+    image: postgres:16
+    container_name: realestate-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: realestate
+    volumes:
+      - realestate-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: ./backend
@@ -10,7 +24,12 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      NODE_ENV: production
-      PORT: '3000'
+      DATABASE_URL: "postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/realestate?schema=public"
     ports:
-      - '3000:3000'
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  realestate-pg-data:
