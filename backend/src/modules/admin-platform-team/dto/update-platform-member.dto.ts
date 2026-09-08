@@ -4,9 +4,14 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
+import {
+  PLATFORM_PHONE_MESSAGE,
+  PLATFORM_PHONE_REGEX,
+} from './create-platform-member.dto';
 
 export class UpdatePlatformMemberDto {
   @IsOptional()
@@ -27,7 +32,8 @@ export class UpdatePlatformMemberDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(30)
+  @MaxLength(16)
+  @Matches(PLATFORM_PHONE_REGEX, { message: PLATFORM_PHONE_MESSAGE })
   phoneNumber?: string;
 
   @IsOptional()
