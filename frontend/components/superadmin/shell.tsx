@@ -112,10 +112,18 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
     : "SA";
 
   useEffect(() => {
-    if (!authLoading && (!accessToken || user?.role !== "super_admin")) {
+    if (authLoading) return;
+    if (!accessToken || user?.role !== "super_admin") {
       router.replace("/admin-login");
+      return;
     }
-  }, [authLoading, accessToken, user?.role, router]);
+    // First-login credentials — the forced password change (shared flow with
+    // Org users) must complete before the console is usable. The backend
+    // blocks every /admin/* call until then; this keeps the UI in step.
+    if (user.must_change_password) {
+      router.replace("/change-password");
+    }
+  }, [authLoading, accessToken, user?.role, user?.must_change_password, router]);
 
   useEffect(() => {
     if (!accessToken || user?.role !== "super_admin") return;

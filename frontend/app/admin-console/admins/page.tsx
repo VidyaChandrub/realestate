@@ -336,9 +336,13 @@ export default function SuperAdminAdminsPage() {
                         <button className="btn btn-ghost btn-sm" type="button" onClick={() => openEdit(m)}>
                           Edit
                         </button>
-                        <button className="btn btn-ghost btn-sm" type="button" onClick={() => void toggleStatus(m)}>
-                          {m.status === "active" ? "Disable" : "Enable"}
-                        </button>
+                        {/* Super Admin members cannot be enabled/disabled from
+                            here — the action is only for other platform roles. */}
+                        {!m.roles.some((r) => r.key === "super_admin") ? (
+                          <button className="btn btn-ghost btn-sm" type="button" onClick={() => void toggleStatus(m)}>
+                            {m.status === "active" ? "Disable" : "Enable"}
+                          </button>
+                        ) : null}
                         {user?.id !== m.id ? (
                           <button
                             className="btn btn-ghost btn-sm"

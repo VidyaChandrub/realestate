@@ -1026,12 +1026,14 @@ export class AuthService {
     const tokens = await this.issueTokens(user.id, user.orgId, roles);
 
     const safeUser = toSafeUser(user);
-    // Password changes are mandatory for organisation users provisioned by
-    // an Organisation Admin. Platform Super Admins use their managed admin
-    // credentials and must not be redirected into the org-user flow.
-    if (!user.orgId) {
-      safeUser.must_change_password = false;
-    }
+    // Forced first-login password change applies to both organisation users
+    // provisioned by an Org Admin AND Platform Team members provisioned by a
+    // Super Admin (both receive initial credentials by email). The flag is
+    // carried straight from the DB — a long-standing Super Admin who was never
+    // flagged keeps must_change_password = false and signs in normally; a
+    // freshly created Platform Team member is routed to /change-password.
+    // Backend access stays blocked until the flag clears (SuperAdminGuard /
+    // OrgApprovedGuard), so this is a redirect hint, not the enforcement.
 
     const isOrgAdmin = roles.includes('admin');
     const stillInDraftSignup =

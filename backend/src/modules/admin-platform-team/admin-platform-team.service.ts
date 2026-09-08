@@ -86,7 +86,12 @@ export class AdminPlatformTeamService {
           status: 'active',
           approvedAt: now,
           emailVerifiedAt: now,
-          mustChangePassword: false,
+          // Credentials go out by email — the member must set their own
+          // password on first login before the console is reachable (enforced
+          // server-side in SuperAdminGuard, mirrors the Org Admin-created
+          // user flow in provisionInvitedUser). Cleared by
+          // AuthService.changePassword once they choose a new password.
+          mustChangePassword: true,
           onboardingStep: 'completed',
         },
       });
@@ -118,7 +123,7 @@ export class AdminPlatformTeamService {
   }
 
   async update(id: string, actorUserId: string, dto: UpdatePlatformMemberDto) {
-    await this.requireMember(id);
+    const member = await this.requireMember(id);
 
     if (dto.status === 'disabled' && id === actorUserId) {
       throw new ForbiddenException('You cannot disable your own account');
@@ -159,6 +164,13 @@ export class AdminPlatformTeamService {
       passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST);
     }
 
+    // Disabling a member must also end any live session immediately: stamp
+    // tokenInvalidBefore so a still-valid access token is rejected on its next
+    // request (SuperAdminGuard -> USER_INACTIVE -> frontend force-logout) and
+    // revoke refresh tokens so it cannot be silently renewed. Re-enabling
+    // deliberately does NOT clear the stamp — a disabled member's old session
+    // stays dead and they must sign in again. Mirrors setOrgUserStatus.
+    const disabling = dto.status === 'disabled';
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
@@ -169,16 +181,12 @@ export class AdminPlatformTeamService {
           ...(dto.email ? { email: dto.email.trim().toLowerCase() } : {}),
           ...(dto.phoneNumber !== undefined ? { phoneNumber: phoneNumber ?? null } : {}),
           ...(dto.status ? { status: dto.status } : {}),
-          ...(passwordHash
-            ? {
-                passwordHash,
-                tokenInvalidBefore: now,
-              }
-            : {}),
+          ...(passwordHash ? { passwordHash } : {}),
+          ...(passwordHash || disabling ? { tokenInvalidBefore: now } : {}),
         },
       });
 
-      if (passwordHash) {
+      if (passwordHash || disabling) {
         await tx.refreshToken.updateMany({
           where: { userId: id, revokedAt: null },
           data: { revokedAt: now },
@@ -193,6 +201,29 @@ export class AdminPlatformTeamService {
         });
       }
     });
+
+    // Notify the member when a Super Admin flips their access on or off —
+    // reuses the existing account activated / deactivated email templates
+    // (platform-level config, resolved with orgId null). Fire-and-forget:
+    // a delivery failure must not fail the status change.
+    if (dto.status && dto.status !== member.status) {
+      const recipientName =
+        [member.firstName, member.lastName].filter(Boolean).join(' ') || undefined;
+      void this.email
+        .sendUserAccountStatusEmail({
+          to: member.email,
+          recipientName,
+          status: dto.status === 'active' ? 'activated' : 'deactivated',
+          orgId: null,
+          loginUrl: `${frontendBaseUrl()}/admin-login`,
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            `[Platform Team] Account ${dto.status} email failed for ${member.email}: ${message}`,
+          );
+        });
+    }
 
     return this.getById(id);
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -20,16 +20,40 @@ export default function SuperAdminLoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Surface the reason a live session was force-ended (see forceSessionEnd in
+  // lib/api.ts) — e.g. a Super Admin disabled this Platform Team member while
+  // they were signed in.
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason === "account_revoked") {
+      setNotice(
+        "Your account access has been revoked. Please contact your administrator.",
+      );
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setGeneralError(null);
     setFieldErrors({});
+    setNotice(null);
     setIsSubmitting(true);
     try {
       const session = await login({ email, password });
       if (session.role !== "super_admin") {
         setGeneralError("This login is for Super Admins only. Organisation users must sign in at /login.");
+        return;
+      }
+      // First login with emailed credentials — the forced password-change flow
+      // (shared with the Org user first-login flow) must complete before the
+      // console is reachable; the backend blocks it until then regardless.
+      if (session.must_change_password) {
+        router.push("/change-password");
+        router.refresh();
         return;
       }
       router.push("/admin-console");
@@ -78,6 +102,11 @@ export default function SuperAdminLoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            {notice ? (
+              <p role="status" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {notice}
+              </p>
+            ) : null}
             <Field label="Super Admin email" error={fieldErrors.email}>
               <Input
                 type="email"
