@@ -565,7 +565,27 @@ export class ProjectsService {
   }
 
   async removeUnitType(orgId: string, projectId: string, id: string) {
-    await this.getOwnedUnitType(orgId, projectId, id);
+    const unitType = await this.getOwnedUnitType(orgId, projectId, id);
+
+    // A configuration that real units are using can't be dropped from the
+    // planned mix. Deleting the row can't cascade to those units (there is no
+    // FK from Unit to UnitType) — it would orphan them, leaving them with no
+    // planned sizes or pricing to prefill from. Both UI paths block this too;
+    // this is the authority, so a direct API call can't slip past it.
+    const unitsUsing = await this.prisma.unit.count({
+      where: { projectId, configuration: unitType.name },
+    });
+    if (unitsUsing > 0) {
+      const plural = unitsUsing === 1 ? '' : 's';
+      throw new BadRequestException(
+        `"${unitType.name}" can't be removed from the planned mix — ` +
+          `${unitsUsing} unit${plural} on this project ` +
+          `${unitsUsing === 1 ? 'uses' : 'use'} it. ` +
+          `Delete ${unitsUsing === 1 ? 'that unit' : 'those units'} first, ` +
+          `or leave the configuration in place.`,
+      );
+    }
+
     await this.prisma.$transaction(async (tx) => {
       await tx.unitType.delete({ where: { id } });
       await tx.auditLog.create({

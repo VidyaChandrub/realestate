@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions } from "@/lib/api";
 import { parseAmount, parseCount, parseInteger } from "@/lib/parse";
 import { prefillFromUnitType, type PrefillField } from "@/lib/unit-prefill";
-import { plannedMixRemovalBlockedReason } from "@/lib/unit-types";
+import { plannedMixRemoval } from "@/lib/unit-types";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
 import { Modal } from "@/components/ui/modal";
@@ -305,8 +305,8 @@ export default function OrgProjectUnitsPage() {
    * project edit form applies when unticking the configuration — one row,
    * reached two ways, so one behaviour and one message.
    */
-  function removalBlockedFor(ut: UnitType): string | null {
-    return plannedMixRemovalBlockedReason(
+  function removalFor(ut: UnitType) {
+    return plannedMixRemoval(
       ut.name,
       ut.unitCount,
       unitTypes.filter((t) => t.name === ut.name),
@@ -811,8 +811,8 @@ export default function OrgProjectUnitsPage() {
                       {ut ? (
                         <>
                           <span className="muted fs-12">
-                            {removalBlockedFor(ut)
-                              ? "In use — set planned units to 0 to stop tracking."
+                            {removalFor(ut).kind === "blocked"
+                              ? `In use by ${ut.unitCount} unit${ut.unitCount === 1 ? "" : "s"}.`
                               : " "}
                           </span>
                           <RowActionsMenu
@@ -826,21 +826,24 @@ export default function OrgProjectUnitsPage() {
                                 key: "remove",
                                 label: "Remove",
                                 danger: true,
-                                // Blocked, not confirmed, while units use this
-                                // configuration — same rule as unticking it on
-                                // the project edit form.
-                                disabled: removalBlockedFor(ut) !== null,
+                                // Only actual units block removal — recorded
+                                // sizes and pricing just get confirmed. Same
+                                // rule as unticking it on the project edit form.
+                                disabled: removalFor(ut).kind === "blocked",
                                 onClick: () => {
-                                  const blocked = removalBlockedFor(ut);
-                                  if (blocked) {
-                                    setError(blocked);
+                                  const outcome = removalFor(ut);
+                                  if (outcome.kind === "blocked") {
+                                    setError(outcome.reason);
                                     return;
                                   }
+                                  setError(null);
                                   setPendingDelete({
                                     kind: "unitType",
                                     id: ut.id,
                                     label: ut.name,
-                                    extra: "",
+                                    // Names what's about to be discarded when
+                                    // the row carries values; empty otherwise.
+                                    extra: outcome.kind === "confirm" ? outcome.message : "",
                                   });
                                 },
                               },

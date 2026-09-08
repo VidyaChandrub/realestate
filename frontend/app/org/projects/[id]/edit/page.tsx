@@ -18,7 +18,7 @@ import {
   findDuplicateConfigurations,
   isEmptyRow,
   pickUnitTypeForConfiguration,
-  plannedMixRemovalBlockedReason,
+  plannedMixRemoval,
 } from "@/lib/unit-types";
 import { allMissing, projectRequirements } from "@/lib/project-validation";
 import {
@@ -170,6 +170,10 @@ export default function OrgProjectEditPage() {
   const [configRows, setConfigRows] = useState<ConfigSizePriceRow[]>([]);
   /** Label whose duplicate cleanup is in flight, so its link can show progress. */
   const [dedupeBusy, setDedupeBusy] = useState<string | null>(null);
+  /** Configuration awaiting confirmation before its planned mix is dropped. */
+  const [pendingUntick, setPendingUntick] = useState<
+    { label: string; message: string } | null
+  >(null);
   const [towerCount, setTowerCount] = useState("");
   const [floorsDescription, setFloorsDescription] = useState("");
   const [carpetRange, setCarpetRange] = useState("");
@@ -425,27 +429,42 @@ export default function OrgProjectEditPage() {
   }
 
   /**
-   * Why this configuration can't be unticked, or null when it can. Uses the
-   * shared rule so this and the Units page's "Remove from planned mix" — the
-   * same row, reached two ways — behave identically and say the same thing.
+   * What unticking this configuration would do. Uses the shared rule so this
+   * and the Units page's "Remove from planned mix" — the same row, reached two
+   * ways — behave identically and say the same thing.
    */
-  function untickBlockedReason(label: string): string | null {
+  function untickOutcome(label: string) {
     const rows = unitTypeRows.filter((u) => u.name === label);
-    if (rows.length === 0) return null; // ticked this session, nothing saved yet
-    return plannedMixRemovalBlockedReason(label, unitsUsing(label), rows);
+    // Ticked in this session and not saved yet: nothing to lose, nothing to ask.
+    if (rows.length === 0) return { kind: "allowed" as const };
+    return plannedMixRemoval(label, unitsUsing(label), rows);
+  }
+
+  /** Drop the configuration and its table row. */
+  function detachConfig(label: string) {
+    setError(null);
+    setPendingUntick(null);
+    setSelectedConfigs((prev) => prev.filter((x) => x !== label));
+    setConfigRows((prev) => prev.filter((r) => r.name !== label));
   }
 
   function toggleConfig(label: string) {
     if (selectedConfigs.includes(label)) {
-      const blocked = untickBlockedReason(label);
-      if (blocked) {
+      const outcome = untickOutcome(label);
+      if (outcome.kind === "blocked") {
         setNotice(null);
-        setError(blocked);
+        setError(outcome.reason);
         return;
       }
-      setError(null);
-      setSelectedConfigs((prev) => prev.filter((x) => x !== label));
-      setConfigRows((prev) => prev.filter((r) => r.name !== label));
+      if (outcome.kind === "confirm") {
+        // Values would be discarded — ask before dropping them, rather than
+        // refusing and forcing the user to zero the row out by hand first.
+        setNotice(null);
+        setError(null);
+        setPendingUntick({ label, message: outcome.message });
+        return;
+      }
+      detachConfig(label);
       return;
     }
     setError(null);
@@ -1238,6 +1257,30 @@ export default function OrgProjectEditPage() {
             </div>
           </div>
         </div>
+
+      {pendingUntick ? (
+        <div className="modal-scrim" onClick={() => setPendingUntick(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <h2 className="fw8 mb-8">Remove configuration?</h2>
+            <p className="ink-2 fs-13-5 m-0">{pendingUntick.message}</p>
+            <p className="ink-2 fs-13-5 mt-8 m-0">
+              No units are affected — this only removes the planned mix entry.
+            </p>
+            <div className="row end gap-10 mt-22">
+              <button className="btn btn-ghost" type="button" onClick={() => setPendingUntick(null)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                type="button"
+                onClick={() => detachConfig(pendingUntick.label)}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {deleteOpen ? (
         <div className="modal-scrim" onClick={() => { if (!deleting) setDeleteOpen(false); }}>

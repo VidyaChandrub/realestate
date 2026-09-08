@@ -86,32 +86,72 @@ export interface DuplicateConfiguration {
 }
 
 /**
- * Why a configuration can't be detached from the planned mix, or null when it
- * can. Shared by the Units page's "Remove from planned mix" and the project
- * edit form's configuration untick — the same row, so the same rule and the
- * same wording.
+ * What removing a configuration from the planned mix should do.
+ *
+ * Only *actual units* can block removal. Whether someone typed a carpet area
+ * or a price into the row says nothing about whether the configuration is in
+ * use — treating that as a blocker forced an absurd workaround (edit the row
+ * to zero, save, then delete) to drop a configuration that was never used.
+ * Those values are worth confirming before they're discarded, not refusing
+ * over.
+ */
+export type PlannedMixRemoval =
+  /** Units carry this configuration — refuse, and say how many. */
+  | { kind: "blocked"; reason: string }
+  /** No units, but the row holds values that would be lost — ask first. */
+  | { kind: "confirm"; message: string }
+  /** No units, nothing recorded — just remove it. */
+  | { kind: "allowed" };
+
+/** The values a row holds, named for the confirmation copy. */
+function recordedValues(rows: UnitType[]): string[] {
+  const names: string[] = [];
+  if (rows.some((r) => r.carpetSqft != null)) names.push("carpet area");
+  if (rows.some((r) => r.builtupSqft != null)) names.push("built-up area");
+  if (rows.some((r) => r.price != null)) names.push("price");
+  if (rows.some((r) => r.totalUnits > 0)) names.push("planned unit count");
+  return names;
+}
+
+/** "a, b and c" */
+function joinList(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1];
+}
+
+/**
+ * Decide what removing a configuration from the planned mix means. Shared by
+ * the Units page's remove action and the project edit form's configuration
+ * untick — the same row reached two ways, so one rule and one wording.
  *
  * Removing the row can never delete units (there is no FK from Unit to
- * UnitType), but it does strip the planned sizes and pricing and leaves the
- * units showing as "derived from units — not in the planned mix", with nothing
- * left to prefill from. While units are using the label that's a Units-page
- * decision made against real inventory, not a side effect of a checkbox.
- *
- * To stop tracking a plan without losing the row, set planned units to 0.
+ * UnitType); it drops the planned mix and whatever sizes and pricing it
+ * carried, and leaves any units showing as "derived from units — not in the
+ * planned mix" with nothing left to prefill from. That is why units block it
+ * and recorded values only warrant a confirmation.
  */
-export function plannedMixRemovalBlockedReason(
+export function plannedMixRemoval(
   label: string,
   unitCount: number,
   rows: UnitType[],
-): string | null {
+): PlannedMixRemoval {
   if (unitCount > 0) {
     const n = unitCount;
-    return `"${label}" can't be removed from the planned mix — ${n} unit${n === 1 ? "" : "s"} on this project ${n === 1 ? "uses" : "use"} it. Set its planned units to 0 to stop tracking the plan, or delete ${n === 1 ? "that unit" : "those units"} first.`;
+    return {
+      kind: "blocked",
+      reason:
+        `"${label}" can't be removed from the planned mix — ${n} unit${n === 1 ? "" : "s"} on this project ${n === 1 ? "uses" : "use"} it. ` +
+        `Delete ${n === 1 ? "that unit" : "those units"} first, or leave the configuration in place.`,
+    };
   }
-  if (rows.some((r) => !isEmptyRow(r))) {
-    return `"${label}" has a planned size, price or unit count recorded. Clear those values first, then remove it — that way nothing is deleted by surprise.`;
+  const values = recordedValues(rows);
+  if (values.length > 0) {
+    return {
+      kind: "confirm",
+      message: `This will remove the "${label}" planned mix, including its ${joinList(values)}. Continue?`,
+    };
   }
-  return null;
+  return { kind: "allowed" };
 }
 
 /** A row carrying nothing at all: no sizes, price, planned count or media. */
