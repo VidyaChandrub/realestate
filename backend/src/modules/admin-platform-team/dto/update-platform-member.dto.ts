@@ -9,9 +9,9 @@ import {
   MinLength,
 } from 'class-validator';
 import {
-  PLATFORM_PHONE_MESSAGE,
-  PLATFORM_PHONE_REGEX,
-} from './create-platform-member.dto';
+  OPTIONAL_PHONE_NUMBER_REGEX,
+  PHONE_NUMBER_MESSAGE,
+} from '../../../common/utils/phone.util';
 
 export class UpdatePlatformMemberDto {
   @IsOptional()
@@ -33,7 +33,7 @@ export class UpdatePlatformMemberDto {
   @IsOptional()
   @IsString()
   @MaxLength(16)
-  @Matches(PLATFORM_PHONE_REGEX, { message: PLATFORM_PHONE_MESSAGE })
+  @Matches(OPTIONAL_PHONE_NUMBER_REGEX, { message: PHONE_NUMBER_MESSAGE })
   phoneNumber?: string;
 
   @IsOptional()

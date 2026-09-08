@@ -74,6 +74,19 @@ const EMPTY_FORM: UserFormData = {
   password: "",
 };
 
+// Mobile number: digits only, an optional single leading "+", at most 15
+// digits (E.164) — the same rule the backend DTO enforces. Sanitising on
+// every keystroke/paste means the field can only ever hold an acceptable
+// value: letters and punctuation are dropped, extra digits past 15 truncated.
+const PHONE_NUMBER_REGEX = /^\+?\d{1,15}$/;
+
+function sanitizePhone(raw: string): string {
+  const hasPlus = raw.trimStart().startsWith("+");
+  const digits = raw.replace(/\D/g, "").slice(0, 15);
+  if (!digits) return hasPlus ? "+" : "";
+  return `${hasPlus ? "+" : ""}${digits}`;
+}
+
 function initials(firstName: string | null, lastName: string | null): string {
   const chars = [firstName?.[0], lastName?.[0]].filter(Boolean).join("");
   return chars ? chars.toUpperCase() : "—";
@@ -211,7 +224,9 @@ export default function OrgUsersPage() {
       firstName: user.firstName ?? "",
       lastName: user.lastName ?? "",
       email: user.email,
-      phoneNumber: user.phoneNumber ?? "",
+      // Normalise a stored value to the shape the field now enforces, so a
+      // legacy row stays editable without forcing a retype.
+      phoneNumber: sanitizePhone(user.phoneNumber ?? ""),
       role: user.role?.key ?? "sales",
     });
     setFormError(null);
@@ -236,8 +251,12 @@ export default function OrgUsersPage() {
       setFormError("Mobile number is required.");
       return;
     }
+    if (!PHONE_NUMBER_REGEX.test(phoneNumber)) {
+      setFormError("Mobile number must contain digits only (max 15).");
+      return;
+    }
     const phoneDigits = phoneNumber.replace(/\D/g, "");
-    if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+    if (phoneDigits.length < 7) {
       setFormError("Please enter a valid mobile number.");
       return;
     }
@@ -474,11 +493,12 @@ export default function OrgUsersPage() {
                 name="phone"
                 required
                 autoComplete="tel"
-                inputMode="tel"
-                placeholder="+91 98765 43210"
+                inputMode="numeric"
+                maxLength={16}
+                placeholder="+919876543210"
                 value={form.phoneNumber}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, phoneNumber: e.target.value }))
+                  setForm((f) => ({ ...f, phoneNumber: sanitizePhone(e.target.value) }))
                 }
               />
             </div>
