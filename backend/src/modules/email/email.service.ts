@@ -21,17 +21,9 @@ import {
   getOrgStatusEmailHtml,
   getUserAccountStatusEmailHtml,
 } from './email.templates';
+import { frontendBaseUrl } from '../../common/utils/app-url.util';
 
-export function frontendBaseUrl(): string {
-  const raw =
-    process.env.FRONTEND_URL ||
-    process.env.APP_FRONTEND_URL ||
-    process.env.APP_URL;
-  if (!raw) {
-    throw new Error('FRONTEND_URL is not configured');
-  }
-  return raw.replace(/\/$/, '');
-}
+export { frontendBaseUrl, DEFAULT_FRONTEND_URL } from '../../common/utils/app-url.util';
 
 export interface SendMailOptions {
   to: string;
