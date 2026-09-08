@@ -102,7 +102,7 @@ export class OrgPermissionsService {
         key: rawKey,
         name: dto.name,
         description: dto.description ?? '',
-        scope: 'team',
+        scope: 'organisation',
         status: 'active',
         sortOrder: 100 + count,
       },

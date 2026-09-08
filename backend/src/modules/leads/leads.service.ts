@@ -35,6 +35,7 @@ export class LeadsService {
     }
 
     let orgId: string | null = null;
+    let projectName: string | null = null;
 
     if (dto.landingPageId) {
       const page = await this.prisma.landingPage.findUnique({
@@ -67,6 +68,7 @@ export class LeadsService {
         );
       }
       orgId = project.orgId;
+      projectName = project.name;
     }
 
     if (dto.unitId) {
@@ -90,7 +92,10 @@ export class LeadsService {
       dto.projectId ??
       (await this.resolveProjectId(orgId, dto.landingPageId, dto.data));
 
-    const data = normalizeLeadData(dto.data ?? {}, { unitId: dto.unitId });
+    const data = normalizeLeadData(dto.data ?? {}, {
+      unitId: dto.unitId,
+      projectName,
+    });
     const existing = await this.findRecentDuplicate(orgId, projectId, data);
     if (existing) {
       return this.prisma.lead.update({
@@ -378,7 +383,11 @@ export class LeadsService {
     const limit = Math.min(query.limit ?? 20, 100);
     const skip = (page - 1) * limit;
 
-    const [leads, total] = await Promise.all([
+    const kpiWhere = query.status
+      ? await this.buildListWhere(orgId, actor, { ...query, status: undefined })
+      : where;
+
+    const [leads, total, kpiTotal, unassigned, byStatus] = await Promise.all([
       this.prisma.lead.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -399,13 +408,33 @@ export class LeadsService {
         },
       }),
       this.prisma.lead.count({ where }),
+      this.prisma.lead.count({ where: kpiWhere }),
+      this.prisma.lead.count({
+        where: { AND: [kpiWhere, { assignedToId: null }] },
+      }),
+      this.prisma.lead.groupBy({
+        by: ['status'],
+        where: kpiWhere,
+        _count: { _all: true },
+      }),
     ]);
+
+    const statusCount = (status: string) =>
+      byStatus.find((row) => row.status === status)?._count._all ?? 0;
 
     return {
       data: leads.map((lead) => this.toListItem(lead)),
       total,
       page,
       limit,
+      stats: {
+        total: kpiTotal,
+        unassigned,
+        new: statusCount('new'),
+        followUp: statusCount('follow_up'),
+        siteVisit: statusCount('site_visit'),
+        won: statusCount('won'),
+      },
     };
   }
 
@@ -419,7 +448,7 @@ export class LeadsService {
         project: { select: { id: true, name: true } },
         activities: {
           orderBy: { createdAt: 'desc' },
-          take: 20,
+          take: 50,
           select: { id: true, type: true, text: true, createdAt: true },
         },
         callLogs: {
@@ -469,6 +498,10 @@ export class LeadsService {
     dto: UpdateLeadNextActionDto,
   ) {
     await this.getById(orgId, leadId, actor);
+    const current = await this.prisma.lead.findFirst({
+      where: { id: leadId, orgId },
+      select: { nextActionAt: true },
+    });
     const scheduledAt = new Date(dto.scheduledAt);
     const reminderAt = dto.reminderAt ? new Date(dto.reminderAt) : null;
     if (Number.isNaN(scheduledAt.getTime()) || (reminderAt && Number.isNaN(reminderAt.getTime()))) {
@@ -484,13 +517,16 @@ export class LeadsService {
       },
       select: { nextActionType: true, nextActionAt: true, nextActionNote: true, reminderAt: true },
     });
+    const kind = dto.actionType === 'site_visit' ? 'Site visit' : 'Follow-up';
+    const verb = current?.nextActionAt ? 'updated' : 'scheduled';
+    const note = dto.note?.trim();
     const activity = await this.prisma.activityEvent.create({
       data: {
         orgId,
         agentId: actor.sub,
         leadId,
         type: dto.actionType === 'site_visit' ? 'site_visit_booked' : 'status_updated',
-        text: `${dto.actionType === 'site_visit' ? 'Site visit scheduled' : 'Follow-up scheduled'} — ${scheduledAt.toLocaleString('en-IN')}${dto.note?.trim() ? ` — ${dto.note.trim()}` : ''}`,
+        text: `Next action ${verb}: ${kind} on ${scheduledAt.toLocaleString('en-IN')}${note ? ` — ${note}` : ''}${reminderAt ? ` · reminder ${reminderAt.toLocaleString('en-IN')}` : ''}`,
       },
       select: { id: true, type: true, text: true, createdAt: true },
     });
@@ -527,6 +563,10 @@ export class LeadsService {
       }
     }
 
+    if (dto.status && dto.status !== lead.status && !dto.note?.trim()) {
+      throw new BadRequestException('A note is required when changing pipeline status');
+    }
+
     const updated = await this.prisma.lead.update({
       where: { id: leadId },
       data: {
@@ -551,10 +591,13 @@ export class LeadsService {
       parts.push(`Assigned to ${assigneeName}`);
     }
     if (dto.status && dto.status !== lead.status) {
-      parts.push(`Status changed to ${dto.status.replace('_', ' ')}`);
+      parts.push(
+        `Status changed from ${lead.status.replaceAll('_', ' ')} to ${dto.status.replaceAll('_', ' ')} — ${dto.note!.trim()}`,
+      );
     }
+    let activity: { id: string; type: string; text: string; createdAt: Date } | null = null;
     if (parts.length > 0) {
-      await this.prisma.activityEvent.create({
+      activity = await this.prisma.activityEvent.create({
         data: {
           orgId,
           agentId: actor.sub,
@@ -562,10 +605,11 @@ export class LeadsService {
           type: 'status_updated',
           text: parts.join(' · '),
         },
+        select: { id: true, type: true, text: true, createdAt: true },
       });
     }
 
-    return this.toListItem(updated);
+    return { ...this.toListItem(updated), activity };
   }
 
   /**

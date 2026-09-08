@@ -16,7 +16,7 @@ const DEFAULT_FIELDS: FormLeadField[] = [
   { id: "f1", type: "text", label: "Full name", placeholder: "e.g. Rohan Kapoor", required: true },
   { id: "f2", type: "phone", label: "Phone number", placeholder: "+91 98765 43210", required: true },
   { id: "f3", type: "email", label: "Email address", placeholder: "you@email.com", required: false },
-  { id: "f4", type: "select", label: "Interested in", placeholder: "Choose an option", required: true, options: ["3 BHK", "4 BHK", "Penthouse"] },
+  { id: "f4", type: "select", label: "Interested in", placeholder: "Choose an option", required: true, options: [] },
   { id: "f5", type: "checkbox", label: "I agree to receive updates", placeholder: "", required: true },
 ];
 
@@ -147,6 +147,7 @@ export function defaultSiteConfig(input: {
       openPopupId: "",
       customActions: [],
     },
+    forms: [],
     media: { notes: "" },
     designSystem: { scope: "template", typography: defaultTypography() },
   };
@@ -306,7 +307,11 @@ function hydrateConfig(raw: SiteConfig, page: LandingPageData): SiteConfig {
       fields: raw.form?.fields?.length ? raw.form.fields : fallback.form.fields,
       customActions: raw.form?.customActions ?? fallback.form.customActions ?? [],
     },
+    forms: Array.isArray(raw.forms) ? raw.forms : (fallback.forms ?? []),
     media: { ...fallback.media, ...raw.media },
+    ...(raw.propertyBinding ? { propertyBinding: raw.propertyBinding } : {}),
+    ...(raw.vars ? { vars: raw.vars } : {}),
+    ...(raw.property ? { property: raw.property } : {}),
     ...(raw.designSystem ? { designSystem: raw.designSystem } : {}),
   };
 }

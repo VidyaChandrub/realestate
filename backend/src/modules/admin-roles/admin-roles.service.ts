@@ -4,38 +4,193 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import type { RoleScope } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { UpdateRolePermissionsDto } from './dto/update-role-permissions.dto';
+import { CreatePlatformRoleDto } from './dto/create-platform-role.dto';
+import { UpdatePlatformRolePermissionsDto } from './dto/update-platform-role-permissions.dto';
 import {
   defaultForRole,
   PERMISSION_MODULES,
+  PLATFORM_PERMISSION_MODULES,
   SYSTEM_ORG_ID,
+  type ModuleDefinition,
 } from '../../common/utils/permissions.util';
 
 const SYSTEM_ROLES = new Set(['super_admin', 'admin', 'manager', 'sales', 'telecaller']);
+const ORG_SCOPES: RoleScope[] = ['organisation', 'team'];
 
 @Injectable()
 export class AdminRolesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list() {
+  listOrgRoles() {
     return this.prisma.role.findMany({
-      where: { orgId: null },
+      where: { orgId: null, scope: { in: ORG_SCOPES } },
       orderBy: { sortOrder: 'asc' },
-      include: {
-        _count: {
-          select: { userRoles: true },
-        },
-      },
+      include: { _count: { select: { userRoles: true } } },
     });
   }
 
-  async create(dto: CreateRoleDto) {
+  listPlatformRoles() {
+    return this.prisma.role.findMany({
+      where: { orgId: null, scope: 'platform' },
+      orderBy: { sortOrder: 'asc' },
+      include: { _count: { select: { userRoles: true } } },
+    });
+  }
+
+  createOrgRole(dto: CreateRoleDto) {
+    return this.createRole(dto, 'organisation');
+  }
+
+  createPlatformRole(dto: CreatePlatformRoleDto) {
+    return this.createRole(dto, 'platform');
+  }
+
+  updateOrgRole(id: string, dto: UpdateRoleDto) {
+    return this.updateRole(id, dto, ORG_SCOPES);
+  }
+
+  updatePlatformRole(id: string, dto: UpdateRoleDto) {
+    return this.updateRole(id, dto, ['platform']);
+  }
+
+  removeOrgRole(id: string) {
+    return this.removeRole(id, ORG_SCOPES);
+  }
+
+  removePlatformRole(id: string) {
+    return this.removeRole(id, ['platform']);
+  }
+
+  getOrgRolePermissions(roleId: string) {
+    return this.getRolePermissions(roleId, ORG_SCOPES, PERMISSION_MODULES, ['super_admin', 'admin']);
+  }
+
+  getPlatformRolePermissions(roleId: string) {
+    return this.getRolePermissions(roleId, ['platform'], PLATFORM_PERMISSION_MODULES, ['super_admin']);
+  }
+
+  updateOrgRolePermissions(roleId: string, dto: UpdateRolePermissionsDto) {
+    return this.saveRolePermissions(
+      roleId,
+      ORG_SCOPES,
+      PERMISSION_MODULES,
+      dto.permissions,
+      ['super_admin', 'admin'],
+    );
+  }
+
+  updatePlatformRolePermissions(roleId: string, dto: UpdatePlatformRolePermissionsDto) {
+    return this.saveRolePermissions(
+      roleId,
+      ['platform'],
+      PLATFORM_PERMISSION_MODULES,
+      dto.permissions,
+      ['super_admin'],
+    );
+  }
+
+  async effectivePlatformPermissions(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        orgId: true,
+        userRoles: { select: { role: { select: { id: true, key: true, name: true, scope: true } } } },
+      },
+    });
+    if (!user || user.orgId !== null) {
+      throw new NotFoundException('Platform user not found');
+    }
+
+    const platformRoles = user.userRoles
+      .map((ur) => ur.role)
+      .filter((r) => r.scope === 'platform');
+    const keys = platformRoles.map((r) => r.key);
+    const unrestricted = keys.includes('super_admin');
+
+    const rows = unrestricted
+      ? []
+      : await this.prisma.roleModulePermission.findMany({
+          where: {
+            orgId: SYSTEM_ORG_ID,
+            roleId: { in: platformRoles.map((r) => r.id) },
+          },
+        });
+
+    const byModule = new Map<string, {
+      canView: boolean;
+      canAdd: boolean;
+      canEdit: boolean;
+      canDelete: boolean;
+      canApprove: boolean;
+    }>();
+
+    for (const row of rows) {
+      const current = byModule.get(row.moduleKey);
+      if (!current) {
+        byModule.set(row.moduleKey, {
+          canView: row.canView,
+          canAdd: row.canAdd,
+          canEdit: row.canEdit,
+          canDelete: row.canDelete,
+          canApprove: row.canApprove,
+        });
+      } else {
+        byModule.set(row.moduleKey, {
+          canView: current.canView || row.canView,
+          canAdd: current.canAdd || row.canAdd,
+          canEdit: current.canEdit || row.canEdit,
+          canDelete: current.canDelete || row.canDelete,
+          canApprove: current.canApprove || row.canApprove,
+        });
+      }
+    }
+
+    const permissions: Record<string, {
+      view?: boolean;
+      add?: boolean;
+      edit?: boolean;
+      delete?: boolean;
+      approve?: boolean;
+    }> = {};
+
+    for (const def of PLATFORM_PERMISSION_MODULES) {
+      if (unrestricted) {
+        permissions[def.key] = { view: true, add: true, edit: true, delete: true, approve: true };
+        continue;
+      }
+      const row = byModule.get(def.key);
+      permissions[def.key] = {
+        view: row?.canView ?? false,
+        add: row?.canAdd ?? false,
+        edit: row?.canEdit ?? false,
+        delete: row?.canDelete ?? false,
+        approve: row?.canApprove ?? false,
+      };
+    }
+
+    return {
+      unrestricted,
+      roles: platformRoles.map((r) => ({ key: r.key, name: r.name })),
+      permissions,
+    };
+  }
+
+  private async createRole(
+    dto: { name: string; key?: string; description?: string },
+    scope: 'organisation' | 'platform',
+  ) {
     const rawKey = dto.key
       ? dto.key.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
       : dto.name.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_');
+
+    if (SYSTEM_ROLES.has(rawKey)) {
+      throw new ConflictException(`Role key '${rawKey}' is reserved`);
+    }
 
     const existing = await this.prisma.role.findFirst({
       where: { orgId: null, key: rawKey },
@@ -44,25 +199,24 @@ export class AdminRolesService {
       throw new ConflictException(`Role key '${rawKey}' already exists`);
     }
 
-    const count = await this.prisma.role.count();
+    const count = await this.prisma.role.count({
+      where: { orgId: null, scope },
+    });
 
     return this.prisma.role.create({
       data: {
         key: rawKey,
         name: dto.name,
         description: dto.description ?? '',
-        scope: dto.scope ?? 'team',
+        scope,
         status: 'active',
         sortOrder: count + 1,
       },
     });
   }
 
-  async update(id: string, dto: UpdateRoleDto) {
-    const role = await this.prisma.role.findUnique({ where: { id } });
-    if (!role) {
-      throw new NotFoundException('Role not found');
-    }
+  private async updateRole(id: string, dto: UpdateRoleDto, allowed: RoleScope[]) {
+    const role = await this.requireRole(id, allowed);
 
     const rawKey = dto.key
       ? dto.key.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
@@ -70,9 +224,7 @@ export class AdminRolesService {
 
     if (rawKey !== undefined && rawKey !== role.key) {
       if (SYSTEM_ROLES.has(role.key)) {
-        throw new BadRequestException(
-          `System role '${role.name}' key cannot be changed`,
-        );
+        throw new BadRequestException(`System role '${role.name}' key cannot be changed`);
       }
       const existing = await this.prisma.role.findFirst({
         where: { orgId: null, key: rawKey },
@@ -88,37 +240,38 @@ export class AdminRolesService {
         ...(dto.name ? { name: dto.name } : {}),
         ...(rawKey !== undefined ? { key: rawKey } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
-        ...(dto.scope ? { scope: dto.scope } : {}),
         ...(dto.status ? { status: dto.status } : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
       },
     });
   }
 
-  async remove(id: string) {
+  private async removeRole(id: string, allowed: RoleScope[]) {
     const role = await this.prisma.role.findUnique({
       where: { id },
       include: { _count: { select: { userRoles: true } } },
     });
-    if (!role) {
+    if (!role || !allowed.includes(role.scope)) {
       throw new NotFoundException('Role not found');
     }
-
     if (SYSTEM_ROLES.has(role.key)) {
       throw new BadRequestException(`System role '${role.name}' cannot be deleted`);
     }
-
     if (role._count.userRoles > 0) {
       throw new BadRequestException(
         `Cannot delete role '${role.name}' because ${role._count.userRoles} user(s) are currently assigned to it`,
       );
     }
-
     await this.prisma.role.delete({ where: { id } });
     return { success: true };
   }
 
-  async getRolePermissions(roleId: string) {
+  private async getRolePermissions(
+    roleId: string,
+    allowed: RoleScope[],
+    catalog: ModuleDefinition[],
+    unrestrictedKeys: string[],
+  ) {
     const role = await this.prisma.role.findUnique({
       where: { id: roleId },
       select: {
@@ -130,7 +283,7 @@ export class AdminRolesService {
         status: true,
       },
     });
-    if (!role) {
+    if (!role || !allowed.includes(role.scope)) {
       throw new NotFoundException('Role not found');
     }
 
@@ -138,10 +291,10 @@ export class AdminRolesService {
       where: { orgId: SYSTEM_ORG_ID, roleId },
     });
 
-    const isUnrestricted = role.key === 'super_admin' || role.key === 'admin';
+    const isUnrestricted = unrestrictedKeys.includes(role.key);
     const rowMap = new Map(systemRows.map((r) => [r.moduleKey, r]));
 
-    const permissions = PERMISSION_MODULES.map((def) => {
+    const permissions = catalog.map((def) => {
       if (isUnrestricted) {
         return {
           moduleKey: def.key,
@@ -182,28 +335,39 @@ export class AdminRolesService {
       };
     });
 
-    return {
-      role,
-      modules: PERMISSION_MODULES,
-      permissions,
-    };
+    return { role, modules: catalog, permissions };
   }
 
-  async updateRolePermissions(roleId: string, dto: UpdateRolePermissionsDto) {
-    const role = await this.prisma.role.findUnique({ where: { id: roleId } });
-    if (!role) {
-      throw new NotFoundException('Role not found');
+  private async saveRolePermissions(
+    roleId: string,
+    allowed: RoleScope[],
+    catalog: ModuleDefinition[],
+    permissions: Array<{
+      moduleKey: string;
+      canView: boolean;
+      canAdd: boolean;
+      canEdit: boolean;
+      canDelete: boolean;
+      canApprove: boolean;
+    }>,
+    unrestrictedKeys: string[],
+  ) {
+    const role = await this.requireRole(roleId, allowed);
+    if (unrestrictedKeys.includes(role.key)) {
+      throw new BadRequestException(`${role.name} permissions cannot be changed`);
     }
+
+    const validModuleKeys = new Set(catalog.map((m) => m.key));
+    const validPermissions = permissions.filter((p) => validModuleKeys.has(p.moduleKey));
 
     await this.prisma.$transaction(async (tx) => {
       await tx.roleModulePermission.deleteMany({
-        where: { orgId: SYSTEM_ORG_ID, roleId },
+        where: {
+          orgId: SYSTEM_ORG_ID,
+          roleId,
+          moduleKey: { in: [...validModuleKeys] },
+        },
       });
-
-      const validModuleKeys = new Set(PERMISSION_MODULES.map((m) => m.key));
-      const validPermissions = dto.permissions.filter((p) =>
-        validModuleKeys.has(p.moduleKey),
-      );
 
       if (validPermissions.length > 0) {
         await tx.roleModulePermission.createMany({
@@ -221,6 +385,16 @@ export class AdminRolesService {
       }
     });
 
-    return this.getRolePermissions(roleId);
+    return allowed.includes('platform')
+      ? this.getPlatformRolePermissions(roleId)
+      : this.getOrgRolePermissions(roleId);
+  }
+
+  private async requireRole(id: string, allowed: RoleScope[]) {
+    const role = await this.prisma.role.findUnique({ where: { id } });
+    if (!role || !allowed.includes(role.scope)) {
+      throw new NotFoundException('Role not found');
+    }
+    return role;
   }
 }

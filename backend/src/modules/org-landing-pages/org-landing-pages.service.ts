@@ -13,6 +13,12 @@ import { CreateLandingPageDto } from './dto/create-landing-page.dto';
 import { UpdateLandingPageDto } from './dto/update-landing-page.dto';
 import { ListLandingPagesQueryDto } from './dto/list-landing-pages-query.dto';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
+import {
+  bindLandingPageContent,
+  snapshotFromProject,
+  snapshotFromStandaloneUnit,
+  type PropertyBinding,
+} from '../../common/utils/landing-page-property.util';
 
 @Injectable()
 export class OrgLandingPagesService {
@@ -37,11 +43,10 @@ export class OrgLandingPagesService {
   }
 
   async create(orgId: string, dto: CreateLandingPageDto) {
-    // No cap on how many landing pages an org may hold, template-derived or
-    // from-scratch — only the *template* quota (OrganisationTemplate count)
-    // is plan-limited. This is a deliberate, known-open decision, not an
-    // oversight: a future Plan.limits.landingPages field may introduce one,
-    // but that's a separate task pending a product decision.
+    if (dto.projectId && dto.unitId) {
+      throw new BadRequestException('Choose a project or a standalone unit, not both.');
+    }
+
     if (!dto.templateId) {
       return this.createBlank(orgId, dto);
     }
@@ -71,6 +76,11 @@ export class OrgLandingPagesService {
       ? await generateUniqueLandingPageSlug(this.prisma, orgId, `${dto.name} thank you`)
       : null;
 
+    const bound = await this.bindContent(orgId, dto, template.content);
+    const companionBound = companion
+      ? await this.bindContent(orgId, dto, companion.content)
+      : null;
+
     const created = await this.prisma.$transaction(async (tx) => {
       const page = await tx.landingPage.create({
         data: {
@@ -79,7 +89,7 @@ export class OrgLandingPagesService {
           name: dto.name,
           slug,
           status: 'draft',
-          content: template.content as Prisma.InputJsonValue,
+          content: bound as Prisma.InputJsonValue,
           thumbnail: template.thumbnail,
           pageType: 'landing',
         },
@@ -96,7 +106,7 @@ export class OrgLandingPagesService {
             name: `${dto.name} — Thank You`,
             slug: companionSlug,
             status: 'draft',
-            content: companion.content as Prisma.InputJsonValue,
+            content: (companionBound ?? companion.content) as Prisma.InputJsonValue,
             thumbnail: companion.thumbnail,
             pageType: 'thank_you',
             parentId: page.id,
@@ -110,7 +120,12 @@ export class OrgLandingPagesService {
           action: 'landing_page_created',
           entity: 'LandingPage',
           entityId: page.id,
-          metadata: { sourceTemplateId: template.id, name: dto.name },
+          metadata: {
+            sourceTemplateId: template.id,
+            name: dto.name,
+            projectId: dto.projectId ?? null,
+            unitId: dto.unitId ?? null,
+          },
         },
       });
 
@@ -120,12 +135,70 @@ export class OrgLandingPagesService {
     return this.getOwned(orgId, created.id);
   }
 
+  private asPageContent(raw: unknown): { sections?: unknown; config?: Record<string, unknown> } {
+    if (raw && typeof raw === 'object') {
+      const o = raw as { sections?: unknown; config?: Record<string, unknown> };
+      return { sections: o.sections ?? [], config: o.config ?? {} };
+    }
+    return { sections: [], config: {} };
+  }
+
+  private async resolveBinding(orgId: string, dto: CreateLandingPageDto) {
+    if (!dto.projectId && !dto.unitId) return null;
+
+    const org = await this.prisma.organisation.findUnique({
+      where: { id: orgId },
+      select: { name: true },
+    });
+    const orgName = org?.name ?? '';
+
+    if (dto.projectId) {
+      const project = await this.prisma.project.findFirst({
+        where: { id: dto.projectId, orgId },
+        include: { _count: { select: { units: true } } },
+      });
+      if (!project) throw new NotFoundException('Project not found');
+      return {
+        binding: { kind: 'project' as const, projectId: project.id },
+        snapshot: snapshotFromProject({
+          orgName,
+          project,
+          unitCount: project._count.units,
+        }),
+      };
+    }
+
+    const unit = await this.prisma.unit.findFirst({
+      where: { id: dto.unitId, orgId, projectId: null },
+    });
+    if (!unit) {
+      throw new BadRequestException(
+        'Standalone unit not found. Project units cannot be bound on their own.',
+      );
+    }
+    return {
+      binding: { kind: 'unit' as const, unitId: unit.id },
+      snapshot: snapshotFromStandaloneUnit({ orgName, unit }),
+    };
+  }
+
+  private async bindContent(orgId: string, dto: CreateLandingPageDto, raw: unknown) {
+    const content = this.asPageContent(raw);
+    const resolved = await this.resolveBinding(orgId, dto);
+    if (!resolved) return { sections: content.sections ?? [], config: content.config ?? {} };
+    return bindLandingPageContent(content, resolved.binding, resolved.snapshot);
+  }
+
   // Blank creation: no template to verify, copy, or derive a companion
   // from — `dto.content` is caller-supplied (built client-side by the same
   // factories the Super Admin blank-template flow uses; the DTO already
   // guarantees it's present and well-formed when templateId is absent).
   private async createBlank(orgId: string, dto: CreateLandingPageDto) {
     const slug = await generateUniqueLandingPageSlug(this.prisma, orgId, dto.name);
+    const bound = await this.bindContent(orgId, dto, {
+      sections: dto.content!.sections,
+      config: dto.content!.config as unknown as Record<string, unknown>,
+    });
 
     const created = await this.prisma.$transaction(async (tx) => {
       const page = await tx.landingPage.create({
@@ -135,7 +208,7 @@ export class OrgLandingPagesService {
           name: dto.name,
           slug,
           status: 'draft',
-          content: { sections: dto.content!.sections, config: dto.content!.config } as Prisma.InputJsonValue,
+          content: bound as Prisma.InputJsonValue,
           pageType: 'landing',
         },
       });
@@ -146,7 +219,12 @@ export class OrgLandingPagesService {
           action: 'landing_page_created',
           entity: 'LandingPage',
           entityId: page.id,
-          metadata: { sourceTemplateId: null, name: dto.name },
+          metadata: {
+            sourceTemplateId: null,
+            name: dto.name,
+            projectId: dto.projectId ?? null,
+            unitId: dto.unitId ?? null,
+          },
         },
       });
 

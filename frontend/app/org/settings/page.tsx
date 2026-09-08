@@ -6,6 +6,7 @@ import { apiFetch, changePlan, createOrgCatalogOption, deleteOrgCatalogOption, g
 import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
+import { OrgSmtpSettings } from "@/components/org/org-smtp-settings";
 import { subdomainPreviewHost } from "@/lib/domain";
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
 
@@ -59,7 +60,7 @@ const NAV_GROUPS = [
   ] },
   { grp: "COMMUNICATION", items: [
     { s: "comms", icon: "phone" as IconName, t: "Calling & WhatsApp" },
-    { s: "email", icon: "mail" as IconName, t: "Email" },
+    { s: "email", icon: "mail" as IconName, t: "Email & SMTP" },
     { s: "notifications", icon: "bell" as IconName, t: "Notifications" },
   ] },
   { grp: "PLATFORM", items: [
@@ -85,7 +86,7 @@ const SECTION_META: Record<string, { icon: IconName; title: string; sub: string 
   scoring: { icon: "star", title: "Scoring & assignment", sub: "Lead scores and distribution rules" },
   automation: { icon: "link", title: "Automation & SLA", sub: "Trigger workflows and response targets" },
   comms: { icon: "phone", title: "Calling & WhatsApp", sub: "Dialler, AI voice and WhatsApp Business" },
-  email: { icon: "mail", title: "Email", sub: "Sending domain and defaults" },
+  email: { icon: "mail", title: "Email & SMTP", sub: "Organisation mail server for invites, resets and notifications" },
   notifications: { icon: "bell", title: "Notifications", sub: "Channels per event type" },
   data: { icon: "document", title: "Data & import", sub: "Move data in and out of the platform" },
   api: { icon: "key", title: "API & webhooks", sub: "Programmatic access and event delivery" },
@@ -1132,14 +1133,8 @@ export default function OrgSettingsPage() {
           {/* EMAIL */}
           <div className={`os-section${section === "email" ? " on" : ""}`}>
             <SectionHead section="email" />
-            <Card icon="mail" title="Email delivery" sub="Sending domain & defaults">
-              <div className="row2">
-                <div className="field"><label>From name</label><input className="inp" defaultValue="Skyline Developers" /></div>
-                <div className="field"><label>From address</label><input className="inp inp-mono" defaultValue="hello@skylinedev.in" /></div>
-              </div>
-              <div className="swrow"><div className="tx"><b>DKIM / SPF verified</b><div className="muted">Domain authentication for deliverability.</div></div><span className="badge b-green">Verified</span></div>
-              <div className="swrow"><div className="tx"><b>Track opens & clicks</b></div><Toggle on /></div>
-              <div className="field" style={{ marginBottom: 0 }}><label>Default signature</label><textarea className="inp" rows={3} defaultValue={"Skyline Developers\nSG Highway, Ahmedabad · +91 79000 12345"} /></div>
+            <Card icon="mail" title="Organisation SMTP" sub="Used for team invites, password resets and notifications from this workspace">
+              <OrgSmtpSettings />
             </Card>
           </div>
 

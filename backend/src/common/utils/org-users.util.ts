@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../../database/prisma.service';
@@ -75,6 +75,7 @@ async function sendInviteEmailNotification(
       to: user.email,
       recipientName: recipientName || undefined,
       orgName,
+      orgId,
       role: roleName || 'Team Member',
       tempPassword,
     });
@@ -85,6 +86,7 @@ async function sendInviteEmailNotification(
 
 async function sendUserAccountStatusNotification(
   prisma: OrgUsersPrisma,
+  orgId: string,
   user: { email: string; firstName?: string | null; lastName?: string | null },
   status: 'activated' | 'deactivated',
 ) {
@@ -97,6 +99,7 @@ async function sendUserAccountStatusNotification(
       to: user.email,
       recipientName: recipientName || undefined,
       status,
+      orgId,
     });
   } catch (err: any) {
     console.error(
@@ -296,7 +299,7 @@ export async function approveOrgUser(
   });
 
   if (user.status !== nextStatus || !user.approvedAt) {
-    sendUserAccountStatusNotification(prisma, updated, 'activated');
+    sendUserAccountStatusNotification(prisma, orgId, updated, 'activated');
   }
 
   return toSafeUser(updated);
@@ -429,9 +432,15 @@ export async function updateOrgUser(
   id: string,
   dto: UpdateOrgUserInput,
 ) {
-  const existing = await prisma.user.findFirst({ where: { id, orgId } });
+  const existing = await prisma.user.findFirst({
+    where: { id, orgId },
+    include: { userRoles: { include: { role: true } } },
+  });
   if (!existing) {
     throw new NotFoundException('User not found');
+  }
+  if (existing.userRoles.some(({ role }) => role.key === 'admin')) {
+    throw new ForbiddenException('Organisation admins cannot be edited.');
   }
 
   if (dto.email && dto.email !== existing.email) {
@@ -579,6 +588,7 @@ export async function setOrgUserStatus(
   if (notifyUser && user.status !== status && (status === 'disabled' || status === 'active')) {
     sendUserAccountStatusNotification(
       prisma,
+      orgId,
       updated,
       status === 'active' ? 'activated' : 'deactivated',
     );

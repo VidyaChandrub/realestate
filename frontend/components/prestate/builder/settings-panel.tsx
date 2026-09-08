@@ -18,6 +18,7 @@ import {
   Monitor,
   Move,
   Palette,
+  PanelRight,
   Plus,
   SlidersHorizontal,
   Smartphone,
@@ -35,6 +36,8 @@ import type { FieldLogicOp, FormLeadField } from "@/lib/prestate/types";
 import { GitBranch, Copy as CopyIcon, ChevronDown as ChevronDownIcon } from "lucide-react";
 import { loadFormLibrary, saveFormLibrary } from "@/lib/prestate/forms-store";
 import type { FormDefinition } from "@/lib/prestate/forms-store";
+import { mergeFormLibraries } from "@/lib/prestate/resolve-form";
+import { sampleBuilderForms } from "@/lib/prestate/sample-forms";
 import { FOOTER_DESIGNS, HEADER_DESIGNS } from "@/lib/prestate/chrome-presets";
 import { designsForWidget } from "@/lib/prestate/widget-designs";
 import type { TemplateTypography, TypeKey } from "@/lib/prestate/design-system";
@@ -558,7 +561,7 @@ function ProjectWidgetSettings({ section, onChange }: { section: SectionInstance
         <TextField value={String(section.settings.enquiryButtonLabel ?? "")} onChange={(v) => onChange({ enquiryButtonLabel: v })} placeholder="Submit Enquiry" />
       </FieldRow>
       <div style={{ fontSize: 11, color: "var(--ps-muted)", background: "var(--ps-primary-mist)", border: "1px solid var(--ps-line)", borderRadius: 8, padding: "8px 10px" }}>
-        Form fields come from <b>Forms module → SiteConfig.form</b> (dynamic per org). The modal injects <code>projectId</code> hidden and posts to <code>POST /org/leads {"{ landingPageId, projectId, data }"} </code>.
+        Enquiry fields come from the Form Builder form selected above. The modal still attaches the project (and optional unit) to the lead.
       </div>
     </div>
   );
@@ -616,7 +619,7 @@ export function SettingsPanel({
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "var(--ps-slate)", lineHeight: 1.6 }}>
               <li><strong>Click any section</strong> on the canvas to open its design layouts, copy, and style controls.</li>
-              <li>Use <strong>🪟 Float</strong> in the header to make this panel movable anywhere and view full-width canvas.</li>
+              <li>Use <strong>Float</strong> in the inspector header to make this panel movable and view a full-width canvas.</li>
               <li>Press <kbd style={{ background: "var(--ps-line)", padding: "1px 5px", borderRadius: 4, fontSize: 10.5 }}>Ctrl + K</kbd> to quick-add widgets anywhere.</li>
             </ul>
           </div>
@@ -725,20 +728,12 @@ export function SettingsPanel({
             {onToggleMode ? (
               <button
                 type="button"
-                title={mode === "floating" ? "Dock to right sidebar" : "Float panel over canvas (see full width canvas)"}
+                className="ps-inspector-mode-btn"
+                data-active={mode === "floating" ? "true" : "false"}
+                title={mode === "floating" ? "Dock to right sidebar" : "Float panel over canvas"}
                 onClick={() => onToggleMode(mode === "floating" ? "docked" : "floating")}
-                style={{
-                  background: mode === "floating" ? "var(--ps-primary-mist)" : "var(--ps-bg)",
-                  border: "1px solid var(--ps-line)",
-                  color: mode === "floating" ? "var(--ps-primary)" : "var(--ps-muted)",
-                  borderRadius: 6,
-                  padding: "3px 7px",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
               >
-                {mode === "floating" ? "📌 Dock" : "🪟 Float"}
+                {mode === "floating" ? <><PanelRight size={12} /> Dock</> : <><Move size={12} /> Float</>}
               </button>
             ) : null}
             {onClose ? (
@@ -836,6 +831,9 @@ export function SettingsPanel({
               </div>
             ) : null}
             {section.type === "popup" ? <PopupSettingsEditor section={section} onChange={(p) => set({ settings: { ...section.settings, ...p } })} /> : null}
+            {FORM_ATTACH_TYPES.has(section.type) ? (
+              <FormAttachPicker section={section} onChange={set} page={page} />
+            ) : null}
             {section.type === "lead-form" ? (
               <FormWidgetConditionalEditor section={section} onChange={set} page={page} onPatchConfig={onPatchConfig} />
             ) : null}
@@ -862,6 +860,7 @@ export function SettingsPanel({
               .filter(([key]) => !(section.type === "text" && (key === "text" || key === "html")))
               .filter(([key]) => !(section.type === "popup" && POPUP_MANAGED_KEYS.includes(key)))
               .filter(([key]) => !(section.type === "html" && key === "code"))
+              .filter(([key]) => !HIDDEN_FORM_KEYS.has(key))
               .map(([key, value]) => (
               <div key={key} style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
                 {section.type === "row" && key === "columns" ? (
@@ -1307,6 +1306,17 @@ function HtmlCodeEditor({
 
 // Popup settings rendered by the dedicated editor below — hidden from the
 // generic field list so each option appears exactly once.
+const FORM_ATTACH_TYPES = new Set([
+  "hero",
+  "brochure",
+  "downloads",
+  "floor-plan-gallery",
+  "floorplans",
+  "popup",
+  "project",
+]);
+const HIDDEN_FORM_KEYS = new Set(["formId", "gateFields", "fields"]);
+
 const POPUP_MANAGED_KEYS = [
   "trigger",
   "delaySeconds",
@@ -1316,6 +1326,8 @@ const POPUP_MANAGED_KEYS = [
   "oncePerSession",
   "conditionMatch",
   "conditions",
+  "formId",
+  "fields",
 ];
 
 const TRIGGER_OPTIONS = [
@@ -1494,17 +1506,61 @@ function PopupSettingsEditor({
   );
 }
 
-function FormWidgetConditionalEditor({ section, onChange, page, onPatchConfig }: { section: SectionInstance; onChange: (patch: Partial<SectionInstance>) => void; page?: LandingPageData; onPatchConfig?: (r: (c: SiteConfig) => SiteConfig) => void }) {
-  const [library, setLibrary] = useState<FormDefinition[]>(() => loadFormLibrary());
-  const refresh = () => setLibrary(loadFormLibrary());
+function useMergedFormLibrary(page?: LandingPageData) {
+  const pageForms = page ? ((ensureConfig(page).forms ?? []) as FormDefinition[]) : [];
+  const [library, setLibrary] = useState<FormDefinition[]>(() =>
+    mergeFormLibraries(pageForms, loadFormLibrary(), sampleBuilderForms()),
+  );
+  const refresh = () =>
+    setLibrary(mergeFormLibraries(pageForms, loadFormLibrary(), sampleBuilderForms()));
   useEffect(() => {
     refresh();
     if (typeof window === "undefined") return;
-    const onStorage = (e: StorageEvent) => { if (e.key === "prestate.forms.v1") refresh(); };
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "prestate.forms.v1") refresh();
+    };
     window.addEventListener("storage", onStorage);
     window.addEventListener("focus", refresh);
-    return () => { window.removeEventListener("storage", onStorage); window.removeEventListener("focus", refresh); };
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", refresh);
+    };
   }, [page?.id]);
+  return { library, setLibrary, refresh };
+}
+
+function FormAttachPicker({
+  section,
+  onChange,
+  page,
+}: {
+  section: SectionInstance;
+  onChange: (patch: Partial<SectionInstance>) => void;
+  page?: LandingPageData;
+}) {
+  const { library } = useMergedFormLibrary(page);
+  const selectedFormId = String((section.settings as Record<string, unknown>).formId ?? "");
+  const pageForm = page ? ensureConfig(page).form : undefined;
+  const selectOptions: { value: string; label: string }[] = [
+    { value: "", label: pageForm ? `Page form — ${pageForm.name || "Default"} (${pageForm.fields.length} fields)` : "Page form (default)" },
+    ...library.map((f) => ({ value: f.id, label: `${f.name} — ${f.fields.length} fields` })),
+  ];
+  return (
+    <div style={{ borderBottom: "1px solid var(--ps-line)", padding: "11px 0" }}>
+      <FieldRow label="Form to display" hint="Pick any form from Form Builder. Create and edit fields in the Forms module.">
+        <SelectField
+          value={selectedFormId}
+          onChange={(v) => onChange({ settings: { ...section.settings, formId: v } })}
+          options={selectOptions}
+          placeholder="Page form"
+        />
+      </FieldRow>
+    </div>
+  );
+}
+
+function FormWidgetConditionalEditor({ section, onChange, page, onPatchConfig }: { section: SectionInstance; onChange: (patch: Partial<SectionInstance>) => void; page?: LandingPageData; onPatchConfig?: (r: (c: SiteConfig) => SiteConfig) => void }) {
+  const { library, setLibrary } = useMergedFormLibrary(page);
   const selectedFormId = String((section.settings as Record<string, unknown>).formId ?? "");
   const pageCfg = page ? ensureConfig(page) : null;
   const pageForm = pageCfg?.form;
@@ -1660,23 +1716,12 @@ function PanelHead({
         {onToggleMode ? (
           <button
             type="button"
-            title={mode === "floating" ? "Dock inspector to right sidebar" : "Float inspector over canvas (see full width canvas)"}
+            className="ps-inspector-mode-btn"
+            data-active={mode === "floating" ? "true" : "false"}
+            title={mode === "floating" ? "Dock inspector to right sidebar" : "Float inspector over canvas"}
             onClick={() => onToggleMode(mode === "floating" ? "docked" : "floating")}
-            style={{
-              background: mode === "floating" ? "var(--ps-primary-mist)" : "var(--ps-bg)",
-              border: "1px solid var(--ps-line)",
-              color: mode === "floating" ? "var(--ps-primary)" : "var(--ps-muted)",
-              borderRadius: 6,
-              padding: "3px 7px",
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-            }}
           >
-            {mode === "floating" ? "📌 Dock" : "🪟 Float"}
+            {mode === "floating" ? <><PanelRight size={12} /> Dock</> : <><Move size={12} /> Float</>}
           </button>
         ) : null}
         {onClose ? (

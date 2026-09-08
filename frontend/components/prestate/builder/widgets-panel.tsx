@@ -51,6 +51,7 @@ export function WidgetsPanel({
   onAddWidget,
   templates,
   onDeleteTemplate,
+  hideToggle,
 }: {
   open: boolean;
   onToggle: () => void;
@@ -58,6 +59,7 @@ export function WidgetsPanel({
   /** Reusable sections stored via the toolbar's "Save as template". */
   templates?: SavedSectionTemplate[];
   onDeleteTemplate?: (id: string) => void;
+  hideToggle?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>("all");
@@ -114,10 +116,12 @@ export function WidgetsPanel({
       <div className="ps-widgets-head">
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span className="ps-widgets-title">Block Library</span>
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--ps-muted)", marginLeft: "auto" }}>{visibleWidgets.length + (templates?.length ?? 0)} blocks</span>
-          <button type="button" onClick={onToggle} title="Collapse widget library" style={{ background: "none", border: "none", color: "var(--ps-muted)", cursor: "pointer", padding: 4, display: "inline-flex" }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--ps-muted)", marginLeft: "auto" }}>{visibleWidgets.length + (templates?.length ?? 0)}</span>
+          {hideToggle ? null : (
+          <button type="button" onClick={onToggle} title="Collapse widget library" className="ps-topnav-icon-btn" style={{ width: 28, height: 28 }}>
             <PanelLeftClose size={16} />
           </button>
+          )}
         </div>
         <div style={{ marginTop: 10, position: "relative" }}>
           <Search size={15} style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "var(--ps-muted)", pointerEvents: "none" }} />
@@ -125,31 +129,21 @@ export function WidgetsPanel({
         </div>
 
         {/* Quick filter pills */}
-        <div style={{ display: "flex", gap: 4, overflowX: "auto", padding: "8px 0 2px", scrollbarWidth: "none" }}>
+        <div className="ps-widget-filters">
           {[
             { key: "all", label: "All" },
-            { key: "real-estate", label: "Real Estate" },
-            { key: "forms", label: "Forms" },
-            { key: "layout", label: "Layout" },
-            { key: "media", label: "Media" },
+            { key: "Real Estate", label: "Real Estate" },
+            { key: "Forms", label: "Forms" },
+            { key: "Layout", label: "Layout" },
+            { key: "Media", label: "Media" },
             ...(templates && templates.length > 0 ? [{ key: "saved", label: "Saved" }] : []),
           ].map((cat) => (
             <button
               key={cat.key}
               type="button"
+              className="ps-widget-filter"
+              data-active={activeCategoryFilter === cat.key ? "true" : "false"}
               onClick={() => setActiveCategoryFilter(cat.key)}
-              style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                padding: "3px 8px",
-                borderRadius: 999,
-                border: "none",
-                background: activeCategoryFilter === cat.key ? "var(--ps-primary)" : "rgba(255,255,255,0.06)",
-                color: activeCategoryFilter === cat.key ? "#fff" : "var(--ps-muted)",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "all .12s",
-              }}
             >
               {cat.label}
             </button>

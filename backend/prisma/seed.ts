@@ -1,5 +1,10 @@
-import { PrismaClient, Prisma, LeadStatus, ActivityType } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import {
+  bindLandingPageContent,
+  snapshotFromProject,
+} from '../src/common/utils/landing-page-property.util';
+import { asTemplateJson, builderTemplateContent } from './seed-builder-page';
 
 // Place this at: prisma/seed.ts
 // Run with: npx prisma db seed
@@ -7,155 +12,14 @@ import * as bcrypt from 'bcrypt';
 // Seeds:
 //   1. Roles catalogue (super_admin / admin / manager / sales)
 //   2. Super Admin account (from env, optional)
-//   3. A demo organisation + its sales team (org admin, manager, sales agents,
-//      all with full profile fields) so the Sales Agents dashboard and lead
-//      inbox show realistic data out of the box.
-//   4. A demo project assigned to the seeded manager and sales users.
-//   5. Landing pages and a spread of leads assigned across the team, with
-//      every Lead field populated (formName, source, status, budget in the
-//      `data` JSON, captured-at timestamps).
-//   6. Per-agent call logs and activity events powering the Calls & comms and
-//      Activity tabs on each agent's dashboard.
+//   3. A demo organisation + org admin (no extra sales/users roster)
+//   4. A demo project assigned to the seeded manager and sales users
+//   5. Demo landing pages (empty until published content is added)
+//   6. Two demo CRM leads for Lead Center (Skyline Heights)
 //
-// Idempotent: roles and users upsert by key/email, leads / calls / activity are
-// re-seeded fresh for this org on every run, so `npx prisma db seed` can be
-// re-run safely.
-
 const prisma = new PrismaClient();
 
 const SEED_USER_PASSWORD = process.env.SEED_USER_PASSWORD ?? 'Welcome@123';
-
-// Deterministic PRNG so re-seeds produce identical (realis) numbers.
-function mulberry32(seed: number) {
-  let t = seed;
-  return function () {
-    t += 0x6d2b79f5;
-    let r = t;
-    r = Math.imul(r ^ (r >>> 15), r | 1);
-    r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
-    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function pickWeighted<T>(rnd: () => number, items: [T, number][]): T {
-  const total = items.reduce((sum, [, w]) => sum + w, 0);
-  let r = rnd() * total;
-  for (const [value, weight] of items) {
-    r -= weight;
-    if (r <= 0) return value;
-  }
-  return items[items.length - 1][0];
-}
-
-const STATUSES: { status: string; weight: number }[] = [
-  { status: 'new', weight: 0.2 },
-  { status: 'contacted', weight: 0.18 },
-  { status: 'follow_up', weight: 0.18 },
-  { status: 'site_visit', weight: 0.14 },
-  { status: 'negotiation', weight: 0.1 },
-  { status: 'won', weight: 0.09 },
-  { status: 'lost', weight: 0.11 },
-];
-
-const SOURCES: [string, number][] = [
-  ['Meta', 0.34],
-  ['Google', 0.22],
-  ['WhatsApp', 0.18],
-  ['Website', 0.14],
-  ['Portal', 0.12],
-];
-
-const FORMS = [
-  '3 BHK Enquiry',
-  '2 BHK Enquiry',
-  '4 BHK Enquiry',
-  'Brochure Request',
-  'Call Me Back',
-  'Book Site Visit',
-];
-
-const NAMES = [
-  'Rahul Mehta',
-  'Meera Iyer',
-  'Divya Shah',
-  'Karan Patel',
-  'Aarav Reddy',
-  'Harsh Trivedi',
-  'Sana Rahman',
-  'Nikhil Bansal',
-  'Pooja Nair',
-  'Suresh Kumar',
-  'Ananya Das',
-  'Vikram Singh',
-  'Kavita Joshi',
-  'Arjun Menon',
-  'Ritu Agarwal',
-  'Sanjay Gupta',
-  'Neha Kapoor',
-  'Farhan Sheikh',
-  'Lakshmi Iyer',
-  'Deepak Rao',
-  'Swati Deshmukh',
-  'Manish Jain',
-  'Rekha Sharma',
-  'Aditya Bhowmick',
-  'Ishita Roy',
-  'Gaurav Malhotra',
-  'Tanvi Kulkarni',
-  'Rohit Nair',
-  'Shreya Ghosh',
-  'Pranav Pillai',
-  'Alok Chatterjee',
-  'Madhuri Patil',
-  'Varun Thakur',
-  'Nandini Rao',
-  'Rajesh Khanna',
-  'Kiran Bedi',
-  'Yash Tiwari',
-  'Sneha Reddy',
-  'Amit Saxena',
-  'Ritika Sethi',
-  'Mohit Bhardwaj',
-  'Priyanka Das',
-  'Navin Shetty',
-  'Beena Nair',
-  'Sameer Khan',
-  'Jyoti Kumari',
-  'Ramesh Choudhary',
-  'Parul Gandhi',
-  'Kunal Arora',
-  'Zoya Ansari',
-];
-
-const CITIES = [
-  'Mumbai',
-  'Pune',
-  'Thane',
-  'Navi Mumbai',
-  'Bengaluru',
-  'Hyderabad',
-];
-
-const BUDGETS: Record<string, [number, number]> = {
-  '2 BHK': [55, 110], // lakhs
-  '3 BHK': [100, 190],
-  '4 BHK': [160, 280],
-};
-
-function budgetString(bhk: string, rnd: () => number): string {
-  const [low, high] = BUDGETS[bhk] ?? BUDGETS['3 BHK'];
-  const lakhs = low + rnd() * (high - low);
-  return lakhs >= 100
-    ? `₹${(lakhs / 100).toFixed(2)} Cr`
-    : `₹${Math.round(lakhs)} L`;
-}
-
-function mobile(rnd: () => number): string {
-  const digits = Array.from({ length: 9 }, () => Math.floor(rnd() * 10)).join(
-    '',
-  );
-  return `+91 9${digits}`;
-}
 
 interface AgentSeed {
   firstName: string;
@@ -164,7 +28,6 @@ interface AgentSeed {
   phone: string | null;
   role: 'admin' | 'manager' | 'sales';
   status: 'active' | 'disabled';
-  leads: number;
 }
 
 const AGENTS: AgentSeed[] = [
@@ -175,52 +38,6 @@ const AGENTS: AgentSeed[] = [
     phone: '+91 98250 11020',
     role: 'admin',
     status: 'active',
-    leads: 90,
-  },
-  {
-    firstName: 'Priya',
-    lastName: 'Sharma',
-    email: 'priya@skylinedev.in',
-    phone: '+91 99870 34412',
-    role: 'manager',
-    status: 'active',
-    leads: 85,
-  },
-  {
-    firstName: 'Vijay',
-    lastName: 'Chandel',
-    email: 'vijay@skylinedev.in',
-    phone: '+91 97250 88109',
-    role: 'sales',
-    status: 'active',
-    leads: 75,
-  },
-  {
-    firstName: 'Rohit',
-    lastName: 'Mehta',
-    email: 'rohit@skylinedev.in',
-    phone: '+91 98204 55127',
-    role: 'sales',
-    status: 'active',
-    leads: 70,
-  },
-  {
-    firstName: 'Sneha',
-    lastName: 'Kulkarni',
-    email: 'sneha@skylinedev.in',
-    phone: '+91 98980 33471',
-    role: 'sales',
-    status: 'active',
-    leads: 62,
-  },
-  {
-    firstName: 'Aditya',
-    lastName: 'Verma',
-    email: 'aditya@skylinedev.in',
-    phone: null,
-    role: 'sales',
-    status: 'disabled',
-    leads: 40,
   },
 ];
 
@@ -330,7 +147,7 @@ async function seedDemoOrg() {
     },
   });
 
-  // --- Sales team (org admin + manager + sales agents) ----------------------
+  // --- Org admin (login). Extra demo sales users are not seeded. ------------
   const userIds: Record<string, string> = {};
   for (const agent of AGENTS) {
     const role = await prisma.role.findFirstOrThrow({
@@ -367,17 +184,11 @@ async function seedDemoOrg() {
     userIds[agent.email] = user.id;
   }
   console.log(
-    `Sales team seeded (${Object.keys(userIds).length} users) — sign in with any ` +
-      `of them, password: ${SEED_USER_PASSWORD}`,
+    `Org admin seeded: rohan@skylinedev.in — password: ${SEED_USER_PASSWORD}`,
   );
 
   // --- Demo project -----------------------------------------------------------
-  const managerId = userIds['priya@skylinedev.in'];
-  const projectSalesAgentIds = [
-    userIds['vijay@skylinedev.in'],
-    userIds['rohit@skylinedev.in'],
-    userIds['sneha@skylinedev.in'],
-  ];
+  const managerId = userIds['rohan@skylinedev.in'];
   const existingProject = await prisma.project.findFirst({
     where: { orgId: org.id, name: 'Skyline Heights' },
     select: { id: true },
@@ -407,6 +218,11 @@ async function seedDemoOrg() {
           pincode: '400051',
           connectivity: ['Metro', 'School', 'Hospital', 'Airport'],
           publishedToWebsite: true,
+          projectType: 'Apartment',
+          constructionStage: 'Under construction',
+          tagline: 'Residences in Bandra East',
+          highlights: 'RERA registered\nMetro connected\nClubhouse and pool',
+          carpetRange: '1,250 – 2,450 sq.ft',
         },
       })
     : await prisma.project.create({
@@ -434,31 +250,125 @@ async function seedDemoOrg() {
           pincode: '400051',
           connectivity: ['Metro', 'School', 'Hospital', 'Airport'],
           publishedToWebsite: true,
+          projectType: 'Apartment',
+          constructionStage: 'Under construction',
+          tagline: 'Residences in Bandra East',
+          highlights: 'RERA registered\nMetro connected\nClubhouse and pool',
+          carpetRange: '1,250 – 2,450 sq.ft',
         },
       });
 
   await prisma.projectSalesAgent.deleteMany({
     where: { projectId: project.id },
   });
-  await prisma.projectSalesAgent.createMany({
-    data: projectSalesAgentIds.map((userId) => ({
-      projectId: project.id,
-      userId,
-    })),
+  console.log(
+    `Demo project seeded: ${project.name} — manager: rohan@skylinedev.in.`,
+  );
+
+  const unitTypes = [
+    { name: '3 BHK', carpetSqft: 1450, builtupSqft: 1850, price: 12500000, totalUnits: 80 },
+    { name: '4 BHK', carpetSqft: 2100, builtupSqft: 2650, price: 19800000, totalUnits: 40 },
+  ];
+  for (const ut of unitTypes) {
+    const existing = await prisma.unitType.findFirst({
+      where: { projectId: project.id, name: ut.name },
+      select: { id: true },
+    });
+    if (existing) {
+      await prisma.unitType.update({ where: { id: existing.id }, data: ut });
+    } else {
+      await prisma.unitType.create({ data: { projectId: project.id, ...ut } });
+    }
+  }
+
+  // --- Builder template + org page bound to the project --------------------
+  const templateSource = builderTemplateContent();
+  const configChoices = unitTypes.map((u) => u.name);
+  const applyChoices = (form: { fields?: Array<{ id?: string; label?: string; options?: string[] }> } | undefined) => {
+    for (const field of form?.fields ?? []) {
+      if (field.id === 'sv-interest' || field.label === 'Interested in') {
+        field.options = configChoices;
+      }
+    }
+  };
+  applyChoices(templateSource.config.form as { fields?: Array<{ id?: string; label?: string; options?: string[] }> });
+  for (const form of (templateSource.config.forms as Array<{ fields?: Array<{ id?: string; label?: string; options?: string[] }> }> | undefined) ?? []) {
+    applyChoices(form);
+  }
+
+  const template = await prisma.template.upsert({
+    where: { slug: 'skyline-heights-builder' },
+    update: {
+      name: 'Project launch (builder)',
+      status: 'published',
+      kind: 'preset',
+      pageType: 'landing',
+      designId: 'tpl-estatepro',
+      baseDesignName: 'Builder',
+      category: 'Real Estate',
+      content: asTemplateJson(templateSource),
+    },
+    create: {
+      name: 'Project launch (builder)',
+      slug: 'skyline-heights-builder',
+      status: 'published',
+      kind: 'preset',
+      pageType: 'landing',
+      designId: 'tpl-estatepro',
+      baseDesignName: 'Builder',
+      category: 'Real Estate',
+      content: asTemplateJson(templateSource),
+    },
+  });
+  await prisma.organisationTemplate.upsert({
+    where: { orgId_templateId: { orgId: org.id, templateId: template.id } },
+    update: {},
+    create: { orgId: org.id, templateId: template.id },
+  });
+
+  const unitCount = await prisma.unit.count({ where: { projectId: project.id } });
+  const bound = bindLandingPageContent(
+    templateSource,
+    { kind: 'project', projectId: project.id },
+    snapshotFromProject({
+      orgName: org.name,
+      project,
+      unitCount,
+    }),
+  );
+
+  await prisma.landingPage.upsert({
+    where: { orgId_slug: { orgId: org.id, slug: 'skyline-heights' } },
+    update: {
+      name: 'Skyline Heights',
+      status: 'published',
+      sourceTemplateId: template.id,
+      content: bound as Prisma.InputJsonValue,
+      publishedAt: new Date(),
+    },
+    create: {
+      orgId: org.id,
+      name: 'Skyline Heights',
+      slug: 'skyline-heights',
+      status: 'published',
+      sourceTemplateId: template.id,
+      content: bound as Prisma.InputJsonValue,
+      pageType: 'landing',
+      publishedAt: new Date(),
+    },
   });
   console.log(
-    `Demo project seeded: ${project.name} — manager: priya@skylinedev.in, ` +
-      `${projectSalesAgentIds.length} sales users assigned.`,
+    `Builder template seeded (${template.slug}) and org page bound to ${project.name}.`,
   );
 
   // --- Landing pages --------------------------------------------------------
-  const pages: { name: string; slug: string }[] = [
+  const landingPages: { name: string; slug: string }[] = [
     { name: 'Palm Residency', slug: 'palm-residency' },
     { name: 'Green Vista', slug: 'green-vista' },
   ];
-  const landingPages: Record<string, string> = {};
-  for (const page of pages) {
-    const lp = await prisma.landingPage.upsert({
+  const pageIds: Record<string, string> = {};
+  for (const page of landingPages) {
+    const row = await prisma.landingPage.upsert({
       where: { orgId_slug: { orgId: org.id, slug: page.slug } },
       update: { status: 'published' },
       create: {
@@ -469,201 +379,81 @@ async function seedDemoOrg() {
         content: { sections: [] },
       },
     });
-    landingPages[page.slug] = lp.id;
+    pageIds[page.slug] = row.id;
   }
+  console.log(`Landing pages seeded (${landingPages.length}) for ${org.name}.`);
 
-  // --- Leads (fresh each seed so counts stay consistent) --------------------
-  await prisma.lead.deleteMany({ where: { orgId: org.id } });
-
-  const rnd = mulberry32(20260902);
-  const leads: Prisma.LeadCreateManyInput[] = [];
-
-  const now = Date.now();
-  for (const agent of AGENTS) {
-    for (let i = 0; i < agent.leads; i++) {
-      const firstName = NAMES[Math.floor(rnd() * NAMES.length)];
-      const bhk = pickWeighted(rnd, [
-        ['2 BHK', 0.32],
-        ['3 BHK', 0.5],
-        ['4 BHK', 0.18],
-      ] as [string, number][]);
-      const page = pickWeighted(rnd, [
-        ['palm-residency', 0.62],
-        ['green-vista', 0.38],
-      ] as [string, number][]);
-      const pageName =
-        page === 'palm-residency' ? 'Palm Residency' : 'Green Vista';
-      const status = pickWeighted(
-        rnd,
-        STATUSES.map((s) => [s.status, s.weight] as [string, number]),
-      );
-
-      leads.push({
-        orgId: org.id,
-        landingPageId: landingPages[page],
-        formName: pickWeighted(
-          rnd,
-          FORMS.map((f) => [f, 1] as [string, number]),
-        ),
-        source: pickWeighted(rnd, SOURCES),
-        data: {
-          fullName: firstName,
-          phone: mobile(rnd),
-          email:
-            rnd() > 0.25
-              ? `${firstName.toLowerCase().replace(/\s+/g, '.')}@gmail.com`
-              : null,
-          city: CITIES[Math.floor(rnd() * CITIES.length)],
-          project: pageName,
-          bhk,
-          budget: budgetString(bhk, rnd),
-          interestedIn: `${bhk} · ${pageName}`,
-          message:
-            rnd() > 0.4 ? 'Interested in a site visit next weekend.' : null,
-          utm: { channel: status === 'won' ? 'meta' : 'organic' },
-        },
-        status: status as LeadStatus,
-        assignedToId: userIds[agent.email],
-        // Bias inbound toward the trailing days so the last-14-days activity
-        // chart on each dashboard reads like a live, rising funnel: ~60% of
-        // captures land inside the window, the rest trail back over 90 days.
-        createdAt: new Date(
-          now -
-            (rnd() < 0.6
-              ? Math.floor(rnd() * 14)
-              : 14 + Math.floor(rnd() * 76)) *
-              24 *
-              60 *
-              60 *
-              1000,
-        ),
-      });
-    }
-  }
-
-  await prisma.lead.createMany({ data: leads });
-  console.log(
-    `Seeded ${leads.length} leads across ${pages.length} landing pages for ${org.name}.`,
-  );
-
-  // --- Calls & activity (Calls & comms / Activity tabs) ----------------------
-  await Promise.all([
-    prisma.callLog.deleteMany({ where: { orgId: org.id } }),
-    prisma.activityEvent.deleteMany({ where: { orgId: org.id } }),
-  ]);
-
-  const CALL_OUTCOMES: [string, number][] = [
-    ['connected', 0.36],
-    ['no_answer', 0.2],
-    ['callback', 0.14],
-    ['missed', 0.12],
-    ['busy', 0.08],
-    ['booked_visit', 0.1],
+  const demoLeads = [
+    {
+      email: 'ananya.mehta@example.com',
+      source: 'website',
+      formName: 'Palm Residency enquiry',
+      landingPageId: pageIds['palm-residency'],
+      status: 'new' as const,
+      data: {
+        fullName: 'Ananya Mehta',
+        name: 'Ananya Mehta',
+        phone: '+91 98765 43101',
+        phoneNumber: '+91 98765 43101',
+        email: 'ananya.mehta@example.com',
+        project: 'Skyline Heights',
+        'Interested in': '3 BHK',
+      },
+    },
+    {
+      email: 'vikram.rao@example.com',
+      source: 'crm',
+      formName: 'Manual lead',
+      landingPageId: pageIds['green-vista'],
+      status: 'contacted' as const,
+      data: {
+        fullName: 'Vikram Rao',
+        name: 'Vikram Rao',
+        phone: '+91 98765 43102',
+        phoneNumber: '+91 98765 43102',
+        email: 'vikram.rao@example.com',
+        project: 'Skyline Heights',
+        'Interested in': '4 BHK',
+      },
+    },
   ];
 
-  const HOUR = 60 * 60 * 1000;
-  const calls: Prisma.CallLogCreateManyInput[] = [];
-  const activity: Prisma.ActivityEventCreateManyInput[] = [];
-  const activityTemplates: ((lead: {
-    name: string;
-    bhk: string;
-    project: string;
-  }) => { type: ActivityType; text: string })[] = [
-    () => ({
-      type: 'logged_in',
-      text: 'Shift started — morning sales queue ready',
-    }),
-    ({ name, bhk, project }) => ({
-      type: 'closed_deal',
-      text: `Closed deal — ${name}, ${bhk} at ${project}`,
-    }),
-    ({ name, project }) => ({
-      type: 'site_visit_booked',
-      text: `Site visit booked — ${name}, ${project}`,
-    }),
-    ({ name, bhk }) => ({
-      type: 'call_logged',
-      text: `Call with ${name} — follow-up on ${bhk}`,
-    }),
-    ({ name }) => ({
-      type: 'whatsapp_sent',
-      text: `Brochure shared on WhatsApp — ${name}`,
-    }),
-    ({ name }) => ({
-      type: 'whatsapp_read',
-      text: `${name} read your message on WhatsApp`,
-    }),
-    ({ name }) => ({
-      type: 'note_added',
-      text: `Note added — pref Team Tower, views of the lake — ${name}'s lead`,
-    }),
-    ({ name }) => ({
-      type: 'status_updated',
-      text: `Moved ${name} to ${pickWeighted(rnd, [
-        ['follow_up', 1],
-        ['site_visit', 1],
-        ['negotiation', 1],
-      ] as [string, number][])}`,
-    }),
-  ];
-
-  for (const agent of AGENTS) {
-    const agentId = userIds[agent.email];
-    const myLeads = await prisma.lead.findMany({
-      where: { orgId: org.id, assignedToId: agentId },
-      select: { id: true, data: true },
-    });
-
-    const leadFor = () => {
-      const lead = myLeads[Math.floor(rnd() * myLeads.length)];
-      const record = (lead?.data ?? {}) as Record<string, unknown>;
-      const name = typeof record.fullName === 'string' ? record.fullName : null;
-      return { id: lead?.id ?? null, name };
-    };
-
-    // Calls — a working ratio of the lead book, spaced so the recent-calls
-    // table reads newest-first and the whole book fits inside the last ~4
-    // days (the "calls made" series on the 14-day chart).
-    const callCount = Math.max(8, Math.round(agent.leads / 5));
-    for (let i = 0; i < callCount; i++) {
-      const { id, name } = leadFor();
-      const outcome = pickWeighted(rnd, CALL_OUTCOMES);
-      const isConnected = outcome === 'connected' || outcome === 'booked_visit';
-      calls.push({
+  let createdLeads = 0;
+  for (const demo of demoLeads) {
+    const existing = await prisma.lead.findFirst({
+      where: {
         orgId: org.id,
-        agentId,
-        leadId: id,
-        leadName: name,
-        direction: rnd() > 0.85 ? 'incoming' : 'outgoing',
-        outcome,
-        durationSeconds: isConnected ? 90 + Math.floor(rnd() * 330) : 0,
-        createdAt: new Date(now - (i * 6 + Math.floor(rnd() * 5)) * HOUR),
-      });
-    }
-
-    // Activity — the same 8 event types for every agent, newest-first window.
-    activityTemplates.forEach((template, i) => {
-      const lead = myLeads[Math.floor(rnd() * myLeads.length)];
-      const record = (lead?.data ?? {}) as Record<string, unknown>;
-      const name =
-        typeof record.fullName === 'string' ? record.fullName : 'Lead';
-      const bhk = typeof record.bhk === 'string' ? record.bhk : '3 BHK';
-      const project =
-        typeof record.project === 'string' ? record.project : 'Palm Residency';
-      activity.push({
-        orgId: org.id,
-        agentId,
-        leadId: lead?.id ?? null,
-        ...template({ name, bhk, project }),
-        createdAt: new Date(now - (i * 11 + Math.floor(rnd() * 6)) * HOUR),
-      });
+        data: { path: ['email'], equals: demo.email },
+      },
+      select: { id: true },
     });
+    if (existing) continue;
+
+    const lead = await prisma.lead.create({
+      data: {
+        orgId: org.id,
+        projectId: project.id,
+        landingPageId: demo.landingPageId,
+        formName: demo.formName,
+        source: demo.source,
+        status: demo.status,
+        assignedToId: managerId,
+        data: demo.data,
+      },
+    });
+    await prisma.activityEvent.create({
+      data: {
+        orgId: org.id,
+        agentId: managerId,
+        leadId: lead.id,
+        type: 'status_updated',
+        text: `Lead seeded for ${demo.data.fullName}`,
+      },
+    });
+    createdLeads += 1;
   }
-
-  await prisma.callLog.createMany({ data: calls });
-  await prisma.activityEvent.createMany({ data: activity });
   console.log(
-    `Seeded ${calls.length} call logs and ${activity.length} activity events across the team.`,
+    `Lead Center seeded: ${demoLeads.length} demo leads for ${org.name} (${createdLeads} new).`,
   );
 }
 

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type * as React from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -10,19 +9,9 @@ import {
   Bell,
   CheckCircle2,
   Clock,
-  CreditCard,
-  Globe,
-  LayoutTemplate,
-  Plug,
-  MessageCircle,
-  Palette,
   PencilRuler,
-  Search,
   Settings,
   Sparkles,
-  Target,
-  TrendingUp,
-  Type,
   X,
 } from "lucide-react";
 import type { Device, LandingPageData, ModuleKey, SectionInstance, SiteConfig } from "@/lib/prestate/types";
@@ -32,7 +21,7 @@ import { BuilderUploadProvider, type BuilderImageUploader } from "@/components/p
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
 import { builderPath, templatePreviewPath } from "@/lib/prestate/paths";
 import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
-import { TopNav, MODULE_LABELS } from "@/components/prestate/topnav";
+import { TopNav } from "@/components/prestate/topnav";
 import { BuilderWorkspace, type BuilderApi } from "@/components/prestate/builder/workspace";
 import { Canvas } from "@/components/prestate/builder/canvas";
 import { FormsModule } from "@/components/prestate/modules/forms";
@@ -41,16 +30,6 @@ import { HeaderFooterModule } from "@/components/prestate/modules/headerfooter";
 import { SeoModule } from "@/components/prestate/modules/seo";
 import { TrackingModule } from "@/components/prestate/modules/tracking";
 import { TypographyModule } from "@/components/prestate/modules/typography";
-
-const NAV_ITEMS: { key: ModuleKey; label: string; icon: React.ComponentType<{ size?: number | string }> }[] = [
-  { key: "builder", label: "Builder", icon: PencilRuler },
-  { key: "typography", label: "Typography & Fonts", icon: Type },
-  { key: "forms", label: "Forms", icon: MessageCircle },
-  { key: "brand", label: "Brand", icon: Palette },
-  { key: "headerfooter", label: "Header & Footer", icon: PencilRuler },
-  { key: "seo", label: "SEO", icon: Search },
-  { key: "tracking", label: "Tracking", icon: Target },
-];
 
 interface Toast {
   id: number;
@@ -130,6 +109,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   const [allPages, setAllPages] = useState<LandingPageData[]>([]);
 
   const [hasUnsaved, setHasUnsaved] = useState(false);
+  const [pageReady, setPageReady] = useState(false);
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (hasUnsaved) {
@@ -182,6 +162,8 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
       if (!cancelled) window.location.replace(returnUrl || HOME_PATH[resource]);
       } catch {
         if (!cancelled) window.location.replace(returnUrl || HOME_PATH[resource]);
+      } finally {
+        if (!cancelled) setPageReady(true);
       }
     })();
 
@@ -250,8 +232,6 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   }, []);
 
   const scoped = activePage ? [activePage] : [];
-
-  const railItems = NAV_ITEMS;
 
   // Fires the debounced single-record save and reconciles the server-derived
   // fields once it resolves, so a slow save can't clobber newer local edits
@@ -362,6 +342,15 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
 
   const [inAppPreviewOpen, setInAppPreviewOpen] = useState(false);
 
+  useEffect(() => {
+    if (!inAppPreviewOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setInAppPreviewOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [inAppPreviewOpen]);
+
   const openLocalPreview = useCallback(
     (pageId?: string) => {
       const page = !pageId || pageId === activePage?.id ? activePage : null;
@@ -425,7 +414,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
             onOpenLocalPreview={() => openLocalPreview(activePage.id)}
           />
         ) : (
-          <div style={{ padding: 40, color: "var(--ps-muted)" }}>Create a landing page to start building.</div>
+          <div className="ps-studio-boot">{pageReady ? "This page could not be opened." : "Opening page…"}</div>
         );
       case "forms":
         return activePage ? (
@@ -531,7 +520,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
 
   return (
     <BuilderUploadProvider uploader={imageUploader}>
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--ps-bg)" }}>
+    <div className="ps-studio-root">
       <TopNav
         module={module}
         setModule={setModule}
@@ -556,16 +545,11 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
         onSignOut={handleSignOut}
         settingsHref={SETTINGS_PATH[resource]}
         homeHref={returnUrl || HOME_PATH[resource]}
-        actions={
-          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ps-primary)", display: "inline-flex", alignItems: "center", gap: 7 }}>
-            <Sparkles size={15} /> {MODULE_LABELS[module]}
-          </span>
-        }
+        unsaved={hasUnsaved}
       />
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-        {/* Module content */}
-        <main className="ps-module-shell" style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>{renderModule()}</main>
+        <main className="ps-studio-main" data-module={module}>{renderModule()}</main>
       </div>
 
       {/* Toasts */}
@@ -583,9 +567,9 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
 
       {/* Notifications panel */}
       <SlidePanel open={notifOpen} onClose={() => setNotifOpen(false)} title="Notifications" icon={<Bell size={16} />}>
-        {NOTIFS.map((n, i) => (
-          <NotifRow key={i} n={n} />
-        ))}
+        <div style={{ padding: "24px 0", textAlign: "center", color: "var(--ps-muted)", fontSize: 12.5 }}>
+          No notifications yet.
+        </div>
       </SlidePanel>
 
       {/* Activity panel */}
@@ -609,16 +593,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
             ))
           )
         ) : (
-          ACTIVITY.map((a, i) => (
-            <div key={i} style={{ display: "flex", gap: 11, padding: "10px 0", borderBottom: "1px solid var(--ps-line)", alignItems: "flex-start" }}>
-              <span style={{ width: 30, height: 30, borderRadius: 9, background: a.bg, color: a.color, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{a.icon}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)" }}>{a.text}</div>
-                <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 1 }}>{a.time}</div>
-              </div>
-              {a.mention ? <span className="ps-chip" style={{ background: "var(--ps-primary-soft)", color: "var(--ps-primary)" }}>{a.mention}</span> : null}
-            </div>
-          ))
+          <div style={{ padding: "24px 0", textAlign: "center", color: "var(--ps-muted)", fontSize: 12.5 }}>No activity yet.</div>
         )}
       </SlidePanel>
 
@@ -636,41 +611,40 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
         <div style={{ fontSize: 13, color: "var(--ps-slate)", lineHeight: 1.7, display: "flex", flexDirection: "column", gap: 12 }}>
           {resource === "landing-page" ? (
             <>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Builder</strong> — drag widgets, then Save Draft, Preview, Publish or Unpublish from the top bar.</div>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Preview</strong> — opens a real local page at /p/your-slug. Resize the window for mobile/tablet.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Builder</strong> — drag widgets, then Save, Preview, Publish or Unpublish from the top bar.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Preview</strong> — opens over this studio. Press Escape or Close to return to the canvas.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Publishing</strong> — click Publish to make this page live, and Unpublish to take it down. No review step — you&apos;re in control.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Pages</strong> — this page came from a template your organisation was assigned. Editing it never changes the shared template or any other organisation&apos;s copy.</div>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Settings</strong> — Brand, Header, SEO, Tracking and Forms apply only to this page.</div>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Shortcuts</strong> — Ctrl+S save, Ctrl+Z undo, Ctrl+Shift+Z redo.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Settings</strong> — Brand, Header, SEO, Tracking and Forms apply only to this page. Open them from Page tools in the top bar.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Shortcuts</strong> — Ctrl+S save, Ctrl+Z undo, Ctrl+Shift+Z redo, Ctrl+K quick add.</div>
             </>
           ) : (
             <>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Builder</strong> — drag widgets, then Save Draft, Preview, Publish or Unpublish from the top bar.</div>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Preview</strong> — opens a real local page at /p/your-slug. Resize the window for mobile/tablet.</div>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Pages</strong> — edit, duplicate, publish, unpublish, or delete. Use the ⋯ menu on desktop or the action row on mobile.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Builder</strong> — drag widgets, then Save, Preview, Publish or Unpublish from the top bar.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Preview</strong> — opens a new tab with the saved template preview. Use the device switcher on the canvas for mobile and tablet.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Pages</strong> — edit, duplicate, publish, unpublish, or delete from Super Admin templates. Page tools in the top bar opens Brand, Forms, SEO and the rest.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Templates</strong> — pick a template from the Templates page in Super Admin. Clicking one opens this builder.</div>
               <div><strong style={{ color: "var(--ps-ink)" }}>Settings</strong> — Brand, Header, SEO, Tracking and Forms apply only to the template selected in the scope bar.</div>
-              <div><strong style={{ color: "var(--ps-ink)" }}>Shortcuts</strong> — Ctrl+S save, Ctrl+Z undo, Ctrl+Shift+Z redo.</div>
+              <div><strong style={{ color: "var(--ps-ink)" }}>Shortcuts</strong> — Ctrl+S save, Ctrl+Z undo, Ctrl+Shift+Z redo, Ctrl+K quick add.</div>
             </>
           )}
         </div>
       </SlidePanel>
 
       {inAppPreviewOpen && activePage ? (
-        <div
-          style={{ position: "fixed", inset: 0, background: "#0f172a", display: "flex", flexDirection: "column", zIndex: 600 }}
-          onClick={() => setInAppPreviewOpen(false)}
-        >
+        <div className="ps-preview-overlay" role="dialog" aria-label="Page preview">
           <div
-            onClick={(e) => e.stopPropagation()}
             style={{ background: "#fff", width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderBottom: "1px solid var(--ps-border, #e5e7eb)", flexShrink: 0 }}>
+            <div className="ps-preview-bar">
               <span style={{ fontWeight: 700, fontSize: 14 }}>{activePage.name}</span>
+              <span style={{ fontSize: 12, color: "var(--ps-muted)" }}>Preview · Esc to close</span>
               <button
                 type="button"
                 onClick={() => setInAppPreviewOpen(false)}
-                style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--ps-muted, #64748b)", cursor: "pointer", display: "inline-flex", padding: 4 }}
+                className="ps-topnav-icon-btn"
+                style={{ marginLeft: "auto" }}
+                title="Close preview"
               >
                 <X size={18} />
               </button>
@@ -697,6 +671,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
                         logo: cfg.brand.logo,
                       }}
                       form={cfg.form}
+                      forms={cfg.forms}
                       chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}
                       onSelect={() => {}}
                       onMutate={() => {}}
@@ -748,32 +723,3 @@ function SlidePanel({
     </div>
   );
 }
-
-function NotifRow({ n }: { n: (typeof NOTIFS)[number] }) {
-  return (
-    <div style={{ display: "flex", gap: 11, padding: "11px 0", borderBottom: "1px solid var(--ps-line)", alignItems: "flex-start" }}>
-      <span style={{ width: 34, height: 34, borderRadius: 10, background: n.bg, color: n.color, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{n.icon}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--ps-ink)", lineHeight: 1.4 }}>{n.text}</div>
-        <div style={{ fontSize: 11, color: "var(--ps-muted)", marginTop: 2 }}>{n.time}</div>
-      </div>
-      {!n.read ? <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--ps-primary)", flexShrink: 0, marginTop: 4 }} /> : null}
-    </div>
-  );
-}
-
-const NOTIFS = [
-  { text: "A lead submitted the form on Aurora Residences — 2 min ago", time: "2 min ago", icon: <MessageCircle size={15} />, bg: "var(--ps-primary-soft)", color: "var(--ps-primary)", read: false },
-  { text: "Your page “Serene Villas” was published successfully", time: "18 min ago", icon: <CheckCircle2 size={15} />, bg: "var(--ps-success-soft)", color: "var(--ps-success)", read: false },
-  { text: "Payment of ₹40,000 received from Rohan K. for booking", time: "1 hr ago", icon: <CreditCard size={15} />, bg: "var(--ps-secondary-soft)", color: "var(--ps-secondary-dark)", read: true },
-  { text: "SEO audit complete — 3 pages need meta descriptions", time: "3 hrs ago", icon: <Search size={15} />, bg: "#e8f1fe", color: "#2563eb", read: true },
-  { text: "Domain luxury.clientdomain.com renewed for 1 year", time: "Yesterday", icon: <Globe size={15} />, bg: "#eef0f5", color: "var(--ps-slate)", read: true },
-];
-
-const ACTIVITY = [
-  { text: "Aarav R. updated hero headline on Aurora Residences", time: "10:42 AM", icon: <PencilRuler size={14} />, bg: "var(--ps-primary-soft)", color: "var(--ps-primary)", mention: "Page" },
-  { text: "Priya M. changed the lead form layout", time: "10:18 AM", icon: <MessageCircle size={14} />, bg: "var(--ps-secondary-soft)", color: "var(--ps-secondary-dark)", mention: "Form" },
-  { text: "Aarav R. published “Serene Villas” to serenevillas.com", time: "9:47 AM", icon: <CheckCircle2 size={14} />, bg: "var(--ps-success-soft)", color: "var(--ps-success)", mention: "Publish" },
-  { text: "System connected Razorpay payments", time: "9:02 AM", icon: <Plug size={14} />, bg: "#eef0f5", color: "var(--ps-slate)", mention: "Integration" },
-  { text: "Priya M. imported 3,412 leads from Facebook Ads", time: "Yesterday", icon: <TrendingUp size={14} />, bg: "#e8f1fe", color: "#2563eb", mention: "Leads" },
-];

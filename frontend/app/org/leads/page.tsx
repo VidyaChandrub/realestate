@@ -13,8 +13,9 @@ import {
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
-import { leadDisplayName, leadDisplayPhone } from "@/lib/lead-display";
+import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
 import { AddLeadModal } from "@/components/org/add-lead-modal";
+import { LeadStatusSelect } from "@/components/org/lead-status-select";
 
 const STATUS_BADGE: Record<CrmLeadStatus, string> = {
   new: "b-gray",
@@ -69,6 +70,13 @@ export default function OrgLeadsPage() {
   const canAdd = admin || hasPermission("crm", "add");
 
   const [leads, setLeads] = useState<CrmLead[] | null>(null);
+  const [listTotal, setListTotal] = useState(0);
+  const [kpi, setKpi] = useState({
+    total: 0,
+    unassigned: 0,
+    new: 0,
+    won: 0,
+  });
   const [assignable, setAssignable] = useState<
     { id: string; name: string }[] | null
   >(null);
@@ -89,6 +97,13 @@ export default function OrgLeadsPage() {
         assignedToId: assigneeFilter || undefined,
       });
       setLeads(res.data);
+      setListTotal(res.total);
+      setKpi({
+        total: res.stats?.total ?? res.total,
+        unassigned: res.stats?.unassigned ?? res.data.filter((l) => !l.assignedTo).length,
+        new: res.stats?.new ?? res.data.filter((l) => l.status === "new").length,
+        won: res.stats?.won ?? res.data.filter((l) => l.status === "won").length,
+      });
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Failed to load leads.",
@@ -116,18 +131,10 @@ export default function OrgLeadsPage() {
     };
   }, [canAssign]);
 
-  const stats = useMemo(() => {
-    const current = leads ?? [];
-    return {
-      total: current.length,
-      unassigned: current.filter((l) => !l.assignedTo).length,
-      new: current.filter((l) => l.status === "new").length,
-      won: current.filter((l) => l.status === "won").length,
-    };
-  }, [leads]);
+  const stats = kpi;
 
   const handleAssign = useCallback(
-    async (lead: CrmLead, assignedToId: string | null, status?: CrmLeadStatus) => {
+    async (lead: CrmLead, assignedToId: string | null, status?: CrmLeadStatus, note?: string) => {
       if (!canAssign || savingId) return;
       setSavingId(lead.id);
       setError(null);
@@ -135,6 +142,7 @@ export default function OrgLeadsPage() {
         const result = await assignCrmLead(lead.id, {
           assignedToId,
           status,
+          note,
         });
         setLeads((prev) =>
           prev
@@ -147,6 +155,7 @@ export default function OrgLeadsPage() {
         );
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to update lead.");
+        throw e;
       } finally {
         setSavingId(null);
       }
@@ -172,7 +181,17 @@ export default function OrgLeadsPage() {
       <AddLeadModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onCreated={(lead) => setLeads((prev) => (prev ? [lead, ...prev] : [lead]))}
+        onCreated={(lead) => {
+          setLeads((prev) => (prev ? [lead, ...prev] : [lead]));
+          setListTotal((n) => n + 1);
+          setKpi((prev) => ({
+            ...prev,
+            total: prev.total + 1,
+            unassigned: lead.assignedTo ? prev.unassigned : prev.unassigned + 1,
+            new: lead.status === "new" ? prev.new + 1 : prev.new,
+            won: lead.status === "won" ? prev.won + 1 : prev.won,
+          }));
+        }}
       />
 
       <Reveal delay={1}>
@@ -234,7 +253,7 @@ export default function OrgLeadsPage() {
           <div className="stat">
             <div className="top"><span className="label">Won</span><span className="ic ic-green"><Icon name="star" size={16} /></span></div>
             <div className="value"><CountUp value={stats.won} /></div>
-            <div className="delta">Closed this batch</div>
+            <div className="delta">Closed deals</div>
           </div>
         </Reveal>
       </div>
@@ -305,6 +324,11 @@ export default function OrgLeadsPage() {
             </div>
           ) : (
             <div className="tbl-wrap">
+              {listTotal > leads.length ? (
+                <div className="help" style={{ padding: "10px 16px 0" }}>
+                  Showing {leads.length} of {listTotal} leads
+                </div>
+              ) : null}
               <table className="tbl">
                 <thead>
                   <tr>
@@ -333,7 +357,7 @@ export default function OrgLeadsPage() {
                         </td>
                         <td>
                           <span className={`badge ${sourceBadgeClass(lead.source)}`}>
-                            {lead.source ?? "website"}
+                            {leadDisplaySource(lead)}
                           </span>
                         </td>
                         <td>
@@ -348,21 +372,13 @@ export default function OrgLeadsPage() {
                         </td>
                         <td>
                           {canAssign ? (
-                            <select
-                              className="inp"
-                              style={{ width: "auto" }}
+                            <LeadStatusSelect
                               value={lead.status}
                               disabled={savingId === lead.id}
-                              onChange={(e) =>
-                                handleAssign(lead, lead.assignedTo?.id ?? null, e.target.value as CrmLeadStatus)
+                              onConfirm={(status, note) =>
+                                handleAssign(lead, lead.assignedTo?.id ?? null, status, note)
                               }
-                            >
-                              {ALL_STATUSES.map((s) => (
-                                <option key={s} value={s}>
-                                  {STATUS_LABEL[s]}
-                                </option>
-                              ))}
-                            </select>
+                            />
                           ) : (
                             <span className={`badge ${STATUS_BADGE[lead.status]}`}>
                               {STATUS_LABEL[lead.status]}

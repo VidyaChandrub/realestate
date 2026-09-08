@@ -854,6 +854,7 @@ export default function AddNewProjectPage() {
               body: JSON.stringify({
                 templateId: selectedTemplate.id,
                 name: lpName,
+                projectId: project.id,
               }),
             });
 

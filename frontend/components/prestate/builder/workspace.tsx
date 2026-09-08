@@ -5,7 +5,7 @@ import type * as React from "react";
 import { DndContext, DragOverlay, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { ArrowRight, CornerDownLeft, Search, SlidersHorizontal, LayoutGrid, Layers, ListOrdered, GripVertical, X } from "lucide-react";
+import { ArrowRight, CornerDownLeft, Search, SlidersHorizontal, LayoutGrid, ListOrdered, GripVertical, X, PanelLeftClose, PanelRight } from "lucide-react";
 import type { Device, FooterDesignId, HeaderDesignId, LandingPageData, MenuLink, SectionInstance, SectionStyle, SiteConfig } from "@/lib/prestate/types";
 import {
   CHROME_FOOTER_ID,
@@ -721,28 +721,30 @@ export function BuilderWorkspace({
           {!dockWidgets ? <button type="button" className="ps-drawer-backdrop" aria-label="Close widgets" onClick={() => setWidgetsOpen(false)} /> : null}
           <div className={dockWidgets ? "ps-sidebar-col" : "ps-drawer-left"} style={{ width: dockWidgets ? (widgetsOpen ? 296 : 48) : 296, flexShrink: 0, transition: dockWidgets ? "width .18s ease" : undefined, zIndex: dockWidgets ? 1 : 420, display: "flex", flexDirection: "column" }}>
             {dockWidgets && widgetsOpen ? (
-              <div style={{ display: "flex", gap: 4, padding: "8px 8px 0", flexShrink: 0, borderBottom: "1px solid var(--ps-line)" }}>
+              <div className="ps-left-tabs">
                 <button
                   type="button"
+                  className="ps-left-tab"
+                  data-active={leftTab === "layers" ? "true" : "false"}
                   onClick={() => setLeftTab("layers")}
-                  style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 6px", borderRadius: 8, border: "none", background: leftTab === "layers" ? "var(--ps-primary)" : "var(--ps-bg)", color: leftTab === "layers" ? "#fff" : "var(--ps-muted)", fontSize: 11.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", cursor: "pointer" }}
                 >
                   <ListOrdered size={13} /> Layers
                 </button>
                 <button
                   type="button"
+                  className="ps-left-tab"
+                  data-active={leftTab === "widgets" ? "true" : "false"}
                   onClick={() => setLeftTab("widgets")}
-                  style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 6px", borderRadius: 8, border: "none", background: leftTab === "widgets" ? "var(--ps-primary)" : "var(--ps-bg)", color: leftTab === "widgets" ? "#fff" : "var(--ps-muted)", fontSize: 11.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", cursor: "pointer" }}
                 >
                   <LayoutGrid size={13} /> Widgets
                 </button>
                 <button
                   type="button"
-                  onClick={() => setWidgetsOpen((v) => !v)}
-                  title="Collapse"
-                  style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--ps-line)", background: "var(--ps-bg)", color: "var(--ps-muted)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                  className="ps-left-collapse"
+                  onClick={() => setWidgetsOpen(false)}
+                  title="Collapse sidebar"
                 >
-                  <Layers size={14} />
+                  <PanelLeftClose size={14} />
                 </button>
               </div>
             ) : null}
@@ -771,6 +773,7 @@ export function BuilderWorkspace({
               ) : (
                 <WidgetsPanel
                   open={true}
+                  hideToggle
                   onToggle={() => setWidgetsOpen((v) => !v)}
                   onAddWidget={addWidget}
                   templates={savedTemplates}
@@ -800,6 +803,7 @@ export function BuilderWorkspace({
           layoutTheme: ensureConfig(page).brand.layoutTheme,
         }}
         form={ensureConfig(page).form}
+        forms={ensureConfig(page).forms}
         chrome={{
           header: ensureConfig(page).header,
           footer: ensureConfig(page).footer,
@@ -812,7 +816,7 @@ export function BuilderWorkspace({
 
       {/* Right Inspector: Docked Mode */}
       {isDocked ? (
-        <div className="ps-sidebar-col" style={{ width: 330, flexShrink: 0, zIndex: 1, display: "flex", flexDirection: "column" }}>
+        <div className="ps-sidebar-col" style={{ width: 320, flexShrink: 0, zIndex: 1, display: "flex", flexDirection: "column" }}>
           <SettingsPanel
             section={selected}
             device={device}
@@ -889,11 +893,12 @@ export function BuilderWorkspace({
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <button
                 type="button"
+                className="ps-inspector-mode-btn"
+                data-active="true"
                 onClick={() => setInspectorMode("docked")}
                 title="Dock to sidebar"
-                style={{ background: "transparent", border: "none", color: "var(--ps-primary)", cursor: "pointer", padding: "2px 6px", fontSize: 11, fontWeight: 800 }}
               >
-                📌 Dock
+                <PanelRight size={12} /> Dock
               </button>
               <button
                 type="button"
@@ -924,33 +929,37 @@ export function BuilderWorkspace({
 
       {/* Floating Action Ribbon */}
       <div className="ps-builder-fabs" style={{ zIndex: 400 }}>
+        {!dockWidgets ? (
         <button
           type="button"
           className="ps-fab"
           onClick={() => setWidgetsOpen((v) => !v)}
-          title="Toggle Blocks/Widgets Sidebar (Ctrl+B)"
+          title="Toggle blocks sidebar"
           style={{ background: widgetsOpen ? "var(--ps-primary)" : undefined, color: widgetsOpen ? "#fff" : undefined }}
         >
-          <LayoutGrid size={15} /> {widgetsOpen ? "Hide Blocks" : "Blocks"}
+          <LayoutGrid size={15} /> {widgetsOpen ? "Hide blocks" : "Blocks"}
+        </button>
+        ) : null}
+
+        <button type="button" className="ps-fab" onClick={() => setQuickOpen(true)} title="Quick add (Ctrl+K)">
+          <Search size={15} /> Quick add
+          <kbd>Ctrl K</kbd>
         </button>
 
-        <button type="button" className="ps-fab" onClick={() => setQuickOpen(true)} title="Quick Add (Ctrl+K)">
-          <Search size={15} /> Quick Add
-          <kbd style={{ fontSize: 10, fontWeight: 800, opacity: 0.7 }}>Ctrl K</kbd>
-        </button>
-
+        {!isDocked || inspectorMode === "hidden" ? (
         <button
           type="button"
           className="ps-fab"
           onClick={() => setInspectorMode((prev) => (prev === "hidden" ? "floating" : prev === "floating" ? "docked" : "hidden"))}
-          title="Toggle Inspector / Full Screen Mode"
+          title="Toggle inspector"
           style={{
             background: inspectorMode !== "hidden" ? "var(--ps-primary)" : undefined,
             color: inspectorMode !== "hidden" ? "#fff" : undefined,
           }}
         >
-          <SlidersHorizontal size={15} /> {inspectorMode === "docked" ? "Docked Inspector" : inspectorMode === "floating" ? "Floating (Move)" : "Full Canvas (Zen)"}
+          <SlidersHorizontal size={15} /> {inspectorMode === "docked" ? "Inspector" : inspectorMode === "floating" ? "Floating" : "Inspector"}
         </button>
+        ) : null}
       </div>
 
       {quickOpen ? <QuickAdd onClose={() => { setQuickOpen(false); setPendingInsertIndex(null); }} onInsert={addWidget} /> : null}

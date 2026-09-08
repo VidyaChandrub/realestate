@@ -128,6 +128,7 @@ export class AdminOrganisationsService {
         to: user.email,
         recipientName: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined,
         orgName: organisation.name,
+        orgId: organisation.id,
         role: 'Organisation Admin',
         tempPassword: rawPassword,
       });
@@ -192,6 +193,7 @@ export class AdminOrganisationsService {
       to: user.email,
       recipientName: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined,
       orgName: organisation.name,
+      orgId: organisation.id,
       role: 'Organisation Admin',
       tempPassword,
     });
@@ -295,6 +297,7 @@ export class AdminOrganisationsService {
       to: admin.email,
       recipientName: [admin.firstName, admin.lastName].filter(Boolean).join(' ') || undefined,
       orgName: result.activated.name,
+      orgId: organisation.id,
       role: 'Organisation Admin',
       tempPassword,
     });

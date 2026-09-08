@@ -38,6 +38,7 @@ export interface SendMailOptions {
   subject: string;
   html: string;
   text?: string;
+  orgId?: string | null;
   template?:
     | 'invite'
     | 'password_reset'
@@ -79,6 +80,7 @@ export class EmailService implements OnApplicationBootstrap {
     await this.prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS identity.email_configs (
         id TEXT PRIMARY KEY,
+        org_id TEXT UNIQUE,
         host TEXT NOT NULL,
         port INTEGER NOT NULL DEFAULT 587,
         secure BOOLEAN NOT NULL DEFAULT false,
@@ -124,9 +126,16 @@ export class EmailService implements OnApplicationBootstrap {
     await this.prisma.$executeRawUnsafe(
       `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS account_deactivated_body TEXT;`,
     );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE identity.email_configs ADD COLUMN IF NOT EXISTS org_id TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `CREATE UNIQUE INDEX IF NOT EXISTS email_configs_org_id_key ON identity.email_configs(org_id) WHERE org_id IS NOT NULL;`,
+    );
     await this.prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS audit.email_logs (
         id TEXT PRIMARY KEY,
+        org_id TEXT,
         "to" TEXT NOT NULL,
         subject TEXT NOT NULL,
         template TEXT,
@@ -145,34 +154,30 @@ export class EmailService implements OnApplicationBootstrap {
     await this.prisma.$executeRawUnsafe(
       `CREATE INDEX IF NOT EXISTS email_logs_sent_at_idx ON audit.email_logs(sent_at);`,
     );
+    await this.prisma.$executeRawUnsafe(
+      `ALTER TABLE audit.email_logs ADD COLUMN IF NOT EXISTS org_id TEXT;`,
+    );
+    await this.prisma.$executeRawUnsafe(
+      `CREATE INDEX IF NOT EXISTS email_logs_org_id_idx ON audit.email_logs(org_id);`,
+    );
     this.tablesReady = true;
   }
 
-  /**
-   * Fetch active config from database, or fallback to environment variables.
-   */
-  async getConfig() {
-    try {
-      await this.ensureEmailTables();
-      const config = await this.prisma.emailConfig.findFirst({
-        orderBy: { updatedAt: 'desc' },
-      });
-      if (config) {
-        return {
-          ...config,
-          // Mask password for safety on read
-          password: config.password ? '••••••••' : '',
-          hasPassword: Boolean(config.password),
-        };
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(`Could not read EmailConfig from DB: ${message}`);
-    }
+  private maskConfig(config: {
+    password?: string | null;
+    [key: string]: unknown;
+  }) {
+    return {
+      ...config,
+      password: config.password ? '••••••••' : '',
+      hasPassword: Boolean(config.password),
+    };
+  }
 
-    // Default fallback from environment variables
+  private envFallbackConfig() {
     return {
       id: null,
+      orgId: null,
       host: process.env.SMTP_HOST || '',
       port: Number(process.env.SMTP_PORT) || 587,
       secure: process.env.SMTP_SECURE === 'true',
@@ -191,18 +196,109 @@ export class EmailService implements OnApplicationBootstrap {
       accountActivatedBody: null,
       accountDeactivatedSubject: null,
       accountDeactivatedBody: null,
+      usingPlatformFallback: false,
+      platformConfigured: Boolean(process.env.SMTP_HOST),
     };
   }
 
+  private async platformConfigured(): Promise<boolean> {
+    try {
+      const platform = await this.prisma.emailConfig.findFirst({
+        where: { orgId: null, isActive: true },
+        select: { host: true },
+      });
+      return Boolean(platform?.host || process.env.SMTP_HOST);
+    } catch {
+      return Boolean(process.env.SMTP_HOST);
+    }
+  }
+
   /**
-   * Update or create the Super Admin's SMTP configuration.
+   * Fetch SMTP config. Pass orgId for organisation settings (never leaks
+   * platform credentials). Omit orgId for Super Admin / platform config.
    */
-  async updateConfig(dto: UpdateEmailConfigDto) {
+  async getConfig(orgId?: string | null) {
+    try {
+      await this.ensureEmailTables();
+      if (orgId) {
+        const config = await this.prisma.emailConfig.findFirst({
+          where: { orgId },
+        });
+        const platformConfigured = await this.platformConfigured();
+        if (config) {
+          return {
+            ...this.maskConfig(config),
+            usingPlatformFallback: false,
+            platformConfigured,
+          };
+        }
+        let fromName = 'Organisation';
+        let fromEmail = '';
+        try {
+          const org = await this.prisma.organisation.findUnique({
+            where: { id: orgId },
+            select: { name: true, supportEmail: true },
+          });
+          if (org?.name) fromName = org.name;
+          if (org?.supportEmail) fromEmail = org.supportEmail;
+        } catch {
+          /* ignore */
+        }
+        return {
+          id: null,
+          orgId,
+          host: '',
+          port: 587,
+          secure: false,
+          user: '',
+          password: '',
+          hasPassword: false,
+          fromEmail,
+          fromName,
+          replyTo: null,
+          isActive: true,
+          inviteSubject: null,
+          inviteBody: null,
+          resetSubject: null,
+          resetBody: null,
+          accountActivatedSubject: null,
+          accountActivatedBody: null,
+          accountDeactivatedSubject: null,
+          accountDeactivatedBody: null,
+          usingPlatformFallback: platformConfigured,
+          platformConfigured,
+        };
+      }
+
+      const config = await this.prisma.emailConfig.findFirst({
+        where: { orgId: null },
+        orderBy: { updatedAt: 'desc' },
+      });
+      if (config) {
+        return {
+          ...this.maskConfig(config),
+          usingPlatformFallback: false,
+          platformConfigured: Boolean(config.host),
+        };
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Could not read EmailConfig from DB: ${message}`);
+    }
+
+    return this.envFallbackConfig();
+  }
+
+  /**
+   * Update or create SMTP configuration (platform when orgId is omitted).
+   */
+  async updateConfig(dto: UpdateEmailConfigDto, orgId?: string | null) {
     await this.ensureEmailTables();
 
     let existing: any = null;
     try {
       existing = await this.prisma.emailConfig.findFirst({
+        where: orgId ? { orgId } : { orgId: null },
         orderBy: { updatedAt: 'desc' },
       });
     } catch (e: any) {
@@ -242,6 +338,7 @@ export class EmailService implements OnApplicationBootstrap {
     } else {
       saved = await this.prisma.emailConfig.create({
         data: {
+          orgId: orgId || null,
           host: dto.host,
           port: dto.port,
           secure: dto.secure,
@@ -268,22 +365,30 @@ export class EmailService implements OnApplicationBootstrap {
     this.cachedConfig = null;
 
     return {
-      ...saved,
-      password: saved.password ? '••••••••' : '',
-      hasPassword: Boolean(saved.password),
+      ...this.maskConfig(saved),
+      usingPlatformFallback: false,
+      platformConfigured: true,
     };
   }
 
   /**
-   * Internal helper to build Nodemailer transporter
+   * Org SMTP if configured and active; otherwise platform / env.
    */
-  private async getTransporter(): Promise<{ transporter: Transporter; from: string }> {
+  private async getTransporter(orgId?: string | null): Promise<{ transporter: Transporter; from: string }> {
     let config: any = null;
     try {
-      config = await this.prisma.emailConfig.findFirst({
-        where: { isActive: true },
-        orderBy: { updatedAt: 'desc' },
-      });
+      if (orgId) {
+        config = await this.prisma.emailConfig.findFirst({
+          where: { orgId, isActive: true },
+        });
+        if (!config?.host) config = null;
+      }
+      if (!config) {
+        config = await this.prisma.emailConfig.findFirst({
+          where: { orgId: null, isActive: true },
+          orderBy: { updatedAt: 'desc' },
+        });
+      }
     } catch (err: any) {
       this.logger.warn(`Could not load emailConfig: ${err.message}`);
     }
@@ -297,7 +402,11 @@ export class EmailService implements OnApplicationBootstrap {
     const fromName = config?.fromName || process.env.SMTP_FROM_NAME || 'iPixxel Realty';
 
     if (!host) {
-      throw new BadRequestException('SMTP Host is not configured in Super Admin settings.');
+      throw new BadRequestException(
+        orgId
+          ? 'SMTP is not configured. Add your organisation SMTP in Settings → Email, or ask the platform admin to configure platform mail.'
+          : 'SMTP Host is not configured in Super Admin settings.',
+      );
     }
 
     const auth = user ? { user, pass } : undefined;
@@ -324,13 +433,13 @@ export class EmailService implements OnApplicationBootstrap {
    * Automatically creates audit logs in EmailLog.
    */
   async sendMail(options: SendMailOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    const { to, subject, html, text, template = 'system', metadata } = options;
+    const { to, subject, html, text, template = 'system', metadata, orgId } = options;
 
     let errorStr: string | undefined = undefined;
     let messageId: string | undefined = undefined;
 
     try {
-      const { transporter, from } = await this.getTransporter();
+      const { transporter, from } = await this.getTransporter(orgId);
 
       const info = await transporter.sendMail({
         from,
@@ -344,6 +453,7 @@ export class EmailService implements OnApplicationBootstrap {
       this.logger.log(`Email dispatched successfully to ${to} [${template}]: ${messageId}`);
 
       await this.logEmailDispatch({
+        orgId,
         to,
         subject,
         template,
@@ -357,6 +467,7 @@ export class EmailService implements OnApplicationBootstrap {
       this.logger.error(`Failed to send email to ${to} [${template}]: ${errorStr}`);
 
       await this.logEmailDispatch({
+        orgId,
         to,
         subject,
         template,
@@ -372,10 +483,13 @@ export class EmailService implements OnApplicationBootstrap {
   /**
    * Send test email to verify SMTP configuration
    */
-  async sendTestEmail(dto: SendTestEmailDto) {
-    const config = await this.getConfig();
-    if (!config.host) {
+  async sendTestEmail(dto: SendTestEmailDto, orgId?: string | null) {
+    const config = await this.getConfig(orgId);
+    if (!config.host && !orgId) {
       throw new BadRequestException('Please configure an SMTP Host before sending a test email.');
+    }
+    if (orgId && !config.host) {
+      throw new BadRequestException('Save your organisation SMTP host before sending a test email.');
     }
 
     const sentAt = new Date().toLocaleString();
@@ -391,7 +505,8 @@ export class EmailService implements OnApplicationBootstrap {
       subject,
       html,
       template: 'test',
-      metadata: { initiatedBy: 'Super Admin Test Trigger' },
+      orgId,
+      metadata: { initiatedBy: orgId ? 'Organisation SMTP test' : 'Super Admin Test Trigger' },
     });
 
     if (!result.success) {
@@ -408,12 +523,13 @@ export class EmailService implements OnApplicationBootstrap {
   /**
    * Query email dispatch logs with pagination
    */
-  async listLogs(query: ListEmailLogsDto) {
+  async listLogs(query: ListEmailLogsDto, orgId?: string | null) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
     const skip = (page - 1) * limit;
 
     const where: any = {};
+    if (orgId) where.orgId = orgId;
     if (query.status && query.status !== 'all') {
       where.status = query.status;
     }
@@ -453,13 +569,14 @@ export class EmailService implements OnApplicationBootstrap {
   /**
    * Get stats for Super Admin dashboard / email settings
    */
-  async getStats() {
+  async getStats(orgId?: string | null) {
     try {
       await this.ensureEmailTables();
+      const where = orgId ? { orgId } : {};
       const [totalSent, totalFailed, lastLog] = await Promise.all([
-        this.prisma.emailLog.count({ where: { status: 'sent' } }),
-        this.prisma.emailLog.count({ where: { status: 'failed' } }),
-        this.prisma.emailLog.findFirst({ orderBy: { sentAt: 'desc' } }),
+        this.prisma.emailLog.count({ where: { ...where, status: 'sent' } }),
+        this.prisma.emailLog.count({ where: { ...where, status: 'failed' } }),
+        this.prisma.emailLog.findFirst({ where, orderBy: { sentAt: 'desc' } }),
       ]);
 
       return {
@@ -482,6 +599,7 @@ export class EmailService implements OnApplicationBootstrap {
    * Helper to write to audit.EmailLog safely
    */
   private async logEmailDispatch(data: {
+    orgId?: string | null;
     to: string;
     subject: string;
     template: string;
@@ -493,6 +611,7 @@ export class EmailService implements OnApplicationBootstrap {
       await this.ensureEmailTables();
       await this.prisma.emailLog.create({
         data: {
+          orgId: data.orgId || null,
           to: data.to,
           subject: data.subject,
           template: data.template,
@@ -513,6 +632,7 @@ export class EmailService implements OnApplicationBootstrap {
     to: string;
     recipientName?: string;
     orgName?: string;
+    orgId?: string;
     role: string;
     tempPassword?: string;
     loginUrl?: string;
@@ -520,7 +640,7 @@ export class EmailService implements OnApplicationBootstrap {
     const loginUrl =
       params.loginUrl || `${frontendBaseUrl()}/login`;
 
-    const config = await this.getConfig();
+    const config = await this.getConfig(params.orgId);
 
     const html = getInviteEmailHtml({
       recipientName: params.recipientName,
@@ -543,6 +663,7 @@ export class EmailService implements OnApplicationBootstrap {
       subject,
       html,
       template: 'invite',
+      orgId: params.orgId,
       metadata: { orgName: params.orgName, role: params.role },
     });
   }
@@ -552,12 +673,13 @@ export class EmailService implements OnApplicationBootstrap {
     recipientName?: string;
     resetToken: string;
     resetUrl?: string;
+    orgId?: string | null;
   }) {
     const resetUrl =
       params.resetUrl ||
       `${frontendBaseUrl()}/reset-password?token=${encodeURIComponent(params.resetToken)}`;
 
-    const config = await this.getConfig();
+    const config = await this.getConfig(params.orgId);
 
     const html = getResetPasswordEmailHtml({
       recipientName: params.recipientName,
@@ -573,6 +695,7 @@ export class EmailService implements OnApplicationBootstrap {
       subject,
       html,
       template: 'password_reset',
+      orgId: params.orgId,
       metadata: { tokenPrefix: params.resetToken.substring(0, 6) },
     });
   }
@@ -581,6 +704,7 @@ export class EmailService implements OnApplicationBootstrap {
     to: string;
     recipientName?: string;
     code: string;
+    orgId?: string | null;
   }) {
     const verifyUrl = `${frontendBaseUrl()}/verify-email?email=${encodeURIComponent(params.to)}`;
     const html = getVerificationEmailHtml({
@@ -593,6 +717,7 @@ export class EmailService implements OnApplicationBootstrap {
       subject: 'Verify your iPixxel Realty email',
       html,
       template: 'notification',
+      orgId: params.orgId,
       metadata: { kind: 'email_verification' },
     });
   }
@@ -601,8 +726,9 @@ export class EmailService implements OnApplicationBootstrap {
     to: string;
     recipientName?: string;
     status: 'activated' | 'deactivated';
+    orgId?: string | null;
   }) {
-    const config = await this.getConfig();
+    const config = await this.getConfig(params.orgId);
     const activated = params.status === 'activated';
     const subject = (
       (activated ? config.accountActivatedSubject : config.accountDeactivatedSubject) ||
@@ -624,6 +750,7 @@ export class EmailService implements OnApplicationBootstrap {
       subject,
       html,
       template: activated ? 'user_account_activated' : 'user_account_deactivated',
+      orgId: params.orgId,
     });
   }
 

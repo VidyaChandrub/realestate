@@ -69,7 +69,6 @@ import type {
 } from "@/lib/prestate/types";
 import { isFieldVisible, withFieldValue } from "@/lib/prestate/form-logic";
 import { PROPERTY, SLUG_ICONS, resolveVars } from "@/lib/prestate/data";
-import { loadFormLibrary } from "@/lib/prestate/forms-store";
 import type {
   FontDef,
   TemplateTypography,
@@ -140,6 +139,11 @@ import {
 import { bumpTracking } from "@/lib/prestate/tracking";
 import { firePrestateLead } from "@/components/prestate/tracking-scripts";
 import { submitLead } from "@/lib/api";
+import { composeLeadSource } from "@/lib/lead-display";
+import { mergeFormLibraries, resolveEffectiveForm } from "@/lib/prestate/resolve-form";
+import type { FormDefinition } from "@/lib/prestate/forms-store";
+import { sampleBuilderForms } from "@/lib/prestate/sample-forms";
+import { DynamicLeadForm } from "@/components/prestate/dynamic-lead-form";
 import { ProjectSection } from "@/components/prestate/project-widget";
 
 type CanvasTheme = {
@@ -156,6 +160,13 @@ type CanvasTheme = {
 const SiteFormContext = createContext<SiteConfig["form"] | undefined>(
   undefined,
 );
+const SiteFormsContext = createContext<FormDefinition[]>([]);
+
+function useResolvedForm(formId?: string | null) {
+  const pageForm = useContext(SiteFormContext);
+  const pageForms = useContext(SiteFormsContext);
+  return resolveEffectiveForm({ formId, pageForm, pageForms });
+}
 const SiteChromeContext = createContext<
   | {
       header: SiteConfig["header"];
@@ -759,6 +770,7 @@ function GatedDownloadModal({
   fields,
   submitLabel,
   successMessage,
+  formId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -770,7 +782,9 @@ function GatedDownloadModal({
   fields: GateField[];
   submitLabel: string;
   successMessage: string;
+  formId?: string;
 }) {
+  const builderForm = useResolvedForm(formId);
   if (!open) return null;
   return (
     <div
@@ -787,6 +801,27 @@ function GatedDownloadModal({
         padding: 16,
       }}
     >
+      {builderForm ? (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="ps-fade-in ps-gate-card"
+          style={{ background: "#fff", borderRadius: 16, padding: 20, width: 420, maxWidth: "100%" }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>{heading || builderForm.name}</div>
+          {text ? <div style={{ fontSize: 12.5, color: "#64748b", marginBottom: 12 }}>{text}</div> : null}
+          <DynamicLeadForm
+            form={{ ...builderForm, submitLabel: submitLabel || builderForm.submitLabel }}
+            live={live}
+            pageId={pageId}
+            place="Brochure gate"
+            onSuccess={() => {
+              if (live && pageId) bumpTracking(pageId, "brochure");
+              if (file) window.setTimeout(() => downloadFile(file), 400);
+              window.setTimeout(onClose, 900);
+            }}
+          />
+        </div>
+      ) : (
       <GateForm
         onClose={onClose}
         live={live}
@@ -798,6 +833,7 @@ function GatedDownloadModal({
         submitLabel={submitLabel}
         successMessage={successMessage}
       />
+      )}
     </div>
   );
 }
@@ -861,7 +897,7 @@ function GateForm({
     void submitLead({
       landingPageId: pageId,
       formName: textOf(heading || "Brochure Gate"),
-      source: "brochure_gate",
+      source: composeLeadSource({ place: "Brochure gate" }),
       fields: leadFields,
     }).catch(() => {});
     window.dispatchEvent(new CustomEvent(LEAD_SUCCESS_EVENT));
@@ -1344,6 +1380,7 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
   const live = useContext(SiteLiveContext);
   const pageId = useContext(SitePageIdContext);
   const wt = useContext(SiteLayoutThemeContext);
+  const heroForm = useResolvedForm(String(st.formId ?? ""));
   const T = typoCss(s, device);
   const design = String(s.settings.design ?? "split");
   const primaryAction = textOf(st.primaryAction ?? "link") as CtaAction;
@@ -1372,8 +1409,6 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
   const [gateOpen, setGateOpen] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
-  const [heroPhone, setHeroPhone] = useState("");
-  const [heroPhoneError, setHeroPhoneError] = useState("");
   const handle = useCtaHandlers(live);
   const gateFields =
     Array.isArray(st.gateFields) && st.gateFields.length
@@ -2140,22 +2175,7 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
                     </button>
                   </div>
                 ) : (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!isValidPhone(heroPhone)) {
-                        setHeroPhoneError("Enter a valid phone number.");
-                        return;
-                      }
-                      setHeroPhoneError("");
-                      setFormSubmitted(true);
-                    }}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 12,
-                    }}
-                  >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <div style={{ marginBottom: 4 }}>
                       <span
                         style={{
@@ -2177,7 +2197,7 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
                         }}
                       >
                         {textOf(
-                          st.formTitle || "Schedule a Private Site Visit",
+                          st.formTitle || heroForm?.name || "Schedule a Private Site Visit",
                         )}
                       </h3>
                       <p
@@ -2185,102 +2205,28 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
                       >
                         {textOf(
                           st.formSubtitle ||
-                            "Get instant pricing, floor plans & unit availability",
+                            heroForm?.description ||
+                            "Share your details and our team will call you back.",
                         )}
                       </p>
                     </div>
-
-                    <div>
-                      <input
-                        placeholder="Your Full Name *"
-                        required
-                        style={{ ...wtFieldDark(undefined, wt) }}
-                      />
-                    </div>
-
-                    <div>
-                      <input
-                        type="tel"
-                        placeholder="Phone Number (+91) *"
-                        required
-                        value={heroPhone}
-                        onChange={(e) => {
-                          setHeroPhone(e.target.value);
-                          if (heroPhoneError) setHeroPhoneError("");
+                    {heroForm ? (
+                      <DynamicLeadForm
+                        form={{
+                          ...heroForm,
+                          submitLabel: textOf(st.formButton || heroForm.submitLabel || "Book Site Visit"),
                         }}
-                        style={{
-                          ...wtFieldDark(
-                            heroPhoneError
-                              ? { border: "1px solid #ef4444" }
-                              : undefined,
-                            wt,
-                          ),
-                        }}
+                        live={!!live}
+                        pageId={pageId}
+                        place="Hero section"
+                        variant="dark"
+                        onSuccess={() => setFormSubmitted(true)}
                       />
-                      {heroPhoneError ? (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "#f87171",
-                            fontWeight: 600,
-                            marginTop: 5,
-                          }}
-                        >
-                          {heroPhoneError}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div>
-                      <input
-                        type="email"
-                        placeholder="Email Address"
-                        style={{ ...wtFieldDark(undefined, wt) }}
-                      />
-                    </div>
-
-                    <div>
-                      <select
-                        style={{
-                          ...wtFieldDark(
-                            { background: "rgba(15,23,42,.95)" },
-                            wt,
-                          ),
-                        }}
-                      >
-                        <option>Interested in 2 BHK Luxury</option>
-                        <option selected>Interested in 3 BHK Premium</option>
-                        <option>Interested in 4 BHK Sky Villa</option>
-                        <option>Interested in Penthouse</option>
-                      </select>
-                    </div>
-
-                    <button
-                      type="submit"
-                      style={{
-                        width: "100%",
-                        padding: "13px",
-                        borderRadius: wt.radiusSm,
-                        background: `linear-gradient(135deg, ${wt.primary} 0%, ${wt.primaryDark} 100%)`,
-                        color: "#fff",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        border: "none",
-                        cursor: "pointer",
-                        boxShadow: `0 8px 24px ${hexToSoft(String(wt.primary), 0.45)}`,
-                        marginTop: 4,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <span>
-                        {textOf(st.formButton || "Book Site Visit Now")}
-                      </span>
-                      <ArrowRight size={15} />
-                    </button>
-
+                    ) : (
+                      <div style={{ fontSize: 12.5, color: "#94a3b8" }}>
+                        Assign a form in Forms or this widget&apos;s Form to display.
+                      </div>
+                    )}
                     <div
                       style={{
                         fontSize: 10.5,
@@ -2289,9 +2235,9 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
                         marginTop: 2,
                       }}
                     >
-                      🔒 100% Privacy Guaranteed • Direct Developer Booking
+                      Privacy guaranteed
                     </div>
-                  </form>
+                  </div>
                 )}
               </div>
             </div>
@@ -2304,6 +2250,7 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
             onClose={() => setGateOpen(false)}
             live={!!live}
             pageId={pageId}
+            formId={String(st.formId ?? "")}
             file={gateFile}
             heading={textOf(st.gateHeading || "Get the brochure")}
             text={textOf(st.gateText || "")}
@@ -2685,6 +2632,7 @@ function HeroSection({ s, device }: { s: SectionInstance; device: Device }) {
           onClose={() => setGateOpen(false)}
           live={!!live}
           pageId={pageId}
+          formId={String(st.formId ?? "")}
           file={gateFile}
           heading={textOf(st.gateHeading || "Get the brochure")}
           text={textOf(st.gateText || "")}
@@ -4799,71 +4747,20 @@ function FloorPlanGallerySection({
 
   const formHeading = textOf(st.formHeading ?? "Unlock Floor Plan");
   const formButton = textOf(st.formButton ?? "View Floor Plan");
+  const unlockForm = useResolvedForm(String(st.formId ?? ""));
 
   // Track which plans have been unlocked (by index)
   const [unlocked, setUnlocked] = useState<Set<number>>(() => new Set());
   // Which plan popup is currently open (index or null)
   const [popupIndex, setPopupIndex] = useState<number | null>(null);
 
-  // Form field state
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [formError, setFormError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
   const openPopup = (i: number) => {
     if (unlocked.has(i)) return;
     if (!live) return; // in builder preview just show as-is
     setPopupIndex(i);
-    setName("");
-    setPhone("");
-    setEmail("");
-    setFormError("");
-    setSubmitting(false);
   };
 
   const closePopup = () => setPopupIndex(null);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const n = name.trim();
-    const p = phone.trim();
-    const em = email.trim();
-    if (!n) {
-      setFormError("Please enter your name.");
-      return;
-    }
-    if (!p) {
-      setFormError("Please enter your phone number.");
-      return;
-    }
-    if (!isValidPhone(p)) {
-      setFormError("Enter a valid phone number.");
-      return;
-    }
-    if (em && !isValidEmail(em)) {
-      setFormError("Enter a valid email address.");
-      return;
-    }
-    setFormError("");
-    setSubmitting(true);
-    if (live) {
-      firePrestateLead();
-      if (pageId) bumpTracking(pageId, "form");
-      window.dispatchEvent(new CustomEvent(LEAD_SUCCESS_EVENT));
-      void submitLead({
-        landingPageId: pageId,
-        formName: "Floor Plan Gallery",
-        source: "floorplan",
-        fields: { Name: n, Phone: p, Email: em },
-      }).catch(() => {});
-    }
-    // Unlock the selected plan
-    setUnlocked((prev) => new Set([...prev, popupIndex!]));
-    setPopupIndex(null);
-    setSubmitting(false);
-  };
 
   const activePlan = popupIndex !== null ? plans[popupIndex] : null;
 
@@ -5780,161 +5677,39 @@ function FloorPlanGallerySection({
               </div>
             </div>
 
-            {/* Form */}
-            <form
-              onSubmit={handleSubmit}
-              style={{
-                padding: "16px 28px 28px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 14,
-              }}
-            >
-              {/* Name */}
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    color: wt.slate,
-                    marginBottom: 6,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
+            <div style={{ padding: "16px 28px 28px" }}>
+              {unlockForm ? (
+                <DynamicLeadForm
+                  form={{ ...unlockForm, submitLabel: formButton || unlockForm.submitLabel }}
+                  live={!!live}
+                  pageId={pageId}
+                  place="Floor plan"
+                  extraFields={{
+                    "Interested in": activePlan.name,
+                    interestedIn: activePlan.name,
                   }}
-                >
-                  Full Name <span style={{ color: "#e11d48" }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your full name"
-                  required
-                  style={{
-                    ...wtField({ backgroundColor: wt.surfaceMuted }, wt),
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = wt.fieldFocus;
-                    e.target.style.background = "#fff";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = wt.fieldBorder;
-                    e.target.style.background = wt.surfaceMuted;
+                  onSuccess={() => {
+                    setUnlocked((prev) => new Set([...prev, popupIndex!]));
+                    closePopup();
                   }}
                 />
-              </div>
-              {/* Phone */}
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    color: wt.slate,
-                    marginBottom: 6,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Phone Number <span style={{ color: "#e11d48" }}>*</span>
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
-                  required
-                  style={{
-                    ...wtField({ backgroundColor: wt.surfaceMuted }, wt),
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = wt.fieldFocus;
-                    e.target.style.background = "#fff";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = wt.fieldBorder;
-                    e.target.style.background = wt.surfaceMuted;
-                  }}
-                />
-              </div>
-              {/* Email */}
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    color: wt.slate,
-                    marginBottom: 6,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com (optional)"
-                  style={{
-                    ...wtField({ backgroundColor: wt.surfaceMuted }, wt),
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = wt.fieldFocus;
-                    e.target.style.background = "#fff";
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = wt.fieldBorder;
-                    e.target.style.background = wt.surfaceMuted;
-                  }}
-                />
-              </div>
-              {/* Error */}
-              {formError && (
-                <div
-                  style={{
-                    background: "#fff1f2",
-                    border: "1px solid #fecdd3",
-                    borderRadius: 8,
-                    padding: "9px 12px",
-                    color: "#e11d48",
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  {formError}
+              ) : (
+                <div style={{ fontSize: 13, color: wt.muted }}>
+                  Assign a Form Builder form in Settings to unlock floor plans.
                 </div>
               )}
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={submitting}
-                style={{
-                  ...wtButton({ accent: st.accent }, wt),
-                  width: "100%",
-                  justifyContent: "center",
-                  fontSize: 14.5,
-                  padding: "13px 20px",
-                  marginTop: 2,
-                  opacity: submitting ? 0.7 : 1,
-                }}
-              >
-                <LockOpen size={15} /> {formButton}
-              </button>
               <p
                 style={{
-                  margin: 0,
+                  margin: "12px 0 0",
                   fontSize: 11.5,
                   color: wt.muted,
                   textAlign: "center",
                   lineHeight: 1.5,
                 }}
               >
-                🔒 Your details are safe. We respect your privacy.
+                Your details are safe. We respect your privacy.
               </p>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -7825,27 +7600,10 @@ function LeadFormSection({
   const [sent, setSent] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
 
-  // Form widget dropdown: if the widget has a formId set, render that library form instead of the page's form.
   const widgetFormId = String(
     (s.settings as Record<string, unknown>).formId ?? "",
   ).trim();
-  const [libraryForm, setLibraryForm] = useState<SiteConfig["form"] | null>(
-    null,
-  );
-  useEffect(() => {
-    if (!widgetFormId) {
-      setLibraryForm(null);
-      return;
-    }
-    try {
-      const lib = loadFormLibrary();
-      const found = lib.find((f) => f.id === widgetFormId);
-      setLibraryForm(found ? (found as unknown as SiteConfig["form"]) : null);
-    } catch {
-      setLibraryForm(null);
-    }
-  }, [widgetFormId]);
-  const effectiveForm = (libraryForm ?? cfg) as SiteConfig["form"];
+  const effectiveForm = (useResolvedForm(widgetFormId) ?? cfg) as SiteConfig["form"];
 
   const rawFields = effectiveForm?.fields?.length
     ? effectiveForm.fields
@@ -8056,11 +7814,22 @@ function LeadFormSection({
       const key = (f as { id?: string }).id || f.label;
       leadFields[f.label] = String(values[key] ?? "");
     }
+    const interest =
+      leadFields.interestedIn ||
+      leadFields["Interested in"] ||
+      leadFields.Configuration ||
+      "";
     void submitLead({
       landingPageId: pageId,
       formName: effectiveForm?.name,
-      source: "website",
-      fields: leadFields,
+      source: composeLeadSource({
+        place: s.label || "Page form",
+        interest,
+      }),
+      fields: {
+        ...leadFields,
+        ...(interest ? { interestedIn: interest } : {}),
+      },
     }).catch(() => {});
     // Conditional action: open a popup (offer / thank-you / download gate).
     const popupAfterSubmit = String(effectiveForm?.openPopupId ?? "").trim();
@@ -10045,6 +9814,7 @@ function ButtonSection({ s }: { s: SectionInstance }) {
           onClose={() => setGateOpen(false)}
           live={live}
           pageId={pageId}
+          formId={String(st.formId ?? "")}
           file={gateFile}
           heading={textOf(st.gateHeading || "Get the brochure")}
           text={textOf(st.gateText || "")}
@@ -11653,6 +11423,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
   );
   const urlParam = textOf(st.urlParam ?? "").trim();
   const showForm = st.showForm === true;
+  const popupBuilderForm = useResolvedForm(String(st.formId ?? ""));
   // Frequency — how often the same visitor sees this popup. The legacy boolean
   // oncePerSession maps: true → "session", false → "always".
   const frequency = textOf(
@@ -11675,9 +11446,6 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
   const [open, setOpen] = useState(false);
   const storageKey = `prestate.popup.${s.id}`;
 
-  // Embedded lead-form state
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState("");
   const [formDone, setFormDone] = useState(false);
 
   useEffect(() => {
@@ -11858,53 +11626,32 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
     }
   };
 
-  const popupFields: GateField[] =
-    Array.isArray(st.fields) && st.fields.length
-      ? (st.fields as GateField[])
-      : formCfg?.fields?.length
-        ? formCfg.fields.slice(0, 3).map((f) => ({ ...f }))
-        : [
-            { label: "Full Name", type: "text", required: true },
-            { label: "Phone Number", type: "phone", required: true },
-          ];
-
-  const submitPopupForm = () => {
-    for (const f of popupFields) {
-      const v = (values[f.label] ?? "").trim();
-      if ((f.required ?? false) && !v && f.type !== "checkbox") {
-        setFormError(`${f.label} is required.`);
-        return;
-      }
-      if (v && f.type === "email" && !isValidEmail(v)) {
-        setFormError("Please enter a valid email address.");
-        return;
-      }
-      if (v && f.type === "phone" && !isValidPhone(v)) {
-        setFormError("Please enter a valid phone number.");
-        return;
-      }
+  const renderPopupLeadForm = (compact = false) => {
+    const form = popupBuilderForm ?? formCfg;
+    if (form?.fields?.length) {
+      return (
+        <DynamicLeadForm
+          form={{
+            ...form,
+            submitLabel: textOf(st.formButton || form.submitLabel || "Submit Enquiry"),
+          }}
+          live={!!live}
+          pageId={pageId}
+          place="Popup"
+          onSuccess={() => {
+            setFormDone(true);
+            const deliverable = textOf(st.pdfUrl || form.deliverableUrl || "").trim();
+            if (deliverable) window.setTimeout(() => downloadFile(deliverable), 800);
+            window.setTimeout(() => dismiss(), 1600);
+          }}
+        />
+      );
     }
-    setFormError("");
-    setFormDone(true);
-    if (!live) return;
-    firePrestateLead();
-    if (pageId) bumpTracking(pageId, "form");
-    const leadFields: Record<string, string> = {};
-    for (const f of popupFields) {
-      leadFields[f.label] = values[f.label] ?? "";
-    }
-    void submitLead({
-      landingPageId: pageId,
-      formName: textOf(heading || "Popup Lead Form"),
-      source: "popup_form",
-      fields: leadFields,
-    }).catch(() => {});
-    window.dispatchEvent(new CustomEvent(LEAD_SUCCESS_EVENT));
-    const deliverable = textOf(
-      st.pdfUrl || formCfg?.deliverableUrl || "",
-    ).trim();
-    if (deliverable) window.setTimeout(() => downloadFile(deliverable), 800);
-    window.setTimeout(() => dismiss(), 1600);
+    return (
+      <div style={{ fontSize: 12.5, color: wt.muted }}>
+        Assign a Form Builder form in Settings{compact ? "." : " to collect leads here."}
+      </div>
+    );
   };
 
   if (!live) {
@@ -11983,7 +11730,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
         ) : null}
         {showForm ? (
           <div style={{ fontSize: 12, color: wt.muted }}>
-            Embedded lead form ({design} design) renders here on live page.
+            {popupBuilderForm?.name || formCfg?.name || "Form Builder form"} ({design}) renders here on the live page.
           </div>
         ) : null}
         {!showForm && cta ? (
@@ -12098,38 +11845,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                 <div
                   style={{ display: "flex", flexDirection: "column", gap: 10 }}
                 >
-                  {popupFields.slice(0, 2).map((f, i) => (
-                    <input
-                      key={i}
-                      type={f.type === "phone" ? "tel" : "text"}
-                      placeholder={f.label}
-                      value={values[f.label] ?? ""}
-                      onChange={(e) =>
-                        setValues((p) => withFieldValue(p, f, e.target.value))
-                      }
-                      style={{ ...wtField(undefined, wt) }}
-                    />
-                  ))}
-                  {formError ? (
-                    <div
-                      style={{
-                        fontSize: 11.5,
-                        color: wt.danger,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {formError}
-                    </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={submitPopupForm}
-                    style={{
-                      ...wtButton({ accent: st.accent, block: true }, wt),
-                    }}
-                  >
-                    {textOf(st.formButton || "Get Callback")}
-                  </button>
+                  {renderPopupLeadForm(true)}
                 </div>
               ) : cta ? (
                 <a
@@ -12304,64 +12020,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                       gap: 11,
                     }}
                   >
-                    {popupFields.map((f, i) => (
-                      <div key={f.id || f.label || i}>
-                        {f.type !== "checkbox" && (
-                          <label
-                            style={{
-                              fontSize: 11.5,
-                              fontWeight: 700,
-                              color: wt.inkSoft,
-                              marginBottom: 4,
-                              display: "block",
-                            }}
-                          >
-                            {f.label}
-                          </label>
-                        )}
-                        <input
-                          type={
-                            f.type === "email"
-                              ? "email"
-                              : f.type === "phone"
-                                ? "tel"
-                                : "text"
-                          }
-                          placeholder={f.placeholder}
-                          value={values[f.label] ?? ""}
-                          onChange={(e) =>
-                            setValues((p) =>
-                              withFieldValue(p, f, e.target.value),
-                            )
-                          }
-                          style={{ ...wtField(undefined, wt) }}
-                        />
-                      </div>
-                    ))}
-                    {formError ? (
-                      <div
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 8,
-                          background: wt.dangerSoft,
-                          color: wt.danger,
-                          fontSize: 12,
-                          fontWeight: 600,
-                        }}
-                      >
-                        {formError}
-                      </div>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={submitPopupForm}
-                      style={{
-                        ...wtButton({ accent: st.accent }, wt),
-                        marginTop: 6,
-                      }}
-                    >
-                      {textOf(st.formButton || "Submit Enquiry")}
-                    </button>
+                    {renderPopupLeadForm()}
                   </div>
                 ) : cta ? (
                   <a
@@ -12504,99 +12163,7 @@ function PopupSection({ s, device }: { s: SectionInstance; device: Device }) {
                   gap: 11,
                 }}
               >
-                {popupFields.map((f, i) => (
-                  <div key={f.id || f.label || i}>
-                    {f.type !== "checkbox" ? (
-                      <label
-                        style={{
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                          color: wt.inkSoft,
-                          marginBottom: 5,
-                          display: "block",
-                        }}
-                      >
-                        {f.label} {f.required !== false ? "*" : ""}
-                      </label>
-                    ) : null}
-                    {f.type === "textarea" ? (
-                      <textarea
-                        placeholder={f.placeholder}
-                        value={values[f.label] ?? ""}
-                        onChange={(e) =>
-                          setValues((p) => withFieldValue(p, f, e.target.value))
-                        }
-                        style={{ ...wtField({ minHeight: 74 }, wt) }}
-                      />
-                    ) : f.type === "checkbox" ? (
-                      <label
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          alignItems: "center",
-                          fontSize: 12.5,
-                          color: wt.inkSoft,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={(values[f.label] ?? "") === "yes"}
-                          onChange={(e) =>
-                            setValues((p) =>
-                              withFieldValue(
-                                p,
-                                f,
-                                e.target.checked ? "yes" : "",
-                              ),
-                            )
-                          }
-                        />
-                        {f.label}
-                      </label>
-                    ) : (
-                      <input
-                        type={
-                          f.type === "email"
-                            ? "email"
-                            : f.type === "phone"
-                              ? "tel"
-                              : "text"
-                        }
-                        placeholder={f.placeholder}
-                        value={values[f.label] ?? ""}
-                        onChange={(e) =>
-                          setValues((p) => withFieldValue(p, f, e.target.value))
-                        }
-                        style={{ ...wtField(undefined, wt) }}
-                      />
-                    )}
-                  </div>
-                ))}
-                {formError ? (
-                  <div
-                    style={{
-                      padding: "9px 12px",
-                      borderRadius: 10,
-                      background: wt.dangerSoft,
-                      color: wt.danger,
-                      fontSize: 12.5,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {" "}
-                    {formError}
-                  </div>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={submitPopupForm}
-                  style={{
-                    ...wtButton({ accent: st.accent }, wt),
-                    marginTop: 4,
-                  }}
-                >
-                  {textOf(st.formButton || "Submit")}
-                </button>
+                {renderPopupLeadForm()}
               </div>
             ) : cta ? (
               <a
@@ -13276,6 +12843,7 @@ function BrochureSection({
             onClose={() => setGateOpen(false)}
             live={!!live}
             pageId={pageId}
+            formId={String(st.formId ?? "")}
             file={file}
             heading={textOf(st.gateHeading || "Get the brochure")}
             text={textOf(st.gateText || "")}
@@ -13341,6 +12909,7 @@ function BrochureSection({
             onClose={() => setGateOpen(false)}
             live={!!live}
             pageId={pageId}
+            formId={String(st.formId ?? "")}
             file={file}
             heading={textOf(st.gateHeading || "Get the brochure")}
             text={textOf(st.gateText || "")}
@@ -13461,6 +13030,7 @@ function BrochureSection({
           onClose={() => setGateOpen(false)}
           live={!!live}
           pageId={pageId}
+          formId={String(st.formId ?? "")}
           file={file}
           heading={textOf(st.gateHeading || "Get the brochure")}
           text={textOf(st.gateText || "")}
@@ -13904,6 +13474,7 @@ function SectionBody({
   const live = useContext(SiteLiveContext);
   const pageId = useContext(SitePageIdContext);
   const form = useContext(SiteFormContext);
+  const widgetForm = useResolvedForm(String(s.settings.formId ?? ""));
   switch (s.type) {
     case "announcement":
       return <AnnouncementBar s={s} />;
@@ -14001,7 +13572,7 @@ function SectionBody({
           pageId={pageId}
           live={live}
           readOnly={readOnly}
-          form={form}
+          form={widgetForm ?? form}
         />
       );
     case "section":
@@ -14527,6 +14098,7 @@ export function Canvas({
   live,
   theme,
   form,
+  forms,
   chrome,
   pageId,
   design,
@@ -14543,6 +14115,7 @@ export function Canvas({
   live?: boolean;
   theme?: CanvasTheme;
   form?: SiteConfig["form"];
+  forms?: FormDefinition[];
   chrome?: {
     header: SiteConfig["header"];
     footer: SiteConfig["footer"];
@@ -14563,6 +14136,11 @@ export function Canvas({
       : device === "tablet"
         ? 768
         : 390;
+
+  const mergedForms = useMemo(
+    () => mergeFormLibraries(forms, sampleBuilderForms()),
+    [forms],
+  );
 
   const mutate = (patch: (prev: SectionInstance[]) => SectionInstance[]) =>
     onMutate(patch);
@@ -14809,6 +14387,7 @@ export function Canvas({
       <SiteDeviceContext.Provider value={device}>
         <SiteChromeContext.Provider value={chrome}>
           <SiteFormContext.Provider value={form}>
+          <SiteFormsContext.Provider value={mergedForms}>
             <SiteLiveContext.Provider value={!!live}>
               <SiteDesignContext.Provider value={design?.bundle ?? null}>
                 <SiteLayoutThemeContext.Provider
@@ -15056,6 +14635,7 @@ export function Canvas({
                 </SiteLayoutThemeContext.Provider>
               </SiteDesignContext.Provider>
             </SiteLiveContext.Provider>
+          </SiteFormsContext.Provider>
           </SiteFormContext.Provider>
         </SiteChromeContext.Provider>
       </SiteDeviceContext.Provider>

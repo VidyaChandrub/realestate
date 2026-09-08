@@ -17,9 +17,17 @@ type NavItem = {
   activeMatch?: string[];
 };
 
-type NavGroup = {
-  grp: string;
-  items: NavItem[];
+const NAV_MODULE: Record<string, string> = {
+  "/admin-console": "admin_dashboard",
+  "/admin-console/organisations": "admin_organisations",
+  "/admin-console/roles": "admin_org_roles",
+  "/admin-console/admins": "admin_platform_team",
+  "/admin-console/templates": "admin_templates",
+  "/admin-console/org-domains": "admin_domains",
+  "/admin-console/subscriptions": "admin_subscriptions",
+  "/admin-console/email": "admin_email",
+  "/admin-console/audit-logs": "admin_audit_logs",
+  "/admin-console/settings": "admin_settings",
 };
 
 const NAV_GROUPS: NavGroup[] = [
@@ -27,23 +35,26 @@ const NAV_GROUPS: NavGroup[] = [
     grp: "Overview",
     items: [
       { href: "/admin-console", icon: "dashboard", label: "Dashboard", tip: "Dashboard", activeMatch: ["/admin-console"] },
-      { href: "/admin-console/analytics", icon: "reports", label: "Analytics", tip: "Analytics", activeMatch: ["/admin-console/analytics"] },
-      { href: "/admin-console/notifications", icon: "bell", label: "Notifications", tip: "Notifications", activeMatch: ["/admin-console/notifications"] },
     ],
   },
   {
-    grp: "Manage",
+    grp: "Organisations",
     items: [
       {
         href: "/admin-console/organisations",
         icon: "building",
         label: "Organisations",
         tip: "Organisations",
-        badge: "142",
         activeMatch: ["/admin-console/organisations", "/admin-console/organisation-detail"],
       },
-      { href: "/admin-console/roles", icon: "lock", label: "Role", tip: "Role Management", activeMatch: ["/admin-console/roles"] },
-      { href: "/admin-console/admins", icon: "users", label: "Platform Team", tip: "Platform Team", activeMatch: ["/admin-console/admins"] },
+      { href: "/admin-console/org-domains", icon: "globe", label: "Domains", tip: "Organisation subdomains and custom domain requests", activeMatch: ["/admin-console/org-domains"] },
+      { href: "/admin-console/roles", icon: "lock", label: "Organisation roles", tip: "Default roles and permissions for organisations", activeMatch: ["/admin-console/roles"] },
+    ],
+  },
+  {
+    grp: "Platform",
+    items: [
+      { href: "/admin-console/admins", icon: "users", label: "Platform Team", tip: "Console users and platform roles", activeMatch: ["/admin-console/admins", "/admin-console/platform-roles"] },
     ],
   },
   {
@@ -56,13 +67,12 @@ const NAV_GROUPS: NavGroup[] = [
         tip: "Template Management",
         activeMatch: ["/admin-console/templates", "/admin-console/template-detail"],
       },
-      { href: "/admin-console/org-domains", icon: "globe", label: "Domains", tip: "Organisation subdomains and custom domain requests", activeMatch: ["/admin-console/org-domains"] },
+      { href: "/admin-console/subscriptions", icon: "billing", label: "Subscriptions", tip: "Plans and subscriptions", activeMatch: ["/admin-console/subscriptions"] },
     ],
   },
   {
-    grp: "Billing & System",
+    grp: "System",
     items: [
-      { href: "/admin-console/subscriptions", icon: "billing", label: "Subscriptions", tip: "Subscriptions", activeMatch: ["/admin-console/subscriptions"] },
       { href: "/admin-console/email", icon: "mail", label: "Email & SMTP", tip: "Email & SMTP Management", activeMatch: ["/admin-console/email"] },
       { href: "/admin-console/audit-logs", icon: "shield", label: "Audit Logs", tip: "Audit Logs", activeMatch: ["/admin-console/audit-logs"] },
       { href: "/admin-console/settings", icon: "settings", label: "Settings", tip: "Settings", activeMatch: ["/admin-console/settings"] },
@@ -72,10 +82,8 @@ const NAV_GROUPS: NavGroup[] = [
 
 const CRUMB_MAP: Record<string, string> = {
   "/admin-console": "Dashboard",
-  "/admin-console/analytics": "Analytics",
-  "/admin-console/notifications": "Notifications",
   "/admin-console/organisations": "Organisations",
-  "/admin-console/roles": "Role",
+  "/admin-console/roles": "Organisation roles",
   "/admin-console/organisation-detail": "Organisation",
   "/admin-console/admins": "Platform Team",
   "/admin-console/templates": "Templates",
@@ -91,7 +99,7 @@ const CRUMB_MAP: Record<string, string> = {
 export function SuperAdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout, accessToken, isLoading: authLoading } = useAuth();
+  const { user, logout, accessToken, isLoading: authLoading, hasPermission } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -107,7 +115,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
     if (!authLoading && (!accessToken || user?.role !== "super_admin")) {
       router.replace("/admin-login");
     }
-  }, [authLoading, accessToken, user, router]);
+  }, [authLoading, accessToken, user?.role, router]);
 
   useEffect(() => {
     if (!accessToken || user?.role !== "super_admin") return;
@@ -123,7 +131,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, user]);
+  }, [accessToken, user?.id, user?.role]);
 
   async function handleSignOut() {
     setIsSigningOut(true);
@@ -172,10 +180,20 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
         </div>
         <nav>
           <ul className="nav">
-            {NAV_GROUPS.map((group) => (
+            {NAV_GROUPS.map((group) => {
+              const items = group.items.filter((item) => {
+                const moduleKey = NAV_MODULE[item.href];
+                if (item.href === "/admin-console/admins") {
+                  return hasPermission("admin_platform_team", "view") || hasPermission("admin_platform_roles", "view");
+                }
+                if (!moduleKey) return true;
+                return hasPermission(moduleKey, "view");
+              });
+              if (items.length === 0) return null;
+              return (
               <ul className="nav-group" key={group.grp}>
                 <li className="grp">{group.grp}</li>
-                {group.items.map((item) => {
+                {items.map((item) => {
                   const isActive =
                     item.activeMatch?.some(
                       (base) => pathname === base || pathname.startsWith(`${base}/`),
@@ -199,7 +217,8 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
                   );
                 })}
               </ul>
-            ))}
+              );
+            })}
           </ul>
         </nav>
         <div className="s-foot">

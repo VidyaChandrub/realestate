@@ -6,8 +6,9 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
 import { getSalesAgents } from "@/lib/api";
-import { AGENTS, initialsFor, type AgentRole } from "@/lib/mock/agents";
 import type { SalesAgent } from "@/lib/types";
+
+type AgentRole = "Admin" | "Manager" | "Sales";
 
 const ROLE_BADGE: Record<AgentRole, string> = {
   Admin: "b-indigo",
@@ -29,6 +30,13 @@ type DisplayRow = {
   added: string;
   av: string;
 };
+
+function initialsFor(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 function roleLabel(api: SalesAgent): AgentRole {
   switch (api.role?.key) {
@@ -69,24 +77,10 @@ function apiRows(agents: SalesAgent[]): DisplayRow[] {
   }));
 }
 
-function mockRows(): DisplayRow[] {
-  return AGENTS.map((a) => ({
-    id: a.slug,
-    name: a.name,
-    email: a.email,
-    phone: a.phone,
-    bridgeMissing: a.bridgeMissing,
-    online: a.online,
-    role: a.role,
-    chip: a.assignment,
-    added: a.added,
-    av: a.av,
-  }));
-}
-
 export default function OrgSalesAgentsPage() {
   const [rows, setRows] = useState<DisplayRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -94,11 +88,14 @@ export default function OrgSalesAgentsPage() {
       .then((res) => {
         if (mounted) {
           setRows(apiRows(res.data));
+          setError(null);
           setLoading(false);
         }
       })
-      .catch(() => {
+      .catch((e) => {
         if (mounted) {
+          setRows([]);
+          setError(e instanceof Error ? e.message : "Failed to load sales agents.");
           setLoading(false);
         }
       });
@@ -124,49 +121,54 @@ export default function OrgSalesAgentsPage() {
           </div>
         </div>
         <div className="actions">
-          <button className="btn btn-primary">
+          <Link className="btn btn-primary" href="/org/users">
             <Icon name="plus" size={15} /> Add agent
-          </button>
+          </Link>
         </div>
       </div>
 
-      <Reveal delay={1}>
-        <div
-          className="help"
-          style={{
-            marginBottom: 20,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 14,
-            flexWrap: "wrap",
-            background: "linear-gradient(120deg, var(--amber-050), #fff)",
-            borderColor: "#f6d9a8",
-          }}
-        >
-          <span>
-            <b>{missing} agent is missing a Phone Bridge</b> — masked calling is
-            disabled for them.
-          </span>
-          <Link href="#missing" style={{ color: "var(--amber)", fontWeight: 600, whiteSpace: "nowrap" }}>
-            Identify missing →
-          </Link>
-        </div>
-      </Reveal>
+      {missing > 0 ? (
+        <Reveal delay={1}>
+          <div
+            className="help"
+            style={{
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 14,
+              flexWrap: "wrap",
+              background: "linear-gradient(120deg, var(--amber-050), #fff)",
+              borderColor: "#f6d9a8",
+            }}
+          >
+            <span>
+              <b>
+                {missing} agent{missing === 1 ? " is" : "s are"} missing a phone
+                number
+              </b>{" "}
+              — masked calling is disabled for them.
+            </span>
+            <a href="#missing" style={{ color: "var(--amber)", fontWeight: 600, whiteSpace: "nowrap" }}>
+              Identify missing →
+            </a>
+          </div>
+        </Reveal>
+      ) : null}
 
       <div className="grid g4" style={{ marginBottom: 20 }}>
         <Reveal delay={1}>
           <div className="stat">
             <div className="top">
-              <span className="label">Agents ready</span>
+              <span className="label">Agents</span>
               <span className="ic ic-green">
                 <Icon name="users" size={17} />
               </span>
             </div>
             <div className="value">
-              <CountUp value={rows.length} />
+              {loading ? "—" : <CountUp value={rows.length} />}
             </div>
-            <div className="delta up">All projects covered</div>
+            <div className="delta">Managers and sales users</div>
           </div>
         </Reveal>
         <Reveal delay={2}>
@@ -178,9 +180,9 @@ export default function OrgSalesAgentsPage() {
               </span>
             </div>
             <div className="value">
-              <CountUp value={paused} />
+              {loading ? "—" : <CountUp value={paused} />}
             </div>
-            <div className="delta up">None paused</div>
+            <div className="delta">{paused === 0 ? "None paused" : "Inactive accounts"}</div>
           </div>
         </Reveal>
         <Reveal delay={3}>
@@ -192,23 +194,23 @@ export default function OrgSalesAgentsPage() {
               </span>
             </div>
             <div className="value">
-              <CountUp value={missing} />
+              {loading ? "—" : <CountUp value={missing} />}
             </div>
-            <div className="delta down">Needs a bridge</div>
+            <div className="delta">{missing === 0 ? "All have a number" : "Needs a number"}</div>
           </div>
         </Reveal>
         <Reveal delay={4}>
           <div className="stat">
             <div className="top">
-              <span className="label">Online now</span>
+              <span className="label">Active accounts</span>
               <span className="ic ic-sky">
                 <Icon name="phone" size={17} />
               </span>
             </div>
             <div className="value">
-              <CountUp value={online} />
+              {loading ? "—" : <CountUp value={online} />}
             </div>
-            <div className="delta up">Live on the floor</div>
+            <div className="delta">Status from user accounts</div>
           </div>
         </Reveal>
       </div>
@@ -229,70 +231,70 @@ export default function OrgSalesAgentsPage() {
                   <th>Status</th>
                   <th>Assignment</th>
                   <th>Added</th>
-                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="muted">Loading sales agents…</td>
+                    <td colSpan={6} className="muted">Loading sales agents…</td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={6} className="muted">{error}</td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="muted">No sales agents found. Invite or create team members in Users management.</td>
+                    <td colSpan={6} className="muted">
+                      No sales agents yet. Create a manager or sales user in Users.
+                    </td>
                   </tr>
                 ) : (
                   rows.map((agent) => (
-                  <tr key={agent.id}>
-                    <td>
-                      <div className="u">
-                        <span className={`av ${agent.av}`}>
-                          {initialsFor(agent.name)}
+                    <tr key={agent.id}>
+                      <td>
+                        <div className="u">
+                          <span className={`av ${agent.av}`}>
+                            {initialsFor(agent.name)}
+                          </span>
+                          <span>
+                            <Link
+                              className="nm"
+                              href={`/org/sales-agents/${agent.id}`}
+                              style={{ color: "var(--brand)" }}
+                            >
+                              {agent.name}
+                            </Link>
+                            <br />
+                            <span className="sm">{agent.email}</span>
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`badge ${ROLE_BADGE[agent.role]}`}>
+                          {agent.role}
                         </span>
-                        <span>
-                          <Link
-                            className="nm"
-                            href={`/org/sales-agents/${agent.id}`}
-                            style={{ color: "var(--brand)" }}
-                          >
-                            {agent.name}
-                          </Link>
-                          <br />
-                          <span className="sm">{agent.email}</span>
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${ROLE_BADGE[agent.role]}`}>
-                        {agent.role}
-                      </span>
-                    </td>
-                    <td>
-                      {agent.bridgeMissing ? (
-                        <span className="badge b-rose">Missing</span>
-                      ) : (
-                        <span className="mono">{agent.phone}</span>
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        className="dot"
-                        style={{
-                          background: agent.online ? "var(--green)" : "var(--faint)",
-                        }}
-                      ></span>{" "}
-                      {agent.online ? "Online" : "Offline"}
-                    </td>
-                    <td>
-                      <span className="chip">{agent.chip}</span>
-                    </td>
-                    <td className="muted">{agent.added}</td>
-                    <td>
-                      <button className="btn btn-ghost btn-sm" aria-label="Agent menu">
-                        ⋯
-                      </button>
-                    </td>
-                  </tr>
+                      </td>
+                      <td>
+                        {agent.bridgeMissing ? (
+                          <span className="badge b-rose">Missing</span>
+                        ) : (
+                          <span className="mono">{agent.phone}</span>
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className="dot"
+                          style={{
+                            background: agent.online ? "var(--green)" : "var(--faint)",
+                          }}
+                        ></span>{" "}
+                        {agent.online ? "Active" : "Inactive"}
+                      </td>
+                      <td>
+                        <span className="chip">{agent.chip}</span>
+                      </td>
+                      <td className="muted">{agent.added}</td>
+                    </tr>
                   ))
                 )}
               </tbody>

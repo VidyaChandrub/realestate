@@ -198,14 +198,14 @@ export const WIDGETS: WidgetDef[] = [
   { id: "contact", label: "Contact Details", category: "Basic", group: "Basic", icon: Phone, desc: "Contact information", make: () => sec("contact", "Contact Details", "Phone", { heading: "Get in Touch", phone: "+91 90000 00000", email: "sales@builder.com", address: "Bangalore" }) },
 
   // REAL ESTATE
-  { id: "hero", label: "Hero Banner", category: "Real Estate", group: "Real Estate", icon: LayoutPanelTop, desc: "Full-width hero with CTAs — 3 standard layouts", make: () => sec("hero", "Hero Banner", "LayoutPanelTop", { design: "classic", eyebrow: "RERA Approved", heading: "Your New Headline", subheading: "Your subheadline", price: "{{starting_price}}", priceLabel: "STARTING FROM", ctaPrimary: "Book Site Visit", ctaSecondary: "Download Brochure", highlights: ["RERA Approved", "Metro connected", "Ready amenities"], heroStats: [{ value: "2.5 Ac", label: "Campus" }, { value: "2", label: "Towers" }, { value: "1650+", label: "Sq.ft" }, { value: "Dec 2027", label: "Possession" }] }, { colors: { bg: "#111827", overlay: "rgba(17,24,39,0.45)", text: "#ffffff" }, layout: { width: "full", height: "vh", fixedHeight: 720, align: "center", direction: "column", justify: "center", alignItems: "center" } }) },
+  { id: "hero", label: "Hero Banner", category: "Real Estate", group: "Real Estate", icon: LayoutPanelTop, desc: "Full-width hero with CTAs — 3 standard layouts", make: () => sec("hero", "Hero Banner", "LayoutPanelTop", { design: "classic", formId: "form-site-visit", eyebrow: "RERA Approved", heading: "Your New Headline", subheading: "Your subheadline", price: "{{starting_price}}", priceLabel: "STARTING FROM", ctaPrimary: "Book Site Visit", ctaSecondary: "Download Brochure", highlights: ["RERA Approved", "Metro connected", "Ready amenities"], heroStats: [{ value: "2.5 Ac", label: "Campus" }, { value: "2", label: "Towers" }, { value: "1650+", label: "Sq.ft" }, { value: "Dec 2027", label: "Possession" }] }, { colors: { bg: "#111827", overlay: "rgba(17,24,39,0.45)", text: "#ffffff" }, layout: { width: "full", height: "vh", fixedHeight: 720, align: "center", direction: "column", justify: "center", alignItems: "center" } }) },
   { id: "overview", label: "Property Overview", category: "Real Estate", group: "Real Estate", icon: Building2, desc: "Project intro with stats — 3 premium designs", make: () => sec("overview", "Property Overview", "Building2", { design: "classic", eyebrow: "About the Project", heading: "Project Overview", text: "Describe your project here.", image: "lobby", bullets: ["Prime location", "Clubhouse & amenities", "RERA registered"], stats: [{ value: "2.5 Ac", label: "Land" }, { value: "450+", label: "Homes" }, { value: "70%", label: "Open" }] }) },
   { id: "highlights", label: "Property Highlights", category: "Real Estate", group: "Real Estate", icon: Award, desc: "Key selling points strip", make: () => sec("highlights", "Property Highlights", "Award", { design: "strip", items: [{ icon: "Sparkles", value: "RERA", label: "Approved" }, { icon: "TrainFront", value: "5 min", label: "To Metro" }, { icon: "Dumbbell", value: "40+", label: "Amenities" }, { icon: "Leaf", value: "70%", label: "Open space" }] }) },
   { id: "stats", label: "Property Statistics", category: "Real Estate", group: "Real Estate", icon: Gauge, desc: "Big number counters — units, acres, floors, possession", make: () => sec("stats", "Property Statistics", "Gauge", { design: "cards", heading: "", items: [{ icon: "Building2", value: "312", label: "Residences" }, { icon: "LandPlot", value: "2.5 Ac", label: "Campus" }, { icon: "Dumbbell", value: "40+", label: "Amenities" }, { icon: "CalendarClock", value: "Dec 2027", label: "Possession" }], style: "cards" }) },
   { id: "amenities", label: "Amenities", category: "Real Estate", group: "Real Estate", icon: Dumbbell, desc: "Amenity grid", make: () => sec("amenities", "Amenities", "Dumbbell", { design: "grid", eyebrow: "Lifestyle", heading: "Amenities", items: [{ icon: "Dumbbell", title: "Gymnasium", desc: "Fully equipped" }, { icon: "SwimmingPool", title: "Pool", desc: "Temperature controlled" }, { icon: "Leaf", title: "Garden", desc: "Landscaped lawns" }, { icon: "Car", title: "Parking", desc: "Covered slots" }] }) },
   { id: "gallery", label: "Property Gallery", category: "Real Estate", group: "Real Estate", icon: Images, desc: "Image masonry", make: () => sec("gallery", "Property Gallery", "Images", { design: "masonry", eyebrow: "Gallery", heading: "Project Gallery", text: "A look inside the development.", images: ["1", "2", "3", "4", "5", "6"], columns: 3, lightbox: true, captions: [] }) },
   { id: "video-gallery", label: "Video Gallery", category: "Real Estate", group: "Real Estate", icon: Video, desc: "Collection of videos", make: () => sec("video-gallery", "Video Gallery", "Video", { design: "grid", heading: "Video Gallery", videos: [{ title: "Walkthrough" }, { title: "Amenities tour" }] }) },
-  { id: "floor-plan-gallery", label: "Floor Plan Gallery", category: "Real Estate", group: "Real Estate", icon: Grid, desc: "Gated floor plan gallery — blurred until user submits enquiry form", make: () => sec("floor-plan-gallery", "Floor Plan Gallery", "Grid", { eyebrow: "Floor Plans", heading: "Explore Our Floor Plans", text: "Submit your details to unlock and view detailed floor plan images.", formHeading: "Unlock Floor Plan", formButton: "View Floor Plan", plans: [{ name: "3 BHK", beds: "3", area: "1,650 sq.ft", price: "₹1.25 Cr", image: "" }, { name: "4 BHK", beds: "4", area: "2,450 sq.ft", price: "₹1.95 Cr", image: "" }, { name: "2 BHK", beds: "2", area: "1,200 sq.ft", price: "₹90 L", image: "" }] }) },
+  { id: "floor-plan-gallery", label: "Floor Plan Gallery", category: "Real Estate", group: "Real Estate", icon: Grid, desc: "Gated floor plan gallery — blurred until user submits enquiry form", make: () => sec("floor-plan-gallery", "Floor Plan Gallery", "Grid", { formId: "form-floor-plan", eyebrow: "Floor Plans", heading: "Explore Our Floor Plans", text: "Submit your details to unlock and view detailed floor plan images.", formHeading: "Unlock Floor Plan", formButton: "View Floor Plan", plans: [{ name: "3 BHK", beds: "3", area: "1,650 sq.ft", price: "₹1.25 Cr", image: "" }, { name: "4 BHK", beds: "4", area: "2,450 sq.ft", price: "₹1.95 Cr", image: "" }, { name: "2 BHK", beds: "2", area: "1,200 sq.ft", price: "₹90 L", image: "" }] }) },
   { id: "master-plan", label: "Master Plan", category: "Real Estate", group: "Real Estate", icon: Map, desc: "Campus master plan", make: () => sec("master-plan", "Master Plan", "Map", { design: "image", heading: "Master Plan", image: "", text: "Towers, clubhouse and landscape across the campus." }) },
   { id: "pricing", label: "Pricing Table", category: "Real Estate", group: "Real Estate", icon: Wallet, desc: "Configurations & price", make: () => sec("pricing", "Pricing Table", "Wallet", { design: "cards", eyebrow: "Investment", heading: "Pricing", text: "Transparent configurations.", plans: [{ name: "3 BHK", area: "1,650 sq.ft", price: "₹1.25 Cr", per: "onwards", features: ["2 baths", "2 parkings", "Club access"], cta: "Enquire", featured: false }, { name: "4 BHK", area: "2,450 sq.ft", price: "₹1.95 Cr", per: "onwards", features: ["3 baths", "2 parkings", "Corner unit"], cta: "Enquire", featured: true }] }) },
   { id: "features", label: "Property Features", category: "Real Estate", group: "Real Estate", icon: BadgeCheck, desc: "Feature checklist", make: () => sec("features", "Property Features", "BadgeCheck", { design: "checklist", heading: "Property Features", items: [{ title: "Vastu compliant", text: "All units" }, { title: "VRV air-conditioning", text: "Premium finishes" }, { title: "Italian marble", text: "Living & foyer" }] }) },
@@ -217,7 +217,7 @@ export const WIDGETS: WidgetDef[] = [
   { id: "payment-plans", label: "Payment Plans", category: "Real Estate", group: "Real Estate", icon: Wallet, desc: "Payment schedule", make: () => sec("payment-plans", "Payment Plans", "Wallet", { design: "steps", heading: "Payment Plans", items: [{ plan: "Booking Amount", amount: "10%", details: "On booking" }, { plan: "Construction Linked", amount: "70%", details: "Till handover" }, { plan: "On Possession", amount: "20%", details: "At registration" }] }) },
   { id: "location-advantages", label: "Location & Map", category: "Real Estate", group: "Real Estate", icon: Navigation, desc: "Embedded map plus connectivity points", make: () => sec("location-advantages", "Location & Map", "Navigation", { design: "split", address: "Sarjapur Road, Bangalore", zoom: 14, eyebrow: "Connectivity", heading: "Location Advantages", text: "Minutes from work, school and transit.", items: [{ icon: "TrainFront", title: "Metro", meta: "5 min" }, { icon: "School", title: "Schools", meta: "2 km" }, { icon: "Hospital", title: "Hospital", meta: "3 km" }, { icon: "Store", title: "Mall", meta: "4 km" }] }) },
   { id: "builder-profile", label: "Builder Profile", category: "Real Estate", group: "Real Estate", icon: Building2, desc: "Builder credibility", hidden: true, make: () => sec("builder-profile", "Builder Profile", "Building2", { design: "card", heading: "About the Builder", name: "{{builder_name}}", text: "Delivering landmark communities across the city." }) },
-  { id: "brochure", label: "Brochure Download (Gated)", category: "Real Estate", group: "Real Estate", icon: FileText, desc: "Click → form popup → validation → download", make: () => sec("brochure", "Brochure Download", "FileText", { design: "centered", heading: "Download Brochure", title: "Download Brochure", file: "", text: "Get the full project kit — plans, specs and pricing.", gateEnabled: true, popupId: "", gateHeading: "Get the brochure in your inbox", gateText: "Share your details and the download starts instantly.", gateFields: [{ id: "g1", type: "text", label: "Full Name", placeholder: "Your name", required: true }, { id: "g2", type: "phone", label: "Phone Number", placeholder: "+91 98XXX XXXXX", required: true }, { id: "g3", type: "email", label: "Email Address", placeholder: "you@email.com", required: true }], gateButton: "Submit & Download", gateSuccessMessage: "Verified — your brochure is downloading." }) },
+  { id: "brochure", label: "Brochure Download (Gated)", category: "Real Estate", group: "Real Estate", icon: FileText, desc: "Click → form popup → validation → download", make: () => sec("brochure", "Brochure Download", "FileText", { design: "centered", formId: "form-brochure", heading: "Download Brochure", title: "Download Brochure", file: "", text: "Get the full project kit — plans, specs and pricing.", gateEnabled: true, popupId: "", gateHeading: "Get the brochure in your inbox", gateText: "Share your details and the download starts instantly.", gateButton: "Submit & Download", gateSuccessMessage: "Verified — your brochure is downloading." }) },
   { id: "downloads", label: "Downloads", category: "Real Estate", group: "Real Estate", icon: Download, desc: "Document downloads", make: () => sec("downloads", "Downloads", "Download", { design: "list", heading: "Downloads", files: [{ name: "Brochure.pdf", url: "" }, { name: "Floor plans.pdf", url: "" }] }) },
   { id: "testimonials", label: "Testimonials", category: "Real Estate", group: "Real Estate", icon: Quote, desc: "Customer reviews", make: () => sec("testimonials", "Testimonials", "Quote", { design: "cards", eyebrow: "Reviews", heading: "What buyers say", items: [{ name: "Anita Rao", role: "Homeowner", quote: "The team was transparent from day one.", rating: 5 }, { name: "Vikram Shah", role: "Investor", quote: "Best launch we booked this year.", rating: 5 }] }) },
   { id: "faq", label: "FAQ / Accordion", category: "Real Estate", group: "Real Estate", icon: PanelsTopLeft, desc: "Collapsible questions & answers", make: () => sec("faq", "FAQ", "Tabs", { design: "accordion", eyebrow: "Help", heading: "Frequently asked questions", items: [{ q: "Is the project RERA registered?", a: "Yes — {{rera_number}}." }, { q: "When is possession?", a: "{{possession_date}}" }] }) },
@@ -228,13 +228,13 @@ export const WIDGETS: WidgetDef[] = [
   // FORMS — single universal Form widget. All configuration (fields, validation,
   // conditions, PDF, thank-you, embed) lives in the Forms module. This widget
   // renders only the form itself — no heading or surrounding copy.
-  { id: "lead-form", label: "Form", category: "Forms", group: "Forms", icon: Send, desc: "Universal form — configure fields, conditions, PDF & thank-you in Forms module", make: () => sec("lead-form", "Form", "Send", { fields: ["name", "phone"] }) },
+  { id: "lead-form", label: "Form", category: "Forms", group: "Forms", icon: Send, desc: "Universal form — configure fields, conditions, PDF & thank-you in Forms module", make: () => sec("lead-form", "Form", "Send", { formId: "form-site-visit" }) },
 
   // MARKETING
   { id: "countdown", label: "Countdown Timer", category: "Marketing", group: "Marketing", icon: Timer, desc: "Launch countdown", make: () => sec("countdown", "Countdown Timer", "Timer", { date: "2026-12-31", heading: "Launching Soon", items: [{ value: "12", label: "Days" }, { value: "08", label: "Hours" }, { value: "24", label: "Mins" }, { value: "11", label: "Secs" }] }, { colors: { bg: "#111827", text: "#ffffff" } }) },
   { id: "cta-banner", label: "CTA Banner", category: "Marketing", group: "Marketing", icon: MousePointerClick, desc: "Conversion banner or slim strip — two configurable CTAs", make: () => sec("cta-banner", "CTA Banner", "MousePointerClick", { eyebrow: "Next step", heading: "Ready to Start?", sub: "Book a site visit with our team.", cta: "Book Now", ctaPrimary: "Book Now", ctaSecondary: "Call sales", layout: "banner" }, { colors: { bg: "#111827", text: "#ffffff" } }) },
   { id: "sticky-cta", label: "Sticky CTA", category: "Marketing", group: "Marketing", icon: Compass, desc: "Always-visible bottom bar — text, phone, WhatsApp & button", make: () => sec("sticky-cta", "Sticky CTA", "Compass", { text: "Book a private tour of {{property_name}}", ctaLabel: "Book Now", phone: "{{starting_price}}" }) },
-  { id: "popup", label: "Conditional Popup", category: "Marketing", group: "Marketing", icon: PartyPopper, desc: "Editable modal — click, delay, scroll %, exit intent or form success", make: () => sec("popup", "Conditional Popup", "PartyPopper", { popupId: "offer-popup", heading: "Get Brochure", text: "Share your details to download the kit.", cta: "Download", link: "", showForm: true, trigger: "delay", delaySeconds: 3, scrollPercent: 40, urlParam: "offer", oncePerSession: true }) },
+  { id: "popup", label: "Conditional Popup", category: "Marketing", group: "Marketing", icon: PartyPopper, desc: "Editable modal — click, delay, scroll %, exit intent or form success", make: () => sec("popup", "Conditional Popup", "PartyPopper", { popupId: "offer-popup", formId: "form-brochure", heading: "Get Brochure", text: "Share your details to download the kit.", cta: "Download", link: "", showForm: true, trigger: "delay", delaySeconds: 3, scrollPercent: 40, urlParam: "offer", oncePerSession: true }) },
   { id: "social-share", label: "Social Sharing", category: "Marketing", group: "Marketing", icon: Share2, desc: "WhatsApp / Facebook / X share buttons + copy link", make: () => sec("social-share", "Social Sharing", "Share2", { heading: "Share this project", channels: ["whatsapp", "facebook", "x", "linkedin", "copy"] }) },
   { id: "call-cta", label: "Contact CTA", category: "Marketing", group: "Marketing", icon: PhoneCall, desc: "Call or WhatsApp banner — pick the action", make: () => sec("call-cta", "Contact CTA", "PhoneCall", { text: "Talk to our sales team", phone: "+91 90000 00000", ctaLabel: "Call Now", mode: "call" }) },
   { id: "floating-icons", label: "Floating Icons", category: "Marketing", group: "Marketing", icon: PhoneCall, desc: "WhatsApp, call, enquire & email on the side", make: () => sec("floating-icons", "Floating Icons", "PhoneCall", { side: "right", whatsapp: true, call: true, enquire: true, email: true, phone: "+91 90000 00000", number: "+91 90000 00000" }) },
@@ -247,7 +247,7 @@ export const WIDGETS: WidgetDef[] = [
 
   // REAL ESTATE (continued)
   { id: "emi-calculator", label: "EMI Calculator", category: "Real Estate", group: "Real Estate", icon: Gauge, desc: "Home-loan EMI estimator with live sliders", make: () => sec("emi-calculator", "EMI Calculator", "Gauge", { heading: "Estimate Your Monthly EMI", price: 125, downPayment: 25, rate: 8.5, tenure: 20, currency: "₹", note: "Indicative calculation only. Final EMI depends on lender terms, tenure and eligibility." }) },
-  { id: "project", label: "Project", category: "Real Estate", group: "Real Estate", icon: Building2, desc: "Dynamic project list — select a project, visitor enquiry opens form linked to that project", make: () => sec("project", "Project", "Building2", { selectedProjectId: null, layout: "grid", columns: 3, cardStyle: "classic", design: "grid", showFilters: true, enquiryFormHeading: "Enquire About This Project", enquiryFormText: "Share your details and our team will get back to you shortly.", enquiryButtonLabel: "Submit Enquiry" }) },
+  { id: "project", label: "Project", category: "Real Estate", group: "Real Estate", icon: Building2, desc: "Dynamic project list — select a project, visitor enquiry opens form linked to that project", make: () => sec("project", "Project", "Building2", { selectedProjectId: null, formId: "form-site-visit", layout: "grid", columns: 3, cardStyle: "classic", design: "grid", showFilters: true, enquiryFormHeading: "Enquire About This Project", enquiryFormText: "Share your details and our team will get back to you shortly.", enquiryButtonLabel: "Submit Enquiry" }) },
 ];
 
 export const WIDGET_CATEGORY_META: { key: WidgetDef["category"]; label: string }[] = [
@@ -344,7 +344,69 @@ const VARS: Record<string, string> = {
   carpet_area: PROPERTY.carpetArea,
   location: PROPERTY.location,
   description: PROPERTY.description,
+  tagline: PROPERTY.description,
+  land_area: PROPERTY.landArea,
+  towers: PROPERTY.towers,
+  units: PROPERTY.units,
 };
+
+const DEFAULT_PROPERTY: PropertyData = JSON.parse(JSON.stringify(PROPERTY)) as PropertyData;
+const DEFAULT_VARS: Record<string, string> = { ...VARS };
+
+function syncVarsFromProperty() {
+  VARS.property_name = PROPERTY.name;
+  VARS.builder_name = PROPERTY.builder;
+  VARS.starting_price = PROPERTY.startingPrice;
+  VARS.rera_number = PROPERTY.reraNumber;
+  VARS.possession_date = PROPERTY.possession;
+  VARS.carpet_area = PROPERTY.carpetArea;
+  VARS.location = PROPERTY.location;
+  VARS.description = PROPERTY.description;
+  VARS.tagline = PROPERTY.description;
+  VARS.land_area = PROPERTY.landArea;
+  VARS.towers = PROPERTY.towers;
+  VARS.units = PROPERTY.units;
+}
+
+/** Apply a landing page's bound project/unit snapshot to the builder tokens and PROPERTY mock. */
+export function applyLandingPagePropertyFromConfig(
+  config?: {
+    vars?: Record<string, string>;
+    property?: Partial<PropertyData> & {
+      startingPrice?: string;
+      carpetArea?: string;
+      reraNumber?: string;
+      landArea?: string;
+    };
+  } | null,
+) {
+  Object.assign(PROPERTY, JSON.parse(JSON.stringify(DEFAULT_PROPERTY)));
+  Object.assign(VARS, DEFAULT_VARS);
+  if (!config?.property && !config?.vars) return;
+  if (config.property) {
+    const p = config.property;
+    if (p.name) PROPERTY.name = p.name;
+    if (p.builder) PROPERTY.builder = p.builder;
+    if (p.type) PROPERTY.type = p.type;
+    if (p.status) PROPERTY.status = p.status;
+    if (p.description != null) PROPERTY.description = p.description;
+    if (p.startingPrice) PROPERTY.startingPrice = p.startingPrice;
+    if (p.carpetArea) PROPERTY.carpetArea = p.carpetArea;
+    if (p.reraNumber != null) PROPERTY.reraNumber = p.reraNumber;
+    if (p.location != null) PROPERTY.location = p.location;
+    if (p.possession != null) PROPERTY.possession = p.possession;
+    if (Array.isArray(p.amenities)) PROPERTY.amenities = p.amenities;
+    if (Array.isArray(p.features)) PROPERTY.features = p.features;
+    if (p.landArea) PROPERTY.landArea = p.landArea;
+    if (p.towers) PROPERTY.towers = p.towers;
+    if (p.units) PROPERTY.units = p.units;
+  }
+  if (config.vars) {
+    Object.assign(VARS, config.vars);
+  } else {
+    syncVarsFromProperty();
+  }
+}
 
 
 

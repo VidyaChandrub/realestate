@@ -7,6 +7,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon, type IconName } from "@/components/icons";
 import { getSalesAgent } from "@/lib/api";
+import { leadDisplaySource } from "@/lib/lead-display";
 import type {
   CrmLeadStatus,
   SalesAgent,
@@ -242,7 +243,7 @@ function apiLeadsToRows(leads: SalesAgentRecentLead[]): LeadRow[] {
       name,
       initials: initialsFor(name),
       av: avClass(lead.id),
-      source: lead.source,
+      source: leadDisplaySource(lead),
       sourceBadge: SOURCE_BADGE[lead.source ?? ""] ?? "b-amber",
       statusLabel: STATUS_LABEL[lead.status],
       statusBadge: STATUS_BADGE[lead.status],
@@ -401,12 +402,11 @@ export default function OrgAgentDetailPage() {
           <Link className="btn btn-ghost" href="/org/sales-agents">
             ← Back
           </Link>
-          <button className="btn btn-ghost">
-            <Icon name="mail" size={15} /> Message
-          </button>
-          <button className="btn btn-primary">
-            <Icon name="edit" size={15} /> Edit agent
-          </button>
+          {agent ? (
+            <Link className="btn btn-primary" href="/org/users">
+              <Icon name="edit" size={15} /> Manage in Users
+            </Link>
+          ) : null}
         </div>
       </div>
 

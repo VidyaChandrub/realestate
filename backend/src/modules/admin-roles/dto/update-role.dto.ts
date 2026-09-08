@@ -19,10 +19,6 @@ export class UpdateRoleDto {
   description?: string;
 
   @IsOptional()
-  @IsIn(['organisation', 'team'])
-  scope?: 'organisation' | 'team';
-
-  @IsOptional()
   @IsIn(['active', 'inactive'])
   status?: 'active' | 'inactive';
 

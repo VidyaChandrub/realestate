@@ -1231,6 +1231,7 @@ export class AuthService {
         to: user.email,
         recipientName: recipientName || undefined,
         resetToken: token,
+        orgId: user.orgId,
       });
       if (!result.success) {
         console.error(`[Forgot Password] Could not deliver email: ${result.error}`);
@@ -1366,6 +1367,7 @@ export class AuthService {
         to: user.email,
         recipientName: recipientName || undefined,
         code,
+        orgId: user.orgId,
       });
       if (!result.success) {
         console.error(

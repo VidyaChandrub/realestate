@@ -3,6 +3,7 @@ import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 
 const jwtModuleOptions: JwtModuleOptions = {
   secret: process.env.JWT_SECRET,
@@ -14,7 +15,7 @@ const jwtModuleOptions: JwtModuleOptions = {
 @Module({
   imports: [JwtModule.register(jwtModuleOptions)],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard],
-  exports: [JwtModule, JwtAuthGuard],
+  providers: [AuthService, JwtAuthGuard, SuperAdminGuard],
+  exports: [JwtModule, JwtAuthGuard, SuperAdminGuard],
 })
 export class AuthModule {}
