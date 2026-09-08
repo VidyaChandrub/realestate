@@ -37,11 +37,10 @@ export class LeadsService {
     let orgId: string | null = null;
     let projectName: string | null = null;
 
+    let resolvedLandingPageId = dto.landingPageId ?? null;
+
     if (dto.landingPageId) {
-      const page = await this.prisma.landingPage.findUnique({
-        where: { id: dto.landingPageId },
-        select: { orgId: true, status: true },
-      });
+      const page = await this.resolvePublicLandingPage(dto.landingPageId);
       if (!page) {
         throw new NotFoundException('Landing page not found');
       }
@@ -49,6 +48,7 @@ export class LeadsService {
         throw new BadRequestException('Leads can only be submitted from a published landing page');
       }
       orgId = page.orgId;
+      resolvedLandingPageId = page.id;
     }
 
     if (dto.projectId) {
@@ -90,7 +90,7 @@ export class LeadsService {
 
     const projectId =
       dto.projectId ??
-      (await this.resolveProjectId(orgId, dto.landingPageId, dto.data));
+      (await this.resolveProjectId(orgId, resolvedLandingPageId, dto.data));
 
     const data = normalizeLeadData(dto.data ?? {}, {
       unitId: dto.unitId,
@@ -102,7 +102,7 @@ export class LeadsService {
         where: { id: existing.id },
         data: {
           data: data as Prisma.InputJsonValue,
-          landingPageId: dto.landingPageId ?? existing.landingPageId,
+          landingPageId: resolvedLandingPageId ?? existing.landingPageId,
           projectId: projectId ?? existing.projectId,
           formName: dto.formName ?? existing.formName,
           source: dto.source ?? existing.source,
@@ -115,7 +115,7 @@ export class LeadsService {
     const lead = await this.prisma.lead.create({
       data: {
         orgId,
-        landingPageId: dto.landingPageId ?? null,
+        landingPageId: resolvedLandingPageId,
         projectId,
         formName: dto.formName ?? null,
         source: dto.source ?? 'website',
@@ -198,6 +198,33 @@ export class LeadsService {
     });
 
     return this.toListItem(lead);
+  }
+
+  /**
+   * Public forms may send a landing-page id, a page slug, or a template id
+   * (builder / Super Admin template preview). Resolve to a real org page.
+   */
+  private async resolvePublicLandingPage(ref: string) {
+    const select = { id: true, orgId: true, status: true } as const;
+    const byId = await this.prisma.landingPage.findUnique({
+      where: { id: ref },
+      select,
+    });
+    if (byId) return byId;
+
+    const published = { status: 'published' as const };
+    const bySlug = await this.prisma.landingPage.findFirst({
+      where: { slug: ref, ...published },
+      orderBy: { publishedAt: 'desc' },
+      select,
+    });
+    if (bySlug) return bySlug;
+
+    return this.prisma.landingPage.findFirst({
+      where: { sourceTemplateId: ref, ...published },
+      orderBy: { publishedAt: 'desc' },
+      select,
+    });
   }
 
   /** Map a captured lead onto a project via linked landing page or form data. */

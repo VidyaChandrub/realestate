@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
-import { EmailService, frontendBaseUrl } from '../email/email.service';
+import { EmailService } from '../email/email.service';
+import { frontendBaseUrl } from '../../common/utils/app-url.util';
 import { generateTempPassword } from '../../common/utils/tokens.util';
 import { normalizePhoneNumber } from '../../common/utils/phone.util';
 import { CreatePlatformMemberDto } from './dto/create-platform-member.dto';

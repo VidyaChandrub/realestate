@@ -19,7 +19,7 @@ describe('LeadsService', () => {
       create: jest.Mock;
       update: jest.Mock;
     };
-    landingPage: { findUnique: jest.Mock };
+    landingPage: { findUnique: jest.Mock; findFirst: jest.Mock };
     project: { findMany: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     projectSalesAgent: { findMany: jest.Mock; findFirst: jest.Mock };
     user: { findFirst: jest.Mock; findMany: jest.Mock };
@@ -36,7 +36,7 @@ describe('LeadsService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
-      landingPage: { findUnique: jest.fn() },
+      landingPage: { findUnique: jest.fn(), findFirst: jest.fn() },
       project: {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
@@ -140,13 +140,43 @@ describe('LeadsService', () => {
 
     it('throws when the landing page does not exist', async () => {
       prisma.landingPage.findUnique.mockResolvedValue(null);
+      prisma.landingPage.findFirst.mockResolvedValue(null);
       await expect(
         service.createFromPublic({ landingPageId: 'lp-x', data: {} }),
       ).rejects.toThrow(NotFoundException);
     });
 
+    it('resolves a template preview id to a published page that used that template', async () => {
+      prisma.landingPage.findUnique.mockResolvedValue(null);
+      prisma.landingPage.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'lp-skyline',
+          orgId: 'org-42',
+          status: 'published',
+        });
+      prisma.lead.findFirst.mockResolvedValue(null);
+      prisma.lead.create.mockResolvedValue({ id: 'lead-tpl' });
+
+      await service.createFromPublic({
+        landingPageId: 'tpl-builder',
+        formName: 'Site visit enquiry',
+        data: { name: 'Aarav' },
+      });
+
+      expect(prisma.lead.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            orgId: 'org-42',
+            landingPageId: 'lp-skyline',
+          }),
+        }),
+      );
+    });
+
     it('resolves org from the landing page and creates the lead', async () => {
       prisma.landingPage.findUnique.mockResolvedValue({
+        id: 'lp-x',
         orgId: 'org-42',
         status: 'published',
       });
