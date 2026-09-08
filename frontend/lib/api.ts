@@ -148,33 +148,37 @@ function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
-// Backend guards on /org/* dashboard routes re-check status from the DB on
-// every request:
+// Backend guards on /org/* and /admin/* dashboard routes re-check status from
+// the DB on every request:
 //   - ORG_INACTIVE  — a Super Admin deactivated the whole organisation.
 //   - USER_INACTIVE — this member was disapproved/deactivated, or their
 //     access token predates an admin password reset / session invalidation.
+//     Raised for organisation members (OrgApprovedGuard) AND Platform Team
+//     members (SuperAdminGuard) alike.
 // Either way the member's very next action gets a tagged 403 — end the
-// session and bounce to login straight away rather than leaving a half-dead
-// portal open.
+// session and bounce to the right login straight away rather than leaving a
+// half-dead portal open.
 let forcedLogoutInFlight = false;
 function forceSessionEnd(reason: "org_inactive" | "account_revoked") {
+  if (typeof window === "undefined" || forcedLogoutInFlight) return;
+
   let isOrganisationSession = false;
-  if (typeof window !== "undefined") {
-    try {
-      const user = JSON.parse(localStorage.getItem(USER_KEY) ?? "null") as {
-        org_id?: string | null;
-      } | null;
-      isOrganisationSession = Boolean(user?.org_id);
-    } catch {
-      isOrganisationSession = false;
-    }
+  try {
+    const user = JSON.parse(localStorage.getItem(USER_KEY) ?? "null") as {
+      org_id?: string | null;
+    } | null;
+    isOrganisationSession = Boolean(user?.org_id);
+  } catch {
+    isOrganisationSession = false;
   }
 
-  // These tags are only actionable for an organisation session. A platform
-  // Super Admin has no org_id and must never be redirected to the org login.
-  if (!isOrganisationSession) return;
+  // A Platform Team / Super Admin session has no org_id and signs in on a
+  // separate route. ORG_INACTIVE is an organisation-only concept, so ignore
+  // it for a platform session; account_revoked (USER_INACTIVE) applies to
+  // both and sends the platform session back to /admin-login.
+  if (!isOrganisationSession && reason === "org_inactive") return;
+  const loginPath = isOrganisationSession ? "/login" : "/admin-login";
 
-  if (typeof window === "undefined" || forcedLogoutInFlight) return;
   const path = window.location.pathname;
   if (
     path === "/login" ||
@@ -183,6 +187,7 @@ function forceSessionEnd(reason: "org_inactive" | "account_revoked") {
     path.startsWith("/verify-email") ||
     path.startsWith("/forgot-password") ||
     path.startsWith("/reset-password") ||
+    path.startsWith("/change-password") ||
     path.startsWith("/onboarding")
   ) {
     return;
@@ -192,7 +197,7 @@ function forceSessionEnd(reason: "org_inactive" | "account_revoked") {
   // Hard replace (not router.push): a full reload resets every bit of
   // in-memory auth/React state, and replace() keeps the dead portal page
   // out of history.
-  window.location.replace(`/login?reason=${reason}`);
+  window.location.replace(`${loginPath}?reason=${reason}`);
 }
 
 export async function apiFetch<T>(

@@ -3,9 +3,14 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
+import {
+  OPTIONAL_PHONE_NUMBER_REGEX,
+  PHONE_NUMBER_MESSAGE,
+} from '../../../common/utils/phone.util';
 
 export class CreatePlatformMemberDto {
   @IsString()
@@ -24,7 +29,8 @@ export class CreatePlatformMemberDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(30)
+  @MaxLength(16)
+  @Matches(OPTIONAL_PHONE_NUMBER_REGEX, { message: PHONE_NUMBER_MESSAGE })
   phoneNumber?: string;
 
   /** Platform-scoped role key (e.g. super_admin or a custom platform role). */

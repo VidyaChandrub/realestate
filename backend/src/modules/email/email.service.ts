@@ -719,6 +719,9 @@ export class EmailService implements OnApplicationBootstrap {
     recipientName?: string;
     status: 'activated' | 'deactivated';
     orgId?: string | null;
+    // Overrides the sign-in link in the "activated" email. Defaults to the
+    // organisation login (/login); Platform Team members pass /admin-login.
+    loginUrl?: string;
   }) {
     const config = await this.getConfig(params.orgId);
     const activated = params.status === 'activated';
@@ -734,7 +737,9 @@ export class EmailService implements OnApplicationBootstrap {
       customBody: activated
         ? config.accountActivatedBody || undefined
         : config.accountDeactivatedBody || undefined,
-      loginUrl: activated ? `${frontendBaseUrl()}/login` : undefined,
+      loginUrl: activated
+        ? params.loginUrl || `${frontendBaseUrl()}/login`
+        : undefined,
     });
 
     return this.sendMail({

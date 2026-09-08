@@ -9,6 +9,6 @@ describe('Home page', () => {
         <Page />
       </AuthProvider>,
     )
-    expect(screen.getByRole('heading', { name: 'BigEstate' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'iPixxel Realty' })).toBeInTheDocument()
   })
 })

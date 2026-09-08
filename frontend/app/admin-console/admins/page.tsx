@@ -25,6 +25,20 @@ const EMPTY_FORM = {
   password: "",
 };
 
+// Mobile is optional, but when present it must be digits only (an optional
+// leading "+" is allowed) and at most 15 digits — E.164's ceiling, and what
+// the backend DTO enforces. Sanitising on every keystroke means the field can
+// only ever hold a value the API will accept: letters and symbols are dropped
+// and extra digits past 15 are truncated as the user types or pastes.
+const PLATFORM_PHONE_REGEX = /^\+?\d{1,15}$/;
+
+function sanitizePlatformPhone(raw: string): string {
+  const hasPlus = raw.trimStart().startsWith("+");
+  const digits = raw.replace(/\D/g, "").slice(0, 15);
+  if (!digits) return hasPlus ? "+" : "";
+  return `${hasPlus ? "+" : ""}${digits}`;
+}
+
 function initials(firstName: string | null, lastName: string | null, email: string): string {
   const chars = [firstName?.[0], lastName?.[0]].filter(Boolean).join("");
   if (chars) return chars.toUpperCase();
@@ -110,7 +124,9 @@ export default function SuperAdminAdminsPage() {
       firstName: member.firstName ?? "",
       lastName: member.lastName ?? "",
       email: member.email,
-      phoneNumber: member.phoneNumber ?? "",
+      // Normalise the stored value to the same shape the field enforces, so a
+      // legacy row can still be saved without forcing the admin to retype it.
+      phoneNumber: sanitizePlatformPhone(member.phoneNumber ?? ""),
       role: member.role?.key ?? "super_admin",
       password: "",
     });
@@ -132,6 +148,11 @@ export default function SuperAdminAdminsPage() {
       setFormError("Select a Super Admin / platform role");
       return;
     }
+    const phone = form.phoneNumber.trim();
+    if (phone && !PLATFORM_PHONE_REGEX.test(phone)) {
+      setFormError("Mobile number must contain digits only (max 15).");
+      return;
+    }
 
     setSubmitting(true);
     setFormError(null);
@@ -141,7 +162,7 @@ export default function SuperAdminAdminsPage() {
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           email: form.email.trim(),
-          phoneNumber: form.phoneNumber.trim() || undefined,
+          phoneNumber: phone || undefined,
           role: form.role,
           ...(form.password.trim() ? { password: form.password.trim() } : {}),
         });
@@ -151,7 +172,7 @@ export default function SuperAdminAdminsPage() {
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           email: form.email.trim(),
-          phoneNumber: form.phoneNumber.trim() || undefined,
+          phoneNumber: phone || undefined,
           role: form.role,
           ...(form.password.trim() ? { password: form.password.trim() } : {}),
         });
@@ -336,9 +357,13 @@ export default function SuperAdminAdminsPage() {
                         <button className="btn btn-ghost btn-sm" type="button" onClick={() => openEdit(m)}>
                           Edit
                         </button>
-                        <button className="btn btn-ghost btn-sm" type="button" onClick={() => void toggleStatus(m)}>
-                          {m.status === "active" ? "Disable" : "Enable"}
-                        </button>
+                        {/* Super Admin members cannot be enabled/disabled from
+                            here — the action is only for other platform roles. */}
+                        {!m.roles.some((r) => r.key === "super_admin") ? (
+                          <button className="btn btn-ghost btn-sm" type="button" onClick={() => void toggleStatus(m)}>
+                            {m.status === "active" ? "Disable" : "Enable"}
+                          </button>
+                        ) : null}
                         {user?.id !== m.id ? (
                           <button
                             className="btn btn-ghost btn-sm"
@@ -405,9 +430,15 @@ export default function SuperAdminAdminsPage() {
             <label>Mobile</label>
             <input
               className="inp"
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              maxLength={16}
               value={form.phoneNumber}
-              onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value }))}
-              placeholder="Optional"
+              onChange={(e) =>
+                setForm((f) => ({ ...f, phoneNumber: sanitizePlatformPhone(e.target.value) }))
+              }
+              placeholder="Optional · digits only, max 15"
             />
           </div>
 

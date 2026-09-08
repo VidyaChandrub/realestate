@@ -16,6 +16,7 @@ import type {
   LoginInput,
   LoginResponse,
   OrganisationRegistrationInput,
+  PermissionAction,
   Permissions,
   SafeUser,
   SessionUser,
@@ -67,10 +68,7 @@ interface AuthContextValue {
   completeEmailVerification: (code: string) => boolean;
   completeOnboarding: () => void;
   getOrgSetup: () => OrgSetupState | null;
-  hasPermission: (
-    module: string,
-    action: "view" | "add" | "edit" | "delete",
-  ) => boolean;
+  hasPermission: (module: string, action: PermissionAction) => boolean;
   isOrgAdmin: () => boolean;
   refreshPermissions: () => Promise<Permissions | null>;
 }
@@ -321,7 +319,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearSession]);
 
   const hasPermission = useCallback(
-    (module: string, action: "view" | "add" | "edit" | "delete") => {
+    (module: string, action: PermissionAction) => {
       if (!user) return false;
       if (!user.org_id) {
         const loaded = user.permissions && Object.keys(user.permissions).length > 0;

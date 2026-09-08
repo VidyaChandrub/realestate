@@ -85,8 +85,10 @@ export class OrgUsersController {
   }
 
   // Disapprove / deactivate a member: revokes login and invalidates any live
-  // session on the member's next authenticated request.
-  @RequirePermission('users', 'edit')
+  // session on the member's next authenticated request. Gated by `approve` —
+  // the same grant that lets a member approve/activate — since deactivating is
+  // just the reverse direction of that same control.
+  @RequirePermission('users', 'approve')
   @Post(':id/disapprove')
   @HttpCode(200)
   disapprove(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {

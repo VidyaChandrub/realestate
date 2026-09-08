@@ -25,13 +25,19 @@ export default function ChangePasswordPage() {
   const [done, setDone] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // No session → nothing to change. Bounce to login (but wait for the
-  // auth context to finish restoring from storage first).
+  // Which login the user belongs to — Platform Team members (no org_id) sign
+  // in at /admin-login, everyone else at /login. Set from the session in the
+  // submit handler (before logout() clears it) so the post-change redirect and
+  // the "sign in" link both point at the right place.
+  const [loginHref, setLoginHref] = useState("/login");
+
+  // No session → nothing to change. Bounce to the right login (but wait for
+  // the auth context to finish restoring from storage first).
   useEffect(() => {
     if (!isLoading && !accessToken) {
-      router.replace("/login");
+      router.replace(loginHref);
     }
-  }, [isLoading, accessToken, router]);
+  }, [isLoading, accessToken, router, loginHref]);
 
   function validate(): boolean {
     const next: Record<string, string> = {};
@@ -67,6 +73,9 @@ export default function ChangePasswordPage() {
         }),
       });
       setDone(true);
+      // Capture the right sign-in route before logout() clears the session —
+      // Platform Team members go back to /admin-login, everyone else to /login.
+      setLoginHref(user && !user.org_id ? "/admin-login" : "/login");
       // New credentials are live — clear the session so the user signs in
       // fresh with the password they just set.
       await logout();
@@ -130,7 +139,7 @@ export default function ChangePasswordPage() {
             >
               ✅ Password changed successfully. You can now{" "}
               <Link
-                href="/login"
+                href={loginHref}
                 style={{ color: "var(--brand)", fontWeight: 600 }}
               >
                 sign in

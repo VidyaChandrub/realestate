@@ -14,7 +14,7 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <BrandMark size={40} />
           <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
-            BigEstate
+            iPixxel Realty
           </h1>
         </div>
 

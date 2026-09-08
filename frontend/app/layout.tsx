@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BigEstate",
+  title: "iPixxel Realty",
   description: "Real estate SaaS platform",
 };
 
