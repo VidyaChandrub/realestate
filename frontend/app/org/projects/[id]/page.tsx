@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, getCrmLeads, getProjectSalesAgents } from "@/lib/api";
+import { apiFetch, createCrmLead, getCrmLeads, getProjectSalesAgents } from "@/lib/api";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { normalizeSpecifications, specificationRows } from "@/lib/specifications";
 import { Reveal } from "@/components/superadmin/reveal";
@@ -12,6 +12,42 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { ProjectPageHead } from "@/components/org/project-tabs";
 import "@/app/org/org.css";
 import type { OrgTemplatesListResponse, ProjectDetail, ProjectSalesAgent } from "@/lib/types";
+
+/**
+ * Direct Lead Entry — the manual walk-in form on this page.
+ *
+ * The Lead's `source` column is free text, but `leadDisplaySource` only maps a
+ * fixed vocabulary (SOURCE_PLACE in lib/lead-display) and that vocabulary is
+ * entirely about *where on a website* a lead came from — page form, popup,
+ * hero, floor plan, brochure gate, project widget — plus "crm" for anything
+ * entered by hand. It has no manual-channel words at all: no walk-in, no
+ * referral, no channel partner.
+ *
+ * So every lead from this form stores `source: "crm"`, which maps cleanly to
+ * "CRM" and reads consistently beside every other lead. The business channel
+ * the user picked is kept in `data` instead, where the lead detail page lists
+ * it with the rest of the captured fields — nothing is lost, and nothing is
+ * written that the display layer would render raw.
+ */
+const LEAD_SOURCE = "crm";
+
+/** The channel this walk-in came through. Stored in `data`, not `source`. */
+const ENQUIRY_CHANNELS = [
+  "Walk-in / Site visit",
+  "Direct referral",
+  "Channel partner",
+  "Phone enquiry",
+  "Meta ad",
+  "Google search",
+];
+
+/** Budget bands offered by the form. Stored as the free-text string the CRM already uses. */
+const BUDGET_BANDS = [
+  "Under ₹50 L",
+  "₹50 L – ₹1 Cr",
+  "₹1 Cr – ₹2.5 Cr",
+  "₹2.5 Cr+",
+];
 
 async function createLandingPageFromOrgTemplate(accessToken: string, pageName: string, projectId: string) {
   const list = await apiFetch<OrgTemplatesListResponse>("/org/templates?limit=1", {
@@ -51,6 +87,16 @@ export default function OrgProjectOverviewPage() {
   const [pagePublishSuccess, setPagePublishSuccess] = useState<string | null>(null);
   const [leadCount, setLeadCount] = useState(0);
 
+  // Direct Lead Entry form.
+  const [leadName, setLeadName] = useState("");
+  const [leadPhone, setLeadPhone] = useState("");
+  const [leadConfig, setLeadConfig] = useState("");
+  const [leadBudget, setLeadBudget] = useState("");
+  const [leadChannel, setLeadChannel] = useState(ENQUIRY_CHANNELS[0]);
+  const [leadSaving, setLeadSaving] = useState(false);
+  const [leadError, setLeadError] = useState<string | null>(null);
+  const [leadToast, setLeadToast] = useState<string | null>(null);
+
   useEffect(() => {
     if (!accessToken || !id) return;
     setLoading(true);
@@ -76,6 +122,66 @@ export default function OrgProjectOverviewPage() {
       .then((res) => setLeadCount(res.total ?? res.data.length))
       .catch(() => setLeadCount(0));
   }, [id]);
+
+  /**
+   * Create the lead through the CRM's own manual endpoint — the same call the
+   * Add-lead modal makes. Round-robin assignment, the "Lead created in CRM"
+   * activity event and the `new` status default all come from that service;
+   * nothing is reimplemented here.
+   *
+   * The `data` keys match what `normalizeLeadData` (server) and
+   * lib/lead-display (client) both look for, so the lead lands fully populated
+   * in Lead Center rather than as a bare name.
+   */
+  async function submitLead() {
+    const name = leadName.trim();
+    const phone = leadPhone.trim();
+    // Client-side check for fast feedback; the server is still authoritative
+    // (it requires at least one of name / phone / email and re-validates).
+    if (!name || !phone) {
+      setLeadToast(null);
+      setLeadError("Enter the customer's name and phone number.");
+      return;
+    }
+    setLeadSaving(true);
+    setLeadError(null);
+    setLeadToast(null);
+    try {
+      await createCrmLead({
+        projectId: id,
+        formName: "Direct lead entry",
+        source: LEAD_SOURCE,
+        data: {
+          // Name and phone under both spellings the key lists accept.
+          fullName: name,
+          name,
+          phone,
+          phoneNumber: phone,
+          // Configuration reads as the lead's interest — an INTEREST_KEYS
+          // match, and what leadDisplaySource appends after the project.
+          ...(leadConfig ? { interestedIn: leadConfig, bhk: leadConfig } : {}),
+          ...(leadBudget ? { budget: leadBudget } : {}),
+          // Denormalised alongside projectId, matching existing lead rows.
+          ...(project ? { project: project.name } : {}),
+          "Enquiry channel": leadChannel,
+        },
+      });
+      setLeadName("");
+      setLeadPhone("");
+      setLeadConfig("");
+      setLeadBudget("");
+      setLeadChannel(ENQUIRY_CHANNELS[0]);
+      setLeadCount((n) => n + 1);
+      setLeadToast(`Lead created for ${name}. It's in Lead Center now.`);
+      setTimeout(() => setLeadToast(null), 4000);
+    } catch (err) {
+      // Surfaced inline rather than hidden — a 403 from a missing crm:add
+      // permission should be readable, not a silently dead button.
+      setLeadError(err instanceof Error ? err.message : "Couldn't create the lead.");
+    } finally {
+      setLeadSaving(false);
+    }
+  }
 
   if (notFound) {
     return (
@@ -728,38 +834,88 @@ export default function OrgProjectOverviewPage() {
             <div className="card">
               <div className="card-h"><span className="t">Direct Lead Entry</span></div>
               <div className="card-b">
-                <div className="field"><label>Full name</label><input className="inp" placeholder="Customer name" /></div>
-                <div className="field"><label>Phone</label><input className="inp" placeholder="+91 " /></div>
+                <div className="field">
+                  <label>Full name <span className="req">*</span></label>
+                  <input
+                    className="inp"
+                    placeholder="Customer name"
+                    value={leadName}
+                    onChange={(e) => setLeadName(e.target.value)}
+                    disabled={leadSaving}
+                  />
+                </div>
+                <div className="field">
+                  <label>Phone <span className="req">*</span></label>
+                  <input
+                    className="inp"
+                    placeholder="+91 "
+                    value={leadPhone}
+                    onChange={(e) => setLeadPhone(e.target.value)}
+                    disabled={leadSaving}
+                  />
+                </div>
                 <div className="row2">
                   <div className="field">
                     <label>Configuration</label>
-                    <select className="inp">
-                      <option>Select</option>
-                      {project.unitTypes.map((u) => <option key={u.id}>{u.name}</option>)}
+                    {/* This project's configurations — the planned mix plus any
+                        already on its units — not the whole org catalog. */}
+                    <select
+                      className="inp"
+                      value={leadConfig}
+                      onChange={(e) => setLeadConfig(e.target.value)}
+                      disabled={leadSaving}
+                    >
+                      <option value="">Select</option>
+                      {configLabels.map((label) => (
+                        <option key={label} value={label}>{label}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="field">
                     <label>Budget</label>
-                    <select className="inp">
-                      <option>Select range</option>
-                      <option>Under ₹50 L</option>
-                      <option>₹50 L – ₹1 Cr</option>
-                      <option>₹1 Cr – ₹2.5 Cr</option>
-                      <option>₹2.5 Cr+</option>
+                    <select
+                      className="inp"
+                      value={leadBudget}
+                      onChange={(e) => setLeadBudget(e.target.value)}
+                      disabled={leadSaving}
+                    >
+                      <option value="">Select range</option>
+                      {BUDGET_BANDS.map((band) => (
+                        <option key={band} value={band}>{band}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
                 <div className="field">
                   <label>Source</label>
-                  <select className="inp">
-                    <option>Walk-in / Site Visit</option>
-                    <option>Meta Ad</option>
-                    <option>Google Search</option>
-                    <option>Direct Referral</option>
-                    <option>Channel Partner</option>
+                  <select
+                    className="inp"
+                    value={leadChannel}
+                    onChange={(e) => setLeadChannel(e.target.value)}
+                    disabled={leadSaving}
+                  >
+                    {ENQUIRY_CHANNELS.map((channel) => (
+                      <option key={channel} value={channel}>{channel}</option>
+                    ))}
                   </select>
                 </div>
-                <button className="btn btn-primary btn-block">Submit &amp; Create Lead →</button>
+                {leadError ? (
+                  <div className="help err mb-8" role="alert">⚠️ {leadError}</div>
+                ) : null}
+                {leadToast ? (
+                  <div className="help mb-8" role="status">
+                    ✅ {leadToast}{" "}
+                    <Link className="brand-link" href={`/org/projects/${id}/leads`}>View leads →</Link>
+                  </div>
+                ) : null}
+                <button
+                  className="btn btn-primary btn-block"
+                  type="button"
+                  onClick={() => void submitLead()}
+                  disabled={leadSaving}
+                >
+                  {leadSaving ? "Creating lead…" : "Submit & Create Lead →"}
+                </button>
                 {project.brochureUrl ? (
                   <a href={project.brochureUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-block mt-8">⬇ Download Brochure</a>
                 ) : null}
