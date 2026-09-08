@@ -1172,12 +1172,6 @@ export default function OrgProjectUnitsPage() {
               }
             />
           </div>
-          <div className="muted fs-12 row gap-8 mb-14">
-            <span><Icon name="properties" size={13} /> Floor plan</span>
-            <span><Icon name="camera" size={13} /> Video</span>
-            <span><Icon name="document" size={13} /> Brochure</span>
-            <span className="badge b-gray">Coming soon</span>
-          </div>
           <div className="row gap-10">
             <button
               className="btn btn-primary"
