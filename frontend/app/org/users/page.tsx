@@ -117,6 +117,16 @@ export default function OrgUsersPage() {
     }
   }, [accessToken, hasPermission, isOrgAdmin, router]);
 
+  // Per-action gating for the Users module. `view` (checked above) lets a
+  // member open this page; each write action then needs its own grant.
+  // Org admins are unrestricted. "Approve" covers the whole activate/
+  // deactivate pair — approving a pending member and deactivating an active
+  // one are two directions of the same control.
+  const isAdmin = isOrgAdmin();
+  const canAdd = isAdmin || hasPermission("users", "add");
+  const canEdit = isAdmin || hasPermission("users", "edit");
+  const canApprove = isAdmin || hasPermission("users", "approve");
+
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("");
@@ -406,15 +416,17 @@ export default function OrgUsersPage() {
             People who can sign in to your organisation&apos;s workspace.
           </div>
         </div>
-        <div className="actions">
-          <button
-            className="btn btn-primary"
-            type="button"
-            onClick={openCreate}
-          >
-            <Icon name="plus" size={15} /> Create user
-          </button>
-        </div>
+        {canAdd ? (
+          <div className="actions">
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={openCreate}
+            >
+              <Icon name="plus" size={15} /> Create user
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <Modal
@@ -727,15 +739,18 @@ export default function OrgUsersPage() {
                               alignItems: "center",
                             }}
                           >
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              type="button"
-                              onClick={() => openEdit(user)}
-                            >
-                              Edit
-                            </button>
-                            {user.status === "pending" ||
-                            user.status === "disabled" ? (
+                            {canEdit ? (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                type="button"
+                                onClick={() => openEdit(user)}
+                              >
+                                Edit
+                              </button>
+                            ) : null}
+                            {canApprove &&
+                            (user.status === "pending" ||
+                              user.status === "disabled") ? (
                               <button
                                 className="btn btn-ghost btn-sm"
                                 type="button"
@@ -745,7 +760,8 @@ export default function OrgUsersPage() {
                                 Approve
                               </button>
                             ) : null}
-                            {(user.status === "pending" ||
+                            {canApprove &&
+                            (user.status === "pending" ||
                               user.status === "active") &&
                             !(
                               user.role?.key === "admin" &&
@@ -762,7 +778,9 @@ export default function OrgUsersPage() {
                                   : "Disapprove"}
                               </button>
                             ) : null}
-                            {user.status !== "active" && user.mustChangePassword ? (
+                            {canEdit &&
+                            user.status !== "active" &&
+                            user.mustChangePassword ? (
                               <button
                                 className="btn btn-ghost btn-sm"
                                 type="button"
@@ -771,6 +789,11 @@ export default function OrgUsersPage() {
                               >
                                 {resentId === user.id ? "Sent " : "Resend Mail"}
                               </button>
+                            ) : null}
+                            {!canEdit && !canApprove ? (
+                              <span className="muted" style={{ fontSize: 12 }}>
+                                View only
+                              </span>
                             ) : null}
                           </div>
                           {rowError?.id === user.id ? (
