@@ -24,6 +24,7 @@
  */
 
 import type { UnitType } from "./types";
+import { pickUnitTypeForConfiguration } from "./unit-types";
 
 /** The three fields a unit type can prefill. */
 export type PrefillField = "carpetSqft" | "builtupSqft" | "price";
@@ -59,10 +60,10 @@ export function prefillFromUnitType(
   const label = configuration.trim();
   if (!label || !unitTypes?.length) return empty;
 
-  // Case-insensitive so "2 bhk" picked from a legacy row still resolves.
-  const match = unitTypes.find(
-    (t) => t.name.trim().toLowerCase() === label.toLowerCase(),
-  );
+  // Shared resolver: a project can hold more than one row for a label, and
+  // prefill must land on the same row the edit table shows — otherwise the
+  // user fills in values that are never read back. See lib/unit-types.
+  const match = pickUnitTypeForConfiguration(label, unitTypes);
   if (!match) return empty;
 
   const values: Partial<Record<PrefillField, string>> = {};

@@ -1,17 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions } from "@/lib/api";
 import { parseAmount, parseCount, parseInteger } from "@/lib/parse";
 import { prefillFromUnitType, type PrefillField } from "@/lib/unit-prefill";
+import { plannedMixRemovalBlockedReason } from "@/lib/unit-types";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Icon } from "@/components/icons";
+import { RowActionsMenu } from "@/components/superadmin/row-actions-menu";
 import { ProjectPageHead } from "@/components/org/project-tabs";
 import {
   ConfigurationSelect,
@@ -134,6 +136,17 @@ type PendingDelete =
 
 export default function OrgProjectUnitsPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  /** `?edit=<unitId>` — the unit detail page's Edit button deep-links here. */
+  const editUnitId = searchParams.get("edit");
+  /**
+   * `?from=unit` — the edit was launched from that unit's detail page, so
+   * closing the modal (cancel or save) should land back there rather than
+   * stranding the user on the list they never chose to visit. Held in a ref
+   * because the query param is stripped as soon as the modal opens.
+   */
+  const returnToUnit = useRef<string | null>(null);
   const id = params?.id ?? "";
   const { accessToken } = useAuth();
 
@@ -206,6 +219,28 @@ export default function OrgProjectUnitsPage() {
     void load();
   }, [load]);
 
+  /**
+   * Arriving from a unit's detail page with `?edit=<unitId>` opens that unit's
+   * edit modal directly, pre-populated — the same modal the row's Edit button
+   * opens, not a second form.
+   *
+   * Waits for the units to load, opens once, then strips the param so a later
+   * Cancel-and-refresh doesn't silently reopen it. An id that doesn't match a
+   * unit on this project is simply ignored: the user still lands on the list.
+   */
+  useEffect(() => {
+    if (!editUnitId || units.length === 0) return;
+    const target = units.find((u) => u.id === editUnitId);
+    if (target) {
+      openUnitEdit(target);
+      if (searchParams.get("from") === "unit") returnToUnit.current = target.id;
+    }
+    router.replace(`/org/projects/${id}/units`, { scroll: false });
+    // openUnitEdit is a stable component-scope function; re-running on every
+    // render would fight the user's own edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editUnitId, units, id, router]);
+
   // The org's price-per-sqft basis, so the live figure and its label match
   // what the server derives.
   useEffect(() => {
@@ -263,6 +298,19 @@ export default function OrgProjectUnitsPage() {
     );
     setPrefilled(filled);
     setUnitForm((f) => ({ ...f, configuration, ...values }));
+  }
+
+  /**
+   * Why this planned-mix row can't be removed, or null. Same shared rule the
+   * project edit form applies when unticking the configuration — one row,
+   * reached two ways, so one behaviour and one message.
+   */
+  function removalBlockedFor(ut: UnitType): string | null {
+    return plannedMixRemovalBlockedReason(
+      ut.name,
+      ut.unitCount,
+      unitTypes.filter((t) => t.name === ut.name),
+    );
   }
 
   /** The note is only true until the user edits that field. */
@@ -349,6 +397,17 @@ export default function OrgProjectUnitsPage() {
   }
 
   // --- unit handlers ---
+  /**
+   * Close the unit modal, returning to the detail page when that's where the
+   * edit was launched from. Launching from the list leaves you on the list.
+   */
+  function closeUnitModal() {
+    const back = returnToUnit.current;
+    returnToUnit.current = null;
+    setUnitMode(null);
+    if (back) router.push(`/org/projects/${id}/units/${back}`);
+  }
+
   function openUnitCreate() {
     setUnitMode("create");
     setUnitEditingId(null);
@@ -437,8 +496,10 @@ export default function OrgProjectUnitsPage() {
           body: JSON.stringify(body),
         });
       }
-      setUnitMode(null);
+      // Refresh the list before navigating, so returning to the detail page
+      // (or staying here) shows the values just saved.
       await load();
+      closeUnitModal();
     } catch (err) {
       setUnitError(err instanceof Error ? err.message : "Failed to save unit.");
     } finally {
@@ -746,33 +807,45 @@ export default function OrgProjectUnitsPage() {
                         </span>
                       ) : null}
                     </div>
-                    <div className="row gap-8 mt-10">
+                    <div className="row gap-8 mt-10 between">
                       {ut ? (
                         <>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            type="button"
-                            onClick={() => openUtEdit(ut)}
-                          >
-                            ✏️ Edit planned mix
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-sm text-rose"
-                            type="button"
-                            onClick={() =>
-                              setPendingDelete({
-                                kind: "unitType",
-                                id: ut.id,
-                                label: ut.name,
-                                extra:
-                                  total > 0
-                                    ? `The ${total} unit(s) with this configuration are kept.`
-                                    : "",
-                              })
-                            }
-                          >
-                            🗑 Remove from planned mix
-                          </button>
+                          <span className="muted fs-12">
+                            {removalBlockedFor(ut)
+                              ? "In use — set planned units to 0 to stop tracking."
+                              : " "}
+                          </span>
+                          <RowActionsMenu
+                            actions={[
+                              {
+                                key: "edit",
+                                label: "Edit ",
+                                onClick: () => openUtEdit(ut),
+                              },
+                              {
+                                key: "remove",
+                                label: "Remove",
+                                danger: true,
+                                // Blocked, not confirmed, while units use this
+                                // configuration — same rule as unticking it on
+                                // the project edit form.
+                                disabled: removalBlockedFor(ut) !== null,
+                                onClick: () => {
+                                  const blocked = removalBlockedFor(ut);
+                                  if (blocked) {
+                                    setError(blocked);
+                                    return;
+                                  }
+                                  setPendingDelete({
+                                    kind: "unitType",
+                                    id: ut.id,
+                                    label: ut.name,
+                                    extra: "",
+                                  });
+                                },
+                              },
+                            ]}
+                          />
                         </>
                       ) : (
                         <span className="muted fs-12">
@@ -866,6 +939,7 @@ export default function OrgProjectUnitsPage() {
                   <th>Facing</th>
                   <th>Parking</th>
                   <th>Price ₹</th>
+                  <th>Created by</th>
                   <th>Updated by</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -874,7 +948,7 @@ export default function OrgProjectUnitsPage() {
               <tbody>
                 {visibleUnits.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="muted">
+                    <td colSpan={12} className="muted">
                       {units.length === 0
                         ? "No units yet — add one with “＋ Add unit”."
                         : "No units match this filter."}
@@ -903,6 +977,16 @@ export default function OrgProjectUnitsPage() {
                             {row.pricePerSqft.toLocaleString("en-IN")} / sqft ({PRICE_BASIS_LABEL[row.pricePerSqftBasis]})
                           </div>
                         ) : null}
+                      </td>
+                      <td>
+                        {row.createdBy ? (
+                          <>
+                            <div>{row.createdBy.name}</div>
+                            <div className="hint">{formatUpdatedAt(row.createdAt)}</div>
+                          </>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
                       </td>
                       <td>
                         {row.updatedBy ? (
@@ -945,29 +1029,33 @@ export default function OrgProjectUnitsPage() {
                         </div>
                       </td>
                       <td>
-                        <div className="row gap-6 wrap">
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            type="button"
-                            onClick={() => openUnitEdit(row)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-sm text-rose"
-                            type="button"
-                            onClick={() =>
-                              setPendingDelete({
-                                kind: "unit",
-                                id: row.id,
-                                label: `unit ${row.unitNo}`,
-                                extra: "",
-                              })
-                            }
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        <RowActionsMenu
+                          actions={[
+                            {
+                              key: "open",
+                              label: "Open",
+                              onClick: () =>
+                                router.push(`/org/projects/${id}/units/${row.id}`),
+                            },
+                            {
+                              key: "edit",
+                              label: "Edit",
+                              onClick: () => openUnitEdit(row),
+                            },
+                            {
+                              key: "delete",
+                              label: "Delete",
+                              danger: true,
+                              onClick: () =>
+                                setPendingDelete({
+                                  kind: "unit",
+                                  id: row.id,
+                                  label: `unit ${row.unitNo}`,
+                                  extra: "",
+                                }),
+                            },
+                          ]}
+                        />
                       </td>
                     </tr>
                   ))
@@ -1122,7 +1210,7 @@ export default function OrgProjectUnitsPage() {
       {/* --- Unit create/edit --- */}
       <Modal
         open={unitMode !== null}
-        onClose={() => setUnitMode(null)}
+        onClose={closeUnitModal}
         title={unitMode === "create" ? "Add unit" : "Edit unit"}
         size="xl"
       >
@@ -1371,7 +1459,7 @@ export default function OrgProjectUnitsPage() {
           <button
             className="btn btn-ghost"
             type="button"
-            onClick={() => setUnitMode(null)}
+            onClick={closeUnitModal}
             disabled={unitBusy}
           >
             Cancel

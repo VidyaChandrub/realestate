@@ -245,6 +245,7 @@ export default function AllUnitsPage() {
                   <th>Facing</th>
                   <th>Parking</th>
                   <th>Price</th>
+                  <th>Created by</th>
                   <th>Updated by</th>
                   <th>Status</th>
                   <th></th>
@@ -253,13 +254,13 @@ export default function AllUnitsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={12} className="muted">
+                    <td colSpan={13} className="muted">
                       Loading…
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="muted">
+                    <td colSpan={13} className="muted">
                       No units match this filter.
                     </td>
                   </tr>
@@ -310,6 +311,16 @@ export default function AllUnitsPage() {
                               {formatMoney(psf, ccy)}/sqft ({PRICE_BASIS_LABEL[u.pricePerSqftBasis]})
                             </div>
                           ) : null}
+                        </td>
+                        <td>
+                          {u.createdBy ? (
+                            <>
+                              <div>{u.createdBy.name}</div>
+                              <div className="hint">{formatUpdatedAt(u.createdAt)}</div>
+                            </>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
                         </td>
                         <td>
                           {u.updatedBy ? (

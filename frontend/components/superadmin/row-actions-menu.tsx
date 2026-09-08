@@ -24,12 +24,13 @@ export function RowActionsMenu({ actions, disabled }: { actions: RowAction[]; di
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   // .row-menu's styling (and the --surface/--ink/etc. custom properties it
-  // reads) is scoped under the .superadmin wrapper, so the portal target
-  // must stay a descendant of that wrapper — portaling to document.body
-  // would land the menu as .superadmin's sibling instead, rendering it
-  // completely unstyled and in-flow at the very bottom of the document
-  // instead of positioned near the click. Resolved in the effect below
-  // (not during render, where reading a ref is disallowed).
+  // reads) is scoped under a theme wrapper — .superadmin in the admin console,
+  // .org in the org app — so the portal target must stay a descendant of
+  // whichever one this instance sits in. Portaling to document.body would land
+  // the menu as that wrapper's sibling, rendering it completely unstyled and
+  // in-flow at the very bottom of the document instead of positioned near the
+  // click. Resolved in the effect below (not during render, where reading a
+  // ref is disallowed).
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -49,7 +50,10 @@ export function RowActionsMenu({ actions, disabled }: { actions: RowAction[]; di
       });
     };
     reposition();
-    setPortalTarget((btnRef.current?.closest(".superadmin") as HTMLElement | null) ?? document.body);
+    setPortalTarget(
+      (btnRef.current?.closest(".superadmin, .org") as HTMLElement | null) ??
+        document.body,
+    );
 
     const close = () => setOpen(false);
     const onClick = (e: MouseEvent) => {

@@ -28,6 +28,32 @@ export function formatUpdatedAt(iso: string): string {
   });
 }
 
+/**
+ * `Project.possession` for display.
+ *
+ * The field is deliberately free text ("Dec 2027"), but the create wizard's
+ * `<input type="month">` writes the raw ISO "YYYY-MM" it produces, so stored
+ * values are a mix. Only that exact shape is reformatted — "2026-09" reads as
+ * "Sep 2026"; anything a human typed is left exactly as they typed it.
+ */
+// Spelled out rather than derived from toLocaleDateString: both en-IN and
+// en-GB render September as "Sept", which reads oddly next to the three-letter
+// months people type by hand ("Dec 2027"), and short-month output varies with
+// the runtime's ICU data. A fixed table can't drift.
+const SHORT_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+] as const;
+
+export function formatPossession(value: string | null | undefined): string {
+  const text = (value ?? "").trim();
+  if (!text) return "—";
+  const m = /^(d{4})-(0[1-9]|1[0-2])$/.exec(text);
+  if (!m) return text;
+  const [, year, month] = m;
+  return `${SHORT_MONTHS[Number(month) - 1]} ${year}`;
+}
+
 /** Human name for a price basis, as shown in the label. */
 export const PRICE_BASIS_LABEL: Record<UnitPriceBasis, string> = {
   carpet: "carpet",
@@ -410,6 +436,89 @@ export function ConfigurationSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+/**
+ * One editable row of the "Size & price per configuration" table. Strings
+ * throughout because it is bound straight to number inputs; the caller parses
+ * on save. `key` is a stable client-side identity — for the create wizard a
+ * counter, for the edit page the `UnitType` id.
+ */
+export interface ConfigSizePriceRow {
+  key: string | number;
+  name: string;
+  carpetSqft: string;
+  builtupSqft: string;
+  price: string;
+  totalUnits: string;
+}
+
+/**
+ * Carpet / built-up / price / planned units, one row per configuration the
+ * project offers.
+ *
+ * Shared verbatim by the create wizard's Step 2 and the project edit form so
+ * the same information is captured the same way in both places — divergent
+ * copies of this form are what made unit types confusing to begin with.
+ *
+ * Every field is optional: an empty row just means that configuration won't
+ * prefill anything when a unit is added. The component is presentational —
+ * it owns no state and does no saving; the caller supplies the rows and
+ * receives patches.
+ */
+export function ConfigSizePriceTable({
+  configurations,
+  rows,
+  onChange,
+  hint,
+}: {
+  /** Labels currently selected, in display order. */
+  configurations: string[];
+  rows: ConfigSizePriceRow[];
+  onChange: (key: string | number, patch: Partial<ConfigSizePriceRow>) => void;
+  hint?: React.ReactNode;
+}) {
+  if (configurations.length === 0) return null;
+  return (
+    <div className="field">
+      <label>Size &amp; price per configuration</label>
+      {hint ? <div className="hint" style={{ marginBottom: 10 }}>{hint}</div> : null}
+      <div className="ut-rows">
+        <div className="ut-row ut-head">
+          <span>Configuration</span>
+          <span>Carpet (sqft)</span>
+          <span>Built-up (sqft)</span>
+          <span>Price (₹)</span>
+          <span>Planned units</span>
+        </div>
+        {configurations.map((label) => {
+          const row = rows.find((r) => r.name === label);
+          if (!row) return null;
+          return (
+            <div className="ut-row" key={row.key}>
+              <span className="ut-name">{label}</span>
+              <input className="inp" type="number" min={0} placeholder="1,000"
+                aria-label={`Carpet area for ${label}`}
+                value={row.carpetSqft}
+                onChange={(e) => onChange(row.key, { carpetSqft: e.target.value })} />
+              <input className="inp" type="number" min={0} placeholder="1,250"
+                aria-label={`Built-up area for ${label}`}
+                value={row.builtupSqft}
+                onChange={(e) => onChange(row.key, { builtupSqft: e.target.value })} />
+              <input className="inp" type="number" min={0} placeholder="64,00,000"
+                aria-label={`Price for ${label}`}
+                value={row.price}
+                onChange={(e) => onChange(row.key, { price: e.target.value })} />
+              <input className="inp" type="number" min={0} placeholder="0"
+                aria-label={`Planned units for ${label}`}
+                value={row.totalUnits}
+                onChange={(e) => onChange(row.key, { totalUnits: e.target.value })} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

@@ -7,7 +7,13 @@ import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, setProjectSalesAgen
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { CURRENCY_LABELS, formatMoneyRange, PROJECT_CURRENCIES } from "@/lib/money";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
-import { CatalogOptions, MoneyInput, SpecificationRows } from "@/components/org/project-form-fields";
+import {
+  CatalogOptions,
+  ConfigSizePriceTable,
+  MoneyInput,
+  SpecificationRows,
+  type ConfigSizePriceRow,
+} from "@/components/org/project-form-fields";
 import {
   defaultSpecRows,
   serializeSpecifications,
@@ -43,14 +49,9 @@ function userLabel(u: OrgUser): string {
   return [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
 }
 
-interface UnitTypeDraft {
-  key: number;
-  name: string;
-  carpetSqft: string;
-  builtupSqft: string;
-  price: string;
-  totalUnits: string;
-}
+// The wizard's draft rows are the shared table's rows — one shape, so the
+// component and the localStorage draft can't drift apart.
+type UnitTypeDraft = ConfigSizePriceRow;
 
 const makeUnitType = (): UnitTypeDraft => ({
   key: Date.now() + Math.random(),
@@ -548,7 +549,7 @@ export default function AddNewProjectPage() {
     setPriceIncludes((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]);
   }
 
-  function updateUnitType(key: number, patch: Partial<UnitTypeDraft>) {
+  function updateUnitType(key: string | number, patch: Partial<UnitTypeDraft>) {
     setUnitTypes((prev) => prev.map((u) => (u.key === key ? { ...u, ...patch } : u)));
   }
 
@@ -1189,42 +1190,12 @@ export default function AddNewProjectPage() {
                     <div className="field"><label>Floors / structure</label><input className="inp" placeholder="G+22" value={floorsDescription} onChange={(e) => setFloorsDescription(e.target.value)} /></div>
                     <div className="field"><label>Carpet area range (sqft)</label><input className="inp" placeholder="640 – 1,850" value={carpetRange} onChange={(e) => setCarpetRange(e.target.value)} /></div>
                   </div>
-                  {selectedConfigs.length > 0 ? (
-                    <div className="field">
-                      <label>Size &amp; price per configuration</label>
-                      <div className="hint" style={{ marginBottom: 10 }}>
-                        Optional, and editable later on the Units page. Filling these in
-                        means adding a unit prefills its area and price from here instead
-                        of asking for them again.
-                      </div>
-                      <div className="ut-rows">
-                        <div className="ut-row ut-head">
-                          <span>Configuration</span>
-                          <span>Carpet (sqft)</span>
-                          <span>Built-up (sqft)</span>
-                          <span>Price (₹)</span>
-                          <span>Planned units</span>
-                        </div>
-                        {selectedConfigs.map((label) => {
-                          const row = unitTypes.find((r) => r.name === label);
-                          if (!row) return null;
-                          return (
-                            <div className="ut-row" key={row.key}>
-                              <span className="ut-name">{label}</span>
-                              <input className="inp" type="number" min={0} placeholder="1,000" value={row.carpetSqft}
-                                onChange={(e) => updateUnitType(row.key, { carpetSqft: e.target.value })} />
-                              <input className="inp" type="number" min={0} placeholder="1,250" value={row.builtupSqft}
-                                onChange={(e) => updateUnitType(row.key, { builtupSqft: e.target.value })} />
-                              <input className="inp" type="number" min={0} placeholder="64,00,000" value={row.price}
-                                onChange={(e) => updateUnitType(row.key, { price: e.target.value })} />
-                              <input className="inp" type="number" min={0} placeholder="0" value={row.totalUnits}
-                                onChange={(e) => updateUnitType(row.key, { totalUnits: e.target.value })} />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
+                  <ConfigSizePriceTable
+                    configurations={selectedConfigs}
+                    rows={unitTypes}
+                    onChange={updateUnitType}
+                    hint="Optional, and editable later from the project's Edit page or the Units page. Filling these in means adding a unit prefills its area and price from here instead of asking for them again."
+                  />
                   <div className="field mb-0"><label>Total land area</label>
                     <div style={{ position: "relative", maxWidth: 260 }}>
                       <input className="inp" type="number" step="0.01" min={0} style={{ paddingRight: 52 }} placeholder="5.2" value={landArea} onChange={(e) => setLandArea(e.target.value)} />

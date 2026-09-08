@@ -7,7 +7,19 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { CURRENCY_LABELS, PROJECT_CURRENCIES } from "@/lib/money";
-import { CatalogOptions, MoneyInput, SpecificationRows } from "@/components/org/project-form-fields";
+import {
+  CatalogOptions,
+  ConfigSizePriceTable,
+  MoneyInput,
+  SpecificationRows,
+  type ConfigSizePriceRow,
+} from "@/components/org/project-form-fields";
+import {
+  findDuplicateConfigurations,
+  isEmptyRow,
+  pickUnitTypeForConfiguration,
+  plannedMixRemovalBlockedReason,
+} from "@/lib/unit-types";
 import { allMissing, projectRequirements } from "@/lib/project-validation";
 import {
   normalizeSpecifications,
@@ -36,6 +48,25 @@ function userLabel(u: OrgUser): string {
 
 function toField(value: number | null | undefined): string {
   return value == null ? "" : String(value);
+}
+
+/**
+ * One size/price table row for a configuration, filled from whichever
+ * `UnitType` row represents it (see `pickUnitTypeForConfiguration` — a project
+ * can hold more than one row per label). Keyed by that row's id so the save
+ * knows to PATCH it; keyed by the label when the configuration was ticked in
+ * this session and has no row yet.
+ */
+function toConfigRow(label: string, unitTypes: UnitType[]): ConfigSizePriceRow {
+  const row = pickUnitTypeForConfiguration(label, unitTypes);
+  return {
+    key: row?.id ?? label,
+    name: label,
+    carpetSqft: toField(row?.carpetSqft),
+    builtupSqft: toField(row?.builtupSqft),
+    price: toField(row?.price),
+    totalUnits: row ? String(row.totalUnits) : "",
+  };
 }
 
 const AD_SOURCES = ["Meta", "Google", "LinkedIn", "Portals"] as const;
@@ -132,6 +163,13 @@ export default function OrgProjectEditPage() {
   const [selectedConfigs, setSelectedConfigs] = useState<string[]>([]);
   const [highlights, setHighlights] = useState("");
   const [unitTypeRows, setUnitTypeRows] = useState<UnitType[]>([]);
+  // Editable carpet / built-up / price / planned per configuration — the same
+  // table the create wizard shows, so this information is editable where it is
+  // created rather than only on the Units page. Keyed by UnitType id for saved
+  // rows, and by label for configurations ticked in this session.
+  const [configRows, setConfigRows] = useState<ConfigSizePriceRow[]>([]);
+  /** Label whose duplicate cleanup is in flight, so its link can show progress. */
+  const [dedupeBusy, setDedupeBusy] = useState<string | null>(null);
   const [towerCount, setTowerCount] = useState("");
   const [floorsDescription, setFloorsDescription] = useState("");
   const [carpetRange, setCarpetRange] = useState("");
@@ -227,8 +265,14 @@ export default function OrgProjectEditPage() {
         setCarpetRange(p.carpetRange ?? "");
         setLandArea(toField(p.landArea));
         setAmenities(p.amenities.map((a) => a.name));
-        setUnitTypeRows(p.unitTypes ?? []);
-        setSelectedConfigs((p.unitTypes ?? []).map((u) => u.name));
+        const loadedTypes = p.unitTypes ?? [];
+        setUnitTypeRows(loadedTypes);
+        // One entry per distinct label — a project can hold several rows for
+        // the same configuration (see lib/unit-types), and the chip list and
+        // the table are both per-configuration, not per-row.
+        const labels = [...new Set(loadedTypes.map((u) => u.name))];
+        setSelectedConfigs(labels);
+        setConfigRows(labels.map((label) => toConfigRow(label, loadedTypes)));
         setHighlights(p.highlights ?? "");
         setSalesTeam(p.salesTeam ?? "");
 
@@ -356,6 +400,7 @@ export default function OrgProjectEditPage() {
 
   const projectTypeOptions = (catalog ?? []).filter((o) => o.category === "project_type");
   const unitTypeOptions = (catalog ?? []).filter((o) => o.category === "unit_type");
+  const duplicateConfigs = findDuplicateConfigurations(unitTypeRows);
   const priceIncludeOptions = (catalog ?? []).filter((o) => o.category === "price_includes");
   const paymentPlanOptions = (catalog ?? []).filter((o) => o.category === "payment_plan");
 
@@ -369,41 +414,96 @@ export default function OrgProjectEditPage() {
     return selected.filter((s) => !options.some((o) => o.label === s));
   }
 
+  /** Units on this project carrying this configuration label. */
+  function unitsUsing(label: string): number {
+    // `unitCount` is derived server-side by matching Unit.configuration to
+    // UnitType.name, so every duplicate row for a label reports the same
+    // figure — take the max rather than summing, which would double-count.
+    return unitTypeRows
+      .filter((u) => u.name === label)
+      .reduce((max, u) => Math.max(max, u.unitCount), 0);
+  }
+
   /**
-   * True when this configuration's UnitType row is still the empty placeholder
-   * the create wizard seeds — no sizes, price, planned count, media or actual
-   * units. Only those can be detached by unticking; a row with real inventory
-   * behind it is left alone and has to be removed from the Units page.
+   * Why this configuration can't be unticked, or null when it can. Uses the
+   * shared rule so this and the Units page's "Remove from planned mix" — the
+   * same row, reached two ways — behave identically and say the same thing.
    */
-  function configIsRemovable(label: string): boolean {
-    const row = unitTypeRows.find((u) => u.name === label);
-    if (!row) return true; // added in this session, not saved yet
-    return (
-      row.unitCount === 0 &&
-      row.totalUnits === 0 &&
-      row.carpetSqft == null &&
-      row.builtupSqft == null &&
-      row.price == null &&
-      !row.floorPlanUrl &&
-      !row.brochureUrl &&
-      !row.videoUrl &&
-      row.galleryUrls.length === 0
-    );
+  function untickBlockedReason(label: string): string | null {
+    const rows = unitTypeRows.filter((u) => u.name === label);
+    if (rows.length === 0) return null; // ticked this session, nothing saved yet
+    return plannedMixRemovalBlockedReason(label, unitsUsing(label), rows);
   }
 
   function toggleConfig(label: string) {
-    setSelectedConfigs((prev) => {
-      if (!prev.includes(label)) return [...prev, label];
-      if (!configIsRemovable(label)) {
+    if (selectedConfigs.includes(label)) {
+      const blocked = untickBlockedReason(label);
+      if (blocked) {
         setNotice(null);
-        setError(
-          `"${label}" has unit inventory behind it — remove it from the project's Units page instead.`,
-        );
-        return prev;
+        setError(blocked);
+        return;
       }
       setError(null);
-      return prev.filter((x) => x !== label);
-    });
+      setSelectedConfigs((prev) => prev.filter((x) => x !== label));
+      setConfigRows((prev) => prev.filter((r) => r.name !== label));
+      return;
+    }
+    setError(null);
+    setSelectedConfigs((prev) => [...prev, label]);
+    // The row appears immediately, in place — no navigating away to set sizes.
+    setConfigRows((prev) =>
+      prev.some((r) => r.name === label)
+        ? prev
+        : [...prev, toConfigRow(label, unitTypeRows)],
+    );
+  }
+
+  function updateConfigRow(
+    key: string | number,
+    patch: Partial<ConfigSizePriceRow>,
+  ) {
+    setConfigRows((prev) =>
+      prev.map((r) => (r.key === key ? { ...r, ...patch } : r)),
+    );
+  }
+
+  /**
+   * Drop the empty duplicate rows for a label, keeping the one in use. Only
+   * ever called with ids that `isEmptyRow` cleared, so nothing with sizes,
+   * pricing, a planned count or media can be removed this way — and units are
+   * untouched regardless, since they don't reference UnitType.
+   */
+  async function removeEmptyDuplicates(label: string, ids: string[]) {
+    if (!accessToken || ids.length === 0) return;
+    setDedupeBusy(label);
+    setError(null);
+    try {
+      for (const rowId of ids) {
+        await apiFetch(`/org/projects/${id}/unit-types/${rowId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+      }
+      const remaining = unitTypeRows.filter((r) => !ids.includes(r.id));
+      setUnitTypeRows(remaining);
+      // Re-key the table row onto the surviving UnitType so the save PATCHes
+      // it; the values the user has already typed are left alone.
+      const survivor = pickUnitTypeForConfiguration(label, remaining);
+      setConfigRows((prev) =>
+        prev.map((r) =>
+          r.name === label ? { ...r, key: survivor?.id ?? label } : r,
+        ),
+      );
+      setNotice(
+        `Removed ${ids.length} empty duplicate of "${label}". The entry with your values is kept.`,
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Couldn't remove the duplicate entry.",
+      );
+    } finally {
+      setDedupeBusy(null);
+    }
   }
 
   async function save() {
@@ -496,20 +596,48 @@ export default function OrgProjectEditPage() {
         body: JSON.stringify(body),
       });
 
-      // Unit configurations live as UnitType rows, so they're reconciled with
-      // their own endpoints after the project PATCH. Additions seed an empty
-      // planned type (exactly what the create wizard does); removals only ever
-      // touch placeholder rows — `toggleConfig` refuses to untick anything
-      // with real inventory, so nothing with data can be deleted from here.
+      // Unit configurations live as UnitType rows, reconciled through their own
+      // endpoints after the project PATCH. Newly ticked labels are created with
+      // whatever sizes/pricing were entered in the table; existing ones are
+      // PATCHed when their values changed. Removals only reach rows that
+      // `untickBlockedReason` cleared — nothing with units or recorded values
+      // can be deleted from here.
       const auth = { headers: { Authorization: `Bearer ${accessToken}` } };
       const originalConfigs = unitTypeRows.map((u) => u.name);
+      const rowFor = (label: string) => configRows.find((r) => r.name === label);
+      const valuesOf = (r: ConfigSizePriceRow | undefined) => ({
+        carpetSqft: parseCount(r?.carpetSqft ?? "") ?? null,
+        builtupSqft: parseCount(r?.builtupSqft ?? "") ?? null,
+        price: parseAmount(r?.price ?? "") ?? null,
+        totalUnits: parseCount(r?.totalUnits ?? "") ?? 0,
+      });
       try {
         for (const label of selectedConfigs) {
-          if (originalConfigs.includes(label)) continue;
-          await apiFetch(`/org/projects/${id}/unit-types`, {
-            method: "POST",
+          const values = valuesOf(rowFor(label));
+          if (!originalConfigs.includes(label)) {
+            await apiFetch(`/org/projects/${id}/unit-types`, {
+              method: "POST",
+              ...auth,
+              body: JSON.stringify({ name: label, ...values }),
+            });
+            continue;
+          }
+          // Existing configuration — update the row the table is bound to, and
+          // only when something actually changed. Editing these values never
+          // touches units that already exist: prefill is a snapshot taken at
+          // unit-creation time, and no unit references a UnitType.
+          const current = pickUnitTypeForConfiguration(label, unitTypeRows);
+          if (!current) continue;
+          const changed =
+            current.carpetSqft !== values.carpetSqft ||
+            current.builtupSqft !== values.builtupSqft ||
+            current.price !== values.price ||
+            current.totalUnits !== values.totalUnits;
+          if (!changed) continue;
+          await apiFetch(`/org/projects/${id}/unit-types/${current.id}`, {
+            method: "PATCH",
             ...auth,
-            body: JSON.stringify({ name: label, totalUnits: 0 }),
+            body: JSON.stringify({ name: label, ...values }),
           });
         }
         for (const row of unitTypeRows) {
@@ -888,10 +1016,58 @@ export default function OrgProjectEditPage() {
                   </div>
                 ) : null}
                 <div className="hint">
-                  Each configuration is a planned unit type. Sizes, pricing and unit counts are set per configuration on the{" "}
+                  Set each configuration&apos;s size and price below. Individual units are
+                  added on the{" "}
                   <Link className="brand-link" href={`/org/projects/${id}/units`}>Units page</Link>.
                 </div>
               </div>
+
+              {/* A project can hold more than one row per configuration (the
+                  table has no uniqueness constraint). Say which one is in use
+                  rather than silently picking, and offer to drop an empty
+                  twin — the only case that's safe to remove from here. */}
+              {duplicateConfigs.length > 0 ? (
+                <div className="form-alert mb-12">
+                  {duplicateConfigs.map((d) => {
+                    const removable = d.others.filter(isEmptyRow);
+                    return (
+                      <div key={d.label} style={{ marginBottom: 6 }}>
+                        <b>&ldquo;{d.label}&rdquo; has {d.rows.length} entries on this project.</b>{" "}
+                        Editing and prefill both use the one with{" "}
+                        {isEmptyRow(d.used)
+                          ? "the most recent change"
+                          : `carpet ${d.used.carpetSqft ?? "—"}, price ${d.used.price ?? "—"}`}
+                        .{" "}
+                        {removable.length > 0 ? (
+                          <>
+                            The {removable.length === 1 ? "other is" : "others are"} empty.{" "}
+                            <button
+                              type="button"
+                              className="brand-link"
+                              style={{ background: "none", border: 0, padding: 0, cursor: "pointer", font: "inherit" }}
+                              disabled={dedupeBusy === d.label}
+                              onClick={() => void removeEmptyDuplicates(d.label, removable.map((r) => r.id))}
+                            >
+                              {dedupeBusy === d.label
+                                ? "Removing…"
+                                : `Remove the empty duplicate${removable.length === 1 ? "" : "s"}`}
+                            </button>
+                          </>
+                        ) : (
+                          <>Both carry data, so neither can be removed from here — merge them on the Units page.</>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              <ConfigSizePriceTable
+                configurations={selectedConfigs}
+                rows={configRows}
+                onChange={updateConfigRow}
+                hint="Optional. Filling these in means adding a unit prefills its area and price from here instead of asking for them again. Changing them later never alters units that already exist."
+              />
               <div className="row3">
                 <div className="field"><label>No. of towers / blocks</label><input className="inp" type="number" min={0} value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /></div>
                 <div className="field"><label>Floors / structure</label><input className="inp" placeholder="G+22" value={floorsDescription} onChange={(e) => setFloorsDescription(e.target.value)} /></div>
