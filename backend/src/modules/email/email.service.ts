@@ -494,8 +494,8 @@ export class EmailService implements OnApplicationBootstrap {
 
     const sentAt = new Date().toLocaleString();
     const html = getTestEmailHtml({
-      host: config.host,
-      senderName: config.fromName,
+      host: config.host || '',
+      senderName: config.fromName || 'iPixxel Realty',
       sentAt,
     });
 
