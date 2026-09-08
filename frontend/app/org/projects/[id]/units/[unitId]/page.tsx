@@ -7,6 +7,11 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectTabs } from "@/components/org/project-tabs";
+import {
+  formatPossession,
+  PRICE_BASIS_LABEL,
+  pricePerSqftLabel,
+} from "@/components/org/project-form-fields";
 import "@/app/org/org.css";
 import type { ProjectDetail, Unit, UnitStatus } from "@/lib/types";
 
@@ -40,11 +45,6 @@ function compactRupees(value: number | null): string {
     return `₹${(value / 1e5).toFixed(2).replace(/\.?0+$/, "")} L`;
   }
   return `₹${value.toLocaleString("en-IN")}`;
-}
-
-function pricePerSqft(price: number | null, carpetSqft: number | null): string | null {
-  if (!price || !carpetSqft) return null;
-  return `₹${Math.round(price / carpetSqft).toLocaleString("en-IN")} / sqft`;
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -147,6 +147,10 @@ export default function OrgProjectUnitDetailPage() {
     );
   }
 
+  // The org's price-per-sqft denominator travels on the unit response, so the
+  // figure shown here and the one the server derived can't disagree.
+  const priceBasis = unit?.pricePerSqftBasis ?? "carpet";
+
   // Planned mix for this configuration — used only as a fallback for
   // display when the unit itself has no carpet/built-up/price set.
   const plannedType =
@@ -180,9 +184,14 @@ export default function OrgProjectUnitDetailPage() {
     },
     { k: "Facing", v: unit?.facing ?? "—" },
     { k: "Parking", v: unit?.parking ?? "—" },
-    { k: "₹/sqft", v: pricePerSqft(effectivePrice, carpet) ?? "—" },
+    {
+      k: `₹/sqft (${PRICE_BASIS_LABEL[priceBasis]})`,
+      v: pricePerSqftLabel(effectivePrice, carpet, builtup, priceBasis) || "—",
+    },
     { k: "Tower", v: unit?.tower ?? "—" },
-    { k: "Possession", v: project?.possession ?? "—" },
+    // Units have no possession date of their own — this is the project's,
+    // labelled so nobody reads it as unit-specific.
+    { k: "Possession (project)", v: formatPossession(project?.possession) },
   ];
 
   const kvRows: { k: string; v: string }[] = [
@@ -190,8 +199,18 @@ export default function OrgProjectUnitDetailPage() {
     { k: "Status", v: unit ? STATUS_LABEL[unit.status] : "—" },
     { k: "Tower", v: unit?.tower ?? "—" },
     { k: "Floor", v: unit?.floor != null ? String(unit.floor) : "—" },
-    { k: "Possession", v: project?.possession ?? "—" },
+    { k: "Possession (project)", v: formatPossession(project?.possession) },
     { k: "RERA", v: project?.reraId ?? "—" },
+    // Who touched this unit — the client asked to see both, particularly for
+    // price changes. Null on rows written before the columns existed.
+    {
+      k: "Created by",
+      v: unit?.createdBy ? `${unit.createdBy.name} · ${formatDate(unit.createdAt)}` : "—",
+    },
+    {
+      k: "Last updated by",
+      v: unit?.updatedBy ? `${unit.updatedBy.name} · ${formatDate(unit.updatedAt)}` : "—",
+    },
   ];
 
   const timeline = unit
@@ -242,7 +261,10 @@ export default function OrgProjectUnitDetailPage() {
             <Link href={`/org/projects/${id}/units`} className="btn btn-ghost">
               ← Back
             </Link>
-            <Link href={`/org/projects/${id}/units`} className="btn btn-ghost">
+            <Link
+              href={`/org/projects/${id}/units?edit=${unitId}&from=unit`}
+              className="btn btn-ghost"
+            >
               ✏️ Edit
             </Link>
           </div>
@@ -340,7 +362,7 @@ export default function OrgProjectUnitDetailPage() {
                       {compactRupees(effectivePrice)}
                     </div>
                     <div className="muted fs-12-5">
-                      {pricePerSqft(effectivePrice, carpet) ?? "Price per sqft"} · all-inclusive
+                      {pricePerSqftLabel(effectivePrice, carpet, builtup, priceBasis) || "Price per sqft"} · all-inclusive
                     </div>
                   </div>
                   <div className="kv mt-16">
