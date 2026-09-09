@@ -1403,6 +1403,22 @@ export interface AssignLeadInput {
   note?: string;
 }
 
+// --- Lead pipeline stage DISPLAY overrides (label + colour only) ---
+// The seven CrmLeadStatus stages are fixed; an org can rename each one and
+// recolour its badge. `customized` is false when the stage still matches its
+// built-in default.
+export interface OrgLeadStageDisplay {
+  status: CrmLeadStatus;
+  label: string;
+  color: string;
+  customized: boolean;
+}
+
+export interface UpdateLeadStageDisplayInput {
+  label: string;
+  color: string;
+}
+
 // --- Sales agents (org CRM team dashboard) ---
 
 export interface SalesAgentPipelineStage {

@@ -2,8 +2,9 @@
 
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, changePlan, createOrgCatalogOption, deleteOrgCatalogOption, getInvoices, getOrgCatalogOptions, getOrgDomainInfo, getPlans, requestCustomDomain } from "@/lib/api";
-import type { ChangePlanResult, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
+import { apiFetch, changePlan, createOrgCatalogOption, deleteOrgCatalogOption, getInvoices, getOrgCatalogOptions, getOrgDomainInfo, getOrgLeadStageDisplays, getPlans, requestCustomDomain, updateOrgLeadStageDisplay } from "@/lib/api";
+import type { ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
+import { DEFAULT_LEAD_STAGES, LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead-stages";
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { OrgSmtpSettings } from "@/components/org/org-smtp-settings";
@@ -619,6 +620,171 @@ function CatalogSection() {
   );
 }
 
+type StageDraft = { label: string; color: string };
+
+/**
+ * Pipeline stages — the seven fixed CRM stages, whose DISPLAY label and colour
+ * an org can customise. The stages themselves can't be added, removed, or
+ * reordered here; only label + colour are editable. Saving pushes the change
+ * into the shared LeadStages store so every screen updates without a reload.
+ */
+function PipelineStagesCard() {
+  const { applyServer } = useLeadStages();
+  const [drafts, setDrafts] = useState<Record<CrmLeadStatus, StageDraft> | null>(null);
+  const [initial, setInitial] = useState<Record<CrmLeadStatus, StageDraft> | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState(false);
+
+  useEffect(() => {
+    getOrgLeadStageDisplays()
+      .then((rows) => {
+        const byStatus = new Map(rows.map((r) => [r.status, r]));
+        const next = {} as Record<CrmLeadStatus, StageDraft>;
+        for (const status of LEAD_STAGE_ORDER) {
+          const row = byStatus.get(status);
+          next[status] = {
+            label: row?.label ?? DEFAULT_LEAD_STAGES[status].label,
+            color: (row?.color ?? DEFAULT_LEAD_STAGES[status].color).toLowerCase(),
+          };
+        }
+        setDrafts(next);
+        setInitial(next);
+      })
+      .catch((e) => setLoadError(e instanceof Error ? e.message : "Failed to load pipeline stages."));
+  }, []);
+
+  function edit(status: CrmLeadStatus, patch: Partial<StageDraft>) {
+    setSavedAt(false);
+    setDrafts((d) => (d ? { ...d, [status]: { ...d[status], ...patch } } : d));
+  }
+
+  function resetRow(status: CrmLeadStatus) {
+    edit(status, {
+      label: DEFAULT_LEAD_STAGES[status].label,
+      color: DEFAULT_LEAD_STAGES[status].color.toLowerCase(),
+    });
+  }
+
+  const dirty = Boolean(
+    drafts &&
+      initial &&
+      LEAD_STAGE_ORDER.some(
+        (s) =>
+          drafts[s].label.trim() !== initial[s].label ||
+          drafts[s].color !== initial[s].color,
+      ),
+  );
+  const hasEmptyLabel = Boolean(
+    drafts && LEAD_STAGE_ORDER.some((s) => !drafts[s].label.trim()),
+  );
+
+  async function save() {
+    if (!drafts || !initial || saving || !dirty) return;
+    if (hasEmptyLabel) {
+      setSaveError("Every stage needs a label.");
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const changed = LEAD_STAGE_ORDER.filter(
+        (s) =>
+          drafts[s].label.trim() !== initial[s].label ||
+          drafts[s].color !== initial[s].color,
+      );
+      for (const status of changed) {
+        await updateOrgLeadStageDisplay(status, {
+          label: drafts[status].label.trim(),
+          color: drafts[status].color,
+        });
+      }
+      // Re-pull the authoritative merged list and share it app-wide.
+      const fresh = await getOrgLeadStageDisplays();
+      applyServer(fresh);
+      const byStatus = new Map(fresh.map((r) => [r.status, r]));
+      const next = {} as Record<CrmLeadStatus, StageDraft>;
+      for (const status of LEAD_STAGE_ORDER) {
+        const row = byStatus.get(status);
+        next[status] = {
+          label: row?.label ?? DEFAULT_LEAD_STAGES[status].label,
+          color: (row?.color ?? DEFAULT_LEAD_STAGES[status].color).toLowerCase(),
+        };
+      }
+      setDrafts(next);
+      setInitial(next);
+      setSavedAt(true);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Couldn't save the pipeline stages.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card
+      icon="modules"
+      title="Pipeline stages"
+      sub="Rename a stage or change its colour. The seven stages are fixed — only the label and colour shown across the app change."
+    >
+      {loadError ? <div className="form-alert">{loadError}</div> : null}
+      {saveError ? <div className="form-alert">{saveError}</div> : null}
+      {drafts === null ? (
+        <p className="muted" style={{ margin: 0 }}>Loading…</p>
+      ) : (
+        <>
+          <div id="stageList">
+            {LEAD_STAGE_ORDER.map((status) => {
+              const isDefault =
+                drafts[status].label.trim() === DEFAULT_LEAD_STAGES[status].label &&
+                drafts[status].color === DEFAULT_LEAD_STAGES[status].color.toLowerCase();
+              return (
+                <div className="stage" key={status}>
+                  <span className="grip" aria-hidden>⠿</span>
+                  <input
+                    type="color"
+                    className="colorpick"
+                    value={drafts[status].color}
+                    onChange={(e) => edit(status, { color: e.target.value.toLowerCase() })}
+                    aria-label={`${DEFAULT_LEAD_STAGES[status].label} colour`}
+                  />
+                  <input
+                    value={drafts[status].label}
+                    maxLength={40}
+                    onChange={(e) => edit(status, { label: e.target.value })}
+                    aria-label={`${DEFAULT_LEAD_STAGES[status].label} label`}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={isDefault}
+                    onClick={() => resetRow(status)}
+                    title="Reset to default label and colour"
+                  >
+                    Reset
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
+            <button
+              className="btn btn-primary btn-sm"
+              type="button"
+              disabled={!dirty || saving || hasEmptyLabel}
+              onClick={() => void save()}
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+            {savedAt ? <span className="hint" style={{ margin: 0 }}><b>Saved.</b></span> : null}
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 export default function OrgSettingsPage() {
   const { accessToken } = useAuth();
   const [section, setSection] = useState("general");
@@ -1034,19 +1200,7 @@ export default function OrgSettingsPage() {
           {/* PIPELINE */}
           <div className={`os-section${section === "pipeline" ? " on" : ""}`}>
             <SectionHead section="pipeline" />
-            <Card icon="modules" title="Pipeline stages" sub="Drag to reorder · click to rename">
-              <div className="card-b" style={{ padding: 0 }} id="stageList">
-                {["New", "Contacted", "Follow-up", "Site Visit", "Negotiation", "Won", "Lost"].map((st, i) => (
-                  <div className="stage" key={st}>
-                    <span className="grip">⠿</span>
-                    <span className="dotc" style={{ background: ["#94a3b8", "#0ea5e9", "#f59e0b", "#6366f1", "#7c3aed", "#16a34a", "#e11d48"][i] }} />
-                    <input defaultValue={st} />
-                    <button className="btn btn-ghost btn-sm">✕</button>
-                  </div>
-                ))}
-                <button className="btn btn-soft btn-sm" style={{ marginTop: 12 }}>+ Add stage</button>
-              </div>
-            </Card>
+            <PipelineStagesCard />
             <Card icon="modules" title="Lost reasons" sub="Why deals are marked lost">
               <div className="pill-list">
                 {["Budget mismatch", "Bought elsewhere", "Not responding", "Location not suitable", "Just browsing"].map((p) => <span key={p} className="pill">{p}<span className="x">×</span></span>)}

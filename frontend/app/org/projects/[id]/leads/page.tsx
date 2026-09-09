@@ -13,29 +13,8 @@ import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
 import { AddLeadModal } from "@/components/org/add-lead-modal";
 import { LeadStatusSelect } from "@/components/org/lead-status-select";
+import { LEAD_STAGE_ORDER, StageBadge, useLeadStages } from "@/lib/lead-stages";
 import "@/app/org/org.css";
-
-const STATUS_BADGE: Record<CrmLeadStatus, string> = {
-  new: "b-gray",
-  contacted: "b-sky",
-  follow_up: "b-amber",
-  site_visit: "b-indigo",
-  negotiation: "b-violet",
-  won: "b-green",
-  lost: "b-rose",
-};
-
-const STATUS_LABEL: Record<CrmLeadStatus, string> = {
-  new: "New",
-  contacted: "Contacted",
-  follow_up: "Follow-up",
-  site_visit: "Site Visit",
-  negotiation: "Negotiation",
-  won: "Won",
-  lost: "Lost",
-};
-
-const ALL_STATUSES = Object.keys(STATUS_LABEL) as CrmLeadStatus[];
 
 function initialsFor(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -62,6 +41,7 @@ export default function OrgProjectLeadsPage() {
   const { isOrgAdmin, hasPermission } = useAuth();
   const canAssign = Boolean(isOrgAdmin?.()) || hasPermission("crm", "edit");
   const canAdd = Boolean(isOrgAdmin?.()) || hasPermission("crm", "add");
+  const { label: stageLabel } = useLeadStages();
   const [leads, setLeads] = useState<CrmLead[] | null>(null);
   const [kpi, setKpi] = useState({ total: 0, new: 0, siteVisits: 0, won: 0 });
   const [assignable, setAssignable] = useState<{ id: string; name: string }[] | null>(null);
@@ -165,7 +145,7 @@ export default function OrgProjectLeadsPage() {
           <div className="card-h">
             <div className="tb-search" style={{ maxWidth: 320, position: "static", margin: 0 }}><span className="si"><Icon name="search" size={14} /></span><input placeholder="Search by name or phone…" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
             <div className="row gap-8 wrap">
-              <select className="inp w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="">All Statuses</option>{ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select>
+              <select className="inp w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}><option value="">All Statuses</option>{LEAD_STAGE_ORDER.map((s) => <option key={s} value={s}>{stageLabel(s)}</option>)}</select>
             </div>
           </div>
           {error ? (
@@ -186,7 +166,7 @@ export default function OrgProjectLeadsPage() {
                       <td><span className="u"><span className={`av ${phone ? "a2" : ""}`}>{initialsFor(name)}</span><span><Link className="nm" href={`/org/leads/${lead.id}`}>{name}</Link>{phone ? <br /> : null}{phone ? <span className="sm">{phone}</span> : null}</span></span></td>
                       <td><span className={`badge ${sourceBadgeClass(lead.source)}`}>{leadDisplaySource(lead)}</span></td>
                       <td>{lead.assignedTo ? <span className="u"><span className="av a3">{initialsFor(lead.assignedTo.name)}</span><span className="nm">{lead.assignedTo.name}</span></span> : <span className="muted">Unassigned</span>}</td>
-                      <td>{canAssign ? <LeadStatusSelect value={lead.status} disabled={savingId === lead.id} onConfirm={(status, note) => handleAssign(lead, lead.assignedTo?.id ?? null, status, note)} /> : <span className={`badge ${STATUS_BADGE[lead.status]}`}>{STATUS_LABEL[lead.status]}</span>}</td>
+                      <td>{canAssign ? <LeadStatusSelect value={lead.status} disabled={savingId === lead.id} onConfirm={(status, note) => handleAssign(lead, lead.assignedTo?.id ?? null, status, note)} /> : <StageBadge status={lead.status} />}</td>
                       {canAssign ? <td><select className="inp" style={{ width: "auto" }} value={lead.assignedTo?.id ?? ""} disabled={savingId === lead.id} onChange={(e) => handleAssign(lead, e.target.value || null)}><option value="">Unassigned</option>{assigneeOptions.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></td> : null}
                     </tr>
                   );

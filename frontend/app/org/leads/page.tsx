@@ -16,28 +16,7 @@ import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
 import { AddLeadModal } from "@/components/org/add-lead-modal";
 import { LeadStatusSelect } from "@/components/org/lead-status-select";
-
-const STATUS_BADGE: Record<CrmLeadStatus, string> = {
-  new: "b-gray",
-  contacted: "b-sky",
-  follow_up: "b-amber",
-  site_visit: "b-indigo",
-  negotiation: "b-violet",
-  won: "b-green",
-  lost: "b-rose",
-};
-
-const STATUS_LABEL: Record<CrmLeadStatus, string> = {
-  new: "New",
-  contacted: "Contacted",
-  follow_up: "Follow-up",
-  site_visit: "Site Visit",
-  negotiation: "Negotiation",
-  won: "Won",
-  lost: "Lost",
-};
-
-const ALL_STATUSES = Object.keys(STATUS_LABEL) as CrmLeadStatus[];
+import { LEAD_STAGE_ORDER, StageBadge, useLeadStages } from "@/lib/lead-stages";
 
 function initialsFor(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -65,6 +44,7 @@ function sourceBadgeClass(source: string | null): string {
 
 export default function OrgLeadsPage() {
   const { isOrgAdmin, hasPermission } = useAuth();
+  const { label: stageLabel } = useLeadStages();
   const admin = Boolean(isOrgAdmin?.());
   const canAssign = admin || hasPermission("crm", "edit");
   const canAdd = admin || hasPermission("crm", "add");
@@ -278,9 +258,9 @@ export default function OrgLeadsPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
               >
                 <option value="">All Statuses</option>
-                {ALL_STATUSES.map((s) => (
+                {LEAD_STAGE_ORDER.map((s) => (
                   <option key={s} value={s}>
-                    {STATUS_LABEL[s]}
+                    {stageLabel(s)}
                   </option>
                 ))}
               </select>
@@ -380,9 +360,7 @@ export default function OrgLeadsPage() {
                               }
                             />
                           ) : (
-                            <span className={`badge ${STATUS_BADGE[lead.status]}`}>
-                              {STATUS_LABEL[lead.status]}
-                            </span>
+                            <StageBadge status={lead.status} />
                           )}
                         </td>
                         {canAssign ? (

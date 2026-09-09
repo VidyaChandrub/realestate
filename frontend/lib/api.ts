@@ -26,6 +26,9 @@ import type {
   OrgCatalogCategory,
   LandingPageRow,
   OrgCatalogOption,
+  OrgLeadStageDisplay,
+  UpdateLeadStageDisplayInput,
+  CrmLeadStatus,
   OrgLandingPagesListResponse,
   OrgUnitsListResponse,
   Unit,
@@ -666,6 +669,22 @@ export async function deleteOrgCatalogOption(
 ): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>(`/org/project-catalog/${id}`, {
     method: "DELETE",
+  });
+}
+
+// --- Lead pipeline stage display overrides (label + colour for the 7 stages) ---
+
+export async function getOrgLeadStageDisplays(): Promise<OrgLeadStageDisplay[]> {
+  return apiFetch<OrgLeadStageDisplay[]>("/org/lead-stage-displays");
+}
+
+export async function updateOrgLeadStageDisplay(
+  status: CrmLeadStatus,
+  input: UpdateLeadStageDisplayInput,
+): Promise<OrgLeadStageDisplay> {
+  return apiFetch<OrgLeadStageDisplay>(`/org/lead-stage-displays/${status}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
   });
 }
 

@@ -8,7 +8,8 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
 import { Seg } from "@/components/superadmin/seg";
-import type { OrgDashboardKpiData } from "@/lib/types";
+import type { CrmLeadStatus, OrgDashboardKpiData } from "@/lib/types";
+import { useLeadStages } from "@/lib/lead-stages";
 
 const PERIOD_OPTIONS = [
   { label: "Today", value: "today" },
@@ -50,6 +51,7 @@ function formatDate(iso: string): string {
 
 export default function OrgDashboardPage() {
   const { accessToken, user } = useAuth();
+  const { label: stageLabel, color: stageColor } = useLeadStages();
 
   const [periodIndex, setPeriodIndex] = useState(2); // default 30d
   const [data, setData] = useState<OrgDashboardKpiData | null>(null);
@@ -250,15 +252,12 @@ export default function OrgDashboardPage() {
           <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {pipeline.map((stage) => {
               const pct = totalPipelineLeads > 0 ? Math.round((stage.count / totalPipelineLeads) * 100) : 0;
-              let barColor = "var(--indigo, #4f46e5)";
-              if (stage.status === "won") barColor = "var(--green, #10b981)";
-              if (stage.status === "lost") barColor = "var(--rose, #e11d48)";
-              if (stage.status === "site_visit" || stage.status === "negotiation") barColor = "var(--amber, #f59e0b)";
+              const barColor = stageColor(stage.status as CrmLeadStatus);
 
               return (
                 <div key={stage.status} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 500 }}>
-                    <span>{stage.label}</span>
+                    <span>{stageLabel(stage.status as CrmLeadStatus)}</span>
                     <span className="muted">{stage.count} leads ({pct}%)</span>
                   </div>
                   <div style={{ height: 8, width: "100%", background: "var(--bg-subtle, #f1f5f9)", borderRadius: 4, overflow: "hidden" }}>
