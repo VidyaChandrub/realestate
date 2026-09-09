@@ -2,19 +2,8 @@
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import { LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead-stages";
 import type { CrmLeadStatus } from "@/lib/types";
-
-export const LEAD_STATUS_LABEL: Record<CrmLeadStatus, string> = {
-  new: "New",
-  contacted: "Contacted",
-  follow_up: "Follow-up",
-  site_visit: "Site Visit",
-  negotiation: "Negotiation",
-  won: "Won",
-  lost: "Lost",
-};
-
-const ALL_STATUSES = Object.keys(LEAD_STATUS_LABEL) as CrmLeadStatus[];
 
 export function LeadStatusSelect({
   value,
@@ -25,6 +14,8 @@ export function LeadStatusSelect({
   disabled?: boolean;
   onConfirm: (status: CrmLeadStatus, note: string) => Promise<void>;
 }) {
+  const { label, color } = useLeadStages();
+  const currentColor = color(value);
   const [pending, setPending] = useState<CrmLeadStatus | null>(null);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -59,16 +50,23 @@ export function LeadStatusSelect({
 
   return (
     <>
+      {/* Native <select> can't paint a per-value background, so the stage
+          colour shows as a tinted border + text on the control itself. */}
       <select
         className="inp"
-        style={{ width: "auto" }}
+        style={{
+          width: "auto",
+          borderColor: currentColor,
+          color: currentColor,
+          fontWeight: 600,
+        }}
         value={value}
         disabled={disabled}
         onChange={(e) => requestChange(e.target.value as CrmLeadStatus)}
       >
-        {ALL_STATUSES.map((status) => (
-          <option key={status} value={status}>
-            {LEAD_STATUS_LABEL[status]}
+        {LEAD_STAGE_ORDER.map((status) => (
+          <option key={status} value={status} style={{ color: "var(--ink)", fontWeight: 400 }}>
+            {label(status)}
           </option>
         ))}
       </select>
@@ -80,7 +78,7 @@ export function LeadStatusSelect({
         title="Update pipeline status"
         description={
           pending
-            ? `Change from ${LEAD_STATUS_LABEL[value]} to ${LEAD_STATUS_LABEL[pending]}. A note is required and will appear in activity.`
+            ? `Change from ${label(value)} to ${label(pending)}. A note is required and will appear in activity.`
             : undefined
         }
         size="sm"

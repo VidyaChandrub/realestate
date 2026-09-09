@@ -6,7 +6,8 @@ import { useParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Icon, type IconName } from "@/components/icons";
 import { LeadsPageHead } from "@/components/org/crm-tabs";
-import { LeadStatusSelect, LEAD_STATUS_LABEL } from "@/components/org/lead-status-select";
+import { LeadStatusSelect } from "@/components/org/lead-status-select";
+import { StageBadge } from "@/lib/lead-stages";
 import { useAuth } from "@/lib/auth-context";
 import { isOrgAdmin } from "@/lib/session";
 import { addCrmLeadNote, assignCrmLead, getCrmLead, updateCrmLeadNextAction } from "@/lib/api";
@@ -185,7 +186,7 @@ export default function OrgLeadDetailPage() {
               {canEditLead ? (
                 <LeadStatusSelect value={lead.status} onConfirm={confirmStatus} />
               ) : (
-                <div><span className="badge b-indigo">{LEAD_STATUS_LABEL[lead.status]}</span></div>
+                <div><StageBadge status={lead.status} /></div>
               )}
             </div>
           </div></div></Reveal>

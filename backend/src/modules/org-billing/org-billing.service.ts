@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { resolveTemplateQuota } from '../../common/utils/plan-quota.util';
+import {
+  assertPlanFitsCurrentUsage,
+  countBillableOrgUsers,
+  countOrgProjects,
+  resolveLimit,
+} from '../../common/utils/plan-quota.util';
 import type { ChangePlanDto } from './dto/change-plan.dto';
 
 export interface InvoiceRow {
@@ -38,19 +43,37 @@ export class OrgBillingService {
     // At most one non-cancelled subscription per org — enforced by
     // SubscriptionsService.create(), not a DB constraint. Mirrors that
     // same lookup rather than assuming a unique index exists.
-    const [subscription, templatesUsed] = await Promise.all([
-      this.prisma.subscription.findFirst({
-        where: { orgId, status: { not: 'cancelled' } },
-        include: { plan: true },
-      }),
-      this.prisma.organisationTemplate.count({ where: { orgId } }),
-    ]);
+    const [subscription, templatesUsed, projectsUsed, usersUsed] =
+      await Promise.all([
+        this.prisma.subscription.findFirst({
+          where: { orgId, status: { not: 'cancelled' } },
+          include: { plan: true },
+        }),
+        this.prisma.organisationTemplate.count({ where: { orgId } }),
+        countOrgProjects(this.prisma, orgId),
+        countBillableOrgUsers(this.prisma, orgId),
+      ]);
 
     if (!subscription) {
-      return { plan: null, subscription: null, usage: { templatesUsed, templatesLimit: null } };
+      return {
+        plan: null,
+        subscription: null,
+        usage: {
+          templatesUsed,
+          templatesLimit: null,
+          projectsUsed,
+          projectsLimit: null,
+          usersUsed,
+          usersLimit: null,
+        },
+      };
     }
 
-    const quota = resolveTemplateQuota(subscription.plan);
+    // Infinity -> null so the UI renders "unlimited" without a magic number.
+    const asLimit = (key: 'projects' | 'users' | 'templates') => {
+      const n = resolveLimit(subscription.plan, key);
+      return n === Infinity ? null : n;
+    };
 
     return {
       plan: {
@@ -62,8 +85,6 @@ export class OrgBillingService {
         color: subscription.plan.color,
         badge: subscription.plan.badge,
         isPopular: subscription.plan.isPopular,
-        // Passed through as-is (whatever shape Shubham's plan editor wrote)
-        // alongside the resolved numeric quota below — don't reshape it.
         limits: subscription.plan.limits,
       },
       subscription: {
@@ -75,12 +96,14 @@ export class OrgBillingService {
         renewsAt: subscription.renewsAt,
         cancelledAt: subscription.cancelledAt,
       },
+      // `*Limit: null` = unlimited on this plan.
       usage: {
         templatesUsed,
-        // null = unlimited ("All"/"Unlimited" on the plan) — distinct from
-        // the no-subscription case above only in that the caller already
-        // knows `plan` is non-null here, so there's no ambiguity in practice.
-        templatesLimit: quota === Infinity ? null : quota,
+        templatesLimit: asLimit('templates'),
+        projectsUsed,
+        projectsLimit: asLimit('projects'),
+        usersUsed,
+        usersLimit: asLimit('users'),
       },
     };
   }
@@ -95,6 +118,10 @@ export class OrgBillingService {
   async changePlan(orgId: string, dto: ChangePlanDto) {
     const plan = await this.prisma.plan.findUnique({ where: { id: dto.planId } });
     if (!plan || !plan.isActive) throw new NotFoundException('Plan not found or inactive');
+
+    // Downgrade guard — refuse to move onto a plan the org already exceeds.
+    // Nothing is deleted to make it fit; upgrades and same-usage moves pass.
+    await assertPlanFitsCurrentUsage(this.prisma, orgId, plan);
 
     const billingCycle = dto.billingCycle ?? 'monthly';
     const { amount, mrr } = computeAmountAndMrr(plan, billingCycle);

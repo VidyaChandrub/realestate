@@ -18,6 +18,10 @@ import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto, UpdateUnitStatusDto } from './dto/update-unit.dto';
 import { ListUnitsQueryDto } from './dto/list-units-query.dto';
 import { ListOrgUnitsQueryDto } from './dto/list-org-units-query.dto';
+import {
+  assertLimit,
+  countOrgProjects,
+} from '../../common/utils/plan-quota.util';
 
 // Columns a PATCH may set on a Project, and the coercion each needs. Keeps
 // update() free of a 12-branch if-ladder while still only touching the keys
@@ -140,6 +144,17 @@ export class ProjectsService {
 
   async create(orgId: string, dto: CreateProjectDto) {
     if (dto.managerId) await this.assertOrgUser(orgId, dto.managerId);
+
+    // Plan project quota — enforced only when the org has a subscription
+    // (mirrors the template-quota behaviour). All projects count, any status.
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { orgId, status: { not: 'cancelled' } },
+      include: { plan: true },
+    });
+    if (subscription) {
+      const currentCount = await countOrgProjects(this.prisma, orgId);
+      assertLimit(subscription.plan, 'projects', currentCount, 1);
+    }
 
     const project = await this.prisma.$transaction(async (tx) => {
       const created = await tx.project.create({

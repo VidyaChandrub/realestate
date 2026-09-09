@@ -16,8 +16,10 @@ import { PlansService } from './plans.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { ListPlansQueryDto } from './dto/list-plans-query.dto';
+import { PLAN_CAPABILITY_CATALOG } from './plan-capabilities';
 
 @Controller('admin/plans')
+@UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class PlansController {
   constructor(private readonly plansService: PlansService) {}
 
@@ -26,26 +28,28 @@ export class PlansController {
     return this.plansService.list(query);
   }
 
+  // Must be declared before `:id` so "capabilities" isn't captured as an id.
+  @Get('capabilities')
+  capabilities() {
+    return PLAN_CAPABILITY_CATALOG;
+  }
+
   @Get(':id')
-  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   getById(@Param('id') id: string) {
     return this.plansService.getById(id);
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   create(@Body() dto: CreatePlanDto) {
     return this.plansService.create(dto);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   update(@Param('id') id: string, @Body() dto: UpdatePlanDto) {
     return this.plansService.update(id, dto);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, SuperAdminGuard)
   @HttpCode(200)
   remove(@Param('id') id: string) {
     return this.plansService.remove(id);

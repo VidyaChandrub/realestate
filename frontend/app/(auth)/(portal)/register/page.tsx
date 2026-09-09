@@ -20,6 +20,7 @@ import {
   restartExistingDraft,
   saveBusinessDetailsStep,
   saveInviteStep,
+  getOnboardingSeats,
   saveModulesStep,
   saveSubscriptionStep,
   saveTemplatesStep,
@@ -29,7 +30,7 @@ import {
 } from "@/lib/api";
 import { subdomainPreviewHost, suggestSubdomainsFromName } from "@/lib/domain";
 import { callingCodeForCountry, validatePhoneForCountry } from "@/lib/phone";
-import type { OnboardingStep, OrgIndustry, Plan, ResumeSignupResponse, SubdomainAvailability } from "@/lib/types";
+import type { InviteFailure, OnboardingStep, OrgIndustry, Plan, ResumeSignupResponse, SeatUsage, SubdomainAvailability } from "@/lib/types";
 import { COUNTRY_META, COUNTRIES } from "@/lib/countries";
 
 const FIELD_KEYS = [
@@ -166,6 +167,10 @@ export default function RegisterPage() {
     { email: "", role: "manager" },
     { email: "", role: "sales" },
   ]);
+  // Live seat usage for the invite step (founding admin counts). null until
+  // the step is opened; { limit: null } = unlimited plan.
+  const [seats, setSeats] = useState<SeatUsage | null>(null);
+  const [inviteFailures, setInviteFailures] = useState<InviteFailure[]>([]);
   const [currency, setCurrency] = useState("");
   const [timezone, setTimezone] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -275,6 +280,30 @@ export default function RegisterPage() {
     })();
   }, [cur]);
 
+  // Refresh live seat usage whenever the invite step (index 6) is shown, so
+  // "+ Add another" and the seat counter reflect the founding admin plus any
+  // invites already sent on a previous visit. Also trims spare empty rows so
+  // the form can't offer more invites than the plan has seats for.
+  useEffect(() => {
+    if (cur !== 6) return;
+    getOnboardingSeats()
+      .then((s) => {
+        setSeats(s);
+        if (s.limit == null) return;
+        const capacity = Math.max(1, s.limit - s.used);
+        setInvites((prev) => {
+          const filled = prev.filter((r) => r.email.trim());
+          if (filled.length >= capacity) return filled;
+          const empties = prev
+            .filter((r) => !r.email.trim())
+            .slice(0, capacity - filled.length);
+          const merged = [...filled, ...empties];
+          return merged.length ? merged : [{ email: "", role: "sales" }];
+        });
+      })
+      .catch(() => setSeats(null));
+  }, [cur]);
+
   useEffect(() => {
     (async () => {
       try {
@@ -320,6 +349,14 @@ export default function RegisterPage() {
     const n = parseInt(String(raw), 10);
     return Number.isNaN(n) ? Infinity : n;
   })();
+
+  // Invite step — seats the plan still has room for, beyond the founding
+  // admin and anything already invited. Infinity when the plan is unlimited
+  // or seat data hasn't loaded.
+  const seatsLeftForRows =
+    seats && seats.limit != null ? Math.max(0, seats.limit - seats.used) : Infinity;
+  const atSeatLimit =
+    seatsLeftForRows !== Infinity && invites.length >= seatsLeftForRows;
 
   const toggleTemplate = (id: string) => {
     if (selectedTemplateIds.includes(id)) setSelectedTemplateIds((prev) => prev.filter((x) => x !== id));
@@ -472,11 +509,39 @@ export default function RegisterPage() {
 
     if (n === 7) {
       const entries = invites.filter((i) => i.email.trim());
-      if (entries.length > 0) {
-        await saveInviteStep({ invites: entries });
-      } else {
+      if (entries.length === 0) {
         await skipStep("invite");
+        setInviteFailures([]);
+        return true;
       }
+
+      const res = await saveInviteStep({ invites: entries });
+      setSeats(res.seats);
+      setInviteFailures(res.failed);
+
+      // Drop rows that actually went out, so a retry never double-sends.
+      const sentEmails = new Set(
+        res.sent.map((s) => (s.email ?? "").trim().toLowerCase()).filter(Boolean),
+      );
+      setInvites((prev) => {
+        const kept = prev.filter((r) => !sentEmails.has(r.email.trim().toLowerCase()));
+        return kept.length > 0 ? kept : [{ email: "", role: "sales" }];
+      });
+
+      if (res.failed.length > 0) {
+        // Some invites did not go out — stay on the step and show why, rather
+        // than continuing as though they succeeded. Removing / fixing the
+        // listed rows and pressing Continue again advances.
+        const quota = res.failed.some((f) => f.kind === "quota");
+        setGeneralError(
+          quota
+            ? "You're at your plan's seat limit — the invites below weren't sent. Remove them or upgrade your plan to continue."
+            : "Some invites couldn't be sent (see below). Fix or remove them, then continue.",
+        );
+        return false;
+      }
+
+      setInviteFailures([]);
       return true;
     }
 
@@ -1192,7 +1257,7 @@ export default function RegisterPage() {
                     const isSel = selectedPlanId === p.id;
                     const price = billingCycle === "monthly" ? p.priceMonthly : p.priceYearly;
                     const per = billingCycle === "monthly" ? "/mo" : "/yr";
-                    const tplLimit = (p.limits as any)?.templates ?? "—";
+                    const tplLimit = (p.limits as any)?.templates ?? "Unlimited";
                     return (
                       <div
                         key={p.id}
@@ -1219,8 +1284,8 @@ export default function RegisterPage() {
                         <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>{p.description}</div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
                           <span className="chip">{tplLimit} templates</span>
-                          <span className="chip">{p.limits?.projects} projects</span>
-                          <span className="chip">{p.limits?.users} users</span>
+                          <span className="chip">{p.limits?.projects ?? "Unlimited"} projects</span>
+                          <span className="chip">{p.limits?.users ?? "Unlimited"} users</span>
                         </div>
                       </div>
                     );
@@ -1311,6 +1376,26 @@ export default function RegisterPage() {
               They&apos;ll get an email invite and set up their name &amp; password when they first sign in.
               Skip and add them later if you like.
             </p>
+
+            {seats && seats.limit != null ? (
+              <div
+                className="muted"
+                style={{ marginTop: 14, fontSize: 13, display: "flex", gap: 8, flexWrap: "wrap" }}
+              >
+                <span>
+                  <b>{Math.min(seats.used + invites.filter((i) => i.email.trim()).length, seats.limit)}</b>
+                  {" of "}
+                  <b>{seats.limit}</b> seats used
+                  <span style={{ opacity: 0.7 }}> (your admin account counts)</span>
+                </span>
+                {atSeatLimit ? (
+                  <span style={{ color: "var(--rose)", fontWeight: 600 }}>
+                    Seat limit reached — upgrade your plan to invite more.
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+
             <div style={{ marginTop: 22 }} id="invites">
               {invites.map((inv, i) => (
                 <div className="inviteRow" key={i}>
@@ -1333,9 +1418,34 @@ export default function RegisterPage() {
                 </div>
               ))}
             </div>
+
+            {inviteFailures.length > 0 ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  background: "var(--rose-050, #fef2f2)",
+                  border: "1px solid var(--rose, #f43f5e)",
+                  fontSize: 13,
+                }}
+              >
+                <b>These invites weren&apos;t sent:</b>
+                <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                  {inviteFailures.map((f, i) => (
+                    <li key={`${f.email}-${i}`}>
+                      {f.email || "(no email)"} — {f.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             <button
               className="btn btn-soft btn-sm"
               type="button"
+              disabled={atSeatLimit}
+              title={atSeatLimit ? "You've used every seat on your plan" : undefined}
               onClick={() => setInvites((prev) => [...prev, { email: "", role: "sales" }])}
             >
               ＋ Add another

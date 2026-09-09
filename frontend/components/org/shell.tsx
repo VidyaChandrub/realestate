@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { LeadStagesProvider } from "@/lib/lead-stages";
 import { dashboardPathFor } from "@/lib/mock/sessions";
 import { Icon, type IconName } from "@/components/icons";
 import { loadTemplates } from "@/lib/prestate/store";
@@ -618,7 +619,9 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
             </div>
           </div>
         </header>
-        <div className="page">{children}</div>
+        <div className="page">
+          <LeadStagesProvider>{children}</LeadStagesProvider>
+        </div>
 
         <Link
           href="/org/support"

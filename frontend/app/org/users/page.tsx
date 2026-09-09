@@ -8,8 +8,10 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { PasswordInput } from "@/components/auth/password-input";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/icons";
+import Link from "next/link";
 import type {
   CreateOrgUserInput,
+  OrgBillingSummary,
   OrgUser,
   OrgUsersListResponse,
   UpdateOrgUserInput,
@@ -147,6 +149,15 @@ export default function OrgUsersPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
+  // Plan seat quota — blocks "Create user" when the org is at its limit. The
+  // server stays authoritative on submit; this is UX only. (Agreed rule: the
+  // admin counts; disabled users don't.)
+  const [seatQuota, setSeatQuota] = useState<{
+    used: number;
+    limit: number | null;
+    planName: string | null;
+  } | null>(null);
+
   useEffect(() => {
     if (!accessToken) return;
     apiFetch<{ roles: { key: string; name: string }[] }>("/org/permissions/modules", {
@@ -215,6 +226,27 @@ export default function OrgUsersPage() {
       )
       .finally(() => setLoading(false));
   }, [accessToken, page, search, roleFilter, statusFilter, reloadTick]);
+
+  // Refresh seat usage on load and after any create / status change.
+  useEffect(() => {
+    if (!accessToken) return;
+    apiFetch<OrgBillingSummary>("/org/billing", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((b) =>
+        setSeatQuota({
+          used: b.usage.usersUsed,
+          limit: b.usage.usersLimit,
+          planName: b.plan?.name ?? null,
+        }),
+      )
+      .catch(() => setSeatQuota(null));
+  }, [accessToken, reloadTick]);
+
+  const atSeatLimit =
+    seatQuota != null &&
+    seatQuota.limit != null &&
+    seatQuota.used >= seatQuota.limit;
 
   function reload() {
     setReloadTick((t) => t + 1);
@@ -422,12 +454,30 @@ export default function OrgUsersPage() {
               className="btn btn-primary"
               type="button"
               onClick={openCreate}
+              disabled={atSeatLimit}
+              title={atSeatLimit ? "You've reached your plan's user limit" : undefined}
+              style={atSeatLimit ? { opacity: 0.45, cursor: "not-allowed", pointerEvents: "none" } : undefined}
             >
               <Icon name="plus" size={15} /> Create user
             </button>
           </div>
         ) : null}
       </div>
+
+      {canAdd && atSeatLimit ? (
+        <div
+          className="card reveal in"
+          style={{ marginBottom: 16, borderColor: "var(--amber, #f59e0b)", padding: "12px 16px", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}
+        >
+          <span style={{ fontSize: 20 }}>⚠️</span>
+          <div style={{ flex: 1, minWidth: 220, fontSize: 13.5 }}>
+            Your{seatQuota?.planName ? ` ${seatQuota.planName}` : ""} plan allows{" "}
+            <b>{seatQuota?.limit}</b> user{seatQuota?.limit === 1 ? "" : "s"} and you have{" "}
+            <b>{seatQuota?.used}</b>. Upgrade your plan to add more.
+          </div>
+          <Link href="/org/settings?section=billing" className="btn btn-soft btn-sm">Upgrade plan</Link>
+        </div>
+      ) : null}
 
       <Modal
         open={formMode !== null}

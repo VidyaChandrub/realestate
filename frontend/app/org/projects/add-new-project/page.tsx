@@ -40,10 +40,12 @@ import type {
   OrgUsersListResponse,
   OrgTemplateSummary,
   OrgTemplatesListResponse,
+  OrgBillingSummary,
   Project,
   ProjectStatus,
   SafeOrganisation,
 } from "@/lib/types";
+import Link from "next/link";
 
 function userLabel(u: OrgUser): string {
   return [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
@@ -326,6 +328,16 @@ export default function AddNewProjectPage() {
   const [pendingDraft, setPendingDraft] = useState<WizardDraft | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
+  // Plan project quota. Blocks a fresh wizard when the org is already at its
+  // limit (deep-link / bookmark guard — the projects list is the primary
+  // block). A resumable draft is still allowed through; the Review step's
+  // server-error path handles the "limit reached while mid-wizard" case.
+  const [projectQuota, setProjectQuota] = useState<{
+    used: number;
+    limit: number | null;
+    planName: string | null;
+  } | null>(null);
+
   // Org catalogs (Settings → Project Catalogs). `null` = not loaded yet;
   // refetched on entry to each catalog step so freshly-added options show up.
   const [catalog, setCatalog] = useState<OrgCatalogOption[] | null>(null);
@@ -343,6 +355,15 @@ export default function AddNewProjectPage() {
     apiFetch<SafeOrganisation>("/org/settings", auth)
       .then((o) => setOrgName(o.name))
       .catch(() => setOrgName(""));
+    apiFetch<OrgBillingSummary>("/org/billing", auth)
+      .then((b) =>
+        setProjectQuota({
+          used: b.usage.projectsUsed,
+          limit: b.usage.projectsLimit,
+          planName: b.plan?.name ?? null,
+        }),
+      )
+      .catch(() => setProjectQuota(null));
     getOrgLandingPages()
       .then((rows) => setOrgLandingPages(rows.filter((lp) => lp.pageType === "landing")))
       .catch(() => setOrgLandingPages([]));
@@ -916,6 +937,30 @@ export default function AddNewProjectPage() {
       setError(err instanceof Error ? err.message : "Failed to create the project.");
       setSubmitting(false);
     }
+  }
+
+  const atProjectLimit =
+    projectQuota != null &&
+    projectQuota.limit != null &&
+    projectQuota.used >= projectQuota.limit;
+
+  // At the limit with no draft to resume — don't let the wizard open at all.
+  if (atProjectLimit && !pendingDraft) {
+    return (
+      <div className="card reveal in" style={{ maxWidth: 620, margin: "40px auto", padding: 28, textAlign: "center" }}>
+        <div style={{ fontSize: 34, marginBottom: 8 }}>🚧</div>
+        <h2 style={{ margin: "0 0 8px" }}>You&apos;ve reached your project limit</h2>
+        <p className="muted" style={{ margin: "0 0 18px", fontSize: 14 }}>
+          Your{projectQuota?.planName ? ` ${projectQuota.planName}` : ""} plan allows{" "}
+          <b>{projectQuota?.limit}</b> project{projectQuota?.limit === 1 ? "" : "s"} and you already have{" "}
+          <b>{projectQuota?.used}</b>. Upgrade your plan to create another.
+        </p>
+        <div className="row gap-10" style={{ justifyContent: "center" }}>
+          <button className="btn btn-ghost" type="button" onClick={() => router.push("/org/projects")}>← Back to projects</button>
+          <Link href="/org/settings?section=billing" className="btn btn-primary">Upgrade plan</Link>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -5,7 +5,11 @@ import { StorageService } from '../../common/storage/storage.service';
 import { TeamService } from '../team/team.service';
 import { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { toSafeOrganisation } from '../../common/utils/mappers.util';
-import { assertTemplateQuota } from '../../common/utils/plan-quota.util';
+import {
+  assertTemplateQuota,
+  countBillableOrgUsers,
+  resolveLimit,
+} from '../../common/utils/plan-quota.util';
 import { assertEligibleTemplateIds } from '../../common/utils/template-eligibility.util';
 import { furthestOnboardingStep, nextOnboardingStep } from '../../common/utils/onboarding.util';
 import { subdomainHost } from '../../common/utils/domain.util';
@@ -180,33 +184,99 @@ export class OnboardingService {
   }
 
   // Step 7 — Invite team (skippable). Each invite fires immediately via
-  // the existing TeamService.invite() — same provisioning path as
-  // /team/invite. A per-entry failure (e.g. duplicate email) is reported
-  // back but never blocks the others or onboarding progress.
+  // TeamService.invite() — same provisioning path as /team/invite.
+  //
+  // Quota is enforced up front against the plan's user limit (the founding
+  // admin counts). Invites beyond the remaining seats are NOT attempted and
+  // come back as `failed` with kind `quota`; other per-entry failures come
+  // back as `duplicate` / `error`. The onboarding step only advances when
+  // there was no quota failure — so the wizard can't silently continue past
+  // discarded invites.
   async sendInvites(actor: JwtPayload, dto: InviteStepDto) {
-    const sent: unknown[] = [];
-    const failed: { email: string; reason: string }[] = [];
+    const orgId = actor.orgId as string;
 
-    for (const invite of dto.invites) {
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { orgId, status: { not: 'cancelled' } },
+      include: { plan: true },
+    });
+    const limit = subscription
+      ? resolveLimit(subscription.plan, 'users')
+      : Infinity;
+    const used = await countBillableOrgUsers(this.prisma, orgId);
+    const remaining = limit === Infinity ? Infinity : Math.max(0, limit - used);
+
+    const sent: unknown[] = [];
+    const failed: {
+      email: string;
+      reason: string;
+      kind: 'quota' | 'duplicate' | 'error';
+    }[] = [];
+
+    for (let i = 0; i < dto.invites.length; i++) {
+      const invite = dto.invites[i];
+      if (i >= remaining) {
+        failed.push({
+          email: invite.email,
+          reason: `Your plan allows ${limit} user(s) and the workspace already has ${used}. Upgrade the plan to invite more.`,
+          kind: 'quota',
+        });
+        continue;
+      }
       try {
-        // No names — see InviteEntryDto. provisionInvitedUser accepts
-        // them as optional, so this creates the user with firstName/
-        // lastName left null; every display site falls back to email.
+        // No names — see InviteEntryDto. provisionInvitedUser accepts them
+        // as optional; every display site falls back to email.
         const user = await this.teamService.invite(actor, {
           email: invite.email,
           role: invite.role,
         });
         sent.push(user);
       } catch (err) {
-        failed.push({
-          email: invite.email,
-          reason: err instanceof Error ? err.message : 'Failed to send invite',
-        });
+        const reason =
+          err instanceof Error ? err.message : 'Failed to send invite';
+        // provisionInvitedUser has its own server-side seat check that can
+        // fire on a concurrent invite — surface that as `quota` too.
+        const isQuota = /plan allows \d+ user/.test(reason);
+        let kind: 'quota' | 'duplicate' | 'error' = 'error';
+        if (isQuota) kind = 'quota';
+        else if (err instanceof ConflictException) kind = 'duplicate';
+        failed.push({ email: invite.email, reason, kind });
       }
     }
 
-    const onboardingStep = await this.advanceStep(actor.sub, 'invite');
-    return { sent, failed, onboardingStep, nextStep: nextOnboardingStep(onboardingStep) };
+    const quotaBlocked = failed.some((f) => f.kind === 'quota');
+    const onboardingStep = quotaBlocked
+      ? (
+          await this.prisma.user.findUniqueOrThrow({
+            where: { id: actor.sub },
+            select: { onboardingStep: true },
+          })
+        ).onboardingStep
+      : await this.advanceStep(actor.sub, 'invite');
+
+    return {
+      sent,
+      failed,
+      seats: {
+        used: used + sent.length,
+        limit: limit === Infinity ? null : limit,
+      },
+      onboardingStep,
+      nextStep: nextOnboardingStep(onboardingStep),
+    };
+  }
+
+  /** Live seat usage for the wizard's invite step. */
+  async getSeatUsage(actor: JwtPayload) {
+    const orgId = actor.orgId as string;
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { orgId, status: { not: 'cancelled' } },
+      include: { plan: true },
+    });
+    const limit = subscription
+      ? resolveLimit(subscription.plan, 'users')
+      : Infinity;
+    const used = await countBillableOrgUsers(this.prisma, orgId);
+    return { used, limit: limit === Infinity ? null : limit };
   }
 
   // Active roles available for team invitation during onboarding

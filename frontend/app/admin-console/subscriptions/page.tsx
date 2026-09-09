@@ -5,14 +5,20 @@ import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, getPlanCapabilities } from "@/lib/api";
 import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import type { Plan, Subscription, BillingOverview, OrganisationListResponse } from "@/lib/types";
+import type { Plan, PlanCapability, Subscription, BillingOverview, OrganisationListResponse } from "@/lib/types";
 
-const ALL_FEATURES = [
-  "Projects", "Users", "Templates", "Custom domain", "Email support", "Priority support",
-  "Dedicated manager", "WhatsApp integration", "Custom branding", "API access", "White-label", "SSO & SLA", "Audit logs", "Advanced analytics"
+/** Display a numeric limit, or "Unlimited" for null. */
+function fmtLimit(n: number | null | undefined): string {
+  return n == null ? "Unlimited" : String(n);
+}
+
+const LIMIT_ROWS: { key: "projects" | "users" | "templates"; label: string }[] = [
+  { key: "projects", label: "Projects" },
+  { key: "users", label: "Users" },
+  { key: "templates", label: "Templates" },
 ];
 
 const PLAN_BADGE_OPTIONS = [
@@ -50,9 +56,14 @@ export default function SuperAdminSubscriptionsPage() {
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
   const [deletingPlan, setDeletingPlan] = useState(false);
 
+  const [capabilities, setCapabilities] = useState<PlanCapability[]>([]);
+
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [planForm, setPlanForm] = useState<Partial<Plan> & { features?: string[] }>({ name: "", priceMonthly: 3000, priceYearly: 30000, description: "", features: [] });
+  const [planForm, setPlanForm] = useState<Partial<Plan> & { features?: string[] }>({
+    name: "", priceMonthly: 3000, priceYearly: 30000, description: "", features: [],
+    limits: { projects: null, users: null, templates: null }, capabilities: {},
+  });
   const [featureInput, setFeatureInput] = useState("");
   const [savingPlan, setSavingPlan] = useState(false);
 
@@ -113,8 +124,13 @@ export default function SuperAdminSubscriptionsPage() {
       setOrgs(res.data.map(o => ({ id: o.id, name: o.name, city: o.city })));
     } catch {}
   }
+  async function fetchCapabilities() {
+    try {
+      setCapabilities(await getPlanCapabilities());
+    } catch {}
+  }
 
-  useEffect(() => { fetchPlans(); fetchOverview(); fetchOrgs(); }, []);
+  useEffect(() => { fetchPlans(); fetchOverview(); fetchOrgs(); fetchCapabilities(); }, []);
   useEffect(() => { if (tab === 2) fetchSubs(1); }, [tab]);
   // debounce search for subs
   useEffect(() => {
@@ -127,19 +143,53 @@ export default function SuperAdminSubscriptionsPage() {
 
   const openCreate = () => {
     setEditingPlan(null);
-    setPlanForm({ name: "", priceMonthly: 3500, priceYearly: 35000, description: "", features: ["3 projects", "Email support"], limits: { projects: "3", users: "2", templates: "20" } });
+    setPlanForm({
+      name: "", priceMonthly: 3500, priceYearly: 35000, description: "",
+      features: ["Everything you need to get started"],
+      limits: { projects: 3, users: 2, templates: 20 },
+      capabilities: {},
+    });
     setFeatureInput("");
     setPlanModalOpen(true);
   };
   const openEdit = (p: Plan) => {
     setEditingPlan(p);
-    setPlanForm({ ...p, features: [...(p.features || [])] });
+    setPlanForm({
+      ...p,
+      features: [...(p.features || [])],
+      limits: { ...(p.limits ?? { projects: null, users: null, templates: null }) },
+      capabilities: { ...(p.capabilities ?? {}) },
+    });
     setFeatureInput("");
     setPlanModalOpen(true);
+  };
+  const formLimit = (key: "projects" | "users" | "templates"): number | null => {
+    const v = planForm.limits?.[key];
+    return v == null ? null : v;
+  };
+  const setFormLimit = (key: "projects" | "users" | "templates", value: number | null) => {
+    setPlanForm(p => ({
+      ...p,
+      limits: { projects: null, users: null, templates: null, ...(p.limits ?? {}), [key]: value },
+    }));
+  };
+  const toggleCapability = (key: string, on: boolean) => {
+    setPlanForm(p => ({ ...p, capabilities: { ...(p.capabilities ?? {}), [key]: on } }));
   };
   const savePlan = async () => {
     const name = String(planForm.name || "").trim();
     if (!name) { notify("Plan name required"); return; }
+    const limits = {
+      projects: formLimit("projects"),
+      users: formLimit("users"),
+      templates: formLimit("templates"),
+    };
+    // Only send capability keys that are true — the backend treats a missing
+    // key as false, and this keeps the payload tidy.
+    const capMap: Record<string, boolean> = {};
+    for (const cap of capabilities) {
+      if (planForm.capabilities?.[cap.key]) capMap[cap.key] = true;
+    }
     setSavingPlan(true);
     try {
       if (editingPlan) {
@@ -152,7 +202,8 @@ export default function SuperAdminSubscriptionsPage() {
             priceMonthly: Number(planForm.priceMonthly || 0),
             priceYearly: Number(planForm.priceYearly || 0),
             features: planForm.features || [],
-            limits: planForm.limits,
+            limits,
+            capabilities: capMap,
             color: planForm.color,
             badge: planForm.badge,
             isPopular: (planForm as any).isPopular,
@@ -170,7 +221,8 @@ export default function SuperAdminSubscriptionsPage() {
             priceMonthly: Number(planForm.priceMonthly || 3000),
             priceYearly: Number(planForm.priceYearly || 30000),
             features: planForm.features || [],
-            limits: planForm.limits || { projects: "—", users: "—", templates: "—" },
+            limits,
+            capabilities: capMap,
             color: planForm.color || "#eef0fe",
             badge: planForm.badge || "b-indigo",
             isPopular: (planForm as any).isPopular || false,
@@ -393,14 +445,14 @@ export default function SuperAdminSubscriptionsPage() {
                     </div>
                     <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 12 }}>{p.description}</div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-                      <span className="chip">{p.limits?.projects ?? "—"} projects</span>
-                      <span className="chip">{p.limits?.users ?? "—"} users</span>
-                      <span className="chip">{p.limits?.templates ?? "—"} templates</span>
+                      <span className="chip">{fmtLimit(p.limits?.projects)} projects</span>
+                      <span className="chip">{fmtLimit(p.limits?.users)} users</span>
+                      <span className="chip">{fmtLimit(p.limits?.templates)} templates</span>
                     </div>
                     <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12, marginBottom: 12 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.06, textTransform: "uppercase", color: "var(--muted)", marginBottom: 8 }}>Plan Features</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.06, textTransform: "uppercase", color: "var(--muted)", marginBottom: 8 }}>Marketing bullet points</div>
                       <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 5 }}>
-                        {p.features.map(f => <li key={f} style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{f}</li>)}
+                        {(p.features.length ? p.features : ["—"]).map(f => <li key={f} style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{f}</li>)}
                       </ul>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
@@ -415,20 +467,30 @@ export default function SuperAdminSubscriptionsPage() {
 
             <div className="card" style={{ marginTop: 18, overflow: "hidden" }}>
               <div className="card-h">
-                <div className="t">Plan Features — comparison matrix</div>
-                <span className="chip">API</span>
+                <div className="t">Plan comparison matrix</div>
               </div>
               <div className="tbl-wrap">
                 <table className="tbl">
                   <thead><tr><th>Feature</th>{plans.map(p => <th key={p.id}>{p.name}</th>)}</tr></thead>
                   <tbody>
-                    {ALL_FEATURES.map(feat => (
-                      <tr key={feat}>
-                        <td style={{ fontWeight: 600 }}>{feat}</td>
-                        {plans.map(p => {
-                          const has = p.features.some(f => f.toLowerCase().includes(feat.toLowerCase().split(" ")[0]));
-                          return <td key={p.id} style={{ textAlign: "center" }}>{has ? "" : "—"}</td>;
-                        })}
+                    {LIMIT_ROWS.map(row => (
+                      <tr key={row.key}>
+                        <td style={{ fontWeight: 600 }}>{row.label}</td>
+                        {plans.map(p => (
+                          <td key={p.id} style={{ textAlign: "center" }}>{fmtLimit(p.limits?.[row.key])}</td>
+                        ))}
+                      </tr>
+                    ))}
+                    {capabilities.map(cap => (
+                      <tr key={cap.key}>
+                        <td style={{ fontWeight: 600 }} title={cap.description}>{cap.label}</td>
+                        {plans.map(p => (
+                          <td key={p.id} style={{ textAlign: "center" }}>
+                            {p.capabilities?.[cap.key]
+                              ? <Icon name="check" size={15} style={{ color: "var(--green)" }} />
+                              : <span style={{ color: "var(--faint)" }}>—</span>}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
@@ -532,7 +594,7 @@ export default function SuperAdminSubscriptionsPage() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }} onClick={() => setPlanModalOpen(false)}>
           <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: 24, width: 720, maxWidth: "100%", maxHeight: "90vh", overflow: "auto", boxShadow: "0 24px 80px rgba(15,23,42,.2)" }}>
             <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800 }}>{editingPlan ? "Edit Plan" : "Create Plan"}</h2>
-            <p style={{ margin: "0 0 16px", color: "var(--muted)", fontSize: 13.5 }}>Configure plan pricing and plan features. Saved to <span className="mono">/admin/plans</span>.</p>
+            <p style={{ margin: "0 0 16px", color: "var(--muted)", fontSize: 13.5 }}>Configure pricing, numeric quotas and capabilities. Saved to <span className="mono">/admin/plans</span>.</p>
             <div className="row2">
               <div className="field"><label>Plan name</label><input className="inp" value={String(planForm.name || "")} onChange={e => setPlanForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Starter" /></div>
               <div className="field"><label>Slug</label><input className="inp" value={String((planForm as any).slug || "")} onChange={e => setPlanForm(p => ({ ...p, slug: e.target.value }))} placeholder="starter" /></div>
@@ -576,10 +638,75 @@ export default function SuperAdminSubscriptionsPage() {
               </div>
             </div>
             <label style={{ display:"flex", gap:8, alignItems:"center", fontSize:13, margin:"8px 0" }}><input type="checkbox" checked={!!(planForm as any).isPopular} onChange={e => setPlanForm(p => ({ ...p, isPopular: e.target.checked } as any))} /> Popular plan</label>
+
             <div className="field">
-              <label>Plan Features</label>
+              <label>Limits</label>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Set a number per quota, or toggle Unlimited.</div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {LIMIT_ROWS.map(row => {
+                  const v = formLimit(row.key);
+                  const unlimited = v === null;
+                  return (
+                    <div key={row.key} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ width: 90, fontSize: 13, fontWeight: 600 }}>{row.label}</span>
+                      <input
+                        className="inp"
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={unlimited ? "" : String(v)}
+                        disabled={unlimited}
+                        onChange={e => {
+                          const raw = e.target.value;
+                          const n = raw === "" ? 0 : Math.max(0, Math.floor(Number(raw) || 0));
+                          setFormLimit(row.key, n);
+                        }}
+                        style={{ width: 120 }}
+                        placeholder="Unlimited"
+                      />
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                        <input
+                          type="checkbox"
+                          checked={unlimited}
+                          onChange={e => setFormLimit(row.key, e.target.checked ? null : 0)}
+                        />
+                        Unlimited
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Capabilities</label>
+              {capabilities.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: "var(--muted)" }}>Capability catalog unavailable.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {capabilities.map(cap => (
+                    <label key={cap.key} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        style={{ marginTop: 3 }}
+                        checked={!!planForm.capabilities?.[cap.key]}
+                        onChange={e => toggleCapability(cap.key, e.target.checked)}
+                      />
+                      <span>
+                        <span style={{ fontWeight: 600 }}>{cap.label}</span>
+                        <span style={{ display: "block", color: "var(--muted)", fontSize: 12 }}>{cap.description}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="field">
+              <label>Marketing bullet points</label>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>Copy shown on the pricing card. Not functional — quotas and capabilities above drive behaviour.</div>
               <div style={{ display: "flex", gap: 8 }}>
-                <input className="inp" value={featureInput} onChange={e => setFeatureInput(e.target.value)} onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addFeature())} placeholder="Add a feature and press Enter" style={{ flex: 1 }} />
+                <input className="inp" value={featureInput} onChange={e => setFeatureInput(e.target.value)} onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addFeature())} placeholder="Add a bullet point and press Enter" style={{ flex: 1 }} />
                 <button className="btn btn-ghost" type="button" onClick={addFeature}>Add</button>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>

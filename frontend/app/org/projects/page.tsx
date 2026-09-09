@@ -9,7 +9,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
 import "@/app/org/org.css";
-import type { ProjectsListResponse, ProjectStatus } from "@/lib/types";
+import type { OrgBillingSummary, ProjectsListResponse, ProjectStatus } from "@/lib/types";
 
 const LIMIT = 20;
 
@@ -63,6 +63,15 @@ export default function OrgProjectsPage() {
     inactive: number;
   } | null>(null);
 
+  // Plan project quota — checked here so the wizard can't be entered at all
+  // when the org is already at its limit. The server stays authoritative at
+  // create time; this is purely UX.
+  const [projectQuota, setProjectQuota] = useState<{
+    used: number;
+    limit: number | null;
+    planName: string | null;
+  } | null>(null);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchInput);
@@ -83,6 +92,16 @@ export default function OrgProjectsPage() {
         setCounts({ total: all.total, active: active.total, inactive: inactive.total })
       )
       .catch(() => setCounts(null));
+
+    apiFetch<OrgBillingSummary>("/org/billing", { headers })
+      .then((b) =>
+        setProjectQuota({
+          used: b.usage.projectsUsed,
+          limit: b.usage.projectsLimit,
+          planName: b.plan?.name ?? null,
+        }),
+      )
+      .catch(() => setProjectQuota(null));
   }, [accessToken]);
 
   useEffect(() => {
@@ -108,6 +127,10 @@ export default function OrgProjectsPage() {
   const to = Math.min(page * LIMIT, total);
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
   const isFiltered = Boolean(search || STATUS_FOR_TAB[tabIndex]);
+  const atProjectLimit =
+    projectQuota != null &&
+    projectQuota.limit != null &&
+    projectQuota.used >= projectQuota.limit;
 
   return (
     <>
@@ -118,9 +141,36 @@ export default function OrgProjectsPage() {
           <div className="sub">Manage every development — inventory, availability, pricing, ad spend and leads. Built for developers, brokers &amp; channel partners.</div>
         </div>
         <div className="actions">
-          <Link href="/org/projects/add-new-project" className="btn btn-primary">＋ New project</Link>
+          {atProjectLimit ? (
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled
+              title="You've reached your plan's project limit"
+              style={{ opacity: 0.45, cursor: "not-allowed", pointerEvents: "none" }}
+            >
+              ＋ New project
+            </button>
+          ) : (
+            <Link href="/org/projects/add-new-project" className="btn btn-primary">＋ New project</Link>
+          )}
         </div>
       </div>
+
+      {atProjectLimit ? (
+        <div
+          className="card reveal in"
+          style={{ marginBottom: 16, borderColor: "var(--amber, #f59e0b)", padding: "12px 16px", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}
+        >
+          <span style={{ fontSize: 20 }}>⚠️</span>
+          <div style={{ flex: 1, minWidth: 220, fontSize: 13.5 }}>
+            Your{projectQuota?.planName ? ` ${projectQuota.planName}` : ""} plan allows{" "}
+            <b>{projectQuota?.limit}</b> project{projectQuota?.limit === 1 ? "" : "s"} and you have{" "}
+            <b>{projectQuota?.used}</b>. Upgrade your plan to add more.
+          </div>
+          <Link href="/org/settings?section=billing" className="btn btn-soft btn-sm">Upgrade plan</Link>
+        </div>
+      ) : null}
 
       <div className="psub reveal in" data-delay="1">
         <Link href="/org/projects" className="active">All Projects</Link>

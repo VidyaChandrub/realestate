@@ -200,6 +200,7 @@ model Organisation {
   trackingEvents        TrackingEvent[]
   projects              Project[]
   catalogOptions        OrgCatalogOption[]
+  leadStageDisplays     OrgLeadStageDisplay[]
   units                 Unit[]
   emailConfig           EmailConfig?
 
@@ -587,8 +588,15 @@ model Plan {
   description  String?  @default("")
   priceMonthly Int      @map("price_monthly")
   priceYearly  Int      @map("price_yearly")
+  // Marketing bullet strings only — not functional. Not the source of truth
+  // for anything.
   features     Json     @default("[]")
-  limits       Json? // { projects, users, templates }
+  // Numeric quotas: { projects, users, templates }, each `number | null`
+  // (null = unlimited).
+  limits       Json?
+  // Boolean capability flags from the plan-capabilities catalog:
+  // { <catalogKey>: boolean }. A missing key means false.
+  capabilities Json     @default("{}")
   color        String   @default("#eef0fe")
   badge        String   @default("b-indigo")
   isPopular    Boolean  @default(false) @map("is_popular")
@@ -827,6 +835,33 @@ model Lead {
   @@index([status])
   @@index([createdAt])
   @@map("leads")
+  @@schema("templates")
+}
+
+// ---------------------------------------------------------------------------
+// Per-org DISPLAY overrides for the fixed LeadStatus pipeline stages. This
+// does NOT change Lead.status (still the enum above) or any logic keyed to
+// its values — it only lets an org rename a stage and recolour its badge in
+// the UI. One optional row per (org, status); a stage with no row falls back
+// to the built-in default label/colour. The seven stages themselves are
+// fixed — rows are never added, removed, or reordered.
+// ---------------------------------------------------------------------------
+
+model OrgLeadStageDisplay {
+  id        String     @id @default(uuid())
+  orgId     String     @map("org_id")
+  status    LeadStatus
+  label     String
+  // Badge colour as a #RRGGBB hex string.
+  color     String
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, status])
+  @@index([orgId])
+  @@map("org_lead_stage_displays")
   @@schema("templates")
 }
 

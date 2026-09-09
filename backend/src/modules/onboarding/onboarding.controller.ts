@@ -54,6 +54,11 @@ export class OnboardingController {
     return this.onboardingService.listAvailableRoles(actor);
   }
 
+  @Get('seats')
+  seats(@CurrentUser() actor: JwtPayload) {
+    return this.onboardingService.getSeatUsage(actor);
+  }
+
   @Post('complete')
   complete(@CurrentUser() actor: JwtPayload) {
     return this.onboardingService.complete(actor);

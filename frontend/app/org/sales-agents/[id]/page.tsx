@@ -8,6 +8,7 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { Icon, type IconName } from "@/components/icons";
 import { getSalesAgent } from "@/lib/api";
 import { leadDisplaySource } from "@/lib/lead-display";
+import { StageBadge, useLeadStages } from "@/lib/lead-stages";
 import type {
   CrmLeadStatus,
   SalesAgent,
@@ -60,47 +61,10 @@ const CALL_OUTCOME_BADGE: Record<SalesAgentCall["outcome"], string> = {
 
 const AV_MODIFIERS = ["", "a2", "a3", "a4", "a5"];
 
-const STATUS_LABEL: Record<CrmLeadStatus, string> = {
-  new: "New",
-  contacted: "Contacted",
-  follow_up: "Follow-up",
-  site_visit: "Site Visit",
-  negotiation: "Negotiation",
-  won: "Won",
-  lost: "Lost",
-};
-
-const STATUS_BADGE: Record<CrmLeadStatus, string> = {
-  new: "b-gray",
-  contacted: "b-sky",
-  follow_up: "b-amber",
-  site_visit: "b-indigo",
-  negotiation: "b-violet",
-  won: "b-green",
-  lost: "b-rose",
-};
-
 const SOURCE_BADGE: Record<string, string> = {
   Meta: "b-indigo",
   Google: "b-sky",
   WhatsApp: "b-green",
-};
-
-const PIPELINE_LABEL: Record<CrmLeadStatus, string> = {
-  new: "New",
-  contacted: "Contacted",
-  follow_up: "Follow-up",
-  site_visit: "Site visit",
-  negotiation: "Negotiation",
-  won: "Won",
-  lost: "Lost",
-};
-
-const PIPELINE_TONE: Partial<Record<CrmLeadStatus, string>> = {
-  site_visit: "var(--iris)",
-  negotiation: "var(--violet)",
-  won: "var(--green)",
-  lost: "var(--rose)",
 };
 
 type LeadRow = {
@@ -110,8 +74,7 @@ type LeadRow = {
   av: string;
   source: string | null;
   sourceBadge: string;
-  statusLabel: string;
-  statusBadge: string;
+  status: CrmLeadStatus;
   value: string;
   when: string;
   hot: boolean;
@@ -189,11 +152,13 @@ function sourcesToSlices(
 
 function apiPipeline(
   stats: SalesAgentStats,
-): { label: string; count: number; tone?: string }[] {
+  resolve: { label: (s: CrmLeadStatus) => string; color: (s: CrmLeadStatus) => string },
+): { status: CrmLeadStatus; label: string; count: number; tone: string }[] {
   return stats.pipeline.map((s) => ({
-    label: PIPELINE_LABEL[s.status] ?? s.status,
+    status: s.status,
+    label: resolve.label(s.status),
     count: s.count,
-    tone: PIPELINE_TONE[s.status],
+    tone: resolve.color(s.status),
   }));
 }
 
@@ -245,8 +210,7 @@ function apiLeadsToRows(leads: SalesAgentRecentLead[]): LeadRow[] {
       av: avClass(lead.id),
       source: leadDisplaySource(lead),
       sourceBadge: SOURCE_BADGE[lead.source ?? ""] ?? "b-amber",
-      statusLabel: STATUS_LABEL[lead.status],
-      statusBadge: STATUS_BADGE[lead.status],
+      status: lead.status,
       value: formatBudget(lead.budget),
       when: formatWhen(lead.createdAt),
       hot: lead.budget >= 1e7,
@@ -291,6 +255,7 @@ function activityIcon(type: SalesAgentActivityType): IconName {
 export default function OrgAgentDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
+  const { label: stageLabel, color: stageColor } = useLeadStages();
 
   const [state, setState] = useState<{
     id: string;
@@ -320,8 +285,11 @@ export default function OrgAgentDetailPage() {
   const error = current?.error ?? false;
 
   const pipeline = useMemo(
-    () => (detail && detail.agent.id === id ? apiPipeline(detail.agent.stats) : []),
-    [detail, id],
+    () =>
+      detail && detail.agent.id === id
+        ? apiPipeline(detail.agent.stats, { label: stageLabel, color: stageColor })
+        : [],
+    [detail, id, stageLabel, stageColor],
   );
   const slices = useMemo(
     () => (detail && detail.agent.id === id ? sourcesToSlices(detail.agent.stats) : []),
@@ -359,8 +327,8 @@ export default function OrgAgentDetailPage() {
   const visibleLeads = leads.filter((l) => {
     if (seg === "All") return true;
     if (seg === "Hot") return l.hot;
-    if (seg === "Follow-up") return l.statusLabel === "Follow-up";
-    if (seg === "Site visit") return l.statusLabel === "Site Visit";
+    if (seg === "Follow-up") return l.status === "follow_up";
+    if (seg === "Site visit") return l.status === "site_visit";
     if (seg === "Idle") return l.idle;
     return true;
   });
@@ -599,11 +567,11 @@ export default function OrgAgentDetailPage() {
                           maxStage > 0
                             ? Math.max(4, Math.round((stage.count / maxStage) * 100))
                             : 0;
-                        const tone = stage.tone
-                          ? { background: `linear-gradient(90deg, ${stage.tone}, ${stage.tone})` }
-                          : {};
+                        const tone = {
+                          background: `linear-gradient(90deg, ${stage.tone}, ${stage.tone})`,
+                        };
                         return (
-                          <div className="agoal" key={stage.label}>
+                          <div className="agoal" key={stage.status}>
                             <div className="agt">
                               <span>{stage.label}</span>
                               <b className="v">{stage.count}</b>
@@ -709,7 +677,7 @@ export default function OrgAgentDetailPage() {
                                 {l.source ?? "—"}
                               </span>
                             </td>
-                            <td><span className={`badge ${l.statusBadge}`}>{l.statusLabel}</span></td>
+                            <td><StageBadge status={l.status} /></td>
                             <td>{l.value}</td>
                             <td className="muted">{l.when}</td>
                             <td>
