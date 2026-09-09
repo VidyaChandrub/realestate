@@ -230,9 +230,22 @@ export interface InviteStepInput {
   invites: InviteEntry[];
 }
 
+export interface SeatUsage {
+  used: number;
+  /** null = unlimited on the current plan. */
+  limit: number | null;
+}
+
+export interface InviteFailure {
+  email: string;
+  reason: string;
+  kind: "quota" | "duplicate" | "error";
+}
+
 export interface InviteStepResponse extends OnboardingStepResult {
-  sent: unknown[];
-  failed: { email: string; reason: string }[];
+  sent: { email?: string | null }[];
+  failed: InviteFailure[];
+  seats: SeatUsage;
 }
 
 export interface LogoUploadUrlInput {
@@ -607,6 +620,21 @@ export interface OrgTemplatesListResponse {
 }
 
 // --- Billing: Plans & Subscriptions ---
+
+/** Numeric plan quotas. `null` means unlimited. */
+export interface PlanLimits {
+  projects: number | null;
+  users: number | null;
+  templates: number | null;
+}
+
+/** One entry of the plan capability catalog (`GET /admin/plans/capabilities`). */
+export interface PlanCapability {
+  key: string;
+  label: string;
+  description: string;
+}
+
 export interface Plan {
   id: string;
   name: string;
@@ -614,8 +642,11 @@ export interface Plan {
   description: string | null;
   priceMonthly: number;
   priceYearly: number;
+  /** Marketing bullet points only — not functional. */
   features: string[];
-  limits: { projects: string; users: string; templates: string } | null;
+  limits: PlanLimits;
+  /** { <capability key>: boolean }; a missing key means false. */
+  capabilities: Record<string, boolean>;
   color: string;
   badge: string;
   isPopular: boolean;
@@ -682,7 +713,8 @@ export interface CreatePlanInput {
   priceMonthly: number;
   priceYearly: number;
   features?: string[];
-  limits?: { projects: string; users: string; templates: string };
+  limits?: Partial<PlanLimits>;
+  capabilities?: Record<string, boolean>;
   color?: string;
   badge?: string;
   isPopular?: boolean;
@@ -784,11 +816,15 @@ export interface OrgBillingSummary {
   plan: OrgBillingPlan | null;
   subscription: OrgBillingSubscription | null;
   usage: {
+    /** `*Limit` is null = unlimited when a plan exists; also null when there's
+     *  no plan at all — callers branch on `plan === null` first, so this is
+     *  never ambiguous in practice. */
     templatesUsed: number;
-    /** null = unlimited when a plan exists; also null when there's no plan
-     *  at all — callers branch on `plan === null` first, so this is never
-     *  ambiguous in practice. */
     templatesLimit: number | null;
+    projectsUsed: number;
+    projectsLimit: number | null;
+    usersUsed: number;
+    usersLimit: number | null;
   };
 }
 

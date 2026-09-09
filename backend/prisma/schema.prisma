@@ -588,8 +588,15 @@ model Plan {
   description  String?  @default("")
   priceMonthly Int      @map("price_monthly")
   priceYearly  Int      @map("price_yearly")
+  // Marketing bullet strings only — not functional. Not the source of truth
+  // for anything.
   features     Json     @default("[]")
-  limits       Json? // { projects, users, templates }
+  // Numeric quotas: { projects, users, templates }, each `number | null`
+  // (null = unlimited).
+  limits       Json?
+  // Boolean capability flags from the plan-capabilities catalog:
+  // { <catalogKey>: boolean }. A missing key means false.
+  capabilities Json     @default("{}")
   color        String   @default("#eef0fe")
   badge        String   @default("b-indigo")
   isPopular    Boolean  @default(false) @map("is_popular")

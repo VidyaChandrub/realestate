@@ -16,6 +16,7 @@ import type {
   CrmLeadListResponse,
   InviteStepInput,
   InviteStepResponse,
+  SeatUsage,
   InvoiceRow,
   LeadSubmission,
   LogoUploadUrlInput,
@@ -42,6 +43,7 @@ import type {
   OrgDomainInfo,
   OrganisationStepResponse,
   Plan,
+  PlanCapability,
   RequestCustomDomainInput,
   ResolveDraftInput,
   ResumeSignupResponse,
@@ -274,6 +276,12 @@ export async function getPlans(): Promise<Plan[]> {
   return apiFetch<Plan[]>("/plans");
 }
 
+/** Canonical plan capability catalog (Super Admin). Single source of truth —
+ *  the plan editor and comparison matrix render from this. */
+export async function getPlanCapabilities(): Promise<PlanCapability[]> {
+  return apiFetch<PlanCapability[]>("/admin/plans/capabilities");
+}
+
 // --- Signup wizard (resumable, step-wise) ---
 
 export async function signupStep1(
@@ -375,6 +383,10 @@ export async function saveInviteStep(
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function getOnboardingSeats(): Promise<SeatUsage> {
+  return apiFetch<SeatUsage>("/onboarding/seats");
 }
 
 export async function verifyEmail(

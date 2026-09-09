@@ -9,6 +9,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { ListSubscriptionsQueryDto } from './dto/list-subscriptions-query.dto';
+import { assertPlanFitsCurrentUsage } from '../../common/utils/plan-quota.util';
 
 function computeAmountAndMrr(
   plan: { priceMonthly: number; priceYearly: number },
@@ -191,6 +192,9 @@ export class SubscriptionsService {
     if (dto.planId && dto.planId !== sub.planId) {
       const newPlan = await this.prisma.plan.findUnique({ where: { id: dto.planId } });
       if (!newPlan || !newPlan.isActive) throw new NotFoundException('Plan not found or inactive');
+      // Downgrade guard — refuse a plan the org already exceeds. Nothing is
+      // deleted to make it fit; upgrades and same-usage moves pass.
+      await assertPlanFitsCurrentUsage(this.prisma, sub.orgId, newPlan);
       targetPlan = newPlan;
       data.plan = { connect: { id: dto.planId } };
     }

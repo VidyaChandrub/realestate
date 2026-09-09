@@ -180,9 +180,33 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function PlanLimitsSelect({ limits }: { limits: { templates?: string; projects?: string; users?: string } | null }) {
+/** Usage-against-limit bar for the Billing card. `limit === null` = unlimited. */
+function UsageBar({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+  const atLimit = limit != null && used >= limit;
+  return (
+    <div className="field" style={{ marginBottom: 0 }}>
+      <label>{label}</label>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6 }}>
+        <span>{used} of {limit ?? "unlimited"} used</span>
+        {atLimit ? <span style={{ color: "var(--rose)", fontWeight: 700 }}>Limit reached</span> : null}
+      </div>
+      {limit != null ? (
+        <div style={{ height: 8, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${Math.min(100, (used / Math.max(1, limit)) * 100)}%`, background: atLimit ? "var(--rose)" : "var(--brand)", borderRadius: 999 }} />
+        </div>
+      ) : <div className="muted" style={{ fontSize: 12 }}>Unlimited on this plan.</div>}
+    </div>
+  );
+}
+
+function PlanLimitsSelect({ limits }: { limits: { templates: number | null; projects: number | null; users: number | null } | null }) {
   const [open, setOpen] = useState(false);
-  const rows = PLAN_LIMIT_ROWS.map((r) => ({ ...r, count: limits?.[r.key] ?? null })).filter((r) => r.count != null && r.count !== "");
+  // A limit is a number, or null = unlimited. Show every quota row; render
+  // "Unlimited" rather than hiding it.
+  const rows = PLAN_LIMIT_ROWS.map((r) => ({
+    ...r,
+    count: limits?.[r.key] == null ? "Unlimited" : String(limits[r.key]),
+  }));
   return (
     <div className="mselect">
       <button type="button" className="mselect-btn" onClick={() => setOpen((o) => !o)}>
@@ -1389,18 +1413,9 @@ export default function OrgSettingsPage() {
                         <div>{formatDate(billing.subscription.renewsAt)}</div>
                       </div>
                     ) : null}
-                    <div className="field" style={{ marginBottom: 0 }}>
-                      <label>Templates</label>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6 }}>
-                        <span>{billing.usage.templatesUsed} of {billing.usage.templatesLimit ?? "unlimited"} used</span>
-                        {billing.usage.templatesLimit != null && billing.usage.templatesUsed >= billing.usage.templatesLimit ? <span style={{ color: "var(--rose)", fontWeight: 700 }}>Limit reached</span> : null}
-                      </div>
-                      {billing.usage.templatesLimit != null ? (
-                        <div style={{ height: 8, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: `${Math.min(100, (billing.usage.templatesUsed / Math.max(1, billing.usage.templatesLimit)) * 100)}%`, background: billing.usage.templatesUsed >= billing.usage.templatesLimit ? "var(--rose)" : "var(--brand)", borderRadius: 999 }} />
-                        </div>
-                      ) : <div className="muted" style={{ fontSize: 12 }}>Unlimited on this plan.</div>}
-                    </div>
+                    <UsageBar label="Projects" used={billing.usage.projectsUsed} limit={billing.usage.projectsLimit} />
+                    <UsageBar label="Users" used={billing.usage.usersUsed} limit={billing.usage.usersLimit} />
+                    <UsageBar label="Templates" used={billing.usage.templatesUsed} limit={billing.usage.templatesLimit} />
                   </div>
                 )}
               </div>

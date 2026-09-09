@@ -7,6 +7,7 @@ import {
 } from './tokens.util';
 import { toSafeUser } from './mappers.util';
 import { normalizePhoneNumber } from './phone.util';
+import { assertLimit, countBillableOrgUsers } from './plan-quota.util';
 
 import { EmailService } from '../../modules/email/email.service';
 
@@ -31,6 +32,7 @@ type OrgUsersPrisma = Pick<
   | 'user'
   | 'role'
   | 'userRole'
+  | 'subscription'
   | 'refreshToken'
   | 'passwordResetToken'
   | '$transaction'
@@ -148,6 +150,21 @@ export async function provisionInvitedUser(
   });
   if (!role) {
     throw new NotFoundException(`Role '${dto.role}' not found or inactive`);
+  }
+
+  // Plan user quota — the single point every "add an org user" path funnels
+  // through (POST /org/users, POST /team/invite, the onboarding invite step,
+  // and Super Admin POST /admin/organisations/:id/users). Enforced only when
+  // the org has a subscription. The founding admin is created elsewhere, at
+  // org creation, before any subscription — it is not gated here but does
+  // count: active + pending users consume a seat, a disabled user does not.
+  const subscription = await prisma.subscription.findFirst({
+    where: { orgId, status: { not: 'cancelled' } },
+    include: { plan: true },
+  });
+  if (subscription) {
+    const currentCount = await countBillableOrgUsers(prisma, orgId);
+    assertLimit(subscription.plan, 'users', currentCount, 1);
   }
 
   const rawPassword = dto.password || generateTempPassword();
