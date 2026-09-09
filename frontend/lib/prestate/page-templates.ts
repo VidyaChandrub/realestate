@@ -51,6 +51,19 @@ const sec = (
 
 export const PAGE_TEMPLATES: TemplateData[] = [
   {
+    id: "tpl-meridian",
+    name: "Meridian Residences",
+    category: "Premium",
+    icon: "Building2",
+    pages: 1,
+    conversions: "—",
+    accent: "#b8860b",
+    accent2: "#1a1612",
+    thumbnail: "hero",
+    description:
+      "Premium real-estate launch page — sticky header, hero with enquiry form, highlights, amenities, gallery, location, plans, pricing, testimonials, FAQ, brochure popup and footer. Fully editable in the page builder.",
+  },
+  {
     id: "tpl-estatepro",
     name: "EstatePro Standard",
     category: "Standard",
@@ -92,6 +105,8 @@ export function inferDesignId(template: string): string {
   if (key.includes("lead") || key === "tpl-lead") return "tpl-lead";
   if (key.includes("luxe") || key.includes("luxury") || key === "tpl-luxe")
     return "tpl-luxe";
+  if (key.includes("meridian") || key === "tpl-meridian" || key.includes("premium"))
+    return "tpl-meridian";
   return "tpl-estatepro";
 }
 

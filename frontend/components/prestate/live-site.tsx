@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Globe, PencilRuler } from "lucide-react";
-import type { Device, LandingPageData } from "@/lib/prestate/types";
-import { Canvas, type DesignBundle } from "@/components/prestate/builder/canvas";
-import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
-import { buildDesignCss, effectiveTypography, ensureDesignSystem, loadFonts, loadPublicGlobalSets, type GlobalStyleSet } from "@/lib/prestate/design-system";
+import type { LandingPageData } from "@/lib/prestate/types";
+import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
+import { siteFromLandingPage } from "@/lib/openpage/content";
+import { ensureConfig } from "@/lib/prestate/site-config";
 import { applyDocumentSeo } from "@/lib/prestate/seo";
 import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
 import { bumpTracking } from "@/lib/prestate/tracking";
@@ -14,39 +14,20 @@ import { findPageByDomain, findPageBySlug } from "@/lib/prestate/store";
 import { applyLandingPagePropertyFromConfig } from "@/lib/prestate/data";
 import { builderPath, localDomainPreviewPath } from "@/lib/prestate/paths";
 
-function deviceFromWidth(w: number): Device {
-  if (w < 700) return "mobile";
-  if (w < 1100) return "tablet";
-  return "desktop";
-}
-
-export function LocalSitePreview({ slug, host, page: serverPage }: { slug?: string; host?: string; page?: LandingPageData | null }) {
+export function LocalSitePreview({
+  slug,
+  host,
+  page: serverPage,
+  publicLive = false,
+}: {
+  slug?: string;
+  host?: string;
+  page?: LandingPageData | null;
+  publicLive?: boolean;
+}) {
   const [page, setPage] = useState<LandingPageData | null | undefined>(serverPage ?? undefined);
-  const [device, setDevice] = useState<Device>("desktop");
   const [gate, setGate] = useState("");
   const [unlocked, setUnlocked] = useState(false);
-  const [globalSets, setGlobalSets] = useState<GlobalStyleSet[]>([]);
-
-  useEffect(() => {
-    const sync = () => setDevice(deviceFromWidth(window.innerWidth));
-    sync();
-    window.addEventListener("resize", sync);
-    return () => window.removeEventListener("resize", sync);
-  }, []);
-
-  // Public/unauthenticated — this route has no session, so only platform
-  // sets are ever reachable here (see loadPublicGlobalSets). Fetched once;
-  // empty while loading just means template-scoped typography renders
-  // until this resolves.
-  useEffect(() => {
-    let cancelled = false;
-    loadPublicGlobalSets().then((sets) => {
-      if (!cancelled) setGlobalSets(sets);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (serverPage) {
@@ -96,14 +77,8 @@ export function LocalSitePreview({ slug, host, page: serverPage }: { slug?: stri
   const hostHref = assigned ? localDomainPreviewPath(assigned) : "";
   const cfg = ensureConfig(page);
   applyLandingPagePropertyFromConfig(cfg);
-  void ensureDesignSystem(cfg);
-  const { typography } = effectiveTypography(cfg, globalSets);
-  const fonts = loadFonts();
-  const design: { css: string; bundle: DesignBundle } = {
-    css: buildDesignCss({ scopeClass: "ps-typo-scope", typography, fonts }),
-    bundle: { tokens: typography, fonts },
-  };
   const needsPassword = Boolean(cfg.page.password) && !unlocked;
+  const openPageSite = siteFromLandingPage(page);
 
   if (needsPassword) {
     return (
@@ -132,8 +107,28 @@ export function LocalSitePreview({ slug, host, page: serverPage }: { slug?: stri
     );
   }
 
+  const pageShell = (
+    <div
+      className="op-live-root"
+      style={{ minHeight: "100vh", background: "var(--color-bg-1, #fff)" }}
+    >
+      <SiteRenderer
+        site={openPageSite}
+        live
+        pageId={page.id}
+        projectName={page.name}
+        forms={(openPageSite.forms ?? cfg.forms) as never}
+      />
+      <PrestateTrackingScripts tracking={cfg.tracking} />
+    </div>
+  );
+
+  if (publicLive) {
+    return pageShell;
+  }
+
   return (
-    <div className="ps-app ps-live" style={{ minHeight: "100vh", background: "#fff", ...siteThemeStyle(cfg.brand) }}>
+    <div className="ps-app ps-live" style={{ minHeight: "100vh", background: "#fff" }}>
       <div
         style={{
           position: "sticky",
@@ -180,29 +175,12 @@ export function LocalSitePreview({ slug, host, page: serverPage }: { slug?: stri
           ) : null}
         </span>
       </div>
-      <Canvas
-        sections={page.sections}
-        selectedId={null}
-        device={device}
-        readOnly
+      <SiteRenderer
+        site={openPageSite}
         live
-        design={design}
-        theme={{
-          primary: cfg.brand.primary,
-          accent: cfg.brand.accent,
-          font: cfg.brand.bodyFont,
-          headingFont: cfg.brand.headingFont,
-          name: cfg.brand.name,
-          phone: cfg.brand.phone,
-          logo: cfg.brand.logo,
-          layoutTheme: cfg.brand.layoutTheme,
-        }}
-        form={cfg.form}
-        forms={cfg.forms}
-        chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}
         pageId={page.id}
-        onSelect={() => {}}
-        onMutate={() => {}}
+        projectName={page.name}
+        forms={(openPageSite.forms ?? cfg.forms) as never}
       />
       <PrestateTrackingScripts tracking={cfg.tracking} />
     </div>

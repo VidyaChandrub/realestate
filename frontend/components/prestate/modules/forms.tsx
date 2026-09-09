@@ -103,6 +103,7 @@ const FIELD_TYPES: { type: FieldType; label: string; icon: React.ReactNode }[] =
       icon: <MessageSquare size={14} />,
     },
     { type: "file", label: "File upload", icon: <Upload size={14} /> },
+    { type: "hidden", label: "Hidden field", icon: <Eye size={14} /> },
   ];
 
 function newEmbedId(): string {

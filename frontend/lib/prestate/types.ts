@@ -7,6 +7,7 @@ export type ModuleKey =
   | "pages"
   | "templates"
   | "forms"
+  | "popups"
   | "brand"
   | "headerfooter"
   | "seo"
@@ -426,6 +427,7 @@ export interface LandingPageData {
   thumbnail: string;
   sections: SectionInstance[];
   config?: SiteConfig;
+  openPageSite?: import("@/components/openpage/blocks/types").SiteConfig;
   kind?: "preset" | "custom";
   designId?: string;
   /** Landing pages convert; thank-you pages confirm and hand over deliverables. */

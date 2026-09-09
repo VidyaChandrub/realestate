@@ -174,6 +174,8 @@ interface ApiTemplate {
   updatedAt: string;
   sections?: SectionInstance[];
   config?: SiteConfig;
+  engine?: string;
+  site?: LandingPageData["openPageSite"] | null;
 }
 
 function formatRelativeTime(iso: string): string {
@@ -207,6 +209,7 @@ function fromApiTemplate(raw: ApiTemplate): LandingPageData {
     thumbnail: raw.thumbnail ?? "",
     sections: raw.sections ?? [],
     config: raw.config,
+    openPageSite: raw.site ?? undefined,
     kind: raw.kind,
     designId: raw.designId,
     pageType: raw.pageType,
@@ -216,8 +219,18 @@ function fromApiTemplate(raw: ApiTemplate): LandingPageData {
   };
 }
 
-function toContentBody(page: Pick<LandingPageData, "sections" | "config">) {
-  return { sections: page.sections, config: page.config ?? {} };
+function toContentBody(page: Pick<LandingPageData, "sections" | "config" | "openPageSite">) {
+  const site = page.openPageSite ?? null;
+  const config = {
+    ...(page.config ?? {}),
+    ...(site ? { site } : {}),
+  };
+  return {
+    engine: "openpage" as const,
+    site,
+    sections: page.sections ?? [],
+    config,
+  };
 }
 
 // Raw shape returned by /org/landing-pages — an org's own copy, not a
@@ -236,7 +249,7 @@ interface ApiLandingPage {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  content?: { sections: SectionInstance[]; config: SiteConfig };
+  content?: { sections: SectionInstance[]; config: SiteConfig; engine?: string; site?: LandingPageData["openPageSite"] };
 }
 
 // Maps a LandingPage row onto the same LandingPageData shape the builder
@@ -268,6 +281,7 @@ function fromApiLandingPage(raw: ApiLandingPage): LandingPageData {
     thumbnail: raw.thumbnail ?? "",
     sections: raw.content?.sections ?? [],
     config: raw.content?.config,
+    openPageSite: raw.content?.site,
     kind: "custom",
     designId: inferDesignId(raw.sourceTemplate?.name ?? BLANK_TEMPLATE.name),
     pageType: raw.pageType === "thank_you" ? "thank-you" : "landing",
@@ -334,6 +348,7 @@ export interface CreateTemplateInput {
   category?: string;
   sections: SectionInstance[];
   config: SiteConfig;
+  openPageSite?: LandingPageData["openPageSite"];
 }
 
 export async function createTemplate(input: CreateTemplateInput): Promise<LandingPageData> {
@@ -351,7 +366,11 @@ export async function createTemplate(input: CreateTemplateInput): Promise<Landin
       thumbnail: input.thumbnail,
       isPaid: input.isPaid,
       category: input.category,
-      content: { sections: input.sections, config: input.config },
+      content: toContentBody({
+        sections: input.sections,
+        config: input.config,
+        openPageSite: input.openPageSite,
+      }),
     }),
   });
   return fromApiTemplate(raw);
@@ -421,15 +440,39 @@ export function saveTemplate(record: LandingPageData, resource: Resource = "temp
     if (existing) clearTimeout(existing.timer);
 
     entry.timer = setTimeout(() => {
-      pendingSaves.delete(key);
-      const patcher = resource === "landing-page" ? patchLandingPage : patchTemplate;
-      patcher(record.id, entry.latest)
-        .then((updated) => entry.resolvers.forEach((r) => r(updated)))
-        .catch((err) => entry.rejecters.forEach((r) => r(err)));
+      void flushPendingSave(key, resource);
     }, SAVE_DEBOUNCE_MS);
 
     pendingSaves.set(key, entry);
   });
+}
+
+async function flushPendingSave(key: string, resource: Resource): Promise<LandingPageData | null> {
+  const entry = pendingSaves.get(key);
+  if (!entry) return null;
+  clearTimeout(entry.timer);
+  pendingSaves.delete(key);
+  const patcher = resource === "landing-page" ? patchLandingPage : patchTemplate;
+  try {
+    const updated = await patcher(entry.latest.id, entry.latest);
+    entry.resolvers.forEach((r) => r(updated));
+    return updated;
+  } catch (err) {
+    entry.rejecters.forEach((r) => r(err));
+    throw err;
+  }
+}
+
+/** Immediate save used by Publish so the live page gets the current builder JSON, not a stale draft. */
+export async function saveTemplateNow(record: LandingPageData, resource: Resource = "template"): Promise<LandingPageData> {
+  const key = `${resource}:${record.id}`;
+  const existing = pendingSaves.get(key);
+  if (existing) {
+    existing.latest = record;
+    return (await flushPendingSave(key, resource))!;
+  }
+  const patcher = resource === "landing-page" ? patchLandingPage : patchTemplate;
+  return patcher(record.id, record);
 }
 
 export async function deleteTemplate(id: string): Promise<void> {

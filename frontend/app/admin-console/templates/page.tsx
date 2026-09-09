@@ -20,6 +20,7 @@ import { createTemplate, deleteTemplate, duplicateTemplate, loadTemplates, reset
 import { builderPath, templatePreviewPath } from "@/lib/prestate/paths";
 import { defaultSiteConfig, seedConfigFor } from "@/lib/prestate/site-config";
 import { inferDesignId } from "@/lib/prestate/page-templates";
+import { buildRealEstateTemplate } from "@/lib/openpage/re-templates";
 import type { LandingPageData, TemplateData } from "@/lib/prestate/types";
 import { Icon } from "@/components/icons";
 
@@ -81,6 +82,7 @@ export default function SuperAdminTemplatesPage() {
         thumbnail: template.thumbnail,
         sections: buildTemplateSections(template.id),
         config: defaultSiteConfig({ name: label, slug, primary: template.accent, accent: "#CDA45E" }),
+        openPageSite: buildRealEstateTemplate("premium", label),
       });
       setPages((prev) => [created, ...prev]);
       goToBuilder(created.id);
@@ -125,6 +127,7 @@ export default function SuperAdminTemplatesPage() {
         thumbnail: template.thumbnail,
         sections,
         config,
+        openPageSite: buildRealEstateTemplate("premium", template.name),
       });
       setPages((prev) => [created, ...prev]);
       goToBuilder(created.id);

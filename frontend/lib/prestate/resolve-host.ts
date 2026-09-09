@@ -7,7 +7,7 @@ export interface ResolvedOrgLandingPage {
   slug: string;
   name: string;
   status: string;
-  content?: { sections?: SectionInstance[]; config?: SiteConfig } | null;
+  content?: { sections?: SectionInstance[]; config?: SiteConfig; site?: LandingPageData["openPageSite"] } | null;
   publishedAt?: string | null;
 }
 
@@ -53,6 +53,7 @@ export async function resolveOrgSiteHost(host: string): Promise<{ page: LandingP
       thumbnail: "",
       sections: lp.content?.sections ?? [],
       config: lp.content?.config,
+      openPageSite: lp.content?.site,
       kind: "custom",
     };
     return { page, resolved };

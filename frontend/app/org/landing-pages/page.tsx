@@ -8,9 +8,10 @@ import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
 import { orgBuilderPath } from "@/lib/prestate/paths";
-import { buildTemplateSections } from "@/lib/prestate/data";
 import { defaultSiteConfig } from "@/lib/prestate/site-config";
-import { Canvas } from "@/components/prestate/builder/canvas";
+import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
+import { siteFromLandingPage } from "@/lib/openpage/content";
+import { buildRealEstateTemplate } from "@/lib/openpage/re-templates";
 import { Icon } from "@/components/icons";
 import type { LandingPageRow, LandingPageStatus, OrgLandingPagesListResponse } from "@/lib/types";
 import type { SectionInstance, SiteConfig } from "@/lib/prestate/types";
@@ -26,7 +27,7 @@ import {
 import "@/app/prestate/prestate.css";
 
 interface LandingPageDetail extends LandingPageRow {
-  content: { sections: SectionInstance[]; config: SiteConfig };
+  content: { sections: SectionInstance[]; config: SiteConfig; engine?: string; site?: import("@/lib/prestate/types").LandingPageData["openPageSite"] };
 }
 
 const LIMIT = 20;
@@ -196,7 +197,9 @@ export default function OrgLandingPagesPage() {
           // Same blank-page factories the Super Admin builder's "create
           // blank template" flow uses — no server-side reimplementation.
           content: {
-            sections: buildTemplateSections("tpl-blank"),
+            engine: "openpage",
+            site: buildRealEstateTemplate("premium", scratchName.trim()),
+            sections: [],
             config: defaultSiteConfig({ name: scratchName.trim(), slug }),
           },
         }),
@@ -390,27 +393,26 @@ export default function OrgLandingPagesPage() {
                 <div style={{ padding: 60, textAlign: "center", color: "var(--muted, #64748b)" }}>{viewError}</div>
               ) : viewData ? (
                 <div className="ps-app">
-                  <Canvas
-                    sections={viewData.content.sections}
-                    selectedId={null}
-                    device="desktop"
-                    readOnly
+                  <SiteRenderer
+                    site={siteFromLandingPage({
+                      id: viewData.id,
+                      name: viewData.name,
+                      slug: viewData.slug,
+                      status: viewData.status as never,
+                      template: "",
+                      domain: "",
+                      views: "—",
+                      conversions: "—",
+                      updated: "",
+                      thumbnail: viewData.thumbnail ?? "",
+                      sections: viewData.content.sections ?? [],
+                      config: viewData.content.config,
+                      openPageSite: viewData.content.site ?? undefined,
+                    })}
                     live
                     pageId={viewData.id}
-                    theme={{
-                      primary: viewData.content.config.brand.primary,
-                      accent: viewData.content.config.brand.accent,
-                      font: viewData.content.config.brand.bodyFont,
-                      headingFont: viewData.content.config.brand.headingFont,
-                      name: viewData.content.config.brand.name,
-                      phone: viewData.content.config.brand.phone,
-                      logo: viewData.content.config.brand.logo,
-                    }}
-                    form={viewData.content.config.form}
-                    forms={viewData.content.config.forms}
-                    chrome={{ header: viewData.content.config.header, footer: viewData.content.config.footer, brand: viewData.content.config.brand }}
-                    onSelect={() => {}}
-                    onMutate={() => {}}
+                    projectName={viewData.name}
+                    forms={viewData.content.config.forms as never}
                   />
                 </div>
               ) : null}

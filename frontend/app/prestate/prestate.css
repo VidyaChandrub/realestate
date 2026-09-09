@@ -12,7 +12,7 @@
   --ps-muted: #94a3b8;
   --ps-line: rgba(255, 255, 255, 0.09);
   --ps-line-strong: rgba(255, 255, 255, 0.16);
-  --ps-bg: #090d16;
+  --ps-bg: #0f172a;
   --ps-panel: #0f172a;
   --ps-panel-raised: #1e293b;
   --ps-surface-muted: rgba(255, 255, 255, 0.06);
@@ -36,7 +36,7 @@
     #3730a3 100%
   );
   --ps-grad-brand: linear-gradient(135deg, #6d5dfc 0%, #cda45e 100%);
-  --ps-canvas-bg: #0b0f19;
+  --ps-canvas-bg: #0f172a;
   --ps-canvas-ink: #0a0c10;
   --ps-gold: #cda45e;
 
@@ -271,6 +271,12 @@
 .ps-studio-main[data-module="builder"] {
   overflow: hidden;
 }
+.op-root {
+  height: 100%;
+  min-height: 0;
+  background: #0f172a;
+  color: #fafafa;
+}
 .ps-studio-main:not([data-module="builder"]) {
   overflow: auto;
   overscroll-behavior: contain;
@@ -279,7 +285,8 @@
 .ps-topnav {
   height: 58px;
   flex-shrink: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   padding: 0 14px;
   gap: 10px;
@@ -296,10 +303,34 @@
   min-width: 0;
 }
 .ps-topnav-left {
-  flex: 1 1 auto;
+  justify-content: flex-start;
 }
 .ps-topnav-center {
-  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ps-topnav-right {
+  justify-content: flex-end;
+}
+.ps-page-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ps-ink);
+}
+.ps-page-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+.ps-page-title-edit {
+  color: var(--ps-muted);
+  flex-shrink: 0;
 }
 .ps-unsaved-pill {
   font-size: 10.5px;
@@ -1265,7 +1296,7 @@
 }
 
 @media (max-width: 1100px) {
-  .ps-builder-actions-wide {
+  .ps-builder-actions-wide .ps-btn-label {
     display: none;
   }
   .ps-topnav-ws {
@@ -1341,9 +1372,13 @@
     gap: 8px;
     height: auto;
     min-height: 58px;
-    flex-wrap: wrap;
+    grid-template-columns: 1fr;
     padding-top: 8px;
     padding-bottom: 8px;
+  }
+  .ps-topnav-center,
+  .ps-topnav-right {
+    justify-content: flex-start;
   }
   .ps-toast-stack {
     left: 12px;
@@ -1365,9 +1400,6 @@
   .ps-stats-grid,
   .ps-tpl-grid {
     grid-template-columns: 1fr;
-  }
-  .ps-builder-chrome {
-    display: none;
   }
   .ps-topnav-sub {
     display: none;

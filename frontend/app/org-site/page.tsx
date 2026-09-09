@@ -8,5 +8,5 @@ export default async function HostSitePage() {
   const { page } = await resolveOrgSiteHost(host);
   // Renders the published site for the visited host. Falls back to the local
   // preview store when the backend has no published site for it.
-  return <LocalSitePreview host={host} page={page} />;
+  return <LocalSitePreview host={host} page={page} publicLive />;
 }

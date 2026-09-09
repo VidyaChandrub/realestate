@@ -14,16 +14,20 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import type { Device, LandingPageData, ModuleKey, SectionInstance, SiteConfig } from "@/lib/prestate/types";
-import { loadTemplate, loadTemplates, saveTemplate, createTemplate, publishLandingPage, unpublishLandingPage, type Resource } from "@/lib/prestate/store";
+import type { LandingPageData, ModuleKey, SiteConfig } from "@/lib/prestate/types";
+import { loadTemplate, loadTemplates, saveTemplate, saveTemplateNow, createTemplate, publishLandingPage, unpublishLandingPage, type Resource } from "@/lib/prestate/store";
 import { uploadBuilderImage } from "@/lib/prestate/persist";
 import { BuilderUploadProvider, type BuilderImageUploader } from "@/components/prestate/builder/upload-context";
 import { buildThankYouSections } from "@/lib/prestate/page-templates";
 import { builderPath, templatePreviewPath } from "@/lib/prestate/paths";
 import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
 import { TopNav } from "@/components/prestate/topnav";
-import { BuilderWorkspace, type BuilderApi } from "@/components/prestate/builder/workspace";
-import { Canvas } from "@/components/prestate/builder/canvas";
+import { EditorLayout } from "@/components/openpage/editor/EditorLayout";
+import { OpenPageBridge } from "@/components/openpage/editor/OpenPageBridge";
+import { PopupsModule } from "@/components/openpage/editor/PopupsModule";
+import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
+import { useConfigStore } from "@/components/openpage/store/configStore";
+import { landingPageFromSite } from "@/lib/openpage/content";
 import { FormsModule } from "@/components/prestate/modules/forms";
 import { BrandModule } from "@/components/prestate/modules/brand";
 import { HeaderFooterModule } from "@/components/prestate/modules/headerfooter";
@@ -91,7 +95,6 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   const router = useRouter();
   const { user: authUser, logout } = useAuth();
   const [module, setModule] = useState<ModuleKey>("builder");
-  const [device, setDevice] = useState<Device>("desktop");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -102,7 +105,14 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   const [activePage, setActivePage] = useState<LandingPageData | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const apiRef = useRef<BuilderApi | null>(null);
+  const apiRef = useRef<{
+    undo: () => void;
+    redo: () => void;
+    save: () => void;
+    preview: () => void;
+    publish: () => void;
+    unpublish: () => void;
+  } | null>(null);
   const toastId = useRef(0);
   // Lightweight (no content) index of every template — feeds FormsModule's
   // site-scope bar/thank-you-page lookup.
@@ -256,7 +266,7 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   );
 
   const persistPage = useCallback(
-    (pageId: string, sections: SectionInstance[], status?: LandingPageData["status"]) => {
+    (pageId: string, sections: LandingPageData["sections"], status?: LandingPageData["status"]) => {
       setActivePage((prev) => {
         if (!prev || prev.id !== pageId) return prev;
         // `status` is only passed by the explicit Publish/Unpublish buttons.
@@ -286,6 +296,14 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
     [saveInBackground, resource],
   );
 
+  const persistOpenPage = useCallback(
+    (next: LandingPageData) => {
+      setActivePage(next);
+      saveInBackground(next);
+    },
+    [saveInBackground],
+  );
+
   // The org builder's direct Publish/Unpublish actions — real API calls,
   // not routed through BuilderApi.publish()/unpublish() like templates.
   // Those go through onPersist -> patchTemplate, which accepts a `status`
@@ -295,10 +313,18 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
   // the only caller).
   const publishPage = useCallback(() => {
     if (!activePage) return;
-    publishLandingPage(activePage.id)
+    const next = landingPageFromSite(activePage, useConfigStore.getState().config);
+    setActivePage(next);
+    saveTemplateNow(next, "landing-page")
+      .then(() => publishLandingPage(activePage.id))
       .then((updated) => {
-        setActivePage((cur) => (cur && cur.id === updated.id ? { ...cur, status: updated.status } : cur));
+        setActivePage((cur) =>
+          cur && cur.id === updated.id
+            ? { ...next, status: updated.status, updated: updated.updated, updatedAt: updated.updatedAt }
+            : cur,
+        );
         toast("Published");
+        window.open(`/preview/${encodeURIComponent(activePage.id)}`, "_blank", "noopener,noreferrer");
       })
       .catch((err) => toast(err instanceof Error ? err.message : "Couldn't publish — try again"));
   }, [activePage, toast]);
@@ -355,26 +381,69 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
     (pageId?: string) => {
       const page = !pageId || pageId === activePage?.id ? activePage : null;
       if (!page) return;
-      // A LandingPage's slug is only unique per-org and public serving of org
-      // pages is out of scope, so there's no route that could resolve one —
-      // preview in-app instead of opening a tab that would 403/404.
-      if (resource === "landing-page") {
-        setInAppPreviewOpen(true);
-        return;
-      }
-      // Templates: open the backend-backed preview keyed by id. The old
-      // /p/[slug] route only resolves seeded/localStorage pages, never a
-      // template that lives in the database.
-      window.open(templatePreviewPath(page.id), "_blank", "noopener,noreferrer");
+      const next = landingPageFromSite(page, useConfigStore.getState().config);
+      setActivePage(next);
+      saveTemplateNow(next, resource)
+        .then(() => {
+          const href =
+            resource === "landing-page"
+              ? `/preview/${encodeURIComponent(page.id)}`
+              : templatePreviewPath(page.id);
+          window.open(href, "_blank", "noopener,noreferrer");
+        })
+        .catch((err) => toast(err instanceof Error ? err.message : "Couldn't save preview"));
     },
-    [activePage, resource],
+    [activePage, resource, toast],
   );
+
+  useEffect(() => {
+    apiRef.current = {
+      undo: () => useConfigStore.getState().undo(),
+      redo: () => useConfigStore.getState().redo(),
+      save: () => {
+        if (!activePage) return;
+        saveInBackground(landingPageFromSite(activePage, useConfigStore.getState().config));
+        toast("Saved");
+      },
+      preview: () => openLocalPreview(activePage?.id),
+      publish: () => {
+        if (!activePage) return;
+        const next = {
+          ...landingPageFromSite(activePage, useConfigStore.getState().config),
+          status: "published" as const,
+        };
+        setActivePage(next);
+        saveTemplateNow(next, resource)
+          .then(() => {
+            toast("Published");
+            window.open(templatePreviewPath(next.id), "_blank", "noopener,noreferrer");
+          })
+          .catch((err) => toast(err instanceof Error ? err.message : "Couldn't publish — try again"));
+      },
+      unpublish: () => {
+        if (!activePage) return;
+        persistOpenPage({
+          ...landingPageFromSite(activePage, useConfigStore.getState().config),
+          status: "unpublished",
+        });
+        toast("Unpublished");
+      },
+    };
+    const syncCaps = () => {
+      setCanUndo(useConfigStore.getState().canUndo());
+      setCanRedo(useConfigStore.getState().canRedo());
+    };
+    syncCaps();
+    return useConfigStore.subscribe(syncCaps);
+  }, [activePage, saveInBackground, toast, openLocalPreview, persistOpenPage, resource]);
 
   const patchConfig = useCallback(
     (pageId: string, recipe: (c: SiteConfig) => SiteConfig) => {
       setActivePage((prev) => {
         if (!prev || prev.id !== pageId) return prev;
-        const next = { ...prev, config: recipe(ensureConfig(prev)), updated: "Just now" };
+        const nextCfg = recipe(ensureConfig(prev));
+        const next = { ...prev, config: nextCfg, updated: "Just now" };
+        useConfigStore.getState().patchSite({ forms: nextCfg.forms as never });
         saveInBackground(next);
         return next;
       });
@@ -398,24 +467,16 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
     switch (module) {
       case "builder":
         return activePage ? (
-          <BuilderWorkspace
-            page={activePage}
-            device={device}
-            setDevice={setDevice}
-            apiRef={apiRef}
-            resource={resource}
-            onCapabilities={({ canUndo: u, canRedo: r }) => {
-              setCanUndo(u);
-              setCanRedo(r);
-            }}
-            onToast={toast}
-            onPersist={(sections, status) => persistPage(activePage.id, sections, status)}
-            onPatchConfig={(recipe) => patchConfig(activePage.id, recipe)}
-            onOpenLocalPreview={() => openLocalPreview(activePage.id)}
-          />
+          <div className="op-root" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <EditorLayout />
+          </div>
         ) : (
           <div className="ps-studio-boot">{pageReady ? "This page could not be opened." : "Opening page…"}</div>
         );
+      case "popups":
+        return activePage ? (
+          <PopupsModule site={activePage} onPatch={(fn) => patchConfig(activePage.id, fn)} onToast={toast} />
+        ) : null;
       case "forms":
         return activePage ? (
           <FormsModule
@@ -520,14 +581,13 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
 
   return (
     <BuilderUploadProvider uploader={imageUploader}>
+    {activePage ? <OpenPageBridge page={activePage} onPersist={persistOpenPage} /> : null}
     <div className="ps-studio-root">
       <TopNav
         module={module}
         setModule={setModule}
         pageName={activePage?.name}
         pageStatus={module === "builder" ? activePage?.status : undefined}
-        device={device}
-        setDevice={setDevice}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={() => apiRef.current?.undo()}
@@ -650,35 +710,13 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
               </button>
             </div>
             <div style={{ flex: 1, overflowY: "auto", background: "#f4f5f8" }}>
-              {(() => {
-                const cfg = ensureConfig(activePage);
-                return (
-                  <div className="ps-app">
-                    <Canvas
-                      sections={activePage.sections}
-                      selectedId={null}
-                      device="desktop"
-                      readOnly
-                      live
-                      pageId={activePage.id}
-                      theme={{
-                        primary: cfg.brand.primary,
-                        accent: cfg.brand.accent,
-                        font: cfg.brand.bodyFont,
-                        headingFont: cfg.brand.headingFont,
-                        name: cfg.brand.name,
-                        phone: cfg.brand.phone,
-                        logo: cfg.brand.logo,
-                      }}
-                      form={cfg.form}
-                      forms={cfg.forms}
-                      chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}
-                      onSelect={() => {}}
-                      onMutate={() => {}}
-                    />
-                  </div>
-                );
-              })()}
+              <SiteRenderer
+                site={useConfigStore.getState().config}
+                live
+                pageId={activePage.id}
+                projectName={activePage.name}
+                forms={useConfigStore.getState().config.forms as never}
+              />
             </div>
           </div>
         </div>

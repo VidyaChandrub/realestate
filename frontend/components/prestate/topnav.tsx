@@ -15,9 +15,9 @@ import {
   Menu,
   MessageCircle,
   Monitor,
-  Moon,
   Palette,
   PanelsTopLeft,
+  Pencil,
   PencilRuler,
   Redo2,
   Rocket,
@@ -25,16 +25,15 @@ import {
   Search,
   Settings,
   Smartphone,
-  Sun,
   Tablet,
   Target,
   Type,
   Undo2,
   User,
-  Users,
   Eye,
 } from "lucide-react";
-import type { Device, ModuleKey } from "@/lib/prestate/types";
+import { useEditorStore, type Viewport } from "@/components/openpage/store/editorStore";
+import type { ModuleKey } from "@/lib/prestate/types";
 import { BRAND } from "@/lib/prestate/data";
 
 export function PrestateMark({
@@ -92,12 +91,6 @@ export function PrestateMark({
   );
 }
 
-const DEVICES: { key: Device; icon: typeof Monitor; label: string }[] = [
-  { key: "desktop", icon: Monitor, label: "Desktop" },
-  { key: "tablet", icon: Tablet, label: "Tablet" },
-  { key: "mobile", icon: Smartphone, label: "Mobile" },
-];
-
 export const MODULE_OPTIONS: {
   key: ModuleKey;
   label: string;
@@ -132,6 +125,14 @@ export const MODULE_OPTIONS: {
     desc: "Lead capture & dynamic forms",
     color: "#10b981",
     bg: "rgba(16, 185, 129, 0.15)",
+  },
+  {
+    key: "popups",
+    label: "Popups & Brochure",
+    icon: Target,
+    desc: "Popup builder and brochure gates",
+    color: "#f43f5e",
+    bg: "rgba(244, 63, 94, 0.15)",
   },
   {
     key: "brand",
@@ -172,8 +173,6 @@ export function TopNav({
   setModule,
   pageName,
   pageStatus,
-  device,
-  setDevice,
   canUndo,
   canRedo,
   onUndo,
@@ -199,8 +198,6 @@ export function TopNav({
   setModule?: (m: ModuleKey) => void;
   pageName?: string;
   pageStatus?: string;
-  device: Device;
-  setDevice: (d: Device) => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -325,18 +322,9 @@ export function TopNav({
             </button>
           ) : null}
           {pageName ? (
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: "var(--ps-ink)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                maxWidth: 200,
-              }}
-            >
-              {pageName}
+            <span className="ps-page-title" title={pageName}>
+              <span>{pageName}</span>
+              <Pencil size={13} className="ps-page-title-edit" />
             </span>
           ) : null}
           {pageStatus ? (
@@ -448,62 +436,21 @@ export function TopNav({
         </div>
       </div>
 
-      {/* Center Device Viewport Switcher */}
-      <div
-        className="ps-topnav-center"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {module === "builder" ? (
-          <div className="ps-device-toggle">
-            {DEVICES.map((d) => (
-              <button
-                key={d.key}
-                type="button"
-                title={`${d.label} view`}
-                onClick={() => setDevice(d.key)}
-                data-active={device === d.key ? "true" : "false"}
-              >
-                <d.icon size={14} />
-                <span className="ps-device-label">{d.label}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
+      <div className="ps-topnav-center">
+        {module === "builder" ? <DeviceToggle /> : null}
       </div>
 
       {/* Right controls */}
       <div className="ps-topnav-right" style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {module === "builder" ? (
           <>
-            <div
-              className="ps-builder-chrome"
-              style={{ display: "flex", alignItems: "center", gap: 2 }}
-            >
-              <button
-                type="button"
-                onClick={onUndo}
-                disabled={!canUndo}
-                title="Undo (Ctrl+Z)"
-                className="ps-topnav-icon-btn"
-                style={iconBtn(canUndo)}
-              >
-                <Undo2 size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={onRedo}
-                disabled={!canRedo}
-                title="Redo (Ctrl+Shift+Z)"
-                className="ps-topnav-icon-btn"
-                style={iconBtn(canRedo)}
-              >
-                <Redo2 size={15} />
-              </button>
-            </div>
+            <EditorChromeButtons
+              canUndo={canUndo}
+              canRedo={canRedo}
+              onUndo={onUndo}
+              onRedo={onRedo}
+              onPreview={onPreview}
+            />
             <div className="ps-vdiv" style={{ height: 20, margin: "0 2px" }} />
             <div
               className="ps-builder-actions-wide"
@@ -517,14 +464,6 @@ export function TopNav({
               >
                 <Save size={14} /> <span className="ps-btn-label">Save</span>
               </button>
-              <button
-                type="button"
-                onClick={onPreview}
-                className="ps-topnav-btn"
-                title="Preview this page"
-              >
-                <Eye size={14} /> <span className="ps-btn-label">Preview</span>
-              </button>
               {published ? (
                 <button
                   type="button"
@@ -533,16 +472,16 @@ export function TopNav({
                 >
                   {unpublishLabel}
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onPublish}
-                  className="ps-topnav-btn ps-topnav-btn--publish"
-                >
-                  <Rocket size={14} />{" "}
-                  <span className="ps-btn-label">{publishLabel}</span>
-                </button>
-              )}
+              ) : null}
+              <button
+                type="button"
+                onClick={onPublish}
+                className="ps-topnav-btn ps-topnav-btn--publish"
+                title={published ? "Update live page" : "Publish this page"}
+              >
+                <Rocket size={14} />
+                <span className="ps-btn-label">{publishLabel}</span>
+              </button>
             </div>
           </>
         ) : (
@@ -825,12 +764,71 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   pages: "Landing Pages",
   templates: "Template Management",
   forms: "Form Builder",
+  popups: "Popup Builder",
   brand: "Brand Center",
   headerfooter: "Header & Footer",
   seo: "SEO Center",
   tracking: "Tracking Center",
   typography: "Typography & Fonts",
 };
+
+const VIEWPORTS: { value: Viewport; icon: typeof Monitor; label: string }[] = [
+  { value: "desktop", icon: Monitor, label: "Desktop" },
+  { value: "tablet", icon: Tablet, label: "Tablet" },
+  { value: "mobile", icon: Smartphone, label: "Mobile" },
+];
+
+function DeviceToggle() {
+  const viewport = useEditorStore((s) => s.viewport);
+  const setViewport = useEditorStore((s) => s.setViewport);
+  return (
+    <div className="ps-device-toggle" role="group" aria-label="Device preview">
+      {VIEWPORTS.map(({ value, icon: Icon, label }) => (
+        <button
+          key={value}
+          type="button"
+          data-active={viewport === value}
+          title={label}
+          aria-label={label}
+          aria-pressed={viewport === value}
+          onClick={() => setViewport(value)}
+        >
+          <Icon size={15} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function EditorChromeButtons({
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  onPreview,
+}: {
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  onPreview: () => void;
+}) {
+  return (
+    <div className="ps-builder-chrome" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <button type="button" onClick={onUndo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="ps-topnav-icon-btn" style={iconBtn(canUndo)}>
+        <Undo2 size={15} />
+      </button>
+      <button type="button" onClick={onRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)" className="ps-topnav-icon-btn" style={iconBtn(canRedo)}>
+        <Redo2 size={15} />
+      </button>
+      <div className="ps-vdiv" style={{ height: 20, margin: "0 4px" }} />
+      <button type="button" onClick={onPreview} title="Preview this page" className="ps-topnav-btn">
+        <Eye size={14} />
+        <span className="ps-btn-label">Preview</span>
+      </button>
+    </div>
+  );
+}
 
 function iconBtn(enabled: boolean) {
   return {

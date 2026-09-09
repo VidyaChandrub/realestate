@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Canvas } from "@/components/prestate/builder/canvas";
+import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
+import { siteFromLandingPage } from "@/lib/openpage/content";
 import { loadTemplate } from "@/lib/prestate/persist";
 import { migrateSections } from "@/lib/prestate/persist";
 import { ensureConfig } from "@/lib/prestate/site-config";
@@ -70,29 +71,7 @@ export default function TemplatePreviewPage() {
 
   return (
     <div className="ps-app" style={{ minHeight: "100vh", background: "#fff" }}>
-      <Canvas
-        sections={sections}
-        selectedId={null}
-        device="desktop"
-        readOnly
-        live
-        pageId={page.id}
-        theme={{
-          primary: cfg.brand.primary,
-          accent: cfg.brand.accent,
-          font: cfg.brand.bodyFont,
-          headingFont: cfg.brand.headingFont,
-          name: cfg.brand.name,
-          phone: cfg.brand.phone,
-          logo: cfg.brand.logo,
-          layoutTheme: cfg.brand.layoutTheme,
-        }}
-        form={cfg.form}
-        forms={cfg.forms}
-        chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}
-        onSelect={() => {}}
-        onMutate={() => {}}
-      />
+      <SiteRenderer site={siteFromLandingPage(page)} live pageId={page.id} projectName={page.name} forms={cfg.forms as never} />
       <PrestateTrackingScripts tracking={cfg.tracking} />
     </div>
   );

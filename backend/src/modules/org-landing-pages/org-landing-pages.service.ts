@@ -135,10 +135,25 @@ export class OrgLandingPagesService {
     return this.getOwned(orgId, created.id);
   }
 
-  private asPageContent(raw: unknown): { sections?: unknown; config?: Record<string, unknown> } {
+  private asPageContent(raw: unknown): {
+    sections?: unknown;
+    config?: Record<string, unknown>;
+    engine?: string;
+    site?: unknown;
+  } {
     if (raw && typeof raw === 'object') {
-      const o = raw as { sections?: unknown; config?: Record<string, unknown> };
-      return { sections: o.sections ?? [], config: o.config ?? {} };
+      const o = raw as {
+        sections?: unknown;
+        config?: Record<string, unknown>;
+        engine?: string;
+        site?: unknown;
+      };
+      return {
+        sections: o.sections ?? [],
+        config: o.config ?? {},
+        engine: o.engine,
+        site: o.site,
+      };
     }
     return { sections: [], config: {} };
   }
@@ -185,8 +200,19 @@ export class OrgLandingPagesService {
   private async bindContent(orgId: string, dto: CreateLandingPageDto, raw: unknown) {
     const content = this.asPageContent(raw);
     const resolved = await this.resolveBinding(orgId, dto);
-    if (!resolved) return { sections: content.sections ?? [], config: content.config ?? {} };
-    return bindLandingPageContent(content, resolved.binding, resolved.snapshot);
+    if (!resolved) {
+      return {
+        sections: content.sections ?? [],
+        config: content.config ?? {},
+        engine: content.engine,
+        site: content.site,
+      };
+    }
+    return {
+      ...bindLandingPageContent(content, resolved.binding, resolved.snapshot),
+      engine: content.engine,
+      site: content.site,
+    };
   }
 
   // Blank creation: no template to verify, copy, or derive a companion
@@ -198,6 +224,8 @@ export class OrgLandingPagesService {
     const bound = await this.bindContent(orgId, dto, {
       sections: dto.content!.sections,
       config: dto.content!.config as unknown as Record<string, unknown>,
+      engine: dto.content!.engine,
+      site: dto.content!.site,
     });
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -286,7 +314,12 @@ export class OrgLandingPagesService {
     if (dto.thumbnail !== undefined) data.thumbnail = dto.thumbnail;
 
     if (dto.content !== undefined) {
-      const nextContent = { sections: dto.content.sections, config: dto.content.config };
+      const nextContent = {
+        sections: dto.content.sections,
+        config: dto.content.config,
+        engine: dto.content.engine,
+        site: dto.content.site,
+      };
       data.content = nextContent as Prisma.InputJsonValue;
 
       // Editing a published page reverts it to draft — only when the

@@ -1,0 +1,49 @@
+"use client";
+
+import { useMemo } from "react";
+import type { SiteConfig, BlockConfig } from "@/components/openpage/blocks/types";
+import { RenderBlock } from "@/components/openpage/blocks/registry";
+import { resolveTheme, themeToCSS } from "@/lib/openpage/theme-presets";
+import { useGoogleFonts } from "@/lib/openpage/useGoogleFonts";
+import { OpenPageRuntimeProvider } from "@/components/openpage/runtime/OpenPageRuntime";
+import type { FormDefinition } from "@/lib/prestate/forms-store";
+
+export function SiteRenderer({
+  site,
+  live = true,
+  pageId,
+  projectName,
+  forms,
+}: {
+  site: SiteConfig;
+  live?: boolean;
+  pageId?: string;
+  projectName?: string;
+  forms?: FormDefinition[];
+}) {
+  const pages = site.pages && site.pages.length > 0 ? site.pages : [{ id: "page-home", name: "Home", path: "/", blocks: site.blocks }];
+  const blocks: BlockConfig[] = pages[0]?.blocks ?? site.blocks ?? [];
+  const resolved = useMemo(() => resolveTheme(site.theme), [site.theme]);
+  const cssVars = useMemo(() => themeToCSS(resolved), [resolved]);
+  useGoogleFonts([resolved.fontSans, resolved.fontDisplay, resolved.fontMono]);
+  const library = forms ?? site.forms ?? [];
+
+  return (
+    <OpenPageRuntimeProvider
+      live={live}
+      pageId={pageId}
+      projectName={projectName || site.property?.name || site.name}
+      forms={library}
+      popups={site.popups ?? []}
+    >
+      <div
+        className="op-site @container min-h-screen w-full"
+        style={{ ...cssVars, color: "var(--color-text-0)", backgroundColor: "var(--color-bg-1)" } as React.CSSProperties}
+      >
+        {blocks.map((block) => (
+          <RenderBlock key={block.id} block={block} />
+        ))}
+      </div>
+    </OpenPageRuntimeProvider>
+  );
+}

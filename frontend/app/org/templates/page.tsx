@@ -7,7 +7,8 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { TemplateCover } from "@/components/superadmin/templates/shared";
-import { Canvas } from "@/components/prestate/builder/canvas";
+import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
+import { siteFromLandingPage } from "@/lib/openpage/content";
 import { ensureConfig } from "@/lib/prestate/site-config";
 import { orgBuilderPath } from "@/lib/prestate/paths";
 import {
@@ -316,27 +317,12 @@ export default function OrgTemplatesPage() {
                 <div style={{ padding: 60, textAlign: "center", color: "var(--muted, #64748b)" }}>{previewError}</div>
               ) : previewData && previewCfg ? (
                 <div className="ps-app">
-                  <Canvas
-                    sections={previewData.sections}
-                    selectedId={null}
-                    device="desktop"
-                    readOnly
+                  <SiteRenderer
+                    site={siteFromLandingPage(previewData)}
                     live
                     pageId={previewData.id}
-                    theme={{
-                      primary: previewCfg.brand.primary,
-                      accent: previewCfg.brand.accent,
-                      font: previewCfg.brand.bodyFont,
-                      headingFont: previewCfg.brand.headingFont,
-                      name: previewCfg.brand.name,
-                      phone: previewCfg.brand.phone,
-                      logo: previewCfg.brand.logo,
-                    }}
-                    form={previewCfg.form}
-                    forms={previewCfg.forms}
-                    chrome={{ header: previewCfg.header, footer: previewCfg.footer, brand: previewCfg.brand }}
-                    onSelect={() => {}}
-                    onMutate={() => {}}
+                    projectName={previewData.name}
+                    forms={previewCfg.forms as never}
                   />
                 </div>
               ) : null}

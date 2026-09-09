@@ -25,6 +25,8 @@ function toContentJson(content: TemplateContentDto): Prisma.InputJsonValue {
   return {
     sections: content.sections,
     config: content.config,
+    engine: content.engine,
+    site: content.site ?? null,
   } as Prisma.InputJsonValue;
 }
 
