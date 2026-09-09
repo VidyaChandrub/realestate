@@ -1607,6 +1607,48 @@
   display: none;
 }
 
+/* ---------- Collapsed rail: keep every icon centered ---------- */
+@media (min-width: 821px) {
+  /* Brand logo — drop the name entirely so the logo can center */
+  .org .app.collapsed .sidebar .s-top {
+    justify-content: center;
+    gap: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .org .app.collapsed .sidebar .s-name {
+    display: none;
+  }
+
+  /* Nav items — remove the label from layout so the icon isn't
+     pushed off the left edge, then center each link as a square */
+  .org .app.collapsed .nav {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .org .app.collapsed .nav a .lbl {
+    display: none;
+  }
+  .org .app.collapsed .nav a {
+    width: 44px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 11px 0;
+  }
+
+  /* Footer user avatar — meta and sign-out are already hidden */
+  .org .app.collapsed .sidebar .s-foot {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .org .app.collapsed .side-user {
+    justify-content: center;
+    gap: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
 /* approval hover rows */
 .org .hov {
   border-radius: 12px;
