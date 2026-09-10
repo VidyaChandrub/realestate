@@ -121,7 +121,10 @@ export function AdvancedPanel({ block }: { block: BlockConfig }) {
               readOnly
               className="w-full px-2 py-1.5 rounded border border-border-default bg-bg-3 text-text-3 text-[11px] font-mono"
             />
-            <p className="text-[9px] text-text-3 mt-1">Use as anchor target: #{block.id}</p>
+            <p className="text-[9px] text-text-3 mt-1">
+              For menu scroll targets, set <b>Section ID</b> on the section Properties tab
+              (e.g. <code>amenities</code>), then use that same ID in Header → Menu items.
+            </p>
           </div>
         </Section>
 

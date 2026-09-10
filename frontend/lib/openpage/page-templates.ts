@@ -64,6 +64,19 @@ export const PAGE_TEMPLATES: TemplateData[] = [
       "Premium real-estate launch page — sticky header, hero with enquiry form, highlights, amenities, gallery, location, plans, pricing, testimonials, FAQ, brochure popup and footer. Fully editable in the page builder.",
   },
   {
+    id: "tpl-lead",
+    name: "Lead Generation",
+    category: "Lead",
+    icon: "Send",
+    pages: 1,
+    conversions: "—",
+    accent: "#2563eb",
+    accent2: "#0f172a",
+    thumbnail: "hero",
+    description:
+      "Conversion-first template with every lead section — hero enquiry form, pricing banner, offers, gated brochure, enquiry card, split form, site visit, contact, newsletter and CTA.",
+  },
+  {
     id: "tpl-estatepro",
     name: "EstatePro Standard",
     category: "Standard",
@@ -74,7 +87,7 @@ export const PAGE_TEMPLATES: TemplateData[] = [
     accent2: "#090d16",
     thumbnail: "hero",
     description:
-      "Builder-standard premium launch page â€” hero classic, overview, highlights, amenities, gallery, floor plans (card grid), pricing, location, testimonials, enquiry and brochure. Single premium template, fully editable in the new Builder with Layers navigator.",
+      "Builder-standard premium launch page — hero classic, overview, highlights, amenities, gallery, floor plans (card grid), pricing, location, testimonials, enquiry and brochure. Single premium template, fully editable in the new Builder with Layers navigator.",
   },
 ];
 

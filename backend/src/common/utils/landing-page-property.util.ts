@@ -43,6 +43,14 @@ export type PropertySnapshot = {
   landArea: string;
   towers: string;
   units: string;
+  brochureUrl: string;
+  floorPlans: Array<{
+    name: string;
+    image: string;
+    beds?: string;
+    area?: string;
+    downloadUrl?: string;
+  }>;
 };
 
 function formatInr(value: number | null | undefined): string {
@@ -113,7 +121,10 @@ function overlayInventoryNode(
   if (!node || typeof node !== 'object') return node;
   const n = node as Record<string, unknown>;
   const settings = { ...((n.settings as Record<string, unknown>) ?? {}) };
+  const props = { ...((n.props as Record<string, unknown>) ?? {}) };
   const type = n.type;
+
+  // Legacy section widgets
   if (type === 'project' && binding.kind === 'project') {
     settings.selectedProjectId = binding.projectId;
   }
@@ -130,17 +141,94 @@ function overlayInventoryNode(
   if (type === 'location-advantages' && snapshot.location) {
     settings.address = snapshot.location;
   }
+
+  // OpenPage block types
+  if (type === 'amenities' && snapshot.amenities.length > 0) {
+    props.items = snapshot.amenities.map((title) => ({
+      icon: '',
+      title,
+      description: '',
+      image: '',
+    }));
+  }
+  if ((type === 'features' || type === 'project-highlights') && snapshot.features.length > 0) {
+    props.items = snapshot.features.map((title) => ({
+      icon: '',
+      title,
+      description: '',
+    }));
+  }
+  if (type === 'location' && snapshot.location) {
+    props.address = snapshot.location;
+  }
+  if (type === 'gallery' && snapshot.gallery.length > 0) {
+    props.images = snapshot.gallery.map((src) => ({ src, alt: snapshot.name, caption: '' }));
+  }
+  if (type === 'floor-plans' && snapshot.floorPlans.length > 0) {
+    props.items = snapshot.floorPlans;
+    if (props.gateEnabled === undefined) props.gateEnabled = true;
+  }
+  if (type === 'download-brochure') {
+    if (snapshot.brochureUrl) props.pdfUrl = snapshot.brochureUrl;
+    if (!props.image && snapshot.gallery[0]) props.image = snapshot.gallery[0];
+  }
+  if (type === 'project-banner' || type === 'project-overview' || type === 're-pricing') {
+    if (snapshot.name && !String(props.title || '').trim()) {
+      // keep template titles; vars already rewrite {{property_name}}
+    }
+    if (type === 're-pricing' && snapshot.startingPrice) {
+      props.startingPrice = snapshot.startingPrice;
+    }
+    if (type === 'project-banner' && snapshot.gallery[0] && !props.image) {
+      props.image = snapshot.gallery[0];
+    }
+  }
+  if (type === 'developer' && snapshot.builder) {
+    props.name = snapshot.builder;
+  }
+
   const children = Array.isArray(n.children)
     ? overlayInventoryWidgets(n.children, binding, snapshot)
     : n.children;
-  return { ...n, settings, children };
+  const next: Record<string, unknown> = { ...n, settings, children };
+  if (n.props && typeof n.props === 'object') next.props = props;
+  return next;
+}
+
+function overlayOpenPageSite(
+  site: unknown,
+  binding: PropertyBinding,
+  snapshot: PropertySnapshot,
+): unknown {
+  if (!site || typeof site !== 'object') return site;
+  const s = site as Record<string, unknown>;
+  const walkBlocks = (blocks: unknown): unknown => {
+    if (!Array.isArray(blocks)) return blocks;
+    return blocks.map((b) => overlayInventoryNode(b, binding, snapshot));
+  };
+  const pages = Array.isArray(s.pages)
+    ? s.pages.map((page) => {
+        if (!page || typeof page !== 'object') return page;
+        const p = page as Record<string, unknown>;
+        return { ...p, blocks: walkBlocks(p.blocks) };
+      })
+    : s.pages;
+  return {
+    ...s,
+    blocks: walkBlocks(s.blocks),
+    pages,
+    property: snapshot,
+    propertyBinding: binding,
+    vars: varsFromSnapshot(snapshot),
+    name: snapshot.name || s.name,
+  };
 }
 
 export function bindLandingPageContent(
-  content: { sections?: unknown; config?: Record<string, unknown> },
+  content: { sections?: unknown; config?: Record<string, unknown>; site?: unknown },
   binding: PropertyBinding,
   snapshot: PropertySnapshot,
-): { sections: unknown; config: Record<string, unknown> } {
+): { sections: unknown; config: Record<string, unknown>; site?: unknown } {
   const vars = varsFromSnapshot(snapshot);
   const withVars = applyLandingPageVars(content.sections ?? [], vars);
   const sections = overlayInventoryWidgets(withVars, binding, snapshot);
@@ -169,8 +257,15 @@ export function bindLandingPageContent(
     rera: snapshot.reraNumber || (config.footer as { rera?: string } | undefined)?.rera,
   };
 
+  let site = content.site;
+  if (site) {
+    site = applyLandingPageVars(site, vars);
+    site = overlayOpenPageSite(site, binding, snapshot);
+  }
+
   return {
     sections,
+    site,
     config: {
       ...config,
       brand,
@@ -179,6 +274,7 @@ export function bindLandingPageContent(
       propertyBinding: binding,
       vars,
       property: snapshot,
+      ...(site ? { site } : {}),
     },
   };
 }
@@ -204,8 +300,16 @@ export function snapshotFromProject(input: {
     amenities: unknown;
     galleryUrls?: string[];
     connectivity?: string[];
+    brochureUrl?: string | null;
+    floorPlanUrls?: string[];
   };
   unitCount?: number;
+  unitTypes?: Array<{
+    name?: string | null;
+    configuration?: string | null;
+    carpetSqft?: number | null;
+    floorPlanUrl?: string | null;
+  }>;
 }): PropertySnapshot {
   const p = input.project;
   const amenityNames = Array.isArray(p.amenities)
@@ -225,6 +329,24 @@ export function snapshotFromProject(input: {
       : '';
   const location = joinLocation([p.location, p.locality, p.city, p.addressLine]);
   const description = (p.tagline || p.highlights || '').trim();
+
+  const fromTypes = (input.unitTypes ?? [])
+    .filter((ut) => ut.floorPlanUrl)
+    .map((ut) => ({
+      name: ut.name || ut.configuration || 'Floor plan',
+      beds: ut.configuration || ut.name || '',
+      area: ut.carpetSqft != null ? `${ut.carpetSqft.toLocaleString('en-IN')} sq.ft` : '',
+      image: ut.floorPlanUrl as string,
+      downloadUrl: ut.floorPlanUrl as string,
+    }));
+  const fromProject = (p.floorPlanUrls ?? []).map((url, i) => ({
+    name: `Floor plan ${i + 1}`,
+    beds: '',
+    area: '',
+    image: url,
+    downloadUrl: url,
+  }));
+
   return {
     name: p.name,
     builder: input.orgName,
@@ -242,6 +364,8 @@ export function snapshotFromProject(input: {
     landArea: land,
     towers: p.towerCount != null ? String(p.towerCount) : '',
     units: input.unitCount != null ? String(input.unitCount) : '',
+    brochureUrl: p.brochureUrl ?? '',
+    floorPlans: fromTypes.length ? fromTypes : fromProject,
   };
 }
 
@@ -260,6 +384,7 @@ export function snapshotFromStandaloneUnit(input: {
     status: string;
     floor: number | null;
     tower: string | null;
+    floorPlanUrl?: string | null;
   };
 }): PropertySnapshot {
   const u = input.unit;
@@ -287,5 +412,17 @@ export function snapshotFromStandaloneUnit(input: {
     landArea: '',
     towers: u.tower ?? '',
     units: '1',
+    brochureUrl: '',
+    floorPlans: u.floorPlanUrl
+      ? [
+          {
+            name: u.configuration || 'Floor plan',
+            beds: u.configuration || '',
+            area: carpet,
+            image: u.floorPlanUrl,
+            downloadUrl: u.floorPlanUrl,
+          },
+        ]
+      : [],
   };
 }

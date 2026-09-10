@@ -170,7 +170,16 @@ export class OrgLandingPagesService {
     if (dto.projectId) {
       const project = await this.prisma.project.findFirst({
         where: { id: dto.projectId, orgId },
-        include: { _count: { select: { units: true } } },
+        include: {
+          _count: { select: { units: true } },
+          unitTypes: {
+            select: {
+              name: true,
+              carpetSqft: true,
+              floorPlanUrl: true,
+            },
+          },
+        },
       });
       if (!project) throw new NotFoundException('Project not found');
       return {
@@ -179,6 +188,7 @@ export class OrgLandingPagesService {
           orgName,
           project,
           unitCount: project._count.units,
+          unitTypes: project.unitTypes,
         }),
       };
     }
@@ -208,10 +218,15 @@ export class OrgLandingPagesService {
         site: content.site,
       };
     }
+    const bound = bindLandingPageContent(
+      { sections: content.sections, config: content.config, site: content.site },
+      resolved.binding,
+      resolved.snapshot,
+    );
     return {
-      ...bindLandingPageContent(content, resolved.binding, resolved.snapshot),
+      ...bound,
       engine: content.engine,
-      site: content.site,
+      site: bound.site ?? content.site,
     };
   }
 

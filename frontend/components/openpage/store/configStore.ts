@@ -74,8 +74,15 @@ const defaultBlocks: BlockConfig[] = [
     variant: 'default',
     props: {
       logo: 'Acme Inc',
-      links: ['Features', 'Pricing', 'About', 'Contact'],
       ctaText: 'Get Started',
+      ctaId: 'enquire',
+      menuItems: [
+        { label: 'Features', id: 'features' },
+        { label: 'Pricing', id: 'pricing' },
+        { label: 'About', id: 'about' },
+        { label: 'Contact', id: 'enquire' },
+      ],
+      links: ['Features', 'Pricing', 'About', 'Contact'],
     },
   },
   {

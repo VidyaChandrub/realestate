@@ -433,15 +433,21 @@ export async function changePlan(
 }
 
 export async function submitLead(input: LeadSubmission): Promise<void> {
+  const projectId =
+    typeof input.projectId === "string" && input.projectId.trim()
+      ? input.projectId.trim()
+      : undefined;
+  const unitId =
+    typeof input.unitId === "string" && input.unitId.trim() ? input.unitId.trim() : undefined;
   await apiFetch("/org/leads", {
     method: "POST",
     body: JSON.stringify({
       landingPageId: input.landingPageId,
-      projectId: input.projectId,
-      unitId: input.unitId,
+      ...(projectId ? { projectId } : {}),
+      ...(unitId ? { unitId } : {}),
       formName: input.formName,
       source: input.source,
-      data: input.fields,
+      data: input.fields ?? {},
     }),
   });
 }
@@ -972,6 +978,31 @@ export async function exportAdminAuditLogs(
   return apiFetch<AdminAuditLogsExportResponse>(
     `/admin/audit-logs/export${auditLogsQuery(params)}`,
   );
+}
+
+function adminLeadsQuery(params?: import("./types").AdminLeadsParams): string {
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.orgId) q.set("orgId", params.orgId);
+  if (params?.projectId) q.set("projectId", params.projectId);
+  if (params?.status) q.set("status", params.status);
+  if (params?.source) q.set("source", params.source);
+  if (params?.search) q.set("search", params.search);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export async function getAdminLeads(
+  params?: import("./types").AdminLeadsParams,
+): Promise<import("./types").AdminLeadsListResponse> {
+  return apiFetch<import("./types").AdminLeadsListResponse>(
+    `/admin/leads${adminLeadsQuery(params)}`,
+  );
+}
+
+export async function getAdminLeadsMeta(): Promise<import("./types").AdminLeadsMeta> {
+  return apiFetch<import("./types").AdminLeadsMeta>("/admin/leads/meta");
 }
 
 export async function getPlatformTeam(): Promise<PlatformTeamMember[]> {

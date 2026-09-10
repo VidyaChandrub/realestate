@@ -54,7 +54,7 @@ export function GalleryBlock({ block }: { block: BlockConfig }) {
   const openImage = open != null ? visible[open] : null;
 
   return (
-    <section id="gallery" className="px-6 py-16 @lg:px-16 @lg:py-20">
+    <section id={(typeof props.anchor === "string" && props.anchor) || "gallery"} className="px-6 py-16 @lg:px-16 @lg:py-20">
       {title ? <h2 className="font-display text-3xl @md:text-4xl font-semibold mb-6 text-center">{title}</h2> : null}
       {categories.length ? (
         <div className="flex flex-wrap justify-center gap-2 mb-8">
@@ -72,10 +72,37 @@ export function GalleryBlock({ block }: { block: BlockConfig }) {
           ))}
         </div>
       ) : null}
-      <div className={variant === "masonry" ? "grid grid-cols-2 @lg:grid-cols-3 auto-rows-[160px] gap-3" : "grid grid-cols-2 @lg:grid-cols-3 gap-3"}>
-        {visible.map((img, i) => (
-          <ImageCard key={`${img.src}-${i}`} image={img} tall={variant === "masonry" && i % 3 === 0} onOpen={() => setOpen(i)} />
-        ))}
+      <div
+        className={
+          variant === "strip"
+            ? "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
+            : variant === "masonry"
+              ? "grid grid-cols-2 @lg:grid-cols-3 auto-rows-[160px] gap-3"
+              : "grid grid-cols-2 @lg:grid-cols-3 gap-3"
+        }
+      >
+        {visible.map((img, i) =>
+          variant === "strip" ? (
+            <button
+              key={`${img.src}-${i}`}
+              type="button"
+              onClick={() => setOpen(i)}
+              className="snap-start shrink-0 w-[72%] @sm:w-[42%] @lg:w-[28%] rounded-xl overflow-hidden border border-border-default group text-left"
+            >
+              {img.src ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={img.src} alt={img.alt || ""} className="w-full h-52 object-cover group-hover:scale-[1.04] transition-transform duration-500" />
+              ) : (
+                <div className="w-full h-52 bg-gradient-to-br from-bg-3 to-bg-4 flex items-center justify-center">
+                  <ImageIcon size={24} className="text-text-3" />
+                </div>
+              )}
+              {img.caption ? <div className="px-3 py-2 bg-bg-2 text-[11px] text-text-2">{img.caption}</div> : null}
+            </button>
+          ) : (
+            <ImageCard key={`${img.src}-${i}`} image={img} tall={variant === "masonry" && i % 3 === 0} onOpen={() => setOpen(i)} />
+          )
+        )}
       </div>
       {openImage?.src ? (
         <div className="fixed inset-0 z-[90] bg-black/80 flex items-center justify-center p-4" onClick={() => setOpen(null)}>

@@ -79,6 +79,16 @@ export function LocalSitePreview({
   applyLandingPagePropertyFromConfig(cfg);
   const needsPassword = Boolean(cfg.page.password) && !unlocked;
   const openPageSite = siteFromLandingPage(page);
+  const pageForms =
+    (openPageSite.forms && openPageSite.forms.length
+      ? openPageSite.forms
+      : cfg.forms && cfg.forms.length
+        ? cfg.forms
+        : openPageSite.forms ?? cfg.forms ?? []) as never;
+  const boundProjectId =
+    openPageSite.propertyBinding?.kind === "project"
+      ? openPageSite.propertyBinding.projectId
+      : undefined;
 
   if (needsPassword) {
     return (
@@ -117,7 +127,8 @@ export function LocalSitePreview({
         live
         pageId={page.id}
         projectName={page.name}
-        forms={(openPageSite.forms ?? cfg.forms) as never}
+        projectId={boundProjectId}
+        forms={pageForms}
       />
       <OpenPageTrackingScripts tracking={cfg.tracking} />
     </div>
@@ -180,7 +191,8 @@ export function LocalSitePreview({
         live
         pageId={page.id}
         projectName={page.name}
-        forms={(openPageSite.forms ?? cfg.forms) as never}
+        projectId={boundProjectId}
+        forms={pageForms}
       />
       <OpenPageTrackingScripts tracking={cfg.tracking} />
     </div>

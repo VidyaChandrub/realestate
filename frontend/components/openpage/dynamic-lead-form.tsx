@@ -297,7 +297,11 @@ export function DynamicLeadForm({
       autoReplyBody: form.autoReplyBody,
     };
     try {
-      if (live && pageId && form.saveToCrm !== false) {
+      const shouldSaveCrm = form.saveToCrm !== false;
+      if (live && shouldSaveCrm) {
+        if (!pageId) {
+          throw new Error("This page is missing an ID, so leads cannot be saved. Open a published or preview URL.");
+        }
         fireTrackingLead();
         bumpTracking(pageId, "form");
         await submitLead({
@@ -316,7 +320,7 @@ export function DynamicLeadForm({
           window.dispatchEvent(new CustomEvent("prestate:lead-success"));
         }
       } else if (!live) {
-        /* editor preview */
+        /* editor preview — CRM write skipped on purpose */
       }
       const eventName = form.integrations?.analyticsEvent;
       if (eventName && typeof window !== "undefined" && typeof (window as any).gtag === "function") {

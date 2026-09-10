@@ -29,6 +29,12 @@ import { CSS } from '@dnd-kit/utilities'
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { useEditorStore } from "@/components/openpage/store/editorStore";
 import { blockMetadata } from "@/lib/openpage/block-metadata";
+import {
+  SECTION_PRESET_CATEGORIES,
+  SECTION_PRESETS,
+  createBlockFromPreset,
+  type SectionPresetCategory,
+} from "@/lib/openpage/section-presets";
 import type { BlockType, BlockConfig } from "@/components/openpage/blocks/types";
 import { EMPTY_GLOBAL_WIDGETS } from "./AdvancedPanel";
 
@@ -49,6 +55,9 @@ const blockIcons: Partial<Record<BlockType, typeof Layout>> = {
   faq: HelpCircle,
   "lead-form": Mail,
   "download-brochure": Download,
+  "site-visit": Home,
+  contact: Mail,
+  newsletter: Mail,
   cta: Megaphone,
   image: ImageIcon,
   video: Play,
@@ -84,7 +93,7 @@ const PICKER_GROUPS: { id: string; title: string; defaultOpen: boolean; types: B
     id: "re",
     title: "Real Estate",
     defaultOpen: true,
-    types: ["project-banner", "unit-config", "image-box", "property-search", "amenities", "floor-plans", "gallery", "testimonials", "lead-form"],
+    types: ["project-banner", "project-overview", "property-details", "unit-config", "amenities", "floor-plans", "gallery", "location", "re-pricing", "developer", "testimonials", "lead-form", "download-brochure", "site-visit", "contact", "newsletter", "cta"],
   },
   {
     id: "layout",
@@ -106,9 +115,9 @@ const PICKER_GROUPS: { id: string; title: string; defaultOpen: boolean; types: B
   },
   {
     id: "forms",
-    title: "Forms",
-    defaultOpen: false,
-    types: ["lead-form", "download-brochure", "property-filters", "button"],
+    title: "Lead & Forms",
+    defaultOpen: true,
+    types: ["lead-form", "site-visit", "contact", "newsletter", "download-brochure", "cta", "button"],
   },
   {
     id: "chrome",
@@ -426,7 +435,7 @@ function GlobalWidgetsPanel() {
   )
 }
 
-type Tab = 'layers' | 'components' | 'globals'
+type Tab = 'layers' | 'components' | 'templates' | 'globals'
 
 export function LayersPanel() {
   const blocks = useConfigStore((s) => {
@@ -474,7 +483,8 @@ export function LayersPanel() {
       {/* Tab bar */}
       <div className="flex border-b border-border-default shrink-0">
         {([
-          { id: 'components' as Tab, label: 'Components' },
+          { id: 'templates' as Tab, label: 'Templates' },
+          { id: 'components' as Tab, label: 'Blocks' },
           { id: 'globals' as Tab, label: 'Globals' },
           { id: 'layers' as Tab, label: 'Layers', count: blocks.length },
         ]).map((t) => (
@@ -544,6 +554,8 @@ export function LayersPanel() {
         </>
       ) : tab === 'components' ? (
         <ComponentsPanel />
+      ) : tab === 'templates' ? (
+        <SectionTemplatesPanel />
       ) : (
         <GlobalWidgetsPanel />
       )}
@@ -577,6 +589,89 @@ function ComponentsPanel() {
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden px-2 pb-2 pt-1">
       <BlockPicker onAdd={handleAdd} />
+    </div>
+  )
+}
+
+function SectionTemplatesPanel() {
+  const addBlock = useConfigStore((s) => s.addBlock)
+  const selectBlock = useEditorStore((s) => s.selectBlock)
+  const [openCat, setOpenCat] = useState<SectionPresetCategory | null>('Lead Forms')
+  const [query, setQuery] = useState('')
+
+  function handleAdd(presetId: string) {
+    const preset = SECTION_PRESETS.find((p) => p.id === presetId)
+    if (!preset) return
+    const block = createBlockFromPreset(preset)
+    addBlock(block)
+    selectBlock(block.id)
+    toast(`${preset.name} added`)
+  }
+
+  const q = query.trim().toLowerCase()
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="px-2 pt-2 pb-1 shrink-0">
+        <p className="text-[10px] text-text-3 mb-2 px-0.5">
+          Ready-to-use real estate sections. Edit content, images, forms and shortcodes in Properties.
+        </p>
+        <div className="relative">
+          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-3" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search templates…"
+            className="w-full pl-7 pr-2 py-1.5 rounded-md border border-border-default bg-bg-2 text-[11px] text-text-0 placeholder:text-text-3"
+          />
+        </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 pb-3 space-y-1">
+        {SECTION_PRESET_CATEGORIES.map((cat) => {
+          const presets = SECTION_PRESETS.filter(
+            (p) =>
+              p.category === cat &&
+              (!q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q) || cat.toLowerCase().includes(q))
+          )
+          if (!presets.length) return null
+          const isOpen = q ? true : openCat === cat
+          return (
+            <div key={cat} className="rounded-md border border-border-subtle overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setOpenCat(isOpen && !q ? null : cat)}
+                className="w-full flex items-center justify-between px-2.5 py-2 bg-bg-2 text-[11px] font-semibold text-text-1 hover:bg-bg-3"
+              >
+                <span>{cat}</span>
+                <span className="flex items-center gap-1.5 text-text-3 font-normal">
+                  {presets.length}
+                  {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                </span>
+              </button>
+              {isOpen ? (
+                <div className="p-1.5 space-y-1 bg-bg-1">
+                  {presets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleAdd(preset.id)}
+                      className="w-full text-left rounded-md border border-border-default px-2.5 py-2 hover:border-green hover:bg-green-glow2 transition-colors group"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-[11.5px] font-medium text-text-0 group-hover:text-green">{preset.name}</div>
+                          <div className="text-[10px] text-text-3 mt-0.5 leading-snug">{preset.description}</div>
+                        </div>
+                        <Plus size={12} className="shrink-0 mt-0.5 text-text-3 group-hover:text-green" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

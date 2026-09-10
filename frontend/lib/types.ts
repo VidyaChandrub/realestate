@@ -298,6 +298,10 @@ export interface SessionUser extends SafeUser {
   roleLabel: string;
   permissions: Permissions;
   organisation: SafeOrganisation | null;
+  /** Platform console: true when the user has the system `super_admin` role. */
+  platformUnrestricted?: boolean;
+  /** Role keys from login / platform-roles/me (e.g. `super_admin`). */
+  roleKeys?: string[];
 }
 
 /** Shape returned by GET /auth/me — the logged-in user plus their organisation. */
@@ -1803,6 +1807,62 @@ export interface AdminAuditLogsParams {
 export interface AdminAuditLogsExportResponse {
   filename: string;
   data: AdminAuditLogEntry[];
+}
+
+/** Platform-wide lead row for Super Admin All Leads. */
+export interface AdminLeadOrganisation {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface AdminLead {
+  id: string;
+  orgId: string;
+  organisation: AdminLeadOrganisation | null;
+  landingPageId: string | null;
+  projectId: string | null;
+  project: { id: string; name: string } | null;
+  formName: string | null;
+  source: string | null;
+  data: Record<string, unknown>;
+  status: CrmLeadStatus;
+  assignedTo: CrmAssignee | null;
+  createdAt: string;
+}
+
+export interface AdminLeadsListResponse {
+  data: AdminLead[];
+  total: number;
+  page: number;
+  limit: number;
+  stats: {
+    total: number;
+    unassigned: number;
+    new: number;
+    followUp: number;
+    siteVisit: number;
+    won: number;
+    contacted: number;
+    negotiation: number;
+    lost: number;
+  };
+}
+
+export interface AdminLeadsMeta {
+  organisations: AdminLeadOrganisation[];
+  sources: string[];
+  statuses: CrmLeadStatus[];
+}
+
+export interface AdminLeadsParams {
+  page?: number;
+  limit?: number;
+  orgId?: string;
+  projectId?: string;
+  status?: CrmLeadStatus;
+  source?: string;
+  search?: string;
 }
 
 /** GET /admin/platform-config — Super Admin platform subdomain / DNS config. */

@@ -20,7 +20,7 @@ import { createTemplate, deleteTemplate, duplicateTemplate, loadTemplates, reset
 import { builderPath, templatePreviewPath } from "@/lib/openpage/paths";
 import { defaultSiteConfig, seedConfigFor } from "@/lib/openpage/site-config";
 import { inferDesignId } from "@/lib/openpage/page-templates";
-import { buildRealEstateTemplate } from "@/lib/openpage/re-templates";
+import { buildRealEstateTemplate, openPageTemplateIdForDesign } from "@/lib/openpage/re-templates";
 import type { LandingPageData, TemplateData } from "@/lib/openpage/types";
 import { Icon } from "@/components/icons";
 import { Modal } from "@/components/ui/modal";
@@ -84,7 +84,7 @@ export default function SuperAdminTemplatesPage() {
         thumbnail: template.thumbnail,
         sections: buildTemplateSections(template.id),
         config: defaultSiteConfig({ name: label, slug, primary: template.accent, accent: "#CDA45E" }),
-        openPageSite: buildRealEstateTemplate("premium", label),
+        openPageSite: buildRealEstateTemplate(openPageTemplateIdForDesign(template.id), label),
       });
       setPages((prev) => [created, ...prev]);
       goToBuilder(created.id);
@@ -129,7 +129,7 @@ export default function SuperAdminTemplatesPage() {
         thumbnail: template.thumbnail,
         sections,
         config,
-        openPageSite: buildRealEstateTemplate("premium", template.name),
+        openPageSite: buildRealEstateTemplate(openPageTemplateIdForDesign(template.id), template.name),
       });
       setPages((prev) => [created, ...prev]);
       goToBuilder(created.id);
@@ -247,8 +247,23 @@ export default function SuperAdminTemplatesPage() {
           </div>
         </div>
         <div className="actions">
-          <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
-            <Plus size={16} /> Create template
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setNewName("");
+              setDesignId("tpl-blank");
+              setCreateOpen(true);
+            }}
+          >
+            Start from design…
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => createFromDesign(BLANK_TEMPLATE)}
+          >
+            <Plus size={16} /> Create blank template
           </button>
         </div>
       </div>
@@ -302,8 +317,8 @@ export default function SuperAdminTemplatesPage() {
             <div className="muted" style={{ fontSize: 13.5, marginBottom: 18 }}>
               Try a different filter or create a new template to get started.
             </div>
-            <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
-              <Plus size={16} /> Create template
+            <button type="button" className="btn btn-primary" onClick={() => createFromDesign(BLANK_TEMPLATE)}>
+              <Plus size={16} /> Create blank template
             </button>
           </div>
         </Reveal>
@@ -329,7 +344,7 @@ export default function SuperAdminTemplatesPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         title="Create a template"
-        description="Start from a blank canvas or copy a predefined design. The new template is fully independent."
+        description="Name is enough — leave “Start from” on Blank canvas, or optionally copy a predefined design."
         size="lg"
         footer={
           <>
@@ -343,7 +358,7 @@ export default function SuperAdminTemplatesPage() {
         }
       >
             <div className="field">
-              <label>Template name</label>
+              <label>Template name <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional)</span></label>
               <input
                 autoFocus
                 className="inp"
@@ -352,12 +367,12 @@ export default function SuperAdminTemplatesPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") submitCreate();
                 }}
-                placeholder="e.g. Harbor Lights — Custom"
+                placeholder="Untitled template"
               />
             </div>
 
             <div className="field" style={{ marginBottom: 0 }}>
-              <label>Start from</label>
+              <label>Start from <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional — blank by default)</span></label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
                 {bases.map((t) => {
                   const active = designId === t.id;

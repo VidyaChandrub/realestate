@@ -93,30 +93,42 @@ export default function PreviewLandingPage() {
 
   // Render ONLY the landing page — no dashboard shell, no extra header.
   // SEO and Tracking are per-page via data.content.config
+  const previewPage: LandingPageData = {
+    id: data.id,
+    name: data.name,
+    slug: data.slug,
+    status: data.status as LandingPageData["status"],
+    template: "",
+    domain: "",
+    views: "—",
+    conversions: "—",
+    updated: "",
+    thumbnail: data.thumbnail ?? "",
+    sections: data.content.sections ?? [],
+    config: data.content.config,
+    openPageSite: data.content.site ?? undefined,
+    kind: "custom",
+    pageType: "landing",
+  };
+  const site = siteFromLandingPage(previewPage);
+  const previewForms =
+    (site.forms && site.forms.length
+      ? site.forms
+      : data.content.config?.forms && data.content.config.forms.length
+        ? data.content.config.forms
+        : site.forms ?? data.content.config?.forms ?? []) as never;
+
   return (
     <div className="ps-app" style={{ minHeight: "100vh", background: "#fff" }}>
       <SiteRenderer
-        site={siteFromLandingPage({
-          id: data.id,
-          name: data.name,
-          slug: data.slug,
-          status: data.status as LandingPageData["status"],
-          template: "",
-          domain: "",
-          views: "—",
-          conversions: "—",
-          updated: "",
-          thumbnail: data.thumbnail ?? "",
-          sections: data.content.sections ?? [],
-          config: data.content.config,
-          openPageSite: data.content.site ?? undefined,
-          kind: "custom",
-          pageType: "landing",
-        })}
+        site={site}
         live
         pageId={data.id}
         projectName={data.name}
-        forms={data.content.config.forms as never}
+        projectId={
+          site.propertyBinding?.kind === "project" ? site.propertyBinding.projectId : undefined
+        }
+        forms={previewForms}
       />
       <OpenPageTrackingScripts tracking={data.content.config.tracking} />
     </div>

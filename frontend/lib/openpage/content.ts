@@ -1,5 +1,4 @@
 import type { BlockConfig, SiteConfig } from "@/components/openpage/blocks/types";
-import { defaultConfig } from "@/components/openpage/store/configStore";
 import type { LandingPageData, SectionInstance, SiteConfig as LegacyConfig } from "@/lib/openpage/types";
 import { ensureConfig } from "@/lib/openpage/site-config";
 import { themePresets } from "@/lib/openpage/theme-presets";
@@ -26,7 +25,7 @@ export function normalizeSite(site: SiteConfig, name?: string): SiteConfig {
   return {
     ...site,
     engine: "openpage",
-    name: site.name || name,
+    name: site.name || name || "Untitled",
     blocks: pages[0]?.blocks ?? blocks,
     pages,
   };
@@ -36,8 +35,9 @@ export function siteFromLandingPage(page: LandingPageData): SiteConfig {
   const raw = page as LandingPageData & {
     openPageSite?: SiteConfig;
     site?: SiteConfig;
-    content?: { site?: SiteConfig; config?: { site?: SiteConfig } };
+    content?: { site?: SiteConfig; config?: { site?: SiteConfig } & Record<string, unknown> };
   };
+  const cfg = page.config ?? raw.content?.config;
   const candidates = [
     raw.openPageSite,
     raw.site,
@@ -47,7 +47,25 @@ export function siteFromLandingPage(page: LandingPageData): SiteConfig {
   ];
   for (const stored of candidates) {
     if (stored && isOpenPageSite(stored) && siteBlocks(stored).length) {
-      return normalizeSite({ ...stored, name: stored.name || page.name });
+      const site = normalizeSite({ ...stored, name: stored.name || page.name });
+      const binding = (cfg as { propertyBinding?: SiteConfig["propertyBinding"] } | undefined)?.propertyBinding
+        ?? site.propertyBinding;
+      const property = (cfg as { property?: SiteConfig["property"] } | undefined)?.property ?? site.property;
+      const vars = (cfg as { vars?: Record<string, string> } | undefined)?.vars ?? site.vars;
+      const cfgForms = (cfg as { forms?: SiteConfig["forms"] } | undefined)?.forms;
+      const forms =
+        Array.isArray(site.forms) && site.forms.length
+          ? site.forms
+          : Array.isArray(cfgForms) && cfgForms.length
+            ? cfgForms
+            : site.forms ?? cfgForms ?? [];
+      return {
+        ...site,
+        forms,
+        ...(binding ? { propertyBinding: binding } : {}),
+        ...(property ? { property } : {}),
+        ...(vars ? { vars } : {}),
+      };
     }
   }
   if (page.sections?.length) {
@@ -155,5 +173,12 @@ export function landingPageFromSite(page: LandingPageData, site: SiteConfig): La
 }
 
 export function emptyOpenPage(name = "Untitled"): SiteConfig {
-  return { ...defaultConfig, engine: "openpage", name };
+  return {
+    engine: "openpage",
+    name,
+    pages: [{ id: "page-home", name: "Home", path: "/", blocks: [] }],
+    blocks: [],
+    forms: [],
+    globalWidgets: [],
+  };
 }

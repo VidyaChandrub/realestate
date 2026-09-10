@@ -9,6 +9,7 @@ import { useConfigStore } from "@/components/openpage/store/configStore";
 import { useEditorStore } from "@/components/openpage/store/editorStore";
 import type { BlockConfig } from "../blocks/types";
 import { blockMetadata } from "@/lib/openpage/block-metadata";
+import { isHiddenOnViewport } from "@/lib/openpage/block-style";
 
 const blockLabels: Record<string, string> = {
   navbar: 'Header',
@@ -106,54 +107,10 @@ export function SortableBlock({ block, isSelected, onSelect, children }: Props) 
     }
   }, [isSelected])
 
-  const blockStyle = block.style
-  const resolvedStyle = useMemo(() => {
-    if (!blockStyle) return {}
-    const s: React.CSSProperties = {}
-    if (blockStyle.marginTop) s.marginTop = blockStyle.marginTop
-    if (blockStyle.marginBottom) s.marginBottom = blockStyle.marginBottom
-    if (blockStyle.marginLeft) s.marginLeft = blockStyle.marginLeft
-    if (blockStyle.marginRight) s.marginRight = blockStyle.marginRight
-    if (blockStyle.paddingTop) s.paddingTop = blockStyle.paddingTop
-    if (blockStyle.paddingBottom) s.paddingBottom = blockStyle.paddingBottom
-    if (blockStyle.paddingLeft) s.paddingLeft = blockStyle.paddingLeft
-    if (blockStyle.paddingRight) s.paddingRight = blockStyle.paddingRight
-    if (blockStyle.width) s.width = blockStyle.width
-    if (blockStyle.maxWidth) s.maxWidth = blockStyle.maxWidth
-    if (blockStyle.minHeight) s.minHeight = blockStyle.minHeight
-    if (blockStyle.alignment) s.textAlign = blockStyle.alignment as "center" | "left" | "right" | "justify"
-    if (blockStyle.backgroundColor) s.backgroundColor = blockStyle.backgroundColor
-    if (blockStyle.backgroundImage) s.backgroundImage = `url(${blockStyle.backgroundImage})`
-    if (blockStyle.backgroundSize) s.backgroundSize = blockStyle.backgroundSize
-    if (blockStyle.backgroundPosition) s.backgroundPosition = blockStyle.backgroundPosition
-    if (blockStyle.backgroundRepeat) s.backgroundRepeat = blockStyle.backgroundRepeat as "repeat" | "no-repeat" | "repeat-x" | "repeat-y"
-    if (blockStyle.borderWidth) s.borderWidth = blockStyle.borderWidth
-    if (blockStyle.borderStyle) s.borderStyle = blockStyle.borderStyle as "solid" | "dashed" | "dotted" | "none"
-    if (blockStyle.borderColor) s.borderColor = blockStyle.borderColor
-    if (blockStyle.borderRadius) s.borderRadius = blockStyle.borderRadius
-    if (blockStyle.boxShadow) s.boxShadow = blockStyle.boxShadow
-    if (blockStyle.opacity) s.opacity = parseFloat(blockStyle.opacity)
-    if (blockStyle.overflow) s.overflow = blockStyle.overflow as "visible" | "hidden" | "scroll" | "auto"
-    if (blockStyle.zIndex) s.zIndex = parseInt(blockStyle.zIndex)
-    if (blockStyle.typography?.fontFamily) s.fontFamily = blockStyle.typography.fontFamily
-    if (blockStyle.typography?.fontSize) s.fontSize = blockStyle.typography.fontSize
-    if (blockStyle.typography?.fontWeight) s.fontWeight = blockStyle.typography.fontWeight as React.CSSProperties["fontWeight"]
-    if (blockStyle.typography?.lineHeight) s.lineHeight = blockStyle.typography.lineHeight
-    if (blockStyle.typography?.letterSpacing) s.letterSpacing = blockStyle.typography.letterSpacing
-    if (blockStyle.typography?.textTransform) s.textTransform = blockStyle.typography.textTransform as React.CSSProperties["textTransform"]
-    if (blockStyle.typography?.textDecoration) s.textDecoration = blockStyle.typography.textDecoration as React.CSSProperties["textDecoration"]
-    if (blockStyle.typography?.color) s.color = blockStyle.typography.color
-    if (blockStyle.typography?.textAlign) s.textAlign = blockStyle.typography.textAlign as React.CSSProperties["textAlign"]
-    return s
-  }, [blockStyle])
-
-  const isHidden = useMemo(() => {
-    if (!blockStyle) return false
-    if (viewport === 'desktop' && blockStyle.hideOnDesktop) return true
-    if (viewport === 'tablet' && blockStyle.hideOnTablet) return true
-    if (viewport === 'mobile' && blockStyle.hideOnMobile) return true
-    return false
-  }, [blockStyle, viewport])
+  const isHidden = useMemo(
+    () => isHiddenOnViewport(block.style, viewport),
+    [block.style, viewport],
+  )
 
   if (isHidden) {
     return (
@@ -310,7 +267,7 @@ export function SortableBlock({ block, isSelected, onSelect, children }: Props) 
         </button>
       </div>
 
-      <div style={resolvedStyle}>
+      <div>
         {children}
       </div>
     </div>

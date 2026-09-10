@@ -253,6 +253,8 @@ export interface SiteProperty {
   landArea?: string;
   towers?: string;
   units?: string;
+  brochureUrl?: string;
+  floorPlans?: Array<{ name: string; image: string; beds?: string; area?: string; downloadUrl?: string }>;
 }
 
 export interface SiteConfig {
@@ -266,6 +268,8 @@ export interface SiteConfig {
   seo?: SiteSeo;
   tracking?: SiteTracking;
   property?: SiteProperty;
+  propertyBinding?: { kind: "project"; projectId: string } | { kind: "unit"; unitId: string };
+  vars?: Record<string, string>;
   globalWidgets?: GlobalWidget[];
   /** Page-specific settings captured by the Page Settings module. */
   settings?: import("@/lib/openpage/types").PageSettings;

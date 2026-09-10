@@ -19,6 +19,15 @@ import {
 } from '../../common/utils/lead-scope.util';
 import { listLeadAssignableUsers } from '../../common/utils/lead-assignee.util';
 
+/** Sentinel org id for Super Admin template captures (Lead.orgId has no FK). */
+export const PLATFORM_LEAD_ORG_ID = 'platform';
+
+type ResolvedPublicPage = {
+  id: string;
+  orgId: string;
+  status: string;
+};
+
 /** Fields needed to render an activity/call actor. */
 const ACTOR_SELECT = {
   select: { id: true, firstName: true, lastName: true, email: true },
@@ -86,8 +95,10 @@ export class LeadsService {
       if (!page) {
         throw new NotFoundException('Landing page not found');
       }
-      if (page.status !== 'published') {
-        throw new BadRequestException('Leads can only be submitted from a published landing page');
+      if (page.status !== 'published' && page.status !== 'draft') {
+        throw new BadRequestException(
+          'Leads can only be submitted from a published or draft landing page',
+        );
       }
       orgId = page.orgId;
       resolvedLandingPageId = page.id;
@@ -104,7 +115,13 @@ export class LeadsService {
       if (project.status !== 'active') {
         throw new BadRequestException('Project is not available for website enquiries');
       }
-      if (orgId && project.orgId !== orgId) {
+      // Platform template captures may bind a project later — then the project
+      // org wins. Otherwise org + project must match.
+      if (
+        orgId &&
+        orgId !== PLATFORM_LEAD_ORG_ID &&
+        project.orgId !== orgId
+      ) {
         throw new BadRequestException(
           'Project and landing page must belong to the same organisation',
         );
@@ -247,10 +264,13 @@ export class LeadsService {
   }
 
   /**
-   * Public forms may send a landing-page id, a page slug, or a template id
-   * (builder / Super Admin template preview). Resolve to a real org page.
+   * Public forms may send a landing-page id, a page slug, a Super Admin
+   * template id (published/draft live or preview), or a template id that an
+   * org has already published as a landing page.
    */
-  private async resolvePublicLandingPage(ref: string) {
+  private async resolvePublicLandingPage(
+    ref: string,
+  ): Promise<ResolvedPublicPage | null> {
     const select = { id: true, orgId: true, status: true } as const;
     const byId = await this.prisma.landingPage.findUnique({
       where: { id: ref },
@@ -265,6 +285,20 @@ export class LeadsService {
       select,
     });
     if (bySlug) return bySlug;
+
+    // Super Admin templates are not LandingPage rows — accept them directly so
+    // lead-gen pages can publish without an org/project binding.
+    const template = await this.prisma.template.findUnique({
+      where: { id: ref },
+      select: { id: true, status: true },
+    });
+    if (template) {
+      return {
+        id: template.id,
+        orgId: PLATFORM_LEAD_ORG_ID,
+        status: template.status,
+      };
+    }
 
     return this.prisma.landingPage.findFirst({
       where: { sourceTemplateId: ref, ...published },

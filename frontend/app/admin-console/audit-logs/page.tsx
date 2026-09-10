@@ -237,7 +237,9 @@ export default function SuperAdminAuditLogsPage() {
             <Icon name="shield" size={14} /> System
           </div>
           <h1>Audit Logs</h1>
-          <div className="sub">Every significant action across the platform.</div>
+          <div className="sub">
+            Live platform activity from the API — every significant action across organisations.
+          </div>
         </div>
         <div className="actions">
           <button

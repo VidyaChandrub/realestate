@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Code } from "lucide-react";
 import type { BlockConfig, BlockType } from "@/components/openpage/blocks/types";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { Section } from "./shared-components";
 import { MediaPicker } from "@/components/media-picker";
+import { loadFormLibrary, type FormDefinition } from "@/lib/openpage/forms-store";
+import { mergeFormLibraries } from "@/lib/openpage/resolve-form";
 
 interface FieldDef {
   key: string
   label: string
-  type: 'text' | 'textarea' | 'select' | 'array-strings' | 'array-items' | 'image' | 'icon'
+  type: 'text' | 'textarea' | 'select' | 'array-strings' | 'array-items' | 'image' | 'icon' | 'form-select' | 'toggle' | 'nav-menu'
   options?: string[]
 }
 
@@ -37,13 +39,14 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
           { key: 'logo', label: 'Logo Text', type: 'text' },
           { key: 'logoImage', label: 'Logo', type: 'image' },
           { key: 'ctaText', label: 'CTA Button', type: 'text' },
-          { key: 'links', label: 'Nav Links', type: 'array-strings' },
+          { key: 'ctaId', label: 'CTA section ID', type: 'text' },
+          { key: 'menuItems', label: 'Menu items', type: 'nav-menu' },
         ],
       },
       {
         title: 'Style',
         fields: [
-          { key: 'variant', label: 'Variant', type: 'select', options: ['default', 'centered'] },
+          { key: 'variant', label: 'Variant', type: 'select', options: ['default', 'centered', 'static'] },
         ],
       },
     ],
@@ -169,7 +172,7 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
       {
         title: 'Style',
         fields: [
-          { key: 'variant', label: 'Variant', type: 'select', options: ['cards', 'carousel', 'spotlight'] },
+          { key: 'variant', label: 'Variant', type: 'select', options: ['cards', 'carousel', 'spotlight', 'band'] },
         ],
       },
     ],
@@ -222,6 +225,7 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
         fields: [
           { key: 'title', label: 'Title', type: 'text' },
           { key: 'subtitle', label: 'Subtitle', type: 'text' },
+          { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
         ],
       },
     ],
@@ -233,8 +237,7 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
         fields: [
           { key: 'title', label: 'Title', type: 'text' },
           { key: 'subtitle', label: 'Subtitle', type: 'text' },
-          { key: 'buttonText', label: 'Button Text', type: 'text' },
-          { key: 'socialProof', label: 'Social Proof', type: 'text' },
+          { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
         ],
       },
     ],
@@ -316,12 +319,13 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
         fields: [
           { key: 'title', label: 'Title', type: 'text' },
           { key: 'images', label: 'Images', type: 'array-items' },
+          { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
         ],
       },
       {
         title: 'Style',
         fields: [
-          { key: 'variant', label: 'Variant', type: 'select', options: ['grid', 'masonry'] },
+          { key: 'variant', label: 'Variant', type: 'select', options: ['grid', 'masonry', 'strip'] },
         ],
       },
     ],
@@ -358,6 +362,9 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
   },
   'project-banner': {
     sections: [
+      { title: 'Layout', fields: [
+        { key: 'variant', label: 'Template', type: 'select', options: ['split-form', 'overlay', 'centered', 'stats'] },
+      ]},
       { title: 'Content', fields: [
         { key: 'badge', label: 'Badge', type: 'text' },
         { key: 'headline', label: 'Headline', type: 'text' },
@@ -367,23 +374,31 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
           { key: 'image', label: 'Cover image', type: 'image' },
           { key: 'primaryCta', label: 'Primary CTA', type: 'text' },
           { key: 'secondaryCta', label: 'Secondary CTA', type: 'text' },
-          { key: 'formId', label: 'Form ID', type: 'text' },
+          { key: 'stats', label: 'Stats (stats layout)', type: 'array-items' },
+          { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
           { key: 'popupId', label: 'Brochure popup ID', type: 'text' },
           { key: 'pdfUrl', label: 'Brochure PDF URL', type: 'text' },
+          { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
       ]},
     ],
   },
   'project-overview': {
-    sections: [{ title: 'Content', fields: [
+    sections: [{ title: 'Layout', fields: [
+      { key: 'variant', label: 'Template', type: 'select', options: ['split', 'centered', 'cards', 'timeline'] },
+    ]}, { title: 'Content', fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'subtitle', label: 'Subtitle', type: 'text' },
       { key: 'body', label: 'Body', type: 'textarea' },
       { key: 'image', label: 'Image', type: 'image' },
+      { key: 'highlights', label: 'Highlights', type: 'array-items' },
       { key: 'ctaText', label: 'CTA text', type: 'text' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
     ]}],
   },
   'property-details': {
-    sections: [{ title: 'Content', fields: [
+    sections: [{ title: 'Layout', fields: [
+      { key: 'variant', label: 'Template', type: 'select', options: ['grid', 'table', 'two-column', 'checklist'] },
+    ]}, { title: 'Content', fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'subtitle', label: 'Subtitle', type: 'text' },
       { key: 'items', label: 'Highlights', type: 'array-items' },
@@ -391,70 +406,140 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
       { key: 'status', label: 'Status', type: 'text' },
       { key: 'possession', label: 'Possession', type: 'text' },
       { key: 'rera', label: 'RERA', type: 'text' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
     ]}],
   },
   amenities: {
-    sections: [{ title: 'Content', fields: [
+    sections: [{ title: 'Layout', fields: [
+      { key: 'variant', label: 'Template', type: 'select', options: ['grid', 'chips', 'icon-grid', 'featured'] },
+    ]}, { title: 'Content', fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'subtitle', label: 'Subtitle', type: 'text' },
       { key: 'items', label: 'Amenities', type: 'array-items' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
     ]}],
   },
   'floor-plans': {
-    sections: [{ title: 'Plans', fields: [{ key: 'items', label: 'Floor plans', type: 'array-items' }] }],
+    sections: [
+      { title: 'Layout', fields: [
+        { key: 'variant', label: 'Template', type: 'select', options: ['cards', 'list', 'showcase'] },
+      ]},
+      { title: 'Plans', fields: [
+        { key: 'title', label: 'Title', type: 'text' },
+        { key: 'subtitle', label: 'Subtitle', type: 'text' },
+        { key: 'items', label: 'Floor plans', type: 'array-items' },
+        { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
+      ]},
+      { title: 'Form gate', fields: [
+        { key: 'gateEnabled', label: 'Require form to unlock', type: 'toggle' },
+        { key: 'formId', label: 'Unlock form (Form Builder)', type: 'form-select' },
+        { key: 'popupId', label: 'Popup ID (optional)', type: 'text' },
+      ]},
+    ],
   },
   'unit-config': {
-    sections: [{ title: 'Units', fields: [{ key: 'items', label: 'Configurations', type: 'array-items' }] }],
+    sections: [{ title: 'Units', fields: [
+      { key: 'variant', label: 'Template', type: 'select', options: ['cards', 'table'] },
+      { key: 'items', label: 'Configurations', type: 'array-items' },
+    ] }],
   },
   're-pricing': {
-    sections: [{ title: 'Content', fields: [
+    sections: [{ title: 'Layout', fields: [
+      { key: 'variant', label: 'Template', type: 'select', options: ['cards', 'simple', 'comparison', 'banner'] },
+    ]}, { title: 'Content', fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'startingPrice', label: 'Starting price', type: 'text' },
       { key: 'subtitle', label: 'Subtitle', type: 'text' },
+      { key: 'items', label: 'Price cards', type: 'array-items' },
+      { key: 'disclaimer', label: 'Disclaimer', type: 'text' },
+      { key: 'ctaText', label: 'CTA text', type: 'text' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
     ]}],
   },
   offers: {
-    sections: [{ title: 'Offers', fields: [{ key: 'items', label: 'Offers', type: 'array-items' }] }],
+    sections: [{ title: 'Offers', fields: [
+      { key: 'items', label: 'Offers', type: 'array-items' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
+    ]}],
   },
   location: {
-    sections: [{ title: 'Content', fields: [
+    sections: [{ title: 'Layout', fields: [
+      { key: 'variant', label: 'Template', type: 'select', options: ['split-map', 'list', 'map-only', 'cards'] },
+    ]}, { title: 'Content', fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'address', label: 'Address', type: 'text' },
       { key: 'embedUrl', label: 'Map embed URL', type: 'text' },
       { key: 'items', label: 'Nearby', type: 'array-items' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
     ]}],
   },
   'google-maps': {
-    sections: [{ title: 'Map', fields: [{ key: 'embedUrl', label: 'Embed URL', type: 'text' }] }],
+    sections: [{ title: 'Map', fields: [
+      { key: 'embedUrl', label: 'Embed URL', type: 'text' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
+    ]}],
   },
   developer: {
-    sections: [{ title: 'Content', fields: [
+    sections: [{ title: 'Layout', fields: [
+      { key: 'variant', label: 'Template', type: 'select', options: ['default', 'split', 'stats', 'band'] },
+    ]}, { title: 'Content', fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'name', label: 'Developer name', type: 'text' },
       { key: 'body', label: 'About', type: 'textarea' },
+      { key: 'image', label: 'Image', type: 'image' },
+      { key: 'logo', label: 'Logo', type: 'image' },
+      { key: 'stats', label: 'Stats', type: 'array-items' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
     ]}],
   },
   'lead-form': {
-    sections: [{ title: 'Form', fields: [
+    sections: [{ title: 'Layout', fields: [
+      { key: 'variant', label: 'Template', type: 'select', options: ['card', 'split', 'inline', 'default'] },
+    ]}, { title: 'Form', fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'subtitle', label: 'Subtitle', type: 'text' },
-      { key: 'formId', label: 'Form ID', type: 'text' },
+      { key: 'image', label: 'Side image (split)', type: 'image' },
+      { key: 'benefits', label: 'Benefits (split)', type: 'array-items' },
+      { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
     ]}],
   },
   'download-brochure': {
-    sections: [{ title: 'Brochure', fields: [
+    sections: [{ title: 'Layout', fields: [
+      { key: 'variant', label: 'Template', type: 'select', options: ['split', 'card', 'banner', 'minimal'] },
+    ]}, { title: 'Brochure', fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'buttonText', label: 'Button text', type: 'text' },
       { key: 'subtitle', label: 'Subtitle', type: 'text' },
       { key: 'image', label: 'Preview image', type: 'image' },
       { key: 'pdfUrl', label: 'PDF URL', type: 'text' },
-      { key: 'popupId', label: 'Popup ID', type: 'text' },
+      { key: 'formId', label: 'Unlock form (Form Builder)', type: 'form-select' },
+      { key: 'popupId', label: 'Popup ID (optional)', type: 'text' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
     ]}],
   },
   'site-visit': {
     sections: [{ title: 'Form', fields: [
       { key: 'title', label: 'Title', type: 'text' },
-      { key: 'formId', label: 'Form ID', type: 'text' },
+      { key: 'subtitle', label: 'Subtitle', type: 'text' },
+      { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
+    ]}],
+  },
+  contact: {
+    sections: [{ title: 'Form', fields: [
+      { key: 'title', label: 'Title', type: 'text' },
+      { key: 'subtitle', label: 'Subtitle', type: 'text' },
+      { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
+    ]}],
+  },
+  newsletter: {
+    sections: [{ title: 'Form', fields: [
+      { key: 'title', label: 'Title', type: 'text' },
+      { key: 'subtitle', label: 'Subtitle', type: 'text' },
+      { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
     ]}],
   },
   'custom-section': {
@@ -635,6 +720,18 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
 function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }) {
   const updateBlockProps = useConfigStore((s) => s.updateBlockProps)
   const updateBlock = useConfigStore((s) => s.updateBlock)
+  const patchSite = useConfigStore((s) => s.patchSite)
+  const forms = useConfigStore((s) => s.config.forms ?? [])
+  const pageBlocks = useConfigStore((s) => {
+    const pages = s.config.pages
+    if (!pages || pages.length === 0) return s.config.blocks
+    const page = pages.find((p) => p.id === s.activePageId) ?? pages[0]
+    return page.blocks
+  })
+  const selectableForms = useMemo(() => {
+    const library = typeof window !== "undefined" ? loadFormLibrary() : []
+    return mergeFormLibraries(forms, library)
+  }, [forms])
 
   // For variant field, it's on the block itself
   const value = field.key === 'variant'
@@ -650,7 +747,190 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
     }
   }
 
+  function ensureFormOnPage(formId: string) {
+    if (!formId) {
+      onChange(formId)
+      return
+    }
+    const already = forms.some((f) => f.id === formId)
+    if (already) {
+      onChange(formId)
+      return
+    }
+    const fromLib = selectableForms.find((f) => f.id === formId)
+    if (fromLib) {
+      const copy: FormDefinition = JSON.parse(JSON.stringify(fromLib))
+      patchSite({ forms: [...forms, copy] })
+    }
+    onChange(formId)
+  }
+
+  const sectionAnchors = (() => {
+    const seen = new Set<string>()
+    const out: Array<{ id: string; label: string }> = []
+    for (const b of pageBlocks) {
+      if (b.type === 'navbar') continue
+      const props = b.props as Record<string, unknown>
+      const anchor =
+        (typeof props.anchor === 'string' && props.anchor) ||
+        (typeof props.anchorId === 'string' && props.anchorId) ||
+        ''
+      const id = String(anchor || '').replace(/^#/, '').trim()
+      if (!id || seen.has(id)) continue
+      seen.add(id)
+      out.push({ id, label: `${b.type} → #${id}` })
+    }
+    // Common defaults always available
+    for (const id of ['overview', 'amenities', 'plans', 'gallery', 'pricing', 'location', 'brochure', 'enquire']) {
+      if (seen.has(id)) continue
+      seen.add(id)
+      out.push({ id, label: `#${id}` })
+    }
+    return out
+  })()
+
   switch (field.type) {
+    case 'nav-menu': {
+      // Prefer structured menuItems; migrate legacy string links on first edit.
+      const rawItems = Array.isArray(value) ? value : []
+      const legacyLinks = Array.isArray((block.props as { links?: unknown }).links)
+        ? ((block.props as { links: unknown[] }).links)
+        : []
+      const items: Array<{ label: string; id: string }> =
+        rawItems.length > 0
+          ? rawItems.map((item) => {
+              if (typeof item === 'string') {
+                const label = item
+                return { label, id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') }
+              }
+              const obj = item as { label?: string; id?: string; href?: string }
+              const label = String(obj.label || '')
+              const id = String(obj.id || obj.href || '').replace(/^#/, '')
+              return { label, id }
+            })
+          : legacyLinks.map((item) => {
+              const label = typeof item === 'string' ? item : String((item as { label?: string }).label || '')
+              return {
+                label,
+                id: label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+              }
+            })
+
+      function commit(next: Array<{ label: string; id: string }>) {
+        updateBlockProps(block.id, {
+          menuItems: next,
+          // Keep legacy string labels in sync for older templates
+          links: next.map((n) => n.label),
+        })
+      }
+
+      return (
+        <div className="mb-2.5">
+          <label className="block text-[11.5px] text-text-2 mb-1 font-medium">{field.label}</label>
+          <p className="text-[10px] text-text-3 mb-2 leading-relaxed">
+            Set a label and section ID. The menu scrolls to <code className="text-green">#id</code> on the page.
+            Match the Section ID field on each section.
+          </p>
+          {items.map((item, i) => (
+            <div key={i} className="bg-bg-2 border border-border-default rounded p-2 mb-1.5 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-text-3 font-medium">Item {i + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => commit(items.filter((_, idx) => idx !== i))}
+                  className="text-[10px] text-text-3 hover:text-status-red transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+              <div>
+                <label className="block text-[10px] text-text-3 mb-0.5">Label</label>
+                <input
+                  type="text"
+                  value={item.label}
+                  placeholder="Amenities"
+                  onChange={(e) => {
+                    const updated = [...items]
+                    updated[i] = { ...updated[i], label: e.target.value }
+                    commit(updated)
+                  }}
+                  className="w-full px-1.5 py-1 rounded border border-border-subtle bg-bg-3 text-text-0 text-[11px] outline-none focus:border-green"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-text-3 mb-0.5">Section ID</label>
+                <div className="flex gap-1">
+                  <span className="px-1.5 py-1 text-[11px] text-text-3 bg-bg-3 border border-border-subtle rounded">#</span>
+                  <input
+                    type="text"
+                    value={item.id}
+                    placeholder="amenities"
+                    list={`nav-anchors-${block.id}`}
+                    onChange={(e) => {
+                      const updated = [...items]
+                      updated[i] = {
+                        ...updated[i],
+                        id: e.target.value.replace(/^#/, '').replace(/\s+/g, '-').toLowerCase(),
+                      }
+                      commit(updated)
+                    }}
+                    className="flex-1 px-1.5 py-1 rounded border border-border-subtle bg-bg-3 text-text-0 text-[11px] outline-none focus:border-green font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+          <datalist id={`nav-anchors-${block.id}`}>
+            {sectionAnchors.map((a) => (
+              <option key={a.id} value={a.id}>{a.label}</option>
+            ))}
+          </datalist>
+          <button
+            type="button"
+            onClick={() => commit([...items, { label: '', id: '' }])}
+            className="text-[10px] text-green hover:text-green-dim transition-colors mt-0.5"
+          >
+            + Add menu item
+          </button>
+        </div>
+      )
+    }
+
+    case 'form-select':
+      return (
+        <div className="mb-2.5">
+          <label className="block text-[11.5px] text-text-2 mb-1 font-medium">{field.label}</label>
+          <select
+            value={String(value || '')}
+            onChange={(e) => ensureFormOnPage(e.target.value)}
+            className="w-full px-2 py-1.5 rounded border border-border-default bg-bg-2 text-text-0 text-xs outline-none focus:border-green cursor-pointer"
+          >
+            <option value="">Default (first form)</option>
+            {selectableForms.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}{forms.some((p) => p.id === f.id) ? "" : " (library)"}
+              </option>
+            ))}
+          </select>
+          <p className="text-[10px] text-text-3 mt-1">
+            Selecting a library form copies it onto this page so leads save on publish/preview.
+          </p>
+        </div>
+      )
+
+    case 'toggle':
+      return (
+        <label className="mb-2.5 flex items-center justify-between gap-2 cursor-pointer">
+          <span className="text-[11.5px] text-text-2 font-medium">{field.label}</span>
+          <input
+            type="checkbox"
+            checked={value !== false}
+            onChange={(e) => onChange(e.target.checked)}
+            className="accent-[var(--color-green,#10b981)]"
+          />
+        </label>
+      )
+
     case 'text':
       return (
         <div className="mb-2.5">
@@ -757,11 +1037,11 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
           testimonials: { items: { name: '', role: '', quote: '' } },
           stats: { items: { value: '', label: '' } },
           faq: { items: { question: '', answer: '' } },
-          team: { members: { name: '', role: '' } },
-          features: { items: { icon: '', title: '', description: '' } },
           team: { members: { name: '', role: '', avatar: '' } },
+          features: { items: { icon: '', title: '', description: '' } },
           image: { images: { src: '', alt: '' } },
           gallery: { images: { src: '', alt: '', caption: '' } },
+          'floor-plans': { items: { name: '', beds: '', area: '', price: '', image: '', downloadUrl: '' } },
         }
         return blockTemplates[block.type]?.[field.key] || { title: '', description: '' }
       }

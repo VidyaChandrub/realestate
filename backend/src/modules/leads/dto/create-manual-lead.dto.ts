@@ -18,5 +18,5 @@ export class CreateManualLeadDto {
   source?: string;
 
   @IsObject()
-  data: Record<string, unknown>;
+  data!: Record<string, unknown>;
 }

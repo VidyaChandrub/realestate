@@ -2,6 +2,12 @@
 
 import type { BlockConfig } from "./types";
 import { Component, type ReactNode } from "react";
+import {
+  applyBlockStyle,
+  blockAnimationClass,
+  blockAnimationStyle,
+  blockResponsiveHideClass,
+} from "@/lib/openpage/block-style";
 
 import { NavbarBlock } from "./navbar/NavbarBlock";
 import { HeroBlock } from "./hero/HeroBlock";
@@ -156,9 +162,27 @@ const blockRenderers: Record<string, React.ComponentType<{ block: BlockConfig }>
 
 export function RenderBlock({ block }: { block: BlockConfig }): ReactNode {
   const Renderer = blockRenderers[block.type] || PlaceholderBlock
+  const style = {
+    ...applyBlockStyle(block.style),
+    ...blockAnimationStyle(block),
+  }
+  const className = [blockAnimationClass(block), blockResponsiveHideClass(block.style)]
+    .filter(Boolean)
+    .join(" ")
+
   return (
     <BlockErrorBoundary blockType={block.type}>
-      <Renderer block={block} />
+      <div
+        className={className || undefined}
+        style={Object.keys(style).length ? style : undefined}
+        data-block-type={block.type}
+        data-block-id={block.id}
+      >
+        {block.style?.customCss ? (
+          <style>{`[data-block-id="${block.id}"] { ${block.style.customCss} }`}</style>
+        ) : null}
+        <Renderer block={block} />
+      </div>
     </BlockErrorBoundary>
   )
 }

@@ -62,8 +62,18 @@ export function buildPremiumRealEstateTemplate(name: string): SiteConfig {
       variant: "default",
       props: {
         logo: name,
-        links: ["Overview", "Units", "Amenities", "Gallery", "Location", "Plans", "Pricing"],
         ctaText: "Enquire Now",
+        ctaId: "enquire",
+        menuItems: [
+          { label: "Overview", id: "overview" },
+          { label: "Units", id: "units" },
+          { label: "Amenities", id: "amenities" },
+          { label: "Gallery", id: "gallery" },
+          { label: "Location", id: "location" },
+          { label: "Plans", id: "plans" },
+          { label: "Pricing", id: "pricing" },
+        ],
+        links: ["Overview", "Units", "Amenities", "Gallery", "Location", "Plans", "Pricing"],
       },
     },
     {

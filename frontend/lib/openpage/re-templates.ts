@@ -59,7 +59,7 @@ function page(name: string, blocks: BlockConfig[]): SiteConfig {
   const form = seedEnquiryForm();
   const popupId = "popup-brochure";
   const withForm = blocks.map((b) =>
-    b.type === "lead-form" || b.type === "site-visit" || b.type === "project-banner"
+    b.type === "lead-form" || b.type === "site-visit" || b.type === "project-banner" || b.type === "contact" || b.type === "newsletter"
       ? { ...b, props: { ...b.props, formId: form.id, popupId: b.props.popupId || popupId } }
       : b.type === "download-brochure" || b.type === "cta"
         ? { ...b, props: { ...b.props, popupId, formId: form.id } }
@@ -88,7 +88,18 @@ function page(name: string, blocks: BlockConfig[]): SiteConfig {
 }
 
 const chrome = (name: string): BlockConfig[] => [
-  { id: bid("nav"), type: "navbar", variant: "default", props: { logo: name, links: ["Overview", "Amenities", "Plans", "Contact"], ctaText: "Enquire" } },
+  { id: bid("nav"), type: "navbar", variant: "default", props: {
+    logo: name,
+    ctaText: "Enquire",
+    ctaId: "enquire",
+    menuItems: [
+      { label: "Overview", id: "overview" },
+      { label: "Amenities", id: "amenities" },
+      { label: "Plans", id: "plans" },
+      { label: "Contact", id: "enquire" },
+    ],
+    links: ["Overview", "Amenities", "Plans", "Contact"],
+  } },
 ];
 
 const footer = (name: string): BlockConfig => ({
@@ -99,6 +110,7 @@ const footer = (name: string): BlockConfig => ({
 });
 
 export const realEstateTemplateMeta = [
+  { id: "blank", name: "Blank canvas", description: "Empty page — add sections from the Templates library" },
   { id: "premium", name: "Meridian Residences", description: "Premium launch page with hero form, gallery, brochure popup and full lead capture" },
   { id: "residential", name: "Residential Project", description: "Apartments with amenities, plans and enquiry" },
   { id: "commercial", name: "Commercial Project", description: "Office / retail project landing page" },
@@ -109,14 +121,227 @@ export const realEstateTemplateMeta = [
   { id: "enquiry", name: "Project Enquiry", description: "Form-first enquiry landing page" },
   { id: "site-visit", name: "Site Visit Landing Page", description: "Book a visit conversion page" },
   { id: "brochure", name: "Brochure Download Landing Page", description: "Brochure gate with popup form" },
+  { id: "lead", name: "Lead Generation", description: "All lead-capture sections — hero form, enquiry, site visit, brochure, contact, newsletter & CTA" },
 ] as const;
 
 export type RealEstateTemplateId = (typeof realEstateTemplateMeta)[number]["id"];
 
+/** Map Super Admin design ids → OpenPage seed templates. */
+export function openPageTemplateIdForDesign(designId: string): RealEstateTemplateId {
+  const key = designId.trim().toLowerCase();
+  if (
+    !key ||
+    key === "tpl-blank" ||
+    key === "blank" ||
+    key.includes("scratch") ||
+    key === "custom" ||
+    key === "none"
+  ) {
+    return "blank";
+  }
+  if (key === "tpl-lead" || key.includes("lead")) return "lead";
+  if (key === "tpl-meridian" || key.includes("premium") || key.includes("meridian")) return "premium";
+  if (key.includes("enquiry")) return "enquiry";
+  if (key.includes("site-visit") || key.includes("sitevisit")) return "site-visit";
+  if (key.includes("brochure")) return "brochure";
+  if (key.includes("commercial")) return "commercial";
+  if (key.includes("luxury") || key.includes("luxe")) return "luxury";
+  if (key.includes("villa")) return "villa";
+  if (key.includes("plot")) return "plot";
+  if (key.includes("launch")) return "launch";
+  if (key.includes("residential") || key === "tpl-estatepro") return "residential";
+  return "premium";
+}
+
+function leadCaptureBlocks(name: string): BlockConfig[] {
+  return [
+    {
+      id: bid("nav"),
+      type: "navbar",
+      variant: "default",
+      props: {
+        logo: name,
+        ctaText: "Enquire",
+        ctaId: "enquire",
+        menuItems: [
+          { label: "Overview", id: "overview" },
+          { label: "Pricing", id: "pricing" },
+          { label: "Brochure", id: "brochure" },
+          { label: "Enquire", id: "enquire" },
+          { label: "Visit", id: "site-visit" },
+        ],
+        links: ["Overview", "Pricing", "Brochure", "Enquire", "Visit"],
+      },
+    },
+    {
+      id: bid("hero"),
+      type: "project-banner",
+      variant: "split-form",
+      props: {
+        badge: "Lead campaign",
+        headline: name,
+        location: "{{location}}",
+        description: "Share your details — a relationship manager will call you shortly.",
+        price: "{{starting_price}}",
+        primaryCta: "Book a Site Visit",
+        secondaryCta: "Download Brochure",
+        formTitle: "Enquire now",
+        formSubtitle: "We'll call you within 15 minutes.",
+        formId: "",
+        anchor: "hero",
+      },
+    },
+    {
+      id: bid("ov"),
+      type: "project-overview",
+      variant: "cards",
+      props: {
+        title: `Why ${name}`,
+        subtitle: "Built for conversions",
+        body: "{{description}}",
+        highlights: [
+          { title: "Fast response", description: "Sales team replies within minutes" },
+          { title: "Transparent pricing", description: "{{starting_price}}" },
+          { title: "Site visits", description: "Weekend slots available" },
+        ],
+        anchor: "overview",
+      },
+    },
+    {
+      id: bid("pr"),
+      type: "re-pricing",
+      variant: "banner",
+      props: {
+        title: "Founders' pricing this weekend",
+        subtitle: "Starting from",
+        startingPrice: "{{starting_price}}",
+        ctaText: "Lock my price",
+        disclaimer: "*T&C apply.",
+        anchor: "pricing",
+      },
+    },
+    {
+      id: bid("off"),
+      type: "offers",
+      variant: "cards",
+      props: {
+        title: "Limited offers",
+        items: [
+          { title: "Zero PLC weekend", description: "No preferential location charge on first release." },
+          { title: "Assured parking", description: "Bundled bay with every founders' booking." },
+        ],
+      },
+    },
+    {
+      id: bid("bro"),
+      type: "download-brochure",
+      variant: "split",
+      props: {
+        title: "Download Brochure",
+        subtitle: "Plans, pricing and specifications in one PDF.",
+        buttonText: "Get PDF",
+        formId: "",
+        anchor: "brochure",
+      },
+    },
+    {
+      id: bid("lead-card"),
+      type: "lead-form",
+      variant: "card",
+      props: {
+        title: "Enquire now",
+        subtitle: "Our team responds within 15 minutes.",
+        formId: "",
+        anchor: "enquire",
+      },
+    },
+    {
+      id: bid("lead-split"),
+      type: "lead-form",
+      variant: "split",
+      props: {
+        title: "Talk to sales",
+        subtitle: "Site visits, pricing and inventory — answered personally.",
+        benefits: ["Priority site-visit slots", "Transparent price sheet", "WhatsApp updates"],
+        formId: "",
+        anchor: "talk",
+      },
+    },
+    {
+      id: bid("sv"),
+      type: "site-visit",
+      variant: "default",
+      props: {
+        title: "Book a site visit",
+        subtitle: "Pick a slot that works for you.",
+        formId: "",
+        anchor: "site-visit",
+      },
+    },
+    {
+      id: bid("contact"),
+      type: "contact",
+      variant: "default",
+      props: {
+        title: "Get in touch",
+        subtitle: "Prefer email? Leave a message below.",
+        formId: "",
+        anchor: "contact",
+      },
+    },
+    {
+      id: bid("news"),
+      type: "newsletter",
+      variant: "default",
+      props: {
+        title: "Project updates",
+        subtitle: "Launch alerts and offer reminders — no spam.",
+        formId: "",
+        anchor: "newsletter",
+      },
+    },
+    {
+      id: bid("cta"),
+      type: "cta",
+      variant: "simple",
+      props: {
+        headline: "Ready to take the next step?",
+        subheadline: "Book a call or visit this weekend.",
+        buttonText: "Enquire Now",
+        buttonUrl: "#enquire",
+      },
+    },
+    {
+      id: bid("tes"),
+      type: "testimonials",
+      variant: "cards",
+      props: {
+        title: "What buyers say",
+        items: [
+          { name: "Anita Rao", role: "Homeowner", quote: "The team was transparent from day one.", rating: 5 },
+          { name: "Vikram Shah", role: "Investor", quote: "Best launch we booked this year.", rating: 5 },
+        ],
+      },
+    },
+    footer(name),
+  ];
+}
+
 export function buildRealEstateTemplate(id: RealEstateTemplateId | string, name: string): SiteConfig {
   switch (id) {
+    case "blank":
+      return {
+        engine: "openpage",
+        name,
+        pages: [{ id: "page-home", name: "Home", path: "/", blocks: [] }],
+        blocks: [],
+        forms: [],
+        globalWidgets: [],
+      };
     case "premium":
       return buildPremiumRealEstateTemplate(name);
+    case "lead":
+      return page(name, leadCaptureBlocks(name));
     case "commercial":
       return page(name, [
         ...chrome(name),

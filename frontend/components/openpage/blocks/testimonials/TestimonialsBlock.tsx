@@ -191,6 +191,43 @@ function TestimonialsSpotlight({ props }: { props: TestimonialsProps }) {
   )
 }
 
+function TestimonialsBand({ props }: { props: TestimonialsProps }) {
+  const items = props.items || defaultTestimonials
+  return (
+    <section className="px-6 @md:px-10 py-14 bg-bg-2 border-y border-border-default">
+      <div className="max-w-6xl mx-auto">
+        {(props.title || props.subtitle) ? (
+          <div className="text-center mb-8">
+            {props.title ? <h2 className="text-2xl font-bold tracking-tight mb-1">{props.title}</h2> : null}
+            {props.subtitle ? <p className="text-text-2 text-sm">{props.subtitle}</p> : null}
+          </div>
+        ) : null}
+        <div className="flex gap-4 overflow-x-auto pb-2 snap-x">
+          {items.map((item, i) => (
+            <div key={i} className="snap-start shrink-0 w-[85%] @sm:w-[48%] @lg:w-[32%] rounded-2xl border border-border-default bg-bg-1 p-5">
+              <Quote size={18} className="text-green/30 mb-3" />
+              <p className="text-[13px] text-text-1 leading-relaxed mb-4 italic line-clamp-4">&quot;{item.quote}&quot;</p>
+              <div className="flex items-center gap-3">
+                {item.avatar ? (
+                  <img src={item.avatar} alt={item.name} className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-bg-4 flex items-center justify-center text-[10px] font-semibold">
+                    {item.name.split(' ').map(n => n[0]).join('')}
+                  </div>
+                )}
+                <div>
+                  <div className="text-[12px] font-semibold">{item.name}</div>
+                  <div className="text-[11px] text-text-3">{item.role}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function TestimonialsBlock({ block }: { block: BlockConfig }) {
   const props = block.props as unknown as TestimonialsProps
 
@@ -199,6 +236,8 @@ export function TestimonialsBlock({ block }: { block: BlockConfig }) {
       return <TestimonialsCarousel props={props} />
     case 'spotlight':
       return <TestimonialsSpotlight props={props} />
+    case 'band':
+      return <TestimonialsBand props={props} />
     default:
       return <TestimonialsCards props={props} />
   }
