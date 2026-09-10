@@ -133,7 +133,7 @@ jobs:
           fi
 
           echo "=== Database migrations ==="
-          docker compose -f "$COMPOSE" exec -T api npx prisma migrate deploy
+          docker compose -f "$COMPOSE" exec -T api npx prisma migrate deploy < /dev/null
 
           echo "=== Frontend: stop to free memory ==="
           pm2 stop "$PM2_APP" 2>/dev/null || echo "(not running yet)"

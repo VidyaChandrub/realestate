@@ -49,6 +49,7 @@ import type {
   ResumeSignupResponse,
   ReviewOrgDomainRequestInput,
   SalesAgentDetailResponse,
+  OrgUserDashboardResponse,
   SalesAgentsListResponse,
   SignupStep1Response,
   SubdomainAvailability,
@@ -520,12 +521,49 @@ export async function assignCrmLead(
   });
 }
 
+/**
+ * Full lead edit form save. Persists the structured contact / requirement /
+ * source / consent fields. Pipeline status is NOT sent here — it keeps its own
+ * note-required path (`assignCrmLead`).
+ */
+export async function updateCrmLead(
+  id: string,
+  input: import("./types").UpdateLeadInput,
+): Promise<CrmLead> {
+  return apiFetch<CrmLead>(`/org/leads/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
 export function getSalesAgents(): Promise<SalesAgentsListResponse> {
   return apiFetch<SalesAgentsListResponse>("/org/sales-agents");
 }
 
 export function getSalesAgent(id: string): Promise<SalesAgentDetailResponse> {
   return apiFetch<SalesAgentDetailResponse>(`/org/sales-agents/${id}`);
+}
+
+// Per-user performance dashboard shown when an admin opens a member from the
+// Users list. Same payload as the sales-agent dashboard. An optional
+// capture-date window (from / to, both YYYY-MM-DD) scopes every metric.
+export function getOrgUserDashboard(
+  id: string,
+  opts?: { from?: string; to?: string },
+): Promise<OrgUserDashboardResponse> {
+  const qs = new URLSearchParams();
+  if (opts?.from) qs.set("from", opts.from);
+  if (opts?.to) qs.set("to", opts.to);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<OrgUserDashboardResponse>(
+    `/org/users/${id}/dashboard${suffix}`,
+  );
+}
+
+export function deleteOrgUser(id: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/org/users/${id}`, {
+    method: "DELETE",
+  });
 }
 
 // --- Organisation domain identity (subdomain + custom domain) ---
@@ -766,6 +804,17 @@ export async function getProjectSalesAgents(
 ): Promise<ProjectSalesAgent[]> {
   return apiFetch<ProjectSalesAgent[]>(
     `/org/projects/${projectId}/sales-agents`,
+  );
+}
+
+/**
+ * Org members who may be assigned to a project as sales agents — the same
+ * "who can hold a lead" rule the Lead Center assignee picker uses (permission
+ * based, admins/managers excluded). Server-enforced on the PUT as well.
+ */
+export async function getProjectSalesAgentCandidates(): Promise<CrmAssignableResponse> {
+  return apiFetch<CrmAssignableResponse>(
+    "/org/projects/sales-agent-candidates",
   );
 }
 

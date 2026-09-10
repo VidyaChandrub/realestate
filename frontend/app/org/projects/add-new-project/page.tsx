@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, setProjectSalesAgents } from "@/lib/api";
+import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectSalesAgentCandidates, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { CURRENCY_LABELS, formatMoneyRange, PROJECT_CURRENCIES } from "@/lib/money";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
@@ -258,7 +258,7 @@ export default function AddNewProjectPage() {
   // Step 7 — team
   const [managerId, setManagerId] = useState("");
   const [managers, setManagers] = useState<OrgUser[]>([]);
-  const [salesAgents, setSalesAgents] = useState<OrgUser[]>([]);
+  const [salesAgents, setSalesAgents] = useState<Array<{ id: string; name: string }>>([]);
   const [salesTeam, setSalesTeam] = useState("Ahmedabad — West");
   // User ids of the agents ticked in Step 7.
   const [agentAssign, setAgentAssign] = useState<string[]>([]);
@@ -349,8 +349,10 @@ export default function AddNewProjectPage() {
     apiFetch<OrgUsersListResponse>("/org/users?role=manager&limit=100&status=active", auth)
       .then((res) => setManagers(res.data))
       .catch(() => setManagers([]));
-    apiFetch<OrgUsersListResponse>("/org/users?role=sales&limit=100&status=active", auth)
-      .then((res) => setSalesAgents(res.data))
+    // "Who can hold a lead" — resolved server-side (permission-based, admins
+    // and managers excluded), and the same rule the PUT enforces.
+    getProjectSalesAgentCandidates()
+      .then((res) => setSalesAgents(res.data.map((u) => ({ id: u.id, name: u.name }))))
       .catch(() => setSalesAgents([]));
     apiFetch<SafeOrganisation>("/org/settings", auth)
       .then((o) => setOrgName(o.name))
@@ -402,6 +404,10 @@ export default function AddNewProjectPage() {
     const grouped: Record<OrgCatalogCategory, OrgCatalogOption[]> = {
       project_type: [], unit_type: [], connectivity: [], amenity: [],
       price_includes: [], payment_plan: [], facing: [], parking: [], unit_variant: [],
+      // Lead-only lists — unused by the project wizard, present only to keep
+      // this record exhaustive over OrgCatalogCategory.
+      lead_purpose: [], lead_financing: [], lead_loan_status: [],
+      lead_timeline_to_buy: [], lead_preferred_floor: [], lead_tag: [],
     };
     for (const opt of catalog ?? []) grouped[opt.category]?.push(opt);
     for (const key of Object.keys(grouped) as OrgCatalogCategory[]) {
@@ -1475,7 +1481,7 @@ export default function AddNewProjectPage() {
                   </div>
                   <div className="field"><label>Assign sales agents</label>
                     {salesAgents.length === 0 ? (
-                      <div className="hint">No sales agents in your organisation yet — add them under Users.</div>
+                      <div className="hint">No assignable users in your organisation yet — add them under Users.</div>
                     ) : (
                       <div className="opts">
                         {salesAgents.map((u) => {
@@ -1486,7 +1492,7 @@ export default function AddNewProjectPage() {
                               className={`opt ${on ? "on" : ""}`}
                               onClick={() => setAgentAssign((prev) => (on ? prev.filter((x) => x !== u.id) : [...prev, u.id]))}
                             >
-                              <span className="b">{on ? "✓" : ""}</span>{userLabel(u)}
+                              <span className="b">{on ? "✓" : ""}</span>{u.name}
                             </span>
                           );
                         })}

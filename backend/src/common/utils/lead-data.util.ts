@@ -40,6 +40,14 @@ const INTEREST_KEYS = [
   'Configuration',
 ];
 
+const ALIAS_GROUPS: Array<{ canonical: string; aliases: string[] }> = [
+  { canonical: 'fullName', aliases: NAME_KEYS },
+  { canonical: 'phone', aliases: PHONE_KEYS },
+  { canonical: 'email', aliases: EMAIL_KEYS },
+  { canonical: 'interestedIn', aliases: INTEREST_KEYS },
+  { canonical: 'project', aliases: PROJECT_KEYS },
+];
+
 function firstString(
   data: Record<string, unknown>,
   keys: string[],
@@ -65,6 +73,24 @@ function firstMatching(
   return null;
 }
 
+function sameValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  return typeof left === 'string' && typeof right === 'string' && left.trim() === right.trim();
+}
+
+function collapseAliases(
+  data: Record<string, unknown>,
+  canonical: string,
+  aliases: string[],
+  value: string | null,
+) {
+  if (!value) return;
+  data[canonical] = value;
+  for (const alias of aliases) {
+    if (alias !== canonical && sameValue(data[alias], value)) delete data[alias];
+  }
+}
+
 export function normalizeLeadData(
   data: Record<string, unknown>,
   extras?: { unitId?: string | null; projectName?: string | null },
@@ -84,18 +110,12 @@ export function normalizeLeadData(
     firstString(data, INTEREST_KEYS) ??
     firstMatching(data, /interest|configuration|bhk/i, skip);
 
-  if (fullName) {
-    next.fullName = fullName;
-    if (!next.name) next.name = fullName;
-  }
-  if (phone) {
-    next.phone = phone;
-    if (!next.phoneNumber) next.phoneNumber = phone;
-  }
-  if (email) next.email = email;
-  if (project) next.project = project;
+  collapseAliases(next, 'fullName', ALIAS_GROUPS[0].aliases, fullName);
+  collapseAliases(next, 'phone', ALIAS_GROUPS[1].aliases, phone);
+  collapseAliases(next, 'email', ALIAS_GROUPS[2].aliases, email);
+  collapseAliases(next, 'project', ALIAS_GROUPS[4].aliases, project);
   if (unitId) next.unitId = unitId;
-  if (interestedIn) next.interestedIn = interestedIn;
+  collapseAliases(next, 'interestedIn', ALIAS_GROUPS[3].aliases, interestedIn);
   return next;
 }
 

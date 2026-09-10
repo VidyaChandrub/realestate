@@ -23,6 +23,8 @@ describe('LeadsService', () => {
     project: { findMany: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     projectSalesAgent: { findMany: jest.Mock; findFirst: jest.Mock };
     user: { findFirst: jest.Mock; findMany: jest.Mock };
+    roleModulePermission: { findMany: jest.Mock };
+    userModulePermission: { findMany: jest.Mock };
     activityEvent: { create: jest.Mock };
   };
 
@@ -48,6 +50,8 @@ describe('LeadsService', () => {
         findFirst: jest.fn(),
       },
       user: { findFirst: jest.fn(), findMany: jest.fn() },
+      roleModulePermission: { findMany: jest.fn().mockResolvedValue([]) },
+      userModulePermission: { findMany: jest.fn().mockResolvedValue([]) },
       activityEvent: { create: jest.fn().mockResolvedValue({}) },
     };
 
@@ -124,9 +128,11 @@ describe('LeadsService', () => {
       const call = prisma.lead.findMany.mock.calls[0][0];
       const andClauses = call.where.AND;
       const orClause = andClauses.find((c: any) => Array.isArray(c.OR));
+      // Project-agent visibility is scoped to leads with no individual
+      // assignee — an explicit lead assignment overrides it.
       expect(orClause.OR).toEqual([
         { assignedToId: 'sales-9' },
-        { projectId: { in: ['proj-5'] } },
+        { assignedToId: null, projectId: { in: ['proj-5'] } },
       ]);
     });
   });
@@ -197,7 +203,7 @@ describe('LeadsService', () => {
           projectId: null,
           formName: 'enquiry',
           source: 'website',
-          data: { name: 'Aarav', fullName: 'Aarav' },
+          data: { fullName: 'Aarav' },
         },
       });
       expect(result.id).toBe('lead-1');
@@ -227,6 +233,105 @@ describe('LeadsService', () => {
         }),
       );
       expect(result.id).toBe('lead-2');
+    });
+
+    it('stores one canonical value per submitted contact field', async () => {
+      prisma.landingPage.findUnique.mockResolvedValue({
+        id: 'lp-x',
+        orgId: 'org-42',
+        status: 'published',
+      });
+      prisma.lead.findFirst.mockResolvedValue(null);
+      prisma.lead.create.mockResolvedValue({ id: 'lead-3' });
+
+      await service.createFromPublic({
+        landingPageId: 'lp-x',
+        data: {
+          name: 'Shubham',
+          'Full name': 'Shubham',
+          email: 'shubham@example.com',
+          'Email address': 'shubham@example.com',
+          phone: '918854545645',
+          phoneNumber: '918854545645',
+          'Phone number': '918854545645',
+          interestedIn: '3 BHK',
+          'Interested in': '3 BHK',
+          Notes: 'Needs evening callback',
+        },
+      });
+
+      expect(prisma.lead.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            data: {
+              fullName: 'Shubham',
+              email: 'shubham@example.com',
+              phone: '918854545645',
+              interestedIn: '3 BHK',
+              Notes: 'Needs evening callback',
+            },
+          }),
+        }),
+      );
+      const persisted = (prisma.lead.create as jest.Mock).mock.calls.at(-1)[0].data;
+      expect(persisted.name).toBeUndefined();
+      expect(persisted['Full name']).toBeUndefined();
+      expect(persisted.phoneNumber).toBeUndefined();
+      expect(persisted['Phone number']).toBeUndefined();
+      expect(persisted['Interested in']).toBeUndefined();
+    });
+  });
+
+  describe('getById — by-id visibility gate', () => {
+    const leadRow = {
+      id: 'lead-9',
+      orgId: 'org-1',
+      status: 'new',
+      assignedToId: 'other-agent',
+      projectId: 'proj-5',
+      landingPageId: null,
+      data: {},
+      activities: [],
+      callLogs: [],
+      nextActionType: null,
+    };
+
+    it('404s a lead the caller cannot see, even when fetched directly by id', async () => {
+      prisma.lead.findFirst.mockResolvedValue(leadRow);
+      prisma.project.findMany.mockResolvedValue([]);
+      prisma.projectSalesAgent.findMany.mockResolvedValue([
+        { projectId: 'proj-5', user: { firstName: 'Sam', lastName: 'Lee', email: 's@x.com' }, project: { name: 'P5', marketing: null } },
+      ]);
+      // The scope query finds nothing — the lead is assigned to someone else,
+      // so the project-agent clause ({ assignedToId: null, projectId }) misses.
+      prisma.lead.count.mockResolvedValue(0);
+
+      await expect(
+        service.getById('org-1', 'lead-9', actor({ roles: ['sales'], sub: 'sales-9' })),
+      ).rejects.toThrow(NotFoundException);
+
+      // The gate ran the same scope clauses as list(), as a real query.
+      expect(prisma.lead.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: 'lead-9', orgId: 'org-1' }),
+        }),
+      );
+    });
+
+    it('returns the lead when the scope query matches', async () => {
+      prisma.lead.findFirst.mockResolvedValue({ ...leadRow, assignedToId: null });
+      prisma.project.findMany.mockResolvedValue([]);
+      prisma.projectSalesAgent.findMany.mockResolvedValue([
+        { projectId: 'proj-5', user: { firstName: 'Sam', lastName: 'Lee', email: 's@x.com' }, project: { name: 'P5', marketing: null } },
+      ]);
+      prisma.lead.count.mockResolvedValue(1);
+
+      const result = await service.getById(
+        'org-1',
+        'lead-9',
+        actor({ roles: ['sales'], sub: 'sales-9' }),
+      );
+      expect(result.id).toBe('lead-9');
     });
   });
 
@@ -339,14 +444,26 @@ describe('LeadsService', () => {
   });
 
   describe('listAssignableUsers', () => {
-    it('only returns active manager/sales users in the org', async () => {
+    it('returns members whose role grants CRM view, excluding admins/managers', async () => {
       prisma.user.findMany.mockResolvedValue([
         {
           id: 'sales-9',
           firstName: 'Rohit',
           lastName: 'Menon',
           email: 'r@x.com',
-          userRoles: [{ role: { key: 'sales', name: 'Sales' } }],
+          userRoles: [{ role: { key: 'sales', name: 'Sales', status: 'active' } }],
+        },
+        {
+          id: 'mgr-2',
+          firstName: 'Meera',
+          lastName: 'Rao',
+          email: 'm@x.com',
+          // Multi-role: also a manager — must be excluded even though `sales`
+          // would otherwise qualify (the picker/API mismatch bug).
+          userRoles: [
+            { role: { key: 'manager', name: 'Manager', status: 'active' } },
+            { role: { key: 'sales', name: 'Sales', status: 'active' } },
+          ],
         },
       ]);
 
@@ -354,20 +471,10 @@ describe('LeadsService', () => {
 
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: {
-            orgId: 'org-1',
-            status: 'active',
-            userRoles: {
-              some: {
-                role: {
-                  status: 'active',
-                  key: { notIn: ['super_admin', 'admin'] },
-                },
-              },
-            },
-          },
+          where: { orgId: 'org-1', status: 'active' },
         }),
       );
+      expect(data.map((u) => u.id)).toEqual(['sales-9']);
       expect(data[0].name).toBe('Rohit Menon');
     });
   });

@@ -49,6 +49,49 @@ interface AgentRow {
   }[];
 }
 
+/** Minimal shape of a row produced by `buildRows`, used to type the shared
+ *  dashboard assembler without threading the full inferred return type.
+ *  Exported so the inferred return types of the public dashboard methods
+ *  (which pass this through as `agent`) remain nameable in declaration emit. */
+export interface AgentSummaryLike {
+  id: string;
+  stats: {
+    leadsAssigned: number;
+    closures: number;
+    revenueBooked: number;
+    pipeline: { status: string; count: number }[];
+  };
+}
+
+/** Inclusive capture-date window applied to the per-user dashboard. Either
+ *  bound may be omitted for an open-ended range. */
+export interface CaptureDateRange {
+  gte?: Date;
+  lte?: Date;
+}
+
+/** Parses `from` / `to` (YYYY-MM-DD, as sent by a native <input type="date">)
+ *  into a capture-date window. Bad or inverted input yields `undefined` so the
+ *  dashboard falls back to all-time — never a 400. Day bounds are UTC. */
+function parseCaptureRange(
+  from?: string,
+  to?: string,
+): CaptureDateRange | undefined {
+  const isYmd = (v?: string): v is string =>
+    typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const range: CaptureDateRange = {};
+  if (isYmd(from)) {
+    const d = new Date(`${from}T00:00:00.000Z`);
+    if (!Number.isNaN(d.getTime())) range.gte = d;
+  }
+  if (isYmd(to)) {
+    const d = new Date(`${to}T23:59:59.999Z`);
+    if (!Number.isNaN(d.getTime())) range.lte = d;
+  }
+  if (range.gte && range.lte && range.gte > range.lte) return undefined;
+  return range.gte || range.lte ? range : undefined;
+}
+
 @Injectable()
 export class SalesAgentsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -117,14 +160,88 @@ export class SalesAgentsService {
       throw new NotFoundException('Sales agent not found');
     }
 
+    return this.assembleDashboard(orgId, summary, allRows);
+  }
+
+  /**
+   * Per-user performance dashboard for the Users module. Unlike `detail`, this
+   * is not restricted to manager/sales roles — any org member (admin,
+   * telecaller, a custom role, …) can be opened. Data is identical in shape to
+   * the sales-agent dashboard so the frontend renders it with the same view.
+   * Access: an org admin may open anyone; every other member only themselves.
+   */
+  async userDashboard(
+    orgId: string | null,
+    actor: JwtPayload,
+    userId: string,
+    opts?: { from?: string; to?: string },
+  ) {
+    if (!orgId) {
+      throw new ForbiddenException('Organisation access required');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, orgId },
+      include: { userRoles: { include: { role: true } } },
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isAdmin = actor.roles.includes('admin');
+    if (!isAdmin && actor.sub !== user.id) {
+      throw new ForbiddenException('You can only view your own dashboard');
+    }
+
+    // Optional capture-date window: when set, every metric on the dashboard
+    // (pipeline, closures, revenue, sources, recent leads, calls, activity,
+    // comms) counts only records created inside it. The "last 14 days" chart
+    // stays a rolling fortnight by design.
+    const dateRange = parseCaptureRange(opts?.from, opts?.to);
+
+    // Rank the user against the sales-agent pool. If they are not already an
+    // agent (e.g. an admin or telecaller) add them so `buildRows` still
+    // produces their stats row and a relative rank.
+    const agents = await this.findAgents(orgId);
+    const pool = agents.some((a) => a.id === user.id)
+      ? agents
+      : [...agents, user];
+    const allRows = await this.buildRows(orgId, pool, dateRange);
+    const summary = allRows.find((row) => row.id === user.id);
+    if (!summary) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.assembleDashboard(orgId, summary, allRows, dateRange);
+  }
+
+  /**
+   * Shared dashboard body for `detail` and `userDashboard`: recent leads,
+   * calls, activity feed, comms KPIs, monthly targets and the 14-day series
+   * for the subject identified by `summary`.
+   */
+  private async assembleDashboard(
+    orgId: string,
+    summary: AgentSummaryLike,
+    allRows: AgentSummaryLike[],
+    dateRange?: CaptureDateRange,
+  ) {
+    const agentId = summary.id;
     const since14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    // Spread into every "current work" query so the whole dashboard honours
+    // the selected capture-date window. Empty when no range is active.
+    const rangeWhere = dateRange ? { createdAt: dateRange } : {};
 
     const [recentLeads, calls, activity, callStats, leadDays, callDays] =
       await Promise.all([
         this.prisma.lead.findMany({
-          where: { orgId, assignedToId: agentId },
+          where: { orgId, assignedToId: agentId, ...rangeWhere },
           orderBy: { createdAt: 'desc' },
-          take: 15,
+          // Recent assigned leads for the dashboard's Leads tab. Capped, but
+          // large enough that the tab's client-side status/date filters
+          // (e.g. "captured in the last 30 days") have a meaningful set to
+          // work over.
+          take: 50,
           select: {
             id: true,
             formName: true,
@@ -135,7 +252,7 @@ export class SalesAgentsService {
           },
         }),
         this.prisma.callLog.findMany({
-          where: { orgId, agentId },
+          where: { orgId, agentId, ...rangeWhere },
           orderBy: { createdAt: 'desc' },
           take: 12,
           select: {
@@ -149,14 +266,14 @@ export class SalesAgentsService {
           },
         }),
         this.prisma.activityEvent.findMany({
-          where: { orgId, agentId },
+          where: { orgId, agentId, ...rangeWhere },
           orderBy: { createdAt: 'desc' },
           take: 12,
           select: { id: true, type: true, text: true, createdAt: true },
         }),
         this.prisma.callLog.groupBy({
           by: ['outcome'],
-          where: { orgId, agentId },
+          where: { orgId, agentId, ...rangeWhere },
           _count: { _all: true },
           _sum: { durationSeconds: true },
         }),
@@ -200,6 +317,7 @@ export class SalesAgentsService {
         orgId,
         agentId,
         type: { in: ['whatsapp_sent', 'whatsapp_read'] },
+        ...rangeWhere,
       },
       _count: { _all: true },
     });
@@ -332,27 +450,39 @@ export class SalesAgentsService {
    *  - source counts (lead source donut)
    *  - won leads' form data (booked revenue)
    */
-  private async buildRows(orgId: string, agents: AgentRow[]) {
+  private async buildRows(
+    orgId: string,
+    agents: AgentRow[],
+    dateRange?: CaptureDateRange,
+  ) {
     const agentIds = agents.map((a) => a.id);
+    const rangeWhere: Prisma.LeadWhereInput = dateRange
+      ? { createdAt: dateRange }
+      : {};
 
     const [pipeline, sources, wonLeads] = await Promise.all([
       agentIds.length
         ? this.prisma.lead.groupBy({
             by: ['assignedToId', 'status'],
-            where: { orgId, assignedToId: { in: agentIds } },
+            where: { orgId, assignedToId: { in: agentIds }, ...rangeWhere },
             _count: { _all: true },
           })
         : [],
       agentIds.length
         ? this.prisma.lead.groupBy({
             by: ['assignedToId', 'source'],
-            where: { orgId, assignedToId: { in: agentIds } },
+            where: { orgId, assignedToId: { in: agentIds }, ...rangeWhere },
             _count: { _all: true },
           })
         : [],
       agentIds.length
         ? this.prisma.lead.findMany({
-            where: { orgId, assignedToId: { in: agentIds }, status: 'won' },
+            where: {
+              orgId,
+              assignedToId: { in: agentIds },
+              status: 'won',
+              ...rangeWhere,
+            },
             select: { assignedToId: true, data: true },
           })
         : [],

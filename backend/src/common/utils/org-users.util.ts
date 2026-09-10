@@ -336,6 +336,31 @@ export async function disapproveOrgUser(
   return setOrgUserStatus(prisma, orgId, id, 'disabled', true);
 }
 
+// Org Admin permanently deletes a member. Refuses org-wide `admin`-role
+// members (same protection as deactivate). Dependent rows are handled by the
+// schema's FK actions: userRoles / sessions / call logs / activity / per-user
+// permissions cascade, while assigned leads and managed projects are detached
+// (ON DELETE SET NULL) so their history survives.
+export async function deleteOrgUser(
+  prisma: OrgUsersPrisma,
+  orgId: string,
+  id: string,
+) {
+  const user = await prisma.user.findFirst({
+    where: { id, orgId },
+    include: { userRoles: { include: { role: true } } },
+  });
+  if (!user) {
+    throw new NotFoundException('User not found');
+  }
+  if (user.userRoles.some(({ role }) => role.key === 'admin')) {
+    throw new ForbiddenException('Organisation admins cannot be deleted.');
+  }
+
+  await prisma.user.delete({ where: { id } });
+  return { success: true };
+}
+
 export interface OrgUsersQuery {
   page?: number;
   limit?: number;

@@ -8,6 +8,7 @@ import type { Prisma, UnitPriceBasis } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
+import { listLeadAssignableUsers } from '../../common/utils/lead-assignee.util';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -416,6 +417,16 @@ export class ProjectsService {
   // re-submitting is idempotent (delete-all + recreate in one transaction).
   // -------------------------------------------------------------------------
 
+  /**
+   * Org members who may be assigned to a project as sales agents — the same
+   * "who can hold a lead" rule the Lead Center assignee picker uses. Kept
+   * org-level (no projectId) because the eligible set doesn't vary by project.
+   */
+  async listSalesAgentCandidates(orgId: string) {
+    const data = await listLeadAssignableUsers(this.prisma, orgId);
+    return { data, total: data.length };
+  }
+
   async listSalesAgents(orgId: string, projectId: string) {
     await this.getOwnedProject(orgId, projectId);
     const rows = await this.prisma.projectSalesAgent.findMany({
@@ -444,21 +455,16 @@ export class ProjectsService {
 
     const unique = [...new Set(userIds)];
     if (unique.length > 0) {
-      // Every id must be a Sales-role user in the caller's own org — never
-      // trusted from the body. The picker only shows sales users, but a
-      // direct API call must not be able to attach an admin/manager. Role
-      // check uses the same `userRoles.some.role.key` shape as
-      // org-users.util.ts / admin-organisations.service.ts.
-      const count = await this.prisma.user.count({
-        where: {
-          id: { in: unique },
-          orgId,
-          userRoles: { some: { role: { key: 'sales' } } },
-        },
-      });
-      if (count !== unique.length) {
+      // Every id must be someone the shared "who can hold a lead" rule allows —
+      // never trusted from the body. Same list the picker shows
+      // (listSalesAgentCandidates), so a direct API call can't attach anyone
+      // the dropdown wouldn't offer.
+      const eligible = new Set(
+        (await listLeadAssignableUsers(this.prisma, orgId)).map((u) => u.id),
+      );
+      if (!unique.every((id) => eligible.has(id))) {
         throw new BadRequestException(
-          'Every assigned agent must be a Sales-role user in your organisation',
+          'Assigned agents must be organisation members who can be assigned leads (not admins or managers)',
         );
       }
     }

@@ -96,6 +96,14 @@ const CATALOG_NOUNS: Record<OrgCatalogCategory, string> = {
   payment_plan: "payment plans",
   facing: "facing options",
   parking: "parking options",
+  // Lead-only requirement lists — not surfaced by the project form, but the
+  // record must stay exhaustive over OrgCatalogCategory.
+  lead_purpose: "lead purpose options",
+  lead_financing: "lead financing options",
+  lead_loan_status: "lead loan-status options",
+  lead_timeline_to_buy: "lead timeline options",
+  lead_preferred_floor: "lead preferred-floor options",
+  lead_tag: "lead tags",
 };
 
 /**
@@ -541,6 +549,7 @@ export function UnitAttributeSelect({
   disabled,
   placeholder = "Not set",
   emptyHint,
+  settingsHref = "/org/settings?section=catalogs",
 }: {
   options: OrgCatalogOption[];
   loaded: boolean;
@@ -551,6 +560,8 @@ export function UnitAttributeSelect({
   placeholder?: string;
   /** Shown instead of the control when the catalog has no options at all. */
   emptyHint?: string;
+  /** Settings deep-link for the empty state — defaults to Project Catalogs. */
+  settingsHref?: string;
 }) {
   if (error) return <div className="hint text-rose">{error}</div>;
   if (!loaded) return <div className="hint">Loading options…</div>;
@@ -563,7 +574,7 @@ export function UnitAttributeSelect({
     return (
       <div className="hint">
         {emptyHint ?? "Nothing configured yet."}{" "}
-        <Link className="brand-link" href="/org/settings?section=catalogs">
+        <Link className="brand-link" href={settingsHref}>
           Add them in Settings →
         </Link>
       </div>

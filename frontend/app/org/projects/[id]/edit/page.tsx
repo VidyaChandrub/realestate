@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, setProjectSalesAgents } from "@/lib/api";
+import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectSalesAgentCandidates, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { CURRENCY_LABELS, PROJECT_CURRENCIES } from "@/lib/money";
 import {
@@ -27,7 +27,6 @@ import {
   type SpecRow,
 } from "@/lib/specifications";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
-import { ProjectTabs } from "@/components/org/project-tabs";
 import "@/app/org/org.css";
 import type {
   Amenity,
@@ -92,14 +91,14 @@ function withCurrent(options: string[], value: string): string[] {
  *
  * The rules themselves come from lib/project-validation — the same module the
  * create wizard uses — so the two can't drift. Only the *placement* differs:
- * this page is one scrolling form, and its project-manager field sits in
- * Basics rather than in a separate Team step.
+ * this page is one scrolling form. The project-manager field (step 6) lives in
+ * the Team & access section, alongside the other access controls.
  */
 const STEP_SECTION: Record<number, string> = {
   0: "sec-basics",
   2: "sec-pricing",
   3: "sec-location",
-  6: "sec-basics",
+  6: "sec-team",
 };
 
 const NAV = [
@@ -197,7 +196,7 @@ export default function OrgProjectEditPage() {
   const [aiKnowledgeBase, setAiKnowledgeBase] = useState(false);
 
   // --- Team & access ---
-  const [salesUsers, setSalesUsers] = useState<OrgUser[]>([]);
+  const [salesUsers, setSalesUsers] = useState<Array<{ id: string; name: string }>>([]);
   const [salesTeam, setSalesTeam] = useState("");
   const [agentAssign, setAgentAssign] = useState<string[]>([]);
   const [requireBookingApproval, setRequireBookingApproval] = useState(false);
@@ -326,8 +325,10 @@ export default function OrgProjectEditPage() {
     apiFetch<OrgUsersListResponse>("/org/users?role=manager&limit=100&status=active", auth)
       .then((res) => setManagers(res.data))
       .catch(() => setManagers([]));
-    apiFetch<OrgUsersListResponse>("/org/users?role=sales&limit=100&status=active", auth)
-      .then((res) => setSalesUsers(res.data))
+    // "Who can hold a lead" — resolved server-side (permission-based, admins
+    // and managers excluded), and the same rule the PUT enforces.
+    getProjectSalesAgentCandidates()
+      .then((res) => setSalesUsers(res.data.map((u) => ({ id: u.id, name: u.name }))))
       .catch(() => setSalesUsers([]));
     apiFetch<SafeOrganisation>("/org/settings", auth)
       .then((o) => setOrgName(o.name))
@@ -748,19 +749,25 @@ export default function OrgProjectEditPage() {
         </div>
       </div>
 
-      <ProjectTabs active="overview" />
-
-      {/* Section jump-nav */}
+      {/* Section nav — sticky underline tab bar (edit page only). Replaces the
+          project workspace tabs here: this page only edits the Overview
+          sections, so the section jump-nav takes the tab-bar slot and pins
+          below the top bar while the form scrolls. */}
       <div
-        className="card"
-        style={{ position: "sticky", top: 8, zIndex: 5, marginBottom: 16 }}
+        style={{
+          position: "sticky",
+          top: 64,
+          zIndex: 20,
+          background: "var(--bg)",
+          marginBottom: 16,
+        }}
       >
-        <div className="card-b" style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "12px 16px" }}>
+        <div className="tabs" style={{ marginBottom: 0 }}>
           {NAV.map(([anchor, label]) => (
             <a
               key={anchor}
               href={`#${anchor}`}
-              className={`btn btn-sm ${activeSection === anchor ? "btn-primary" : "btn-ghost"}`}
+              className={activeSection === anchor ? "active" : ""}
               onClick={(event) => {
                 event.preventDefault();
                 jumpToSection(anchor, label);
@@ -795,7 +802,7 @@ export default function OrgProjectEditPage() {
       <div className="col gap-18">
 
           {/* BASICS */}
-          <div className="card" id="sec-basics" style={{ scrollMarginTop: 72 }}>
+          <div className="card" id="sec-basics" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Basics</span></div>
             <div className="card-b">
               <div className="row2">
@@ -862,33 +869,18 @@ export default function OrgProjectEditPage() {
                   </select>
                 </div>
               </div>
-              <div className="row2 mb-0">
-                <div className={fieldClass("managerId")}>
-                  <label>Project manager <span className="req">*</span></label>
-                  <select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
-                    <option value="">Unassigned</option>
-                    {currentManager && !managers.some((u) => u.id === currentManager.id) ? (
-                      <option value={currentManager.id}>{currentManager.name} (current)</option>
-                    ) : null}
-                    {managers.map((u) => (
-                      <option key={u.id} value={u.id}>{userLabel(u)}</option>
-                    ))}
-                  </select>
-                  {fieldError("managerId") ? <div className="field-err">{fieldError("managerId")}</div> : null}
-                </div>
-                <div className="field">
-                  <label>Status</label>
-                  <select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
+              <div className="field mb-0">
+                <label>Status</label>
+                <select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
               </div>
             </div>
           </div>
 
           {/* PRICING */}
-          <div className="card" id="sec-pricing" style={{ scrollMarginTop: 72 }}>
+          <div className="card" id="sec-pricing" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Pricing &amp; payment</span></div>
             <div className="card-b">
               <div className="row2">
@@ -960,7 +952,7 @@ export default function OrgProjectEditPage() {
           </div>
 
           {/* LOCATION */}
-          <div className="card" id="sec-location" style={{ scrollMarginTop: 72 }}>
+          <div className="card" id="sec-location" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Location &amp; connectivity</span></div>
             <div className="card-b">
               <div className="field">
@@ -1011,7 +1003,7 @@ export default function OrgProjectEditPage() {
           </div>
 
           {/* INVENTORY & SPECS */}
-          <div className="card" id="sec-inventory" style={{ scrollMarginTop: 72 }}>
+          <div className="card" id="sec-inventory" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Inventory &amp; specifications</span></div>
             <div className="card-b">
               <div className="field">
@@ -1140,7 +1132,7 @@ export default function OrgProjectEditPage() {
           </div>
 
           {/* MARKETING */}
-          <div className="card" id="sec-marketing" style={{ scrollMarginTop: 72 }}>
+          <div className="card" id="sec-marketing" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Marketing &amp; leads</span></div>
             <div className="card-b">
               <div className="field">
@@ -1182,29 +1174,44 @@ export default function OrgProjectEditPage() {
           </div>
 
           {/* TEAM & ACCESS */}
-          <div className="card" id="sec-team" style={{ scrollMarginTop: 72 }}>
+          <div className="card" id="sec-team" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Team &amp; access</span></div>
             <div className="card-b">
-              <div className="field">
-                <label>Sales team</label>
-                <select value={salesTeam} onChange={(e) => setSalesTeam(e.target.value)}>
-                  <option value="">Not set</option>
-                  {withCurrent(SALES_TEAMS, salesTeam).map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+              <div className="row2">
+                <div className={fieldClass("managerId")}>
+                  <label>Project manager <span className="req">*</span></label>
+                  <select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
+                    <option value="">Unassigned</option>
+                    {currentManager && !managers.some((u) => u.id === currentManager.id) ? (
+                      <option value={currentManager.id}>{currentManager.name} (current)</option>
+                    ) : null}
+                    {managers.map((u) => (
+                      <option key={u.id} value={u.id}>{userLabel(u)}</option>
+                    ))}
+                  </select>
+                  {fieldError("managerId") ? <div className="field-err">{fieldError("managerId")}</div> : null}
+                </div>
+                <div className="field">
+                  <label>Sales team</label>
+                  <select value={salesTeam} onChange={(e) => setSalesTeam(e.target.value)}>
+                    <option value="">Not set</option>
+                    {withCurrent(SALES_TEAMS, salesTeam).map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="field">
                 <label>Assigned sales agents</label>
                 {salesUsers.length === 0 ? (
-                  <div className="hint">No sales-role users in your organisation yet — add them under Users.</div>
+                  <div className="hint">No assignable users in your organisation yet — add them under Users.</div>
                 ) : (
                   <div className="opts">
                     {salesUsers.map((u) => {
                       const on = agentAssign.includes(u.id);
                       return (
                         <span key={u.id} className={`opt ${on ? "on" : ""}`} onClick={() => setAgentAssign((prev) => (on ? prev.filter((x) => x !== u.id) : [...prev, u.id]))}>
-                          <span className="b">{on ? "✓" : ""}</span>{userLabel(u)}
+                          <span className="b">{on ? "✓" : ""}</span>{u.name}
                         </span>
                       );
                     })}
@@ -1218,7 +1225,7 @@ export default function OrgProjectEditPage() {
           </div>
 
           {/* MEDIA */}
-          <div className="card" id="sec-media" style={{ scrollMarginTop: 72 }}>
+          <div className="card" id="sec-media" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Documents &amp; media</span></div>
             <div className="card-b">
               <div className="row2">
