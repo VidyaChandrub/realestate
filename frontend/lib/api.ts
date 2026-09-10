@@ -807,6 +807,17 @@ export async function getProjectSalesAgents(
   );
 }
 
+/**
+ * Org members who may be assigned to a project as sales agents — the same
+ * "who can hold a lead" rule the Lead Center assignee picker uses (permission
+ * based, admins/managers excluded). Server-enforced on the PUT as well.
+ */
+export async function getProjectSalesAgentCandidates(): Promise<CrmAssignableResponse> {
+  return apiFetch<CrmAssignableResponse>(
+    "/org/projects/sales-agent-candidates",
+  );
+}
+
 /** Full-set replace — pass every assigned user id; re-submitting is idempotent. */
 export async function setProjectSalesAgents(
   projectId: string,

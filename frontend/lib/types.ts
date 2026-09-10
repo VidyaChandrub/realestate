@@ -1412,6 +1412,12 @@ export interface CrmLead extends Partial<CrmLeadEditFields> {
   data: Record<string, unknown>;
   status: CrmLeadStatus;
   assignedTo: CrmAssignee | null;
+  /**
+   * Derived (never stored): when the lead has no individual `assignedTo` but
+   * its project has sales agents, those agents can all see it — nobody owns it.
+   * Null when the lead has an owner or its project has no agents.
+   */
+  projectTeam?: { count: number; names: string[] } | null;
   createdAt: string;
   activities?: Array<{
     id: string;

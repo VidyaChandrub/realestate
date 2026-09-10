@@ -586,12 +586,17 @@ export default function OrgLeadEditPage() {
               <div className="field">
                 <label>Owner / agent</label>
                 <select className="inp" value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
-                  <option value="">Unassigned</option>
+                  <option value="">{lead.projectTeam?.count ? "Project team (no individual owner)" : "Unassigned"}</option>
                   {assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                   {form.assignedToId && !assignees.some((a) => a.id === form.assignedToId) && lead.assignedTo ? (
                     <option value={form.assignedToId}>{lead.assignedTo.name}</option>
                   ) : null}
                 </select>
+                {!form.assignedToId && lead.projectTeam?.count ? (
+                  <div className="hint">
+                    Visible to {lead.projectTeam.count} project agent{lead.projectTeam.count === 1 ? "" : "s"} ({lead.projectTeam.names.join(", ")}) until someone is assigned.
+                  </div>
+                ) : null}
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>Team</label>
