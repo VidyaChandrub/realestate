@@ -14,16 +14,16 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import type { LandingPageData, ModuleKey, SiteConfig } from "@/lib/openpage/types";
+import type { LandingPageData, ModuleKey } from "@/lib/openpage/types";
 import { loadTemplate, loadTemplates, saveTemplate, saveTemplateNow, publishLandingPage, unpublishLandingPage, type Resource } from "@/lib/openpage/store";
 import { uploadBuilderImage } from "@/lib/openpage/persist";
 import { BuilderUploadProvider, type BuilderImageUploader } from "@/components/openpage/builder/upload-context";
 import { templatePreviewPath } from "@/lib/openpage/paths";
-import { ensureConfig } from "@/lib/openpage/site-config";
 import { TopNav } from "@/components/openpage/topnav";
 import { EditorLayout } from "@/components/openpage/editor/EditorLayout";
 import { OpenPageBridge } from "@/components/openpage/editor/OpenPageBridge";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
+import { PageSettingsModule } from "@/components/openpage/modules/page-settings";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { landingPageFromSite } from "@/lib/openpage/content";
 
@@ -394,20 +394,6 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
     return useConfigStore.subscribe(syncCaps);
   }, [activePage, saveInBackground, toast, openLocalPreview, persistOpenPage, resource]);
 
-  const patchConfig = useCallback(
-    (pageId: string, recipe: (c: SiteConfig) => SiteConfig) => {
-      setActivePage((prev) => {
-        if (!prev || prev.id !== pageId) return prev;
-        const nextCfg = recipe(ensureConfig(prev));
-        const next = { ...prev, config: nextCfg, updated: "Just now" };
-        useConfigStore.getState().patchSite({ forms: nextCfg.forms as never });
-        saveInBackground(next);
-        return next;
-      });
-    },
-    [saveInBackground],
-  );
-
   const patchPage = useCallback(
     (pageId: string, patch: Partial<LandingPageData>) => {
       setActivePage((prev) => {
@@ -427,6 +413,12 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
           <div className="op-root" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column" }}>
             <EditorLayout />
           </div>
+        ) : (
+          <div className="ps-studio-boot">{pageReady ? "This page could not be opened." : "Opening page…"}</div>
+        );
+      case "settings":
+        return activePage ? (
+          <PageSettingsModule page={activePage} onPage={(patch) => patchPage(activePage.id, patch)} />
         ) : (
           <div className="ps-studio-boot">{pageReady ? "This page could not be opened." : "Opening page…"}</div>
         );

@@ -202,9 +202,17 @@ export interface SiteSeo {
   keywords?: string;
   canonical?: string;
   index?: boolean;
+  /** Freeform robots directive (e.g. "index,follow") — overrides the index flag when set. */
+  robots?: string;
   ogTitle?: string;
   ogDescription?: string;
   ogImage?: string;
+  twitterCard?: "summary" | "summary_large_image";
+  twitterTitle?: string;
+  twitterDescription?: string;
+  twitterImage?: string;
+  /** Raw JSON-LD string. When set and valid, it replaces the auto-generated schema. */
+  schema?: string;
 }
 
 export interface SiteTracking {
@@ -212,9 +220,20 @@ export interface SiteTracking {
   gtmId?: string;
   metaPixel?: string;
   customScripts?: string;
+  /** Injected into <head> verbatim. */
+  headerScripts?: string;
+  /** Injected into <body> verbatim. */
+  bodyScripts?: string;
+  /** Gate third-party pixels behind an explicit consent banner. */
+  cookieConsent?: boolean;
+  consentText?: string;
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
+  goalForm?: boolean;
+  goalWhatsapp?: boolean;
+  goalCall?: boolean;
+  goalBrochure?: boolean;
 }
 
 export interface SiteProperty {
@@ -248,4 +267,6 @@ export interface SiteConfig {
   tracking?: SiteTracking;
   property?: SiteProperty;
   globalWidgets?: GlobalWidget[];
+  /** Page-specific settings captured by the Page Settings module. */
+  settings?: import("@/lib/openpage/types").PageSettings;
 }

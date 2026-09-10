@@ -20,6 +20,7 @@ import {
   Rocket,
   Save,
   Settings,
+  SlidersHorizontal,
   Smartphone,
   Tablet,
   Undo2,
@@ -103,6 +104,14 @@ export const MODULE_OPTIONS: {
     desc: "Visual drag & drop page editor",
     color: "#6d5dfc",
     bg: "rgba(109, 93, 252, 0.15)",
+  },
+  {
+    key: "settings",
+    label: "Page Settings",
+    icon: SlidersHorizontal,
+    desc: "SEO, tracking, branding, typography & more",
+    color: "#0ea5e9",
+    bg: "rgba(14, 165, 233, 0.15)",
   },
 ];
 
@@ -699,6 +708,7 @@ export function TopNav({
 
 export const MODULE_LABELS: Record<ModuleKey, string> = {
   builder: "Builder",
+  settings: "Settings",
 };
 
 const VIEWPORTS: { value: Viewport; icon: typeof Monitor; label: string }[] = [

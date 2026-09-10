@@ -73,13 +73,25 @@ export function applyDocumentSeo(page: LandingPageData) {
   document.documentElement.lang = cfg.page.language || "en";
   upsertMeta("name", "description", cfg.seo.metaDescription);
   upsertMeta("name", "keywords", cfg.seo.keywords);
-  upsertMeta("name", "robots", cfg.seo.index ? "index,follow" : "noindex,nofollow");
+  const robots =
+    cfg.seo.robots?.trim() ||
+    (cfg.seo.index ? "index,follow" : "noindex,nofollow");
+  upsertMeta("name", "robots", robots);
   upsertMeta("property", "og:title", cfg.seo.ogTitle || cfg.seo.metaTitle);
   upsertMeta("property", "og:description", cfg.seo.ogDescription || cfg.seo.metaDescription);
   upsertMeta("property", "og:image", cfg.seo.ogImage);
   upsertMeta("property", "og:url", cfg.seo.canonical);
+  upsertMeta("name", "twitter:card", cfg.seo.twitterCard ?? (cfg.seo.ogImage ? "summary_large_image" : "summary"));
+  upsertMeta("name", "twitter:title", cfg.seo.twitterTitle || cfg.seo.ogTitle || cfg.seo.metaTitle);
+  upsertMeta("name", "twitter:description", cfg.seo.twitterDescription || cfg.seo.ogDescription || cfg.seo.metaDescription);
+  upsertMeta("name", "twitter:image", cfg.seo.twitterImage || cfg.seo.ogImage);
   upsertLink("canonical", cfg.seo.canonical);
   upsertLink("icon", cfg.page.favicon);
+
+  const schema =
+    typeof cfg.seo.schema === "string" && cfg.seo.schema.trim()
+      ? parseJsonLd(cfg.seo.schema) ?? buildJsonLd(page, cfg)
+      : buildJsonLd(page, cfg);
 
   let script = document.head.querySelector(`script[type="application/ld+json"][${MANAGED}]`) as HTMLScriptElement | null;
   if (!script) {
@@ -88,5 +100,14 @@ export function applyDocumentSeo(page: LandingPageData) {
     script.setAttribute(MANAGED, "true");
     document.head.appendChild(script);
   }
-  script.textContent = JSON.stringify(buildJsonLd(page, cfg));
+  script.textContent = JSON.stringify(schema);
+}
+
+function parseJsonLd(raw: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
 }

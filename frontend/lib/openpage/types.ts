@@ -2,7 +2,70 @@ import type { DesignSystemState } from "./design-system";
 
 export type Device = "desktop" | "tablet" | "mobile";
 
-export type ModuleKey = "builder";
+export type ModuleKey = "builder" | "settings";
+
+/** Heading level typography (used by Page Settings). */
+export interface HeadingStyle {
+  size?: string;
+  weight?: string;
+  lineHeight?: string;
+  letterSpacing?: string;
+}
+
+/** Page-scoped typography overrides (Page Settings → Typography). */
+export interface TypographySettings {
+  bodyFont?: string;
+  headingFont?: string;
+  bodySize?: string;
+  bodyWeight?: string;
+  bodyLineHeight?: string;
+  h1?: HeadingStyle;
+  h2?: HeadingStyle;
+  h3?: HeadingStyle;
+  h4?: HeadingStyle;
+  h5?: HeadingStyle;
+  h6?: HeadingStyle;
+  /** Per-device size percentage relative to desktop (e.g. 0.9). */
+  tabletScale?: number;
+  mobileScale?: number;
+  /** @font-face / custom font CSS injected verbatim. */
+  customFontCss?: string;
+}
+
+/** Branding overrides applied on top of the template theme (Page Settings → Branding). */
+export interface ThemeOverride {
+  primary?: string;
+  text?: string;
+  bg?: string;
+  radius?: number;
+  containerWidth?: number;
+}
+
+/** Business contact details (Page Settings → Business Info). */
+export interface BusinessSettings {
+  name?: string;
+  tagline?: string;
+  address?: string;
+  city?: string;
+  email?: string;
+  phone?: string;
+  whatsapp?: string;
+  website?: string;
+}
+
+export interface SocialLink {
+  platform: string;
+  url: string;
+}
+
+/** The per-page configuration bag edited by Page Settings. */
+export interface PageSettings {
+  theme: ThemeOverride;
+  typography: TypographySettings;
+  business: BusinessSettings;
+  socialLinks: SocialLink[];
+  page: { favicon?: string; customCss?: string; customJs?: string };
+}
 
 export type WidgetCategory =
   | "Layout"
@@ -264,6 +327,10 @@ export interface SiteConfig {
     language: string;
     password: string;
     favicon: string;
+    /** Page-specific CSS injected on the live page. */
+    customCss?: string;
+    /** Page-specific JS injected on the live page. */
+    customJs?: string;
   };
   seo: {
     metaTitle: string;
@@ -275,6 +342,12 @@ export interface SiteConfig {
     ogTitle: string;
     ogDescription: string;
     ogImage: string;
+    robots?: string;
+    twitterCard?: "summary" | "summary_large_image";
+    twitterTitle?: string;
+    twitterDescription?: string;
+    twitterImage?: string;
+    schema?: string;
   };
   brand: {
     name: string;
@@ -333,6 +406,10 @@ export interface SiteConfig {
     gtmId: string;
     metaPixel: string;
     customScripts: string;
+    headerScripts?: string;
+    bodyScripts?: string;
+    cookieConsent?: boolean;
+    consentText?: string;
     utmSource: string;
     utmMedium: string;
     utmCampaign: string;
@@ -402,6 +479,8 @@ export interface SiteConfig {
   };
   /** Per-template design system — typography scope (template/global) + tokens. */
   designSystem?: DesignSystemState;
+  /** Page-scoped configuration captured by Page Settings. */
+  settings?: PageSettings;
 }
 
 export interface LandingPageData {
