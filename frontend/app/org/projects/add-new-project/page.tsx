@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, setProjectSalesAgents } from "@/lib/api";
+import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectSalesAgentCandidates, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { CURRENCY_LABELS, formatMoneyRange, PROJECT_CURRENCIES } from "@/lib/money";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
@@ -258,7 +258,7 @@ export default function AddNewProjectPage() {
   // Step 7 — team
   const [managerId, setManagerId] = useState("");
   const [managers, setManagers] = useState<OrgUser[]>([]);
-  const [salesAgents, setSalesAgents] = useState<OrgUser[]>([]);
+  const [salesAgents, setSalesAgents] = useState<Array<{ id: string; name: string }>>([]);
   const [salesTeam, setSalesTeam] = useState("Ahmedabad — West");
   // User ids of the agents ticked in Step 7.
   const [agentAssign, setAgentAssign] = useState<string[]>([]);
@@ -349,17 +349,10 @@ export default function AddNewProjectPage() {
     apiFetch<OrgUsersListResponse>("/org/users?role=manager&limit=100&status=active", auth)
       .then((res) => setManagers(res.data))
       .catch(() => setManagers([]));
-    // Any active org member who isn't an admin or a manager can be assigned to
-    // work a project's leads (sales, telecaller, custom roles, …). Filtered
-    // client-side so a single call covers every eligible role.
-    apiFetch<OrgUsersListResponse>("/org/users?limit=100&status=active", auth)
-      .then((res) =>
-        setSalesAgents(
-          res.data.filter(
-            (u) => u.role?.key !== "admin" && u.role?.key !== "manager",
-          ),
-        ),
-      )
+    // "Who can hold a lead" — resolved server-side (permission-based, admins
+    // and managers excluded), and the same rule the PUT enforces.
+    getProjectSalesAgentCandidates()
+      .then((res) => setSalesAgents(res.data.map((u) => ({ id: u.id, name: u.name }))))
       .catch(() => setSalesAgents([]));
     apiFetch<SafeOrganisation>("/org/settings", auth)
       .then((o) => setOrgName(o.name))
@@ -1499,7 +1492,7 @@ export default function AddNewProjectPage() {
                               className={`opt ${on ? "on" : ""}`}
                               onClick={() => setAgentAssign((prev) => (on ? prev.filter((x) => x !== u.id) : [...prev, u.id]))}
                             >
-                              <span className="b">{on ? "✓" : ""}</span>{userLabel(u)}
+                              <span className="b">{on ? "✓" : ""}</span>{u.name}
                             </span>
                           );
                         })}

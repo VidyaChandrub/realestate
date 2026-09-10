@@ -16,8 +16,8 @@ import {
 import {
   actorLeadOrClauses,
   canSeeAllLeads,
-  leadMatchesActorScope,
 } from '../../common/utils/lead-scope.util';
+import { listLeadAssignableUsers } from '../../common/utils/lead-assignee.util';
 
 /** Fields needed to render an activity/call actor. */
 const ACTOR_SELECT = {
@@ -389,19 +389,23 @@ export class LeadsService {
     return match;
   }
 
+  /**
+   * Gate a single lead behind the same visibility rule `list()` uses — by
+   * re-running the scope clauses as a real query rather than re-checking the
+   * loaded row in memory, so the by-id path can never drift from the list
+   * path. A lead the caller may not see 404s (same as a non-existent id).
+   */
   private async assertCanAccessLead(
     orgId: string,
-    lead: {
-      assignedToId?: string | null;
-      projectId?: string | null;
-      landingPageId?: string | null;
-      data?: unknown;
-    },
+    leadId: string,
     actor: JwtPayload,
   ) {
     if (canSeeAllLeads(actor.roles)) return;
     const scope = await actorLeadOrClauses(this.prisma, orgId, actor.sub);
-    if (!leadMatchesActorScope(lead, actor.sub, scope)) {
+    const visible = await this.prisma.lead.count({
+      where: { id: leadId, orgId, OR: scope },
+    });
+    if (visible === 0) {
       throw new NotFoundException('Lead not found');
     }
   }
@@ -495,8 +499,15 @@ export class LeadsService {
     const statusCount = (status: string) =>
       byStatus.find((row) => row.status === status)?._count._all ?? 0;
 
+    const teams = await this.projectTeamsByProject(
+      leads.filter((l) => !l.assignedToId).map((l) => l.projectId),
+    );
+
     return {
-      data: leads.map((lead) => this.toListItem(lead)),
+      data: leads.map((lead) => ({
+        ...this.toListItem(lead),
+        projectTeam: this.projectTeamFor(lead, teams),
+      })),
       total,
       page,
       limit,
@@ -545,11 +556,16 @@ export class LeadsService {
       },
     });
     if (!lead) throw new NotFoundException('Lead not found');
-    await this.assertCanAccessLead(orgId, lead, actor);
+    await this.assertCanAccessLead(orgId, leadId, actor);
+
+    const teams = await this.projectTeamsByProject([
+      lead.assignedToId ? null : lead.projectId,
+    ]);
 
     return {
       ...this.toListItem(lead),
       ...this.leadEditFields(lead),
+      projectTeam: this.projectTeamFor(lead, teams),
       activities: lead.activities.map(toActivity),
       callLogs: lead.callLogs.map((call) => ({
         id: call.id,
@@ -645,7 +661,7 @@ export class LeadsService {
       where: { id: leadId, orgId },
     });
     if (!existing) throw new NotFoundException('Lead not found');
-    await this.assertCanAccessLead(orgId, existing, actor);
+    await this.assertCanAccessLead(orgId, leadId, actor);
 
     if (dto.projectId) {
       const project = await this.prisma.project.findFirst({
@@ -862,7 +878,7 @@ export class LeadsService {
     if (!lead) {
       throw new NotFoundException('Lead not found');
     }
-    await this.assertCanAccessLead(orgId, lead, actor);
+    await this.assertCanAccessLead(orgId, leadId, actor);
 
     if (dto.assignedToId != null) {
       const assignee = await this.prisma.user.findFirst({
@@ -931,45 +947,53 @@ export class LeadsService {
   }
 
   /**
-   * Org members eligible as lead assignees (manager/sales/telecaller/custom roles).
+   * Org members eligible to hold a lead — one shared rule (permission-based)
+   * used by this picker and the project Sales Agent picker alike. See
+   * listLeadAssignableUsers.
    */
   async listAssignableUsers(orgId: string) {
-    const users = await this.prisma.user.findMany({
-      where: {
-        orgId,
-        status: 'active',
-        userRoles: {
-          some: {
-            role: {
-              status: 'active',
-              key: { notIn: ['super_admin', 'admin'] },
-            },
-          },
-        },
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        userRoles: { select: { role: { select: { key: true, name: true } } } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    const data = await listLeadAssignableUsers(this.prisma, orgId);
+    return { data, total: data.length };
+  }
 
-    return {
-      data: users.map((user) => ({
-        id: user.id,
-        name:
-          [user.firstName, user.lastName].filter(Boolean).join(' ') ||
-          user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        role: user.userRoles[0]?.role ?? null,
-      })),
-      total: users.length,
-    };
+  /**
+   * Sales-agent roster for a set of projects. Used to show "Project team" on a
+   * lead that has a project but no individual assignee — those agents can all
+   * see it, nobody owns it. Purely derived, never written to Lead.assignedToId.
+   */
+  private async projectTeamsByProject(
+    projectIds: Array<string | null | undefined>,
+  ): Promise<Map<string, { count: number; names: string[] }>> {
+    const map = new Map<string, { count: number; names: string[] }>();
+    const ids = [...new Set(projectIds.filter((id): id is string => !!id))];
+    if (ids.length === 0) return map;
+    const rows = await this.prisma.projectSalesAgent.findMany({
+      where: { projectId: { in: ids } },
+      select: {
+        projectId: true,
+        user: { select: { firstName: true, lastName: true, email: true } },
+      },
+      orderBy: { assignedAt: 'asc' },
+    });
+    for (const row of rows) {
+      const name =
+        [row.user.firstName, row.user.lastName].filter(Boolean).join(' ') ||
+        row.user.email;
+      const entry = map.get(row.projectId) ?? { count: 0, names: [] };
+      entry.count += 1;
+      entry.names.push(name);
+      map.set(row.projectId, entry);
+    }
+    return map;
+  }
+
+  /** `projectTeam` for one lead, or null when it has an owner / no project. */
+  private projectTeamFor(
+    lead: { assignedToId?: string | null; projectId?: string | null },
+    teams: Map<string, { count: number; names: string[] }>,
+  ): { count: number; names: string[] } | null {
+    if (lead.assignedToId || !lead.projectId) return null;
+    return teams.get(lead.projectId) ?? null;
   }
 
   private toListItem(lead: {

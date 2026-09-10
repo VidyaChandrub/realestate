@@ -61,6 +61,17 @@ export class ProjectsController {
     return this.service.list(user.orgId as string, query, user);
   }
 
+  /**
+   * Org members who can be assigned to a project as sales agents — the shared
+   * "who can hold a lead" rule. Static path, declared before `:id` so it isn't
+   * swallowed by the getById route.
+   */
+  @Get('sales-agent-candidates')
+  @RequirePermission('projects', 'view')
+  listSalesAgentCandidates(@CurrentUser() user: JwtPayload) {
+    return this.service.listSalesAgentCandidates(user.orgId as string);
+  }
+
   @Get(':id')
   @RequirePermission('projects', 'view')
   getById(@CurrentUser() user: JwtPayload, @Param('id') id: string) {

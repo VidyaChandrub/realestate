@@ -193,7 +193,7 @@ export default function OrgLeadDetailPage() {
           <Reveal delay={2}><div className="card"><div className="card-h"><span className="t">Lead source</span></div><div className="card-b"><div className="kv">
             <div className="row"><span className="k">Source</span><span className="v"><span className="badge b-indigo">{leadDisplaySource(lead)}</span></span></div>
             <div className="row"><span className="k">Project</span><span className="v">{project}</span></div><div className="row"><span className="k">Unit</span><span className="v">{unit}</span></div>
-            <div className="row"><span className="k">Form</span><span className="v">{lead.formName ?? "—"}</span></div><div className="row"><span className="k">Assigned agent</span><span className="v"><span className="badge b-violet">{lead.assignedTo?.name ?? "Unassigned"}</span></span></div>
+            <div className="row"><span className="k">Form</span><span className="v">{lead.formName ?? "—"}</span></div><div className="row"><span className="k">Assigned agent</span><span className="v"><span className="badge b-violet" title={!lead.assignedTo && lead.projectTeam?.count ? lead.projectTeam.names.join(", ") : undefined}>{lead.assignedTo?.name ?? (lead.projectTeam?.count ? "Project team" : "Unassigned")}</span></span></div>
           </div></div></div></Reveal>
         </div>
 

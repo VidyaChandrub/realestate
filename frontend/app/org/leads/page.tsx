@@ -346,6 +346,10 @@ export default function OrgLeadsPage() {
                               <span className="av a3">{initialsFor(lead.assignedTo.name)}</span>
                               <span className="nm">{lead.assignedTo.name}</span>
                             </span>
+                          ) : lead.projectTeam?.count ? (
+                            <span className="nm" title={lead.projectTeam.names.join(", ")}>
+                              Project team
+                            </span>
                           ) : (
                             <span className="muted">Unassigned</span>
                           )}
