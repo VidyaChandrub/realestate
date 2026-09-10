@@ -306,8 +306,7 @@ export async function loadTemplates(
   } = {},
 ): Promise<LandingPageData[]> {
   if (options.resource === "landing-page") {
-    // The org's own pages — always lightweight (no content), matching the
-    // includeContent:false use case this is called with (allPages index).
+    // The org's own pages — always lightweight (no content) regardless.
     const res = await apiFetch<{ data: ApiLandingPage[] }>(`${LANDING_PAGES_PATH}?limit=100`);
     return res.data.map(fromApiLandingPage);
   }

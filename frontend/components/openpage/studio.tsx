@@ -15,24 +15,17 @@ import {
   X,
 } from "lucide-react";
 import type { LandingPageData, ModuleKey, SiteConfig } from "@/lib/openpage/types";
-import { loadTemplate, loadTemplates, saveTemplate, saveTemplateNow, createTemplate, publishLandingPage, unpublishLandingPage, type Resource } from "@/lib/openpage/store";
+import { loadTemplate, loadTemplates, saveTemplate, saveTemplateNow, publishLandingPage, unpublishLandingPage, type Resource } from "@/lib/openpage/store";
 import { uploadBuilderImage } from "@/lib/openpage/persist";
 import { BuilderUploadProvider, type BuilderImageUploader } from "@/components/openpage/builder/upload-context";
-import { buildThankYouSections } from "@/lib/openpage/page-templates";
-import { builderPath, templatePreviewPath } from "@/lib/openpage/paths";
-import { cloneConfig, ensureConfig } from "@/lib/openpage/site-config";
+import { templatePreviewPath } from "@/lib/openpage/paths";
+import { ensureConfig } from "@/lib/openpage/site-config";
 import { TopNav } from "@/components/openpage/topnav";
 import { EditorLayout } from "@/components/openpage/editor/EditorLayout";
 import { OpenPageBridge } from "@/components/openpage/editor/OpenPageBridge";
-import { PopupsModule } from "@/components/openpage/editor/PopupsModule";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { landingPageFromSite } from "@/lib/openpage/content";
-import { FormsModule } from "@/components/openpage/modules/forms";
-import { BrandModule } from "@/components/openpage/modules/brand";
-import { HeaderFooterModule } from "@/components/openpage/modules/headerfooter";
-import { SeoModule } from "@/components/openpage/modules/seo";
-import { TypographyModule } from "@/components/openpage/modules/typography";
 
 interface Toast {
   id: number;
@@ -113,9 +106,6 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
     unpublish: () => void;
   } | null>(null);
   const toastId = useRef(0);
-  // Lightweight (no content) index of every template — feeds FormsModule's
-  // site-scope bar/thank-you-page lookup.
-  const [allPages, setAllPages] = useState<LandingPageData[]>([]);
 
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const [pageReady, setPageReady] = useState(false);
@@ -181,36 +171,6 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
     };
   }, [searchParams, resource]);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (resource === "landing-page") {
-      // The org's own pages already come back as one list (both pageTypes
-      // together) — no separate landing/thank-you calls needed.
-      loadTemplates({ resource: "landing-page" }).then((pages) => {
-        if (!cancelled) setAllPages(pages);
-      }).catch(() => {
-        if (!cancelled) setAllPages([]);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-    // FormsModule needs both: its thank-you picker lists every thank-you
-    // page in the workspace (not just this page's own companion), and the
-    // scope bar / domain-collision check need every landing page.
-    Promise.all([
-      loadTemplates({ includeContent: false, pageType: "landing" }),
-      loadTemplates({ includeContent: false, pageType: "thank-you" }),
-    ]).then(([landing, thankYou]) => {
-      if (!cancelled) setAllPages([...landing, ...thankYou]);
-    }).catch(() => {
-      if (!cancelled) setAllPages([]);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activePage?.id, resource]);
-
   // Scoped to the page currently open in the builder — not the whole org's
   // feed, which would mix in every other page's history (including old
   // entries unrelated to what you're looking at right now). Fetches on
@@ -239,8 +199,6 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
     setToasts((t) => [...t, { id, text }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3400);
   }, []);
-
-  const scoped = activePage ? [activePage] : [];
 
   // Fires the debounced single-record save and reconciles the server-derived
   // fields once it resolves, so a slow save can't clobber newer local edits
@@ -472,89 +430,6 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
         ) : (
           <div className="ps-studio-boot">{pageReady ? "This page could not be opened." : "Opening page…"}</div>
         );
-      case "popups":
-        return activePage ? (
-          <PopupsModule site={activePage} onPatch={(fn) => patchConfig(activePage.id, fn)} onToast={toast} />
-        ) : null;
-      case "forms":
-        return activePage ? (
-          <FormsModule
-            site={activePage}
-            pages={allPages}
-            onSelectSite={() => {}}
-            onPatch={(fn) => patchConfig(activePage.id, fn)}
-            onToast={toast}
-            onCreateThankYouPage={
-              // Ad-hoc thank-you creation writes a new platform Template row
-              // — never available for an org's own landing pages. An org
-              // page's companion (if any) was copied alongside it at
-              // creation time; there's no "add one later" flow here.
-              resource === "landing-page" ||
-              allPages.some((p) => p.pageType === "thank-you" && p.parentPageId === activePage.id)
-                ? undefined
-                : () => {
-                    void createTemplate({
-                      name: `${ensureConfig(activePage).brand.name} — Thank You`,
-                      slug: `${activePage.slug}-thanks`,
-                      designId: "tpl-thankyou",
-                      template: "Thank You Page",
-                      status: activePage.status === "published" ? "published" : "draft",
-                      kind: "custom",
-                      pageType: "thank-you",
-                      parentPageId: activePage.id,
-                      thumbnail: activePage.thumbnail,
-                      sections: buildThankYouSections(),
-                      config: cloneConfig(ensureConfig(activePage)),
-                    }).then((created) => {
-                      toast("Thank You page created — opening in builder");
-                      window.location.assign(builderPath(created.id));
-                    });
-                  }
-            }
-          />
-        ) : null;
-      case "typography":
-        return activePage ? (
-          <TypographyModule
-            site={activePage}
-            pages={scoped}
-            onSelectSite={() => {}}
-            onPatch={(fn) => patchConfig(activePage.id, fn)}
-            onToast={toast}
-            resource={resource}
-          />
-        ) : null;
-      case "brand":
-        return activePage ? (
-          <BrandModule
-            site={activePage}
-            pages={scoped}
-            onSelectSite={() => {}}
-            onPatch={(fn) => patchConfig(activePage.id, fn)}
-            onToast={toast}
-          />
-        ) : null;
-      case "headerfooter":
-        return activePage ? (
-          <HeaderFooterModule
-            site={activePage}
-            pages={scoped}
-            onSelectSite={() => {}}
-            onPatch={(fn) => patchConfig(activePage.id, fn)}
-            onToast={toast}
-          />
-        ) : null;
-      case "seo":
-        return activePage ? (
-          <SeoModule
-            site={activePage}
-            pages={scoped}
-            onSelectSite={() => {}}
-            onPatch={(fn) => patchConfig(activePage.id, fn)}
-            onPatchPage={(patch) => patchPage(activePage.id, patch)}
-            onToast={toast}
-          />
-        ) : null;
       default:
         return null;
     }

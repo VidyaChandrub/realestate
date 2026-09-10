@@ -2,16 +2,7 @@ import type { DesignSystemState } from "./design-system";
 
 export type Device = "desktop" | "tablet" | "mobile";
 
-export type ModuleKey =
-  | "builder"
-  | "pages"
-  | "templates"
-  | "forms"
-  | "popups"
-  | "brand"
-  | "headerfooter"
-  | "seo"
-  | "typography";
+export type ModuleKey = "builder";
 
 export type WidgetCategory =
   | "Layout"
