@@ -521,6 +521,21 @@ export async function assignCrmLead(
   });
 }
 
+/**
+ * Full lead edit form save. Persists the structured contact / requirement /
+ * source / consent fields. Pipeline status is NOT sent here — it keeps its own
+ * note-required path (`assignCrmLead`).
+ */
+export async function updateCrmLead(
+  id: string,
+  input: import("./types").UpdateLeadInput,
+): Promise<CrmLead> {
+  return apiFetch<CrmLead>(`/org/leads/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
 export function getSalesAgents(): Promise<SalesAgentsListResponse> {
   return apiFetch<SalesAgentsListResponse>("/org/sales-agents");
 }

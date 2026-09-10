@@ -823,6 +823,37 @@ model Lead {
   reminderAt     DateTime?  @map("reminder_at")
   createdAt      DateTime   @default(now()) @map("created_at")
 
+  // --- CRM edit-form fields ---------------------------------------------------
+  // Structured columns edited on the lead edit page. All additive, nullable /
+  // defaulted — the public capture path still writes only `data` (the raw form
+  // blob); these are populated by agents via PATCH /org/leads/:id. Kept as real
+  // columns (not JSON) so they stay filterable/reportable, matching how the
+  // nextAction* / reminderAt fields already sit here.
+  altName          String?  @map("alt_name")
+  altPhone         String?  @map("alt_phone")
+  whatsapp         String?
+  city             String?
+  budgetMin        BigInt?  @map("budget_min")
+  budgetMax        BigInt?  @map("budget_max")
+  configurations   String[] @map("configurations")
+  purpose          String?
+  financing        String?
+  loanStatus       String?  @map("loan_status")
+  timelineToBuy    String?  @map("timeline_to_buy")
+  preferredFloor   String?  @map("preferred_floor")
+  facing           String?
+  parking          String?
+  requirementNotes String?  @map("requirement_notes")
+  campaign         String?
+  utmSource        String?  @map("utm_source")
+  utmMedium        String?  @map("utm_medium")
+  utmCampaign      String?  @map("utm_campaign")
+  temperature      String?
+  tags             String[] @map("tags")
+  consentWhatsapp  Boolean  @default(false) @map("consent_whatsapp")
+  consentCall      Boolean  @default(false) @map("consent_call")
+  consentEmail     Boolean  @default(false) @map("consent_email")
+
   assignedTo User?           @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
   project    Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   callLogs   CallLog[]
@@ -921,13 +952,17 @@ enum ActivityType {
 model ActivityEvent {
   id        String       @id @default(uuid())
   orgId     String       @map("org_id")
-  agentId   String       @map("agent_id")
+  // Nullable: a null actor means the entry was produced by an automated
+  // process (e.g. a public website-form capture) and renders as "System".
+  // FK is SET NULL on user delete so history survives as System rather than
+  // vanishing.
+  agentId   String?      @map("agent_id")
   leadId    String?      @map("lead_id")
   type      ActivityType
   text      String
   createdAt DateTime     @default(now()) @map("created_at")
 
-  agent User? @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agent User? @relation(fields: [agentId], references: [id], onDelete: SetNull)
   lead  Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
   @@index([orgId])
@@ -997,6 +1032,17 @@ enum OrgCatalogCategory {
   // the unit form, confusingly labelled "Unit type" next to the actual unit
   // types — now an org-managed list like facing and parking.
   unit_variant
+  // Lead option lists for the lead edit page, managed under Settings → CRM &
+  // Leads. Only the categories with NO project equivalent live here —
+  // Configuration reuses `unit_type`, and a lead's Facing / Parking reuse
+  // `facing` / `parking` above (same value sets; one list per org, shared with
+  // projects & units). `lead_tag` backs the lead's Tags multi-select.
+  lead_purpose
+  lead_financing
+  lead_loan_status
+  lead_timeline_to_buy
+  lead_preferred_floor
+  lead_tag
 
   @@schema("projects")
 }

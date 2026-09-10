@@ -7,6 +7,7 @@ import type { AssignLeadDto } from './dto/assign-lead.dto';
 import type { ListLeadsQueryDto } from './dto/list-leads-query.dto';
 import type { CreateLeadNoteDto } from './dto/create-lead-note.dto';
 import type { UpdateLeadNextActionDto } from './dto/update-lead-next-action.dto';
+import type { UpdateLeadDto } from './dto/update-lead.dto';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import {
   leadContactFromData,
@@ -17,6 +18,47 @@ import {
   canSeeAllLeads,
   leadMatchesActorScope,
 } from '../../common/utils/lead-scope.util';
+
+/** Fields needed to render an activity/call actor. */
+const ACTOR_SELECT = {
+  select: { id: true, firstName: true, lastName: true, email: true },
+} as const;
+
+type ActorRow = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+} | null;
+
+/** Actor for the activity feed. `null` (no user) renders as "System". */
+function toActor(user: ActorRow): { id: string; name: string } | null {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name:
+      [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+  };
+}
+
+type ActivityRow = {
+  id: string;
+  type: string;
+  text: string;
+  createdAt: Date;
+  agent?: ActorRow;
+};
+
+/** Shape an ActivityEvent row (with `agent` selected) for the API. */
+function toActivity(row: ActivityRow) {
+  return {
+    id: row.id,
+    type: row.type,
+    text: row.text,
+    createdAt: row.createdAt,
+    actor: toActor(row.agent ?? null),
+  };
+}
 
 @Injectable()
 export class LeadsService {
@@ -124,17 +166,21 @@ export class LeadsService {
       },
     });
 
-    if (assignedToId) {
-      await this.prisma.activityEvent.create({
-        data: {
-          orgId,
-          agentId: assignedToId,
-          leadId: lead.id,
-          type: 'status_updated',
-          text: 'Lead captured from website and assigned automatically',
-        },
-      });
-    }
+    // Always record the capture on the timeline. It's an automated event, so
+    // there is no actor — `agentId: null` renders as "System". (Previously this
+    // row was only written when a round-robin assignee existed, and was then
+    // mis-attributed to that assignee.)
+    await this.prisma.activityEvent.create({
+      data: {
+        orgId,
+        agentId: null,
+        leadId: lead.id,
+        type: 'status_updated',
+        text: assignedToId
+          ? 'Lead captured from website and assigned automatically'
+          : 'Lead captured from website',
+      },
+    });
 
     return lead;
   }
@@ -476,12 +522,25 @@ export class LeadsService {
         activities: {
           orderBy: { createdAt: 'desc' },
           take: 50,
-          select: { id: true, type: true, text: true, createdAt: true },
+          select: {
+            id: true,
+            type: true,
+            text: true,
+            createdAt: true,
+            agent: ACTOR_SELECT,
+          },
         },
         callLogs: {
           orderBy: { createdAt: 'desc' },
           take: 20,
-          select: { id: true, direction: true, outcome: true, durationSeconds: true, createdAt: true },
+          select: {
+            id: true,
+            direction: true,
+            outcome: true,
+            durationSeconds: true,
+            createdAt: true,
+            agent: ACTOR_SELECT,
+          },
         },
       },
     });
@@ -490,8 +549,16 @@ export class LeadsService {
 
     return {
       ...this.toListItem(lead),
-      activities: lead.activities,
-      callLogs: lead.callLogs,
+      ...this.leadEditFields(lead),
+      activities: lead.activities.map(toActivity),
+      callLogs: lead.callLogs.map((call) => ({
+        id: call.id,
+        direction: call.direction,
+        outcome: call.outcome,
+        durationSeconds: call.durationSeconds,
+        createdAt: call.createdAt,
+        actor: toActor(call.agent ?? null),
+      })),
       nextAction: lead.nextActionType
         ? {
             type: lead.nextActionType,
@@ -503,6 +570,210 @@ export class LeadsService {
     };
   }
 
+  /**
+   * The structured CRM edit-form columns, shaped for the API. BigInt budgets
+   * become plain numbers (rupee amounts are well within Number range).
+   */
+  private leadEditFields(lead: {
+    altName: string | null;
+    altPhone: string | null;
+    whatsapp: string | null;
+    city: string | null;
+    budgetMin: bigint | null;
+    budgetMax: bigint | null;
+    configurations: string[];
+    purpose: string | null;
+    financing: string | null;
+    loanStatus: string | null;
+    timelineToBuy: string | null;
+    preferredFloor: string | null;
+    facing: string | null;
+    parking: string | null;
+    requirementNotes: string | null;
+    campaign: string | null;
+    utmSource: string | null;
+    utmMedium: string | null;
+    utmCampaign: string | null;
+    temperature: string | null;
+    tags: string[];
+    consentWhatsapp: boolean;
+    consentCall: boolean;
+    consentEmail: boolean;
+  }) {
+    return {
+      altName: lead.altName,
+      altPhone: lead.altPhone,
+      whatsapp: lead.whatsapp,
+      city: lead.city,
+      budgetMin: lead.budgetMin == null ? null : Number(lead.budgetMin),
+      budgetMax: lead.budgetMax == null ? null : Number(lead.budgetMax),
+      configurations: lead.configurations,
+      purpose: lead.purpose,
+      financing: lead.financing,
+      loanStatus: lead.loanStatus,
+      timelineToBuy: lead.timelineToBuy,
+      preferredFloor: lead.preferredFloor,
+      facing: lead.facing,
+      parking: lead.parking,
+      requirementNotes: lead.requirementNotes,
+      campaign: lead.campaign,
+      utmSource: lead.utmSource,
+      utmMedium: lead.utmMedium,
+      utmCampaign: lead.utmCampaign,
+      temperature: lead.temperature,
+      tags: lead.tags,
+      consentWhatsapp: lead.consentWhatsapp,
+      consentCall: lead.consentCall,
+      consentEmail: lead.consentEmail,
+    };
+  }
+
+  /**
+   * Full lead edit form (lead edit page). Writes the structured columns and
+   * merges contact name/phone/email back into the capture `data` blob. Pipeline
+   * `status` is intentionally not handled here — it keeps its note-required path
+   * in `assign`. An activity entry is written, attributed to the editor, so the
+   * change shows up (correctly attributed) on the timeline.
+   */
+  async update(
+    orgId: string,
+    leadId: string,
+    actor: JwtPayload,
+    dto: UpdateLeadDto,
+  ) {
+    const existing = await this.prisma.lead.findFirst({
+      where: { id: leadId, orgId },
+    });
+    if (!existing) throw new NotFoundException('Lead not found');
+    await this.assertCanAccessLead(orgId, existing, actor);
+
+    if (dto.projectId) {
+      const project = await this.prisma.project.findFirst({
+        where: { id: dto.projectId, orgId },
+        select: { id: true },
+      });
+      if (!project) throw new NotFoundException('Project not found');
+    }
+
+    let assignee: {
+      id: string;
+      firstName: string | null;
+      lastName: string | null;
+      email: string;
+    } | null = null;
+    if (dto.assignedToId != null) {
+      assignee = await this.prisma.user.findFirst({
+        where: { id: dto.assignedToId, orgId },
+        select: { id: true, firstName: true, lastName: true, email: true },
+      });
+      if (!assignee) {
+        throw new NotFoundException('Assignee not found in this organisation');
+      }
+    }
+
+    // Merge contact fields into the raw capture blob without disturbing other
+    // submitted values.
+    const currentData =
+      existing.data && typeof existing.data === 'object'
+        ? (existing.data as Record<string, unknown>)
+        : {};
+    let data = currentData;
+    if (dto.contact) {
+      const merged = { ...currentData };
+      if (dto.contact.fullName !== undefined) {
+        merged.fullName = dto.contact.fullName;
+        merged.name = dto.contact.fullName;
+      }
+      if (dto.contact.phone !== undefined) {
+        merged.phone = dto.contact.phone;
+        merged.phoneNumber = dto.contact.phone;
+      }
+      if (dto.contact.email !== undefined) merged.email = dto.contact.email;
+      data = normalizeLeadData(merged);
+    }
+
+    const has = <K extends keyof UpdateLeadDto>(key: K): boolean =>
+      Object.prototype.hasOwnProperty.call(dto, key) === true;
+    const bignum = (v: number | null | undefined) =>
+      v == null ? null : BigInt(Math.trunc(v));
+
+    const updated = await this.prisma.lead.update({
+      where: { id: leadId },
+      data: {
+        ...(dto.contact ? { data: data as Prisma.InputJsonValue } : {}),
+        ...(has('altName') ? { altName: dto.altName ?? null } : {}),
+        ...(has('altPhone') ? { altPhone: dto.altPhone ?? null } : {}),
+        ...(has('whatsapp') ? { whatsapp: dto.whatsapp ?? null } : {}),
+        ...(has('city') ? { city: dto.city ?? null } : {}),
+        ...(has('tags') ? { tags: dto.tags ?? [] } : {}),
+        ...(has('configurations')
+          ? { configurations: dto.configurations ?? [] }
+          : {}),
+        ...(has('budgetMin') ? { budgetMin: bignum(dto.budgetMin) } : {}),
+        ...(has('budgetMax') ? { budgetMax: bignum(dto.budgetMax) } : {}),
+        ...(has('purpose') ? { purpose: dto.purpose ?? null } : {}),
+        ...(has('financing') ? { financing: dto.financing ?? null } : {}),
+        ...(has('loanStatus') ? { loanStatus: dto.loanStatus ?? null } : {}),
+        ...(has('timelineToBuy')
+          ? { timelineToBuy: dto.timelineToBuy ?? null }
+          : {}),
+        ...(has('preferredFloor')
+          ? { preferredFloor: dto.preferredFloor ?? null }
+          : {}),
+        ...(has('facing') ? { facing: dto.facing ?? null } : {}),
+        ...(has('parking') ? { parking: dto.parking ?? null } : {}),
+        ...(has('requirementNotes')
+          ? { requirementNotes: dto.requirementNotes ?? null }
+          : {}),
+        ...(has('projectId') ? { projectId: dto.projectId ?? null } : {}),
+        ...(has('source') ? { source: dto.source ?? null } : {}),
+        ...(has('campaign') ? { campaign: dto.campaign ?? null } : {}),
+        ...(has('utmSource') ? { utmSource: dto.utmSource ?? null } : {}),
+        ...(has('utmMedium') ? { utmMedium: dto.utmMedium ?? null } : {}),
+        ...(has('utmCampaign') ? { utmCampaign: dto.utmCampaign ?? null } : {}),
+        ...(has('temperature') ? { temperature: dto.temperature ?? null } : {}),
+        ...(has('assignedToId')
+          ? { assignedToId: dto.assignedToId ?? null }
+          : {}),
+        ...(has('consentWhatsapp')
+          ? { consentWhatsapp: dto.consentWhatsapp ?? false }
+          : {}),
+        ...(has('consentCall')
+          ? { consentCall: dto.consentCall ?? false }
+          : {}),
+        ...(has('consentEmail')
+          ? { consentEmail: dto.consentEmail ?? false }
+          : {}),
+      },
+    });
+
+    // One timeline entry for the edit, plus a distinct assignment line when the
+    // owner actually changed (mirrors `assign`'s wording).
+    const parts: string[] = [];
+    if (
+      has('assignedToId') &&
+      (dto.assignedToId ?? null) !== existing.assignedToId
+    ) {
+      const name = assignee
+        ? [assignee.firstName, assignee.lastName].filter(Boolean).join(' ') ||
+          assignee.email
+        : 'Unassigned';
+      parts.push(`Assigned to ${name}`);
+    }
+    parts.push('Lead details updated');
+    await this.prisma.activityEvent.create({
+      data: {
+        orgId,
+        agentId: actor.sub,
+        leadId,
+        type: 'status_updated',
+        text: parts.join(' · '),
+      },
+    });
+
+    return this.getById(orgId, updated.id, actor);
+  }
+
   async addNote(
     orgId: string,
     leadId: string,
@@ -512,10 +783,17 @@ export class LeadsService {
     await this.getById(orgId, leadId, actor);
     const text = dto.text.trim();
     if (!text) throw new BadRequestException('Note cannot be empty');
-    return this.prisma.activityEvent.create({
+    const activity = await this.prisma.activityEvent.create({
       data: { orgId, agentId: actor.sub, leadId, type: 'note_added', text },
-      select: { id: true, type: true, text: true, createdAt: true },
+      select: {
+        id: true,
+        type: true,
+        text: true,
+        createdAt: true,
+        agent: ACTOR_SELECT,
+      },
     });
+    return toActivity(activity);
   }
 
   async updateNextAction(
@@ -555,7 +833,13 @@ export class LeadsService {
         type: dto.actionType === 'site_visit' ? 'site_visit_booked' : 'status_updated',
         text: `Next action ${verb}: ${kind} on ${scheduledAt.toLocaleString('en-IN')}${note ? ` — ${note}` : ''}${reminderAt ? ` · reminder ${reminderAt.toLocaleString('en-IN')}` : ''}`,
       },
-      select: { id: true, type: true, text: true, createdAt: true },
+      select: {
+        id: true,
+        type: true,
+        text: true,
+        createdAt: true,
+        agent: ACTOR_SELECT,
+      },
     });
 
     return {
@@ -563,7 +847,7 @@ export class LeadsService {
       scheduledAt: updated.nextActionAt,
       note: updated.nextActionNote,
       reminderAt: updated.reminderAt,
-      activity,
+      activity: toActivity(activity),
     };
   }
 
@@ -622,9 +906,9 @@ export class LeadsService {
         `Status changed from ${lead.status.replaceAll('_', ' ')} to ${dto.status.replaceAll('_', ' ')} — ${dto.note!.trim()}`,
       );
     }
-    let activity: { id: string; type: string; text: string; createdAt: Date } | null = null;
+    let activity: ReturnType<typeof toActivity> | null = null;
     if (parts.length > 0) {
-      activity = await this.prisma.activityEvent.create({
+      const row = await this.prisma.activityEvent.create({
         data: {
           orgId,
           agentId: actor.sub,
@@ -632,8 +916,15 @@ export class LeadsService {
           type: 'status_updated',
           text: parts.join(' · '),
         },
-        select: { id: true, type: true, text: true, createdAt: true },
+        select: {
+          id: true,
+          type: true,
+          text: true,
+          createdAt: true,
+          agent: ACTOR_SELECT,
+        },
       });
+      activity = toActivity(row);
     }
 
     return { ...this.toListItem(updated), activity };
@@ -699,6 +990,11 @@ export class LeadsService {
     } | null;
     createdAt: Date;
   }) {
+    const data =
+      lead.data && typeof lead.data === 'object' && !Array.isArray(lead.data)
+        ? normalizeLeadData(lead.data as Record<string, unknown>)
+        : lead.data;
+
     return {
       id: lead.id,
       orgId: lead.orgId,
@@ -707,7 +1003,7 @@ export class LeadsService {
       project: lead.project ?? null,
       formName: lead.formName,
       source: lead.source,
-      data: lead.data,
+      data,
       status: lead.status,
       assignedTo: lead.assignedTo
         ? {

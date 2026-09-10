@@ -454,21 +454,39 @@ function DomainSection() {
 
 // The project-wizard catalogs, in the order they appear in the wizard. Each
 // maps to one OrgCatalogCategory; the section renders one card per row.
-const CATALOG_GROUPS: {
+type CatalogGroup = {
   category: OrgCatalogCategory;
   title: string;
   sub: string;
   placeholder: string;
-}[] = [
+};
+// These lists are org-wide vocabularies, not project-only: Configurations,
+// Facing and Parking also drive the lead requirement form. Titles/copy are
+// kept generic for that reason (the enum values stay `unit_type` / `facing` /
+// `parking`).
+const CATALOG_GROUPS: CatalogGroup[] = [
   { category: "project_type", title: "Project types", sub: "e.g. Apartments, Villas, Plots, Commercial, Mixed-use", placeholder: "Add a project type…" },
-  { category: "unit_type", title: "Unit types", sub: "Configuration labels — e.g. 2 BHK, 3 BHK, Penthouse, Shop / Office", placeholder: "Add a unit type…" },
+  { category: "unit_type", title: "Configurations", sub: "Configuration labels for units and lead requirements — e.g. 2 BHK, 3 BHK, Penthouse, Villa, Plot", placeholder: "Add a configuration…" },
   { category: "connectivity", title: "Connectivity & landmarks", sub: "Nearby categories — e.g. Metro / transit, Schools, Hospitals, Airport", placeholder: "Add a connectivity category…" },
   { category: "amenity", title: "Amenities", sub: "Lifestyle features — e.g. Clubhouse, Gymnasium, Swimming pool", placeholder: "Add an amenity…" },
   { category: "price_includes", title: "Price includes", sub: "What the quoted price covers — e.g. Floor rise, 1 covered parking, Club membership, GST", placeholder: "Add a price inclusion…" },
   { category: "payment_plan", title: "Payment plans", sub: "Plan types buyers can pick — e.g. Construction-linked, Down payment, Flexi (20:80), Subvention", placeholder: "Add a payment plan…" },
-  { category: "facing", title: "Unit facing", sub: "Directions or views available for units — e.g. East, North, Garden, Sea", placeholder: "Add a facing option…" },
-  { category: "parking", title: "Unit parking", sub: "Parking choices available for units — e.g. 1 covered, 2 covered, Open", placeholder: "Add a parking option…" },
+  { category: "facing", title: "Facing", sub: "Directions or views — e.g. East, North, Garden, Sea", placeholder: "Add a facing option…" },
+  { category: "parking", title: "Parking", sub: "Parking choices — e.g. 1 covered, 2 covered, Open", placeholder: "Add a parking option…" },
   { category: "unit_variant", title: "Unit variants", sub: "Optional variant label within a configuration — e.g. Type A, Type B, Corner", placeholder: "Add a unit variant…" },
+];
+
+// Lead-only option lists, shown inside the CRM & Leads settings section. The
+// lead form's Configuration / Facing / Parking are NOT here — they read the
+// shared Project Catalogs lists above (a lead's facing preference is the same
+// value set as a unit's, so it's one list with one home).
+const LEAD_CATALOG_GROUPS: CatalogGroup[] = [
+  { category: "lead_tag", title: "Lead tags", sub: "Reusable labels agents apply to a lead — e.g. Hot, NRI, Investor, Ready buyer, Price-sensitive, VIP", placeholder: "Add a tag…" },
+  { category: "lead_purpose", title: "Purpose", sub: "Why the lead is buying — e.g. End use (self), Investment, Rental income", placeholder: "Add a purpose…" },
+  { category: "lead_financing", title: "Financing", sub: "How the purchase is funded — e.g. Home loan, Self-funded, Loan + self", placeholder: "Add a financing option…" },
+  { category: "lead_loan_status", title: "Loan status", sub: "Where the loan stands — e.g. Not started, Pre-approved, Applied, Sanctioned", placeholder: "Add a loan status…" },
+  { category: "lead_timeline_to_buy", title: "Timeline to buy", sub: "How soon the lead intends to purchase — e.g. Immediate, 1–2 months, 3–6 months", placeholder: "Add a timeline…" },
+  { category: "lead_preferred_floor", title: "Preferred floor", sub: "Floor preference — e.g. Any, Low, Mid, High (10th+)", placeholder: "Add a floor preference…" },
 ];
 
 /**
@@ -547,7 +565,15 @@ function PricingBasisCard() {
   );
 }
 
-function CatalogSection() {
+function CatalogSection({
+  groups = CATALOG_GROUPS,
+  heading,
+}: {
+  groups?: CatalogGroup[];
+  /** Optional intro shown above the cards, to set them apart from other
+   *  content in a shared section (e.g. the CRM & Leads toggles). */
+  heading?: { title: string; sub: string };
+}) {
   const [options, setOptions] = useState<OrgCatalogOption[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -593,9 +619,15 @@ function CatalogSection() {
 
   return (
     <>
+      {heading ? (
+        <div style={{ margin: "26px 0 12px", borderTop: "1px solid var(--line)", paddingTop: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>{heading.title}</div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{heading.sub}</div>
+        </div>
+      ) : null}
       {loadError ? <div className="form-alert">{loadError}</div> : null}
       {rowError ? <div className="form-alert">{rowError}</div> : null}
-      {CATALOG_GROUPS.map((g) => {
+      {groups.map((g) => {
         const rows = (options ?? [])
           .filter((o) => o.category === g.category)
           .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
@@ -1185,14 +1217,13 @@ export default function OrgSettingsPage() {
                 <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add field</span>
               </div>
             </Card>
-            <Card icon="star" title="Lead tags" sub="Reusable labels agents can apply">
-              <div className="pill-list">
-                {["Hot", "NRI", "Investor", "Ready buyer", "Price-sensitive", "VIP"].map((p) => (
-                <span key={p} className="pill" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>{p === "Hot" ? <Icon name="flame" size={13} /> : null}{p}<span className="x">×</span></span>
-              ))}
-                <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add tag</span>
-              </div>
-            </Card>
+            <CatalogSection
+              groups={LEAD_CATALOG_GROUPS}
+              heading={{
+                title: "Lead option lists",
+                sub: "Tags and the Requirement-section dropdown choices on the lead edit page. Each list starts empty — build it from your own options. (Configuration, Facing and Parking are shared lists — manage those under Project Catalogs.)",
+              }}
+            />
           </div>
 
           {/* FIELDS */}

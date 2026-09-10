@@ -411,6 +411,10 @@ export default function AddNewProjectPage() {
     const grouped: Record<OrgCatalogCategory, OrgCatalogOption[]> = {
       project_type: [], unit_type: [], connectivity: [], amenity: [],
       price_includes: [], payment_plan: [], facing: [], parking: [], unit_variant: [],
+      // Lead-only lists — unused by the project wizard, present only to keep
+      // this record exhaustive over OrgCatalogCategory.
+      lead_purpose: [], lead_financing: [], lead_loan_status: [],
+      lead_timeline_to_buy: [], lead_preferred_floor: [], lead_tag: [],
     };
     for (const opt of catalog ?? []) grouped[opt.category]?.push(opt);
     for (const key of Object.keys(grouped) as OrgCatalogCategory[]) {
