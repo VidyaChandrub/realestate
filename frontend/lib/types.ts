@@ -1198,7 +1198,16 @@ export type OrgCatalogCategory =
   | "payment_plan"
   | "facing"
   | "parking"
-  | "unit_variant";
+  | "unit_variant"
+  // Lead-only lists (Settings → CRM & Leads). Configuration, Facing and
+  // Parking have no lead-specific twin — they reuse "unit_type" / "facing" /
+  // "parking" above. "lead_tag" backs the lead Tags multi-select.
+  | "lead_purpose"
+  | "lead_financing"
+  | "lead_loan_status"
+  | "lead_timeline_to_buy"
+  | "lead_preferred_floor"
+  | "lead_tag";
 
 export interface OrgCatalogOption {
   id: string;
@@ -1354,7 +1363,45 @@ export interface CrmAssignee {
   name: string;
 }
 
-export interface CrmLead {
+/** Actor on an activity / call timeline row. `null` renders as "System". */
+export interface CrmActor {
+  id: string;
+  name: string;
+}
+
+/**
+ * Structured CRM edit-form fields. Persisted as real columns on `Lead` and
+ * edited on the lead edit page (`/org/leads/[id]/edit`). All optional — a lead
+ * captured from a public form has none of them set until an agent fills them in.
+ */
+export interface CrmLeadEditFields {
+  altName: string | null;
+  altPhone: string | null;
+  whatsapp: string | null;
+  city: string | null;
+  budgetMin: number | null;
+  budgetMax: number | null;
+  configurations: string[];
+  purpose: string | null;
+  financing: string | null;
+  loanStatus: string | null;
+  timelineToBuy: string | null;
+  preferredFloor: string | null;
+  facing: string | null;
+  parking: string | null;
+  requirementNotes: string | null;
+  campaign: string | null;
+  utmSource: string | null;
+  utmMedium: string | null;
+  utmCampaign: string | null;
+  temperature: string | null;
+  tags: string[];
+  consentWhatsapp: boolean;
+  consentCall: boolean;
+  consentEmail: boolean;
+}
+
+export interface CrmLead extends Partial<CrmLeadEditFields> {
   id: string;
   orgId?: string;
   landingPageId: string | null;
@@ -1371,6 +1418,7 @@ export interface CrmLead {
     type: string;
     text: string;
     createdAt: string;
+    actor?: CrmActor | null;
   }>;
   callLogs?: Array<{
     id: string;
@@ -1378,6 +1426,7 @@ export interface CrmLead {
     outcome: string;
     durationSeconds: number;
     createdAt: string;
+    actor?: CrmActor | null;
   }>;
   nextAction?: {
     type: string;
@@ -1392,6 +1441,15 @@ export interface CrmLeadActivity {
   type: string;
   text: string;
   createdAt: string;
+  actor?: CrmActor | null;
+}
+
+/** Body for `PATCH /org/leads/:id` (lead edit page). Every field optional. */
+export interface UpdateLeadInput extends Partial<CrmLeadEditFields> {
+  contact?: { fullName?: string; phone?: string; email?: string };
+  projectId?: string | null;
+  source?: string | null;
+  assignedToId?: string | null;
 }
 
 export interface CrmLeadListResponse {

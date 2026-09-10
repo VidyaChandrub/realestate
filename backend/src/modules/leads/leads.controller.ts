@@ -21,6 +21,7 @@ import { AssignLeadDto } from './dto/assign-lead.dto';
 import { ListLeadsQueryDto } from './dto/list-leads-query.dto';
 import { CreateLeadNoteDto } from './dto/create-lead-note.dto';
 import { UpdateLeadNextActionDto } from './dto/update-lead-next-action.dto';
+import { UpdateLeadDto } from './dto/update-lead.dto';
 
 @Controller('org/leads')
 export class LeadsController {
@@ -76,6 +77,22 @@ export class LeadsController {
     @Param('id') id: string,
   ) {
     return this.service.getById(user.orgId as string, id, user);
+  }
+
+  /**
+   * Full lead edit form. Persists the structured contact / requirement /
+   * source / consent fields. Pipeline status is not accepted here — it keeps
+   * its own note-required path (`PATCH :id/assign`).
+   */
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('crm', 'edit')
+  @Patch(':id')
+  update(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: UpdateLeadDto,
+  ) {
+    return this.service.update(user.orgId as string, id, user, dto);
   }
 
   @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)

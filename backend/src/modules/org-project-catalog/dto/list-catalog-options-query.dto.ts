@@ -14,6 +14,15 @@ export const CATALOG_CATEGORY_VALUES = [
   'facing',
   'parking',
   'unit_variant',
+  // Lead-only lists (Settings → CRM & Leads). The ones with a project
+  // equivalent — Configuration, Facing, Parking — reuse `unit_type` / `facing`
+  // / `parking` above instead of having a lead-specific twin.
+  'lead_purpose',
+  'lead_financing',
+  'lead_loan_status',
+  'lead_timeline_to_buy',
+  'lead_preferred_floor',
+  'lead_tag',
 ] as const;
 
 export type CatalogCategoryValue = (typeof CATALOG_CATEGORY_VALUES)[number];

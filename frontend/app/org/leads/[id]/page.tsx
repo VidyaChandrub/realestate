@@ -152,8 +152,8 @@ export default function OrgLeadDetailPage() {
   }
 
   const timeline = useMemo(() => [
-    ...(lead?.activities ?? []).map((event) => ({ id: event.id, type: event.type, text: event.text, createdAt: event.createdAt })),
-    ...(lead?.callLogs ?? []).map((call) => ({ id: call.id, type: "call_logged", text: `${call.outcome.replace("_", " ")}${call.durationSeconds ? ` · ${Math.floor(call.durationSeconds / 60)}m ${call.durationSeconds % 60}s` : ""}`, createdAt: call.createdAt })),
+    ...(lead?.activities ?? []).map((event) => ({ id: event.id, type: event.type, text: event.text, createdAt: event.createdAt, actor: event.actor ?? null })),
+    ...(lead?.callLogs ?? []).map((call) => ({ id: call.id, type: "call_logged", text: `${call.outcome.replace("_", " ")}${call.durationSeconds ? ` · ${Math.floor(call.durationSeconds / 60)}m ${call.durationSeconds % 60}s` : ""}`, createdAt: call.createdAt, actor: call.actor ?? null })),
   ].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)), [lead]);
   const requirements = Object.entries(lead?.data ?? {}).filter(([key]) => /budget|bhk|bed|area|require|preference|timeline|interest/i.test(key));
   const documents = Object.entries(lead?.data ?? {}).filter(([key]) => /brochure|document|floor|pan|aadhaar|proof/i.test(key));
@@ -173,7 +173,7 @@ export default function OrgLeadDetailPage() {
       <LeadsPageHead active="lead-center" />
       <div className="page-head reveal in" style={{ marginTop: 4 }}>
         <div><div className="eyebrow"><Icon name="crm" size={14} /> Lead</div><h1>{name}</h1><div className="sub">{project} · {unit} · captured {formatDate(lead.createdAt)}</div></div>
-        <div className="actions"><Link className="btn btn-ghost" href="/org/leads">← Back to leads</Link></div>
+        <div className="actions">{canEditLead ? <Link className="btn btn-primary" href={`/org/leads/${lead.id}/edit`}><Icon name="edit" size={14} /> Edit lead</Link> : null}<Link className="btn btn-ghost" href="/org/leads">← Back to leads</Link></div>
       </div>
       {actionError ? <div className="empty" style={{ padding: 12, marginBottom: 12, color: "var(--rose)" }}>{actionError}</div> : null}
 
@@ -200,7 +200,7 @@ export default function OrgLeadDetailPage() {
         <Reveal delay={2}><div className="card"><div className="card-h" style={{ paddingBottom: 0 }}><div style={{ display: "flex", gap: 18, overflowX: "auto" }}>{(["activity", "requirements", "communications", "documents", "deal"] as const).map((tab) => <button key={tab} className="x" style={{ border: 0, background: "transparent", padding: "0 0 14px", color: activeTab === tab ? "var(--brand)" : undefined, borderBottom: activeTab === tab ? "2px solid var(--brand)" : "2px solid transparent", cursor: "pointer" }} onClick={() => setActiveTab(tab)}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}</div></div><div className="card-b">
           {activeTab === "activity" && <>
           {canAddNote && <div className="field" style={{ marginBottom: 16 }}><label htmlFor="lead-note">Add note</label><textarea id="lead-note" className="inp" rows={3} value={note} maxLength={2000} placeholder="Add a note about this lead..." onChange={(event) => setNote(event.target.value)} /><button className="btn btn-primary" style={{ marginTop: 8 }} disabled={!note.trim() || addingNote} onClick={() => void addNote()}>{addingNote ? "Saving..." : "Add note"}</button></div>}
-          {timeline.length ? <ul className="timeline">{timeline.map((event) => <li key={event.id}><b><Icon name={icons[event.type] ?? "refresh"} size={14} /> {event.type.replaceAll("_", " ")}</b> — {event.text}{canEditLead && isNextActionEvent(event.type, event.text) ? <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => { nextActionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Edit next action</button> : null}<div className="tt">{formatDate(event.createdAt)}</div></li>)}</ul> : <div className="empty" style={{ padding: 20 }}>No activity recorded yet.</div>}
+          {timeline.length ? <ul className="timeline">{timeline.map((event) => <li key={event.id}><b><Icon name={icons[event.type] ?? "refresh"} size={14} /> {event.type.replaceAll("_", " ")}</b> — {event.text} <span className="muted">· {event.actor?.name ?? "System"}</span>{canEditLead && isNextActionEvent(event.type, event.text) ? <button type="button" className="btn btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => { nextActionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>Edit next action</button> : null}<div className="tt">{formatDate(event.createdAt)}</div></li>)}</ul> : <div className="empty" style={{ padding: 20 }}>No activity recorded yet.</div>}
           </>}
           {activeTab === "requirements" && <DataRows entries={requirements} empty="No requirement details captured." />}
           {activeTab === "communications" && <DataRows entries={timeline.filter((event) => ["call_logged", "whatsapp_sent", "whatsapp_read"].includes(event.type)).map((event) => [event.type, `${event.text} · ${formatDate(event.createdAt)}`])} empty="No communications recorded." />}
