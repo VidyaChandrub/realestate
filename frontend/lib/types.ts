@@ -1585,6 +1585,11 @@ export interface SalesAgentDetailResponse {
   activity14: SalesAgentDayBar[];
 }
 
+// Per-user performance dashboard (Users module). Identical in shape to the
+// sales-agent dashboard so the same view renders it, but returned for any org
+// member regardless of role.
+export type OrgUserDashboardResponse = SalesAgentDetailResponse;
+
 // --- Organisation domain identity (subdomain + custom domain) ---
 
 export type OrgDomainKind = "subdomain" | "custom_domain";

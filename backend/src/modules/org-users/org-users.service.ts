@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import {
   approveOrgUser,
+  deleteOrgUser,
   disapproveOrgUser,
   getOrgUserById,
   listOrgUsers,
@@ -60,5 +61,12 @@ export class OrgUsersService {
 
   resendInvite(orgId: string, id: string) {
     return resendCredentials(this.prisma, orgId, id);
+  }
+
+  remove(orgId: string, id: string, actorUserId: string) {
+    if (id === actorUserId) {
+      throw new ForbiddenException('You cannot delete your own account');
+    }
+    return deleteOrgUser(this.prisma, orgId, id);
   }
 }
