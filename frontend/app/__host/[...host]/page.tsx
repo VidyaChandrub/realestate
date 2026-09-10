@@ -1,5 +1,5 @@
-import { LocalSitePreview } from "@/components/prestate/live-site";
-import { resolveOrgSiteHost } from "@/lib/prestate/resolve-host";
+import { LocalSitePreview } from "@/components/openpage/live-site";
+import { resolveOrgSiteHost } from "@/lib/openpage/resolve-host";
 
 export default async function DomainPreviewPage({ params }: { params: Promise<{ host: string[] }> }) {
   const { host } = await params;
@@ -7,5 +7,5 @@ export default async function DomainPreviewPage({ params }: { params: Promise<{ 
   const { page } = await resolveOrgSiteHost(hostString);
   // Explicit hostname preview (used by the builder for a page's assigned
   // domain). The live subdomain is served via /org-site instead.
-  return <LocalSitePreview host={hostString} page={page} />;
+  return <LocalSitePreview host={hostString} page={page} publicLive />;
 }

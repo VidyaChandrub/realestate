@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { evalLogicRule, isFieldVisible, ruleFieldValue, withFieldValue } from "@/lib/prestate/form-logic";
-import type { FormLeadField } from "@/lib/prestate/types";
+import { evalLogicRule, isFieldDisabled, isFieldRequired, isFieldVisible, logicSetValue, ruleFieldValue, withFieldValue } from "@/lib/openpage/form-logic";
+import type { FormLeadField } from "@/lib/openpage/types";
 
 const fields: FormLeadField[] = [
   { id: "f1", type: "select", label: "Budget", placeholder: "", required: false },
@@ -42,5 +42,26 @@ describe("form conditional logic", () => {
     const next = withFieldValue({}, { id: "x1", label: "Name" }, "Ada");
     expect(next.x1).toBe("Ada");
     expect(next.Name).toBe("Ada");
+  });
+
+  it("hide action inverts visibility when rules match", () => {
+    const field: FormLeadField = {
+      ...fields[2],
+      logic: { enabled: true, match: "all", action: "hide", rules: [{ field: "f1", op: "eq", value: "Yes" }] },
+    };
+    expect(isFieldVisible(field, fields, withFieldValue({}, fields[0], "Yes"))).toBe(false);
+    expect(isFieldVisible(field, fields, withFieldValue({}, fields[0], "No"))).toBe(true);
+  });
+
+  it("require / optional / disable / set_value actions", () => {
+    const phone: FormLeadField = {
+      ...fields[2],
+      required: false,
+      logic: { enabled: true, match: "all", action: "require", rules: [{ field: "f1", op: "eq", value: "Yes" }] },
+    };
+    expect(isFieldRequired(phone, fields, withFieldValue({}, fields[0], "Yes"))).toBe(true);
+    expect(isFieldRequired({ ...phone, logic: { ...phone.logic!, action: "optional" }, required: true }, fields, withFieldValue({}, fields[0], "Yes"))).toBe(false);
+    expect(isFieldDisabled({ ...phone, logic: { ...phone.logic!, action: "disable" } }, fields, withFieldValue({}, fields[0], "Yes"))).toBe(true);
+    expect(logicSetValue({ ...phone, logic: { ...phone.logic!, action: "set_value", setValue: "ok" } }, fields, withFieldValue({}, fields[0], "Yes"))).toBe("ok");
   });
 });

@@ -17,6 +17,8 @@ export function toLandingPageData(
   const content = template.content as {
     sections?: unknown[];
     config?: Record<string, unknown>;
+    engine?: string;
+    site?: unknown;
   } | null;
 
   const base = {
@@ -45,5 +47,7 @@ export function toLandingPageData(
     ...base,
     sections: content?.sections ?? [],
     config: content?.config ?? {},
+    engine: content?.engine,
+    site: content?.site ?? null,
   };
 }

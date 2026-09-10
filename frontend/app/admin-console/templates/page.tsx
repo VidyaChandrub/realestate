@@ -5,7 +5,7 @@ import { CheckCircle2, LayoutTemplate, Plus, Search, X } from "lucide-react";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
-import { SceneImage } from "@/components/prestate/art";
+import { SceneImage } from "@/components/openpage/art";
 import {
   buildTemplateRows,
   deriveStats,
@@ -15,13 +15,16 @@ import {
   type TemplateRow,
 } from "@/components/superadmin/templates/shared";
 import { TemplateCard } from "@/components/superadmin/templates/template-card";
-import { BLANK_TEMPLATE, TEMPLATES, buildTemplateSections } from "@/lib/prestate/data";
-import { createTemplate, deleteTemplate, duplicateTemplate, loadTemplates, resetTemplate, saveTemplate } from "@/lib/prestate/persist";
-import { builderPath, templatePreviewPath } from "@/lib/prestate/paths";
-import { defaultSiteConfig, seedConfigFor } from "@/lib/prestate/site-config";
-import { inferDesignId } from "@/lib/prestate/page-templates";
-import type { LandingPageData, TemplateData } from "@/lib/prestate/types";
+import { BLANK_TEMPLATE, TEMPLATES, buildTemplateSections } from "@/lib/openpage/data";
+import { createTemplate, deleteTemplate, duplicateTemplate, loadTemplates, resetTemplate, saveTemplate } from "@/lib/openpage/persist";
+import { builderPath, templatePreviewPath } from "@/lib/openpage/paths";
+import { defaultSiteConfig, seedConfigFor } from "@/lib/openpage/site-config";
+import { inferDesignId } from "@/lib/openpage/page-templates";
+import { buildRealEstateTemplate, openPageTemplateIdForDesign } from "@/lib/openpage/re-templates";
+import type { LandingPageData, TemplateData } from "@/lib/openpage/types";
 import { Icon } from "@/components/icons";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 function goToBuilder(pageId: string) {
   window.location.assign(builderPath(pageId));
@@ -81,6 +84,7 @@ export default function SuperAdminTemplatesPage() {
         thumbnail: template.thumbnail,
         sections: buildTemplateSections(template.id),
         config: defaultSiteConfig({ name: label, slug, primary: template.accent, accent: "#CDA45E" }),
+        openPageSite: buildRealEstateTemplate(openPageTemplateIdForDesign(template.id), label),
       });
       setPages((prev) => [created, ...prev]);
       goToBuilder(created.id);
@@ -125,6 +129,7 @@ export default function SuperAdminTemplatesPage() {
         thumbnail: template.thumbnail,
         sections,
         config,
+        openPageSite: buildRealEstateTemplate(openPageTemplateIdForDesign(template.id), template.name),
       });
       setPages((prev) => [created, ...prev]);
       goToBuilder(created.id);
@@ -238,12 +243,27 @@ export default function SuperAdminTemplatesPage() {
           <h1>Template Management</h1>
           <div className="sub">
             Create, preview and manage every landing-page template. Each template keeps its own design, brand, SEO,
-            domain and tracking — open one to edit it in the Prestate builder.
+            domain and tracking — open one to edit it in the OpenPage builder.
           </div>
         </div>
         <div className="actions">
-          <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
-            <Plus size={16} /> Create template
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setNewName("");
+              setDesignId("tpl-blank");
+              setCreateOpen(true);
+            }}
+          >
+            Start from design…
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => createFromDesign(BLANK_TEMPLATE)}
+          >
+            <Plus size={16} /> Create blank template
           </button>
         </div>
       </div>
@@ -297,8 +317,8 @@ export default function SuperAdminTemplatesPage() {
             <div className="muted" style={{ fontSize: 13.5, marginBottom: 18 }}>
               Try a different filter or create a new template to get started.
             </div>
-            <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
-              <Plus size={16} /> Create template
+            <button type="button" className="btn btn-primary" onClick={() => createFromDesign(BLANK_TEMPLATE)}>
+              <Plus size={16} /> Create blank template
             </button>
           </div>
         </Reveal>
@@ -320,23 +340,25 @@ export default function SuperAdminTemplatesPage() {
         </div>
       )}
 
-      {/* Create modal */}
-      {createOpen ? (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }}
-          onClick={() => setCreateOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 20, padding: 32, width: 720, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(15,23,42,.2)" }}
-          >
-            <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>Create a template</h2>
-            <p style={{ margin: "0 0 20px", color: "var(--muted)", fontSize: 13.5 }}>
-              Start from a blank canvas or copy a predefined design. The new template is fully independent.
-            </p>
-
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Create a template"
+        description="Name is enough — leave “Start from” on Blank canvas, or optionally copy a predefined design."
+        size="lg"
+        footer={
+          <>
+            <button className="btn btn-ghost" type="button" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" type="button" onClick={submitCreate}>
+              Create &amp; open builder →
+            </button>
+          </>
+        }
+      >
             <div className="field">
-              <label>Template name</label>
+              <label>Template name <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional)</span></label>
               <input
                 autoFocus
                 className="inp"
@@ -345,12 +367,12 @@ export default function SuperAdminTemplatesPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") submitCreate();
                 }}
-                placeholder="e.g. Harbor Lights — Custom"
+                placeholder="Untitled template"
               />
             </div>
 
             <div className="field" style={{ marginBottom: 0 }}>
-              <label>Start from</label>
+              <label>Start from <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional — blank by default)</span></label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
                 {bases.map((t) => {
                   const active = designId === t.id;
@@ -399,62 +421,32 @@ export default function SuperAdminTemplatesPage() {
               </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--line)" }}>
-              <button className="btn btn-ghost" type="button" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </button>
-              <button className="btn btn-primary" type="button" onClick={submitCreate}>
-                Create &amp; open builder →
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
 
-      {/* Delete / reset modal */}
-      {deleteFor ? (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }}
-          onClick={() => setDeleteFor(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 20, padding: 32, width: 440, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.2)" }}
-          >
-            <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>
-              {deleteFor.kind === "preset" ? "Reset predefined template?" : "Delete template?"}
-            </h2>
-            <p style={{ margin: 0, color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
-              {deleteFor.kind === "preset" ? (
-                <>
-                  Reset <strong>{deleteFor.name}</strong> to its original design? Edits on this template are removed.
-                  Other templates are not affected.
-                </>
-              ) : (
-                <>
-                  <strong>{deleteFor.name}</strong> will be permanently deleted. Other templates keep their own design
-                  and settings. This cannot be undone.
-                </>
-              )}
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--line)" }}>
-              <button className="btn btn-ghost" type="button" onClick={() => setDeleteFor(null)}>
-                Cancel
-              </button>
-              <button
-                className={deleteFor.kind === "preset" ? "btn btn-primary" : "btn btn-danger"}
-                type="button"
-                onClick={() => {
-                  remove(deleteFor);
-                  setDeleteFor(null);
-                }}
-              >
-                {deleteFor.kind === "preset" ? "Reset template" : "Delete template"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmModal
+        open={!!deleteFor}
+        title={deleteFor?.kind === "preset" ? "Reset predefined template?" : "Delete template?"}
+        message={
+          deleteFor?.kind === "preset" ? (
+            <>
+              Reset <strong>{deleteFor.name}</strong> to its original design? Edits on this template are removed.
+              Other templates are not affected.
+            </>
+          ) : deleteFor ? (
+            <>
+              <strong>{deleteFor.name}</strong> will be permanently deleted. Other templates keep their own design
+              and settings. This cannot be undone.
+            </>
+          ) : null
+        }
+        confirmLabel={deleteFor?.kind === "preset" ? "Reset template" : "Delete template"}
+        destructive={deleteFor?.kind !== "preset"}
+        onConfirm={() => {
+          if (deleteFor) remove(deleteFor);
+          setDeleteFor(null);
+        }}
+        onClose={() => setDeleteFor(null)}
+      />
 
       {/* Toast */}
       {toast ? (

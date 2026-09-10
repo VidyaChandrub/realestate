@@ -17,12 +17,19 @@ type NavItem = {
   activeMatch?: string[];
 };
 
+type NavGroup = {
+  grp: string;
+  items: NavItem[];
+};
+
 const NAV_MODULE: Record<string, string> = {
   "/admin-console": "admin_dashboard",
   "/admin-console/organisations": "admin_organisations",
   "/admin-console/roles": "admin_org_roles",
   "/admin-console/admins": "admin_platform_team",
   "/admin-console/templates": "admin_templates",
+  "/admin-console/forms": "admin_templates",
+  "/admin-console/leads": "admin_leads",
   "/admin-console/org-domains": "admin_domains",
   "/admin-console/subscriptions": "admin_subscriptions",
   "/admin-console/email": "admin_email",
@@ -67,6 +74,20 @@ const NAV_GROUPS: NavGroup[] = [
         tip: "Template Management",
         activeMatch: ["/admin-console/templates", "/admin-console/template-detail"],
       },
+      {
+        href: "/admin-console/forms",
+        icon: "document",
+        label: "Form Builder",
+        tip: "Create and manage forms",
+        activeMatch: ["/admin-console/forms"],
+      },
+      {
+        href: "/admin-console/leads",
+        icon: "users",
+        label: "All Leads",
+        tip: "Leads across all organisations",
+        activeMatch: ["/admin-console/leads"],
+      },
       { href: "/admin-console/subscriptions", icon: "billing", label: "Subscriptions", tip: "Plans and subscriptions", activeMatch: ["/admin-console/subscriptions"] },
     ],
   },
@@ -87,8 +108,10 @@ const CRUMB_MAP: Record<string, string> = {
   "/admin-console/organisation-detail": "Organisation",
   "/admin-console/admins": "Platform Team",
   "/admin-console/templates": "Templates",
+  "/admin-console/forms": "Form Builder",
+  "/admin-console/leads": "All Leads",
   "/admin-console/template-detail": "Template",
-  "/prestate": "Builder",
+  "/org-builder": "Builder",
   "/admin-console/org-domains": "Domains",
   "/admin-console/subscriptions": "Subscriptions",
   "/admin-console/email": "Email & SMTP",
@@ -190,9 +213,28 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
           <ul className="nav">
             {NAV_GROUPS.map((group) => {
               const items = group.items.filter((item) => {
+                // Full Super Admin / unrestricted platform users see every item.
+                if (
+                  user &&
+                  !user.org_id &&
+                  (user.platformUnrestricted ||
+                    user.roleKeys?.includes("super_admin") ||
+                    // Stale session before refreshPermissions: treat console Super Admin as full access.
+                    (user.role === "super_admin" &&
+                      (!user.permissions || Object.keys(user.permissions).length === 0)))
+                ) {
+                  return true;
+                }
                 const moduleKey = NAV_MODULE[item.href];
                 if (item.href === "/admin-console/admins") {
-                  return hasPermission("admin_platform_team", "view") || hasPermission("admin_platform_roles", "view");
+                  return (
+                    hasPermission("admin_platform_team", "view") ||
+                    hasPermission("admin_platform_roles", "view")
+                  );
+                }
+                // Form Builder shares Templates access — never hide it when Templates is visible.
+                if (item.href === "/admin-console/forms") {
+                  return hasPermission("admin_templates", "view");
                 }
                 if (!moduleKey) return true;
                 return hasPermission(moduleKey, "view");
@@ -203,9 +245,12 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
                 <li className="grp">{group.grp}</li>
                 {items.map((item) => {
                   const isActive =
-                    item.activeMatch?.some(
-                      (base) => pathname === base || pathname.startsWith(`${base}/`),
-                    ) ?? false;
+                    item.activeMatch?.some((base) => {
+                      if (base === "/admin-console") {
+                        return pathname === "/admin-console";
+                      }
+                      return pathname === base || pathname.startsWith(`${base}/`);
+                    }) ?? false;
                   const badge =
                     item.href === "/admin-console/organisations"
                       ? (pendingOrgsBadge && pendingOrgsBadge > 0 ? `${pendingOrgsBadge} pending` : undefined)

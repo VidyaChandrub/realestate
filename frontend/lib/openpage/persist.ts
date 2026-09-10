@@ -1,0 +1,598 @@
+import type { LandingPageData, SectionInstance, SiteConfig } from "./types";
+import { PAGES } from "./data";
+import { applyLandingPagePropertyFromConfig } from "./data";
+import { BLANK_TEMPLATE, buildTemplateSections, buildThankYouSections, inferDesignId } from "./page-templates";
+import { ensureConfig } from "./site-config";
+import { apiFetch } from "../api";
+import { isStructural } from "./tree";
+
+export const PAGES_STORAGE_KEY = "prestate.pages.v4";
+
+// ---------------------------------------------------------------------------
+// Widget migrations — merged library ids. Old pages keep rendering: every
+// stored section type is remapped once on load, carrying its settings across.
+// ---------------------------------------------------------------------------
+
+/** Removed widget id → primary widget id that replaces it. */
+export const WIDGET_MIGRATIONS: Record<string, string> = {
+  slider: "carousel",
+  accordion: "faq",
+  "row-2": "row",
+  "enquiry-form": "lead-form",
+  "multistep-form": "lead-form",
+  "whatsapp-form": "lead-form",
+  "sticky-footer-bar": "sticky-cta",
+  "whatsapp-cta": "call-cta",
+  map: "location-advantages",
+  nearby: "location-advantages",
+  "offer-banner": "cta-banner",
+};
+
+/** Extra settings patches applied when a widget is migrated. */
+const WIDGET_MIGRATION_SETTINGS: Record<string, Record<string, unknown> | undefined> = {
+  "whatsapp-cta": { mode: "whatsapp" },
+  "offer-banner": { layout: "strip" },
+};
+
+function migrateSectionNode(node: SectionInstance): SectionInstance {
+  const target = WIDGET_MIGRATIONS[node.type];
+  let next: SectionInstance = node;
+  if (target) {
+    next = {
+      ...node,
+      type: target,
+      // Adopt the primary widget's identity so labels/icons stay consistent.
+      label: node.label || target,
+      settings: {
+        ...node.settings,
+        ...(WIDGET_MIGRATION_SETTINGS[node.type] ?? {}),
+      },
+    };
+    // nearby items used {title,text}; LocationSection reads {title,meta}.
+    if (node.type === "nearby" && Array.isArray(next.settings.items)) {
+      next.settings.items = (next.settings.items as { title?: string; text?: string; meta?: string }[]).map((it) => ({
+        ...it,
+        meta: it.meta ?? it.text,
+      }));
+    }
+  }
+  if (!isStructural(next.type)) {
+    const align = next.style.layout?.align;
+    if (align == null || align === "left") {
+      next = {
+        ...next,
+        style: {
+          ...next.style,
+          layout: {
+            ...next.style.layout,
+            align: "center",
+          },
+        },
+      };
+    }
+  }
+  if (next.children?.length) next = { ...next, children: next.children.map(migrateSectionNode) };
+  return next;
+}
+
+/** Normalize a page's section tree through all widget merges (idempotent). */
+export function migrateSections(list: SectionInstance[]): SectionInstance[] {
+  return list.map(migrateSectionNode);
+}
+
+function sectionsFor(designId: string, pageType?: string) {
+  return migrateSections(pageType === "thank-you" ? buildThankYouSections() : buildTemplateSections(designId));
+}
+
+export function seedPages(): LandingPageData[] {
+  return PAGES.map((p) => {
+    const page: LandingPageData = {
+      ...p,
+      kind: p.kind ?? "preset",
+      designId: p.designId ?? inferDesignId(p.template),
+      pageType: p.pageType ?? "landing",
+      sections: sectionsFor(p.designId ?? p.template, p.pageType),
+    };
+    return { ...page, config: ensureConfig(page) };
+  });
+}
+
+const PRESET_IDS = PAGES.map((p) => p.id);
+
+export function loadPages(): LandingPageData[] {
+  if (typeof window === "undefined") return seedPages();
+  try {
+    const raw = window.localStorage.getItem(PAGES_STORAGE_KEY);
+    if (!raw) return seedPages();
+    const parsed = JSON.parse(raw) as LandingPageData[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return seedPages();
+    return parsed.map((p) => {
+      const designId = p.designId ?? inferDesignId(p.template);
+      const kind = p.kind ?? (PRESET_IDS.includes(p.id) ? "preset" : "custom");
+      const pageType = p.pageType ?? "landing";
+      const page: LandingPageData = {
+        ...p,
+        designId,
+        kind,
+        pageType,
+        sections: migrateSections(Array.isArray(p.sections) ? p.sections : sectionsFor(designId, pageType)),
+      };
+      return { ...page, config: ensureConfig(page) };
+    });
+  } catch {
+    return seedPages();
+  }
+}
+
+export function savePages(pages: LandingPageData[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PAGES_STORAGE_KEY, JSON.stringify(pages));
+  } catch {
+    /* quota */
+  }
+}
+
+/** Update a single page inside storage without touching the rest (no data loss). */
+export function savePage(pages: LandingPageData[], updated: LandingPageData) {
+  const idx = pages.findIndex((p) => p.id === updated.id);
+  const next = idx >= 0 ? pages.map((p) => (p.id === updated.id ? { ...updated, updated: new Date().toISOString() } : p)) : [...pages, updated];
+  savePages(next);
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// API — templates (backend)
+// ---------------------------------------------------------------------------
+
+const TEMPLATES_PATH = "/admin/templates";
+const LANDING_PAGES_PATH = "/org/landing-pages";
+
+// Which REST resource the builder is editing. Defaults to "template"
+// everywhere so every existing admin-console caller is unaffected — only
+// the org builder (`resource="landing-page"`) opts into the org-scoped path.
+export type Resource = "template" | "landing-page";
+
+// Raw shape returned by the backend — same field names/casing as
+// LandingPageData except sections/config are only present when content was
+// requested (list rows omit them by default).
+interface ApiTemplate {
+  id: string;
+  name: string;
+  slug: string;
+  status: LandingPageData["status"];
+  template: string;
+  domain: string;
+  thumbnail: string | null;
+  kind: "preset" | "custom";
+  designId: string;
+  pageType: "landing" | "thank-you";
+  parentPageId: string | null;
+  category: string | null;
+  isPaid: boolean;
+  createdAt: string;
+  updatedAt: string;
+  sections?: SectionInstance[];
+  config?: SiteConfig;
+  engine?: string;
+  site?: LandingPageData["openPageSite"] | null;
+}
+
+function formatRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+// Maps the backend's response shape onto LandingPageData. `views`/`conversions`
+// are decorative-only in the frontend (never computed anywhere) and are not
+// persisted server-side, so they always fall back to the existing "—" placeholder.
+function fromApiTemplate(raw: ApiTemplate): LandingPageData {
+  return {
+    id: raw.id,
+    name: raw.name,
+    slug: raw.slug,
+    status: raw.status,
+    template: raw.template,
+    domain: raw.domain,
+    views: "—",
+    conversions: "—",
+    updated: formatRelativeTime(raw.updatedAt),
+    updatedAt: raw.updatedAt,
+    thumbnail: raw.thumbnail ?? "",
+    sections: raw.sections ?? [],
+    config: raw.config,
+    openPageSite: raw.site ?? undefined,
+    kind: raw.kind,
+    designId: raw.designId,
+    pageType: raw.pageType,
+    parentPageId: raw.parentPageId ?? undefined,
+    isPaid: raw.isPaid,
+    category: raw.category,
+  };
+}
+
+function toContentBody(page: Pick<LandingPageData, "sections" | "config" | "openPageSite">) {
+  const site = page.openPageSite ?? null;
+  const config = {
+    ...(page.config ?? {}),
+    ...(site ? { site } : {}),
+  };
+  return {
+    engine: "openpage" as const,
+    site,
+    sections: page.sections ?? [],
+    config,
+  };
+}
+
+// Raw shape returned by /org/landing-pages — an org's own copy, not a
+// Template row. Deliberately has no domain/isPaid/kind: those are
+// Template-only concepts that don't exist on LandingPage.
+interface ApiLandingPage {
+  id: string;
+  name: string;
+  slug: string;
+  status: "draft" | "pending_approval" | "approved" | "rejected" | "published" | "unpublished";
+  thumbnail: string | null;
+  pageType: "landing" | "thank_you";
+  parentId: string | null;
+  sourceTemplateId: string | null;
+  sourceTemplate?: { id: string; name: string } | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  content?: { sections: SectionInstance[]; config: SiteConfig; engine?: string; site?: LandingPageData["openPageSite"] };
+}
+
+// Maps a LandingPage row onto the same LandingPageData shape the builder
+// already knows how to render — so BuilderWorkspace/Canvas/the widget
+// modules need no changes to serve either resource.
+function fromApiLandingPage(raw: ApiLandingPage): LandingPageData {
+  return {
+    id: raw.id,
+    name: raw.name,
+    slug: raw.slug,
+    // LandingPageStatus has values (pending_approval/approved/rejected) that
+    // LandingPageData's status union doesn't include. The builder only ever
+    // compares this against "published" (see TopNav), which still resolves
+    // correctly for every other value — so this cast doesn't lie, it just
+    // widens past a union that predates approval statuses.
+    status: raw.status as LandingPageData["status"],
+    // A from-scratch page (no sourceTemplate) has genuinely empty sections
+    // in storage — BuilderWorkspace's seedSections() re-derives starter
+    // content from `template` whenever sections is empty, and only
+    // buildTemplateSections("tpl-blank"/"...scratch"/"blank") short-circuits
+    // to []. Any other fallback (e.g. the previous "Custom") falls through
+    // to the default design's real starter content instead of staying blank.
+    template: raw.sourceTemplate?.name ?? BLANK_TEMPLATE.name,
+    domain: "",
+    views: "—",
+    conversions: "—",
+    updated: formatRelativeTime(raw.updatedAt),
+    updatedAt: raw.updatedAt,
+    thumbnail: raw.thumbnail ?? "",
+    sections: raw.content?.sections ?? [],
+    config: raw.content?.config,
+    openPageSite: raw.content?.site,
+    kind: "custom",
+    designId: inferDesignId(raw.sourceTemplate?.name ?? BLANK_TEMPLATE.name),
+    pageType: raw.pageType === "thank_you" ? "thank-you" : "landing",
+    parentPageId: raw.parentId ?? undefined,
+    isPaid: false,
+    category: null,
+  };
+}
+
+/** List persisted templates. Includes content by default so
+ *  buildTemplateRows()'s existing brand/font reads on custom rows keep
+ *  working unchanged — pass includeContent: false for lightweight reads
+ *  (e.g. a domain-collision index) that don't need the section tree.
+ *  The API defaults to landing pages only (thank-you companions are reached
+ *  through their parent, not browsable in their own right) — pass
+ *  pageType: "thank-you" for the few callers that genuinely need those. */
+export async function loadTemplates(
+  options: {
+    includeContent?: boolean;
+    pageType?: "landing" | "thank-you";
+    resource?: Resource;
+  } = {},
+): Promise<LandingPageData[]> {
+  if (options.resource === "landing-page") {
+    // The org's own pages — always lightweight (no content) regardless.
+    const res = await apiFetch<{ data: ApiLandingPage[] }>(`${LANDING_PAGES_PATH}?limit=100`);
+    return res.data.map(fromApiLandingPage);
+  }
+  const includeContent = options.includeContent ?? true;
+  const params = new URLSearchParams({ includeContent: String(includeContent) });
+  if (options.pageType) params.set("pageType", options.pageType);
+  const rows = await apiFetch<ApiTemplate[]>(`${TEMPLATES_PATH}?${params.toString()}`);
+  return rows.map(fromApiTemplate);
+}
+
+export async function loadTemplate(id: string, resource: Resource = "template"): Promise<LandingPageData | null> {
+  try {
+    if (resource === "landing-page") {
+      const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}`);
+      const page = fromApiLandingPage(raw);
+      applyLandingPagePropertyFromConfig(page.config);
+      return page;
+    }
+    const raw = await apiFetch<ApiTemplate>(`${TEMPLATES_PATH}/${encodeURIComponent(id)}`);
+    applyLandingPagePropertyFromConfig(null);
+    return fromApiTemplate(raw);
+  } catch {
+    return null;
+  }
+}
+
+export interface CreateTemplateInput {
+  name: string;
+  slug?: string;
+  designId: string;
+  template: string;
+  status?: LandingPageData["status"];
+  kind?: "preset" | "custom";
+  pageType?: "landing" | "thank-you";
+  parentPageId?: string;
+  thumbnail?: string;
+  isPaid?: boolean;
+  category?: string;
+  sections: SectionInstance[];
+  config: SiteConfig;
+  openPageSite?: LandingPageData["openPageSite"];
+}
+
+export async function createTemplate(input: CreateTemplateInput): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiTemplate>(TEMPLATES_PATH, {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name,
+      slug: input.slug,
+      designId: input.designId,
+      template: input.template,
+      status: input.status,
+      kind: input.kind,
+      pageType: input.pageType,
+      parentPageId: input.parentPageId,
+      thumbnail: input.thumbnail,
+      isPaid: input.isPaid,
+      category: input.category,
+      content: toContentBody({
+        sections: input.sections,
+        config: input.config,
+        openPageSite: input.openPageSite,
+      }),
+    }),
+  });
+  return fromApiTemplate(raw);
+}
+
+async function patchTemplate(id: string, record: LandingPageData): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiTemplate>(`${TEMPLATES_PATH}/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      name: record.name,
+      slug: record.slug,
+      status: record.status,
+      domain: record.domain,
+      thumbnail: record.thumbnail,
+      isPaid: record.isPaid,
+      category: record.category,
+      content: toContentBody(record),
+    }),
+  });
+  return fromApiTemplate(raw);
+}
+
+// LandingPageUpdateDto only accepts name/slug/thumbnail/content — status,
+// domain, isPaid and category don't exist on LandingPage, and the backend's
+// ValidationPipe (forbidNonWhitelisted) would 400 the whole request if we
+// sent them. Status changes only ever happen through submit/approve/
+// reject/publish, never a plain content save.
+async function patchLandingPage(id: string, record: LandingPageData): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      name: record.name,
+      slug: record.slug,
+      thumbnail: record.thumbnail,
+      content: toContentBody(record),
+    }),
+  });
+  return fromApiLandingPage(raw);
+}
+
+const SAVE_DEBOUNCE_MS = 500;
+interface PendingSave {
+  timer: ReturnType<typeof setTimeout>;
+  latest: LandingPageData;
+  resolvers: ((value: LandingPageData) => void)[];
+  rejecters: ((reason: unknown) => void)[];
+}
+const pendingSaves = new Map<string, PendingSave>();
+
+/** Debounced single-record save — replaces the old bulk "save the whole
+ *  array" pattern. Multiple calls for the same record id (within the same
+ *  resource) within the debounce window collapse into one PATCH using the
+ *  latest record. */
+export function saveTemplate(record: LandingPageData, resource: Resource = "template"): Promise<LandingPageData> {
+  return new Promise((resolve, reject) => {
+    const key = `${resource}:${record.id}`;
+    const existing = pendingSaves.get(key);
+    const entry: PendingSave = existing ?? {
+      timer: null as unknown as ReturnType<typeof setTimeout>,
+      latest: record,
+      resolvers: [],
+      rejecters: [],
+    };
+    entry.latest = record;
+    entry.resolvers.push(resolve);
+    entry.rejecters.push(reject);
+    if (existing) clearTimeout(existing.timer);
+
+    entry.timer = setTimeout(() => {
+      void flushPendingSave(key, resource);
+    }, SAVE_DEBOUNCE_MS);
+
+    pendingSaves.set(key, entry);
+  });
+}
+
+async function flushPendingSave(key: string, resource: Resource): Promise<LandingPageData | null> {
+  const entry = pendingSaves.get(key);
+  if (!entry) return null;
+  clearTimeout(entry.timer);
+  pendingSaves.delete(key);
+  const patcher = resource === "landing-page" ? patchLandingPage : patchTemplate;
+  try {
+    const updated = await patcher(entry.latest.id, entry.latest);
+    entry.resolvers.forEach((r) => r(updated));
+    return updated;
+  } catch (err) {
+    entry.rejecters.forEach((r) => r(err));
+    throw err;
+  }
+}
+
+/** Immediate save used by Publish so the live page gets the current builder JSON, not a stale draft. */
+export async function saveTemplateNow(record: LandingPageData, resource: Resource = "template"): Promise<LandingPageData> {
+  const key = `${resource}:${record.id}`;
+  const existing = pendingSaves.get(key);
+  if (existing) {
+    existing.latest = record;
+    return (await flushPendingSave(key, resource))!;
+  }
+  const patcher = resource === "landing-page" ? patchLandingPage : patchTemplate;
+  return patcher(record.id, record);
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  await apiFetch(`${TEMPLATES_PATH}/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function duplicateTemplate(id: string): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiTemplate>(`${TEMPLATES_PATH}/${encodeURIComponent(id)}/duplicate`, {
+    method: "POST",
+  });
+  return fromApiTemplate(raw);
+}
+
+export async function resetTemplate(
+  id: string,
+  content: { sections: SectionInstance[]; config: SiteConfig },
+): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiTemplate>(`${TEMPLATES_PATH}/${encodeURIComponent(id)}/reset`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
+  return fromApiTemplate(raw);
+}
+
+/** Publishes an org's own landing page directly — no approval gate. Only
+ *  ever called for resource: "landing-page". */
+export async function publishLandingPage(id: string): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}/publish`, {
+    method: "POST",
+  });
+  return fromApiLandingPage(raw);
+}
+
+export async function unpublishLandingPage(id: string): Promise<LandingPageData> {
+  const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}/unpublish`, {
+    method: "POST",
+  });
+  return fromApiLandingPage(raw);
+}
+
+// ---------------------------------------------------------------------------
+// Builder image upload — replaces base64-data-URI-in-content (413 fix).
+// Asks the backend for a short-lived presigned PUT URL, uploads the file
+// straight to R2 (never through the API), returns the stored public URL.
+// ---------------------------------------------------------------------------
+
+const BUILDER_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const BUILDER_IMAGE_MIMES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+];
+
+export async function uploadBuilderImage(
+  file: File,
+  opts: { id: string; resource: Resource },
+): Promise<string> {
+  if (file.type && !BUILDER_IMAGE_MIMES.includes(file.type)) {
+    throw new Error("Choose a PNG, JPG, WebP, GIF or SVG image");
+  }
+  if (file.size > BUILDER_IMAGE_MAX_BYTES) {
+    throw new Error("Keep images under 5 MB");
+  }
+  const base =
+    opts.resource === "landing-page" ? LANDING_PAGES_PATH : TEMPLATES_PATH;
+  const { uploadUrl, publicUrl } = await apiFetch<{
+    uploadUrl: string;
+    publicUrl: string;
+  }>(`${base}/${encodeURIComponent(opts.id)}/upload-url`, {
+    method: "POST",
+    body: JSON.stringify({
+      filename: file.name,
+      contentType: file.type,
+      size: file.size,
+    }),
+  });
+  const put = await fetch(uploadUrl, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": file.type },
+  });
+  if (!put.ok) {
+    throw new Error(`Upload to storage failed (${put.status}).`);
+  }
+  return publicUrl;
+}
+
+// ---------------------------------------------------------------------------
+// Saved section templates — "Save as template" in the section toolbar stores
+// reusable sections here; they appear under "Saved" in the widget library.
+// ---------------------------------------------------------------------------
+
+export interface SavedSectionTemplate {
+  id: string;
+  name: string;
+  type: string;
+  savedAt: string;
+  data: LandingPageData["sections"][number];
+}
+
+const SECTION_TEMPLATES_KEY = "prestate.section-templates.v1";
+
+export function loadSectionTemplates(): SavedSectionTemplate[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(SECTION_TEMPLATES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as SavedSectionTemplate[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveSectionTemplates(templates: SavedSectionTemplate[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SECTION_TEMPLATES_KEY, JSON.stringify(templates.slice(0, 40)));
+  } catch {
+    /* quota */
+  }
+}

@@ -48,7 +48,7 @@ export class AdminPlatformTeamService {
     return users.map((user) => this.toMember(user));
   }
 
-  async create(dto: CreatePlatformMemberDto) {
+  async create(dto: CreatePlatformMemberDto, actorUserId?: string) {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -97,6 +97,22 @@ export class AdminPlatformTeamService {
       });
       await tx.userRole.createMany({
         data: roleIds.map((roleId) => ({ userId: created.id, roleId })),
+      });
+      await tx.auditLog.create({
+        data: {
+          orgId: null,
+          actorId: actorUserId ?? null,
+          moduleKey: 'admin_platform_team',
+          action: 'platform_member_created',
+          entity: 'PlatformTeamMember',
+          entityId: created.id,
+          metadata: {
+            firstName: dto.firstName.trim(),
+            lastName: dto.lastName.trim(),
+            email,
+            role: dto.role,
+          } as any,
+        },
       });
       return created;
     });

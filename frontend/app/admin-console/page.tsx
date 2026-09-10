@@ -223,6 +223,9 @@ export default function SuperAdminDashboardPage() {
               <Link className="btn btn-ghost btn-block" href="/admin-console/templates">
                 <Icon name="puzzle" size={14} /> Template studio
               </Link>
+              <Link className="btn btn-ghost btn-block" href="/admin-console/forms">
+                <Icon name="document" size={14} /> Form Builder
+              </Link>
               <Link className="btn btn-ghost btn-block" href="/admin-console/email">
                 <Icon name="mail" size={14} /> Email &amp; SMTP delivery
               </Link>

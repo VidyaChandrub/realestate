@@ -36,6 +36,8 @@ import { OrgDashboardModule } from './modules/org-dashboard/org-dashboard.module
 import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
 import { PlatformConfigModule } from './modules/platform-config/platform-config.module';
 import { AdminPlatformTeamModule } from './modules/admin-platform-team/admin-platform-team.module';
+import { AdminAuditLogsModule } from './modules/admin-audit-logs/admin-audit-logs.module';
+import { AdminLeadsModule } from './modules/admin-leads/admin-leads.module';
 
 @Module({
   imports: [
@@ -74,6 +76,8 @@ import { AdminPlatformTeamModule } from './modules/admin-platform-team/admin-pla
     AdminDashboardModule,
     PlatformConfigModule,
     AdminPlatformTeamModule,
+    AdminAuditLogsModule,
+    AdminLeadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

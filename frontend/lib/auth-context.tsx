@@ -141,18 +141,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toSessionUser = useCallback(
-    (safeUser: SafeUser, permissions: Permissions, roleKeys?: string[]): SessionUser => {
+    (
+      safeUser: SafeUser,
+      permissions: Permissions,
+      roleKeys?: string[],
+      platformUnrestricted?: boolean,
+    ): SessionUser => {
       const mapped = sessionRoleFromKeys(
         roleKeys,
         safeUser.org_id,
         safeUser.onboarding_step,
       );
+      const keys = roleKeys ?? [];
       return {
         ...safeUser,
         role: mapped.role,
         roleLabel: mapped.roleLabel,
         permissions,
         organisation: null,
+        roleKeys: keys,
+        platformUnrestricted:
+          platformUnrestricted ?? keys.includes("super_admin"),
       };
     },
     [],
@@ -170,17 +179,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       let permissions: Permissions = {};
       let roleKeys = response.roles ?? [];
+      let platformUnrestricted = roleKeys.includes("super_admin");
 
       if (
         !response.user.org_id &&
         response.user.onboarding_step === "completed"
       ) {
         try {
-          const meRes = await apiFetch<{ permissions: Permissions }>(
-            "/admin/platform-roles/me",
-            { headers: { Authorization: `Bearer ${response.access_token}` } },
-          );
+          const meRes = await apiFetch<{
+            permissions: Permissions;
+            unrestricted?: boolean;
+            roles?: { key: string; name: string }[];
+          }>("/admin/platform-roles/me", {
+            headers: { Authorization: `Bearer ${response.access_token}` },
+          });
           if (meRes.permissions) permissions = meRes.permissions;
+          if (typeof meRes.unrestricted === "boolean") {
+            platformUnrestricted = meRes.unrestricted;
+          }
+          if (meRes.roles?.length) {
+            roleKeys = meRes.roles.map((r) => r.key);
+            if (roleKeys.includes("super_admin")) platformUnrestricted = true;
+          }
         } catch {
           permissions = {};
         }
@@ -208,7 +228,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const session = toSessionUser(response.user, permissions, roleKeys);
+      const session = toSessionUser(
+        response.user,
+        permissions,
+        roleKeys,
+        platformUnrestricted,
+      );
       if (!response.onboarding_incomplete && session.role !== "super_admin") {
         session.onboarding_step = "completed";
       }
@@ -322,8 +347,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (module: string, action: PermissionAction) => {
       if (!user) return false;
       if (!user.org_id) {
-        const loaded = user.permissions && Object.keys(user.permissions).length > 0;
-        if (loaded) return user.permissions[module]?.[action] === true;
+        if (
+          user.platformUnrestricted ||
+          user.roleKeys?.includes("super_admin")
+        ) {
+          return true;
+        }
+        const perms = user.permissions ?? {};
+        const loaded = Object.keys(perms).length > 0;
+        if (loaded) {
+          if (perms[module]?.[action] === true) return true;
+          // Stale sessions may lack newly added modules (e.g. admin_leads).
+          // If every known admin_* module is fully granted, treat as unrestricted.
+          const adminKeys = Object.keys(perms).filter((k) => k.startsWith("admin_"));
+          if (
+            adminKeys.length >= 8 &&
+            adminKeys.every((k) => perms[k]?.view === true)
+          ) {
+            return true;
+          }
+          return false;
+        }
         return user.role === "super_admin";
       }
       if (isOrgAdminSession()) return true;
@@ -339,13 +383,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = accessToken ?? (typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.accessToken) : null);
     if (!token || token.startsWith("mock-access-")) return null;
 
-    const applyPermissions = (next: Permissions) => {
+    const applyPermissions = (
+      next: Permissions,
+      extras?: { unrestricted?: boolean; roleKeys?: string[] },
+    ) => {
       setUser((prev) => {
         if (!prev) return null;
-        if (JSON.stringify(prev.permissions ?? {}) === JSON.stringify(next)) {
+        const nextUnrestricted =
+          extras?.unrestricted ??
+          extras?.roleKeys?.includes("super_admin") ??
+          prev.platformUnrestricted;
+        const nextKeys = extras?.roleKeys ?? prev.roleKeys;
+        if (
+          JSON.stringify(prev.permissions ?? {}) === JSON.stringify(next) &&
+          prev.platformUnrestricted === nextUnrestricted &&
+          JSON.stringify(prev.roleKeys ?? []) === JSON.stringify(nextKeys ?? [])
+        ) {
           return prev;
         }
-        const updated = { ...prev, permissions: next };
+        const updated: SessionUser = {
+          ...prev,
+          permissions: next,
+          platformUnrestricted: nextUnrestricted,
+          roleKeys: nextKeys,
+        };
         try {
           localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(updated));
         } catch {
@@ -358,11 +419,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (currentUser && !currentUser.org_id) {
       try {
-        const meRes = await apiFetch<{ permissions: Permissions }>("/admin/platform-roles/me", {
+        const meRes = await apiFetch<{
+          permissions: Permissions;
+          unrestricted?: boolean;
+          roles?: { key: string; name: string }[];
+        }>("/admin/platform-roles/me", {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (meRes?.permissions) {
-          return applyPermissions(meRes.permissions);
+          return applyPermissions(meRes.permissions, {
+            unrestricted: meRes.unrestricted,
+            roleKeys: meRes.roles?.map((r) => r.key),
+          });
         }
       } catch {
         return null;

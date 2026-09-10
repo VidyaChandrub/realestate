@@ -1,11 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { SceneImage } from "@/components/prestate/art";
-import { TEMPLATES } from "@/lib/prestate/data";
-import { localPreviewPath } from "@/lib/prestate/paths";
-import { ensureConfig } from "@/lib/prestate/site-config";
-import type { LandingPageData } from "@/lib/prestate/types";
+import { SceneImage } from "@/components/openpage/art";
+import { TEMPLATES } from "@/lib/openpage/data";
+import { localPreviewPath } from "@/lib/openpage/paths";
+import { ensureConfig } from "@/lib/openpage/site-config";
+import type { LandingPageData } from "@/lib/openpage/types";
 
 /* ------------------------------------------------------------------ *
  * Shared, reusable Template Management primitives.

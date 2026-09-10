@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Canvas } from "@/components/prestate/builder/canvas";
-import { loadTemplate } from "@/lib/prestate/persist";
-import { migrateSections } from "@/lib/prestate/persist";
-import { ensureConfig } from "@/lib/prestate/site-config";
-import { applyDocumentSeo } from "@/lib/prestate/seo";
-import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
-import { bumpTracking } from "@/lib/prestate/tracking";
-import type { LandingPageData } from "@/lib/prestate/types";
-import "@/app/prestate/prestate.css";
+import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
+import { ensureSiteForms, siteFromLandingPage } from "@/lib/openpage/content";
+import { loadTemplate } from "@/lib/openpage/persist";
+import { ensureConfig } from "@/lib/openpage/site-config";
+import { applyDocumentSeo } from "@/lib/openpage/seo";
+import { OpenPageTrackingScripts } from "@/components/openpage/tracking-scripts";
+import { bumpTracking } from "@/lib/openpage/tracking";
+import type { LandingPageData } from "@/lib/openpage/types";
+import "@/app/openpage.css";
 
 // Super Admin template preview — resolves the template from the backend by id
 // (GET /admin/templates/:id via loadTemplate), not from the /p/:slug route
@@ -66,34 +66,18 @@ export default function TemplatePreviewPage() {
   }
 
   const cfg = ensureConfig(page);
-  const sections = migrateSections(page.sections);
+  const site = ensureSiteForms(siteFromLandingPage(page));
 
   return (
     <div className="ps-app" style={{ minHeight: "100vh", background: "#fff" }}>
-      <Canvas
-        sections={sections}
-        selectedId={null}
-        device="desktop"
-        readOnly
+      <SiteRenderer
+        site={site}
         live
         pageId={page.id}
-        theme={{
-          primary: cfg.brand.primary,
-          accent: cfg.brand.accent,
-          font: cfg.brand.bodyFont,
-          headingFont: cfg.brand.headingFont,
-          name: cfg.brand.name,
-          phone: cfg.brand.phone,
-          logo: cfg.brand.logo,
-          layoutTheme: cfg.brand.layoutTheme,
-        }}
-        form={cfg.form}
-        forms={cfg.forms}
-        chrome={{ header: cfg.header, footer: cfg.footer, brand: cfg.brand }}
-        onSelect={() => {}}
-        onMutate={() => {}}
+        projectName={page.name}
+        forms={(site.forms ?? cfg.forms ?? []) as never}
       />
-      <PrestateTrackingScripts tracking={cfg.tracking} />
+      <OpenPageTrackingScripts tracking={cfg.tracking} />
     </div>
   );
 }

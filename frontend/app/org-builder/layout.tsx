@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
-import "@/app/prestate/prestate.css";
+import "@/app/openpage.css";
 
-// Mirrors app/prestate/layout.tsx exactly. This has to be a top-level
-// sibling route, not nested under app/org/ — app/org/layout.tsx
-// unconditionally wraps every child in <OrgAdminShell>, and the builder is
-// its own full-screen app with its own chrome (rail nav + topnav), never
-// meant to render inside a dashboard shell. Nesting it there previously
-// produced two overlapping sidebars. Also, prestate.css's rules depend on
-// the --font-inter/--font-playfair variables and the ps-app class set up
-// here — importing the stylesheet alone (what app/org/builder/page.tsx used
-// to do) isn't enough without this wrapper.
+// This has to be a top-level sibling route, not nested under app/org/ —
+// app/org/layout.tsx unconditionally wraps every child in <OrgAdminShell>,
+// and the builder is its own full-screen app with its own chrome (rail nav +
+// topnav), never meant to render inside a dashboard shell. Nesting it there
+// previously produced two overlapping sidebars. Also, openpage.css's rules
+// depend on the --font-inter/--font-playfair variables and the ps-app class
+// set up here — importing the stylesheet alone isn't enough without this
+// wrapper.
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
@@ -23,7 +22,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Prestate Builder",
+  title: "OpenPage Builder",
   description: "Edit your organisation's landing pages.",
 };
 

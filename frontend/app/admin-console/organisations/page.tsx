@@ -9,6 +9,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import type { OrganisationListResponse, OrganisationListRow, OrganisationSummary } from "@/lib/types";
 import { Icon } from "@/components/icons";
+import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RowActionsMenu, type RowAction } from "@/components/superadmin/row-actions-menu";
 import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
@@ -573,40 +574,42 @@ export default function SuperAdminOrganisationsPage() {
         }}
         onClose={() => setConfirmState(null)}
       />
-      {rejectModal ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15,23,42,.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 400,
-            padding: 20,
-          }}
-          onClick={() => {
-            if (!rejectSubmitting) { setRejectModal(null); setRejectReason(""); setRejectError(null); }
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "var(--surface)",
-              borderRadius: 20,
-              padding: 28,
-              width: 460,
-              maxWidth: "100%",
-              boxShadow: "var(--sh-lg)",
-            }}
-          >
-            <h2 style={{ margin: "0 0 6px", fontSize: 19, fontWeight: 800, color: "var(--ink)" }}>
-              Reject organisation?
-            </h2>
-            <p style={{ margin: "0 0 14px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
+      <Modal
+        open={!!rejectModal}
+        onClose={() => {
+          if (!rejectSubmitting) { setRejectModal(null); setRejectReason(""); setRejectError(null); }
+        }}
+        title="Reject organisation?"
+        description={
+          rejectModal ? (
+            <>
               <strong>&quot;{rejectModal.name}&quot;</strong> will be marked rejected. A reason is required
               — it&apos;s saved with the organisation and shown to super admins on the organisations list.
-            </p>
+            </>
+          ) : undefined
+        }
+        closeDisabled={rejectSubmitting}
+        footer={
+          <>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => { setRejectModal(null); setRejectReason(""); setRejectError(null); }}
+              disabled={rejectSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-danger"
+              type="button"
+              onClick={() => void submitReject()}
+              disabled={rejectSubmitting}
+            >
+              {rejectSubmitting ? "Rejecting…" : "Reject organisation"}
+            </button>
+          </>
+        }
+      >
             <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6 }}>
               Rejection reason <span style={{ color: "var(--rose)" }}>*</span>
             </label>
@@ -626,36 +629,7 @@ export default function SuperAdminOrganisationsPage() {
             <div style={{ marginTop: 6, fontSize: 11.5, color: rejectError ? "var(--rose)" : "var(--faint)", fontWeight: rejectError ? 600 : 400 }}>
               {rejectError ?? `${rejectReason.length}/500`}
             </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 10,
-                marginTop: 20,
-                paddingTop: 18,
-                borderTop: "1px solid var(--line)",
-              }}
-            >
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => { setRejectModal(null); setRejectReason(""); setRejectError(null); }}
-                disabled={rejectSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-danger"
-                type="button"
-                onClick={() => void submitReject()}
-                disabled={rejectSubmitting}
-              >
-                {rejectSubmitting ? "Rejecting…" : "Reject organisation"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
     </>
   );
 }

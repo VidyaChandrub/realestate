@@ -1,4 +1,4 @@
-import { IsArray, IsObject } from 'class-validator';
+import { IsArray, IsObject, IsOptional, IsString } from 'class-validator';
 
 // Deliberately shallow: `sections`/`config` are the builder's arbitrary,
 // frontend-owned JSON tree — validated only at this top level so the actual
@@ -10,4 +10,12 @@ export class TemplateContentDto {
 
   @IsObject()
   config: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  engine?: string;
+
+  @IsOptional()
+  @IsObject()
+  site?: Record<string, unknown>;
 }

@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
-import { LocalSitePreview } from "@/components/prestate/live-site";
-import { resolveOrgSiteHost } from "@/lib/prestate/resolve-host";
+import { LocalSitePreview } from "@/components/openpage/live-site";
+import { resolveOrgSiteHost } from "@/lib/openpage/resolve-host";
 
 export default async function HostSitePage() {
   const h = await headers();
@@ -8,5 +8,5 @@ export default async function HostSitePage() {
   const { page } = await resolveOrgSiteHost(host);
   // Renders the published site for the visited host. Falls back to the local
   // preview store when the backend has no published site for it.
-  return <LocalSitePreview host={host} page={page} />;
+  return <LocalSitePreview host={host} page={page} publicLive />;
 }

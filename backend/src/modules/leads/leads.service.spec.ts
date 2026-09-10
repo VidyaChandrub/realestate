@@ -20,6 +20,7 @@ describe('LeadsService', () => {
       update: jest.Mock;
     };
     landingPage: { findUnique: jest.Mock; findFirst: jest.Mock };
+    template: { findUnique: jest.Mock };
     project: { findMany: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     projectSalesAgent: { findMany: jest.Mock; findFirst: jest.Mock };
     user: { findFirst: jest.Mock; findMany: jest.Mock };
@@ -39,6 +40,7 @@ describe('LeadsService', () => {
         update: jest.fn(),
       },
       landingPage: { findUnique: jest.fn(), findFirst: jest.fn() },
+      template: { findUnique: jest.fn().mockResolvedValue(null) },
       project: {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
@@ -147,13 +149,43 @@ describe('LeadsService', () => {
     it('throws when the landing page does not exist', async () => {
       prisma.landingPage.findUnique.mockResolvedValue(null);
       prisma.landingPage.findFirst.mockResolvedValue(null);
+      prisma.template.findUnique.mockResolvedValue(null);
       await expect(
         service.createFromPublic({ landingPageId: 'lp-x', data: {} }),
       ).rejects.toThrow(NotFoundException);
     });
 
+    it('creates a platform lead from a Super Admin published template', async () => {
+      prisma.landingPage.findUnique.mockResolvedValue(null);
+      prisma.landingPage.findFirst.mockResolvedValue(null);
+      prisma.template.findUnique.mockResolvedValue({
+        id: 'tpl-lead',
+        status: 'published',
+      });
+      prisma.lead.findFirst.mockResolvedValue(null);
+      prisma.lead.create.mockResolvedValue({ id: 'lead-platform' });
+      prisma.activityEvent.create.mockResolvedValue({});
+
+      await service.createFromPublic({
+        landingPageId: 'tpl-lead',
+        formName: 'Lead gen',
+        data: { name: 'Riya' },
+      });
+
+      expect(prisma.lead.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            orgId: 'platform',
+            landingPageId: 'tpl-lead',
+            projectId: null,
+          }),
+        }),
+      );
+    });
+
     it('resolves a template preview id to a published page that used that template', async () => {
       prisma.landingPage.findUnique.mockResolvedValue(null);
+      prisma.template.findUnique.mockResolvedValue(null);
       prisma.landingPage.findFirst
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({
@@ -163,6 +195,7 @@ describe('LeadsService', () => {
         });
       prisma.lead.findFirst.mockResolvedValue(null);
       prisma.lead.create.mockResolvedValue({ id: 'lead-tpl' });
+      prisma.activityEvent.create.mockResolvedValue({});
 
       await service.createFromPublic({
         landingPageId: 'tpl-builder',
@@ -204,6 +237,8 @@ describe('LeadsService', () => {
           formName: 'enquiry',
           source: 'website',
           data: { fullName: 'Aarav' },
+          configurations: [],
+          tags: [],
         },
       });
       expect(result.id).toBe('lead-1');

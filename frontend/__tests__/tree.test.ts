@@ -7,8 +7,8 @@ import {
   makeColumn,
   makeThreeColRow,
   setRowColumnCount,
-} from "@/lib/prestate/tree";
-import type { SectionInstance } from "@/lib/prestate/types";
+} from "@/lib/openpage/tree";
+import type { SectionInstance } from "@/lib/openpage/types";
 
 function node(id: string, type = "section", children?: SectionInstance[]): SectionInstance {
   return {

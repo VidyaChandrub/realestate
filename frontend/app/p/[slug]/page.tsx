@@ -1,4 +1,4 @@
-import { LocalSitePreview } from "@/components/prestate/live-site";
+import { LocalSitePreview } from "@/components/openpage/live-site";
 
 export default async function LocalPreviewPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

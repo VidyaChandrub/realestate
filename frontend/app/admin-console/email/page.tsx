@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { Icon } from "@/components/icons";
+import { Modal } from "@/components/ui/modal";
 import {
   getSmtpConfig,
   updateSmtpConfig,
@@ -160,8 +161,8 @@ export default function SuperAdminEmailPage() {
     }
   }
 
-  async function handleSendTestEmail(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSendTestEmail(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!testRecipient) return;
     setTesting(true);
     setTestResult(null);
@@ -685,41 +686,35 @@ export default function SuperAdminEmailPage() {
         </div>
       )}
 
-      {/* Test Email Modal */}
-      {testModalOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            zIndex: 9999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-          }}
-          onClick={() => !testing && setTestModalOpen(false)}
-        >
-          <div
-            className="card"
-            style={{ width: "100%", maxWidth: 480, margin: 0, boxShadow: "0 20px 25px -5px rgba(0,0,0,0.2)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="card-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="t">Send SMTP Test Email</span>
-              <button
-                onClick={() => setTestModalOpen(false)}
-                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16 }}
-              >
-                ✕
-              </button>
-            </div>
-            <form onSubmit={handleSendTestEmail}>
-              <div className="card-b">
-                <p style={{ fontSize: 13, color: "var(--fg-muted)", marginTop: 0 }}>
-                  Deliver a test email to verify that your SMTP host credentials, port, and security settings are fully functional.
-                </p>
-
+      <Modal
+        open={testModalOpen}
+        onClose={() => {
+          if (!testing) setTestModalOpen(false);
+        }}
+        title="Send SMTP test email"
+        description="Deliver a test email to verify that your SMTP host credentials, port, and security settings are fully functional."
+        closeDisabled={testing}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setTestModalOpen(false)}
+              disabled={testing}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={testing || !testRecipient}
+              onClick={() => void handleSendTestEmail()}
+            >
+              {testing ? "Dispatching..." : "Send Test Now"}
+            </button>
+          </>
+        }
+      >
                 <div className="field">
                   <label>Recipient Email Address</label>
                   <input
@@ -736,9 +731,8 @@ export default function SuperAdminEmailPage() {
                   <div
                     style={{
                       padding: "10px 14px",
-                      borderRadius: 6,
+                      borderRadius: 10,
                       fontSize: 13,
-                      marginBottom: 16,
                       background: testResult.success ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
                       color: testResult.success ? "#065f46" : "#991b1b",
                       border: `1px solid ${testResult.success ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
@@ -747,37 +741,7 @@ export default function SuperAdminEmailPage() {
                     {testResult.msg}
                   </div>
                 )}
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: 10,
-                  padding: "14px 20px",
-                  background: "var(--bg-subtle, #f8fafc)",
-                  borderTop: "1px solid var(--line)",
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setTestModalOpen(false)}
-                  disabled={testing}
-                >
-                  Close
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={testing || !testRecipient}
-                >
-                  {testing ? "Dispatching..." : "Send Test Now"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </>
   );
 }

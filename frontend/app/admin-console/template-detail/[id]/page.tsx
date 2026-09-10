@@ -6,10 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Copy, Eye, LayoutTemplate, Pencil, X } from "lucide-react";
 import { Reveal } from "@/components/superadmin/reveal";
 import { StatusBadge, TemplateCover, manageHref, statusStyle } from "@/components/superadmin/templates/shared";
-import { loadTemplate, duplicateTemplate, saveTemplate } from "@/lib/prestate/persist";
-import { builderPath, templatePreviewPath } from "@/lib/prestate/paths";
-import { ensureConfig } from "@/lib/prestate/site-config";
-import type { LandingPageData } from "@/lib/prestate/types";
+import { loadTemplate, duplicateTemplate, saveTemplate } from "@/lib/openpage/persist";
+import { builderPath, templatePreviewPath } from "@/lib/openpage/paths";
+import { ensureConfig } from "@/lib/openpage/site-config";
+import type { LandingPageData } from "@/lib/openpage/types";
 
 type Tab = "overview" | "settings" | "preview";
 const TABS: { key: Tab; label: string }[] = [

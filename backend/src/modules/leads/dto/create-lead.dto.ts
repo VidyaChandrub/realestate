@@ -1,4 +1,10 @@
 import { IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+function emptyToUndefined(value: unknown) {
+  if (value === '' || value === null || value === undefined) return undefined;
+  return value;
+}
 
 export class CreateLeadDto {
   /** Landing page the form belongs to — used to resolve orgId on a public POST. */
@@ -8,10 +14,12 @@ export class CreateLeadDto {
 
   /** Project this enquiry is about — lead will be scoped to its org and visible to assigned sales. */
   @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
   @IsUUID()
   projectId?: string;
 
   @IsOptional()
+  @Transform(({ value }) => emptyToUndefined(value))
   @IsUUID()
   unitId?: string;
 
@@ -25,5 +33,5 @@ export class CreateLeadDto {
 
   /** Free-form field values captured by the form (label/key -> value). */
   @IsObject()
-  data: Record<string, unknown>;
+  data!: Record<string, unknown>;
 }

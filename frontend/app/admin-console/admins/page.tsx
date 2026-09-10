@@ -16,6 +16,27 @@ import { PasswordInput } from "@/components/auth/password-input";
 import type { PlatformTeamMember, PlatformTeamRole } from "@/lib/types";
 import { PlatformRolesPanel } from "./roles-panel";
 
+const fieldLabel: React.CSSProperties = {
+  display: "block",
+  fontSize: 13,
+  fontWeight: 500,
+  color: "#475569",
+  marginBottom: 6,
+};
+
+const fieldInput: React.CSSProperties = {
+  width: "100%",
+  padding: "9px 12px",
+  borderRadius: 10,
+  border: "1px solid #e2e8f0",
+  background: "#ffffff",
+  color: "#0f172a",
+  fontSize: 14,
+  outline: "none",
+  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+  boxSizing: "border-box" as const,
+};
+
 const EMPTY_FORM = {
   firstName: "",
   lastName: "",
@@ -388,99 +409,255 @@ export default function SuperAdminAdminsPage() {
         open={modalOpen}
         onClose={() => !submitting && setModalOpen(false)}
         title={editing ? "Edit platform admin" : "Create platform admin"}
-        description="Assign a Super Admin–related platform role. They sign in at /admin-login."
+        description={editing ? "Update this team member's profile or role." : "Invite a new admin to the Super Admin console."}
         size="md"
       >
-        <form onSubmit={submitForm} style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "70vh", overflowY: "auto" }}>
-          {formError ? <div className="form-alert" style={{ position: "sticky", top: 0, zIndex: 1 }}>{formError}</div> : null}
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div className="field">
-              <label>First name *</label>
-              <input
-                className="inp"
-                value={form.firstName}
-                onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="field">
-              <label>Last name *</label>
-              <input
-                className="inp"
-                value={form.lastName}
-                onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="field">
-            <label>Email *</label>
-            <input
-              className="inp"
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              required
-            />
-          </div>
-
-          <div className="field">
-            <label>Mobile</label>
-            <input
-              className="inp"
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel"
-              maxLength={16}
-              value={form.phoneNumber}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, phoneNumber: sanitizePlatformPhone(e.target.value) }))
-              }
-              placeholder="Optional · digits only, max 15"
-            />
-          </div>
-
-          <div className="field">
-            <label>Super Admin / platform role *</label>
-            <select
-              className="inp"
-              value={form.role}
-              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-              required
+        <form onSubmit={submitForm} style={{ display: "flex", flexDirection: "column", gap: 0, maxHeight: "70vh", overflowY: "auto" }}>
+          {formError ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 14px",
+                borderRadius: 10,
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                color: "#b91c1c",
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 20,
+              }}
             >
-              {roles.length === 0 ? <option value="super_admin">Super Admin</option> : null}
-              {roles.map((r) => (
-                <option key={r.key} value={r.key}>
-                  {r.name}
-                  {r.key === "super_admin" ? " (full console access)" : ""}
-                </option>
-              ))}
-            </select>
-            <div className="hint" style={{ marginTop: 6 }}>
-              Create a role on the Roles tab first if you need a custom permission set.
+              <Icon name="alert" size={16} />
+              {formError}
+            </div>
+          ) : null}
+
+          {/* Section: Personal Information */}
+          <div style={{ marginBottom: 0 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 14,
+              }}
+            >
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "#eef2ff",
+                  color: "#4f46e5",
+                }}
+              >
+                <Icon name="users" size={14} />
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", letterSpacing: "0.01em" }}>
+                Personal information
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={fieldLabel}>First name *</label>
+                <input
+                  style={fieldInput}
+                  value={form.firstName}
+                  onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <label style={fieldLabel}>Last name *</label>
+                <input
+                  style={fieldInput}
+                  value={form.lastName}
+                  onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                  required
+                />
+              </div>
             </div>
           </div>
 
-          <div className="field">
-            <label>
-              {editing ? "New password" : "Temporary password"}{" "}
-              <span style={{ fontWeight: 400, color: "var(--muted)" }}>(auto-generated if empty)</span>
-            </label>
-            <PasswordInput
-              value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-              placeholder="Leave blank to generate"
-              autoComplete="new-password"
-            />
+          {/* Divider */}
+          <div style={{ height: 1, background: "#f1f5f9", margin: "0 0 20px" }} />
+
+          {/* Section: Contact */}
+          <div style={{ marginBottom: 20 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 14,
+              }}
+            >
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "#ecfdf5",
+                  color: "#0d9488",
+                }}
+              >
+                <Icon name="mail" size={14} />
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", letterSpacing: "0.01em" }}>
+                Contact details
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={fieldLabel}>Email *</label>
+                <input
+                  style={fieldInput}
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <label style={fieldLabel}>Mobile</label>
+                <input
+                  style={fieldInput}
+                  type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  maxLength={16}
+                  value={form.phoneNumber}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, phoneNumber: sanitizePlatformPhone(e.target.value) }))
+                  }
+                  placeholder="Optional · digits only"
+                />
+              </div>
+            </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
-            <button className="btn btn-ghost" type="button" onClick={() => setModalOpen(false)} disabled={submitting}>
+          {/* Divider */}
+          <div style={{ height: 1, background: "#f1f5f9", margin: "0 0 20px" }} />
+
+          {/* Section: Access */}
+          <div style={{ marginBottom: 4 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 14,
+              }}
+            >
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "#fef3c7",
+                  color: "#d97706",
+                }}
+              >
+                <Icon name="shield" size={14} />
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", letterSpacing: "0.01em" }}>
+                Role & access
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={fieldLabel}>Platform role *</label>
+                <select
+                  style={fieldInput}
+                  value={form.role}
+                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                  required
+                >
+                  {roles.length === 0 ? <option value="super_admin">Super Admin</option> : null}
+                  {roles.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.name}
+                      {r.key === "super_admin" ? " (full access)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <div style={{ marginTop: 6, fontSize: 12, color: "#94a3b8", lineHeight: 1.4 }}>
+                  Create a role on the Roles tab first for a custom permission set.
+                </div>
+              </div>
+              <div>
+                <label style={fieldLabel}>
+                  {editing ? "New password" : "Temporary password"}
+                  <span style={{ fontWeight: 400, color: "#94a3b8" }}> (auto-generated if empty)</span>
+                </label>
+                <PasswordInput
+                  value={form.password}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder="Leave blank to generate"
+                  autoComplete="new-password"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 10,
+              marginTop: 24,
+              paddingTop: 18,
+              borderTop: "1px solid #f1f5f9",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setModalOpen(false)}
+              disabled={submitting}
+              style={{
+                padding: "9px 18px",
+                borderRadius: 10,
+                fontSize: 13.5,
+                fontWeight: 500,
+                border: "1px solid #e2e8f0",
+                background: "#ffffff",
+                color: "#475569",
+                cursor: submitting ? "not-allowed" : "pointer",
+                opacity: submitting ? 0.5 : 1,
+                transition: "all 0.15s ease",
+              }}
+            >
               Cancel
             </button>
-            <button className="btn btn-primary" type="submit" disabled={submitting}>
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{
+                padding: "9px 20px",
+                borderRadius: 10,
+                fontSize: 13.5,
+                fontWeight: 600,
+                border: "none",
+                color: "#ffffff",
+                cursor: submitting ? "not-allowed" : "pointer",
+                opacity: submitting ? 0.5 : 1,
+                transition: "all 0.15s ease",
+                background: "linear-gradient(135deg, #4f46e5, #4338ca)",
+                boxShadow: "0 2px 8px -2px rgba(79, 70, 229, 0.4)",
+              }}
+            >
               {submitting ? "Saving…" : editing ? "Save changes" : "Create admin"}
             </button>
           </div>

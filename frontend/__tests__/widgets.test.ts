@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { WIDGETS } from "@/lib/prestate/data";
-import { resolveVars } from "@/lib/prestate/data";
-import { designsForWidget } from "@/lib/prestate/widget-designs";
-import { buildThankYouSections } from "@/lib/prestate/page-templates";
-import { migrateSections } from "@/lib/prestate/persist";
-import type { SectionInstance } from "@/lib/prestate/types";
+import { WIDGETS } from "@/lib/openpage/data";
+import { resolveVars } from "@/lib/openpage/data";
+import { designsForWidget } from "@/lib/openpage/widget-designs";
+import { buildThankYouSections } from "@/lib/openpage/page-templates";
+import { migrateSections } from "@/lib/openpage/persist";
+import type { SectionInstance } from "@/lib/openpage/types";
 
 describe("widget library integrity", () => {
   it("has unique ids across the registry", () => {
@@ -65,7 +65,7 @@ describe("widget library integrity", () => {
   });
 
   it("applies bound inventory vars onto the same tokens", async () => {
-    const { applyLandingPagePropertyFromConfig } = await import("@/lib/prestate/data");
+    const { applyLandingPagePropertyFromConfig } = await import("@/lib/openpage/data");
     applyLandingPagePropertyFromConfig({
       vars: { property_name: "Skyline Heights", starting_price: "₹2 Cr" },
       property: { name: "Skyline Heights", startingPrice: "₹2 Cr" },

@@ -4,18 +4,19 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
-import { Canvas } from "@/components/prestate/builder/canvas";
+import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
+import { ensureSiteForms, siteFromLandingPage } from "@/lib/openpage/content";
 import type { LandingPageRow } from "@/lib/types";
-import type { LandingPageData } from "@/lib/prestate/types";
-import type { SectionInstance, SiteConfig } from "@/lib/prestate/types";
-import { applyDocumentSeo } from "@/lib/prestate/seo";
-import { applyLandingPagePropertyFromConfig } from "@/lib/prestate/data";
-import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
-import { bumpTracking } from "@/lib/prestate/tracking";
-import "@/app/prestate/prestate.css";
+import type { LandingPageData } from "@/lib/openpage/types";
+import type { SectionInstance, SiteConfig } from "@/lib/openpage/types";
+import { applyDocumentSeo } from "@/lib/openpage/seo";
+import { applyLandingPagePropertyFromConfig } from "@/lib/openpage/data";
+import { OpenPageTrackingScripts } from "@/components/openpage/tracking-scripts";
+import { bumpTracking } from "@/lib/openpage/tracking";
+import "@/app/openpage.css";
 
 interface LandingPageDetail extends LandingPageRow {
-  content: { sections: SectionInstance[]; config: SiteConfig };
+  content: { sections: SectionInstance[]; config: SiteConfig; engine?: string; site?: LandingPageData["openPageSite"] };
 }
 
 export default function PreviewLandingPage() {
@@ -92,31 +93,39 @@ export default function PreviewLandingPage() {
 
   // Render ONLY the landing page — no dashboard shell, no extra header.
   // SEO and Tracking are per-page via data.content.config
+  const previewPage: LandingPageData = {
+    id: data.id,
+    name: data.name,
+    slug: data.slug,
+    status: data.status as LandingPageData["status"],
+    template: "",
+    domain: "",
+    views: "—",
+    conversions: "—",
+    updated: "",
+    thumbnail: data.thumbnail ?? "",
+    sections: data.content.sections ?? [],
+    config: data.content.config,
+    openPageSite: data.content.site ?? undefined,
+    kind: "custom",
+    pageType: "landing",
+  };
+  const site = ensureSiteForms(siteFromLandingPage(previewPage));
+  const previewForms = (site.forms ?? data.content.config?.forms ?? []) as never;
+
   return (
     <div className="ps-app" style={{ minHeight: "100vh", background: "#fff" }}>
-      <Canvas
-        sections={data.content.sections}
-        selectedId={null}
-        device="desktop"
-        readOnly
+      <SiteRenderer
+        site={site}
         live
         pageId={data.id}
-        theme={{
-          primary: data.content.config.brand.primary,
-          accent: data.content.config.brand.accent,
-          font: data.content.config.brand.bodyFont,
-          headingFont: data.content.config.brand.headingFont,
-          name: data.content.config.brand.name,
-          phone: data.content.config.brand.phone,
-          logo: data.content.config.brand.logo,
-        }}
-        form={data.content.config.form}
-        forms={data.content.config.forms}
-        chrome={{ header: data.content.config.header, footer: data.content.config.footer, brand: data.content.config.brand }}
-        onSelect={() => {}}
-        onMutate={() => {}}
+        projectName={data.name}
+        projectId={
+          site.propertyBinding?.kind === "project" ? site.propertyBinding.projectId : undefined
+        }
+        forms={previewForms}
       />
-      <PrestateTrackingScripts tracking={data.content.config.tracking} />
+      <OpenPageTrackingScripts tracking={data.content.config.tracking} />
     </div>
   );
 }
