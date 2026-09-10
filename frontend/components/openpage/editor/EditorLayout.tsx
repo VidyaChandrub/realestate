@@ -7,6 +7,7 @@ import { JsonDrawer } from "./JsonDrawer";
 import { VersionHistory } from "./VersionHistory";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { ShortcutsModal } from "./ShortcutsModal";
+import { FormBuilder } from "./FormBuilder";
 import { useEditorStore } from "@/components/openpage/store/editorStore";
 import { OpenPageRuntimeProvider } from "@/components/openpage/runtime/OpenPageRuntime";
 import { useConfigStore } from "@/components/openpage/store/configStore";
@@ -16,6 +17,8 @@ import { useOpenPageKeyboard } from "@/lib/openpage/useKeyboardShortcuts";
 export function EditorLayout() {
   useOpenPageKeyboard();
   const previewMode = useEditorStore((s) => s.previewMode);
+  const formBuilderOpen = useEditorStore((s) => s.formBuilderOpen);
+  const toggleFormBuilder = useEditorStore((s) => s.toggleFormBuilder);
   const config = useConfigStore((s) => s.config);
 
   return (
@@ -41,6 +44,21 @@ export function EditorLayout() {
         </div>
         <VersionHistory />
         <ShortcutsModal />
+
+        {/* Form Builder Slide Panel */}
+        {formBuilderOpen && (
+          <div
+            className="fixed inset-0 z-[200] flex justify-end bg-black/40 backdrop-blur-sm"
+            onClick={toggleFormBuilder}
+          >
+            <div
+              className="w-[480px] max-w-[95vw] h-full bg-bg-1 border-l border-border-default shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex flex-col overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <FormBuilder onClose={toggleFormBuilder} />
+            </div>
+          </div>
+        )}
       </div>
     </OpenPageRuntimeProvider>
   );

@@ -24,6 +24,7 @@ interface EditorState {
   isDragging: boolean
   templatesOpen: boolean
   globalsOpen: boolean
+  formBuilderOpen: boolean
   isGenerating: boolean
   generationPrompt: string | null
   generationError: string | null
@@ -45,6 +46,7 @@ interface EditorState {
   setIsDragging: (dragging: boolean) => void
   toggleTemplates: () => void
   toggleGlobals: () => void
+  toggleFormBuilder: () => void
   setGenerating: (prompt: string | null) => void
   setGenerationError: (err: string | null) => void
   clearGeneration: () => void
@@ -67,6 +69,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   isDragging: false,
   templatesOpen: false,
   globalsOpen: false,
+  formBuilderOpen: false,
   isGenerating: false,
   generationPrompt: null,
   generationError: null,
@@ -95,6 +98,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setIsDragging: (dragging) => set({ isDragging: dragging }),
   toggleTemplates: () => set((s) => ({ templatesOpen: !s.templatesOpen })),
   toggleGlobals: () => set((s) => ({ globalsOpen: !s.globalsOpen })),
+  toggleFormBuilder: () => set((s) => ({ formBuilderOpen: !s.formBuilderOpen })),
   setGenerating: (prompt) => set({ isGenerating: !!prompt, generationPrompt: prompt, generationError: null }),
   setGenerationError: (err) => set({ generationError: err }),
   clearGeneration: () => set({ isGenerating: false, generationPrompt: null }),

@@ -834,6 +834,13 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
 export function PropertiesPanel({ block }: { block: BlockConfig }) {
   const [showJson, setShowJson] = useState(false)
   const schema = blockFields[block.type]
+  const updateColumnWidth = useConfigStore((s) => s.updateColumnWidth)
+  const addColumn = useConfigStore((s) => s.addColumn)
+  const removeColumn = useConfigStore((s) => s.removeColumn)
+
+  const columns = block.type === 'columns'
+    ? ((block.props.columns as Array<{ width: number; blocks: BlockConfig[] }>) ?? [])
+    : []
 
   return (
     <>
@@ -858,6 +865,50 @@ export function PropertiesPanel({ block }: { block: BlockConfig }) {
         <div className="p-3.5 text-[11px] text-text-3">
           No editable properties defined for this block type.
         </div>
+      )}
+
+      {/* Column Width Editor */}
+      {block.type === 'columns' && (
+        <Section title="Columns">
+          <div className="space-y-2">
+            {columns.map((col, i) => (
+              <div key={i} className="bg-bg-2 border border-border-default rounded p-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] text-text-3 font-medium">Column {i + 1}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-text-3 font-mono">{col.width}%</span>
+                    {columns.length > 1 && (
+                      <button
+                        onClick={() => removeColumn(block.id, i)}
+                        className="text-[10px] text-text-3 hover:text-status-red transition-colors"
+                        title="Remove column"
+                      >
+                        x
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={10}
+                  max={90}
+                  value={col.width}
+                  onChange={(e) => updateColumnWidth(block.id, i, Number(e.target.value))}
+                  className="w-full h-1.5 rounded-full appearance-none bg-bg-4 cursor-pointer accent-green"
+                />
+                <div className="text-[9px] text-text-3 mt-0.5">{col.blocks.length} widget(s) in this column</div>
+              </div>
+            ))}
+            {columns.length < 6 && (
+              <button
+                onClick={() => addColumn(block.id)}
+                className="w-full py-1.5 rounded border border-dashed border-border-default text-[10px] text-text-3 hover:border-green hover:text-green transition-colors"
+              >
+                + Add Column
+              </button>
+            )}
+          </div>
+        </Section>
       )}
 
       {/* View JSON toggle */}

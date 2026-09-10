@@ -17,7 +17,6 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { useEditorStore } from "@/components/openpage/store/editorStore";
 import { CanvasEmpty } from "./CanvasEmpty";
@@ -38,6 +37,7 @@ export function Canvas() {
   })
   const theme = useConfigStore((s) => s.config.theme)
   const moveBlock = useConfigStore((s) => s.moveBlock)
+  const addBlockToColumn = useConfigStore((s) => s.addBlockToColumn)
   const { selectedBlockId, selectBlock, viewport, isDragging, setIsDragging } = useEditorStore()
 
   const resolved = useMemo(() => resolveTheme(theme), [theme])
@@ -64,12 +64,37 @@ export function Canvas() {
     setActiveId(null)
     setIsDragging(false)
     if (!over || active.id === over.id) return
+
+    const overData = over.data?.current as Record<string, unknown> | undefined
+
+    if (overData?.type === 'column' && overData.sectionBlockId && typeof overData.colIndex === 'number') {
+      const sourceBlockId = String(active.id)
+      const sourceBlock = blocks.find((b) => b.id === sourceBlockId)
+      if (sourceBlock) {
+        const alreadyInSameColumn = blocks.some((b) => {
+          if (b.type !== 'columns' || b.id !== overData.sectionBlockId) return false
+          const cols = b.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
+          if (!cols) return false
+          return cols[overData.colIndex as number]?.blocks.some((cb) => cb.id === sourceBlockId)
+        })
+
+        if (!alreadyInSameColumn) {
+          const newBlock: BlockConfig = {
+            ...JSON.parse(JSON.stringify(sourceBlock)),
+            id: `block-${Date.now()}`,
+          }
+          addBlockToColumn(String(overData.sectionBlockId), overData.colIndex as number, newBlock)
+          return
+        }
+      }
+    }
+
     const oldIndex = blocks.findIndex((b) => b.id === active.id)
     const newIndex = blocks.findIndex((b) => b.id === over.id)
     if (oldIndex !== -1 && newIndex !== -1) {
       moveBlock(oldIndex, newIndex)
     }
-  }, [blocks, moveBlock, setIsDragging])
+  }, [blocks, moveBlock, addBlockToColumn, setIsDragging])
 
   if (blocks.length === 0) {
     return <CanvasEmpty />
@@ -97,7 +122,6 @@ export function Canvas() {
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        modifiers={[restrictToVerticalAxis]}
       >
         <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
           {blocks.map((block) => (

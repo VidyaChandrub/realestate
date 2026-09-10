@@ -211,32 +211,38 @@ export function ProjectEnquiryModal({
   const fieldStyle = {
     width: "100%",
     boxSizing: "border-box" as const,
-    padding: "11px 12px",
-    borderRadius: 10,
-    border: `1.5px solid ${W.borderStrong}`,
-    backgroundColor: "#fff",
-    color: W.ink,
-    fontSize: 13.5,
-    outline: "none",
+    padding: "12px 14px",
+    borderRadius: 12,
+    border: "1.5px solid #e2e8f0",
+    backgroundColor: "#f8fafc",
+    color: "#0f172a",
+    fontSize: 14,
+    outline: "none" as const,
+    transition: "all .2s ease",
+    fontFamily: "inherit",
   };
 
   return (
     <div
       onClick={onClose}
+      className="op-popup-overlay"
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 1200,
-        background: "rgba(8,10,20,.62)",
-        backdropFilter: "blur(6px)",
+        background: "rgba(8,10,20,.55)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 16,
+        opacity: 1,
       }}
     >
       <div
-        className="ps-lead-modal"
+        className="op-popup-card"
+        data-popup-card
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "relative",
@@ -244,63 +250,97 @@ export function ProjectEnquiryModal({
           maxWidth: "100%",
           background: "#fff",
           color: W.ink,
-          borderRadius: 18,
-          boxShadow: "0 30px 80px rgba(8,10,20,.45)",
-          overflow: "hidden",
+          borderRadius: 20,
+          boxShadow: "0 32px 80px rgba(8,10,20,.5)",
+          overflow: "visible",
+          transform: "translateY(0) scale(1)",
+          opacity: 1,
         }}
       >
         <button
           type="button"
           aria-label="Close"
           onClick={onClose}
+          className="op-popup-close"
           style={{
             position: "absolute",
             top: 12,
             right: 12,
-            width: 32,
-            height: 32,
+            width: 34,
+            height: 34,
             borderRadius: "50%",
             border: "none",
-            background: "#f1f5f9",
-            color: "#64748b",
+            background: "rgba(255,255,255,.92)",
+            color: "#334155",
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 2,
+            zIndex: 3,
+            boxShadow: "0 2px 12px rgba(0,0,0,.16)",
           }}
         >
-          <X size={16} />
+          <X size={16} strokeWidth={2.5} />
         </button>
+
         {!done ? (
           <>
             <div
               style={{
-                background: `linear-gradient(135deg, ${W.primary} 0%, #6d5dfc 100%)`,
-                padding: "16px 20px",
+                background: `linear-gradient(135deg, ${W.primary} 0%, #6d5dfc 45%, #8b5cf6 100%)`,
+                padding: "20px 20px 22px",
                 color: "#fff",
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
+                position: "relative",
+                overflow: "hidden",
               }}
             >
               <div
                 style={{
+                  position: "absolute",
+                  top: -40,
+                  right: -40,
+                  width: 140,
+                  height: 140,
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,.08)",
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: -60,
+                  left: -30,
+                  width: 120,
+                  height: 120,
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,.06)",
+                }}
+              />
+              <div
+                style={{
+                  position: "relative",
                   fontSize: 11,
                   fontWeight: 800,
-                  letterSpacing: 1.2,
+                  letterSpacing: 1.4,
                   textTransform: "uppercase",
-                  opacity: 0.9,
+                  opacity: 0.95,
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
+                  marginBottom: 8,
                 }}
               >
-                <Building2 size={12} /> {project.name}
+                <Building2 size={12} strokeWidth={2.5} /> {project.name}
               </div>
               <div
                 style={{
-                  fontSize: 18,
+                  position: "relative",
+                  fontSize: 19,
                   fontWeight: 900,
-                  marginTop: 4,
                   lineHeight: 1.2,
+                  letterSpacing: "-0.02em",
                 }}
               >
                 {heading || `Enquire About ${project.name}`}
@@ -308,32 +348,35 @@ export function ProjectEnquiryModal({
               {text ? (
                 <p
                   style={{
-                    fontSize: 12.5,
-                    opacity: 0.9,
-                    marginTop: 6,
-                    lineHeight: 1.45,
+                    position: "relative",
+                    fontSize: 13,
+                    opacity: 0.92,
+                    marginTop: 7,
+                    lineHeight: 1.5,
+                    fontWeight: 400,
                   }}
                 >
                   {text}
                 </p>
               ) : null}
             </div>
+
             <div
               style={{
-                padding: "16px 18px",
+                padding: "20px 22px 22px",
                 display: "flex",
                 flexDirection: "column",
-                gap: 10,
+                gap: 12,
               }}
             >
               {units.length > 0 ? (
                 <div>
                   <label
                     style={{
-                      fontSize: 11.5,
+                      fontSize: 12,
                       fontWeight: 700,
-                      color: W.slate,
-                      marginBottom: 5,
+                      color: "#334155",
+                      marginBottom: 6,
                       display: "block",
                     }}
                   >
@@ -357,6 +400,7 @@ export function ProjectEnquiryModal({
                   </select>
                 </div>
               ) : null}
+
               {visible.map((f, i) => {
                 const key = (f as { id?: string }).id || f.label;
                 const val = values[key] ?? "";
@@ -365,10 +409,10 @@ export function ProjectEnquiryModal({
                     {f.type !== "checkbox" ? (
                       <label
                         style={{
-                          fontSize: 11.5,
+                          fontSize: 12,
                           fontWeight: 700,
-                          color: W.slate,
-                          marginBottom: 5,
+                          color: "#334155",
+                          marginBottom: 6,
                           display: "block",
                         }}
                       >
@@ -402,16 +446,17 @@ export function ProjectEnquiryModal({
                         onChange={(e) =>
                           setValues((p) => ({ ...p, [key]: e.target.value }))
                         }
-                        style={{ ...fieldStyle, minHeight: 80 }}
+                        style={{ ...fieldStyle, minHeight: 80, resize: "vertical" }}
                       />
                     ) : f.type === "checkbox" ? (
                       <label
                         style={{
                           display: "flex",
-                          gap: 8,
+                          gap: 9,
                           alignItems: "center",
-                          fontSize: 12.5,
-                          color: W.slate,
+                          fontSize: 13,
+                          color: "#475569",
+                          cursor: "pointer",
                         }}
                       >
                         <input
@@ -423,6 +468,7 @@ export function ProjectEnquiryModal({
                               [key]: e.target.checked ? "yes" : "",
                             }))
                           }
+                          style={{ accentColor: W.primary, width: 16, height: 16 }}
                         />
                         {f.label}
                       </label>
@@ -446,20 +492,23 @@ export function ProjectEnquiryModal({
                   </div>
                 );
               })}
+
               {error ? (
                 <div
                   style={{
-                    padding: "9px 12px",
+                    padding: "10px 14px",
                     borderRadius: 10,
                     background: "#fef2f2",
                     color: "#dc2626",
                     fontSize: 12.5,
                     fontWeight: 600,
+                    border: "1px solid #fecaca",
                   }}
                 >
                   {error}
                 </div>
               ) : null}
+
               <button
                 type="button"
                 onClick={handleSubmit}
@@ -467,56 +516,76 @@ export function ProjectEnquiryModal({
                 style={{
                   marginTop: 4,
                   width: "100%",
-                  padding: "12px 16px",
-                  borderRadius: 10,
+                  padding: "14px 18px",
+                  borderRadius: 12,
                   border: "none",
-                  background: W.primary,
+                  background: `linear-gradient(135deg, ${W.primary}, #5448e8)`,
                   color: "#fff",
                   fontWeight: 800,
-                  fontSize: 14,
+                  fontSize: 14.5,
                   cursor: submitting ? "not-allowed" : "pointer",
                   opacity: submitting ? 0.7 : 1,
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 8,
+                  fontFamily: "inherit",
+                  boxShadow: `0 4px 16px rgba(109,93,252,.35)`,
+                  transition: "all .2s ease",
                 }}
               >
-                <Send size={16} /> {buttonLabel || "Submit Enquiry"}
+                <Send size={16} strokeWidth={2.5} /> {buttonLabel || "Submit Enquiry"}
               </button>
+
               <div
                 style={{
                   textAlign: "center",
                   fontSize: 11,
-                  color: W.muted,
+                  color: "#94a3b8",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 6,
                 }}
               >
-                <ShieldCheck size={12} /> Your details are safe with us
+                <ShieldCheck size={12} strokeWidth={2.5} /> Your details are safe with us
               </div>
             </div>
           </>
         ) : (
-          <div style={{ textAlign: "center", padding: "42px 22px 36px" }}>
+          <div
+            style={{
+              textAlign: "center",
+              padding: "48px 28px 42px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
             <span
               style={{
-                width: 58,
-                height: 58,
+                width: 72,
+                height: 72,
                 borderRadius: "50%",
                 background: "#dcfce7",
                 color: "#16a34a",
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                marginBottom: 14,
+                marginBottom: 18,
+                animation: "op-popup-pop .5s cubic-bezier(.34,1.56,.64,1) .1s both",
               }}
             >
-              <CheckCircle2 size={28} />
+              <CheckCircle2 size={36} strokeWidth={2} />
             </span>
-            <div style={{ fontSize: 19, fontWeight: 800, color: "#0f172a" }}>
+            <div
+              style={{
+                fontSize: 21,
+                fontWeight: 800,
+                color: "#0f172a",
+                letterSpacing: "-0.02em",
+              }}
+            >
               Enquiry Sent!
             </div>
             <div
@@ -524,7 +593,8 @@ export function ProjectEnquiryModal({
                 fontSize: 13.5,
                 color: "#64748b",
                 marginTop: 8,
-                lineHeight: 1.5,
+                lineHeight: 1.6,
+                maxWidth: 300,
               }}
             >
               Thank you for your interest in <b>{project.name}</b>. Our team

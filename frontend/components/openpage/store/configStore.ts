@@ -20,6 +20,7 @@ interface UndoEntry {
   blocks: BlockConfig[]
   theme?: Partial<ThemeConfig>
   globalWidgets?: GlobalWidget[]
+  forms?: SiteConfig["forms"]
   label: string
   timestamp: number
 }
@@ -40,6 +41,13 @@ interface ConfigState {
   duplicateBlock: (id: string) => void
   moveBlock: (fromIndex: number, toIndex: number) => void
   moveBlockToIndex: (blockId: string, toIndex: number) => void
+  addBlockToColumn: (sectionBlockId: string, colIndex: number, block: BlockConfig, index?: number) => void
+  removeBlockFromColumn: (sectionBlockId: string, colIndex: number, blockId: string) => void
+  moveBlockInColumn: (sectionBlockId: string, colIndex: number, fromIndex: number, toIndex: number) => void
+  duplicateBlockInColumn: (sectionBlockId: string, colIndex: number, blockId: string) => void
+  updateColumnWidth: (sectionBlockId: string, colIndex: number, width: number) => void
+  addColumn: (sectionBlockId: string) => void
+  removeColumn: (sectionBlockId: string, colIndex: number) => void
   addPage: (name: string, path: string) => string
   removePage: (id: string) => void
   renamePage: (id: string, name: string) => void
@@ -127,12 +135,13 @@ export const defaultConfig: SiteConfig = {
   globalWidgets: [],
 }
 
-function snapshot(state: ConfigState): { pages?: PageConfig[]; blocks: BlockConfig[]; theme?: Partial<ThemeConfig>; globalWidgets?: GlobalWidget[] } {
+function snapshot(state: ConfigState): { pages?: PageConfig[]; blocks: BlockConfig[]; theme?: Partial<ThemeConfig>; globalWidgets?: GlobalWidget[]; forms?: SiteConfig["forms"] } {
   return {
     pages: state.config.pages ? JSON.parse(JSON.stringify(state.config.pages)) : undefined,
     blocks: JSON.parse(JSON.stringify(state.config.blocks)),
     theme: state.config.theme ? JSON.parse(JSON.stringify(state.config.theme)) : undefined,
     globalWidgets: state.config.globalWidgets ? JSON.parse(JSON.stringify(state.config.globalWidgets)) : undefined,
+    forms: state.config.forms ? JSON.parse(JSON.stringify(state.config.forms)) : undefined,
   }
 }
 
@@ -322,6 +331,136 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           }
         }),
 
+      addBlockToColumn: (sectionBlockId, colIndex, block, index) =>
+        set((state) => ({
+          ...pushUndo(state, 'Add block to column'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const section = page.blocks.find((b) => b.id === sectionBlockId)
+            if (!section || section.type !== 'columns') return
+            const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
+            if (!cols || !cols[colIndex]) return
+            if (index !== undefined) {
+              cols[colIndex].blocks.splice(index, 0, block)
+            } else {
+              cols[colIndex].blocks.push(block)
+            }
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      removeBlockFromColumn: (sectionBlockId, colIndex, blockId) =>
+        set((state) => ({
+          ...pushUndo(state, 'Remove block from column'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const section = page.blocks.find((b) => b.id === sectionBlockId)
+            if (!section || section.type !== 'columns') return
+            const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
+            if (!cols || !cols[colIndex]) return
+            cols[colIndex].blocks = cols[colIndex].blocks.filter((b) => b.id !== blockId)
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      moveBlockInColumn: (sectionBlockId, colIndex, fromIndex, toIndex) =>
+        set((state) => ({
+          ...pushUndo(state, 'Move block in column'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const section = page.blocks.find((b) => b.id === sectionBlockId)
+            if (!section || section.type !== 'columns') return
+            const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
+            if (!cols || !cols[colIndex]) return
+            const colBlocks = cols[colIndex].blocks
+            const [moved] = colBlocks.splice(fromIndex, 1)
+            colBlocks.splice(toIndex, 0, moved)
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      duplicateBlockInColumn: (sectionBlockId, colIndex, blockId) =>
+        set((state) => {
+          const blocks = getPageBlocks(state.config, state.activePageId)
+          const section = blocks.find((b) => b.id === sectionBlockId)
+          if (!section || section.type !== 'columns') return state
+          const cols = (section.props.columns as Array<{ width: number; blocks: BlockConfig[] }>) ?? []
+          if (!cols[colIndex]) return state
+          const colBlocks = cols[colIndex].blocks
+          const idx = colBlocks.findIndex((b) => b.id === blockId)
+          if (idx === -1) return state
+          const original = colBlocks[idx]
+          const clone: BlockConfig = {
+            ...JSON.parse(JSON.stringify(original)),
+            id: `block-${Date.now()}`,
+          }
+          return {
+            ...pushUndo(state, 'Duplicate block in column'),
+            config: produce(withPages(state.config), (draft) => {
+              const page = draft.pages!.find((p) => p.id === state.activePageId)
+              if (!page) return
+              const sec = page.blocks.find((b) => b.id === sectionBlockId)
+              if (!sec || sec.type !== 'columns') return
+              const c = sec.props.columns as Array<{ width: number; blocks: BlockConfig[] }>
+              if (!c || !c[colIndex]) return
+              c[colIndex].blocks.splice(idx + 1, 0, clone)
+              draft.blocks = page.blocks
+            }),
+          }
+        }),
+
+      updateColumnWidth: (sectionBlockId, colIndex, width) =>
+        set((state) => ({
+          ...pushUndo(state, 'Update column width'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const section = page.blocks.find((b) => b.id === sectionBlockId)
+            if (!section || section.type !== 'columns') return
+            const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
+            if (!cols || !cols[colIndex]) return
+            cols[colIndex].width = width
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      addColumn: (sectionBlockId) =>
+        set((state) => ({
+          ...pushUndo(state, 'Add column'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const section = page.blocks.find((b) => b.id === sectionBlockId)
+            if (!section || section.type !== 'columns') return
+            const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
+            if (!cols) return
+            const newWidth = Math.floor(100 / (cols.length + 1))
+            cols.forEach((c) => { c.width = newWidth })
+            cols.push({ width: newWidth, blocks: [] })
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      removeColumn: (sectionBlockId, colIndex) =>
+        set((state) => ({
+          ...pushUndo(state, 'Remove column'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const section = page.blocks.find((b) => b.id === sectionBlockId)
+            if (!section || section.type !== 'columns') return
+            const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
+            if (!cols || cols.length <= 1) return
+            cols.splice(colIndex, 1)
+            const newWidth = Math.floor(100 / cols.length)
+            cols.forEach((c) => { c.width = newWidth })
+            draft.blocks = page.blocks
+          }),
+        })),
+
       addPage: (name, path) => {
         const id = `page-${Date.now()}`
         set((state) => ({
@@ -435,7 +574,7 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           return {
             undoStack: state.undoStack.slice(0, -1),
             redoStack: [...state.redoStack, { ...snap, label: prev.label, timestamp: Date.now() }],
-            config: { ...state.config, pages: prev.pages, blocks: prev.blocks, theme: prev.theme, globalWidgets: prev.globalWidgets },
+            config: { ...state.config, pages: prev.pages, blocks: prev.blocks, theme: prev.theme, globalWidgets: prev.globalWidgets, forms: prev.forms },
           }
         }),
 
@@ -447,7 +586,7 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           return {
             redoStack: state.redoStack.slice(0, -1),
             undoStack: [...state.undoStack, { ...snap, label: next.label, timestamp: Date.now() }],
-            config: { ...state.config, pages: next.pages, blocks: next.blocks, theme: next.theme, globalWidgets: next.globalWidgets },
+            config: { ...state.config, pages: next.pages, blocks: next.blocks, theme: next.theme, globalWidgets: next.globalWidgets, forms: next.forms },
           }
         }),
 

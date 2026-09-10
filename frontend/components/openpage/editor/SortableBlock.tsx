@@ -10,6 +10,56 @@ import { useEditorStore } from "@/components/openpage/store/editorStore";
 import type { BlockConfig } from "../blocks/types";
 import { blockMetadata } from "@/lib/openpage/block-metadata";
 
+const blockLabels: Record<string, string> = {
+  navbar: 'Header',
+  footer: 'Footer',
+  'project-banner': 'Hero',
+  'property-details': 'Highlights',
+  'project-overview': 'About',
+  'unit-config': 'Unit types',
+  amenities: 'Amenities',
+  gallery: 'Gallery',
+  location: 'Location',
+  'floor-plans': 'Floor plans',
+  're-pricing': 'Pricing',
+  features: 'Highlights',
+  testimonials: 'Testimonials',
+  faq: 'FAQ',
+  'lead-form': 'Enquiry form',
+  'download-brochure': 'Brochure',
+  cta: 'CTA',
+  image: 'Image',
+  video: 'Video',
+  banner: 'Banner',
+  divider: 'Divider',
+  developer: 'Developer',
+  offers: 'Offers',
+  'custom-section': 'Custom',
+  heading: 'Heading',
+  text: 'Text',
+  button: 'Button',
+  icon: 'Icon',
+  'icon-box': 'Icon box',
+  'image-box': 'Image box',
+  columns: 'Columns',
+  spacer: 'Spacer',
+  'html-code': 'HTML',
+  'property-search': 'Search',
+  'property-filters': 'Filters',
+  'emi-calculator': 'EMI calc',
+  'payment-plan': 'Payment plan',
+  team: 'Sales team',
+  'social-icons': 'Social icons',
+  tabs: 'Tabs',
+  countdown: 'Countdown',
+  logocloud: 'Logos',
+  newsletter: 'Newsletter',
+  contact: 'Contact',
+  'construction-status': 'Construction',
+  'project-highlights': 'Highlights',
+  stats: 'Stats',
+}
+
 interface Props {
   block: BlockConfig
   isSelected: boolean
@@ -160,7 +210,7 @@ export function SortableBlock({ block, isSelected, onSelect, children }: Props) 
           isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         }`}
       >
-        Section
+        {blockLabels[block.type] || block.type}
       </span>
 
       <div
