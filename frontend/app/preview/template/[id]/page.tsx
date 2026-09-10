@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
-import { siteFromLandingPage } from "@/lib/openpage/content";
+import { ensureSiteForms, siteFromLandingPage } from "@/lib/openpage/content";
 import { loadTemplate } from "@/lib/openpage/persist";
-import { migrateSections } from "@/lib/openpage/persist";
 import { ensureConfig } from "@/lib/openpage/site-config";
 import { applyDocumentSeo } from "@/lib/openpage/seo";
 import { OpenPageTrackingScripts } from "@/components/openpage/tracking-scripts";
@@ -67,11 +66,17 @@ export default function TemplatePreviewPage() {
   }
 
   const cfg = ensureConfig(page);
-  const sections = migrateSections(page.sections);
+  const site = ensureSiteForms(siteFromLandingPage(page));
 
   return (
     <div className="ps-app" style={{ minHeight: "100vh", background: "#fff" }}>
-      <SiteRenderer site={siteFromLandingPage(page)} live pageId={page.id} projectName={page.name} forms={cfg.forms as never} />
+      <SiteRenderer
+        site={site}
+        live
+        pageId={page.id}
+        projectName={page.name}
+        forms={(site.forms ?? cfg.forms ?? []) as never}
+      />
       <OpenPageTrackingScripts tracking={cfg.tracking} />
     </div>
   );

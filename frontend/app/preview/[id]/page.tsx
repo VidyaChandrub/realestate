@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
-import { siteFromLandingPage } from "@/lib/openpage/content";
+import { ensureSiteForms, siteFromLandingPage } from "@/lib/openpage/content";
 import type { LandingPageRow } from "@/lib/types";
 import type { LandingPageData } from "@/lib/openpage/types";
 import type { SectionInstance, SiteConfig } from "@/lib/openpage/types";
@@ -110,13 +110,8 @@ export default function PreviewLandingPage() {
     kind: "custom",
     pageType: "landing",
   };
-  const site = siteFromLandingPage(previewPage);
-  const previewForms =
-    (site.forms && site.forms.length
-      ? site.forms
-      : data.content.config?.forms && data.content.config.forms.length
-        ? data.content.config.forms
-        : site.forms ?? data.content.config?.forms ?? []) as never;
+  const site = ensureSiteForms(siteFromLandingPage(previewPage));
+  const previewForms = (site.forms ?? data.content.config?.forms ?? []) as never;
 
   return (
     <div className="ps-app" style={{ minHeight: "100vh", background: "#fff" }}>

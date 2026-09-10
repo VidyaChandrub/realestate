@@ -75,7 +75,7 @@ export function newFormDefinition(pageId?: string, name = "Untitled Form"): Form
     webhookUrl: "",
     autoReplySubject: "",
     autoReplyBody: "",
-    honeypot: true,
+    honeypot: false,
     preventDuplicate: true,
     captchaEnabled: false,
     progressBar: true,

@@ -237,6 +237,8 @@ describe('LeadsService', () => {
           formName: 'enquiry',
           source: 'website',
           data: { fullName: 'Aarav' },
+          configurations: [],
+          tags: [],
         },
       });
       expect(result.id).toBe('lead-1');

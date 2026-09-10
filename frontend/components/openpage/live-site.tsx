@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ExternalLink, Globe, PencilRuler } from "lucide-react";
 import type { LandingPageData } from "@/lib/openpage/types";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
-import { siteFromLandingPage } from "@/lib/openpage/content";
+import { siteFromLandingPage, ensureSiteForms } from "@/lib/openpage/content";
 import { ensureConfig } from "@/lib/openpage/site-config";
 import { applyDocumentSeo } from "@/lib/openpage/seo";
 import { OpenPageTrackingScripts } from "@/components/openpage/tracking-scripts";
@@ -78,13 +78,8 @@ export function LocalSitePreview({
   const cfg = ensureConfig(page);
   applyLandingPagePropertyFromConfig(cfg);
   const needsPassword = Boolean(cfg.page.password) && !unlocked;
-  const openPageSite = siteFromLandingPage(page);
-  const pageForms =
-    (openPageSite.forms && openPageSite.forms.length
-      ? openPageSite.forms
-      : cfg.forms && cfg.forms.length
-        ? cfg.forms
-        : openPageSite.forms ?? cfg.forms ?? []) as never;
+  const openPageSite = ensureSiteForms(siteFromLandingPage(page));
+  const pageForms = (openPageSite.forms ?? cfg.forms ?? []) as never;
   const boundProjectId =
     openPageSite.propertyBinding?.kind === "project"
       ? openPageSite.propertyBinding.projectId

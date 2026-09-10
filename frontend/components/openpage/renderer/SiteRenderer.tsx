@@ -7,6 +7,7 @@ import { resolveTheme, themeToCSS } from "@/lib/openpage/theme-presets";
 import { useGoogleFonts } from "@/lib/openpage/useGoogleFonts";
 import { OpenPageRuntimeProvider } from "@/components/openpage/runtime/OpenPageRuntime";
 import type { FormDefinition } from "@/lib/openpage/forms-store";
+import { mergeFormLibraries } from "@/lib/openpage/resolve-form";
 import { PageSettingsChrome } from "@/components/openpage/renderer/PageSettingsChrome";
 import { applyVarsDeep } from "@/lib/openpage/block-style";
 
@@ -88,7 +89,7 @@ export function SiteRenderer({
     return vars;
   }, [resolved, resolvedSite.settings]);
   useGoogleFonts([resolved.fontSans, resolved.fontDisplay, resolved.fontMono]);
-  const library = forms && forms.length ? forms : resolvedSite.forms ?? [];
+  const library = mergeFormLibraries(forms, resolvedSite.forms);
 
   const binding = resolvedSite.propertyBinding;
   const resolvedProjectId =

@@ -166,10 +166,15 @@ export class AdminLeadsService {
       : [];
 
     return {
-      organisations: orgs,
+      organisations: [
+        ...orgs,
+        ...(orgIds.includes('platform')
+          ? [{ id: 'platform', name: 'Platform (Super Admin)', slug: 'platform' }]
+          : []),
+      ],
       sources: sourceRows
-        .map((s) => s.source)
-        .filter((s): s is string => !!s?.trim()),
+        .map((r) => r.source)
+        .filter((s): s is string => Boolean(s)),
       statuses: [
         'new',
         'contacted',

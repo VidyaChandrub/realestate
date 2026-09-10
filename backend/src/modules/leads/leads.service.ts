@@ -179,6 +179,8 @@ export class LeadsService {
         formName: dto.formName ?? null,
         source: dto.source ?? 'website',
         data: data as Prisma.InputJsonValue,
+        configurations: [],
+        tags: [],
         ...(assignedToId ? { assignedToId } : {}),
       },
     });
@@ -238,6 +240,8 @@ export class LeadsService {
         formName: dto.formName ?? 'Manual lead',
         source: dto.source ?? 'crm',
         data: data as Prisma.InputJsonValue,
+        configurations: [],
+        tags: [],
         assignedToId,
       },
       include: {

@@ -483,7 +483,7 @@ export function FormDesigner({
               <label>Google Sheets webhook</label>
               <input value={form.integrations?.googleSheetsUrl ?? ""} onChange={(e) => patch({ integrations: { ...form.integrations, googleSheetsUrl: e.target.value } })} />
               <label className="fb-check">
-                <input type="checkbox" checked={form.honeypot !== false} onChange={(e) => patch({ honeypot: e.target.checked })} />
+                <input type="checkbox" checked={form.honeypot === true} onChange={(e) => patch({ honeypot: e.target.checked })} />
                 Honeypot spam protection
               </label>
               <label className="fb-check">

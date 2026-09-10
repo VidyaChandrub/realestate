@@ -89,7 +89,6 @@ export function DynamicLeadForm({
   const [submitting, setSubmitting] = useState(false);
   const [download, setDownload] = useState<ResolvedDownload | null>(null);
   const [step, setStep] = useState(0);
-  const [honeypot, setHoneypot] = useState("");
   const [captcha, setCaptcha] = useState(makeCaptcha);
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const started = useRef(false);
@@ -243,10 +242,6 @@ export function DynamicLeadForm({
   };
 
   const submit = async () => {
-    if (form.honeypot !== false && honeypot.trim()) {
-      finishSuccess();
-      return;
-    }
     if (!validateFields(stepFields)) return;
     if (!isLastStep) {
       setError("");
@@ -261,15 +256,15 @@ export function DynamicLeadForm({
       return;
     }
 
-    if (form.preventDuplicate && typeof window !== "undefined") {
-      const fp = submissionFingerprint(values);
-      if (fp !== "|") {
-        const key = formDupStorageKey(formId, fp);
-        if (window.sessionStorage.getItem(key)) {
-          setError("This form was already submitted.");
-          return;
-        }
-        window.sessionStorage.setItem(key, "1");
+    const fp =
+      form.preventDuplicate && typeof window !== "undefined"
+        ? submissionFingerprint(values)
+        : "";
+    if (form.preventDuplicate && typeof window !== "undefined" && fp && fp !== "|") {
+      const key = formDupStorageKey(formId, fp);
+      if (window.sessionStorage.getItem(key)) {
+        setError("This form was already submitted.");
+        return;
       }
     }
 
@@ -297,38 +292,41 @@ export function DynamicLeadForm({
       autoReplyBody: form.autoReplyBody,
     };
     try {
-      const shouldSaveCrm = form.saveToCrm !== false;
-      if (live && shouldSaveCrm) {
-        if (!pageId) {
-          throw new Error("This page is missing an ID, so leads cannot be saved. Open a published or preview URL.");
-        }
-        fireTrackingLead();
-        bumpTracking(pageId, "form");
-        await submitLead({
-          landingPageId: pageId,
-          projectId,
-          formName: form.name || place,
-          source: composeLeadSource({
-            place,
-            project: projectName,
-            interest: leadFields.interestedIn,
-          }),
-          fields: leadFields,
-          unitId,
-        });
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("prestate:lead-success"));
-        }
-      } else if (!live) {
-        /* editor preview — CRM write skipped on purpose */
+      if (!pageId) {
+        throw new Error("This page is missing an ID, so leads cannot be saved. Open Preview or a published URL.");
       }
+      const shouldSaveCrm =
+        form.saveToCrm !== false && form.integrations?.crm !== false;
+      if (!shouldSaveCrm) {
+        throw new Error("Save to CRM is disabled on this form. Enable it in Form settings.");
+      }
+
+      fireTrackingLead();
+      bumpTracking(pageId, "form");
+      await submitLead({
+        landingPageId: pageId,
+        projectId,
+        formName: form.name || place,
+        source: composeLeadSource({
+          place,
+          project: projectName,
+          interest: leadFields.interestedIn,
+        }),
+        fields: leadFields,
+        unitId,
+      });
+      if (form.preventDuplicate && typeof window !== "undefined" && fp && fp !== "|") {
+        window.sessionStorage.setItem(formDupStorageKey(formId, fp), "1");
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("prestate:lead-success"));
+      }
+
       const eventName = form.integrations?.analyticsEvent;
       if (eventName && typeof window !== "undefined" && typeof (window as any).gtag === "function") {
         (window as any).gtag("event", eventName);
       }
-      const hooks = live
-        ? ([form.webhookUrl, form.integrations?.googleSheetsUrl].filter(Boolean) as string[])
-        : [];
+      const hooks = [form.webhookUrl, form.integrations?.googleSheetsUrl].filter(Boolean) as string[];
       for (const url of hooks) {
         try {
           void fetch(url, {
@@ -562,12 +560,6 @@ export function DynamicLeadForm({
           <div style={{ fontSize: 11, marginTop: 4, color: labelColor }}>
             Step {step + 1} of {stepIndexes.length}
           </div>
-        </div>
-      ) : null}
-
-      {form.honeypot !== false ? (
-        <div aria-hidden style={{ position: "absolute", left: -9999, height: 0, overflow: "hidden" }}>
-          <input tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
         </div>
       ) : null}
 

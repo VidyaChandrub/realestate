@@ -411,7 +411,7 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
       case "builder":
         return activePage ? (
           <div className="op-root" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <EditorLayout />
+            <EditorLayout pageId={activePage.id} captureLeads />
           </div>
         ) : (
           <div className="ps-studio-boot">{pageReady ? "This page could not be opened." : "Opening page…"}</div>

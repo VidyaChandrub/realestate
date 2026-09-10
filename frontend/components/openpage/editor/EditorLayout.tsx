@@ -13,16 +13,34 @@ import { useConfigStore } from "@/components/openpage/store/configStore";
 import { Toaster } from "sonner";
 import { useOpenPageKeyboard } from "@/lib/openpage/useKeyboardShortcuts";
 
-export function EditorLayout() {
+export function EditorLayout({
+  pageId,
+  captureLeads = true,
+}: {
+  pageId?: string;
+  /** When true and pageId is set, canvas form submits write to CRM (same as Preview). */
+  captureLeads?: boolean;
+}) {
   useOpenPageKeyboard();
   const previewMode = useEditorStore((s) => s.previewMode);
   const config = useConfigStore((s) => s.config);
+  const canCapture = Boolean(captureLeads && pageId);
 
   return (
     <OpenPageRuntimeProvider
-      live={false}
-      pageId={undefined}
+      live={canCapture}
+      pageId={pageId}
       projectName={config.property?.name || config.name}
+      projectId={
+        config.propertyBinding?.kind === "project"
+          ? config.propertyBinding.projectId
+          : undefined
+      }
+      unitId={
+        config.propertyBinding?.kind === "unit"
+          ? config.propertyBinding.unitId
+          : undefined
+      }
       forms={config.forms ?? []}
       popups={config.popups ?? []}
     >

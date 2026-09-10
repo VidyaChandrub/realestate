@@ -1375,7 +1375,7 @@ export function FormBuilder({ onClose }: { onClose?: () => void }) {
             <>
               <Toggle
                 label="Honeypot (spam)"
-                checked={form.honeypot !== false}
+                checked={form.honeypot === true}
                 onChange={(v) => updateForm({ honeypot: v } as any)}
               />
               <Toggle
