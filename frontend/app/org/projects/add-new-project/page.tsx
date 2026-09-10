@@ -349,8 +349,17 @@ export default function AddNewProjectPage() {
     apiFetch<OrgUsersListResponse>("/org/users?role=manager&limit=100&status=active", auth)
       .then((res) => setManagers(res.data))
       .catch(() => setManagers([]));
-    apiFetch<OrgUsersListResponse>("/org/users?role=sales&limit=100&status=active", auth)
-      .then((res) => setSalesAgents(res.data))
+    // Any active org member who isn't an admin or a manager can be assigned to
+    // work a project's leads (sales, telecaller, custom roles, …). Filtered
+    // client-side so a single call covers every eligible role.
+    apiFetch<OrgUsersListResponse>("/org/users?limit=100&status=active", auth)
+      .then((res) =>
+        setSalesAgents(
+          res.data.filter(
+            (u) => u.role?.key !== "admin" && u.role?.key !== "manager",
+          ),
+        ),
+      )
       .catch(() => setSalesAgents([]));
     apiFetch<SafeOrganisation>("/org/settings", auth)
       .then((o) => setOrgName(o.name))
@@ -1475,7 +1484,7 @@ export default function AddNewProjectPage() {
                   </div>
                   <div className="field"><label>Assign sales agents</label>
                     {salesAgents.length === 0 ? (
-                      <div className="hint">No sales agents in your organisation yet — add them under Users.</div>
+                      <div className="hint">No assignable users in your organisation yet — add them under Users.</div>
                     ) : (
                       <div className="opts">
                         {salesAgents.map((u) => {
