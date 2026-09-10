@@ -7,6 +7,7 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
 import { apiFetch, getPlanCapabilities } from "@/lib/api";
 import { Icon } from "@/components/icons";
+import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { Plan, PlanCapability, Subscription, BillingOverview, OrganisationListResponse } from "@/lib/types";
 
@@ -590,11 +591,19 @@ export default function SuperAdminSubscriptionsPage() {
         )}
       </div>
 
-      {planModalOpen ? (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }} onClick={() => setPlanModalOpen(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: 24, width: 720, maxWidth: "100%", maxHeight: "90vh", overflow: "auto", boxShadow: "0 24px 80px rgba(15,23,42,.2)" }}>
-            <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 800 }}>{editingPlan ? "Edit Plan" : "Create Plan"}</h2>
-            <p style={{ margin: "0 0 16px", color: "var(--muted)", fontSize: 13.5 }}>Configure pricing, numeric quotas and capabilities. Saved to <span className="mono">/admin/plans</span>.</p>
+      <Modal
+        open={planModalOpen}
+        onClose={() => setPlanModalOpen(false)}
+        title={editingPlan ? "Edit Plan" : "Create Plan"}
+        description={<>Configure pricing, numeric quotas and capabilities. Saved to <span className="mono">/admin/plans</span>.</>}
+        size="lg"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setPlanModalOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={savePlan} disabled={savingPlan}>{savingPlan ? "Saving…" : editingPlan ? "Save plan" : "Create plan"}</button>
+          </>
+        }
+      >
             <div className="row2">
               <div className="field"><label>Plan name</label><input className="inp" value={String(planForm.name || "")} onChange={e => setPlanForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Starter" /></div>
               <div className="field"><label>Slug</label><input className="inp" value={String((planForm as any).slug || "")} onChange={e => setPlanForm(p => ({ ...p, slug: e.target.value }))} placeholder="starter" /></div>
@@ -717,21 +726,28 @@ export default function SuperAdminSubscriptionsPage() {
                 ))}
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
-              <button className="btn btn-ghost" onClick={() => setPlanModalOpen(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={savePlan} disabled={savingPlan}>{savingPlan ? "Saving…" : editingPlan ? "Save plan" : "Create plan"}</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
 
-      {upgradeTarget ? (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }} onClick={() => setUpgradeTarget(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: 24, width: 520, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.2)" }}>
-            <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 800 }}>Upgrade / Downgrade</h2>
-            <p style={{ margin: "0 0 14px", color: "var(--muted)", fontSize: 13.5 }}>
-              Change subscription for <strong>{upgradeTarget.organisation?.name}</strong> — current <span className={`badge ${upgradeTarget.plan?.badge || "b-indigo"}`}>{upgradeTarget.plan?.name}</span>
-            </p>
+      <Modal
+        open={!!upgradeTarget}
+        onClose={() => setUpgradeTarget(null)}
+        title="Upgrade / Downgrade"
+        description={
+          upgradeTarget ? (
+            <>
+              Change subscription for <strong>{upgradeTarget.organisation?.name}</strong> — current{" "}
+              <span className={`badge ${upgradeTarget.plan?.badge || "b-indigo"}`}>{upgradeTarget.plan?.name}</span>
+            </>
+          ) : undefined
+        }
+        size="md"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setUpgradeTarget(null)}>Cancel</button>
+            <button className="btn btn-primary" onClick={confirmUpgrade}>Confirm change</button>
+          </>
+        }
+      >
             <div className="field">
               <label>Select plan</label>
               <select value={upgradePlanId} onChange={e => setUpgradePlanId(e.target.value)}>
@@ -745,19 +761,21 @@ export default function SuperAdminSubscriptionsPage() {
                 <option value="yearly">Yearly</option>
               </select>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
-              <button className="btn btn-ghost" onClick={() => setUpgradeTarget(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={confirmUpgrade}>Confirm change</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
 
-      {assignOpen ? (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }} onClick={() => setAssignOpen(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: 24, width: 520, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.2)" }}>
-            <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 800 }}>Assign Subscription</h2>
-            <p style={{ margin: "0 0 14px", color: "var(--muted)", fontSize: 13.5 }}>Link an organisation to a plan.</p>
+      <Modal
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        title="Assign Subscription"
+        description="Link an organisation to a plan."
+        size="md"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => setAssignOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={confirmAssign}>Assign</button>
+          </>
+        }
+      >
             <div className="field">
               <label>Organisation</label>
               <select value={assignOrgId} onChange={e => setAssignOrgId(e.target.value)}>
@@ -779,13 +797,7 @@ export default function SuperAdminSubscriptionsPage() {
                 <option value="yearly">Yearly</option>
               </select>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
-              <button className="btn btn-ghost" onClick={() => setAssignOpen(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={confirmAssign}>Assign</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
 
       {toast ? <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}><div className="card" style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, boxShadow: "var(--sh-lg)", border: "1px solid var(--line)" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--green)" }} />{toast}</div></div> : null}
       <ConfirmModal

@@ -28,6 +28,7 @@ import {
   stepStatus,
 } from "@/lib/project-validation";
 import { Reveal } from "@/components/superadmin/reveal";
+import { Modal } from "@/components/ui/modal";
 import { orgBuilderPath } from "@/lib/openpage/paths";
 import "@/app/org/org.css";
 import type {
@@ -1708,50 +1709,13 @@ export default function AddNewProjectPage() {
         </div>
       </Reveal>
 
-      {/* TEMPLATE PICKER MODAL */}
-      {showTemplateModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.75)",
-            backdropFilter: "blur(4px)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-          }}
-          onClick={() => setShowTemplateModal(false)}
-        >
-          <div
-            className="card pad-26 reveal in"
-            style={{
-              maxWidth: 960,
-              width: "100%",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              background: "#fff",
-              borderRadius: 16,
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--brand, #4f46e5)" }}>
-                  Super Admin Templates
-                </div>
-                <h2 style={{ margin: "4px 0 6px", fontSize: 22 }}>Select a Project Template</h2>
-                <p className="muted fs-13" style={{ margin: 0 }}>
-                  These are the templates Super Admin assigned to your organisation. The selected design is copied onto this project&apos;s landing page.
-                </p>
-              </div>
-              <button className="btn btn-ghost" onClick={() => setShowTemplateModal(false)} style={{ fontSize: 18, padding: "4px 10px" }}>
-                ✕
-              </button>
-            </div>
-
+      <Modal
+        open={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        title="Select a project template"
+        description="These are the templates Super Admin assigned to your organisation. The selected design is copied onto this project's landing page."
+        size="full"
+      >
             <div className="grid g2" style={{ gap: 20 }}>
               {orgDbTemplates.length === 0 ? (
                 <div className="muted" style={{ gridColumn: "1 / -1", padding: 24, textAlign: "center" }}>
@@ -1838,42 +1802,23 @@ export default function AddNewProjectPage() {
                 );
               })}
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* LAUNCH CELEBRATION MODAL */}
-      {createdLandingPage && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.8)",
-            backdropFilter: "blur(6px)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-          }}
-        >
-          <div
-            className="card pad-26 reveal in"
-            style={{
-              maxWidth: 520,
-              width: "100%",
-              background: "#fff",
-              borderRadius: 16,
-              textAlign: "center",
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-            }}
-          >
-            <div style={{ fontSize: 52, marginBottom: 12, lineHeight: 1 }}>🚀</div>
-            <h2 style={{ fontSize: 24, margin: "0 0 8px" }}>Project Published Successfully!</h2>
-            <p className="muted fs-13" style={{ margin: "0 0 20px", lineHeight: 1.6 }}>
-              <b>{name}</b> is now live. Its dedicated landing page has been generated using <b>{selectedTemplate?.name || "the selected template"}</b> and is immediately accessible.
-            </p>
-
+      <Modal
+        open={!!createdLandingPage}
+        onClose={() => {
+          if (publishedProjectId) router.push(`/org/projects/${publishedProjectId}`);
+        }}
+        title="Project published"
+        description={
+          <>
+            <b>{name}</b> is now live. Its dedicated landing page has been generated using <b>{selectedTemplate?.name || "the selected template"}</b> and is immediately accessible.
+          </>
+        }
+        size="md"
+      >
+        {createdLandingPage ? (
+          <>
             <div
               className="card pad-16"
               style={{
@@ -1936,9 +1881,9 @@ export default function AddNewProjectPage() {
                 </button>
               )}
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        ) : null}
+      </Modal>
     </>
   );
 }

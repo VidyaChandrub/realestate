@@ -13,6 +13,8 @@ import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
 import { siteFromLandingPage } from "@/lib/openpage/content";
 import { buildRealEstateTemplate } from "@/lib/openpage/re-templates";
 import { Icon } from "@/components/icons";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { LandingPageRow, LandingPageStatus, OrgLandingPagesListResponse } from "@/lib/types";
 import type { SectionInstance, SiteConfig } from "@/lib/openpage/types";
 import {
@@ -366,27 +368,15 @@ export default function OrgLandingPagesPage() {
         </div>
       </Reveal>
 
-      {viewId ? (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }}
-          onClick={closeView}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 16, width: "min(1180px, 100%)", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(15,23,42,.35)" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 18px", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
-              <span style={{ fontWeight: 700, fontSize: 14 }}>{viewData?.name ?? "Loading preview…"}</span>
-              <span className="muted" style={{ fontSize: 12 }}>Content preview — not the live public URL</span>
-              <button
-                type="button"
-                onClick={closeView}
-                style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--muted)", cursor: "pointer", display: "inline-flex", padding: 4 }}
-              >
-                <Icon name="close" size={18} />
-              </button>
-            </div>
-            <div style={{ flex: 1, overflowY: "auto", background: "#f4f5f8" }}>
+      <Modal
+        open={!!viewId}
+        onClose={closeView}
+        title={viewData?.name ?? "Loading preview…"}
+        description="Content preview — not the live public URL"
+        size="full"
+        flush
+      >
+            <div style={{ flex: 1, overflowY: "auto", background: "#f4f5f8", minHeight: 360 }}>
               {viewLoading ? (
                 <div style={{ padding: 60, textAlign: "center", color: "var(--muted, #64748b)" }}>Loading preview…</div>
               ) : viewError ? (
@@ -417,23 +407,27 @@ export default function OrgLandingPagesPage() {
                 </div>
               ) : null}
             </div>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
 
-      {scratchOpen ? (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }}
-          onClick={() => !scratchSubmitting && setScratchOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 16, padding: 24, width: 480, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.35)" }}
-          >
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Create a blank page</div>
-            <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-              Starts with an empty canvas — no template involved. Bind a project or standalone unit so that listing’s details fill the page tokens.
-            </div>
+      <Modal
+        open={scratchOpen}
+        onClose={() => {
+          if (!scratchSubmitting) setScratchOpen(false);
+        }}
+        title="Create a blank page"
+        description="Starts with an empty canvas — no template involved. Bind a project or standalone unit so that listing’s details fill the page tokens."
+        closeDisabled={scratchSubmitting}
+        footer={
+          <>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => setScratchOpen(false)} disabled={scratchSubmitting}>
+              Cancel
+            </button>
+            <button className="btn btn-primary btn-sm" type="button" onClick={confirmCreateFromScratch} disabled={scratchSubmitting}>
+              {scratchSubmitting ? "Creating…" : "Create page"}
+            </button>
+          </>
+        }
+      >
             <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
               Page name
             </label>
@@ -456,70 +450,32 @@ export default function OrgLandingPagesPage() {
             {scratchError ? (
               <div style={{ color: "var(--rose)", fontSize: 12.5, marginTop: 8 }}>{scratchError}</div>
             ) : null}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-              <button className="btn btn-ghost btn-sm" type="button" onClick={() => setScratchOpen(false)} disabled={scratchSubmitting}>
-                Cancel
-              </button>
-              <button className="btn btn-primary btn-sm" type="button" onClick={confirmCreateFromScratch} disabled={scratchSubmitting}>
-                {scratchSubmitting ? "Creating…" : "Create page"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
 
-      {deleteTarget ? (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }}
-          onClick={() => {
-            if (!deleting) setDeleteTarget(null);
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 20, padding: 32, width: 440, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.2)" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <span
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 12,
-                  background: "var(--rose-050)",
-                  color: "var(--rose)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  fontSize: 18,
-                }}
-              >
-                <Icon name="trash" size={14} />
-              </span>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>Delete page?</h2>
-            </div>
-            <p style={{ margin: "0 0 6px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
+      <ConfirmModal
+        open={!!deleteTarget}
+        title="Delete page?"
+        message={
+          deleteTarget ? (
+            <>
               <strong>&quot;{deleteTarget.name}&quot;</strong> will be permanently deleted.
-            </p>
-            <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>This action cannot be undone.</p>
-
-            {deleteError ? (
-              <div style={{ color: "var(--rose)", fontSize: 13, marginTop: 12, background: "var(--rose-050)", padding: "8px 12px", borderRadius: 8 }}>
-                {deleteError}
-              </div>
-            ) : null}
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--line)" }}>
-              <button className="btn btn-ghost" type="button" onClick={() => setDeleteTarget(null)} disabled={deleting}>
-                Cancel
-              </button>
-              <button className="btn btn-danger" type="button" onClick={() => void confirmDelete()} disabled={deleting}>
-                {deleting ? "Deleting…" : "Delete page"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+              <span style={{ display: "block", marginTop: 8, color: "#64748b" }}>This action cannot be undone.</span>
+              {deleteError ? (
+                <div style={{ color: "#e11d48", fontSize: 13, marginTop: 12, background: "#fef2f2", padding: "8px 12px", borderRadius: 8 }}>
+                  {deleteError}
+                </div>
+              ) : null}
+            </>
+          ) : null
+        }
+        confirmLabel="Delete page"
+        destructive
+        busy={deleting}
+        onConfirm={() => void confirmDelete()}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+      />
 
       {toast ? (
         <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}>

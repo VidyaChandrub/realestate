@@ -10,6 +10,7 @@ import { normalizeSpecifications, specificationRows } from "@/lib/specifications
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import { Modal } from "@/components/ui/modal";
 import "@/app/org/org.css";
 import type { OrgTemplatesListResponse, ProjectDetail, ProjectSalesAgent } from "@/lib/types";
 
@@ -85,6 +86,7 @@ export default function OrgProjectOverviewPage() {
   const [notFound, setNotFound] = useState(false);
   const [publishingPage, setPublishingPage] = useState(false);
   const [pagePublishSuccess, setPagePublishSuccess] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [leadCount, setLeadCount] = useState(0);
 
   // Direct Lead Entry form.
@@ -758,7 +760,7 @@ export default function OrgProjectOverviewPage() {
                               router.push(`/org-builder?id=${encodeURIComponent(lp.id)}&returnUrl=${encodeURIComponent(`/org/projects/${id}`)}`);
                             }
                           } catch (e) {
-                            alert(e instanceof Error ? e.message : "Failed to create landing page.");
+                            setPageError(e instanceof Error ? e.message : "Failed to create landing page.");
                           } finally {
                             setPublishingPage(false);
                           }
@@ -815,7 +817,7 @@ export default function OrgProjectOverviewPage() {
                               setPagePublishSuccess(lp.slug);
                             }
                           } catch (e) {
-                            alert(e instanceof Error ? e.message : "Failed to publish landing page.");
+                            setPageError(e instanceof Error ? e.message : "Failed to publish landing page.");
                           } finally {
                             setPublishingPage(false);
                           }
@@ -979,6 +981,19 @@ export default function OrgProjectOverviewPage() {
           </Reveal>
         </div>
       </div>
+      <Modal
+        open={!!pageError}
+        onClose={() => setPageError(null)}
+        title="Couldn't complete"
+        size="sm"
+        footer={
+          <button className="btn btn-primary" type="button" onClick={() => setPageError(null)}>
+            OK
+          </button>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#475569" }}>{pageError}</p>
+      </Modal>
     </>
   );
 }

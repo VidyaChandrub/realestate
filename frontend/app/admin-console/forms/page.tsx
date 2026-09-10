@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Code, Copy, Eye, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Code, Copy, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Icon } from "@/components/icons";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import {
   deleteForm,
   duplicateForm,
@@ -46,6 +48,7 @@ export default function SuperAdminFormsPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "disabled">("all");
   const [embedFor, setEmbedFor] = useState<FormDefinition | null>(null);
+  const [deleteFor, setDeleteFor] = useState<FormDefinition | null>(null);
 
   function refresh() {
     setForms(ensureLibrary());
@@ -185,12 +188,7 @@ export default function SuperAdminFormsPage() {
                         type="button"
                         className="fb-icon-btn danger"
                         title="Delete"
-                        onClick={() => {
-                          if (!window.confirm(`Delete “${form.name}”?`)) return;
-                          deleteForm(form.id);
-                          refresh();
-                          toast.success("Form deleted");
-                        }}
+                        onClick={() => setDeleteFor(form)}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -203,44 +201,56 @@ export default function SuperAdminFormsPage() {
         </table>
       </div>
 
-      {embedFor ? (
-        <div className="fb-modal" onClick={() => setEmbedFor(null)}>
-          <div className="fb-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="fb-modal-h">
-              <div>
-                <div className="eyebrow">Embed form</div>
-                <b>{embedFor.name}</b>
-              </div>
-              <button type="button" className="fb-icon-btn" onClick={() => setEmbedFor(null)}>
-                <X size={14} />
-              </button>
-            </div>
-            {[
+      <Modal
+        open={!!embedFor}
+        onClose={() => setEmbedFor(null)}
+        title={embedFor ? `Embed “${embedFor.name}”` : "Embed form"}
+        description="Copy a snippet to drop this form on a landing page or external site."
+        size="md"
+      >
+        {embedFor
+          ? (
+            [
               ["Form ID (landing pages)", embedFor.id],
               ["Embed ID", embedFor.embed?.id ?? embedFor.id],
               ["HTML", embedSnippet(embedFor.embed?.id || embedFor.id)],
               ["Iframe", iframeSnippet(embedFor.embed?.id || embedFor.id)],
               ["Shortcode", shortcodeSnippet(embedFor.embed?.id || embedFor.id)],
-            ].map(([label, value]) => (
-              <div key={label} style={{ marginBottom: 12 }}>
-                <div className="muted" style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>{label}</div>
-                <textarea readOnly rows={label === "HTML" || label === "Iframe" ? 3 : 1} value={value} />
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  style={{ marginTop: 6 }}
-                  onClick={() => {
-                    void navigator.clipboard.writeText(value);
-                    toast.success("Copied");
-                  }}
-                >
-                  Copy
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+            ] as [string, string][]
+          ).map(([label, value]) => (
+            <div key={label} style={{ marginBottom: 12 }}>
+              <div className="muted" style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>{label}</div>
+              <textarea readOnly rows={label === "HTML" || label === "Iframe" ? 3 : 1} value={value} />
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ marginTop: 6 }}
+                onClick={() => {
+                  void navigator.clipboard.writeText(value);
+                  toast.success("Copied");
+                }}
+              >
+                Copy
+              </button>
+            </div>
+          ))
+          : null}
+      </Modal>
+      <ConfirmModal
+        open={!!deleteFor}
+        title="Delete form?"
+        message={deleteFor ? <>Delete “{deleteFor.name}”? This cannot be undone.</> : null}
+        confirmLabel="Delete form"
+        destructive
+        onConfirm={() => {
+          if (!deleteFor) return;
+          deleteForm(deleteFor.id);
+          refresh();
+          toast.success("Form deleted");
+          setDeleteFor(null);
+        }}
+        onClose={() => setDeleteFor(null)}
+      />
     </div>
   );
 }

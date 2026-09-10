@@ -28,6 +28,7 @@ import {
 } from "@/lib/specifications";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import "@/app/org/org.css";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type {
   Amenity,
   LandingPageRow,
@@ -1265,47 +1266,42 @@ export default function OrgProjectEditPage() {
           </div>
         </div>
 
-      {pendingUntick ? (
-        <div className="modal-scrim" onClick={() => setPendingUntick(null)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h2 className="fw8 mb-8">Remove configuration?</h2>
-            <p className="ink-2 fs-13-5 m-0">{pendingUntick.message}</p>
-            <p className="ink-2 fs-13-5 mt-8 m-0">
-              No units are affected — this only removes the planned mix entry.
-            </p>
-            <div className="row end gap-10 mt-22">
-              <button className="btn btn-ghost" type="button" onClick={() => setPendingUntick(null)}>
-                Cancel
-              </button>
-              <button
-                className="btn btn-danger"
-                type="button"
-                onClick={() => detachConfig(pendingUntick.label)}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmModal
+        open={!!pendingUntick}
+        title="Remove configuration?"
+        message={
+          pendingUntick ? (
+            <>
+              {pendingUntick.message}
+              <span style={{ display: "block", marginTop: 8 }}>
+                No units are affected — this only removes the planned mix entry.
+              </span>
+            </>
+          ) : null
+        }
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() => pendingUntick && detachConfig(pendingUntick.label)}
+        onClose={() => setPendingUntick(null)}
+      />
 
-      {deleteOpen ? (
-        <div className="modal-scrim" onClick={() => { if (!deleting) setDeleteOpen(false); }}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h2 className="fw8 mb-8">Delete project?</h2>
-            <p className="ink-2 fs-13-5 m-0">
-              <strong>&quot;{projectName}&quot;</strong> and all its unit types and units will be
-              permanently deleted. This cannot be undone.
-            </p>
-            <div className="row end gap-10 mt-22">
-              <button className="btn btn-ghost" type="button" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</button>
-              <button className="btn btn-danger" type="button" onClick={() => void remove()} disabled={deleting}>
-                {deleting ? "Deleting…" : "Delete project"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmModal
+        open={deleteOpen}
+        title="Delete project?"
+        message={
+          <>
+            <strong>&quot;{projectName}&quot;</strong> and all its unit types and units will be
+            permanently deleted. This cannot be undone.
+          </>
+        }
+        confirmLabel="Delete project"
+        destructive
+        busy={deleting}
+        onConfirm={() => void remove()}
+        onClose={() => {
+          if (!deleting) setDeleteOpen(false);
+        }}
+      />
     </>
   );
 }

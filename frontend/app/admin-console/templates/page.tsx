@@ -23,6 +23,8 @@ import { inferDesignId } from "@/lib/openpage/page-templates";
 import { buildRealEstateTemplate } from "@/lib/openpage/re-templates";
 import type { LandingPageData, TemplateData } from "@/lib/openpage/types";
 import { Icon } from "@/components/icons";
+import { Modal } from "@/components/ui/modal";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 function goToBuilder(pageId: string) {
   window.location.assign(builderPath(pageId));
@@ -323,21 +325,23 @@ export default function SuperAdminTemplatesPage() {
         </div>
       )}
 
-      {/* Create modal */}
-      {createOpen ? (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }}
-          onClick={() => setCreateOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 20, padding: 32, width: 720, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(15,23,42,.2)" }}
-          >
-            <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>Create a template</h2>
-            <p style={{ margin: "0 0 20px", color: "var(--muted)", fontSize: 13.5 }}>
-              Start from a blank canvas or copy a predefined design. The new template is fully independent.
-            </p>
-
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Create a template"
+        description="Start from a blank canvas or copy a predefined design. The new template is fully independent."
+        size="lg"
+        footer={
+          <>
+            <button className="btn btn-ghost" type="button" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" type="button" onClick={submitCreate}>
+              Create &amp; open builder →
+            </button>
+          </>
+        }
+      >
             <div className="field">
               <label>Template name</label>
               <input
@@ -402,62 +406,32 @@ export default function SuperAdminTemplatesPage() {
               </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--line)" }}>
-              <button className="btn btn-ghost" type="button" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </button>
-              <button className="btn btn-primary" type="button" onClick={submitCreate}>
-                Create &amp; open builder →
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
 
-      {/* Delete / reset modal */}
-      {deleteFor ? (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }}
-          onClick={() => setDeleteFor(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 20, padding: 32, width: 440, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.2)" }}
-          >
-            <h2 style={{ margin: "0 0 8px", fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>
-              {deleteFor.kind === "preset" ? "Reset predefined template?" : "Delete template?"}
-            </h2>
-            <p style={{ margin: 0, color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
-              {deleteFor.kind === "preset" ? (
-                <>
-                  Reset <strong>{deleteFor.name}</strong> to its original design? Edits on this template are removed.
-                  Other templates are not affected.
-                </>
-              ) : (
-                <>
-                  <strong>{deleteFor.name}</strong> will be permanently deleted. Other templates keep their own design
-                  and settings. This cannot be undone.
-                </>
-              )}
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--line)" }}>
-              <button className="btn btn-ghost" type="button" onClick={() => setDeleteFor(null)}>
-                Cancel
-              </button>
-              <button
-                className={deleteFor.kind === "preset" ? "btn btn-primary" : "btn btn-danger"}
-                type="button"
-                onClick={() => {
-                  remove(deleteFor);
-                  setDeleteFor(null);
-                }}
-              >
-                {deleteFor.kind === "preset" ? "Reset template" : "Delete template"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmModal
+        open={!!deleteFor}
+        title={deleteFor?.kind === "preset" ? "Reset predefined template?" : "Delete template?"}
+        message={
+          deleteFor?.kind === "preset" ? (
+            <>
+              Reset <strong>{deleteFor.name}</strong> to its original design? Edits on this template are removed.
+              Other templates are not affected.
+            </>
+          ) : deleteFor ? (
+            <>
+              <strong>{deleteFor.name}</strong> will be permanently deleted. Other templates keep their own design
+              and settings. This cannot be undone.
+            </>
+          ) : null
+        }
+        confirmLabel={deleteFor?.kind === "preset" ? "Reset template" : "Delete template"}
+        destructive={deleteFor?.kind !== "preset"}
+        onConfirm={() => {
+          if (deleteFor) remove(deleteFor);
+          setDeleteFor(null);
+        }}
+        onClose={() => setDeleteFor(null)}
+      />
 
       {/* Toast */}
       {toast ? (

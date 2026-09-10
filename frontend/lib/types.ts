@@ -1738,6 +1738,73 @@ export interface ReviewOrgDomainRequestInput {
   reason?: string;
 }
 
+// --- Super Admin: Audit logs ---
+
+/** GET /admin/audit-logs detail view — the person who performed the action. */
+export interface AdminAuditLogActor {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+}
+
+/** GET /admin/audit-logs detail view — the organisation the event belongs to. */
+export interface AdminAuditLogOrganisation {
+  id: string;
+  name: string;
+}
+
+/** GET /admin/audit-logs row. */
+export interface AdminAuditLogEntry {
+  id: string;
+  orgId: string | null;
+  actorId: string | null;
+  moduleKey: string | null;
+  action: string;
+  actionLabel: string;
+  entity: string | null;
+  entityId: string | null;
+  metadata: unknown;
+  createdAt: string;
+  actor: AdminAuditLogActor | null;
+  organisation: AdminAuditLogOrganisation | null;
+}
+
+export interface AdminAuditLogsListResponse {
+  data: AdminAuditLogEntry[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/** GET /admin/audit-logs/meta — values that populate the filter dropdowns. */
+export interface AdminAuditLogsMeta {
+  actions: { value: string; label: string; count: number }[];
+  actors: { id: string; name: string; email: string }[];
+  organisations: { id: string; name: string }[];
+  modules: { key: string; moduleKey: string }[];
+}
+
+/** Query params shared by GET /admin/audit-logs list and export. */
+export interface AdminAuditLogsParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  actorId?: string;
+  orgId?: string;
+  action?: string;
+  moduleKey?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+/** GET /admin/audit-logs/export — JSON payload the frontend converts to CSV. */
+export interface AdminAuditLogsExportResponse {
+  filename: string;
+  data: AdminAuditLogEntry[];
+}
+
 /** GET /admin/platform-config — Super Admin platform subdomain / DNS config. */
 export interface PlatformConfig {
   id: string | null;

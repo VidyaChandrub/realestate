@@ -14,6 +14,27 @@ const PRESETS = [
   { name: "Platform Support", key: "platform_support", desc: "Helps organisations with onboarding, billing, and access issues" },
 ];
 
+const roleFieldLabel: React.CSSProperties = {
+  display: "block",
+  fontSize: 13,
+  fontWeight: 500,
+  color: "#475569",
+  marginBottom: 6,
+};
+
+const roleFieldInput: React.CSSProperties = {
+  width: "100%",
+  padding: "9px 12px",
+  borderRadius: 10,
+  border: "1px solid #e2e8f0",
+  background: "#ffffff",
+  color: "#0f172a",
+  fontSize: 14,
+  outline: "none",
+  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+  boxSizing: "border-box" as const,
+};
+
 export function PlatformRolesPanel({
   createOpen,
   onCreateOpenChange,
@@ -368,37 +389,165 @@ export function PlatformRolesPanel({
         </div>
       </Reveal>
 
-      <Modal open={createOpen} onClose={() => onCreateOpenChange(false)} title="Create platform role" description="This role can be assigned when you create a platform admin. Permissions are Super Admin console modules only." size="md">
-        <form onSubmit={createRole} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {createError ? <div className="form-alert">{createError}</div> : null}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {PRESETS.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setCreateForm({ name: p.name, key: p.key, description: p.desc })}
-              >
-                ＋ {p.name}
-              </button>
-            ))}
+      <Modal open={createOpen} onClose={() => onCreateOpenChange(false)} title="Create platform role" description="Define a new role that can be assigned to platform admins." size="md">
+        <form onSubmit={createRole} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          {createError ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 14px",
+                borderRadius: 10,
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                color: "#b91c1c",
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 20,
+              }}
+            >
+              {createError}
+            </div>
+          ) : null}
+
+          {/* Quick presets */}
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Quick start
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {PRESETS.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => setCreateForm({ name: p.name, key: p.key, description: p.desc })}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: createForm.key === p.key ? "1.5px solid #4f46e5" : "1px solid #e2e8f0",
+                    background: createForm.key === p.key ? "#eef2ff" : "#ffffff",
+                    color: createForm.key === p.key ? "#4f46e5" : "#475569",
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                    textAlign: "left" as const,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: createForm.key === p.key ? "#6366f1" : "#94a3b8" }}>
+                    {p.desc}
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="field">
-            <label>Role name *</label>
-            <input className="inp" required value={createForm.name} onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))} />
+
+          <div style={{ height: 1, background: "#f1f5f9", margin: "0 0 20px" }} />
+
+          {/* Fields */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={roleFieldLabel}>Role name *</label>
+              <input
+                style={roleFieldInput}
+                required
+                value={createForm.name}
+                onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Platform Operator"
+              />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={roleFieldLabel}>Key / slug</label>
+                <input
+                  style={roleFieldInput}
+                  value={createForm.key}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, key: e.target.value }))}
+                  placeholder="Auto-generated if empty"
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end", paddingBottom: 2 }}>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "6px 10px",
+                    borderRadius: 8,
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    fontSize: 12,
+                    color: "#64748b",
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>🌐</span>
+                  Platform scope
+                </div>
+              </div>
+            </div>
+            <div>
+              <label style={roleFieldLabel}>Description</label>
+              <textarea
+                style={{ ...roleFieldInput, minHeight: 72, resize: "vertical" as const }}
+                rows={3}
+                value={createForm.description}
+                onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="What does this role do?"
+              />
+            </div>
           </div>
-          <div className="field">
-            <label>Key / slug</label>
-            <input className="inp" value={createForm.key} onChange={(e) => setCreateForm((f) => ({ ...f, key: e.target.value }))} placeholder="Auto if empty" />
-          </div>
-          <div className="field">
-            <label>Description</label>
-            <textarea className="inp" rows={3} value={createForm.description} onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))} />
-          </div>
-          <div className="help">Scope is locked to 🌐 Platform. Organisation module permissions are not used here.</div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button className="btn btn-ghost" type="button" onClick={() => onCreateOpenChange(false)} disabled={createBusy}>Cancel</button>
-            <button className="btn btn-primary" type="submit" disabled={createBusy || !createForm.name.trim()}>
+
+          {/* Actions */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 10,
+              marginTop: 24,
+              paddingTop: 18,
+              borderTop: "1px solid #f1f5f9",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => onCreateOpenChange(false)}
+              disabled={createBusy}
+              style={{
+                padding: "9px 18px",
+                borderRadius: 10,
+                fontSize: 13.5,
+                fontWeight: 500,
+                border: "1px solid #e2e8f0",
+                background: "#ffffff",
+                color: "#475569",
+                cursor: createBusy ? "not-allowed" : "pointer",
+                opacity: createBusy ? 0.5 : 1,
+                transition: "all 0.15s ease",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={createBusy || !createForm.name.trim()}
+              style={{
+                padding: "9px 20px",
+                borderRadius: 10,
+                fontSize: 13.5,
+                fontWeight: 600,
+                border: "none",
+                color: "#ffffff",
+                cursor: createBusy || !createForm.name.trim() ? "not-allowed" : "pointer",
+                opacity: createBusy || !createForm.name.trim() ? 0.5 : 1,
+                transition: "all 0.15s ease",
+                background: "linear-gradient(135deg, #4f46e5, #4338ca)",
+                boxShadow: "0 2px 8px -2px rgba(79, 70, 229, 0.4)",
+              }}
+            >
               {createBusy ? "Creating…" : "Create role"}
             </button>
           </div>
@@ -406,30 +555,118 @@ export function PlatformRolesPanel({
       </Modal>
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={`Edit: ${editing?.name ?? ""}`} size="md">
-        <form onSubmit={saveEdit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {editError ? <div className="form-alert">{editError}</div> : null}
-          <div className="field">
-            <label>Role name *</label>
-            <input className="inp" required value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} />
+        <form onSubmit={saveEdit} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          {editError ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 14px",
+                borderRadius: 10,
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                color: "#b91c1c",
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 20,
+              }}
+            >
+              {editError}
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={roleFieldLabel}>Role name *</label>
+              <input
+                style={roleFieldInput}
+                required
+                value={editForm.name}
+                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={roleFieldLabel}>Key</label>
+                <input
+                  style={roleFieldInput}
+                  readOnly={editing?.key === "super_admin"}
+                  value={editForm.key}
+                  onChange={(e) => setEditForm((f) => ({ ...f, key: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label style={roleFieldLabel}>Status</label>
+                <select
+                  style={roleFieldInput}
+                  value={editForm.status}
+                  onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as "active" | "inactive" }))}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={roleFieldLabel}>Description</label>
+              <textarea
+                style={{ ...roleFieldInput, minHeight: 72, resize: "vertical" as const }}
+                rows={3}
+                value={editForm.description}
+                onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+              />
+            </div>
           </div>
-          <div className="field">
-            <label>Key</label>
-            <input className="inp" readOnly={editing?.key === "super_admin"} value={editForm.key} onChange={(e) => setEditForm((f) => ({ ...f, key: e.target.value }))} />
-          </div>
-          <div className="field">
-            <label>Status</label>
-            <select className="inp" value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as "active" | "inactive" }))}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Description</label>
-            <textarea className="inp" rows={3} value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <button className="btn btn-ghost" type="button" onClick={() => setEditing(null)} disabled={editBusy}>Cancel</button>
-            <button className="btn btn-primary" type="submit" disabled={editBusy}> {editBusy ? "Saving…" : "Save"} </button>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 10,
+              marginTop: 24,
+              paddingTop: 18,
+              borderTop: "1px solid #f1f5f9",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setEditing(null)}
+              disabled={editBusy}
+              style={{
+                padding: "9px 18px",
+                borderRadius: 10,
+                fontSize: 13.5,
+                fontWeight: 500,
+                border: "1px solid #e2e8f0",
+                background: "#ffffff",
+                color: "#475569",
+                cursor: editBusy ? "not-allowed" : "pointer",
+                opacity: editBusy ? 0.5 : 1,
+                transition: "all 0.15s ease",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={editBusy}
+              style={{
+                padding: "9px 20px",
+                borderRadius: 10,
+                fontSize: 13.5,
+                fontWeight: 600,
+                border: "none",
+                color: "#ffffff",
+                cursor: editBusy ? "not-allowed" : "pointer",
+                opacity: editBusy ? 0.5 : 1,
+                transition: "all 0.15s ease",
+                background: "linear-gradient(135deg, #4f46e5, #4338ca)",
+                boxShadow: "0 2px 8px -2px rgba(79, 70, 229, 0.4)",
+              }}
+            >
+              {editBusy ? "Saving…" : "Save changes"}
+            </button>
           </div>
         </form>
       </Modal>

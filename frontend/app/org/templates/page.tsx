@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutTemplate, Search, X } from "lucide-react";
+import { LayoutTemplate, Search } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
@@ -255,62 +256,24 @@ export default function OrgTemplatesPage() {
         </div>
       ) : null}
 
-      {previewId ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15,23,42,.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 400,
-            padding: 20,
-          }}
-          onClick={closePreview}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              width: "min(1180px, 100%)",
-              maxHeight: "90vh",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              boxShadow: "0 24px 80px rgba(15,23,42,.35)",
-            }}
+      <Modal
+        open={!!previewId}
+        onClose={closePreview}
+        title={previewData?.name ?? "Loading preview…"}
+        size="full"
+        flush
+        headerActions={
+          <button
+            className="btn btn-primary btn-sm"
+            type="button"
+            disabled={!previewData}
+            onClick={() => previewData && openUseTemplate(previewData.id, previewData.name)}
           >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "14px 18px",
-                borderBottom: "1px solid var(--line)",
-                flexShrink: 0,
-              }}
-            >
-              <span style={{ fontWeight: 700, fontSize: 14 }}>{previewData?.name ?? "Loading preview…"}</span>
-              <button
-                className="btn btn-primary btn-sm"
-                type="button"
-                disabled={!previewData}
-                style={{ marginLeft: "auto" }}
-                onClick={() => previewData && openUseTemplate(previewData.id, previewData.name)}
-              >
-                Use this template
-              </button>
-              <button
-                type="button"
-                onClick={closePreview}
-                style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", display: "inline-flex", padding: 4 }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div style={{ flex: 1, overflowY: "auto", background: "#f4f5f8" }}>
+            Use this template
+          </button>
+        }
+      >
+            <div style={{ flex: 1, overflowY: "auto", background: "#f4f5f8", minHeight: 360 }}>
               {previewLoading ? (
                 <div style={{ padding: 60, textAlign: "center", color: "var(--muted, #64748b)" }}>Loading preview…</div>
               ) : previewError ? (
@@ -327,23 +290,28 @@ export default function OrgTemplatesPage() {
                 </div>
               ) : null}
             </div>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
 
-      {useTemplate ? (
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }}
-          onClick={() => !useSubmitting && setUseTemplate(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: "#fff", borderRadius: 16, padding: 24, width: 480, maxWidth: "100%", boxShadow: "0 24px 80px rgba(15,23,42,.35)" }}
-          >
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Use “{useTemplate.name}”</div>
-            <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-              This creates your own editable copy — the shared template is never changed. Bind a project or standalone unit so only that listing’s details fill the page.
-            </div>
+      <Modal
+        open={!!useTemplate}
+        onClose={() => {
+          if (!useSubmitting) setUseTemplate(null);
+        }}
+        title={useTemplate ? `Use “${useTemplate.name}”` : "Use template"}
+        description="This creates your own editable copy — the shared template is never changed. Bind a project or standalone unit so only that listing’s details fill the page."
+        closeDisabled={useSubmitting}
+        containerClassName="z-[60]"
+        footer={
+          <>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => setUseTemplate(null)} disabled={useSubmitting}>
+              Cancel
+            </button>
+            <button className="btn btn-primary btn-sm" type="button" onClick={confirmUseTemplate} disabled={useSubmitting}>
+              {useSubmitting ? "Creating…" : "Create page"}
+            </button>
+          </>
+        }
+      >
             <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
               Page name
             </label>
@@ -366,17 +334,7 @@ export default function OrgTemplatesPage() {
             {useError ? (
               <div style={{ color: "var(--rose)", fontSize: 12.5, marginTop: 8 }}>{useError}</div>
             ) : null}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-              <button className="btn btn-ghost btn-sm" type="button" onClick={() => setUseTemplate(null)} disabled={useSubmitting}>
-                Cancel
-              </button>
-              <button className="btn btn-primary btn-sm" type="button" onClick={confirmUseTemplate} disabled={useSubmitting}>
-                {useSubmitting ? "Creating…" : "Create page"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </Modal>
     </>
   );
 }

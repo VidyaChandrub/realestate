@@ -32,8 +32,8 @@ export class AdminPlatformTeamController {
   }
 
   @Post()
-  create(@Body() dto: CreatePlatformMemberDto) {
-    return this.platformTeam.create(dto);
+  create(@CurrentUser() actor: JwtPayload, @Body() dto: CreatePlatformMemberDto) {
+    return this.platformTeam.create(dto, actor.sub);
   }
 
   @Patch(':id')

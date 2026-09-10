@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Modal } from "@/components/ui/modal";
 import { DynamicLeadForm } from "@/components/openpage/dynamic-lead-form";
 import { FIELD_LOGIC_ACTIONS, FIELD_LOGIC_OPS } from "@/lib/openpage/form-logic";
 import { defaultField, FIELD_TYPE_HINT, FIELD_TYPE_LABEL, PALETTE_TYPES } from "@/lib/openpage/form-fields";
@@ -635,17 +636,9 @@ export function FormDesigner({
         </aside>
       </div>
 
-      {showPreview ? (
-        <div className="fb-modal" onClick={() => setShowPreview(false)}>
-          <div className="fb-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="fb-modal-h">
-              <b>Full preview</b>
-              <button type="button" onClick={() => setShowPreview(false)}><X size={16} /></button>
-            </div>
-            <DynamicLeadForm form={form} live={false} place="admin-preview" />
-          </div>
-        </div>
-      ) : null}
+      <Modal open={showPreview} onClose={() => setShowPreview(false)} title="Full preview" size="lg">
+        <DynamicLeadForm form={form} live={false} place="admin-preview" />
+      </Modal>
     </div>
   );
 }

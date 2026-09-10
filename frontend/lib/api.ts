@@ -1,4 +1,8 @@
 import type {
+  AdminAuditLogsExportResponse,
+  AdminAuditLogsListResponse,
+  AdminAuditLogsMeta,
+  AdminAuditLogsParams,
   AdminOrgDomainRequestListResponse,
   ApiErrorBody,
   AssignLeadInput,
@@ -931,6 +935,43 @@ export async function getOrgEmailStats(): Promise<EmailStatsResponse> {
 
 export async function getAdminDashboard(): Promise<AdminDashboardResponse> {
   return apiFetch<AdminDashboardResponse>("/admin/dashboard");
+}
+
+// --- Super Admin: Audit logs ---
+
+function auditLogsQuery(params?: AdminAuditLogsParams): string {
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.search?.trim()) q.set("search", params.search.trim());
+  if (params?.actorId) q.set("actorId", params.actorId);
+  if (params?.orgId) q.set("orgId", params.orgId);
+  if (params?.action) q.set("action", params.action);
+  if (params?.moduleKey) q.set("moduleKey", params.moduleKey);
+  if (params?.dateFrom) q.set("dateFrom", params.dateFrom);
+  if (params?.dateTo) q.set("dateTo", params.dateTo);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export async function getAdminAuditLogs(
+  params?: AdminAuditLogsParams,
+): Promise<AdminAuditLogsListResponse> {
+  return apiFetch<AdminAuditLogsListResponse>(
+    `/admin/audit-logs${auditLogsQuery(params)}`,
+  );
+}
+
+export async function getAdminAuditLogsMeta(): Promise<AdminAuditLogsMeta> {
+  return apiFetch<AdminAuditLogsMeta>("/admin/audit-logs/meta");
+}
+
+export async function exportAdminAuditLogs(
+  params?: AdminAuditLogsParams,
+): Promise<AdminAuditLogsExportResponse> {
+  return apiFetch<AdminAuditLogsExportResponse>(
+    `/admin/audit-logs/export${auditLogsQuery(params)}`,
+  );
 }
 
 export async function getPlatformTeam(): Promise<PlatformTeamMember[]> {

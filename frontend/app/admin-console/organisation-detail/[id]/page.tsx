@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 import type {
   CreateOrgUserInput,
@@ -1414,163 +1415,51 @@ export default function SuperAdminOrganisationDetailPage() {
         </div>
       </div>
 
-      {statusModalOpen ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15,23,42,.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 400,
-            padding: 20,
-          }}
-          onClick={() => {
-            if (!statusSubmitting) setStatusModalOpen(false);
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#fff",
-              borderRadius: 20,
-              padding: 32,
-              width: 440,
-              maxWidth: "100%",
-              boxShadow: "0 24px 80px rgba(15,23,42,.2)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <span
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 12,
-                  background: "var(--amber-050)",
-                  color: "var(--amber)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  fontSize: 18,
-                }}
-              >
-                {org.status === "active" ? <Icon name="close" size={14} /> : <Icon name="chevron-right" size={14} />}
-              </span>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>
-                {org.status === "active" ? "Suspend organisation?" : "Reactivate organisation?"}
-              </h2>
-            </div>
-            <p style={{ margin: "0 0 6px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
-              {org.status === "active" ? (
-                <>
-                  <strong>&quot;{org.name}&quot;</strong> will be marked disabled. No data is deleted — you
-                  can reactivate any time.
-                </>
-              ) : (
-                <>
-                  <strong>&quot;{org.name}&quot;</strong> will be marked active again.
-                </>
-              )}
-            </p>
+      <ConfirmModal
+        open={statusModalOpen}
+        title={org.status === "active" ? "Suspend organisation?" : "Reactivate organisation?"}
+        message={
+          org.status === "active" ? (
+            <>
+              <strong>&quot;{org.name}&quot;</strong> will be marked disabled. No data is deleted — you
+              can reactivate any time.
+            </>
+          ) : (
+            <>
+              <strong>&quot;{org.name}&quot;</strong> will be marked active again.
+            </>
+          )
+        }
+        confirmLabel={
+          statusSubmitting
+            ? "Saving…"
+            : org.status === "active"
+              ? "Suspend organisation"
+              : "Reactivate organisation"
+        }
+        destructive={org.status === "active"}
+        busy={statusSubmitting}
+        onConfirm={() => void confirmToggleStatus()}
+        onClose={() => {
+          if (!statusSubmitting) setStatusModalOpen(false);
+        }}
+      />
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 10,
-                marginTop: 24,
-                paddingTop: 20,
-                borderTop: "1px solid var(--line)",
-              }}
-            >
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => setStatusModalOpen(false)}
-                disabled={statusSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={() => void confirmToggleStatus()}
-                disabled={statusSubmitting}
-              >
-                {statusSubmitting
-                  ? "Saving…"
-                  : org.status === "active"
-                    ? "Suspend organisation"
-                    : "Reactivate organisation"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {deleteModalOpen ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15,23,42,.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 400,
-            padding: 20,
-          }}
-          onClick={() => {
-            if (!deleting) setDeleteModalOpen(false);
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#fff",
-              borderRadius: 20,
-              padding: 32,
-              width: 440,
-              maxWidth: "100%",
-              boxShadow: "0 24px 80px rgba(15,23,42,.2)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <span
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 12,
-                  background: "var(--rose-050)",
-                  color: "var(--rose)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  fontSize: 18,
-                }}
-              >
-                <Icon name="trash" size={14} />
-              </span>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "var(--ink)" }}>
-                Delete organisation?
-              </h2>
-            </div>
-            <p style={{ margin: "0 0 6px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
-              <strong>&quot;{org.name}&quot;</strong> and its {org.userCount} user
-              {org.userCount === 1 ? "" : "s"} will be permanently deleted.
-            </p>
-            <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>This action cannot be undone.</p>
-
+      <ConfirmModal
+        open={deleteModalOpen}
+        title="Delete organisation?"
+        message={
+          <>
+            <strong>&quot;{org.name}&quot;</strong> and its {org.userCount} user
+            {org.userCount === 1 ? "" : "s"} will be permanently deleted.
+            <span style={{ display: "block", marginTop: 8, color: "#64748b" }}>This action cannot be undone.</span>
             {deleteError ? (
               <div
                 style={{
-                  color: "var(--rose)",
+                  color: "#e11d48",
                   fontSize: 13,
                   marginTop: 12,
-                  background: "var(--rose-050)",
+                  background: "#fef2f2",
                   padding: "8px 12px",
                   borderRadius: 8,
                 }}
@@ -1578,32 +1467,16 @@ export default function SuperAdminOrganisationDetailPage() {
                 {deleteError}
               </div>
             ) : null}
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 10,
-                marginTop: 24,
-                paddingTop: 20,
-                borderTop: "1px solid var(--line)",
-              }}
-            >
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => setDeleteModalOpen(false)}
-                disabled={deleting}
-              >
-                Cancel
-              </button>
-              <button className="btn btn-danger" type="button" onClick={() => void handleDelete()} disabled={deleting}>
-                {deleting ? "Deleting…" : "Delete organisation"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+          </>
+        }
+        confirmLabel="Delete organisation"
+        destructive
+        busy={deleting}
+        onConfirm={() => void handleDelete()}
+        onClose={() => {
+          if (!deleting) setDeleteModalOpen(false);
+        }}
+      />
 
       {toast ? (
         <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}>
