@@ -38,10 +38,11 @@ export function packDynamicLeadFields(
 ): Record<string, string> {
   const leadFields: Record<string, string> = {};
   for (const f of fields) {
+    const type = String(f.type ?? "").toLowerCase();
+    if (["heading", "html", "submit", "captcha"].includes(type)) continue;
     const key = f.id || f.label;
     const value = String(values[key] ?? "").trim();
     leadFields[f.label] = value;
-    const type = String(f.type ?? "").toLowerCase();
     const label = f.label.toLowerCase();
     if (type === "phone" || /phone|mobile|whatsapp/.test(label)) {
       leadFields.phone = value;

@@ -6,7 +6,7 @@ import { useEditorStore } from "@/components/openpage/store/editorStore";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 
 export function useOpenPageKeyboard() {
-  const { toggleJsonDrawer, toggleHistory, toggleShortcutsModal, togglePreview, toggleFormBuilder, selectBlock, setClipboardStyle, setRightSidebarTab } = useEditorStore();
+  const { toggleJsonDrawer, toggleHistory, toggleShortcutsModal, togglePreview, selectBlock, setClipboardStyle, setRightSidebarTab } = useEditorStore();
   const { undo, redo, removeBlock, duplicateBlock } = useConfigStore();
 
   useEffect(() => {
@@ -36,11 +36,6 @@ export function useOpenPageKeyboard() {
           case "P":
             e.preventDefault();
             togglePreview();
-            return;
-          case "f":
-          case "F":
-            e.preventDefault();
-            toggleFormBuilder();
             return;
           case "Escape":
             e.preventDefault();
@@ -118,5 +113,5 @@ export function useOpenPageKeyboard() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleJsonDrawer, toggleHistory, toggleShortcutsModal, togglePreview, toggleFormBuilder, selectBlock, undo, redo, removeBlock, duplicateBlock, setClipboardStyle, setRightSidebarTab]);
+  }, [toggleJsonDrawer, toggleHistory, toggleShortcutsModal, togglePreview, selectBlock, undo, redo, removeBlock, duplicateBlock, setClipboardStyle, setRightSidebarTab]);
 }

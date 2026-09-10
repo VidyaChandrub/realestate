@@ -221,15 +221,29 @@ export interface FieldLogicRule {
   value: string;
 }
 
+export type FieldLogicAction =
+  | "show"
+  | "hide"
+  | "require"
+  | "optional"
+  | "enable"
+  | "disable"
+  | "set_value";
+
 export interface FieldLogic {
   enabled: boolean;
   /** AND = all rules must match; OR = any rule must match. */
   match: "any" | "all";
   rules: FieldLogicRule[];
+  /** What to do when the rules match. Default: show. */
+  action?: FieldLogicAction;
+  /** Used when action === "set_value". */
+  setValue?: string;
 }
 
 export type FormFieldType =
   | "text"
+  | "name"
   | "email"
   | "phone"
   | "number"
@@ -238,9 +252,18 @@ export type FormFieldType =
   | "checkbox"
   | "date"
   | "time"
+  | "datetime"
   | "textarea"
   | "file"
-  | "hidden";
+  | "hidden"
+  | "address"
+  | "heading"
+  | "html"
+  | "consent"
+  | "captcha"
+  | "submit";
+
+export type FormFieldWidth = "full" | "half" | "third";
 
 export interface FieldValidation {
   /** Regex or preset name */
@@ -264,6 +287,15 @@ export interface FormLeadField {
   validation?: FieldValidation;
   /** Optional help text under field */
   helpText?: string;
+  defaultValue?: string;
+  width?: FormFieldWidth;
+  cssClass?: string;
+  /** Auto-fill from ?param= on the page URL. */
+  queryParam?: string;
+  /** 0-based step index when the form is multi-step. */
+  step?: number;
+  /** Raw HTML for type === "html". */
+  html?: string;
 }
 
 export interface FormPdfConfig {
@@ -271,6 +303,18 @@ export interface FormPdfConfig {
   url: string;
   filename: string;
   autoDownload: boolean;
+  /** pdf or image shown / downloaded after submit. */
+  kind?: "pdf" | "image";
+}
+
+export interface FormDownloadRule {
+  field: string;
+  op: FieldLogicOp | string;
+  value: string;
+  url: string;
+  filename?: string;
+  kind?: "pdf" | "image";
+  label?: string;
 }
 
 export interface FormThankYouButton {
@@ -450,6 +494,35 @@ export interface SiteConfig {
     openPopupId: string;
     /** Extensible submission pipeline */
     customActions?: FormCustomAction[];
+    webhookUrl?: string;
+    autoReplySubject?: string;
+    autoReplyBody?: string;
+    honeypot?: boolean;
+    preventDuplicate?: boolean;
+    captchaEnabled?: boolean;
+    progressBar?: boolean;
+    stepCount?: number;
+    style?: {
+      background?: string;
+      textColor?: string;
+      buttonColor?: string;
+      radius?: number;
+    };
+    analytics?: { views?: number; submissions?: number };
+    /** When false, the form is disabled and not receiving leads. */
+    enabled?: boolean;
+    integrations?: {
+      googleSheetsUrl?: string;
+      crm?: boolean;
+      email?: boolean;
+      whatsapp?: boolean;
+      sms?: string;
+      analyticsEvent?: string;
+    };
+    /** If a rule matches after submit, redirect there instead of successUrl. */
+    redirectRules?: Array<{ field: string; op: FieldLogicOp; value: string; url: string }>;
+    /** Conditional after-submit PDF/image downloads. First match wins, else pdf config. */
+    downloadRules?: FormDownloadRule[];
   };
   /** Form Builder library persisted with the page (not only localStorage). */
   forms?: Array<SiteConfig["form"] & { id: string; pageId?: string; createdAt?: string; updatedAt?: string }>;

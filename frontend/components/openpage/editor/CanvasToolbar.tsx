@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Plus, FileText } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useConfigStore } from "@/components/openpage/store/configStore";
-import { useEditorStore } from "@/components/openpage/store/editorStore";
 import type { PageConfig } from "@/components/openpage/blocks/types";
 
 function AddPagePopover({ onAdd, onClose }: { onAdd: (name: string, path: string) => void; onClose: () => void }) {
@@ -144,7 +143,6 @@ export function CanvasToolbar() {
   const addPage = useConfigStore((s) => s.addPage)
   const removePage = useConfigStore((s) => s.removePage)
   const renamePage = useConfigStore((s) => s.renamePage)
-  const toggleFormBuilder = useEditorStore((s) => s.toggleFormBuilder)
   const [showAddPage, setShowAddPage] = useState(false)
 
   return (
@@ -179,16 +177,6 @@ export function CanvasToolbar() {
           )}
         </div>
       </div>
-
-      {/* Form Builder toggle */}
-      <button
-        onClick={toggleFormBuilder}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-[10px] font-medium text-text-3 hover:text-text-0 hover:bg-bg-2 transition-colors"
-        title="Form Builder (F)"
-      >
-        <FileText size={13} />
-        <span className="hidden @md:inline">Form Builder</span>
-      </button>
     </div>
   )
 }

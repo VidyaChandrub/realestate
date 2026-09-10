@@ -17,12 +17,18 @@ type NavItem = {
   activeMatch?: string[];
 };
 
+type NavGroup = {
+  grp: string;
+  items: NavItem[];
+};
+
 const NAV_MODULE: Record<string, string> = {
   "/admin-console": "admin_dashboard",
   "/admin-console/organisations": "admin_organisations",
   "/admin-console/roles": "admin_org_roles",
   "/admin-console/admins": "admin_platform_team",
   "/admin-console/templates": "admin_templates",
+  "/admin-console/forms": "admin_templates",
   "/admin-console/org-domains": "admin_domains",
   "/admin-console/subscriptions": "admin_subscriptions",
   "/admin-console/email": "admin_email",
@@ -67,6 +73,13 @@ const NAV_GROUPS: NavGroup[] = [
         tip: "Template Management",
         activeMatch: ["/admin-console/templates", "/admin-console/template-detail"],
       },
+      {
+        href: "/admin-console/forms",
+        icon: "document",
+        label: "Form Builder",
+        tip: "Create and manage forms",
+        activeMatch: ["/admin-console/forms"],
+      },
       { href: "/admin-console/subscriptions", icon: "billing", label: "Subscriptions", tip: "Plans and subscriptions", activeMatch: ["/admin-console/subscriptions"] },
     ],
   },
@@ -87,6 +100,7 @@ const CRUMB_MAP: Record<string, string> = {
   "/admin-console/organisation-detail": "Organisation",
   "/admin-console/admins": "Platform Team",
   "/admin-console/templates": "Templates",
+  "/admin-console/forms": "Form Builder",
   "/admin-console/template-detail": "Template",
   "/org-builder": "Builder",
   "/admin-console/org-domains": "Domains",

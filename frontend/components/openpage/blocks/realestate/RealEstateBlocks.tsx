@@ -544,7 +544,7 @@ export function LeadFormBlock({ block }: { block: BlockConfig }) {
             projectName={runtime.projectName}
           />
         ) : (
-          <p className="text-sm text-text-3 text-center">Select a form in Properties, or create one in Form Builder.</p>
+          <p className="text-sm text-text-3 text-center">Select a form in Properties.</p>
         )}
       </div>
     </SectionShell>

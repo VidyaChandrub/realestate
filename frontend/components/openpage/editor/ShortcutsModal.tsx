@@ -20,7 +20,6 @@ const shortcutGroups = [
       { keys: ['J'], description: 'Toggle JSON drawer' },
       { keys: ['H'], description: 'Toggle version history' },
       { keys: ['P'], description: 'Toggle preview mode' },
-      { keys: ['F'], description: 'Toggle Form Builder' },
       { keys: ['Esc'], description: 'Deselect block' },
       { keys: ['?'], description: 'Show this help' },
     ],

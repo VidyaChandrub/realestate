@@ -11,6 +11,16 @@ export const FIELD_LOGIC_OPS: { op: FieldLogicOp; label: string; needsValue: boo
   { op: "notempty", label: "Is not empty", needsValue: false },
 ];
 
+export const FIELD_LOGIC_ACTIONS: { action: NonNullable<FieldLogic["action"]>; label: string }[] = [
+  { action: "show", label: "Show field" },
+  { action: "hide", label: "Hide field" },
+  { action: "require", label: "Make required" },
+  { action: "optional", label: "Make optional" },
+  { action: "enable", label: "Enable" },
+  { action: "disable", label: "Disable" },
+  { action: "set_value", label: "Set value" },
+];
+
 /**
  * Resolve the current value of the controlling field referenced by a rule.
  * Values are looked up by field id first (stable across renames), then by
@@ -70,14 +80,62 @@ export function evalLogicRule(
   }
 }
 
+export function logicMatches(
+  logic: FieldLogic | undefined,
+  allFields: FormLeadField[],
+  valuesByLabel: Record<string, string>,
+): boolean {
+  if (!logic || !logic.enabled || !logic.rules || logic.rules.length === 0) return false;
+  const results = logic.rules.map((r) => evalLogicRule(r, allFields, valuesByLabel));
+  return logic.match === "all" ? results.every(Boolean) : results.some(Boolean);
+}
+
 /** Returns true when a field should be visible given the current values. */
 export function isFieldVisible(
   field: FormLeadField,
   allFields: FormLeadField[],
   valuesByLabel: Record<string, string>,
 ): boolean {
-  const logic: FieldLogic | undefined = field.logic;
+  const logic = field.logic;
   if (!logic || !logic.enabled || !logic.rules || logic.rules.length === 0) return true;
-  const results = logic.rules.map((r) => evalLogicRule(r, allFields, valuesByLabel));
-  return logic.match === "all" ? results.every(Boolean) : results.some(Boolean);
+  const matched = logicMatches(logic, allFields, valuesByLabel);
+  const action = logic.action ?? "show";
+  if (action === "hide") return !matched;
+  if (action === "show") return matched;
+  return true;
+}
+
+export function isFieldRequired(
+  field: FormLeadField,
+  allFields: FormLeadField[],
+  valuesByLabel: Record<string, string>,
+): boolean {
+  const logic = field.logic;
+  const matched = logicMatches(logic, allFields, valuesByLabel);
+  if (logic?.enabled && matched && logic.action === "require") return true;
+  if (logic?.enabled && matched && logic.action === "optional") return false;
+  return !!field.required;
+}
+
+export function isFieldDisabled(
+  field: FormLeadField,
+  allFields: FormLeadField[],
+  valuesByLabel: Record<string, string>,
+): boolean {
+  const logic = field.logic;
+  const matched = logicMatches(logic, allFields, valuesByLabel);
+  if (logic?.enabled && matched && logic.action === "disable") return true;
+  if (logic?.enabled && matched && logic.action === "enable") return false;
+  return false;
+}
+
+export function logicSetValue(
+  field: FormLeadField,
+  allFields: FormLeadField[],
+  valuesByLabel: Record<string, string>,
+): string | undefined {
+  const logic = field.logic;
+  if (!logic?.enabled || logic.action !== "set_value") return undefined;
+  if (!logicMatches(logic, allFields, valuesByLabel)) return undefined;
+  return logic.setValue ?? "";
 }

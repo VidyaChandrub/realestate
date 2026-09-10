@@ -27,7 +27,7 @@ export function newFormDefinition(pageId?: string, name = "Untitled Form"): Form
     name,
     description: "Configure fields, validation and success behavior for this form.",
     embed: { id: embedId(), allowExternal: true },
-    pdf: { enabled: false, url: "", filename: "brochure.pdf", autoDownload: true },
+    pdf: { enabled: false, url: "", filename: "brochure.pdf", autoDownload: true, kind: "pdf" },
     thankYouPage: {
       enabled: true,
       heading: "Thank You — You're All Set!",
@@ -72,7 +72,40 @@ export function newFormDefinition(pageId?: string, name = "Untitled Form"): Form
     errorMessage: "Please fill in the highlighted required fields.",
     openPopupId: "",
     customActions: [],
+    webhookUrl: "",
+    autoReplySubject: "",
+    autoReplyBody: "",
+    honeypot: true,
+    preventDuplicate: true,
+    captchaEnabled: false,
+    progressBar: true,
+    stepCount: 1,
+    style: { background: "", textColor: "", buttonColor: "", radius: 10 },
+    integrations: { crm: true, email: true, whatsapp: false, googleSheetsUrl: "", sms: "", analyticsEvent: "" },
+    redirectRules: [],
+    downloadRules: [],
+    enabled: true,
   };
+}
+
+export function deleteForm(id: string) {
+  saveFormLibrary(loadFormLibrary().filter((f) => f.id !== id && f.embed?.id !== id));
+}
+
+export function duplicateForm(id: string): FormDefinition | undefined {
+  const src = findFormById(id);
+  if (!src) return undefined;
+  const copy: FormDefinition = {
+    ...JSON.parse(JSON.stringify(src)),
+    id: uid("form"),
+    name: `${src.name} (copy)`,
+    embed: { id: embedId(), allowExternal: src.embed?.allowExternal ?? true },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    fields: (src.fields ?? []).map((f) => ({ ...f, id: uid("fld") })),
+  };
+  upsertForm(copy);
+  return copy;
 }
 
 export function loadFormLibrary(): FormDefinition[] {
@@ -111,17 +144,19 @@ export function findFormByEmbedId(embedIdStr: string, forms?: FormDefinition[]):
 
 export function findFormById(id: string, forms?: FormDefinition[]): FormDefinition | undefined {
   const list = forms ?? loadFormLibrary();
-  return list.find((f) => f.id === id);
+  return list.find((f) => f.id === id || f.embed?.id === id);
 }
 
 export function embedSnippet(embed: string, origin?: string): string {
   const base = origin ?? (typeof window !== "undefined" ? window.location.origin : "");
-  // Universal embed — works on website pages, landing pages, external sites, Custom HTML widgets and templates.
-  // Loads the latest saved version of the form via the embed route.
-  return `<div data-prestate-form="${embed}"></div>\n<script src="${base}/embed.js" data-form="${embed}" async><\/script>\n<!-- Fallback iframe (works even with JS disabled) -->\n<!-- <iframe src="${base}/embed/form/${embed}" title="Form ${embed}" style="width:100%;min-height:720px;border:0"></iframe> -->`;
+  return `<div data-prestate-form="${embed}"></div>\n<script src="${base}/embed.js" data-form="${embed}" async><\/script>`;
 }
 
-export function iframeSnippet(slug: string, origin?: string): string {
+export function iframeSnippet(embed: string, origin?: string): string {
   const base = origin ?? (typeof window !== "undefined" ? window.location.origin : "");
-  return `<iframe src="${base}/p/${slug}#lead-form" title="Lead form" style="width:100%;min-height:720px;border:0"></iframe>`;
+  return `<iframe src="${base}/embed/form/${embed}" title="Form ${embed}" style="width:100%;min-height:720px;border:0"></iframe>`;
+}
+
+export function shortcodeSnippet(embed: string): string {
+  return `[prestate-form id="${embed}"]`;
 }
