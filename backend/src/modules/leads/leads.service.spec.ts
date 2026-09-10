@@ -197,7 +197,7 @@ describe('LeadsService', () => {
           projectId: null,
           formName: 'enquiry',
           source: 'website',
-          data: { name: 'Aarav', fullName: 'Aarav' },
+          data: { fullName: 'Aarav' },
         },
       });
       expect(result.id).toBe('lead-1');
@@ -227,6 +227,52 @@ describe('LeadsService', () => {
         }),
       );
       expect(result.id).toBe('lead-2');
+    });
+
+    it('stores one canonical value per submitted contact field', async () => {
+      prisma.landingPage.findUnique.mockResolvedValue({
+        id: 'lp-x',
+        orgId: 'org-42',
+        status: 'published',
+      });
+      prisma.lead.findFirst.mockResolvedValue(null);
+      prisma.lead.create.mockResolvedValue({ id: 'lead-3' });
+
+      await service.createFromPublic({
+        landingPageId: 'lp-x',
+        data: {
+          name: 'Shubham',
+          'Full name': 'Shubham',
+          email: 'shubham@example.com',
+          'Email address': 'shubham@example.com',
+          phone: '918854545645',
+          phoneNumber: '918854545645',
+          'Phone number': '918854545645',
+          interestedIn: '3 BHK',
+          'Interested in': '3 BHK',
+          Notes: 'Needs evening callback',
+        },
+      });
+
+      expect(prisma.lead.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            data: {
+              fullName: 'Shubham',
+              email: 'shubham@example.com',
+              phone: '918854545645',
+              interestedIn: '3 BHK',
+              Notes: 'Needs evening callback',
+            },
+          }),
+        }),
+      );
+      const persisted = (prisma.lead.create as jest.Mock).mock.calls.at(-1)[0].data;
+      expect(persisted.name).toBeUndefined();
+      expect(persisted['Full name']).toBeUndefined();
+      expect(persisted.phoneNumber).toBeUndefined();
+      expect(persisted['Phone number']).toBeUndefined();
+      expect(persisted['Interested in']).toBeUndefined();
     });
   });
 
