@@ -32,7 +32,7 @@ import type {
   LandingPageData,
   MenuLink,
   SiteConfig,
-} from "@/lib/prestate/types";
+} from "@/lib/openpage/types";
 import {
   FOOTER_DESIGNS,
   HEADER_DESIGNS,
@@ -40,12 +40,12 @@ import {
   defaultFooterStyle,
   defaultHeaderSettings,
   defaultHeaderStyle,
-} from "@/lib/prestate/chrome-presets";
-import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
+} from "@/lib/openpage/chrome-presets";
+import { ensureConfig, siteThemeStyle } from "@/lib/openpage/site-config";
 import {
   ChromeFooter,
   ChromeHeader,
-} from "@/components/prestate/builder/chrome-renderers";
+} from "@/components/openpage/builder/chrome-renderers";
 import { MediaPicker } from "@/components/media-picker";
 
 function slugHref(label: string): string {

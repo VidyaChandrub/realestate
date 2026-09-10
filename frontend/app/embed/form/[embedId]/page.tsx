@@ -1,16 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { SiteConfig } from "@/lib/prestate/types";
-import { loadPages } from "@/lib/prestate/persist";
-import { findFormByEmbedId, loadFormLibrary } from "@/lib/prestate/forms-store";
-import { ensureConfig } from "@/lib/prestate/site-config";
-import { Canvas } from "@/components/prestate/builder/canvas";
-import { buildThankYouSections } from "@/lib/prestate/page-templates";
+import { useEffect, useMemo, useState } from "react";
+import type { SiteConfig } from "@/components/openpage/blocks/types";
+import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
+import type { SiteConfig as LegacySiteConfig } from "@/lib/openpage/types";
+import type { FormDefinition } from "@/lib/openpage/forms-store";
+import { findFormByEmbedId, loadFormLibrary } from "@/lib/openpage/forms-store";
+import { loadPages } from "@/lib/openpage/persist";
+import { ensureConfig } from "@/lib/openpage/site-config";
+
+/** Normalise a legacy per-page form into a full FormDefinition so the OpenPage
+ *  lead-form block can resolve it by id. */
+function withEmbedId(form: LegacySiteConfig["form"], embedId: string): FormDefinition {
+  const now = new Date().toISOString();
+  const raw = form as FormDefinition;
+  return {
+    ...raw,
+    id: raw.id || embedId,
+    pageId: raw.pageId || "",
+    createdAt: raw.createdAt || now,
+    updatedAt: raw.updatedAt || now,
+  };
+}
 
 export default function EmbedFormPage({ params }: { params: Promise<{ embedId: string }> }) {
   const [embedId, setEmbedId] = useState<string | null>(null);
-  const [form, setForm] = useState<SiteConfig["form"] | null>(null);
+  const [form, setForm] = useState<FormDefinition | null>(null);
 
   useEffect(() => {
     void params.then((p) => setEmbedId(p.embedId));
@@ -18,69 +33,86 @@ export default function EmbedFormPage({ params }: { params: Promise<{ embedId: s
 
   useEffect(() => {
     if (!embedId) return;
-    // Try forms library first (reusable forms), then fall back to page configs (per-template form)
+    // Try the forms library first (reusable forms), then fall back to page
+    // configs (per-template form).
     const lib = loadFormLibrary();
-    const fromLib = findFormByEmbedId(embedId, lib as never);
+    const fromLib = findFormByEmbedId(embedId, lib);
     if (fromLib) {
-      setForm(fromLib as unknown as SiteConfig["form"]);
+      setForm(fromLib);
       return;
     }
     const pages = loadPages();
     for (const pg of pages) {
       const cfg = ensureConfig(pg);
-      if (cfg.form.embed?.id === embedId || pg.slug === embedId) {
-        setForm(cfg.form);
+      const f = cfg.form;
+      if (f.embed?.id === embedId || pg.slug === embedId) {
+        setForm(withEmbedId(f, embedId));
         return;
       }
     }
     // Fallback: first page's form
     const fallback = pages[0] ? ensureConfig(pages[0]).form : null;
-    setForm(fallback);
+    setForm(fallback ? withEmbedId(fallback, embedId) : null);
   }, [embedId]);
 
-  if (!embedId) return <div style={{ padding: 40, fontFamily: "Inter, sans-serif", color: "#64748b" }}>Loading embed…</div>;
-  if (!form) return <div style={{ padding: 40, fontFamily: "Inter, sans-serif", color: "#64748b" }}>Form not found for “{embedId}”. Save the form in the builder to generate its latest version — the embed always loads the current config.</div>;
+  const site = useMemo<SiteConfig | null>(() => {
+    if (!form) return null;
+    return {
+      engine: "openpage",
+      name: form.name || "Enquiry",
+      pages: [
+        {
+          id: "page-embed",
+          name: form.name || "Enquiry",
+          path: "/",
+          blocks: [
+            {
+              id: "embed_lead_form",
+              type: "lead-form",
+              variant: "card",
+              props: {
+                formId: form.id,
+                title: form.name || "Enquiry",
+                subtitle: form.description || "",
+              },
+            },
+          ],
+        },
+      ],
+      blocks: [],
+      forms: [form],
+    };
+  }, [form]);
 
-  // Render just the lead-form as a standalone page — no header/footer chrome, white bg.
-  const dummySections = buildThankYouSections().slice(0, 0);
-  // We render Canvas with a single lead-form section so all validation / PDF / thank-you logic stays consolidated.
-  const sections = [
-    {
-      id: "embed_lead_form",
-      type: "lead-form",
-      label: "Form",
-      icon: "Send",
-      settings: { heading: form.name || "Enquiry", sub: form.description || "", button: form.submitLabel || "Submit" },
-      style: {
-        colors: { bg: "#ffffff", text: "#111827" },
-        spacing: { padding: { top: 12, right: 12, bottom: 12, left: 12 }, margin: { top: 0, right: 0, bottom: 0, left: 0 }, gap: 8 },
-        layout: { width: "full", height: "auto", align: "center", direction: "column" },
-        typography: {},
-        responsive: {},
-      },
-    },
-  ];
+  if (!embedId)
+    return <div style={{ padding: 40, fontFamily: "Inter, sans-serif", color: "#64748b" }}>Loading embed…</div>;
+  if (!form || !site)
+    return (
+      <div style={{ padding: 40, fontFamily: "Inter, sans-serif", color: "#64748b" }}>
+        Form not found for “{embedId}”. Save the form in the builder to generate its latest version — the embed always
+        loads the current config.
+      </div>
+    );
 
+  // Render just the lead-form as a standalone page — no header/footer chrome.
+  // SiteRenderer with a single lead-form block keeps all the validation / PDF /
+  // thank-you logic consolidated in the OpenPage lead-form block (and its
+  // DynamicLeadForm), so embeds match the editor exactly.
   return (
     <div style={{ minHeight: "auto", background: "#fff", padding: 0 }}>
       <style>{`body{margin:0;padding:0}`}</style>
-      <Canvas
-        sections={sections as never}
-        selectedId={null}
-        device="desktop"
-        readOnly
-        live
-        design={{ css: "", bundle: { tokens: {} as never, fonts: [] } }}
-        theme={{ primary: "#6D5DFC", accent: "#CDA45E", font: "Inter", name: form.name }}
-        form={form}
-        forms={form.id ? [{ ...(form as never), id: form.id }] : []}
-        chrome={{ header: {} as never, footer: {} as never, brand: {} as never }}
-        pageId={`embed_${embedId}`}
-        onSelect={() => {}}
-        onMutate={() => {}}
-      />
-      <div style={{ textAlign: "center", padding: "10px 12px", fontSize: 11, color: "#94a3b8", fontFamily: "Inter, sans-serif", borderTop: "1px solid #f1f5f9" }}>
-        Powered by Prestate · Form <code>{embedId}</code> · always shows the latest saved version
+      <SiteRenderer site={site} live pageId={`embed_${embedId}`} projectName={form.name} />
+      <div
+        style={{
+          textAlign: "center",
+          padding: "10px 12px",
+          fontSize: 11,
+          color: "#94a3b8",
+          fontFamily: "Inter, sans-serif",
+          borderTop: "1px solid #f1f5f9",
+        }}
+      >
+        Powered by OpenPage · Form <code>{embedId}</code> · always shows the latest saved version
       </div>
     </div>
   );

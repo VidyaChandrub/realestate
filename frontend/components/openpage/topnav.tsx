@@ -33,10 +33,10 @@ import {
   Eye,
 } from "lucide-react";
 import { useEditorStore, type Viewport } from "@/components/openpage/store/editorStore";
-import type { ModuleKey } from "@/lib/prestate/types";
-import { BRAND } from "@/lib/prestate/data";
+import type { ModuleKey } from "@/lib/openpage/types";
+import { BRAND } from "@/lib/openpage/data";
 
-export function PrestateMark({
+export function OpenPageMark({
   size = 30,
   color,
 }: {
@@ -158,14 +158,6 @@ export const MODULE_OPTIONS: {
     color: "#ec4899",
     bg: "rgba(236, 72, 153, 0.15)",
   },
-  {
-    key: "tracking",
-    label: "Tracking & Pixels",
-    icon: Target,
-    desc: "Analytics, GTM, Meta Pixel",
-    color: "#06b6d4",
-    bg: "rgba(6, 182, 212, 0.15)",
-  },
 ];
 
 export function TopNav({
@@ -285,7 +277,7 @@ export function TopNav({
           className="ps-topnav-brand"
           style={{ display: "flex", alignItems: "center", gap: 10 }}
         >
-          <PrestateMark size={28} />
+          <OpenPageMark size={28} />
           <div
             style={{
               display: "flex",
@@ -293,7 +285,7 @@ export function TopNav({
               lineHeight: 1.1,
             }}
           >
-            <span className="ps-topnav-wordmark">PRESTATE</span>
+            <span className="ps-topnav-wordmark">OPENPAGE</span>
             <span className="ps-topnav-sub">STUDIO</span>
           </div>
         </div>
@@ -768,7 +760,6 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   brand: "Brand Center",
   headerfooter: "Header & Footer",
   seo: "SEO Center",
-  tracking: "Tracking Center",
   typography: "Typography & Fonts",
 };
 

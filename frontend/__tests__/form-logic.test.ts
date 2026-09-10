@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { evalLogicRule, isFieldVisible, ruleFieldValue, withFieldValue } from "@/lib/prestate/form-logic";
-import type { FormLeadField } from "@/lib/prestate/types";
+import { evalLogicRule, isFieldVisible, ruleFieldValue, withFieldValue } from "@/lib/openpage/form-logic";
+import type { FormLeadField } from "@/lib/openpage/types";
 
 const fields: FormLeadField[] = [
   { id: "f1", type: "select", label: "Budget", placeholder: "", required: false },

@@ -1,7 +1,7 @@
 import type { BlockConfig, SiteConfig } from "@/components/openpage/blocks/types";
 import { defaultConfig } from "@/components/openpage/store/configStore";
-import type { LandingPageData, SectionInstance, SiteConfig as LegacyConfig } from "@/lib/prestate/types";
-import { ensureConfig } from "@/lib/prestate/site-config";
+import type { LandingPageData, SectionInstance, SiteConfig as LegacyConfig } from "@/lib/openpage/types";
+import { ensureConfig } from "@/lib/openpage/site-config";
 import { themePresets } from "@/lib/openpage/theme-presets";
 import { buildRealEstateTemplate } from "@/lib/openpage/re-templates";
 

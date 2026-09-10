@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Link2, Sparkles, Trash2, Upload } from "lucide-react";
 import { isMediaSrc, readMediaFile } from "@/lib/media";
-import { useBuilderImageUpload } from "@/components/prestate/builder/upload-context";
+import { useBuilderImageUpload } from "@/components/openpage/builder/upload-context";
 
 export function MediaPicker({
   kind,

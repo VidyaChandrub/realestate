@@ -88,7 +88,7 @@ const CRUMB_MAP: Record<string, string> = {
   "/admin-console/admins": "Platform Team",
   "/admin-console/templates": "Templates",
   "/admin-console/template-detail": "Template",
-  "/prestate": "Builder",
+  "/org-builder": "Builder",
   "/admin-console/org-domains": "Domains",
   "/admin-console/subscriptions": "Subscriptions",
   "/admin-console/email": "Email & SMTP",

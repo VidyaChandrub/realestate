@@ -21,9 +21,9 @@ import {
   Tablet,
   Type,
 } from "lucide-react";
-import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
-import type { LayoutTheme } from "@/lib/prestate/widget-theme";
-import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
+import type { LandingPageData, SiteConfig } from "@/lib/openpage/types";
+import type { LayoutTheme } from "@/lib/openpage/widget-theme";
+import { ensureConfig, siteThemeStyle } from "@/lib/openpage/site-config";
 import { MediaPicker } from "@/components/media-picker";
 
 const PRIMARY_SWATCHES = [

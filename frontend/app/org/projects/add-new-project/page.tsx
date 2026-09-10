@@ -28,7 +28,7 @@ import {
   stepStatus,
 } from "@/lib/project-validation";
 import { Reveal } from "@/components/superadmin/reveal";
-import { orgBuilderPath } from "@/lib/prestate/paths";
+import { orgBuilderPath } from "@/lib/openpage/paths";
 import "@/app/org/org.css";
 import type {
   CreateProjectInput,

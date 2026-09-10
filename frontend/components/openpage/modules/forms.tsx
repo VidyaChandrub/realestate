@@ -50,17 +50,17 @@ import {
   Upload,
   Users,
 } from "lucide-react";
-import { uid } from "@/lib/prestate/data";
-import { FIELD_LOGIC_OPS } from "@/lib/prestate/form-logic";
+import { uid } from "@/lib/openpage/data";
+import { FIELD_LOGIC_OPS } from "@/lib/openpage/form-logic";
 import {
   loadFormLibrary,
   saveFormLibrary,
   newFormDefinition,
   embedSnippet as libEmbedSnippet,
-} from "@/lib/prestate/forms-store";
-import type { FormDefinition } from "@/lib/prestate/forms-store";
-import { mergeFormLibraries } from "@/lib/prestate/resolve-form";
-import { sampleBuilderForms } from "@/lib/prestate/sample-forms";
+} from "@/lib/openpage/forms-store";
+import type { FormDefinition } from "@/lib/openpage/forms-store";
+import { mergeFormLibraries } from "@/lib/openpage/resolve-form";
+import { sampleBuilderForms } from "@/lib/openpage/sample-forms";
 import type {
   Device,
   FieldLogicOp,
@@ -68,8 +68,8 @@ import type {
   LandingPageData,
   SiteConfig,
   FormThankYouPage,
-} from "@/lib/prestate/types";
-import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
+} from "@/lib/openpage/types";
+import { ensureConfig, siteThemeStyle } from "@/lib/openpage/site-config";
 import { MediaPicker } from "@/components/media-picker";
 
 type FieldType =

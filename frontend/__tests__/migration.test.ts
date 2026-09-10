@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { WIDGET_MIGRATIONS, migrateSections } from "@/lib/prestate/persist";
-import { PAGES, WIDGETS } from "@/lib/prestate/data";
-import { buildTemplateSections } from "@/lib/prestate/page-templates";
-import type { SectionInstance } from "@/lib/prestate/types";
+import { WIDGET_MIGRATIONS, migrateSections } from "@/lib/openpage/persist";
+import { PAGES, WIDGETS } from "@/lib/openpage/data";
+import { buildTemplateSections } from "@/lib/openpage/page-templates";
+import type { SectionInstance } from "@/lib/openpage/types";
 
 function node(type: string, settings: Record<string, unknown> = {}, children?: SectionInstance[]): SectionInstance {
   return {

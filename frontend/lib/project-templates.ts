@@ -1,6 +1,6 @@
-import type { SectionInstance, SectionStyle, SiteConfig } from "./prestate/types";
-import { defaultSiteConfig } from "./prestate/site-config";
-import { buildTemplateSections } from "./prestate/page-templates";
+import type { SectionInstance, SectionStyle, SiteConfig } from "./openpage/types";
+import { defaultSiteConfig } from "./openpage/site-config";
+import { buildTemplateSections } from "./openpage/page-templates";
 
 export interface ProjectTemplateDefaultData {
   name: string;

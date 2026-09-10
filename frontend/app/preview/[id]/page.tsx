@@ -7,13 +7,13 @@ import { apiFetch } from "@/lib/api";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
 import { siteFromLandingPage } from "@/lib/openpage/content";
 import type { LandingPageRow } from "@/lib/types";
-import type { LandingPageData } from "@/lib/prestate/types";
-import type { SectionInstance, SiteConfig } from "@/lib/prestate/types";
-import { applyDocumentSeo } from "@/lib/prestate/seo";
-import { applyLandingPagePropertyFromConfig } from "@/lib/prestate/data";
-import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
-import { bumpTracking } from "@/lib/prestate/tracking";
-import "@/app/prestate/prestate.css";
+import type { LandingPageData } from "@/lib/openpage/types";
+import type { SectionInstance, SiteConfig } from "@/lib/openpage/types";
+import { applyDocumentSeo } from "@/lib/openpage/seo";
+import { applyLandingPagePropertyFromConfig } from "@/lib/openpage/data";
+import { OpenPageTrackingScripts } from "@/components/openpage/tracking-scripts";
+import { bumpTracking } from "@/lib/openpage/tracking";
+import "@/app/openpage.css";
 
 interface LandingPageDetail extends LandingPageRow {
   content: { sections: SectionInstance[]; config: SiteConfig; engine?: string; site?: LandingPageData["openPageSite"] };
@@ -118,7 +118,7 @@ export default function PreviewLandingPage() {
         projectName={data.name}
         forms={data.content.config.forms as never}
       />
-      <PrestateTrackingScripts tracking={data.content.config.tracking} />
+      <OpenPageTrackingScripts tracking={data.content.config.tracking} />
     </div>
   );
 }

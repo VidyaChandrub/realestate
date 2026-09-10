@@ -5,10 +5,10 @@ import {
   hydrateFooter,
   hydrateHeader,
   linksOf,
-} from "@/lib/prestate/chrome-presets";
-import { ensureConfig } from "@/lib/prestate/site-config";
-import { PAGES } from "@/lib/prestate/data";
-import type { FooterDesignId, HeaderDesignId, LandingPageData, SiteConfig } from "@/lib/prestate/types";
+} from "@/lib/openpage/chrome-presets";
+import { ensureConfig } from "@/lib/openpage/site-config";
+import { PAGES } from "@/lib/openpage/data";
+import type { FooterDesignId, HeaderDesignId, LandingPageData, SiteConfig } from "@/lib/openpage/types";
 
 const PRESET_IDS = ["p1", "p2", "p3", "p4"];
 

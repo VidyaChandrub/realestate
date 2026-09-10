@@ -3,8 +3,8 @@
 import type { BlockConfig } from "../types";
 import { ArrowRight, Check, Download, MapPin, Play } from "lucide-react";
 import { useOpenPageRuntime } from "@/components/openpage/runtime/OpenPageRuntime";
-import { DynamicLeadForm } from "@/components/prestate/dynamic-lead-form";
-import { findFormById } from "@/lib/prestate/forms-store";
+import { DynamicLeadForm } from "@/components/openpage/dynamic-lead-form";
+import { findFormById } from "@/lib/openpage/forms-store";
 import { isMediaSrc } from "@/lib/media";
 
 function str(v: unknown, fallback = ""): string {

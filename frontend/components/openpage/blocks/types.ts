@@ -1,4 +1,4 @@
-import type { FormDefinition } from "@/lib/prestate/forms-store";
+import type { FormDefinition } from "@/lib/openpage/forms-store";
 
 export type GenericBlockType =
   | "navbar"

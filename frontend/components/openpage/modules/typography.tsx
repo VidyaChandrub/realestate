@@ -25,7 +25,7 @@ import {
   Type as TypeIcon,
   Upload,
 } from "lucide-react";
-import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
+import type { LandingPageData, SiteConfig } from "@/lib/openpage/types";
 import type {
   FontDef,
   GlobalStyleSet,
@@ -33,7 +33,7 @@ import type {
   TemplateTypography,
   TypeKey,
   TypeToken,
-} from "@/lib/prestate/design-system";
+} from "@/lib/openpage/design-system";
 import {
   createGlobalSet,
   defaultTypography,
@@ -45,10 +45,10 @@ import {
   loadGlobalSets,
   saveFonts,
   updateGlobalSet,
-} from "@/lib/prestate/design-system";
-import type { Resource } from "@/lib/prestate/store";
-import { uid } from "@/lib/prestate/data";
-import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
+} from "@/lib/openpage/design-system";
+import type { Resource } from "@/lib/openpage/store";
+import { uid } from "@/lib/openpage/data";
+import { ensureConfig, siteThemeStyle } from "@/lib/openpage/site-config";
 
 const CURATED_PAIRINGS = [
   {

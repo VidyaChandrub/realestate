@@ -5,7 +5,7 @@ import { CheckCircle2, LayoutTemplate, Plus, Search, X } from "lucide-react";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
-import { SceneImage } from "@/components/prestate/art";
+import { SceneImage } from "@/components/openpage/art";
 import {
   buildTemplateRows,
   deriveStats,
@@ -15,13 +15,13 @@ import {
   type TemplateRow,
 } from "@/components/superadmin/templates/shared";
 import { TemplateCard } from "@/components/superadmin/templates/template-card";
-import { BLANK_TEMPLATE, TEMPLATES, buildTemplateSections } from "@/lib/prestate/data";
-import { createTemplate, deleteTemplate, duplicateTemplate, loadTemplates, resetTemplate, saveTemplate } from "@/lib/prestate/persist";
-import { builderPath, templatePreviewPath } from "@/lib/prestate/paths";
-import { defaultSiteConfig, seedConfigFor } from "@/lib/prestate/site-config";
-import { inferDesignId } from "@/lib/prestate/page-templates";
+import { BLANK_TEMPLATE, TEMPLATES, buildTemplateSections } from "@/lib/openpage/data";
+import { createTemplate, deleteTemplate, duplicateTemplate, loadTemplates, resetTemplate, saveTemplate } from "@/lib/openpage/persist";
+import { builderPath, templatePreviewPath } from "@/lib/openpage/paths";
+import { defaultSiteConfig, seedConfigFor } from "@/lib/openpage/site-config";
+import { inferDesignId } from "@/lib/openpage/page-templates";
 import { buildRealEstateTemplate } from "@/lib/openpage/re-templates";
-import type { LandingPageData, TemplateData } from "@/lib/prestate/types";
+import type { LandingPageData, TemplateData } from "@/lib/openpage/types";
 import { Icon } from "@/components/icons";
 
 function goToBuilder(pageId: string) {
@@ -241,7 +241,7 @@ export default function SuperAdminTemplatesPage() {
           <h1>Template Management</h1>
           <div className="sub">
             Create, preview and manage every landing-page template. Each template keeps its own design, brand, SEO,
-            domain and tracking — open one to edit it in the Prestate builder.
+            domain and tracking — open one to edit it in the OpenPage builder.
           </div>
         </div>
         <div className="actions">

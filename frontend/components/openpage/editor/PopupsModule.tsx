@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { FormDefinition } from "@/lib/prestate/forms-store";
-import type { LandingPageData } from "@/lib/prestate/types";
+import type { FormDefinition } from "@/lib/openpage/forms-store";
+import type { LandingPageData } from "@/lib/openpage/types";
 import type { PopupConfig } from "@/components/openpage/blocks/types";
 import { useConfigStore } from "@/components/openpage/store/configStore";
-import { ensureConfig } from "@/lib/prestate/site-config";
+import { ensureConfig } from "@/lib/openpage/site-config";
 
 function uid() {
   return `popup_${Math.random().toString(36).slice(2, 9)}`;

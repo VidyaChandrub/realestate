@@ -9,21 +9,21 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { TemplateCover } from "@/components/superadmin/templates/shared";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
 import { siteFromLandingPage } from "@/lib/openpage/content";
-import { ensureConfig } from "@/lib/prestate/site-config";
-import { orgBuilderPath } from "@/lib/prestate/paths";
+import { ensureConfig } from "@/lib/openpage/site-config";
+import { orgBuilderPath } from "@/lib/openpage/paths";
 import {
   InventoryBindFields,
   inventoryBindPayload,
   needsInventorySelection,
   type InventoryBindValue,
 } from "@/components/org/inventory-bind-fields";
-import type { LandingPageData } from "@/lib/prestate/types";
+import type { LandingPageData } from "@/lib/openpage/types";
 import type { LandingPageRow, OrgTemplateSummary, OrgTemplatesListResponse } from "@/lib/types";
-// Canvas renders using the prestate design system's ps-* classes, which only
-// this route needs — every rule in prestate.css is ps-prefixed, so importing
-// it here can't leak into the rest of the org shell (same pattern app/org/*
+// Canvas renders using the builder's ps-* classes, which only this route
+// needs — every rule in openpage.css is ps-prefixed, so importing it here
+// can't leak into the rest of the org shell (same pattern app/org/*
 // already uses borrowing superadmin.css from the Super Admin route group).
-import "@/app/prestate/prestate.css";
+import "@/app/openpage.css";
 
 const LIMIT = 12;
 

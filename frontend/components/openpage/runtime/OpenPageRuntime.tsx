@@ -1,9 +1,9 @@
 "use client";
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { findFormById, type FormDefinition } from "@/lib/prestate/forms-store";
+import { findFormById, type FormDefinition } from "@/lib/openpage/forms-store";
 import type { PopupConfig } from "@/components/openpage/blocks/types";
-import { DynamicLeadForm } from "@/components/prestate/dynamic-lead-form";
+import { DynamicLeadForm } from "@/components/openpage/dynamic-lead-form";
 import { X } from "lucide-react";
 
 export interface OpenPageRuntimeValue {

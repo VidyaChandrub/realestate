@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
 import { siteFromLandingPage } from "@/lib/openpage/content";
-import { loadTemplate } from "@/lib/prestate/persist";
-import { migrateSections } from "@/lib/prestate/persist";
-import { ensureConfig } from "@/lib/prestate/site-config";
-import { applyDocumentSeo } from "@/lib/prestate/seo";
-import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
-import { bumpTracking } from "@/lib/prestate/tracking";
-import type { LandingPageData } from "@/lib/prestate/types";
-import "@/app/prestate/prestate.css";
+import { loadTemplate } from "@/lib/openpage/persist";
+import { migrateSections } from "@/lib/openpage/persist";
+import { ensureConfig } from "@/lib/openpage/site-config";
+import { applyDocumentSeo } from "@/lib/openpage/seo";
+import { OpenPageTrackingScripts } from "@/components/openpage/tracking-scripts";
+import { bumpTracking } from "@/lib/openpage/tracking";
+import type { LandingPageData } from "@/lib/openpage/types";
+import "@/app/openpage.css";
 
 // Super Admin template preview — resolves the template from the backend by id
 // (GET /admin/templates/:id via loadTemplate), not from the /p/:slug route
@@ -72,7 +72,7 @@ export default function TemplatePreviewPage() {
   return (
     <div className="ps-app" style={{ minHeight: "100vh", background: "#fff" }}>
       <SiteRenderer site={siteFromLandingPage(page)} live pageId={page.id} projectName={page.name} forms={cfg.forms as never} />
-      <PrestateTrackingScripts tracking={cfg.tracking} />
+      <OpenPageTrackingScripts tracking={cfg.tracking} />
     </div>
   );
 }

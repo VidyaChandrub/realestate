@@ -22,10 +22,10 @@ import {
   Sparkles,
   Tablet,
 } from "lucide-react";
-import type { LandingPageData, SiteConfig } from "@/lib/prestate/types";
-import { ensureConfig, siteThemeStyle } from "@/lib/prestate/site-config";
-import { buildJsonLd, jsonLdValid, suggestedCanonical } from "@/lib/prestate/seo";
-import { localPreviewPath } from "@/lib/prestate/paths";
+import type { LandingPageData, SiteConfig } from "@/lib/openpage/types";
+import { ensureConfig, siteThemeStyle } from "@/lib/openpage/site-config";
+import { buildJsonLd, jsonLdValid, suggestedCanonical } from "@/lib/openpage/seo";
+import { localPreviewPath } from "@/lib/openpage/paths";
 import { MediaPicker } from "@/components/media-picker";
 
 export function SeoModule({

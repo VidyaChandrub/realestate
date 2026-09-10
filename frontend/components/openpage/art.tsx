@@ -433,7 +433,7 @@ export function SceneImage({ art, className, beds }: { art: string; className?: 
       return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src="/prestate/hero-aurora.jpg"
+          src="/openpage/hero-aurora.jpg"
           alt="Aurora Residences — night view of luxury twin towers"
           className={className}
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}

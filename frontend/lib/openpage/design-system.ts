@@ -268,9 +268,9 @@ export function ensureDesignSystem(config: SiteConfig): DesignSystemState {
 /** Effective tokens for a template — honours the template/global scope.
  *  `sets` must be pre-fetched by the caller (loadGlobalSets is async now
  *  that it's a network call; this stays synchronous for the render-path
- *  callers — builder/workspace.tsx's canvas CSS and live-site.tsx — that
- *  can't await mid-render). Pass [] while a fetch is still in flight; the
- *  page just renders with template-scoped typography until it resolves. */
+ *  callers — the studio's canvas CSS and live-site.tsx — that can't await
+ *  mid-render). Pass [] while a fetch is still in flight; the page just
+ *  renders with template-scoped typography until it resolves. */
 export function effectiveTypography(
   config: SiteConfig,
   sets: GlobalStyleSet[] = [],

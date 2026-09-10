@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MoreHorizontal, Plus } from "lucide-react";
-import { Btn } from "@/components/prestate/ui";
-import type { LandingPageData } from "@/lib/prestate/types";
+import { Btn } from "@/components/openpage/ui";
+import type { LandingPageData } from "@/lib/openpage/types";
 
 export function ModuleShell({ children }: { children: ReactNode }) {
   return <div className="ps-module-shell">{children}</div>;

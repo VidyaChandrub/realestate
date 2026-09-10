@@ -14,7 +14,7 @@
       src = location.origin + "/embed/form/" + encodeURIComponent(embedId);
     }
     iframe.src = src;
-    iframe.title = "Prestate form " + embedId;
+    iframe.title = "OpenPage form " + embedId;
     iframe.style.width = "100%";
     iframe.style.minHeight = "720px";
     iframe.style.border = "0";
@@ -46,7 +46,7 @@
     if (id && !el.dataset.prestateMounted) {
       var iframe = document.createElement("iframe");
       iframe.src = (document.currentScript ? new URL(document.currentScript.src).origin : location.origin) + "/embed/form/" + encodeURIComponent(id);
-      iframe.title = "Prestate form " + id;
+      iframe.title = "OpenPage form " + id;
       iframe.style.width = "100%";
       iframe.style.minHeight = "720px";
       iframe.style.border = "0";

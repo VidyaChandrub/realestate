@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import type { SiteConfig } from "@/lib/prestate/types";
+import type { SiteConfig } from "@/lib/openpage/types";
 
-export function PrestateTrackingScripts({ tracking }: { tracking: SiteConfig["tracking"] }) {
+export function OpenPageTrackingScripts({ tracking }: { tracking: SiteConfig["tracking"] }) {
   useEffect(() => {
     const inject = (id: string, text: string) => {
       const existing = document.getElementById(id);
@@ -59,7 +59,7 @@ export function PrestateTrackingScripts({ tracking }: { tracking: SiteConfig["tr
   return null;
 }
 
-export function firePrestateLead() {
+export function fireTrackingLead() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event("prestate:lead"));
 }

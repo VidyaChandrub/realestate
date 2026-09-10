@@ -3,16 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Globe, PencilRuler } from "lucide-react";
-import type { LandingPageData } from "@/lib/prestate/types";
+import type { LandingPageData } from "@/lib/openpage/types";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
 import { siteFromLandingPage } from "@/lib/openpage/content";
-import { ensureConfig } from "@/lib/prestate/site-config";
-import { applyDocumentSeo } from "@/lib/prestate/seo";
-import { PrestateTrackingScripts } from "@/components/prestate/tracking-scripts";
-import { bumpTracking } from "@/lib/prestate/tracking";
-import { findPageByDomain, findPageBySlug } from "@/lib/prestate/store";
-import { applyLandingPagePropertyFromConfig } from "@/lib/prestate/data";
-import { builderPath, localDomainPreviewPath } from "@/lib/prestate/paths";
+import { ensureConfig } from "@/lib/openpage/site-config";
+import { applyDocumentSeo } from "@/lib/openpage/seo";
+import { OpenPageTrackingScripts } from "@/components/openpage/tracking-scripts";
+import { bumpTracking } from "@/lib/openpage/tracking";
+import { findPageByDomain, findPageBySlug } from "@/lib/openpage/store";
+import { applyLandingPagePropertyFromConfig } from "@/lib/openpage/data";
+import { builderPath, localDomainPreviewPath } from "@/lib/openpage/paths";
 
 export function LocalSitePreview({
   slug,
@@ -119,7 +119,7 @@ export function LocalSitePreview({
         projectName={page.name}
         forms={(openPageSite.forms ?? cfg.forms) as never}
       />
-      <PrestateTrackingScripts tracking={cfg.tracking} />
+      <OpenPageTrackingScripts tracking={cfg.tracking} />
     </div>
   );
 
@@ -182,7 +182,7 @@ export function LocalSitePreview({
         projectName={page.name}
         forms={(openPageSite.forms ?? cfg.forms) as never}
       />
-      <PrestateTrackingScripts tracking={cfg.tracking} />
+      <OpenPageTrackingScripts tracking={cfg.tracking} />
     </div>
   );
 }

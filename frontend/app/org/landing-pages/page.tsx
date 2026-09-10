@@ -7,27 +7,27 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
-import { orgBuilderPath } from "@/lib/prestate/paths";
-import { defaultSiteConfig } from "@/lib/prestate/site-config";
+import { orgBuilderPath } from "@/lib/openpage/paths";
+import { defaultSiteConfig } from "@/lib/openpage/site-config";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
 import { siteFromLandingPage } from "@/lib/openpage/content";
 import { buildRealEstateTemplate } from "@/lib/openpage/re-templates";
 import { Icon } from "@/components/icons";
 import type { LandingPageRow, LandingPageStatus, OrgLandingPagesListResponse } from "@/lib/types";
-import type { SectionInstance, SiteConfig } from "@/lib/prestate/types";
+import type { SectionInstance, SiteConfig } from "@/lib/openpage/types";
 import {
   InventoryBindFields,
   inventoryBindPayload,
   needsInventorySelection,
   type InventoryBindValue,
 } from "@/components/org/inventory-bind-fields";
-// Canvas renders using the prestate design system's ps-* classes, which only
-// this route needs — same pattern /org/templates already uses (those rules
-// are all ps-prefixed, so importing it here can't leak into the org shell).
-import "@/app/prestate/prestate.css";
+// Canvas renders using the builder's ps-* classes, which only this route
+// needs — same pattern /org/templates already uses (those rules are all
+// ps-prefixed, so importing it here can't leak into the org shell).
+import "@/app/openpage.css";
 
 interface LandingPageDetail extends LandingPageRow {
-  content: { sections: SectionInstance[]; config: SiteConfig; engine?: string; site?: import("@/lib/prestate/types").LandingPageData["openPageSite"] };
+  content: { sections: SectionInstance[]; config: SiteConfig; engine?: string; site?: import("@/lib/openpage/types").LandingPageData["openPageSite"] };
 }
 
 const LIMIT = 20;

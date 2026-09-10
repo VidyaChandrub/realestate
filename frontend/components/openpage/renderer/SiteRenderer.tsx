@@ -6,7 +6,7 @@ import { RenderBlock } from "@/components/openpage/blocks/registry";
 import { resolveTheme, themeToCSS } from "@/lib/openpage/theme-presets";
 import { useGoogleFonts } from "@/lib/openpage/useGoogleFonts";
 import { OpenPageRuntimeProvider } from "@/components/openpage/runtime/OpenPageRuntime";
-import type { FormDefinition } from "@/lib/prestate/forms-store";
+import type { FormDefinition } from "@/lib/openpage/forms-store";
 
 export function SiteRenderer({
   site,

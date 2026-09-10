@@ -10,13 +10,13 @@ import {
   Send,
   ShieldCheck,
 } from "lucide-react";
-import type { Device, SectionInstance, SiteConfig } from "@/lib/prestate/types";
+import type { Device, SectionInstance, SiteConfig } from "@/lib/openpage/types";
 import type { Project, PublicProject, EnquiryUnit } from "@/lib/types";
 import { apiFetch, submitLead } from "@/lib/api";
-import { isFieldVisible } from "@/lib/prestate/form-logic";
-import { bumpTracking } from "@/lib/prestate/tracking";
+import { isFieldVisible } from "@/lib/openpage/form-logic";
+import { bumpTracking } from "@/lib/openpage/tracking";
 import { composeLeadSource } from "@/lib/lead-display";
-import { firePrestateLead } from "@/components/prestate/tracking-scripts";
+import { fireTrackingLead } from "@/components/openpage/tracking-scripts";
 
 function isValidEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
@@ -112,8 +112,8 @@ export function ProjectEnquiryModal({
 
   const visible = fields.filter((f) =>
     isFieldVisible(
-      f as unknown as import("@/lib/prestate/types").FormLeadField,
-      fields as unknown as import("@/lib/prestate/types").FormLeadField[],
+      f as unknown as import("@/lib/openpage/types").FormLeadField,
+      fields as unknown as import("@/lib/openpage/types").FormLeadField[],
       values,
     ),
   );
@@ -168,7 +168,7 @@ export function ProjectEnquiryModal({
     if (selectedUnit) leadFields["Unit ID"] = selectedUnit.id;
     try {
       if (live && pageId) {
-        firePrestateLead();
+        fireTrackingLead();
         bumpTracking(pageId, "form");
         await submitLead({
           landingPageId: pageId,

@@ -8,7 +8,7 @@ import { Modal } from "./modal";
  * not used anywhere in this app — route every "are you sure?" through this.
  *
  * Self-styled with Tailwind so it renders correctly inside any area
- * (org console, admin console, prestate) regardless of the local CSS.
+ * (org console, admin console, builder) regardless of the local CSS.
  */
 export function ConfirmModal({
   open,

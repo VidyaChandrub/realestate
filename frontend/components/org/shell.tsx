@@ -7,8 +7,8 @@ import { useAuth } from "@/lib/auth-context";
 import { LeadStagesProvider } from "@/lib/lead-stages";
 import { dashboardPathFor } from "@/lib/mock/sessions";
 import { Icon, type IconName } from "@/components/icons";
-import { loadTemplates } from "@/lib/prestate/store";
-import { orgBuilderPath } from "@/lib/prestate/paths";
+import { loadTemplates } from "@/lib/openpage/store";
+import { orgBuilderPath } from "@/lib/openpage/paths";
 
 type NavItem = {
   href: string;

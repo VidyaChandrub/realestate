@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { landingPageFromSite, siteFromLandingPage } from "@/lib/openpage/content";
-import type { LandingPageData } from "@/lib/prestate/types";
+import type { LandingPageData } from "@/lib/openpage/types";
 
 export function OpenPageBridge({
   page,

@@ -32,7 +32,7 @@ export function jsonLdValid(data: Record<string, unknown>): boolean {
   return Boolean(data.name && data.url && data.description);
 }
 
-const MANAGED = "data-prestate-seo";
+const MANAGED = "data-openpage-seo";
 
 function upsertMeta(attr: "name" | "property", key: string, content: string) {
   if (typeof document === "undefined") return;

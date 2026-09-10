@@ -84,7 +84,7 @@ export { buildTemplateSections };
 export { PAGE_TEMPLATES as TEMPLATES, BLANK_TEMPLATE } from "./page-templates";
 
 export const BRAND = {
-  name: "Prestate Builder",
+  name: "OpenPage Builder",
   tagline: "High-converting real estate landing pages, in minutes.",
   primary: "#6D5DFC",
   secondary: "#CDA45E",

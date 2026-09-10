@@ -1,5 +1,5 @@
-import { LocalSitePreview } from "@/components/prestate/live-site";
-import { resolveOrgSiteHost } from "@/lib/prestate/resolve-host";
+import { LocalSitePreview } from "@/components/openpage/live-site";
+import { resolveOrgSiteHost } from "@/lib/openpage/resolve-host";
 
 export default async function DomainPreviewPage({ params }: { params: Promise<{ host: string[] }> }) {
   const { host } = await params;

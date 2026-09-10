@@ -1,10 +1,12 @@
+/** Builder against a Super Admin Template — the org-builder route with the
+ *  `scope` param, which makes the studio pick `resource: "template"`. */
 export function builderPath(pageId: string, returnUrl?: string): string {
-  const base = `/prestate?id=${encodeURIComponent(pageId)}`;
+  const base = `/org-builder?scope=template&id=${encodeURIComponent(pageId)}`;
   return returnUrl ? `${base}&returnUrl=${encodeURIComponent(returnUrl)}` : base;
 }
 
 /** Same builder, opened against an org's own LandingPage instead of a Template.
- *  A top-level sibling route (like /prestate), not nested under /org/ —
+ *  A top-level sibling route (/org-builder), not nested under /org/ —
  *  app/org/layout.tsx wraps every child in OrgAdminShell, which the
  *  full-screen builder must never render inside. */
 export function orgBuilderPath(pageId: string, returnUrl?: string): string {

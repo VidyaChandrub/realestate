@@ -11,7 +11,6 @@ export type ModuleKey =
   | "brand"
   | "headerfooter"
   | "seo"
-  | "tracking"
   | "typography";
 
 export type WidgetCategory =

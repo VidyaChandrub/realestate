@@ -1,5 +1,5 @@
 "use client";
-import type { Device, SectionInstance } from "@/lib/prestate/types";
+import type { Device, SectionInstance } from "@/lib/openpage/types";
 
 export const PREMIUM_CONTAINER = { maxWidth: 1200, paddingX: 24 };
 export const PREMIUM_SPACING = {

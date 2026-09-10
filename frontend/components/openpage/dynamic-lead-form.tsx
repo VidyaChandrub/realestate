@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import type { FormLeadField, SiteConfig } from "@/lib/prestate/types";
-import { isFieldVisible } from "@/lib/prestate/form-logic";
+import type { FormLeadField, SiteConfig } from "@/lib/openpage/types";
+import { isFieldVisible } from "@/lib/openpage/form-logic";
 import { submitLead } from "@/lib/api";
 import { composeLeadSource } from "@/lib/lead-display";
-import { packDynamicLeadFields } from "@/lib/prestate/resolve-form";
-import { firePrestateLead } from "@/components/prestate/tracking-scripts";
-import { bumpTracking } from "@/lib/prestate/tracking";
-import { wtField, wtFieldDark, getWidgetTheme } from "@/lib/prestate/widget-theme";
+import { packDynamicLeadFields } from "@/lib/openpage/resolve-form";
+import { fireTrackingLead } from "@/components/openpage/tracking-scripts";
+import { bumpTracking } from "@/lib/openpage/tracking";
+import { wtField, wtFieldDark, getWidgetTheme } from "@/lib/openpage/widget-theme";
 
 function isValidEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
@@ -100,7 +100,7 @@ export function DynamicLeadForm({
     }
     try {
       if (live && pageId) {
-        firePrestateLead();
+        fireTrackingLead();
         bumpTracking(pageId, "form");
         await submitLead({
           landingPageId: pageId,

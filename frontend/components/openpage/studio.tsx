@@ -14,26 +14,25 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import type { LandingPageData, ModuleKey, SiteConfig } from "@/lib/prestate/types";
-import { loadTemplate, loadTemplates, saveTemplate, saveTemplateNow, createTemplate, publishLandingPage, unpublishLandingPage, type Resource } from "@/lib/prestate/store";
-import { uploadBuilderImage } from "@/lib/prestate/persist";
-import { BuilderUploadProvider, type BuilderImageUploader } from "@/components/prestate/builder/upload-context";
-import { buildThankYouSections } from "@/lib/prestate/page-templates";
-import { builderPath, templatePreviewPath } from "@/lib/prestate/paths";
-import { cloneConfig, ensureConfig } from "@/lib/prestate/site-config";
-import { TopNav } from "@/components/prestate/topnav";
+import type { LandingPageData, ModuleKey, SiteConfig } from "@/lib/openpage/types";
+import { loadTemplate, loadTemplates, saveTemplate, saveTemplateNow, createTemplate, publishLandingPage, unpublishLandingPage, type Resource } from "@/lib/openpage/store";
+import { uploadBuilderImage } from "@/lib/openpage/persist";
+import { BuilderUploadProvider, type BuilderImageUploader } from "@/components/openpage/builder/upload-context";
+import { buildThankYouSections } from "@/lib/openpage/page-templates";
+import { builderPath, templatePreviewPath } from "@/lib/openpage/paths";
+import { cloneConfig, ensureConfig } from "@/lib/openpage/site-config";
+import { TopNav } from "@/components/openpage/topnav";
 import { EditorLayout } from "@/components/openpage/editor/EditorLayout";
 import { OpenPageBridge } from "@/components/openpage/editor/OpenPageBridge";
 import { PopupsModule } from "@/components/openpage/editor/PopupsModule";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { landingPageFromSite } from "@/lib/openpage/content";
-import { FormsModule } from "@/components/prestate/modules/forms";
-import { BrandModule } from "@/components/prestate/modules/brand";
-import { HeaderFooterModule } from "@/components/prestate/modules/headerfooter";
-import { SeoModule } from "@/components/prestate/modules/seo";
-import { TrackingModule } from "@/components/prestate/modules/tracking";
-import { TypographyModule } from "@/components/prestate/modules/typography";
+import { FormsModule } from "@/components/openpage/modules/forms";
+import { BrandModule } from "@/components/openpage/modules/brand";
+import { HeaderFooterModule } from "@/components/openpage/modules/headerfooter";
+import { SeoModule } from "@/components/openpage/modules/seo";
+import { TypographyModule } from "@/components/openpage/modules/typography";
 
 interface Toast {
   id: number;
@@ -68,9 +67,9 @@ function activityLabel(action: string): string {
 
 // Which backend resource this session edits — a Super Admin Template
 // (default) or an org's own LandingPage. Threading this through is the
-// entire org-builder integration: BuilderWorkspace/Canvas/the widget
-// modules are untouched, they just render whatever LandingPageData they're
-// handed, regardless of which REST resource it came from.
+// entire org-builder integration: the OpenPage editor and the config modules
+// are untouched, they just render whatever LandingPageData they're handed,
+// regardless of which REST resource it came from.
 const HOME_PATH: Record<Resource, string> = {
   template: "/admin-console/templates",
   "landing-page": "/org/landing-pages",
@@ -89,7 +88,7 @@ function initialsFor(firstName: string | null | undefined, lastName: string | nu
   return parts.slice(0, 2).map((p) => p[0]?.toUpperCase()).join("");
 }
 
-export function PrestateStudio({ resource = "template" }: { resource?: Resource }) {
+export function OpenPageStudio({ resource = "template" }: { resource?: Resource }) {
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get("returnUrl") || searchParams.get("returnTo") || null;
   const router = useRouter();
@@ -553,16 +552,6 @@ export function PrestateStudio({ resource = "template" }: { resource?: Resource 
             onSelectSite={() => {}}
             onPatch={(fn) => patchConfig(activePage.id, fn)}
             onPatchPage={(patch) => patchPage(activePage.id, patch)}
-            onToast={toast}
-          />
-        ) : null;
-      case "tracking":
-        return activePage ? (
-          <TrackingModule
-            site={activePage}
-            pages={scoped}
-            onSelectSite={() => {}}
-            onPatch={(fn) => patchConfig(activePage.id, fn)}
             onToast={toast}
           />
         ) : null;
