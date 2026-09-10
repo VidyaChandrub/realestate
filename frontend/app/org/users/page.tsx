@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, deleteOrgUser } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { PasswordInput } from "@/components/auth/password-input";
 import { Modal } from "@/components/ui/modal";
@@ -128,6 +128,7 @@ export default function OrgUsersPage() {
   const canAdd = isAdmin || hasPermission("users", "add");
   const canEdit = isAdmin || hasPermission("users", "edit");
   const canApprove = isAdmin || hasPermission("users", "approve");
+  const canDelete = isAdmin || hasPermission("users", "delete");
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -408,6 +409,36 @@ export default function OrgUsersPage() {
       danger: true,
       run: () =>
         runRowAction(user, "disapprove", "Failed to update user access."),
+    });
+  }
+
+  async function deleteUser(user: OrgUser) {
+    if (!accessToken) return;
+    setBusyId(user.id);
+    setRowError(null);
+    try {
+      await deleteOrgUser(user.id);
+      reload();
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to delete user.";
+      setRowError({ id: user.id, message });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function askDelete(user: OrgUser) {
+    setConfirm({
+      title: "Delete user?",
+      message: `${fullName(user.firstName, user.lastName, user.email)} will be permanently removed. Their sessions end immediately and any leads assigned to them become unassigned. This cannot be undone.`,
+      confirmLabel: "Delete user",
+      danger: true,
+      run: () => deleteUser(user),
     });
   }
 
@@ -749,9 +780,13 @@ export default function OrgUsersPage() {
                               {initials(user.firstName, user.lastName)}
                             </span>
                             <span>
-                              <span className="nm">
+                              <Link
+                                className="nm"
+                                href={`/org/users/${user.id}`}
+                                style={{ color: "var(--brand)" }}
+                              >
                                 {fullName(user.firstName, user.lastName, user.email)}
-                              </span>
+                              </Link>
                               <br />
                               <span className="sm">{user.email}</span>
                             </span>
@@ -840,7 +875,18 @@ export default function OrgUsersPage() {
                                 {resentId === user.id ? "Sent " : "Resend Mail"}
                               </button>
                             ) : null}
-                            {!canEdit && !canApprove ? (
+                            {canDelete && user.role?.key !== "admin" ? (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                type="button"
+                                disabled={busyId === user.id}
+                                onClick={() => askDelete(user)}
+                                style={{ color: "var(--rose)" }}
+                              >
+                                Delete
+                              </button>
+                            ) : null}
+                            {!canEdit && !canApprove && !canDelete ? (
                               <span className="muted" style={{ fontSize: 12 }}>
                                 View only
                               </span>

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -16,6 +17,7 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
+import { SalesAgentsService } from '../sales-agents/sales-agents.service';
 import { OrgUsersService } from './org-users.service';
 import { CreateOrgUserDto } from './dto/create-org-user.dto';
 import { UpdateOrgUserDto } from './dto/update-org-user.dto';
@@ -29,7 +31,10 @@ import { ListOrgUsersQueryDto } from './dto/list-org-users-query.dto';
 @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
 @Controller('org/users')
 export class OrgUsersController {
-  constructor(private readonly orgUsersService: OrgUsersService) {}
+  constructor(
+    private readonly orgUsersService: OrgUsersService,
+    private readonly salesAgentsService: SalesAgentsService,
+  ) {}
 
   @RequirePermission('users', 'view')
   @Get()
@@ -47,6 +52,25 @@ export class OrgUsersController {
   @Get(':id')
   getById(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {
     return this.orgUsersService.getById(actor.orgId as string, id);
+  }
+
+  // Live per-user performance dashboard (lead pipeline, closures, revenue,
+  // calls, activity) — the same payload the Sales Agents dashboard renders,
+  // but available for any org member regardless of role.
+  @RequirePermission('users', 'view')
+  @Get(':id/dashboard')
+  dashboard(
+    @CurrentUser() actor: JwtPayload,
+    @Param('id') id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.salesAgentsService.userDashboard(
+      actor.orgId as string,
+      actor,
+      id,
+      { from, to },
+    );
   }
 
   @RequirePermission('users', 'edit')
@@ -104,5 +128,15 @@ export class OrgUsersController {
   @HttpCode(200)
   resendInvite(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {
     return this.orgUsersService.resendInvite(actor.orgId as string, id);
+  }
+
+  // Permanently remove a member. Blocked for organisation admins and for the
+  // caller's own account. Related rows (roles, sessions, call logs, activity)
+  // cascade; assigned leads are unassigned (FK ON DELETE SET NULL).
+  @RequirePermission('users', 'delete')
+  @Delete(':id')
+  @HttpCode(200)
+  remove(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {
+    return this.orgUsersService.remove(actor.orgId as string, id, actor.sub);
   }
 }

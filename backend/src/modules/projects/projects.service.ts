@@ -444,21 +444,22 @@ export class ProjectsService {
 
     const unique = [...new Set(userIds)];
     if (unique.length > 0) {
-      // Every id must be a Sales-role user in the caller's own org — never
-      // trusted from the body. The picker only shows sales users, but a
-      // direct API call must not be able to attach an admin/manager. Role
+      // Every id must be a user in the caller's own org who is NOT an admin or
+      // a manager — never trusted from the body. Any other role (sales,
+      // telecaller, custom, …) may work a project's leads. The picker mirrors
+      // this; a direct API call still can't attach an admin/manager. Role
       // check uses the same `userRoles.some.role.key` shape as
       // org-users.util.ts / admin-organisations.service.ts.
       const count = await this.prisma.user.count({
         where: {
           id: { in: unique },
           orgId,
-          userRoles: { some: { role: { key: 'sales' } } },
+          userRoles: { none: { role: { key: { in: ['admin', 'manager'] } } } },
         },
       });
       if (count !== unique.length) {
         throw new BadRequestException(
-          'Every assigned agent must be a Sales-role user in your organisation',
+          'Assigned agents must be users in your organisation and cannot be admins or managers',
         );
       }
     }

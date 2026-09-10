@@ -49,6 +49,7 @@ import type {
   ResumeSignupResponse,
   ReviewOrgDomainRequestInput,
   SalesAgentDetailResponse,
+  OrgUserDashboardResponse,
   SalesAgentsListResponse,
   SignupStep1Response,
   SubdomainAvailability,
@@ -526,6 +527,28 @@ export function getSalesAgents(): Promise<SalesAgentsListResponse> {
 
 export function getSalesAgent(id: string): Promise<SalesAgentDetailResponse> {
   return apiFetch<SalesAgentDetailResponse>(`/org/sales-agents/${id}`);
+}
+
+// Per-user performance dashboard shown when an admin opens a member from the
+// Users list. Same payload as the sales-agent dashboard. An optional
+// capture-date window (from / to, both YYYY-MM-DD) scopes every metric.
+export function getOrgUserDashboard(
+  id: string,
+  opts?: { from?: string; to?: string },
+): Promise<OrgUserDashboardResponse> {
+  const qs = new URLSearchParams();
+  if (opts?.from) qs.set("from", opts.from);
+  if (opts?.to) qs.set("to", opts.to);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<OrgUserDashboardResponse>(
+    `/org/users/${id}/dashboard${suffix}`,
+  );
+}
+
+export function deleteOrgUser(id: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/org/users/${id}`, {
+    method: "DELETE",
+  });
 }
 
 // --- Organisation domain identity (subdomain + custom domain) ---
