@@ -2244,3 +2244,94 @@ export interface AdminDashboardResponse {
   recentOrganisations: AdminDashboardOrgRow[];
   pendingRequests: AdminDashboardPendingRequest[];
 }
+
+// --- Teams (org/teams) -------------------------------------------------
+// Per-member seniority label — its own namespace, unrelated to the org-wide
+// Role/RBAC system (see OrgUserRole). "telecaller" exists independently in
+// both by coincidence only.
+export type TeamMemberRoleValue =
+  | "team_lead"
+  | "sr_agent"
+  | "sales_agent"
+  | "telecaller"
+  | "viewer";
+
+export interface TeamLeadSummary {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  name: string;
+}
+
+export interface TeamMemberPreview {
+  id: string;
+  name: string;
+}
+
+export type TeamStatus = "active" | "inactive";
+
+export interface Team {
+  id: string;
+  orgId: string;
+  name: string;
+  status: TeamStatus;
+  region: string | null;
+  workingHours: string | null;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+  teamLead: TeamLeadSummary | null;
+  memberCount: number;
+  projectCount: number;
+  memberPreviews: TeamMemberPreview[];
+  /** Real, derived from Lead.assignedToId + status — not yet won/lost. */
+  activeLeads: number;
+  /** Real: won ÷ (won + lost) among this team's members' leads, rounded. */
+  conversionPct: number;
+}
+
+export interface TeamMemberRow {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  name: string;
+  role: TeamMemberRoleValue;
+  joinedAt: string;
+  activeLeads: number;
+  conversionPct: number;
+}
+
+export interface TeamProjectRow {
+  id: string;
+  name: string;
+  assignedAt: string;
+}
+
+export interface TeamDetail extends Team {
+  members: TeamMemberRow[];
+  projects: TeamProjectRow[];
+}
+
+export interface CreateTeamInput {
+  name: string;
+  teamLeadId?: string;
+  region?: string;
+  workingHours?: string;
+  description?: string;
+}
+
+export interface UpdateTeamInput {
+  name?: string;
+  status?: TeamStatus;
+  teamLeadId?: string | null;
+  region?: string | null;
+  workingHours?: string | null;
+  description?: string | null;
+}
+
+export interface SetTeamMembersInput {
+  userId: string;
+  role: TeamMemberRoleValue;
+}

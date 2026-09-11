@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
@@ -43,6 +44,7 @@ function sourceBadgeClass(source: string | null): string {
 }
 
 export default function OrgLeadsPage() {
+  const searchParams = useSearchParams();
   const { isOrgAdmin, hasPermission } = useAuth();
   const { label: stageLabel } = useLeadStages();
   const admin = Boolean(isOrgAdmin?.());
@@ -65,7 +67,7 @@ export default function OrgLeadsPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState(() => searchParams.get("assignedTo") ?? "");
   const [addOpen, setAddOpen] = useState(false);
 
   const load = useCallback(async () => {
