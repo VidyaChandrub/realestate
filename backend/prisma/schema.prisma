@@ -256,6 +256,8 @@ model User {
   notifications   Notification[]
   createdUnits    Unit[]                 @relation("UnitCreatedBy")
   updatedUnits    Unit[]                 @relation("UnitUpdatedBy")
+  managedUnits    Unit[]                 @relation("UnitManager")
+  unitSalesAgentAssignments UnitSalesAgent[]
 
   @@map("users")
   @@schema("identity")
@@ -1243,6 +1245,12 @@ model Unit {
   galleryUrls  String[] @default([]) @map("gallery_urls")
 
   status    UnitStatus @default(available)
+  // Access/assignment for a unit, mirroring Project.managerId +
+  // Project.salesAgents but at the single-unit level. A project-bound unit
+  // normally inherits its access from the project; these mainly matter for a
+  // *standalone* unit, which has no project to inherit from. Nullable;
+  // ON DELETE SET NULL keeps the unit when the manager is removed.
+  managerId String? @map("manager_id")
   // Who created / last touched this unit, from the JWT. Nullable: rows written
   // before these columns existed have no actor, and ON DELETE SET NULL keeps a
   // unit when the user is removed. Complements the audit_logs trail (which
@@ -1253,14 +1261,34 @@ model Unit {
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
 
-  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  project      Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy    User?        @relation("UnitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy    User?        @relation("UnitUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  organisation Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  manager      User?            @relation("UnitManager", fields: [managerId], references: [id], onDelete: SetNull)
+  createdBy    User?            @relation("UnitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?            @relation("UnitUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  salesAgents  UnitSalesAgent[]
 
   @@index([orgId])
   @@index([projectId])
+  @@index([managerId])
   @@map("units")
+  @@schema("projects")
+}
+
+// A standalone unit's assigned agents — same shape as ProjectSalesAgent, one
+// level down. A project-bound unit is worked by its project's sales team; a
+// unit with no project needs its own set.
+model UnitSalesAgent {
+  unitId     String   @map("unit_id")
+  userId     String   @map("user_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([unitId, userId])
+  @@index([userId])
+  @@map("unit_sales_agents")
   @@schema("projects")
 }
 

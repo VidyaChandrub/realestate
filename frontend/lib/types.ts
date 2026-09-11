@@ -1039,6 +1039,11 @@ export interface Unit {
   floorPlanUrl: string | null;
   galleryUrls: string[];
   status: UnitStatus;
+  /** Assignment — mainly meaningful for a standalone unit (a project-bound
+   *  unit inherits access from its project's manager/sales team instead). */
+  managerId: string | null;
+  manager: UnitActor | null;
+  salesAgentIds: string[];
   createdById: string | null;
   updatedById: string | null;
   /** Who created / last edited this unit. Null on rows written before this existed. */
@@ -1266,6 +1271,10 @@ export interface CreateUnitInput {
   addressLine?: string;
   ownerName?: string;
   notes?: string;
+  /** Standalone-listing assignment (ignored for a project-bound unit, which
+   *  inherits access from its project's manager / sales team instead). */
+  managerId?: string;
+  salesAgentIds?: string[];
   /** Media — public R2 URLs. */
   floorPlanUrl?: string;
   galleryUrls?: string[];
@@ -1285,6 +1294,7 @@ export type UpdateUnitInput = Partial<
     | "ownerName"
     | "notes"
     | "floorPlanUrl"
+    | "managerId"
   >
 > & {
   /** value to set, or explicit null to clear. */
@@ -1300,6 +1310,10 @@ export type UpdateUnitInput = Partial<
   notes?: string | null;
   floorPlanUrl?: string | null;
   galleryUrls?: string[];
+  /** null clears the manager. */
+  managerId?: string | null;
+  /** Full-set replace — omit to leave the current agents untouched, `[]` to clear all. */
+  salesAgentIds?: string[];
 };
 
 /** One row of the cross-project "All Units" list (GET /org/units). */

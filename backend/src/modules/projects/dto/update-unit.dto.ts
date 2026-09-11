@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayUnique,
   IsArray,
   IsIn,
   IsInt,
@@ -8,6 +9,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -95,6 +97,21 @@ export class UpdateUnitDto {
   @IsString()
   @MaxLength(2000)
   notes?: string | null;
+
+  // --- Standalone-listing assignment: mirrors Project.managerId / sales
+  // agents, one level down. Ignored for project units (see create-unit.dto).
+  // `managerId: null` clears the manager; `salesAgentIds` is a full-set
+  // replace — omit to leave the current agents untouched, `[]` to clear all. ---
+  @IsOptional()
+  @IsUUID()
+  managerId?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  salesAgentIds?: string[];
 
   @IsOptional()
   @IsUrl({ require_protocol: true })

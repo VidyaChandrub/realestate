@@ -8,6 +8,7 @@ import {
   apiFetch,
   createStandaloneUnit,
   getOrgCatalogOptions,
+  getProjectSalesAgentCandidates,
 } from "@/lib/api";
 import { parseAmount, parseCount, parseInteger } from "@/lib/parse";
 import { formatMoney } from "@/lib/money";
@@ -25,7 +26,10 @@ import {
 import "@/app/org/org.css";
 import type {
   CreateUnitInput,
+  CrmAssignableUser,
   OrgCatalogOption,
+  OrgUser,
+  OrgUsersListResponse,
   ProjectsListResponse,
   ProjectListRow,
   ProjectDetail,
@@ -49,6 +53,10 @@ const STATUS_BADGE: Record<UnitStatus, string> = {
   held: "b-amber",
   sold: "b-gray",
 };
+
+function userLabel(u: OrgUser): string {
+  return [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
+}
 
 export default function UnitCreatePage() {
   const router = useRouter();
@@ -86,6 +94,16 @@ export default function UnitCreatePage() {
   const [addressLine, setAddressLine] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Standalone-only assignment (a project unit inherits access from its
+  // project's manager / sales team instead). Same eligibility rule as a
+  // project's Team & access section.
+  const [managerId, setManagerId] = useState("");
+  const [managers, setManagers] = useState<OrgUser[]>([]);
+  const [agentAssign, setAgentAssign] = useState<string[]>([]);
+  const [salesAgentCandidates, setSalesAgentCandidates] = useState<
+    CrmAssignableUser[]
+  >([]);
 
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -127,6 +145,25 @@ export default function UnitCreatePage() {
               ? e.message
               : "Couldn't load configuration options.",
           );
+      });
+    // Standalone-unit assignment pickers — same org-level lists the project
+    // Team & access section uses.
+    apiFetch<OrgUsersListResponse>(
+      "/org/users?role=manager&limit=100&status=active",
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+      .then((res) => {
+        if (!cancelled) setManagers(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setManagers([]);
+      });
+    getProjectSalesAgentCandidates()
+      .then((res) => {
+        if (!cancelled) setSalesAgentCandidates(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setSalesAgentCandidates([]);
       });
     return () => {
       cancelled = true;
@@ -270,6 +307,11 @@ export default function UnitCreatePage() {
         addressLine: addressLine.trim() || undefined,
         ownerName: ownerName.trim() || undefined,
         notes: notes.trim() || undefined,
+        // Assignment only applies to a standalone unit — a project unit
+        // inherits access from its project instead.
+        managerId: standalone ? managerId || undefined : undefined,
+        salesAgentIds:
+          standalone && agentAssign.length ? agentAssign : undefined,
       };
       if (standalone) {
         const created = await createStandaloneUnit(body);
@@ -550,6 +592,57 @@ export default function UnitCreatePage() {
                 </div>
               </div>
             </div>
+
+            {standalone ? (
+              <div className="sec">
+                <div className="lbl"><Icon name="users" size={15} /> Team &amp; access</div>
+                <div className="grid g2">
+                  <div className="field">
+                    <label>Manager</label>
+                    <select
+                      className="inp"
+                      value={managerId}
+                      onChange={(e) => setManagerId(e.target.value)}
+                    >
+                      <option value="">Unassigned</option>
+                      {managers.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {userLabel(u)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="field mb-0">
+                  <label>Assign sales agents</label>
+                  {salesAgentCandidates.length === 0 ? (
+                    <div className="hint">No assignable users in your organisation yet — add them under Users.</div>
+                  ) : (
+                    <div className="opts">
+                      {salesAgentCandidates.map((u) => {
+                        const on = agentAssign.includes(u.id);
+                        return (
+                          <span
+                            key={u.id}
+                            className={`opt ${on ? "on" : ""}`}
+                            onClick={() =>
+                              setAgentAssign((prev) =>
+                                on ? prev.filter((x) => x !== u.id) : [...prev, u.id],
+                              )
+                            }
+                          >
+                            <span className="b">{on ? "✓" : ""}</span>{u.name}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="hint">
+                    Controls whose All Units list this shows up in — org admins always see every unit.
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <div className="sec">
               <div className="lbl"><Icon name="document" size={15} /> Media &amp; documents</div>

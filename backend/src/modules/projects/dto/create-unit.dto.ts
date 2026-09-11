@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayUnique,
   IsArray,
   IsIn,
   IsInt,
@@ -8,6 +9,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -107,6 +109,21 @@ export class CreateUnitDto {
   @IsString()
   @MaxLength(2000)
   notes?: string;
+
+  // --- Standalone-listing assignment: mirrors Project.managerId / sales
+  // agents, one level down. A project-bound unit inherits access from its
+  // project instead, so the UI never sends these for that path — accepted
+  // here regardless and just left unused, same as the fields above. ---
+  @IsOptional()
+  @IsUUID()
+  managerId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  salesAgentIds?: string[];
 
   // --- Media (public R2 URLs from POST /org/projects/upload-url). ---
   @IsOptional()

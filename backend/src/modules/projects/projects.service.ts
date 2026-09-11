@@ -79,6 +79,8 @@ const UNIT_ACTOR_SELECT = {
 const UNIT_INCLUDE = {
   createdBy: UNIT_ACTOR_SELECT,
   updatedBy: UNIT_ACTOR_SELECT,
+  manager: UNIT_ACTOR_SELECT,
+  salesAgents: { select: { userId: true } },
 } satisfies Prisma.UnitInclude;
 
 type UnitRow = Prisma.UnitGetPayload<{ include: typeof UNIT_INCLUDE }>;
@@ -450,24 +452,49 @@ export class ProjectsService {
     }));
   }
 
+  /**
+   * Every id must be someone the shared "who can hold a lead" rule allows —
+   * never trusted from the body. Same list `listSalesAgentCandidates` shows,
+   * so a direct API call can't attach anyone the picker wouldn't offer. Used
+   * by both a project's sales agents and a standalone unit's.
+   *
+   * Callers must pass only the ids being newly added to the set, not the
+   * whole resubmitted list — an id that's already assigned may have since
+   * gone inactive or lost CRM access (a role/permission change made after
+   * they were assigned), and re-saving the *same* set, or removing a
+   * *different* agent, must not be blocked by that. Eligibility only gates
+   * adding someone new.
+   */
+  private async assertAssignableAgents(orgId: string, userIds: string[]) {
+    if (userIds.length === 0) return;
+    const eligible = new Set(
+      (await listLeadAssignableUsers(this.prisma, orgId)).map((u) => u.id),
+    );
+    if (!userIds.every((id) => eligible.has(id))) {
+      throw new BadRequestException(
+        'Assigned agents must be organisation members who can be assigned leads (not admins or managers)',
+      );
+    }
+  }
+
   async setSalesAgents(orgId: string, projectId: string, userIds: string[]) {
     await this.getOwnedProject(orgId, projectId);
 
     const unique = [...new Set(userIds)];
-    if (unique.length > 0) {
-      // Every id must be someone the shared "who can hold a lead" rule allows —
-      // never trusted from the body. Same list the picker shows
-      // (listSalesAgentCandidates), so a direct API call can't attach anyone
-      // the dropdown wouldn't offer.
-      const eligible = new Set(
-        (await listLeadAssignableUsers(this.prisma, orgId)).map((u) => u.id),
-      );
-      if (!unique.every((id) => eligible.has(id))) {
-        throw new BadRequestException(
-          'Assigned agents must be organisation members who can be assigned leads (not admins or managers)',
-        );
-      }
-    }
+    // Only ids being newly added need to pass the eligibility check (see
+    // assertAssignableAgents) — dropping or re-saving an already-assigned
+    // agent must always be possible, even if they'd no longer be offered by
+    // the picker today.
+    const currentIds = new Set(
+      (
+        await this.prisma.projectSalesAgent.findMany({
+          where: { projectId },
+          select: { userId: true },
+        })
+      ).map((r) => r.userId),
+    );
+    const newIds = unique.filter((id) => !currentIds.has(id));
+    await this.assertAssignableAgents(orgId, newIds);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.projectSalesAgent.deleteMany({ where: { projectId } });
@@ -879,6 +906,9 @@ export class ProjectsService {
     // Standalone units belong to no project, so the org catalog is the scope.
     await this.assertConfigurationInCatalog(orgId, dto.configuration);
     await this.assertVariantInCatalog(orgId, dto.variantLabel);
+    if (dto.managerId) await this.assertOrgUser(orgId, dto.managerId);
+    const agentIds = [...new Set(dto.salesAgentIds ?? [])];
+    await this.assertAssignableAgents(orgId, agentIds);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const row = await tx.unit.create({
@@ -901,10 +931,16 @@ export class ProjectsService {
           floorPlanUrl: dto.floorPlanUrl ?? null,
           galleryUrls: dto.galleryUrls ?? [],
           status: dto.status ?? 'available',
+          managerId: dto.managerId ?? null,
           createdById: actorId ?? null,
           updatedById: actorId ?? null,
         },
       });
+      if (agentIds.length > 0) {
+        await tx.unitSalesAgent.createMany({
+          data: agentIds.map((userId) => ({ unitId: row.id, userId })),
+        });
+      }
       await tx.auditLog.create({
         data: {
           orgId,
@@ -947,6 +983,25 @@ export class ProjectsService {
         existing.variantLabel,
       );
     }
+    if (dto.managerId !== undefined && dto.managerId) {
+      await this.assertOrgUser(orgId, dto.managerId);
+    }
+    // Full-set replace, like a project's sales agents: omit the field to
+    // leave the current agents untouched, send `[]` to clear them all. Only
+    // newly-added ids need to pass the eligibility check (see
+    // assertAssignableAgents) — dropping or re-saving an already-assigned
+    // agent must always be possible.
+    let nextAgentIds: string[] | undefined;
+    if (dto.salesAgentIds !== undefined) {
+      nextAgentIds = [...new Set(dto.salesAgentIds)];
+      const currentAgentIds = new Set(
+        existing.salesAgents.map((row) => row.userId),
+      );
+      const newAgentIds = nextAgentIds.filter(
+        (uid) => !currentAgentIds.has(uid),
+      );
+      await this.assertAssignableAgents(orgId, newAgentIds);
+    }
 
     const data: Prisma.UnitUncheckedUpdateInput = {};
     if (dto.configuration !== undefined) {
@@ -984,10 +1039,19 @@ export class ProjectsService {
     }
     if (dto.floorPlanUrl !== undefined) data.floorPlanUrl = dto.floorPlanUrl;
     if (dto.galleryUrls !== undefined) data.galleryUrls = dto.galleryUrls;
+    if (dto.managerId !== undefined) data.managerId = dto.managerId || null;
     data.updatedById = actorId ?? null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.unit.update({ where: { id }, data });
+      if (nextAgentIds !== undefined) {
+        await tx.unitSalesAgent.deleteMany({ where: { unitId: id } });
+        if (nextAgentIds.length > 0) {
+          await tx.unitSalesAgent.createMany({
+            data: nextAgentIds.map((userId) => ({ unitId: id, userId })),
+          });
+        }
+      }
       await tx.auditLog.create({
         data: {
           orgId,
@@ -1037,7 +1101,11 @@ export class ProjectsService {
   // tiles don't need a second request.
   // -------------------------------------------------------------------------
 
-  async listAllUnits(orgId: string, query: ListOrgUnitsQueryDto) {
+  async listAllUnits(
+    orgId: string,
+    query: ListOrgUnitsQueryDto,
+    actor?: JwtPayload,
+  ) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
@@ -1047,6 +1115,29 @@ export class ProjectsService {
     if (query.status) where.status = query.status;
     if (query.search) {
       where.unitNo = { contains: query.search, mode: 'insensitive' };
+    }
+
+    // Non-admin members only see units they have access to: a project-bound
+    // unit if they manage that project or are one of its assigned sales
+    // agents, or a standalone unit they were directly assigned to as manager
+    // or sales agent. Mirrors ProjectsService.list's own-project scoping —
+    // without this, "All Units" leaked every project's inventory to whoever
+    // could open the page.
+    if (
+      actor &&
+      !actor.roles?.includes('admin') &&
+      !actor.roles?.includes('super_admin')
+    ) {
+      where.AND = [
+        {
+          OR: [
+            { project: { managerId: actor.sub } },
+            { project: { salesAgents: { some: { userId: actor.sub } } } },
+            { projectId: null, managerId: actor.sub },
+            { projectId: null, salesAgents: { some: { userId: actor.sub } } },
+          ],
+        },
+      ];
     }
 
     const [rows, total, grouped, basis] = await Promise.all([
@@ -1497,6 +1588,11 @@ export class ProjectsService {
       floorPlanUrl: unit.floorPlanUrl,
       galleryUrls: unit.galleryUrls,
       status: unit.status,
+      // Assignment — mainly meaningful for a standalone unit (no project to
+      // inherit access from); null/empty for a project-bound unit today.
+      managerId: unit.managerId,
+      manager: this.serializeActor(unit.manager),
+      salesAgentIds: unit.salesAgents.map((row) => row.userId),
       createdById: unit.createdById,
       updatedById: unit.updatedById,
       createdBy: this.serializeActor(unit.createdBy),
