@@ -28,6 +28,13 @@ import type {
   ModulesStepInput,
   ModulesStepResponse,
   NotificationsListResponse,
+  OrgNotificationsListResponse,
+  CreateSupportTicketInput,
+  CreateSupportMessageInput,
+  ListSupportTicketsParams,
+  SupportMessage,
+  SupportTicketDetailResponse,
+  SupportTicketsListResponse,
   OrgCatalogCategory,
   LandingPageRow,
   OrgCatalogOption,
@@ -692,6 +699,131 @@ export async function markAllNotificationsRead(): Promise<{
   success: boolean;
 }> {
   return apiFetch<{ success: boolean }>("/admin/notifications/read-all", {
+    method: "POST",
+  });
+}
+
+// --- Org member's own bell (mirrors the Super Admin notifications above) ---
+
+export async function getOrgNotifications(params?: {
+  page?: number;
+  limit?: number;
+  unreadOnly?: boolean;
+}): Promise<OrgNotificationsListResponse> {
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.unreadOnly) q.set("unreadOnly", "true");
+  const s = q.toString();
+  return apiFetch<OrgNotificationsListResponse>(
+    `/org/notifications${s ? `?${s}` : ""}`,
+  );
+}
+
+export async function getOrgUnreadNotifications(): Promise<UnreadNotificationsResponse> {
+  return apiFetch<UnreadNotificationsResponse>("/org/notifications/unread-count");
+}
+
+export async function markOrgNotificationRead(id: string): Promise<{ id: string }> {
+  return apiFetch<{ id: string }>(`/org/notifications/${id}/read`, {
+    method: "PATCH",
+  });
+}
+
+export async function markAllOrgNotificationsRead(): Promise<{
+  success: boolean;
+}> {
+  return apiFetch<{ success: boolean }>("/org/notifications/read-all", {
+    method: "POST",
+  });
+}
+
+// --- Support & Help (org side) / Support Management (Super Admin) ----------
+// Plain REST, no websockets — the ticket detail pages poll on an interval.
+
+function supportQueryString(params?: ListSupportTicketsParams): string {
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.status) q.set("status", params.status);
+  if (params?.search) q.set("search", params.search);
+  if (params?.orgId) q.set("orgId", params.orgId);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export function createSupportUploadUrl(input: {
+  filename: string;
+  contentType: string;
+  size: number;
+}): Promise<LogoUploadUrlResult> {
+  return apiFetch<LogoUploadUrlResult>("/org/support/upload-url", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function createSupportTicket(
+  input: CreateSupportTicketInput,
+): Promise<SupportTicketDetailResponse> {
+  return apiFetch<SupportTicketDetailResponse>("/org/support", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getSupportTickets(
+  params?: ListSupportTicketsParams,
+): Promise<SupportTicketsListResponse> {
+  return apiFetch<SupportTicketsListResponse>(
+    `/org/support${supportQueryString(params)}`,
+  );
+}
+
+export function getSupportTicket(id: string): Promise<SupportTicketDetailResponse> {
+  return apiFetch<SupportTicketDetailResponse>(`/org/support/${id}`);
+}
+
+export function addSupportMessage(
+  id: string,
+  input: CreateSupportMessageInput,
+): Promise<SupportMessage> {
+  return apiFetch<SupportMessage>(`/org/support/${id}/messages`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// --- Support Management (Super Admin console) ---
+
+export function getAdminSupportTickets(
+  params?: ListSupportTicketsParams,
+): Promise<SupportTicketsListResponse> {
+  return apiFetch<SupportTicketsListResponse>(
+    `/admin/support${supportQueryString(params)}`,
+  );
+}
+
+export function getAdminSupportTicket(
+  id: string,
+): Promise<SupportTicketDetailResponse> {
+  return apiFetch<SupportTicketDetailResponse>(`/admin/support/${id}`);
+}
+
+export function addAdminSupportMessage(
+  id: string,
+  input: CreateSupportMessageInput,
+): Promise<SupportMessage> {
+  return apiFetch<SupportMessage>(`/admin/support/${id}/messages`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function closeAdminSupportTicket(
+  id: string,
+): Promise<SupportTicketDetailResponse> {
+  return apiFetch<SupportTicketDetailResponse>(`/admin/support/${id}/close`, {
     method: "POST",
   });
 }

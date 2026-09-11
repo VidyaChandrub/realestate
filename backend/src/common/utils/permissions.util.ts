@@ -42,6 +42,7 @@ export const PERMISSION_MODULES: ModuleDefinition[] = [
   { key: 'integrations', label: 'Integrations', description: 'Connected apps and channels' },
   { key: 'billing', label: 'Billing', description: 'Plan, subscription and invoices' },
   { key: 'settings', label: 'Settings', description: 'Organisation settings and profile' },
+  { key: 'support', label: 'Support & Help', description: 'Raise support tickets and chat with the iPixxel team' },
 ];
 
 export type PermissionModuleKey = (typeof PERMISSION_MODULES)[number]['key'];
@@ -63,6 +64,7 @@ export const PLATFORM_PERMISSION_MODULES: ModuleDefinition[] = [
   { key: 'admin_email', label: 'Email & SMTP', description: 'Platform email delivery and logs' },
   { key: 'admin_audit_logs', label: 'Audit logs', description: 'Platform audit history' },
   { key: 'admin_settings', label: 'Settings', description: 'Platform configuration' },
+  { key: 'admin_support', label: 'Support Management', description: "Organisations' support tickets and conversations" },
 ];
 
 export const PLATFORM_PERMISSION_MODULE_KEYS = PLATFORM_PERMISSION_MODULES.map(
@@ -86,6 +88,7 @@ export const PLATFORM_ROUTE_MODULES: Array<{ prefix: string; module: string }> =
   { prefix: '/admin/dashboard', module: 'admin_dashboard' },
   { prefix: '/admin/roles', module: 'admin_org_roles' },
   { prefix: '/admin/audit-logs', module: 'admin_audit_logs' },
+  { prefix: '/admin/support', module: 'admin_support' },
 ];
 
 export function platformModuleForPath(path: string): string | null {

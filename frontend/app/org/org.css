@@ -541,6 +541,28 @@
   border: 2px solid var(--surface);
 }
 
+/* Numeric unread badge (e.g. the notification bell) — same treatment as the
+   Super Admin console's .nb-count, so both portals read the same way. */
+.org .icon-btn .count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--rose);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.4);
+  line-height: 1;
+}
+
 .org .tb-avatar {
   width: 40px;
   height: 40px;
