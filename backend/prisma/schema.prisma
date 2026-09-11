@@ -203,6 +203,7 @@ model Organisation {
   leadStageDisplays     OrgLeadStageDisplay[]
   units                 Unit[]
   emailConfig           EmailConfig?
+  supportTickets        SupportTicket[]
 
   @@map("organisations")
   @@schema("identity")
@@ -256,6 +257,11 @@ model User {
   notifications   Notification[]
   createdUnits    Unit[]                 @relation("UnitCreatedBy")
   updatedUnits    Unit[]                 @relation("UnitUpdatedBy")
+  managedUnits    Unit[]                 @relation("UnitManager")
+  unitSalesAgentAssignments UnitSalesAgent[]
+  raisedSupportTickets SupportTicket[]   @relation("SupportTicketRaisedBy")
+  closedSupportTickets SupportTicket[]   @relation("SupportTicketClosedBy")
+  sentSupportMessages  SupportMessage[]  @relation("SupportMessageSender")
 
   @@map("users")
   @@schema("identity")
@@ -479,6 +485,13 @@ enum NotificationType {
   custom_domain_request
   organisation_approved
   organisation_rejected
+  // Support ticket lifecycle — support_ticket_created / _message fan out to
+  // "all super admins" (recipientId null, same as the org-registration rows
+  // above); support_ticket_status_changed is addressed to the org member who
+  // raised the ticket. See SupportService.
+  support_ticket_created
+  support_ticket_message
+  support_ticket_status_changed
 
   @@schema("audit")
 }
@@ -490,7 +503,7 @@ model Notification {
   type        NotificationType
   title       String
   body        String?
-  entity      String? // e.g. "Organisation" | "OrgDomainRequest"
+  entity      String? // e.g. "Organisation" | "OrgDomainRequest" | "SupportTicket"
   entityId    String?          @map("entity_id")
   readAt      DateTime?        @map("read_at")
   createdAt   DateTime         @default(now()) @map("created_at")
@@ -501,6 +514,80 @@ model Notification {
   @@index([recipientId, readAt])
   @@index([type])
   @@map("notifications")
+  @@schema("audit")
+}
+
+// ---------------------------------------------------------------------------
+// Support tickets — an org member raises an issue to the Platform Team and
+// the two sides chat in a threaded conversation (SupportMessage). Status
+// starts `open`, moves to `ongoing` once either side has replied, and only
+// becomes `resolved` when a Super Admin closes the ticket — the org side
+// never sets `resolved` directly. Plain REST + polling, no websockets.
+// ---------------------------------------------------------------------------
+
+enum SupportTicketStatus {
+  open
+  ongoing
+  resolved
+
+  @@schema("audit")
+}
+
+enum SupportTicketPriority {
+  normal
+  high
+  urgent
+
+  @@schema("audit")
+}
+
+model SupportTicket {
+  id         String                @id @default(uuid())
+  // Human-friendly per-org ticket number ("SR-1", "SR-2", …) — count of the
+  // org's existing tickets + 1 at creation time (see SupportService.create),
+  // not a global sequence, so it reads naturally regardless of how many
+  // other orgs are on the platform.
+  number     Int
+  orgId      String                @map("org_id")
+  raisedById String                @map("raised_by_id")
+  subject    String
+  category   String
+  priority   SupportTicketPriority @default(normal)
+  status     SupportTicketStatus   @default(open)
+  closedAt   DateTime?             @map("closed_at")
+  closedById String?               @map("closed_by_id")
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+
+  organisation Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  raisedBy     User             @relation("SupportTicketRaisedBy", fields: [raisedById], references: [id], onDelete: Cascade)
+  closedBy     User?            @relation("SupportTicketClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  messages     SupportMessage[]
+
+  @@unique([orgId, number])
+  @@index([orgId])
+  @@index([status])
+  @@map("support_tickets")
+  @@schema("audit")
+}
+
+// One chat message in a ticket's thread. `senderId` is always a User row —
+// an org member (their own org's ticket) or a Platform Team member (any
+// ticket) — so "which side sent this" is derived from sender.orgId at read
+// time rather than a stored flag.
+model SupportMessage {
+  id             String   @id @default(uuid())
+  ticketId       String   @map("ticket_id")
+  senderId       String   @map("sender_id")
+  body           String
+  attachmentUrls String[] @default([]) @map("attachment_urls")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User          @relation("SupportMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("support_messages")
   @@schema("audit")
 }
 
@@ -1243,6 +1330,12 @@ model Unit {
   galleryUrls  String[] @default([]) @map("gallery_urls")
 
   status    UnitStatus @default(available)
+  // Access/assignment for a unit, mirroring Project.managerId +
+  // Project.salesAgents but at the single-unit level. A project-bound unit
+  // normally inherits its access from the project; these mainly matter for a
+  // *standalone* unit, which has no project to inherit from. Nullable;
+  // ON DELETE SET NULL keeps the unit when the manager is removed.
+  managerId String? @map("manager_id")
   // Who created / last touched this unit, from the JWT. Nullable: rows written
   // before these columns existed have no actor, and ON DELETE SET NULL keeps a
   // unit when the user is removed. Complements the audit_logs trail (which
@@ -1253,14 +1346,34 @@ model Unit {
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
 
-  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  project      Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy    User?        @relation("UnitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  updatedBy    User?        @relation("UnitUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  organisation Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  manager      User?            @relation("UnitManager", fields: [managerId], references: [id], onDelete: SetNull)
+  createdBy    User?            @relation("UnitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?            @relation("UnitUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  salesAgents  UnitSalesAgent[]
 
   @@index([orgId])
   @@index([projectId])
+  @@index([managerId])
   @@map("units")
+  @@schema("projects")
+}
+
+// A standalone unit's assigned agents — same shape as ProjectSalesAgent, one
+// level down. A project-bound unit is worked by its project's sales team; a
+// unit with no project needs its own set.
+model UnitSalesAgent {
+  unitId     String   @map("unit_id")
+  userId     String   @map("user_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([unitId, userId])
+  @@index([userId])
+  @@map("unit_sales_agents")
   @@schema("projects")
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -9,6 +9,14 @@ import { dashboardPathFor } from "@/lib/mock/sessions";
 import { Icon, type IconName } from "@/components/icons";
 import { loadTemplates } from "@/lib/openpage/store";
 import { orgBuilderPath } from "@/lib/openpage/paths";
+import {
+  getOrgNotifications,
+  getOrgUnreadNotifications,
+  markAllOrgNotificationsRead,
+  markOrgNotificationRead,
+} from "@/lib/api";
+import type { OrgNotification } from "@/lib/types";
+import { useToast } from "@/components/ui/toast";
 
 type NavItem = {
   href: string;
@@ -62,6 +70,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/org/integrations", icon: "integrations", label: "Integrations", tip: "Integrations" },
       { href: "/org/settings", icon: "settings", label: "Settings", tip: "Organisation Settings" },
+      { href: "/org/support", icon: "flag", label: "Support & Help", tip: "Support & Help" },
     ],
   },
 ];
@@ -94,8 +103,27 @@ const CRUMB_MAP: Record<string, string> = {
   "/org/roles-permissions": "Roles & Permissions",
   "/org/publish-approvals": "Publish & Approvals",
   "/org/settings": "Organisation Settings",
-  "/org/support": "Support",
+  "/org/support": "Support & Help",
 };
+
+// Accent dot colour per notification type, same palette the mock data used.
+const NOTIFICATION_ACCENT: Record<string, string> = {
+  support_ticket_created: "#4f46e5",
+  support_ticket_message: "#4f46e5",
+  support_ticket_status_changed: "#10b981",
+};
+
+function relativeNotificationTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
 
 function initials(firstName: string | null, lastName: string | null): string {
   const parts = [firstName, lastName].filter(Boolean) as string[];
@@ -186,32 +214,86 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
         ]) ??
     "Dashboard";
 
-  const notifications = [
-    {
-      id: 1,
-      title: "New lead assigned",
-      meta: "Apex Heights • Premium Apartments",
-      time: "2 min ago",
-      unread: true,
-      accent: "#4f46e5",
-    },
-    {
-      id: 2,
-      title: "Property update needed",
-      meta: "Palm Residency • Final approval review",
-      time: "1 hour ago",
-      unread: true,
-      accent: "#f59e0b",
-    },
-    {
-      id: 3,
-      title: "Campaign published",
-      meta: "Skyline Villas landing page is live",
-      time: "Today",
-      unread: false,
-      accent: "#10b981",
-    },
-  ];
+  const [rawNotifications, setRawNotifications] = useState<OrgNotification[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const { toast } = useToast();
+  // Notification ids already flashed (or seen on the first poll after
+  // mount, which seeds this without flashing the org's whole history).
+  const seenNotificationIdsRef = useRef<Set<string> | null>(null);
+
+  const pollNotifications = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const [count, recent] = await Promise.all([
+        getOrgUnreadNotifications(),
+        getOrgNotifications({ limit: 10 }),
+      ]);
+      setUnreadNotificationCount(count.count);
+
+      if (seenNotificationIdsRef.current === null) {
+        seenNotificationIdsRef.current = new Set(recent.data.map((n) => n.id));
+        return;
+      }
+      const seen = seenNotificationIdsRef.current;
+      for (const n of recent.data) {
+        if (seen.has(n.id)) continue;
+        seen.add(n.id);
+        // Flash message — no page refresh, just the newly-arrived chat/ticket
+        // event surfacing without opening the bell.
+        toast({ title: n.title, description: n.body ?? undefined, variant: "info" });
+      }
+    } catch {
+      // Best-effort — the bell badge simply stays at its last known value.
+    }
+  }, [accessToken, toast]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    void pollNotifications();
+    const id = window.setInterval(() => void pollNotifications(), 30000);
+    return () => window.clearInterval(id);
+  }, [accessToken, pollNotifications]);
+
+  useEffect(() => {
+    if (!notificationOpen || !accessToken) return;
+    void getOrgNotifications({ limit: 20 })
+      .then((res) => setRawNotifications(res.data))
+      .catch(() => undefined);
+  }, [notificationOpen, accessToken]);
+
+  const notifications = rawNotifications.map((n) => ({
+    id: n.id,
+    title: n.title,
+    meta: n.body ?? "",
+    time: relativeNotificationTime(n.createdAt),
+    unread: !n.readAt,
+    accent: NOTIFICATION_ACCENT[n.type] ?? "#4f46e5",
+    entityId: n.entityId,
+    type: n.type,
+  }));
+
+  async function handleNotificationClick(item: (typeof notifications)[number]) {
+    if (item.unread) {
+      await markOrgNotificationRead(item.id).catch(() => undefined);
+      setUnreadNotificationCount((count) => Math.max(0, count - 1));
+      setRawNotifications((prev) =>
+        prev.map((n) => (n.id === item.id ? { ...n, readAt: new Date().toISOString() } : n)),
+      );
+    }
+    setNotificationOpen(false);
+    if (item.type.startsWith("support_ticket")) {
+      router.push(item.entityId ? `/org/support/${item.entityId}` : "/org/support");
+    }
+  }
+
+  async function handleMarkAllRead() {
+    await markAllOrgNotificationsRead().catch(() => undefined);
+    setUnreadNotificationCount(0);
+    setRawNotifications((prev) =>
+      prev.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })),
+    );
+  }
 
   useEffect(() => {
     if (!profileMenuOpen && !notificationOpen) return;
@@ -230,8 +312,6 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [profileMenuOpen, notificationOpen]);
-
-  const unreadNotificationCount = notifications.filter((item) => item.unread).length;
 
   if (
     authLoading ||
@@ -270,6 +350,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                 if (item.href.startsWith("/org/roles-permissions")) return user.role === "organisation_admin";
                 if (item.href.startsWith("/org/integrations")) return hasPermission("integrations", "view");
                 if (item.href.startsWith("/org/settings")) return hasPermission("settings", "view");
+                if (item.href.startsWith("/org/support")) return hasPermission("support", "view");
                 return false;
               });
 
@@ -391,7 +472,9 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                 style={{ position: "relative" }}
               >
                 <Icon name="bell" size={14} />
-                {unreadNotificationCount > 0 ? <span className="dot" /> : null}
+                {unreadNotificationCount > 0 ? (
+                  <span className="count">{unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}</span>
+                ) : null}
               </button>
 
               {notificationOpen ? (
@@ -428,6 +511,8 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                     </div>
                     <button
                       type="button"
+                      onClick={() => void handleMarkAllRead()}
+                      disabled={unreadNotificationCount === 0}
                       style={{
                         border: "none",
                         background: "rgba(79, 70, 229, 0.08)",
@@ -435,7 +520,8 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                         borderRadius: 10,
                         padding: "8px 10px",
                         fontWeight: 600,
-                        cursor: "pointer",
+                        cursor: unreadNotificationCount === 0 ? "default" : "pointer",
+                        opacity: unreadNotificationCount === 0 ? 0.5 : 1,
                       }}
                     >
                       Mark all read
@@ -443,9 +529,15 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                   </div>
 
                   <div style={{ maxHeight: 340, overflowY: "auto" }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: "24px 16px", textAlign: "center", color: "#64748b", fontSize: 13 }}>
+                        No notifications yet.
+                      </div>
+                    ) : null}
                     {notifications.map((item) => (
                       <div
                         key={item.id}
+                        onClick={() => void handleNotificationClick(item)}
                         style={{
                           display: "flex",
                           alignItems: "flex-start",
@@ -453,6 +545,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                           padding: "14px 16px",
                           borderBottom: "1px solid rgba(148, 163, 184, 0.12)",
                           background: item.unread ? "rgba(79, 70, 229, 0.02)" : "transparent",
+                          cursor: "pointer",
                         }}
                       >
                         <div
@@ -623,29 +716,31 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
           <LeadStagesProvider>{children}</LeadStagesProvider>
         </div>
 
-        <Link
-          href="/org/support"
-          style={{
-            position: "fixed",
-            right: 24,
-            bottom: 24,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "12px 18px",
-            borderRadius: 999,
-            background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
-            color: "#fff",
-            textDecoration: "none",
-            boxShadow: "0 18px 40px rgba(79, 70, 229, 0.32)",
-            fontSize: 13,
-            fontWeight: 700,
-            zIndex: 30,
-          }}
-        >
-          <Icon name="flag" size={15} />
-          Support
-        </Link>
+        {hasPermission("support", "view") ? (
+          <Link
+            href="/org/support"
+            style={{
+              position: "fixed",
+              right: 24,
+              bottom: 24,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "12px 18px",
+              borderRadius: 999,
+              background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+              color: "#fff",
+              textDecoration: "none",
+              boxShadow: "0 18px 40px rgba(79, 70, 229, 0.32)",
+              fontSize: 13,
+              fontWeight: 700,
+              zIndex: 30,
+            }}
+          >
+            <Icon name="flag" size={15} />
+            Support
+          </Link>
+        ) : null}
       </main>
     </div>
   );

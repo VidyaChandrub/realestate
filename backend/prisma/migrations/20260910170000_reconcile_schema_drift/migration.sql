@@ -1,4 +1,3 @@
--- Reconcile live database with schema.prisma. Captures drift that accumulated
 -- between the model file and earlier hand-written/raw SQL migrations:
 --   * email_configs / email_logs id was created as gen_random_uuid()/no default
 --     while schema models id as @default(uuid()) (client-side) and updated_at

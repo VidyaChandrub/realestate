@@ -5,13 +5,19 @@ export type NotificationType =
   | 'subdomain_request'
   | 'custom_domain_request'
   | 'organisation_approved'
-  | 'organisation_rejected';
+  | 'organisation_rejected'
+  | 'support_ticket_created'
+  | 'support_ticket_message'
+  | 'support_ticket_status_changed';
 
-// Creates an in-app notification row delivered to every Super Admin user.
-// recipientId is left null so the UI's "unread" count / list for super admins
-// can include rows addressed to "all super admins" (the platform-wide inbox).
+// Creates an in-app notification row. Leave `recipientId` unset to address
+// "all Super Admins" (the platform-wide inbox — organisation registrations,
+// a new support ticket, an org's reply to one). Pass it to address one
+// specific user instead (e.g. the org member who raised a ticket, once the
+// Platform Team replies or closes it).
 export function buildNotificationData(input: {
   orgId?: string | null;
+  recipientId?: string;
   type: NotificationType;
   title: string;
   body?: string;
@@ -25,5 +31,6 @@ export function buildNotificationData(input: {
     entity: input.entity,
     entityId: input.entityId,
     organisation: input.orgId ? { connect: { id: input.orgId } } : undefined,
+    recipient: input.recipientId ? { connect: { id: input.recipientId } } : undefined,
   };
 }

@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import type { AppNotification } from "@/lib/types";
 import { Icon } from "@/components/icons";
+import { useToast } from "@/components/ui/toast";
 
 const PAGE_SIZE = 25;
 
@@ -19,6 +20,9 @@ const TYPE_LABEL: Record<string, string> = {
   custom_domain_request: "Custom domain",
   organisation_approved: "Approval",
   organisation_rejected: "Rejection",
+  support_ticket_created: "New ticket",
+  support_ticket_message: "Support message",
+  support_ticket_status_changed: "Ticket status",
 };
 
 const TYPE_ICON: Record<string, string> = {
@@ -27,6 +31,9 @@ const TYPE_ICON: Record<string, string> = {
   custom_domain_request: "link",
   organisation_approved: "check",
   organisation_rejected: "close",
+  support_ticket_created: "flag",
+  support_ticket_message: "mail",
+  support_ticket_status_changed: "check",
 };
 
 function relativeTime(iso: string) {
@@ -48,11 +55,19 @@ function getNotificationLink(n: AppNotification): string {
   if (n.type === "organisation_approved" || n.type === "organisation_rejected") {
     return n.entityId ? `/admin-console/organisation-detail/${n.entityId}` : "/admin-console/organisations";
   }
+  if (
+    n.type === "support_ticket_created" ||
+    n.type === "support_ticket_message" ||
+    n.type === "support_ticket_status_changed"
+  ) {
+    return n.entityId ? `/admin-console/support/${n.entityId}` : "/admin-console/support";
+  }
   return "/admin-console";
 }
 
 export function NotificationsBell({ accessToken }: { accessToken: string | null }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -61,6 +76,9 @@ export function NotificationsBell({ accessToken }: { accessToken: string | null 
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // Notification ids already flashed (or seen on the first poll after
+  // mount, which seeds this without flashing the whole existing inbox).
+  const seenIdsRef = useRef<Set<string> | null>(null);
 
   async function loadPage(nextPage: number, replace: boolean) {
     if (!accessToken) return;
@@ -78,6 +96,22 @@ export function NotificationsBell({ accessToken }: { accessToken: string | null 
     if (!accessToken) return;
     const count = await getUnreadNotifications().catch(() => ({ count: 0 }));
     setUnread(count.count ?? 0);
+
+    // Flash message — no page refresh — for whatever just arrived, in
+    // addition to the badge count.
+    const recent = await getNotifications({ page: 1, limit: 10 }).catch(
+      () => ({ data: [] as AppNotification[], total: 0 }),
+    );
+    if (seenIdsRef.current === null) {
+      seenIdsRef.current = new Set(recent.data.map((n) => n.id));
+      return;
+    }
+    const seen = seenIdsRef.current;
+    for (const n of recent.data) {
+      if (seen.has(n.id)) continue;
+      seen.add(n.id);
+      toast({ title: n.title, description: n.body ?? undefined, variant: "info" });
+    }
   }
 
   useEffect(() => {

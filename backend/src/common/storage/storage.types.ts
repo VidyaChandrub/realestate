@@ -17,7 +17,10 @@ export type UploadField =
   | 'logo'
   // Organisation favicon — same lifecycle as the logo, uploaded from the
   // Super Admin org-detail edit form. Smaller size cap and .ico allowed.
-  | 'favicon';
+  | 'favicon'
+  // A support-ticket attachment (screenshot / PDF) — org side, from the
+  // Support & Help "Contact support" form or a reply in the chat thread.
+  | 'supportAttachment';
 
 export const UPLOAD_FIELDS: readonly UploadField[] = [
   'amenityIcon',
@@ -28,6 +31,7 @@ export const UPLOAD_FIELDS: readonly UploadField[] = [
   'builderImage',
   'logo',
   'favicon',
+  'supportAttachment',
 ] as const;
 
 export interface FieldRule {
@@ -93,6 +97,11 @@ export const FIELD_RULES: Record<UploadField, FieldRule> = {
     ],
     maxBytes: 512 * 1024,
     label: 'favicon',
+  },
+  supportAttachment: {
+    mimeTypes: ['image/png', 'image/jpeg', 'application/pdf'],
+    maxBytes: 10 * MB,
+    label: 'attachment',
   },
 };
 

@@ -35,6 +35,7 @@ const NAV_MODULE: Record<string, string> = {
   "/admin-console/email": "admin_email",
   "/admin-console/audit-logs": "admin_audit_logs",
   "/admin-console/settings": "admin_settings",
+  "/admin-console/support": "admin_support",
 };
 
 const NAV_GROUPS: NavGroup[] = [
@@ -96,6 +97,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/admin-console/email", icon: "mail", label: "Email & SMTP", tip: "Email & SMTP Management", activeMatch: ["/admin-console/email"] },
       { href: "/admin-console/audit-logs", icon: "shield", label: "Audit Logs", tip: "Audit Logs", activeMatch: ["/admin-console/audit-logs"] },
+      { href: "/admin-console/support", icon: "flag", label: "Support Management", tip: "Every organisation's support tickets", activeMatch: ["/admin-console/support"] },
       { href: "/admin-console/settings", icon: "settings", label: "Settings", tip: "Settings", activeMatch: ["/admin-console/settings"] },
     ],
   },
@@ -117,6 +119,7 @@ const CRUMB_MAP: Record<string, string> = {
   "/admin-console/email": "Email & SMTP",
   "/admin-console/audit-logs": "Audit Logs",
   "/admin-console/settings": "Settings",
+  "/admin-console/support": "Support Management",
 };
 
 export function SuperAdminShell({ children }: { children: ReactNode }) {

@@ -34,7 +34,7 @@ export class OrgUnitsController {
   @RequirePermission('projects', 'view')
   @Get()
   list(@CurrentUser() user: JwtPayload, @Query() query: ListOrgUnitsQueryDto) {
-    return this.service.listAllUnits(user.orgId as string, query);
+    return this.service.listAllUnits(user.orgId as string, query, user);
   }
 
   @RequirePermission('projects', 'add')

@@ -1039,6 +1039,11 @@ export interface Unit {
   floorPlanUrl: string | null;
   galleryUrls: string[];
   status: UnitStatus;
+  /** Assignment — mainly meaningful for a standalone unit (a project-bound
+   *  unit inherits access from its project's manager/sales team instead). */
+  managerId: string | null;
+  manager: UnitActor | null;
+  salesAgentIds: string[];
   createdById: string | null;
   updatedById: string | null;
   /** Who created / last edited this unit. Null on rows written before this existed. */
@@ -1266,6 +1271,10 @@ export interface CreateUnitInput {
   addressLine?: string;
   ownerName?: string;
   notes?: string;
+  /** Standalone-listing assignment (ignored for a project-bound unit, which
+   *  inherits access from its project's manager / sales team instead). */
+  managerId?: string;
+  salesAgentIds?: string[];
   /** Media — public R2 URLs. */
   floorPlanUrl?: string;
   galleryUrls?: string[];
@@ -1285,6 +1294,7 @@ export type UpdateUnitInput = Partial<
     | "ownerName"
     | "notes"
     | "floorPlanUrl"
+    | "managerId"
   >
 > & {
   /** value to set, or explicit null to clear. */
@@ -1300,6 +1310,10 @@ export type UpdateUnitInput = Partial<
   notes?: string | null;
   floorPlanUrl?: string | null;
   galleryUrls?: string[];
+  /** null clears the manager. */
+  managerId?: string | null;
+  /** Full-set replace — omit to leave the current agents untouched, `[]` to clear all. */
+  salesAgentIds?: string[];
 };
 
 /** One row of the cross-project "All Units" list (GET /org/units). */
@@ -1927,7 +1941,10 @@ export type NotificationType =
   | "subdomain_request"
   | "custom_domain_request"
   | "organisation_approved"
-  | "organisation_rejected";
+  | "organisation_rejected"
+  | "support_ticket_created"
+  | "support_ticket_message"
+  | "support_ticket_status_changed";
 
 export interface AppNotification {
   id: string;
@@ -1957,6 +1974,133 @@ export interface NotificationsListResponse {
 
 export interface UnreadNotificationsResponse {
   count: number;
+}
+
+/** An org member's own bell notification (GET /org/notifications). Same
+ *  shape as the Super Admin's AppNotification, minus the org-summary field
+ *  (every row already belongs to the viewer's own org). */
+export interface OrgNotification {
+  id: string;
+  orgId: string | null;
+  recipientId: string | null;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  entity: string | null;
+  entityId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface OrgNotificationsListResponse {
+  data: OrgNotification[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// --- Support tickets ---------------------------------------------------
+
+export type SupportTicketStatus = "open" | "ongoing" | "resolved";
+export type SupportTicketPriority = "normal" | "high" | "urgent";
+export type SupportTicketCategory =
+  | "Billing"
+  | "Calling"
+  | "WhatsApp"
+  | "Leads"
+  | "Projects"
+  | "Other";
+
+export interface SupportTicketActor {
+  id: string;
+  name: string;
+  email: string;
+}
+
+/** One row of the tickets list — org's own (GET /org/support) or every org's
+ *  (GET /admin/support). `organisation` is present only from the admin
+ *  endpoint. */
+export interface SupportTicketSummary {
+  id: string;
+  number: number;
+  /** Display code, e.g. "SR-14". */
+  code: string;
+  subject: string;
+  category: string;
+  priority: SupportTicketPriority;
+  status: SupportTicketStatus;
+  raisedBy: SupportTicketActor;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  /** True while an unread notification for this ticket still exists for the
+   *  viewer — drives the list's "new activity" dot. Clears once the ticket
+   *  is opened (or its bell notification is marked read). */
+  hasUnread: boolean;
+  organisation?: { id: string; name: string };
+}
+
+export interface SupportTicketsListResponse {
+  data: SupportTicketSummary[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface SupportMessage {
+  id: string;
+  ticketId: string;
+  body: string;
+  attachmentUrls: string[];
+  createdAt: string;
+  sender: SupportTicketActor;
+  /** "org" = the ticket's own organisation, "platform" = the iPixxel team —
+   *  derived server-side from the sender's own org membership. */
+  side: "org" | "platform";
+}
+
+export interface SupportTicketDetail {
+  id: string;
+  number: number;
+  code: string;
+  orgId: string;
+  organisation: { id: string; name: string };
+  subject: string;
+  category: string;
+  priority: SupportTicketPriority;
+  status: SupportTicketStatus;
+  raisedBy: SupportTicketActor;
+  closedBy: SupportTicketActor | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupportTicketDetailResponse {
+  ticket: SupportTicketDetail;
+  messages: SupportMessage[];
+}
+
+export interface CreateSupportTicketInput {
+  subject: string;
+  category: SupportTicketCategory;
+  priority?: SupportTicketPriority;
+  message: string;
+  attachmentUrls?: string[];
+}
+
+export interface CreateSupportMessageInput {
+  body: string;
+  attachmentUrls?: string[];
+}
+
+export interface ListSupportTicketsParams {
+  page?: number;
+  limit?: number;
+  status?: SupportTicketStatus;
+  search?: string;
+  /** Support Management (admin) only. */
+  orgId?: string;
 }
 
 /** GET /auth/subdomain-availability — live check for the signup form. */

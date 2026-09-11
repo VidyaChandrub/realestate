@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
+  apiFetch,
   deleteStandaloneUnit,
   getOrgCatalogOptions,
+  getProjectSalesAgentCandidates,
   getStandaloneUnit,
   updateStandaloneUnit,
 } from "@/lib/api";
@@ -23,7 +25,14 @@ import {
   UnitAttributeSelect,
 } from "@/components/org/project-form-fields";
 import "@/app/org/org.css";
-import type { OrgCatalogOption, Unit, UnitStatus } from "@/lib/types";
+import type {
+  CrmAssignableUser,
+  OrgCatalogOption,
+  OrgUser,
+  OrgUsersListResponse,
+  Unit,
+  UnitStatus,
+} from "@/lib/types";
 
 const STATUSES: { value: UnitStatus; label: string }[] = [
   { value: "available", label: "Available" },
@@ -53,6 +62,8 @@ interface Form {
   notes: string;
   floorPlanUrl: string;
   galleryUrls: string[];
+  managerId: string;
+  agentAssign: string[];
 }
 
 const toForm = (u: Unit): Form => ({
@@ -70,7 +81,13 @@ const toForm = (u: Unit): Form => ({
   notes: u.notes ?? "",
   floorPlanUrl: u.floorPlanUrl ?? "",
   galleryUrls: u.galleryUrls ?? [],
+  managerId: u.managerId ?? "",
+  agentAssign: u.salesAgentIds ?? [],
 });
+
+function userLabel(u: OrgUser): string {
+  return [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
+}
 
 export default function StandaloneUnitPage() {
   const params = useParams<{ unitId: string }>();
@@ -91,6 +108,13 @@ export default function StandaloneUnitPage() {
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Assignment pickers — same org-level lists a project's Team & access
+  // section uses.
+  const [managers, setManagers] = useState<OrgUser[]>([]);
+  const [salesAgentCandidates, setSalesAgentCandidates] = useState<
+    CrmAssignableUser[]
+  >([]);
 
   const load = useCallback(async () => {
     if (!accessToken || !unitId) return;
@@ -126,6 +150,15 @@ export default function StandaloneUnitPage() {
           e instanceof Error ? e.message : "Couldn't load configurations.",
         ),
       );
+    apiFetch<OrgUsersListResponse>(
+      "/org/users?role=manager&limit=100&status=active",
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+      .then((res) => setManagers(res.data))
+      .catch(() => setManagers([]));
+    getProjectSalesAgentCandidates()
+      .then((res) => setSalesAgentCandidates(res.data))
+      .catch(() => setSalesAgentCandidates([]));
   }, [accessToken]);
 
   const facingOptions = (catalog ?? []).filter((option) => option.category === "facing");
@@ -164,6 +197,8 @@ export default function StandaloneUnitPage() {
         notes: form.notes.trim() || null,
         floorPlanUrl: form.floorPlanUrl || null,
         galleryUrls: form.galleryUrls,
+        managerId: form.managerId || null,
+        salesAgentIds: form.agentAssign,
       });
       setUnit(updated);
       setForm(toForm(updated));
@@ -239,6 +274,15 @@ export default function StandaloneUnitPage() {
     },
     { k: "Location / address", v: unit.addressLine ?? "—" },
     { k: "Owner / seller", v: unit.ownerName ?? "—" },
+    { k: "Manager", v: unit.manager?.name ?? "Unassigned" },
+    {
+      k: "Assigned agents",
+      v:
+        unit.salesAgentIds
+          .map((id) => salesAgentCandidates.find((c) => c.id === id)?.name)
+          .filter((n): n is string => Boolean(n))
+          .join(", ") || "None",
+    },
     {
       k: "Created by",
       v: unit.createdBy
@@ -441,6 +485,57 @@ export default function StandaloneUnitPage() {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="sec">
+              <div className="lbl">👤 Team &amp; access</div>
+              <div className="grid g2">
+                <div className="field">
+                  <label>Manager</label>
+                  <select
+                    className="inp"
+                    value={form.managerId}
+                    onChange={(e) => patch({ managerId: e.target.value })}
+                  >
+                    <option value="">Unassigned</option>
+                    {managers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {userLabel(m)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="field mb-0">
+                <label>Assign sales agents</label>
+                {salesAgentCandidates.length === 0 ? (
+                  <div className="hint">No assignable users in your organisation yet — add them under Users.</div>
+                ) : (
+                  <div className="opts">
+                    {salesAgentCandidates.map((a) => {
+                      const on = form.agentAssign.includes(a.id);
+                      return (
+                        <span
+                          key={a.id}
+                          className={`opt ${on ? "on" : ""}`}
+                          onClick={() =>
+                            patch({
+                              agentAssign: on
+                                ? form.agentAssign.filter((x) => x !== a.id)
+                                : [...form.agentAssign, a.id],
+                            })
+                          }
+                        >
+                          <span className="b">{on ? "✓" : ""}</span>{a.name}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="hint">
+                  Controls whose All Units list this shows up in — org admins always see every unit.
                 </div>
               </div>
             </div>

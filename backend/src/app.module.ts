@@ -38,6 +38,7 @@ import { PlatformConfigModule } from './modules/platform-config/platform-config.
 import { AdminPlatformTeamModule } from './modules/admin-platform-team/admin-platform-team.module';
 import { AdminAuditLogsModule } from './modules/admin-audit-logs/admin-audit-logs.module';
 import { AdminLeadsModule } from './modules/admin-leads/admin-leads.module';
+import { SupportModule } from './modules/support/support.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { AdminLeadsModule } from './modules/admin-leads/admin-leads.module';
     AdminPlatformTeamModule,
     AdminAuditLogsModule,
     AdminLeadsModule,
+    SupportModule,
   ],
   controllers: [AppController],
   providers: [AppService],
