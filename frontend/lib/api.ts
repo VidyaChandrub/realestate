@@ -84,6 +84,15 @@ import type {
   PlatformTeamRole,
   DynamicRole,
   Permissions,
+  Team,
+  TeamDetail,
+  CreateTeamInput,
+  UpdateTeamInput,
+  SetTeamMembersInput,
+  TeamMemberRow,
+  TeamProjectRow,
+  CreateOrgUserInput,
+  OrgUser,
 } from "./types";
 
 const API_BASE = "/api";
@@ -1193,4 +1202,63 @@ export async function getMyPlatformPermissions(): Promise<{
   permissions: Permissions;
 }> {
   return apiFetch("/admin/platform-roles/me");
+}
+
+// --- Teams (org/teams) ---------------------------------------------------
+
+export function listTeams(): Promise<Team[]> {
+  return apiFetch<Team[]>("/org/teams");
+}
+
+export function getTeam(id: string): Promise<TeamDetail> {
+  return apiFetch<TeamDetail>(`/org/teams/${id}`);
+}
+
+export function createTeam(input: CreateTeamInput): Promise<Team> {
+  return apiFetch<Team>("/org/teams", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateTeam(id: string, input: UpdateTeamInput): Promise<Team> {
+  return apiFetch<Team>(`/org/teams/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteTeam(id: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/org/teams/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function setTeamMembers(
+  id: string,
+  members: SetTeamMembersInput[],
+): Promise<TeamMemberRow[]> {
+  return apiFetch<TeamMemberRow[]>(`/org/teams/${id}/members`, {
+    method: "PUT",
+    body: JSON.stringify({ members }),
+  });
+}
+
+export function setTeamProjects(
+  id: string,
+  projectIds: string[],
+): Promise<TeamProjectRow[]> {
+  return apiFetch<TeamProjectRow[]>(`/org/teams/${id}/projects`, {
+    method: "PUT",
+    body: JSON.stringify({ projectIds }),
+  });
+}
+
+// Reused by the Teams onboarding page — same real "create org user" call
+// (and the same server-side invite email) the Users page already uses.
+export function createOrgUser(input: CreateOrgUserInput): Promise<OrgUser> {
+  return apiFetch<OrgUser>("/org/users", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }

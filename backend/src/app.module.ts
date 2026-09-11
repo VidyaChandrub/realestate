@@ -30,6 +30,7 @@ import { EmailModule } from './modules/email/email.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { OrgProjectCatalogModule } from './modules/org-project-catalog/org-project-catalog.module';
 import { OrgLeadStageDisplayModule } from './modules/org-lead-stage-display/org-lead-stage-display.module';
+import { OrgTeamsModule } from './modules/org-teams/org-teams.module';
 import { OrgPermissionsModule } from './modules/org-permissions/org-permissions.module';
 import { AdminRolesModule } from './modules/admin-roles/admin-roles.module';
 import { OrgDashboardModule } from './modules/org-dashboard/org-dashboard.module';
@@ -65,6 +66,7 @@ import { SupportModule } from './modules/support/support.module';
     ProjectsModule,
     OrgProjectCatalogModule,
     OrgLeadStageDisplayModule,
+    OrgTeamsModule,
     OrgPermissionsModule,
     AdminRolesModule,
     OrgDashboardModule,
