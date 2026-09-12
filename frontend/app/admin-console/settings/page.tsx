@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Switch } from "@/components/superadmin/switch";
+import { BillingExpirySettings } from "@/components/superadmin/billing-expiry-settings";
 import { Icon } from "@/components/icons";
 import { CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
 
@@ -136,6 +137,12 @@ export default function SuperAdminSettingsPage() {
           </Reveal>
         ))}
       </div>
+
+      <h2 style={{ margin: "8px 0 6px" }}>Billing</h2>
+      <div className="sub muted reveal" style={{ marginBottom: 16 }}>
+        Subscription expiry, grace period and the org-facing popup — the global policy enforced by the lifecycle sweep.
+      </div>
+      <BillingExpirySettings />
 
       <h2 style={{ margin: "8px 0 6px" }}>Security</h2>
       <div className="card reveal">

@@ -12,6 +12,7 @@ import type {
   ChangePasswordInput,
   ChangePlanInput,
   ChangePlanResult,
+  BillingRenewResult,
   CompleteOnboardingResult,
   CreateOrgCatalogOptionInput,
   CrmAssignee,
@@ -42,6 +43,7 @@ import type {
   UpdateLeadStageDisplayInput,
   CrmLeadStatus,
   OrgLandingPagesListResponse,
+  OrgBillingSummary,
   OrgUnitsListResponse,
   Unit,
   CreateUnitInput,
@@ -93,6 +95,15 @@ import type {
   TeamProjectRow,
   CreateOrgUserInput,
   OrgUser,
+  TeamChatOverview,
+  TeamChatDetail,
+  TeamChatChannelSummary,
+  TeamChatMessage,
+  CreateTeamChannelInput,
+  CreateTeamMessageInput,
+  LeadFormRecord,
+  CreateFormInput,
+  UpdateFormInput,
 } from "./types";
 
 const API_BASE = "/api";
@@ -439,12 +450,65 @@ export async function getInvoices(): Promise<InvoiceRow[]> {
   return apiFetch<InvoiceRow[]>("/org/billing/invoices");
 }
 
+export async function getOrgBilling(): Promise<OrgBillingSummary> {
+  return apiFetch<OrgBillingSummary>("/org/billing");
+}
+
+/** Scope mirrors the backend split: "org" hits /org/forms (JWT orgId), "admin"
+ *  hits /admin/forms (Super Admin platform-owned forms). Auth separation is
+ *  enforced server-side. */
+export type FormScope = "org" | "admin";
+
+function formPath(scope: FormScope): string {
+  return scope === "org" ? "/org/forms" : "/admin/forms";
+}
+
+export async function listForms(scope: FormScope): Promise<LeadFormRecord[]> {
+  return apiFetch<LeadFormRecord[]>(formPath(scope));
+}
+
+export async function getForm(scope: FormScope, id: string): Promise<LeadFormRecord> {
+  return apiFetch<LeadFormRecord>(`${formPath(scope)}/${id}`);
+}
+
+export async function createForm(scope: FormScope, input: CreateFormInput): Promise<LeadFormRecord> {
+  return apiFetch<LeadFormRecord>(formPath(scope), {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateForm(scope: FormScope, id: string, input: UpdateFormInput): Promise<LeadFormRecord> {
+  return apiFetch<LeadFormRecord>(`${formPath(scope)}/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function duplicateForm(scope: FormScope, id: string): Promise<LeadFormRecord> {
+  return apiFetch<LeadFormRecord>(`${formPath(scope)}/${id}/duplicate`, {
+    method: "POST",
+  });
+}
+
+export async function deleteForm(scope: FormScope, id: string): Promise<{ deleted: boolean }> {
+  return apiFetch<{ deleted: boolean }>(`${formPath(scope)}/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function changePlan(
   input: ChangePlanInput,
 ): Promise<ChangePlanResult> {
   return apiFetch<ChangePlanResult>("/org/billing/plan", {
     method: "PATCH",
     body: JSON.stringify(input),
+  });
+}
+
+export async function renewSubscription(): Promise<BillingRenewResult> {
+  return apiFetch<BillingRenewResult>("/org/billing/renew", {
+    method: "POST",
   });
 }
 
@@ -1261,4 +1325,43 @@ export function createOrgUser(input: CreateOrgUserInput): Promise<OrgUser> {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+// --- Team Chat (org/team-chat) -------------------------------------------
+
+export function getTeamChatOverview(): Promise<TeamChatOverview> {
+  return apiFetch<TeamChatOverview>("/org/team-chat");
+}
+
+export function getTeamChannel(id: string): Promise<TeamChatDetail> {
+  return apiFetch<TeamChatDetail>(`/org/team-chat/channels/${id}`);
+}
+
+export function createTeamChannel(
+  input: CreateTeamChannelInput,
+): Promise<TeamChatChannelSummary> {
+  return apiFetch<TeamChatChannelSummary>("/org/team-chat/channels", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function createTeamDm(userId: string): Promise<TeamChatDetail> {
+  return apiFetch<TeamChatDetail>("/org/team-chat/dms", {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export function sendTeamMessage(
+  channelId: string,
+  input: CreateTeamMessageInput,
+): Promise<TeamChatMessage> {
+  return apiFetch<TeamChatMessage>(
+    `/org/team-chat/channels/${channelId}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
 }

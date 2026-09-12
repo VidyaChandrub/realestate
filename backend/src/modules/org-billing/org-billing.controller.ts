@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
@@ -29,5 +29,11 @@ export class OrgBillingController {
   @Patch('plan')
   changePlan(@CurrentUser() user: JwtPayload, @Body() dto: ChangePlanDto) {
     return this.service.changePlan(user.orgId as string, dto);
+  }
+
+  @RequirePermission('billing', 'edit')
+  @Post('renew')
+  renew(@CurrentUser() user: JwtPayload) {
+    return this.service.renew(user.orgId as string);
   }
 }

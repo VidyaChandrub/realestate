@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Code, Copy, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { toast, Toaster } from "sonner";
 import { Icon } from "@/components/icons";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { embedSnippet, iframeSnippet, shortcodeSnippet, type FormDefinition } from "@/lib/openpage/forms-store";
+import { Reveal } from "@/components/superadmin/reveal";
+import { useAuth } from "@/lib/auth-context";
+import { embedSnippet, iframeSnippet, shortcodeSnippet } from "@/lib/openpage/forms-store";
 import {
   createFormDef,
   deleteFormDef,
@@ -30,8 +31,10 @@ function formatWhen(iso?: string) {
   });
 }
 
-export default function SuperAdminFormsPage() {
+export default function OrgFormsPage() {
   const router = useRouter();
+  const { hasPermission } = useAuth();
+
   const [forms, setForms] = useState<BackedForm[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -40,28 +43,39 @@ export default function SuperAdminFormsPage() {
   const [embedFor, setEmbedFor] = useState<BackedForm | null>(null);
   const [deleteFor, setDeleteFor] = useState<BackedForm | null>(null);
   const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setLoading(true);
-    setLoadError(null);
-    /* eslint-enable react-hooks/set-state-in-effect */
-    ensureFormLibrary("admin")
-      .then(setForms)
-      .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load forms."))
-      .finally(() => setLoading(false));
-  }, []);
+  const notify = (m: string) => {
+    setToast(m);
+    setTimeout(() => setToast(null), 2800);
+  };
+
+  const canView = hasPermission("forms", "view");
 
   function refresh(quiet = false) {
+    if (!canView) return;
     if (!quiet) {
       setLoading(true);
       setLoadError(null);
     }
-    ensureFormLibrary("admin")
+    ensureFormLibrary("org")
       .then(setForms)
       .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load forms."))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    if (canView) {
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setLoading(true);
+      setLoadError(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
+      ensureFormLibrary("org")
+        .then(setForms)
+        .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load forms."))
+        .finally(() => setLoading(false));
+    }
+  }, [canView]);
 
   const activeCount = forms.filter((f) => f.enabled !== false).length;
 
@@ -89,10 +103,10 @@ export default function SuperAdminFormsPage() {
   async function createForm() {
     setBusy(true);
     try {
-      const created = await createFormDef("admin", "New enquiry form");
-      router.push(`/admin-console/forms/${created.backendId}`);
+      const created = await createFormDef("org", "New enquiry form");
+      router.push(`/org/forms/${created.backendId}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create form.");
+      notify(err instanceof Error ? err.message : "Failed to create form.");
       setBusy(false);
     }
   }
@@ -100,76 +114,94 @@ export default function SuperAdminFormsPage() {
   async function duplicate(id: string) {
     setBusy(true);
     try {
-      await duplicateFormDef("admin", id);
-      toast.success("Form duplicated");
+      await duplicateFormDef("org", id);
+      notify("Form duplicated");
       refresh(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to duplicate form.");
+      notify(err instanceof Error ? err.message : "Failed to duplicate form.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function remove(target: FormDefinition & { backendId: string }) {
+  async function remove(target: BackedForm) {
     setBusy(true);
     try {
-      await deleteFormDef("admin", target.backendId);
-      toast.success("Form deleted");
+      await deleteFormDef("org", target.backendId);
+      notify("Form deleted");
       refresh(true);
       setDeleteFor(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete form.");
+      notify(err instanceof Error ? err.message : "Failed to delete form.");
     } finally {
       setBusy(false);
     }
   }
 
+  if (!canView) {
+    return (
+      <Reveal>
+        <div className="card" style={{ textAlign: "center", padding: "60px 24px" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, color: "var(--faint)" }}>
+            <Icon name="document" size={40} />
+          </div>
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Lead Forms are locked</div>
+          <div className="muted" style={{ fontSize: 13.5 }}>
+            Your role doesn&apos;t include access to lead forms. Ask your organisation admin to grant the &quot;forms&quot; permission.
+          </div>
+        </div>
+      </Reveal>
+    );
+  }
+
   return (
-    <div>
-      <Toaster theme="light" position="bottom-right" />
-      <div className="page-head">
+    <>
+      <div className="page-head reveal in">
         <div>
           <div className="eyebrow">
-            <Icon name="document" size={14} /> Platform lead capture & landing page forms
+            <Icon name="document" size={13} /> Website
           </div>
           <h1>Lead Forms</h1>
+          <div className="sub">Build lead-capture forms for your landing pages — separate from the Super Admin library.</div>
         </div>
         <div className="actions">
-          <span className="fb-live">{activeCount} active forms</span>
           <button type="button" className="btn btn-primary" onClick={createForm} disabled={busy}>
             <Plus size={15} /> Create New Form
           </button>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-        <div className="search" style={{ flex: 1, minWidth: 240, position: "relative" }}>
-          <Search size={14} style={{ position: "absolute", left: 12, top: 12, color: "var(--muted)" }} />
-          <input
-            className="inp"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search forms by name, description, field label, or CSS class…"
-            style={{ paddingLeft: 34, width: "100%" }}
-          />
+      <Reveal delay={1}>
+        <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ position: "relative", flex: 1, minWidth: 240 }}>
+            <Search size={14} style={{ position: "absolute", left: 12, top: 12, color: "var(--muted)" }} />
+            <input
+              className="inp"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search forms by name, description, field label, or CSS class…"
+              style={{ paddingLeft: 34, width: "100%" }}
+            />
+          </div>
+          {(["all", "active", "disabled"] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={`btn btn-sm ${filter === key ? "btn-dark" : "btn-ghost"}`}
+              onClick={() => setFilter(key)}
+            >
+              {key === "all" ? `All (${forms.length})` : key === "active" ? `Active (${activeCount})` : `Disabled (${forms.length - activeCount})`}
+            </button>
+          ))}
         </div>
-        <div className="fb-seg">
-          <button type="button" className={filter === "all" ? "is-on" : ""} onClick={() => setFilter("all")}>
-            All ({forms.length})
-          </button>
-          <button type="button" className={filter === "active" ? "is-on" : ""} onClick={() => setFilter("active")}>
-            Active ({activeCount})
-          </button>
-          <button type="button" className={filter === "disabled" ? "is-on" : ""} onClick={() => setFilter("disabled")}>
-            Disabled ({forms.length - activeCount})
-          </button>
-        </div>
-      </div>
+      </Reveal>
 
       {loadError ? (
-        <div className="card" style={{ padding: 24 }}>
-          <p style={{ margin: 0 }}>{loadError}</p>
-        </div>
+        <Reveal delay={2}>
+          <div className="card" style={{ textAlign: "center", padding: "60px 24px" }}>
+            <div className="muted">{loadError}</div>
+          </div>
+        </Reveal>
       ) : (
         <div className="tbl-wrap">
           <table className="tbl">
@@ -194,47 +226,35 @@ export default function SuperAdminFormsPage() {
                 visible.map((form) => (
                   <tr key={form.backendId}>
                     <td>
-                      <span className={`fb-dot ${form.enabled === false ? "off" : ""}`} />
-                      <Link href={`/admin-console/forms/${form.backendId}`} style={{ fontWeight: 800, color: "inherit" }}>
+                      <span className={`b-${form.enabled === false ? "gray" : "green"}`} style={{ display: "inline-block", width: 8, height: 8, borderRadius: 8, marginRight: 8, verticalAlign: "middle" }} />
+                      <Link href={`/org/forms/${form.backendId}`} style={{ fontWeight: 800, color: "inherit" }}>
                         {form.name || "Untitled form"}
                       </Link>
-                      {form.multiStep ? <span className="fb-chip">Multi-Step</span> : null}
-                      <div className="muted" style={{ marginTop: 4, paddingLeft: 16 }}>
+                      {form.multiStep ? <span className="chip" style={{ marginLeft: 6 }}>Multi-Step</span> : null}
+                      <div className="muted" style={{ marginTop: 4, paddingLeft: 8 }}>
                         {form.description || "—"}
                       </div>
                     </td>
                     <td>
-                      <span className="fb-list-id">{form.embed?.id || form.id}</span>
+                      <span className="muted">{form.embed?.id || form.id}</span>
                     </td>
                     <td className="muted">{formatWhen(form.createdAt)}</td>
                     <td>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <Link href={`/admin-console/forms/${form.backendId}`} className="btn btn-ghost" style={{ padding: "8px 12px" }}>
-                          <Pencil size={13} /> Edit
+                        <Link href={`/org/forms/${form.backendId}`} className="btn btn-ghost btn-sm">
+                          <Pencil size={12} /> Edit
                         </Link>
-                        <button type="button" className="fb-icon-btn" title="Embed" onClick={() => setEmbedFor(form)}>
-                          <Code size={14} />
+                        <button type="button" className="btn btn-ghost btn-sm" title="Embed" onClick={() => setEmbedFor(form)}>
+                          <Code size={12} />
                         </button>
-                        <Link href={`/admin-console/forms/${form.backendId}?preview=1`} className="fb-icon-btn" title="Preview">
-                          <Eye size={14} />
+                        <Link href={`/org/forms/${form.backendId}?preview=1`} className="btn btn-ghost btn-sm" title="Preview">
+                          <Eye size={12} />
                         </Link>
-                        <button
-                          type="button"
-                          className="fb-icon-btn"
-                          title="Duplicate"
-                          disabled={busy}
-                          onClick={() => duplicate(form.backendId)}
-                        >
-                          <Copy size={14} />
+                        <button type="button" className="btn btn-ghost btn-sm" title="Duplicate" disabled={busy} onClick={() => duplicate(form.backendId)}>
+                          <Copy size={12} />
                         </button>
-                        <button
-                          type="button"
-                          className="fb-icon-btn danger"
-                          title="Delete"
-                          disabled={busy}
-                          onClick={() => setDeleteFor(form)}
-                        >
-                          <Trash2 size={14} />
+                        <button type="button" className="btn btn-danger btn-sm" title="Delete" disabled={busy} onClick={() => setDeleteFor(form)}>
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </td>
@@ -266,17 +286,17 @@ export default function SuperAdminFormsPage() {
             <div key={label} style={{ marginBottom: 12 }}>
               <div className="muted" style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>{label}</div>
               <textarea readOnly rows={label === "HTML" || label === "Iframe" ? 3 : 1} value={value} />
-              <button
-                type="button"
-                className="btn btn-ghost"
-                style={{ marginTop: 6 }}
-                onClick={() => {
-                  void navigator.clipboard.writeText(value);
-                  toast.success("Copied");
-                }}
-              >
-                Copy
-              </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ marginTop: 6 }}
+                  onClick={() => {
+                    void navigator.clipboard.writeText(value);
+                    notify("Copied");
+                  }}
+                >
+                  Copy
+                </button>
             </div>
           ))
           : null}
@@ -290,6 +310,12 @@ export default function SuperAdminFormsPage() {
         onConfirm={() => deleteFor && remove(deleteFor)}
         onClose={() => setDeleteFor(null)}
       />
-    </div>
+
+      {toast ? (
+        <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}>
+          <div className="card" style={{ padding: "12px 16px", boxShadow: "var(--sh-lg)" }}>{toast}</div>
+        </div>
+      ) : null}
+    </>
   );
 }

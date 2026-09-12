@@ -40,6 +40,8 @@ import { AdminPlatformTeamModule } from './modules/admin-platform-team/admin-pla
 import { AdminAuditLogsModule } from './modules/admin-audit-logs/admin-audit-logs.module';
 import { AdminLeadsModule } from './modules/admin-leads/admin-leads.module';
 import { SupportModule } from './modules/support/support.module';
+import { TeamChatModule } from './modules/team-chat/team-chat.module';
+import { FormsModule } from './modules/forms/forms.module';
 
 @Module({
   imports: [
@@ -82,6 +84,8 @@ import { SupportModule } from './modules/support/support.module';
     AdminAuditLogsModule,
     AdminLeadsModule,
     SupportModule,
+    TeamChatModule,
+    FormsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

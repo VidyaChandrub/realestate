@@ -510,11 +510,63 @@ async function seedEmailTables() {
   console.log('Email configuration & audit log tables initialized successfully.');
 }
 
+async function seedDemoPlanAndSubscription() {
+  const org = await prisma.organisation.findUnique({ where: { slug: 'skylinedev' } });
+  if (!org) return;
+
+  const plan = await prisma.plan.upsert({
+    where: { slug: 'starter' },
+    update: {},
+    create: {
+      name: 'Starter',
+      slug: 'starter',
+      description: 'For small teams getting started — 5 landing pages, 1 project, 10 users.',
+      priceMonthly: 999,
+      priceYearly: 9990,
+      features: [
+        '5 landing pages',
+        '1 project',
+        '10 team members',
+        'Publishing',
+        'WhatsApp integration',
+      ],
+      limits: { projects: 1, users: 10, templates: 5, landingPages: 5 },
+      capabilities: { publishing: true, whatsappIntegration: true },
+      color: '#eef0fe',
+      badge: 'b-indigo',
+      isPopular: true,
+      isActive: true,
+    },
+  });
+
+  // One active subscription for the demo org so the publish gate and billing
+  // screen work out of the box. Renews ~1 year out.
+  const existing = await prisma.subscription.findFirst({
+    where: { orgId: org.id, status: { not: 'cancelled' } },
+  });
+  if (!existing) {
+    await prisma.subscription.create({
+      data: {
+        orgId: org.id,
+        planId: plan.id,
+        billingCycle: 'monthly',
+        status: 'active',
+        amount: plan.priceMonthly,
+        mrr: plan.priceMonthly,
+        currency: 'INR',
+        renewsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+    });
+    console.log(`Demo subscription seeded for ${org.name} (${plan.name}).`);
+  }
+}
+
 async function main() {
   await seedRoles();
   await seedSuperAdmin();
   await seedDemoOrg();
   await seedEmailTables();
+  await seedDemoPlanAndSubscription();
 }
 
 main()

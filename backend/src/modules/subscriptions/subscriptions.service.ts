@@ -10,6 +10,10 @@ import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { ListSubscriptionsQueryDto } from './dto/list-subscriptions-query.dto';
 import { assertPlanFitsCurrentUsage } from '../../common/utils/plan-quota.util';
+import {
+  applyOrgSubscriptionLifecycle,
+  renewOrgSubscription,
+} from '../../common/utils/subscription-lifecycle.util';
 
 function computeAmountAndMrr(
   plan: { priceMonthly: number; priceYearly: number },
@@ -26,6 +30,10 @@ export class SubscriptionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async overview() {
+    // Lazy lifecycle pass so any expired / past-due transitions are applied
+    // before the numbers below are computed (the boot timer does the same).
+    await applyOrgSubscriptionLifecycle(this.prisma);
+
     const [allSubs, plans, activeSubs] = await Promise.all([
       this.prisma.subscription.findMany({ include: { plan: true } }),
       this.prisma.plan.findMany({ where: { isActive: true } }),
@@ -81,6 +89,8 @@ export class SubscriptionsService {
   }
 
   async list(query: ListSubscriptionsQueryDto) {
+    await applyOrgSubscriptionLifecycle(this.prisma);
+
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const where: Prisma.SubscriptionWhereInput = {};
@@ -126,6 +136,8 @@ export class SubscriptionsService {
   }
 
   async getById(id: string) {
+    await applyOrgSubscriptionLifecycle(this.prisma);
+
     const sub = await this.prisma.subscription.findUnique({
       where: { id },
       include: { organisation: true, plan: true },
@@ -212,6 +224,10 @@ export class SubscriptionsService {
     if (dto.status) {
       data.status = dto.status as any;
       if (dto.status === 'cancelled') data.cancelledAt = new Date();
+      // Manual status moves (active/trial/expired/…) end any grace window
+      // opened by the lifecycle sweep — grace is only ever re-set by the
+      // active/trial -> past_due transition.
+      if (dto.status !== 'past_due') data.graceEndsAt = null;
     }
     if (dto.currency) data.currency = dto.currency;
     if (dto.renewsAt) data.renewsAt = new Date(dto.renewsAt);
@@ -241,10 +257,55 @@ export class SubscriptionsService {
     // soft cancel
     const updated = await this.prisma.subscription.update({
       where: { id },
-      data: { status: 'cancelled', cancelledAt: new Date() },
+      data: { status: 'cancelled', cancelledAt: new Date(), graceEndsAt: null },
       include: { organisation: true, plan: true },
     });
     return toSubscriptionResponse(updated);
+  }
+
+  /**
+   * Super-Admin counterpart of the org's own renew: extends the term on the
+   * same plan, clears grace/expired state. Single source of truth is the
+   * shared lifecycle util.
+   */
+  async renew(id: string) {
+    const sub = await this.prisma.subscription.findUnique({ where: { id } });
+    if (!sub) throw new NotFoundException('Subscription not found');
+
+    // A soft-cancelled subscription is revived in place; everything else goes
+    // through the shared lifecycle util (which clears any grace/expired state).
+    const periodMs =
+      sub.billingCycle === 'yearly' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+    const renewed =
+      sub.status === 'cancelled'
+        ? await this.prisma.subscription.update({
+            where: { id },
+            data: {
+              status: 'active',
+              cancelledAt: null,
+              graceEndsAt: null,
+              renewsAt: new Date(Date.now() + periodMs),
+            },
+          })
+        : await renewOrgSubscription(this.prisma, sub.orgId);
+
+    const withRelations = await this.prisma.subscription.findUnique({
+      where: { id: renewed.id },
+      include: { organisation: true, plan: true },
+    });
+    if (!withRelations) throw new NotFoundException('Subscription not found');
+
+    await this.prisma.auditLog.create({
+      data: {
+        orgId: withRelations.orgId,
+        action: 'subscription_renewed',
+        entity: 'Subscription',
+        entityId: withRelations.id,
+        metadata: { renewsAt: renewed.renewsAt },
+      },
+    });
+
+    return toSubscriptionResponse(withRelations);
   }
 }
 
@@ -261,6 +322,7 @@ function toSubscriptionResponse(sub: any) {
     currency: sub.currency,
     mrr: sub.mrr,
     renewsAt: sub.renewsAt,
+    graceEndsAt: sub.graceEndsAt,
     startedAt: sub.startedAt,
     cancelledAt: sub.cancelledAt,
     createdAt: sub.createdAt,

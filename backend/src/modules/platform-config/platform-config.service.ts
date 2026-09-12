@@ -54,6 +54,10 @@ export class PlatformConfigService implements OnApplicationBootstrap {
         "infra_cname" TEXT,
         "infra_ns1" TEXT,
         "infra_ns2" TEXT,
+        "billing_expiry_notify_days" INTEGER NOT NULL DEFAULT 3,
+        "billing_grace_period_days" INTEGER NOT NULL DEFAULT 7,
+        "billing_expiry_behavior" TEXT NOT NULL DEFAULT 'restrict',
+        "billing_expiry_message" TEXT NOT NULL DEFAULT 'Your subscription is due for renewal soon. Renew to keep your landing pages and features running without interruption.',
         "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT "platform_configs_pkey" PRIMARY KEY ("id")
       );
@@ -134,6 +138,11 @@ export class PlatformConfigService implements OnApplicationBootstrap {
       infraCname: process.env.INFRA_CNAME_TARGET || null,
       infraNs1: process.env.INFRA_NS1 || null,
       infraNs2: process.env.INFRA_NS2 || null,
+      billingExpiryNotifyDays: 3,
+      billingGracePeriodDays: 7,
+      billingExpiryBehavior: 'restrict',
+      billingExpiryMessage:
+        'Your subscription is due for renewal soon. Renew to keep your landing pages and features running without interruption.',
       updatedAt: null,
     };
   }
@@ -153,6 +162,12 @@ export class PlatformConfigService implements OnApplicationBootstrap {
       infraCname: dto.infraCname?.trim() || null,
       infraNs1: dto.infraNs1?.trim() || null,
       infraNs2: dto.infraNs2?.trim() || null,
+      billingExpiryNotifyDays: dto.billingExpiryNotifyDays ?? 3,
+      billingGracePeriodDays: dto.billingGracePeriodDays ?? 7,
+      billingExpiryBehavior: dto.billingExpiryBehavior ?? 'restrict',
+      billingExpiryMessage:
+        dto.billingExpiryMessage?.trim() ||
+        'Your subscription is due for renewal soon. Renew to keep your landing pages and features running without interruption.',
     };
 
     if (data.dnsMode === 'a' && !data.infraIp) {
@@ -201,6 +216,10 @@ export class PlatformConfigService implements OnApplicationBootstrap {
       infraCname: config.infraCname,
       infraNs1: config.infraNs1,
       infraNs2: config.infraNs2,
+      billingExpiryNotifyDays: config.billingExpiryNotifyDays,
+      billingGracePeriodDays: config.billingGracePeriodDays,
+      billingExpiryBehavior: config.billingExpiryBehavior,
+      billingExpiryMessage: config.billingExpiryMessage,
       updatedAt: config.updatedAt,
     };
   }

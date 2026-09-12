@@ -6,6 +6,7 @@ export const MODULES = {
   users: "users",
   sales_agents: "sales_agents",
   crm: "crm",
+  forms: "forms",
   projects: "projects",
   websites: "websites",
   domains: "domains",

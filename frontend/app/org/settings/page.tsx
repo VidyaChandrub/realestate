@@ -2,8 +2,8 @@
 
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, changePlan, createOrgCatalogOption, deleteOrgCatalogOption, getInvoices, getOrgCatalogOptions, getOrgDomainInfo, getOrgLeadStageDisplays, getPlans, requestCustomDomain, updateOrgLeadStageDisplay } from "@/lib/api";
-import type { ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
+import { apiFetch, changePlan, createOrgCatalogOption, deleteOrgCatalogOption, getInvoices, getOrgCatalogOptions, getOrgDomainInfo, getOrgLeadStageDisplays, getPlans, renewSubscription, requestCustomDomain, updateOrgLeadStageDisplay } from "@/lib/api";
+import type { BillingRenewResult, ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
 import { DEFAULT_LEAD_STAGES, LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead-stages";
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
@@ -30,18 +30,19 @@ const INDUSTRY_OPTIONS: { value: OrgIndustry; label: string }[] = [
 
 
 const SUBSCRIPTION_STATUS_BADGE: Record<string, string> = {
-  active: "b-green", trial: "b-amber", past_due: "b-rose", paused: "b-gray", cancelled: "b-gray",
+  active: "b-green", trial: "b-amber", past_due: "b-rose", paused: "b-gray", cancelled: "b-gray", expired: "b-rose",
 };
 const SUBSCRIPTION_STATUS_LABEL: Record<string, string> = {
-  active: "Active", trial: "Trial", past_due: "Past due", paused: "Paused", cancelled: "Cancelled",
+  active: "Active", trial: "Trial", past_due: "Past due", paused: "Paused", cancelled: "Cancelled", expired: "Expired",
 };
 const INVOICE_STATUS_BADGE: Record<string, string> = { paid: "b-green", pending: "b-amber" };
 const INVOICE_STATUS_LABEL: Record<string, string> = { paid: "Paid", pending: "Pending" };
 
-const PLAN_LIMIT_ROWS: { key: "templates" | "projects" | "users"; label: string }[] = [
+const PLAN_LIMIT_ROWS: { key: "templates" | "projects" | "users" | "landingPages"; label: string }[] = [
   { key: "templates", label: "Templates" },
   { key: "projects", label: "Projects" },
   { key: "users", label: "Users" },
+  { key: "landingPages", label: "Landing pages" },
 ];
 
 const NAV_GROUPS = [
@@ -199,7 +200,88 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
   );
 }
 
-function PlanLimitsSelect({ limits }: { limits: { templates: number | null; projects: number | null; users: number | null } | null }) {
+/**
+ * Subscription health banner for the Billing card — the persistent, in-context
+ * reminder that pairs with the expiry popup in the org shell. `expired` blocks
+ * publishing; `past_due` is inside the grace window (still usable); active/trial
+ * shows a "renewing soon" hint inside the configured notify window.
+ */
+function SubscriptionHealthBanner({
+  status,
+  renewsAt,
+  graceEndsAt,
+  renewing,
+  onRenew,
+}: {
+  status: string;
+  renewsAt: string | null;
+  graceEndsAt: string | null;
+  renewing: boolean;
+  onRenew: () => void;
+}) {
+  const tone =
+    status === "expired" || status === "cancelled" || status === "paused"
+      ? "rose"
+      : status === "past_due"
+        ? "amber"
+        : status === "active" || status === "trial"
+          ? "info"
+          : "gray";
+  const title =
+    status === "expired"
+      ? "Your subscription has expired"
+      : status === "cancelled"
+        ? "Your subscription is cancelled"
+        : status === "paused"
+          ? "Your subscription is paused"
+          : status === "past_due"
+            ? "Your subscription is past due"
+            : status === "trial"
+              ? `Trial ${renewsAt ? `ends ${formatDate(renewsAt)}` : "ending soon"}`
+              : `Renews ${renewsAt ? formatDate(renewsAt) : "soon"}`;
+
+  const body =
+    status === "expired"
+      ? "Publishing is paused. Renew to restore your live pages and features."
+      : status === "cancelled" || status === "paused"
+        ? "This subscription is not active. Choose a plan or renew to continue."
+        : status === "past_due" && graceEndsAt
+          ? `Your term has ended — you're within the ${formatDate(graceEndsAt)} grace period. Renew before it ends to keep everything running.`
+          : status === "past_due"
+            ? "Your term has ended. Renew within the grace period to avoid interruption."
+            : null;
+
+  const canRenew = status !== "active";
+
+  return (
+    <div
+      className={`sub-health sub-health--${tone}`}
+      style={{
+        display: "flex", alignItems: "center", gap: 12, padding: "11px 13px",
+        borderRadius: 11, border: "1px solid", flexWrap: "wrap",
+        ...(tone === "rose" && { borderColor: "rgba(244,63,94,.28)", background: "rgba(244,63,94,.07)" }),
+        ...(tone === "amber" && { borderColor: "rgba(245,158,11,.28)", background: "rgba(245,158,11,.07)" }),
+        ...(tone === "info" && { borderColor: "rgba(79,70,229,.22)", background: "rgba(79,70,229,.05)" }),
+        ...(tone === "gray" && { borderColor: "var(--line-2)", background: "var(--surface)" }),
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <b style={{ fontSize: 13 }}>{title}</b>
+        {body ? <div className="muted" style={{ fontSize: 12.5 }}>{body}</div> : null}
+        {!body && renewsAt && status !== "trial" ? (
+          <div className="muted" style={{ fontSize: 12.5 }}>Keep a valid payment method on file so billing never lapses.</div>
+        ) : null}
+      </div>
+      {canRenew ? (
+        <button className="btn btn-primary" onClick={onRenew} disabled={renewing}>
+          {renewing ? "Renewing…" : "Renew now"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function PlanLimitsSelect({ limits }: { limits: { templates: number | null; projects: number | null; users: number | null; landingPages: number | null } | null }) {
   const [open, setOpen] = useState(false);
   // A limit is a number, or null = unlimited. Show every quota row; render
   // "Unlimited" rather than hiding it.
@@ -865,6 +947,9 @@ export default function OrgSettingsPage() {
   const [changeLoading, setChangeLoading] = useState(false);
   const [changeError, setChangeError] = useState<string | null>(null);
   const [changeOk, setChangeOk] = useState<string | null>(null);
+  const [renewLoading, setRenewLoading] = useState(false);
+  const [renewError, setRenewError] = useState<string | null>(null);
+  const [renewOk, setRenewOk] = useState<string | null>(null);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -988,6 +1073,18 @@ export default function OrgSettingsPage() {
       setBilling(b); if (b.subscription) setPlansCycle(b.subscription.billingCycle);
     } catch (err) { setChangeError(err instanceof Error ? err.message : "Failed to change plan."); }
     finally { setChangeLoading(false); }
+  }
+
+  async function handleRenew() {
+    if (!accessToken) return;
+    setRenewError(null); setRenewOk(null); setRenewLoading(true);
+    try {
+      const res: BillingRenewResult = await renewSubscription();
+      const b = await apiFetch<OrgBillingSummary>("/org/billing", { headers: { Authorization: `Bearer ${accessToken}` } });
+      setBilling(b);
+      setRenewOk(`${res.status === "active" ? "Subscription renewed" : "Subscription updated"} — renews on ${res.renewsAt ? formatDate(res.renewsAt) : "your plan's term"}.`);
+    } catch (err) { setRenewError(err instanceof Error ? err.message : "Failed to renew subscription."); }
+    finally { setRenewLoading(false); }
   }
 
   if (loading || !org || !form) {
@@ -1415,12 +1512,21 @@ export default function OrgSettingsPage() {
             <SectionHead section="billing" />
             {changeOk ? <div className="form-alert ok">{changeOk}</div> : null}
             {changeError ? <div className="form-alert">{changeError}</div> : null}
+            {renewOk ? <div className="form-alert ok">{renewOk}</div> : null}
+            {renewError ? <div className="form-alert">{renewError}</div> : null}
             <Card icon="billing" title="Plan" sub="Subscription & seats">
               <div className="card-b" style={{ padding: 0 }}>
                 {billingLoading ? <p className="muted" style={{ padding: "4px 0 16px" }}>Loading billing details…</p> : billingError ? <p className="muted" style={{ padding: "4px 0 16px" }}>{billingError}</p> : !billing?.plan || !billing.subscription ? (
                   <div style={{ padding: "4px 0 16px" }}><p className="muted" style={{ marginTop: 0 }}>No active subscription on this organisation yet.</p><p className="muted" style={{ fontSize: 12.5 }}>Pick a plan below to get started.</p></div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "4px 0 16px" }}>
+                    <SubscriptionHealthBanner
+                      status={billing.subscription.status}
+                      renewsAt={billing.subscription.renewsAt}
+                      graceEndsAt={billing.subscription.graceEndsAt}
+                      renewing={renewLoading}
+                      onRenew={() => void handleRenew()}
+                    />
                     <div className="row2">
                       <div className="field" style={{ marginBottom: 0 }}>
                         <label>Current plan</label>
@@ -1447,6 +1553,7 @@ export default function OrgSettingsPage() {
                     <UsageBar label="Projects" used={billing.usage.projectsUsed} limit={billing.usage.projectsLimit} />
                     <UsageBar label="Users" used={billing.usage.usersUsed} limit={billing.usage.usersLimit} />
                     <UsageBar label="Templates" used={billing.usage.templatesUsed} limit={billing.usage.templatesLimit} />
+                    <UsageBar label="Landing pages" used={billing.usage.landingPagesUsed} limit={billing.usage.landingPagesLimit} />
                   </div>
                 )}
               </div>
