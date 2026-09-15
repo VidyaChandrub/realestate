@@ -16,11 +16,13 @@ import type { SupportMessage, SupportTicketDetail } from "@/lib/types";
 const STATUS_BADGE: Record<string, string> = {
   open: "b-amber",
   ongoing: "b-sky",
+  on_hold: "b-violet",
   resolved: "b-green",
 };
 const STATUS_LABEL: Record<string, string> = {
   open: "Open",
-  ongoing: "Ongoing",
+  ongoing: "In Progress",
+  on_hold: "On Hold",
   resolved: "Resolved",
 };
 const PRIORITY_BADGE: Record<string, string> = {
@@ -202,6 +204,15 @@ export default function OrgSupportTicketPage() {
             ✅ <b>Resolved</b> by {ticket.closedBy?.name ?? "the iPixxel team"}
             {ticket.closedAt ? ` on ${formatWhen(ticket.closedAt)}` : ""}. This conversation is now
             read-only — raise a new ticket if you need further help.
+          </div>
+        </Reveal>
+      ) : null}
+
+      {ticket.status === "on_hold" ? (
+        <Reveal delay={1}>
+          <div className="help" style={{ marginBottom: 18 }}>
+            ⏸ <b>On hold</b> by the iPixxel team{ticket.heldAt ? ` on ${formatWhen(ticket.heldAt)}` : ""}
+            {ticket.holdReason ? `: ${ticket.holdReason}` : ""}
           </div>
         </Reveal>
       ) : null}

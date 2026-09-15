@@ -10,6 +10,7 @@ import {
   getSupportTickets,
 } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
+import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 import { Icon } from "@/components/icons";
 import type {
   SupportTicketCategory,
@@ -41,12 +42,14 @@ const PRIORITY_BADGE: Record<SupportTicketPriority, string> = {
 const STATUS_BADGE: Record<string, string> = {
   open: "b-amber",
   ongoing: "b-sky",
+  on_hold: "b-violet",
   resolved: "b-green",
 };
 
 const STATUS_LABEL: Record<string, string> = {
   open: "Open",
-  ongoing: "Ongoing",
+  ongoing: "In Progress",
+  on_hold: "On Hold",
   resolved: "Resolved",
 };
 
@@ -373,8 +376,13 @@ export default function OrgSupportPage() {
                             </span>
                           </td>
                           <td>
-                            <span className={`badge ${STATUS_BADGE[t.status]}`}>
-                              {STATUS_LABEL[t.status]}
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              <span className={`badge ${STATUS_BADGE[t.status]}`}>
+                                {STATUS_LABEL[t.status]}
+                              </span>
+                              {t.status === "on_hold" && t.holdReason ? (
+                                <ReasonInfoPopover reason={t.holdReason} label="On-hold reason" />
+                              ) : null}
                             </span>
                           </td>
                           <td className="muted">{timeAgo(t.updatedAt)}</td>

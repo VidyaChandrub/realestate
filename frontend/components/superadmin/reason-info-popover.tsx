@@ -8,6 +8,8 @@ import { Icon } from "@/components/icons";
 // commonly sits inside a table cell within a horizontally-scrolling
 // .tbl-wrap (overflow-x: auto forces overflow-y: auto too per spec), so an
 // absolutely-positioned popover nested in that wrapper would get clipped.
+// Used from both the Support Management (.superadmin) and Support & Help
+// (.org) scopes — each has its own copy of the .reason-info-* CSS.
 export function ReasonInfoPopover({
   reason,
   label = "Rejection reason",
@@ -32,7 +34,9 @@ export function ReasonInfoPopover({
       setPos({ top: rect.bottom + 6, left: Math.max(12, left) });
     };
     reposition();
-    setPortalTarget((btnRef.current?.closest(".superadmin") as HTMLElement | null) ?? document.body);
+    setPortalTarget(
+      (btnRef.current?.closest(".superadmin, .org") as HTMLElement | null) ?? document.body,
+    );
 
     const close = () => setOpen(false);
     const onClick = (e: MouseEvent) => {

@@ -8,7 +8,8 @@ export type NotificationType =
   | 'organisation_rejected'
   | 'support_ticket_created'
   | 'support_ticket_message'
-  | 'support_ticket_status_changed';
+  | 'support_ticket_status_changed'
+  | 'support_ticket_assigned';
 
 // Creates an in-app notification row. Leave `recipientId` unset to address
 // "all Super Admins" (the platform-wide inbox — organisation registrations,
