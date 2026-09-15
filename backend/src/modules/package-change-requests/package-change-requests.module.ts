@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../database/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 import { PackageChangeRequestsService } from './package-change-requests.service';
 import {
   AdminPackageChangeRequestsController,
@@ -7,7 +8,7 @@ import {
 } from './package-change-requests.controller';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuthModule],
   controllers: [OrgPackageChangeRequestsController, AdminPackageChangeRequestsController],
   providers: [PackageChangeRequestsService],
   exports: [PackageChangeRequestsService],
