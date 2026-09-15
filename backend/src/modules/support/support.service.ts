@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -12,6 +13,8 @@ import { CreateSupportTicketDto } from './dto/create-support-ticket.dto';
 import { CreateSupportMessageDto } from './dto/create-support-message.dto';
 import { ListSupportTicketsQueryDto } from './dto/list-support-tickets-query.dto';
 import { CreateSupportUploadUrlDto } from './dto/create-support-upload-url.dto';
+import { HoldSupportTicketDto } from './dto/hold-support-ticket.dto';
+import { AssignSupportTicketDto } from './dto/assign-support-ticket.dto';
 
 const ACTOR_SELECT = {
   id: true,
@@ -24,6 +27,8 @@ const ACTOR_SELECT = {
 const TICKET_INCLUDE = {
   raisedBy: { select: ACTOR_SELECT },
   closedBy: { select: ACTOR_SELECT },
+  heldBy: { select: ACTOR_SELECT },
+  assignedTo: { select: ACTOR_SELECT },
   organisation: { select: { id: true, name: true } },
 } satisfies Prisma.SupportTicketInclude;
 
@@ -50,7 +55,10 @@ export class SupportService {
   // Attachments
   // -------------------------------------------------------------------------
 
-  createUploadUrl(orgId: string, dto: CreateSupportUploadUrlDto) {
+  // orgId is omitted for a Platform Team (Super Admin) upload — those land
+  // under the `platform/` storage prefix instead of an org's own, same as
+  // the template builder (see StorageService.buildKey).
+  createUploadUrl(orgId: string | undefined, dto: CreateSupportUploadUrlDto) {
     return this.storage.createUploadUrl({
       orgId,
       field: 'supportAttachment',
@@ -146,7 +154,7 @@ export class SupportService {
     // Opening the ticket clears its "unread" indicator in the list — the
     // same rows the bell counts, so the badge count drops too.
     await this.markTicketNotificationsRead(id, { recipientId: actor.sub });
-    return this.serializeDetail(ticket);
+    return this.serializeDetail(ticket, false);
   }
 
   async addOrgMessage(
@@ -167,7 +175,16 @@ export class SupportService {
   // -------------------------------------------------------------------------
 
   async listForAdmin(actor: JwtPayload, query: ListSupportTicketsQueryDto) {
-    return this.list(query, true, { recipientId: actor.sub, includeBroadcast: true });
+    // A Platform Team member without the system super_admin role only ever
+    // sees the tickets a Super Admin has assigned to them — not the whole
+    // platform-wide inbox. See assignTicket / assertAdminTicketAccess.
+    const assignedToId = this.isSuperAdmin(actor) ? undefined : actor.sub;
+    return this.list(
+      query,
+      true,
+      { recipientId: actor.sub, includeBroadcast: true },
+      assignedToId,
+    );
   }
 
   async getForAdmin(actor: JwtPayload, id: string) {
@@ -176,13 +193,14 @@ export class SupportService {
       include: TICKET_INCLUDE,
     });
     if (!ticket) throw new NotFoundException('Ticket not found');
+    this.assertAdminTicketAccess(actor, ticket);
     // Shared "all Super Admins" inbox — whoever opens the ticket clears it
     // for every Platform Team member, same as the bell's own mark-read.
     await this.markTicketNotificationsRead(id, {
       recipientId: actor.sub,
       includeBroadcast: true,
     });
-    return this.serializeDetail(ticket);
+    return this.serializeDetail(ticket, true);
   }
 
   async addAdminMessage(
@@ -194,7 +212,61 @@ export class SupportService {
       where: { id: ticketId },
     });
     if (!ticket) throw new NotFoundException('Ticket not found');
+    this.assertAdminTicketAccess(actor, ticket);
     return this.addMessage(ticket, actor, dto, { asAdmin: true });
+  }
+
+  /** Assigns (or unassigns, with `assigneeId: null`) a ticket to a Platform
+   *  Team member — Super Admin only. That member then sees this ticket in
+   *  their own Support Management list and can act on it (see
+   *  listForAdmin / assertAdminTicketAccess). */
+  async assignTicket(actor: JwtPayload, ticketId: string, dto: AssignSupportTicketDto) {
+    if (!this.isSuperAdmin(actor)) {
+      throw new ForbiddenException('Only a Super Admin can assign tickets.');
+    }
+    const ticket = await this.prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+      include: { organisation: { select: { name: true } } },
+    });
+    if (!ticket) throw new NotFoundException('Ticket not found');
+
+    const assigneeId = dto.assigneeId ?? null;
+    if (assigneeId) {
+      const assignee = await this.prisma.user.findFirst({
+        where: {
+          id: assigneeId,
+          orgId: null,
+          status: 'active',
+          userRoles: { some: { role: { scope: 'platform' } } },
+        },
+      });
+      if (!assignee) {
+        throw new BadRequestException(
+          'That user is not an active Platform Team member.',
+        );
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.supportTicket.update({
+        where: { id: ticketId },
+        data: { assignedToId: assigneeId },
+      });
+      if (assigneeId && assigneeId !== ticket.assignedToId) {
+        await tx.notification.create({
+          data: buildNotificationData({
+            orgId: ticket.orgId,
+            recipientId: assigneeId,
+            type: 'support_ticket_assigned',
+            title: `Ticket assigned to you: SR-${ticket.number}`,
+            body: `${ticket.subject} · ${ticket.organisation.name}`,
+            entity: 'SupportTicket',
+            entityId: ticket.id,
+          }),
+        });
+      }
+    });
+    return this.getForAdmin(actor, ticketId);
   }
 
   async closeTicket(actor: JwtPayload, ticketId: string) {
@@ -202,6 +274,7 @@ export class SupportService {
       where: { id: ticketId },
     });
     if (!ticket) throw new NotFoundException('Ticket not found');
+    this.assertAdminTicketAccess(actor, ticket);
 
     if (ticket.status !== 'resolved') {
       await this.prisma.$transaction(async (tx) => {
@@ -225,9 +298,101 @@ export class SupportService {
     return this.getForAdmin(actor, ticketId);
   }
 
+  /** Pauses a ticket with a required reason — Super Admin only. The org that
+   *  raised it (and Support Management's own list) sees status "On Hold"
+   *  with this reason behind a tooltip (see serializeSummary/serializeDetail). */
+  async holdTicket(actor: JwtPayload, ticketId: string, dto: HoldSupportTicketDto) {
+    const ticket = await this.prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+    });
+    if (!ticket) throw new NotFoundException('Ticket not found');
+    this.assertAdminTicketAccess(actor, ticket);
+    if (ticket.status === 'resolved') {
+      throw new ForbiddenException('A resolved ticket cannot be put on hold.');
+    }
+
+    const reason = dto.reason.trim();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.supportTicket.update({
+        where: { id: ticketId },
+        data: {
+          status: 'on_hold',
+          holdReason: reason,
+          heldAt: new Date(),
+          heldById: actor.sub,
+        },
+      });
+      await tx.notification.create({
+        data: buildNotificationData({
+          orgId: ticket.orgId,
+          recipientId: ticket.raisedById,
+          type: 'support_ticket_status_changed',
+          title: `Ticket on hold: SR-${ticket.number}`,
+          body: reason.slice(0, 160),
+          entity: 'SupportTicket',
+          entityId: ticket.id,
+        }),
+      });
+    });
+    return this.getForAdmin(actor, ticketId);
+  }
+
+  /** Resumes a held ticket back to active work — Super Admin only. */
+  async resumeTicket(actor: JwtPayload, ticketId: string) {
+    const ticket = await this.prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+    });
+    if (!ticket) throw new NotFoundException('Ticket not found');
+    this.assertAdminTicketAccess(actor, ticket);
+
+    if (ticket.status === 'on_hold') {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.supportTicket.update({
+          where: { id: ticketId },
+          data: { status: 'ongoing' },
+        });
+        await tx.notification.create({
+          data: buildNotificationData({
+            orgId: ticket.orgId,
+            recipientId: ticket.raisedById,
+            type: 'support_ticket_status_changed',
+            title: `Ticket resumed: SR-${ticket.number}`,
+            body: `${ticket.subject} is back in progress.`,
+            entity: 'SupportTicket',
+            entityId: ticket.id,
+          }),
+        });
+      });
+    }
+    return this.getForAdmin(actor, ticketId);
+  }
+
   // -------------------------------------------------------------------------
   // Shared
   // -------------------------------------------------------------------------
+
+  /** Mirrors SuperAdminGuard's own check — the system role, not just having
+   *  the admin_support permission. Only this role can see every org's
+   *  tickets and assign them out; every other Platform Team member is
+   *  scoped to their own assigned tickets (see listForAdmin /
+   *  assertAdminTicketAccess). */
+  private isSuperAdmin(actor: JwtPayload): boolean {
+    return actor.roles?.includes('super_admin') ?? false;
+  }
+
+  /** A non-super-admin Platform Team member may only view or act on a ticket
+   *  assigned to them — 404s (not 403) so an unassigned ticket's existence
+   *  isn't disclosed, matching "not shown in their list" for direct-id
+   *  access too. Super Admin is always exempt. */
+  private assertAdminTicketAccess(
+    actor: JwtPayload,
+    ticket: { assignedToId: string | null },
+  ) {
+    if (this.isSuperAdmin(actor)) return;
+    if (ticket.assignedToId !== actor.sub) {
+      throw new NotFoundException('Ticket not found');
+    }
+  }
 
   /** Marks this ticket's still-unread notifications read for one viewer (org)
    *  or the whole "all Super Admins" inbox plus this viewer (admin) — the
@@ -280,6 +445,9 @@ export class SupportService {
     query: ListSupportTicketsQueryDto & { orgId?: string },
     isAdmin: boolean,
     unreadScope: { recipientId: string; includeBroadcast?: boolean },
+    // Set only for a non-super-admin Platform Team member (see listForAdmin)
+    // — narrows the whole list to tickets assigned to them.
+    assignedToId?: string,
   ) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -287,6 +455,7 @@ export class SupportService {
     const where: Prisma.SupportTicketWhereInput = {};
     if (query.orgId) where.orgId = query.orgId;
     if (query.status) where.status = query.status;
+    if (assignedToId) where.assignedToId = assignedToId;
     if (query.search) {
       const search = query.search.replace(/^#?SR-/i, '');
       const asNumber = Number(search);
@@ -445,15 +614,26 @@ export class SupportService {
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt,
       closedAt: ticket.closedAt,
+      // Only meaningful while status is "on_hold" — the list's tooltip
+      // reads this to show why. Left populated after a resume/close (see
+      // holdTicket) so it stays available as a record if held again later.
+      holdReason: ticket.holdReason,
       // Drives the list's "new activity" dot — true while an unread
       // notification for this ticket still exists for the viewer (org: the
       // ticket's raiser; admin: any Super Admin, shared inbox).
       hasUnread,
-      ...(isAdmin ? { organisation: ticket.organisation } : {}),
+      ...(isAdmin
+        ? {
+            organisation: ticket.organisation,
+            // Support Management only — which Platform Team member (if any)
+            // this ticket is assigned to (see assignTicket).
+            assignedTo: ticket.assignedTo ? this.serializeActor(ticket.assignedTo) : null,
+          }
+        : {}),
     };
   }
 
-  private async serializeDetail(ticket: TicketRow) {
+  private async serializeDetail(ticket: TicketRow, isAdmin: boolean) {
     const messages = await this.prisma.supportMessage.findMany({
       where: { ticketId: ticket.id },
       orderBy: { createdAt: 'asc' },
@@ -473,8 +653,14 @@ export class SupportService {
         raisedBy: this.serializeActor(ticket.raisedBy),
         closedBy: ticket.closedBy ? this.serializeActor(ticket.closedBy) : null,
         closedAt: ticket.closedAt,
+        holdReason: ticket.holdReason,
+        heldBy: ticket.heldBy ? this.serializeActor(ticket.heldBy) : null,
+        heldAt: ticket.heldAt,
         createdAt: ticket.createdAt,
         updatedAt: ticket.updatedAt,
+        ...(isAdmin
+          ? { assignedTo: ticket.assignedTo ? this.serializeActor(ticket.assignedTo) : null }
+          : {}),
       },
       messages: messages.map((m) => this.serializeMessage(m, ticket.orgId)),
     };

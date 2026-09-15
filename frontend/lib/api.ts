@@ -32,6 +32,8 @@ import type {
   OrgNotificationsListResponse,
   CreateSupportTicketInput,
   CreateSupportMessageInput,
+  HoldSupportTicketInput,
+  AssignSupportTicketInput,
   ListSupportTicketsParams,
   SupportMessage,
   SupportTicketDetailResponse,
@@ -943,6 +945,17 @@ export function addSupportMessage(
 
 // --- Support Management (Super Admin console) ---
 
+export function createAdminSupportUploadUrl(input: {
+  filename: string;
+  contentType: string;
+  size: number;
+}): Promise<LogoUploadUrlResult> {
+  return apiFetch<LogoUploadUrlResult>("/admin/support/upload-url", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function getAdminSupportTickets(
   params?: ListSupportTicketsParams,
 ): Promise<SupportTicketsListResponse> {
@@ -972,6 +985,36 @@ export function closeAdminSupportTicket(
 ): Promise<SupportTicketDetailResponse> {
   return apiFetch<SupportTicketDetailResponse>(`/admin/support/${id}/close`, {
     method: "POST",
+  });
+}
+
+export function holdAdminSupportTicket(
+  id: string,
+  input: HoldSupportTicketInput,
+): Promise<SupportTicketDetailResponse> {
+  return apiFetch<SupportTicketDetailResponse>(`/admin/support/${id}/hold`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function resumeAdminSupportTicket(
+  id: string,
+): Promise<SupportTicketDetailResponse> {
+  return apiFetch<SupportTicketDetailResponse>(`/admin/support/${id}/resume`, {
+    method: "POST",
+  });
+}
+
+// Super Admin only — the backend rejects this for any other Platform Team
+// member even with Support Management access (see SupportService.assignTicket).
+export function assignAdminSupportTicket(
+  id: string,
+  input: AssignSupportTicketInput,
+): Promise<SupportTicketDetailResponse> {
+  return apiFetch<SupportTicketDetailResponse>(`/admin/support/${id}/assign`, {
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }
 

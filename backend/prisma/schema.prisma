@@ -266,6 +266,8 @@ model User {
   unitSalesAgentAssignments UnitSalesAgent[]
   raisedSupportTickets SupportTicket[]   @relation("SupportTicketRaisedBy")
   closedSupportTickets SupportTicket[]   @relation("SupportTicketClosedBy")
+  heldSupportTickets   SupportTicket[]   @relation("SupportTicketHeldBy")
+  assignedSupportTickets SupportTicket[] @relation("SupportTicketAssignedTo")
   sentSupportMessages  SupportMessage[]  @relation("SupportMessageSender")
   teamChannelsCreated  TeamChannel[]     @relation("TeamChannelCreatedBy")
   teamChannelsDm       TeamChannel[]     @relation("TeamChannelDmUser")
@@ -638,6 +640,10 @@ enum NotificationType {
   support_ticket_created
   support_ticket_message
   support_ticket_status_changed
+  // A Super Admin assigns a ticket to a specific Platform Team member —
+  // addressed to that member only (recipientId), not the "all super admins"
+  // broadcast. See SupportService.assignTicket.
+  support_ticket_assigned
   // Subscription lifecycle — created by the expiry sweep (and the org's own
   // billing read when the sweep hasn't run yet). subscription_expiring fires
   // `notifyDays` before renewsAt; subscription_past_due fires the moment the
@@ -686,6 +692,7 @@ model Notification {
 enum SupportTicketStatus {
   open
   ongoing
+  on_hold
   resolved
 
   @@schema("audit")
@@ -714,17 +721,34 @@ model SupportTicket {
   status     SupportTicketStatus   @default(open)
   closedAt   DateTime?             @map("closed_at")
   closedById String?               @map("closed_by_id")
+  // Set together whenever a Super Admin puts this ticket on hold (see
+  // SupportService.holdTicket) — holdReason is what the tooltip in both the
+  // org and Support Management lists shows. Left in place across a later
+  // resume/close so the last hold reason stays visible as a record; only
+  // `status` gates whether it's currently shown.
+  holdReason String?               @map("hold_reason")
+  heldAt     DateTime?             @map("held_at")
+  heldById   String?               @map("held_by_id")
+  // Set only by a Super Admin (see SupportService.assignTicket) — the
+  // Platform Team member this ticket is handed off to. A non-super-admin
+  // Platform Team member with Support Management access only ever sees (and
+  // can act on) tickets where this is their own id (see
+  // SupportService.assertAdminTicketAccess).
+  assignedToId String?             @map("assigned_to_id")
   createdAt  DateTime              @default(now()) @map("created_at")
   updatedAt  DateTime              @updatedAt @map("updated_at")
 
   organisation Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
   raisedBy     User             @relation("SupportTicketRaisedBy", fields: [raisedById], references: [id], onDelete: Cascade)
   closedBy     User?            @relation("SupportTicketClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  heldBy       User?            @relation("SupportTicketHeldBy", fields: [heldById], references: [id], onDelete: SetNull)
+  assignedTo   User?            @relation("SupportTicketAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   messages     SupportMessage[]
 
   @@unique([orgId, number])
   @@index([orgId])
   @@index([status])
+  @@index([assignedToId])
   @@map("support_tickets")
   @@schema("audit")
 }

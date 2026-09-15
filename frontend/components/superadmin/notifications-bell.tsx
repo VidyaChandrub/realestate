@@ -23,6 +23,7 @@ const TYPE_LABEL: Record<string, string> = {
   support_ticket_created: "New ticket",
   support_ticket_message: "Support message",
   support_ticket_status_changed: "Ticket status",
+  support_ticket_assigned: "Ticket assigned",
 };
 
 const TYPE_ICON: Record<string, string> = {
@@ -34,7 +35,19 @@ const TYPE_ICON: Record<string, string> = {
   support_ticket_created: "flag",
   support_ticket_message: "mail",
   support_ticket_status_changed: "check",
+  support_ticket_assigned: "flag",
 };
+
+// A new-ticket notification's body is built server-side as
+// "SR-3 · Billing · high priority" — append the raising organisation's name
+// (already included on every notification row) so a Super Admin can tell
+// which org raised it without opening the ticket.
+function notificationBody(n: AppNotification): string | null {
+  if (n.type === "support_ticket_created" && n.organisation?.name) {
+    return n.body ? `${n.body} · ${n.organisation.name}` : n.organisation.name;
+  }
+  return n.body;
+}
 
 function relativeTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -58,7 +71,8 @@ function getNotificationLink(n: AppNotification): string {
   if (
     n.type === "support_ticket_created" ||
     n.type === "support_ticket_message" ||
-    n.type === "support_ticket_status_changed"
+    n.type === "support_ticket_status_changed" ||
+    n.type === "support_ticket_assigned"
   ) {
     return n.entityId ? `/admin-console/support/${n.entityId}` : "/admin-console/support";
   }
@@ -110,7 +124,7 @@ export function NotificationsBell({ accessToken }: { accessToken: string | null 
     for (const n of recent.data) {
       if (seen.has(n.id)) continue;
       seen.add(n.id);
-      toast({ title: n.title, description: n.body ?? undefined, variant: "info" });
+      toast({ title: n.title, description: notificationBody(n) ?? undefined, variant: "info" });
     }
   }
 
@@ -230,7 +244,7 @@ export function NotificationsBell({ accessToken }: { accessToken: string | null 
                       <span className="nb-meta">{relativeTime(n.createdAt)}</span>
                     </div>
                     <div className="nb-title">{n.title}</div>
-                    {n.body ? <div className="nb-body">{n.body}</div> : null}
+                    {notificationBody(n) ? <div className="nb-body">{notificationBody(n)}</div> : null}
                   </button>
                 ))}
                 {canLoadMore ? (
