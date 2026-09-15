@@ -363,4 +363,18 @@ export async function assertOrgCanPublish(prisma: PrismaLike, orgId: string): Pr
       'Your current plan does not include Publishing. Upgrade your plan from Org Settings → Billing to publish landing pages.',
     );
   }
+
+  // Published landing pages limit check
+  const maxPublishedAllowed = resolveLimit((sub as any).plan, 'landingPages');
+  if (Number.isFinite(maxPublishedAllowed)) {
+    const publishedCount = await prisma.landingPage.count({
+      where: { orgId, status: 'published', pageType: 'landing' },
+    });
+    if (publishedCount >= maxPublishedAllowed) {
+      const planName = (sub as any).plan?.name ? `"${(sub as any).plan.name}" ` : '';
+      throw new ForbiddenException(
+        `Publishing limit reached. Your ${planName}plan allows a maximum of ${maxPublishedAllowed} published landing page(s) simultaneously. Please unpublish an existing page or upgrade your package limit to publish this page.`,
+      );
+    }
+  }
 }

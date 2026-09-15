@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutTemplate, Search } from "lucide-react";
+import { LayoutTemplate, Search, Plus, Check } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -19,11 +19,7 @@ import {
   type InventoryBindValue,
 } from "@/components/org/inventory-bind-fields";
 import type { LandingPageData } from "@/lib/openpage/types";
-import type { LandingPageRow, OrgTemplateSummary, OrgTemplatesListResponse } from "@/lib/types";
-// Canvas renders using the builder's ps-* classes, which only this route
-// needs — every rule in openpage.css is ps-prefixed, so importing it here
-// can't leak into the rest of the org shell (same pattern app/org/*
-// already uses borrowing superadmin.css from the Super Admin route group).
+import type { LandingPageRow, OrgTemplateSummary, OrgTemplatesListResponse, AvailableTemplatesResponse } from "@/lib/types";
 import "@/app/openpage.css";
 
 const LIMIT = 12;
@@ -38,6 +34,14 @@ export default function OrgTemplatesPage() {
   const [useHasInventory, setUseHasInventory] = useState(false);
   const [useSubmitting, setUseSubmitting] = useState(false);
   const [useError, setUseError] = useState<string | null>(null);
+
+  // Add Template Modal State
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [availableData, setAvailableData] = useState<AvailableTemplatesResponse | null>(null);
+  const [availableLoading, setAvailableLoading] = useState(false);
+  const [availableError, setAvailableError] = useState<string | null>(null);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [assignMessage, setAssignMessage] = useState<string | null>(null);
 
   function openUseTemplate(id: string, defaultName: string) {
     setUseTemplate({ id, name: defaultName });
@@ -90,20 +94,10 @@ export default function OrgTemplatesPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setSearch(searchInput.trim());
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [searchInput]);
-
-  useEffect(() => {
+  const fetchAssignedTemplates = useCallback(() => {
     if (!accessToken) return;
-    /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     setLoadError(null);
-    /* eslint-enable react-hooks/set-state-in-effect */
     const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
     if (search) params.set("search", search);
     if (category) params.set("category", category);
@@ -115,6 +109,56 @@ export default function OrgTemplatesPage() {
       .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load templates."))
       .finally(() => setLoading(false));
   }, [accessToken, page, search, category]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
+    fetchAssignedTemplates();
+  }, [fetchAssignedTemplates]);
+
+  const loadAvailableTemplates = useCallback(() => {
+    if (!accessToken) return;
+    setAvailableLoading(true);
+    setAvailableError(null);
+    apiFetch<AvailableTemplatesResponse>("/org/templates/available", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then(setAvailableData)
+      .catch((err) => setAvailableError(err instanceof Error ? err.message : "Failed to load available templates."))
+      .finally(() => setAvailableLoading(false));
+  }, [accessToken]);
+
+  function openAddModal() {
+    setAddModalOpen(true);
+    setAssignMessage(null);
+    loadAvailableTemplates();
+  }
+
+  async function handleAssignTemplate(templateId: string) {
+    if (!accessToken) return;
+    setAssigningId(templateId);
+    setAssignMessage(null);
+    setAvailableError(null);
+    try {
+      const res = await apiFetch<{ success: boolean; message: string }>(`/org/templates/${templateId}/assign`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setAssignMessage(res.message);
+      loadAvailableTemplates();
+      fetchAssignedTemplates();
+    } catch (err) {
+      setAvailableError(err instanceof Error ? err.message : "Failed to add template.");
+    } finally {
+      setAssigningId(null);
+    }
+  }
 
   function openPreview(id: string) {
     if (!accessToken) return;
@@ -150,13 +194,18 @@ export default function OrgTemplatesPage() {
 
   return (
     <>
-      <div className="page-head reveal in">
+      <div className="page-head reveal in" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
         <div>
           <div className="eyebrow">
             <LayoutTemplate size={13} /> Website
           </div>
           <h1>Templates</h1>
           <div className="sub">Ready-made templates granted to your organisation.</div>
+        </div>
+        <div className="actions" style={{ marginTop: 8 }}>
+          <button className="btn btn-primary" type="button" onClick={openAddModal} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <Plus size={15} /> Add Template
+          </button>
         </div>
       </div>
 
@@ -209,13 +258,18 @@ export default function OrgTemplatesPage() {
               <LayoutTemplate size={40} />
             </div>
             <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
-              {isFiltered ? "No templates match this filter" : "No templates available yet"}
+              {isFiltered ? "No templates match this filter" : "No templates added yet"}
             </div>
-            <div className="muted" style={{ fontSize: 13.5 }}>
+            <div className="muted" style={{ fontSize: 13.5, marginBottom: 16 }}>
               {isFiltered
                 ? "Try a different search or category."
-                : "No templates have been assigned to your organisation yet. Ask your Super Admin to assign published templates."}
+                : "You haven't selected any templates for your workspace yet. Click 'Add Template' to choose from your plan's available templates."}
             </div>
+            {!isFiltered && (
+              <button className="btn btn-primary" type="button" onClick={openAddModal}>
+                <Plus size={15} style={{ marginRight: 6 }} /> Add Template from Package
+              </button>
+            )}
           </div>
         </Reveal>
       ) : (
@@ -255,6 +309,155 @@ export default function OrgTemplatesPage() {
           </button>
         </div>
       ) : null}
+
+      {/* Add Template Modal */}
+      <Modal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        title="Add Template to Workspace"
+        description="Select remaining templates included in your package plan."
+        size="lg"
+      >
+        <div>
+          {availableLoading ? (
+            <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+              Loading available package templates…
+            </div>
+          ) : availableError ? (
+            <div style={{ padding: "16px 0", color: "var(--rose)", fontSize: 13 }}>
+              {availableError}
+            </div>
+          ) : availableData ? (
+            <div>
+              {/* Quota Banner */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justify: "space-between",
+                  padding: "12px 16px",
+                  background: "var(--surface-2, #f8fafc)",
+                  borderRadius: 10,
+                  border: "1px solid var(--line)",
+                  marginBottom: 16,
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+                    {availableData.planName} Package
+                  </span>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                    Template Allowance: {availableData.assignedCount} of{" "}
+                    {availableData.maxAllowed == null ? "Unlimited" : availableData.maxAllowed} Selected
+                  </div>
+                </div>
+                <span
+                  className={`badge ${
+                    availableData.remainingQuota === 0
+                      ? "b-amber"
+                      : availableData.remainingQuota != null
+                      ? "b-indigo"
+                      : "b-green"
+                  }`}
+                  style={{ fontSize: 12, padding: "4px 10px" }}
+                >
+                  {availableData.remainingQuota === 0
+                    ? "Quota Full"
+                    : availableData.remainingQuota != null
+                    ? `${availableData.remainingQuota} Available`
+                    : "Unlimited"}
+                </span>
+              </div>
+
+              {assignMessage && (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    background: "var(--green-050, #f0fdf4)",
+                    color: "var(--green, #16a34a)",
+                    border: "1px solid var(--green-100, #bbf7d0)",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    marginBottom: 16,
+                  }}
+                >
+                  {assignMessage}
+                </div>
+              )}
+
+              {/* Template Cards Grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16, maxHeight: 420, overflowY: "auto", paddingRight: 4 }}>
+                {availableData.data.map((tmpl) => {
+                  const isAssigned = tmpl.isAssigned;
+                  const isQuotaFull = availableData.remainingQuota === 0 && !isAssigned;
+
+                  return (
+                    <div
+                      key={tmpl.id}
+                      style={{
+                        border: isAssigned ? "2px solid var(--indigo, #6366f1)" : "1px solid var(--line)",
+                        borderRadius: 12,
+                        overflow: "hidden",
+                        background: "#fff",
+                        display: "flex",
+                        flexDirection: "column",
+                        position: "relative",
+                      }}
+                    >
+                      <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent={isAssigned ? "#6366f1" : "#94a3b8"} />
+                      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                            <span style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{tmpl.name}</span>
+                            {tmpl.category && <span className="badge b-gray" style={{ fontSize: 10 }}>{tmpl.category}</span>}
+                          </div>
+                          <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{tmpl.template}</div>
+                        </div>
+
+                        <div style={{ marginTop: "auto", paddingTop: 8 }}>
+                          {isAssigned ? (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "var(--indigo, #6366f1)",
+                                background: "var(--indigo-050, #eef2ff)",
+                                padding: "6px 12px",
+                                borderRadius: 8,
+                                width: "100%",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Check size={14} /> Already Selected
+                            </span>
+                          ) : (
+                            <button
+                              className="btn btn-primary btn-sm"
+                              type="button"
+                              disabled={isQuotaFull || assigningId === tmpl.id}
+                              onClick={() => handleAssignTemplate(tmpl.id)}
+                              style={{ width: "100%", justifyContent: "center" }}
+                            >
+                              {assigningId === tmpl.id
+                                ? "Adding…"
+                                : isQuotaFull
+                                ? "Package Limit Reached"
+                                : "+ Add to Workspace"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
 
       <Modal
         open={!!previewId}
@@ -384,3 +587,4 @@ function OrgTemplateCard({
     </Reveal>
   );
 }
+

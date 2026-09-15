@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { toLandingPageData } from '../admin-templates/template.mapper';
 import { ListOrgTemplatesQueryDto } from './dto/list-org-templates-query.dto';
+import { resolveTemplateQuota } from '../../common/utils/plan-quota.util';
+import { getOrgActivePlan } from '../../common/utils/subscription-lifecycle.util';
 
 // Templates are plan-quota based, not per-template priced — access is
 // entirely determined by the OrganisationTemplate assignment made at
@@ -74,6 +76,109 @@ export class OrgTemplatesService {
     };
   }
 
+  async getAvailable(orgId: string) {
+    const activePlanInfo = await getOrgActivePlan(this.prisma, orgId);
+    const plan = activePlanInfo?.plan;
+    const maxAllowed = resolveTemplateQuota(plan);
+
+    const [allPublishedTemplates, assignedRecords] = await Promise.all([
+      this.prisma.template.findMany({
+        where: ELIGIBLE_WHERE,
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.organisationTemplate.findMany({
+        where: { orgId },
+        select: { templateId: true },
+      }),
+    ]);
+
+    const assignedSet = new Set(assignedRecords.map((a) => a.templateId));
+    const assignedCount = assignedSet.size;
+    const remainingQuota = Number.isFinite(maxAllowed)
+      ? Math.max(0, maxAllowed - assignedCount)
+      : null;
+
+    const data = allPublishedTemplates.map((t) => {
+      const mapped = toLandingPageData(t);
+      return {
+        id: mapped.id,
+        name: mapped.name,
+        slug: mapped.slug,
+        thumbnail: mapped.thumbnail,
+        category: mapped.category,
+        template: mapped.template,
+        updatedAt: mapped.updatedAt,
+        isAssigned: assignedSet.has(t.id),
+      };
+    });
+
+    return {
+      data,
+      assignedCount,
+      maxAllowed: Number.isFinite(maxAllowed) ? maxAllowed : null,
+      remainingQuota,
+      planName: plan?.name ?? 'Current',
+    };
+  }
+
+  async assignTemplate(templateId: string, orgId: string, userId?: string) {
+    const template = await this.prisma.template.findFirst({
+      where: { id: templateId, ...ELIGIBLE_WHERE },
+    });
+    if (!template) {
+      throw new NotFoundException('Template not found or not published');
+    }
+
+    const existing = await this.prisma.organisationTemplate.findUnique({
+      where: { orgId_templateId: { orgId, templateId } },
+    });
+    if (existing) {
+      return { success: true, message: 'Template is already assigned to your organisation' };
+    }
+
+    const activePlanInfo = await getOrgActivePlan(this.prisma, orgId);
+    const plan = activePlanInfo?.plan;
+    const maxAllowed = resolveTemplateQuota(plan);
+    const currentCount = await this.prisma.organisationTemplate.count({
+      where: { orgId },
+    });
+
+    if (currentCount >= maxAllowed) {
+      const planName = plan?.name ? `"${plan.name}" ` : '';
+      throw new BadRequestException(
+        `Template limit reached. Your ${planName}plan allows a maximum of ${maxAllowed} template(s). Upgrade your package to add more templates.`,
+      );
+    }
+
+    await this.prisma.organisationTemplate.create({
+      data: {
+        orgId,
+        templateId,
+        assignedBy: userId,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Template added to your organisation successfully',
+    };
+  }
+
+  async unassignTemplate(templateId: string, orgId: string) {
+    const existing = await this.prisma.organisationTemplate.findUnique({
+      where: { orgId_templateId: { orgId, templateId } },
+    });
+    if (!existing) {
+      throw new NotFoundException('Template assignment not found');
+    }
+
+    await this.prisma.organisationTemplate.delete({
+      where: { orgId_templateId: { orgId, templateId } },
+    });
+
+    return { success: true, message: 'Template removed from your organisation' };
+  }
+
   async getById(id: string, orgId?: string | null) {
     // Same eligibility filter as the list — a draft/paid/thank-you id must
     // 404 here, not just be hidden by the UI.
@@ -96,3 +201,4 @@ export class OrgTemplatesService {
     return toLandingPageData(template, { includeContent: true });
   }
 }
+

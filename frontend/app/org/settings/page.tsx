@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useState, useCallback, type ChangeEvent } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, changePlan, createOrgCatalogOption, deleteOrgCatalogOption, getInvoices, getOrgCatalogOptions, getOrgDomainInfo, getOrgLeadStageDisplays, getPlans, renewSubscription, requestCustomDomain, updateOrgLeadStageDisplay } from "@/lib/api";
-import type { BillingRenewResult, ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
+import { apiFetch, cancelPackageChangeRequest, changePlan, createOrgCatalogOption, deleteOrgCatalogOption, getInvoices, getOrgCatalogOptions, getOrgDomainInfo, getOrgLeadStageDisplays, getOrgPackageChangeRequest, getPlans, renewSubscription, requestCustomDomain, submitPackageChangeRequest, updateOrgLeadStageDisplay } from "@/lib/api";
+import type { BillingRenewResult, ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, PackageChangeRequestRow, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
 import { DEFAULT_LEAD_STAGES, LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead-stages";
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { OrgSmtpSettings } from "@/components/org/org-smtp-settings";
+import { Modal } from "@/components/ui/modal";
 import { subdomainPreviewHost } from "@/lib/domain";
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
 
@@ -281,35 +282,26 @@ function SubscriptionHealthBanner({
   );
 }
 
-function PlanLimitsSelect({ limits }: { limits: { templates: number | null; projects: number | null; users: number | null; landingPages: number | null } | null }) {
-  const [open, setOpen] = useState(false);
-  // A limit is a number, or null = unlimited. Show every quota row; render
-  // "Unlimited" rather than hiding it.
+function PlanLimitsList({ limits, features }: { limits: { templates: number | null; projects: number | null; users: number | null; landingPages: number | null } | null; features?: string[] | null }) {
   const rows = PLAN_LIMIT_ROWS.map((r) => ({
     ...r,
     count: limits?.[r.key] == null ? "Unlimited" : String(limits[r.key]),
   }));
   return (
-    <div className="mselect">
-      <button type="button" className="mselect-btn" onClick={() => setOpen((o) => !o)}>
-        <span>{rows.length} included</span><span className={`caret${open ? " up" : ""}`}>▾</span>
-      </button>
-      {open ? (
-        <div className="mselect-panel">
-          {rows.length === 0 ? (
-            <div className="mselect-empty">No limit details for this plan.</div>
-          ) : (
-            rows.map((r) => (
-              <label key={r.key} className="mselect-opt">
-                <input type="checkbox" defaultChecked readOnly />
-                <span className="cnt">{r.count}</span>
-                <span>{r.label}</span>
-              </label>
-            ))
-          )}
-        </div>
-      ) : null}
-    </div>
+    <ul className="plan-limits-list">
+      {rows.map((r) => (
+        <li key={r.key}>
+          <Icon name="check" size={14} />
+          <span><b>{r.count}</b> {r.label}</span>
+        </li>
+      ))}
+      {(features || []).map((feat, idx) => (
+        <li key={idx}>
+          <Icon name="check" size={14} />
+          <span>{feat}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -951,6 +943,61 @@ export default function OrgSettingsPage() {
   const [renewError, setRenewError] = useState<string | null>(null);
   const [renewOk, setRenewOk] = useState<string | null>(null);
 
+  const [pendingChangeRequest, setPendingChangeRequest] = useState<PackageChangeRequestRow | null>(null);
+  const [requestModalPlan, setRequestModalPlan] = useState<Plan | null>(null);
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [cancelingRequest, setCancelingRequest] = useState(false);
+
+  const loadPendingRequest = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const res = await getOrgPackageChangeRequest();
+      setPendingChangeRequest(res.pendingRequest);
+    } catch {
+      // ignore
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    void loadPendingRequest();
+  }, [loadPendingRequest]);
+
+  async function handleSubmitPackageChangeRequest() {
+    if (!requestModalPlan) return;
+    setSubmittingRequest(true);
+    setChangeError(null);
+    setChangeOk(null);
+    try {
+      const req = await submitPackageChangeRequest({
+        targetPlanId: requestModalPlan.id,
+        billingCycle: plansCycle,
+      });
+      setPendingChangeRequest(req);
+      setRequestModalPlan(null);
+      setChangeOk(`Package change request to "${requestModalPlan.name}" submitted successfully. Awaiting Super Admin approval.`);
+    } catch (err) {
+      setChangeError(err instanceof Error ? err.message : "Failed to submit package change request.");
+    } finally {
+      setSubmittingRequest(false);
+    }
+  }
+
+  async function handleCancelPackageChangeRequest() {
+    if (!pendingChangeRequest) return;
+    setCancelingRequest(true);
+    setChangeError(null);
+    setChangeOk(null);
+    try {
+      await cancelPackageChangeRequest(pendingChangeRequest.id);
+      setPendingChangeRequest(null);
+      setChangeOk("Package change request cancelled successfully.");
+    } catch (err) {
+      setChangeError(err instanceof Error ? err.message : "Failed to cancel request.");
+    } finally {
+      setCancelingRequest(false);
+    }
+  }
+
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
     if (!accessToken) return;
@@ -1510,77 +1557,297 @@ export default function OrgSettingsPage() {
           {/* BILLING */}
           <div className={`os-section${section === "billing" ? " on" : ""}`}>
             <SectionHead section="billing" />
-            {changeOk ? <div className="form-alert ok">{changeOk}</div> : null}
-            {changeError ? <div className="form-alert">{changeError}</div> : null}
-            {renewOk ? <div className="form-alert ok">{renewOk}</div> : null}
-            {renewError ? <div className="form-alert">{renewError}</div> : null}
-            <Card icon="billing" title="Plan" sub="Subscription & seats">
+            
+            {/* Success / Alert Banner */}
+            {changeOk ? (
+              <div style={{ padding: "12px 16px", borderRadius: 12, background: "var(--green-050)", border: "1px solid rgba(22, 163, 74, 0.3)", color: "var(--green)", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, fontSize: 13.5, fontWeight: 600 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--green)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>✓</span>
+                  <span>{changeOk}</span>
+                </div>
+                <button type="button" onClick={() => setChangeOk(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--green)", fontSize: 16 }}>✕</button>
+              </div>
+            ) : null}
+
+            {pendingChangeRequest ? (
+              <div
+                style={{
+                  padding: "16px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                  background: "rgba(245, 158, 11, 0.08)",
+                  marginBottom: "20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "16px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <b style={{ color: "#b45309", fontSize: 14 }}>Package Change Pending Approval</b>
+                    <span className="badge b-amber">Pending Approval</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: "var(--ink-2)" }}>
+                    Request to switch to <strong>{pendingChangeRequest.targetPlan?.name ?? "Selected Package"}</strong> ({pendingChangeRequest.billingCycle === "yearly" ? "Billed yearly" : "Billed monthly"}) submitted on {formatDate(pendingChangeRequest.createdAt)}.
+                  </div>
+                  <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                    Your organisation will continue using the active <strong>{billing?.plan?.name ?? "current"}</strong> plan until a Super Admin approves your request.
+                  </div>
+                </div>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ color: "var(--rose)", borderColor: "rgba(244,63,94,0.3)" }}
+                  disabled={cancelingRequest}
+                  onClick={() => void handleCancelPackageChangeRequest()}
+                >
+                  {cancelingRequest ? "Cancelling…" : "Cancel Request"}
+                </button>
+              </div>
+            ) : null}
+            {changeError ? <div className="form-alert" style={{ marginBottom: 16 }}>{changeError}</div> : null}
+            {renewOk ? <div className="form-alert ok" style={{ marginBottom: 16 }}>{renewOk}</div> : null}
+            {renewError ? <div className="form-alert" style={{ marginBottom: 16 }}>{renewError}</div> : null}
+
+            {/* Current Plan Card */}
+            <Card icon="billing" title="Current Plan" sub="Here's your active plan and usage summary.">
               <div className="card-b" style={{ padding: 0 }}>
-                {billingLoading ? <p className="muted" style={{ padding: "4px 0 16px" }}>Loading billing details…</p> : billingError ? <p className="muted" style={{ padding: "4px 0 16px" }}>{billingError}</p> : !billing?.plan || !billing.subscription ? (
-                  <div style={{ padding: "4px 0 16px" }}><p className="muted" style={{ marginTop: 0 }}>No active subscription on this organisation yet.</p><p className="muted" style={{ fontSize: 12.5 }}>Pick a plan below to get started.</p></div>
+                {billingLoading ? (
+                  <p className="muted" style={{ padding: "4px 0 16px" }}>Loading billing details…</p>
+                ) : billingError ? (
+                  <p className="muted" style={{ padding: "4px 0 16px" }}>{billingError}</p>
+                ) : !billing?.plan || !billing.subscription ? (
+                  <div style={{ padding: "16px 0" }}>
+                    <p className="muted" style={{ marginTop: 0 }}>No active subscription on this organisation yet.</p>
+                    <p className="muted" style={{ fontSize: 12.5 }}>Pick a plan below to get started.</p>
+                  </div>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "4px 0 16px" }}>
-                    <SubscriptionHealthBanner
-                      status={billing.subscription.status}
-                      renewsAt={billing.subscription.renewsAt}
-                      graceEndsAt={billing.subscription.graceEndsAt}
-                      renewing={renewLoading}
-                      onRenew={() => void handleRenew()}
-                    />
-                    <div className="row2">
-                      <div className="field" style={{ marginBottom: 0 }}>
-                        <label>Current plan</label>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span className={`badge ${billing.plan.badge}`} style={{ fontSize: 13, padding: "6px 12px" }}>{billing.plan.name}</span>
-                          {billing.plan.isPopular ? <span className="chip">Popular</span> : null}
-                          <span className={`badge ${SUBSCRIPTION_STATUS_BADGE[billing.subscription.status] ?? "b-gray"}`}>{SUBSCRIPTION_STATUS_LABEL[billing.subscription.status] ?? billing.subscription.status}</span>
-                        </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, padding: "12px 16px", background: "var(--surface-2)", borderRadius: 12, border: "1px solid var(--line-2)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                      <div style={{ width: 44, height: 44, borderRadius: 12, background: "var(--amber-050)", color: "var(--amber)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+                        👑
                       </div>
-                      <div className="field" style={{ marginBottom: 0 }}>
-                        <label>Price</label>
-                        <div style={{ fontWeight: 700, fontSize: 15 }}>
-                          {formatMoney(billing.subscription.billingCycle === "yearly" ? billing.plan.priceYearly : billing.plan.priceMonthly, billing.subscription.currency)}
-                          <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}> / {billing.subscription.billingCycle === "yearly" ? "year" : "month"}</span>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{billing.plan.name}</h3>
+                          <span className={`badge ${SUBSCRIPTION_STATUS_BADGE[billing.subscription.status] ?? "b-green"}`}>
+                            {SUBSCRIPTION_STATUS_LABEL[billing.subscription.status] ?? "Active"}
+                          </span>
                         </div>
+                        {billing.subscription.renewsAt ? (
+                          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                            🗓 Renews on <b>{formatDate(billing.subscription.renewsAt)}</b>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
-                    {billing.subscription.renewsAt ? (
-                      <div className="field" style={{ marginBottom: 0 }}>
-                        <label>{billing.subscription.status === "trial" ? "Trial ends" : "Renews on"}</label>
-                        <div>{formatDate(billing.subscription.renewsAt)}</div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, background: "var(--surface)", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--line)" }}>
+                      <div style={{ fontSize: 18, color: "var(--brand)" }}>📅</div>
+                      <div>
+                        <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 700, color: "var(--muted)" }}>Next billing date</div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>{billing.subscription.renewsAt ? formatDate(billing.subscription.renewsAt) : "Auto-renew"}</div>
+                        <div className="muted" style={{ fontSize: 11, marginTop: 1 }}>Keep a valid payment method on file to avoid service interruptions.</div>
                       </div>
-                    ) : null}
-                    <UsageBar label="Projects" used={billing.usage.projectsUsed} limit={billing.usage.projectsLimit} />
-                    <UsageBar label="Users" used={billing.usage.usersUsed} limit={billing.usage.usersLimit} />
-                    <UsageBar label="Templates" used={billing.usage.templatesUsed} limit={billing.usage.templatesLimit} />
-                    <UsageBar label="Landing pages" used={billing.usage.landingPagesUsed} limit={billing.usage.landingPagesLimit} />
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                      <div>
+                        <span style={{ fontSize: 22, fontWeight: 800, color: "var(--brand)" }}>
+                          {formatMoney(billing.subscription.billingCycle === "yearly" ? billing.plan.priceYearly : billing.plan.priceMonthly, billing.subscription.currency)}
+                        </span>
+                        <span className="muted" style={{ fontSize: 12 }}> / {billing.subscription.billingCycle === "yearly" ? "year" : "month"}</span>
+                      </div>
+                      <button className="btn btn-ghost btn-sm" onClick={() => void handleRenew()} disabled={renewLoading}>
+                        {renewLoading ? "Renewing…" : "Manage Subscription"}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             </Card>
+
+            {/* Usage Overview Card */}
             <Card
-              icon="billing"
-              title="Plans & packages"
+              icon="reports"
+              title="Usage Overview"
+              sub="Track your plan limits and usage."
+              action={<div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--green)", fontWeight: 600 }}><span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--green)" }} /> Updated just now</div>}
+            >
+              {billing?.usage ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+                  {/* Projects */}
+                  <div style={{ padding: 16, border: "1px solid var(--line-2)", borderRadius: 12, background: "var(--surface)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--brand-050)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon name="properties" size={16} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>Projects</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{billing.usage.projectsUsed} of {billing.usage.projectsLimit ?? "unlimited"} used</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden", marginTop: 12 }}>
+                      <div style={{ height: "100%", width: `${billing.usage.projectsLimit ? Math.min(100, (billing.usage.projectsUsed / billing.usage.projectsLimit) * 100) : 0}%`, background: "var(--brand)", borderRadius: 999 }} />
+                    </div>
+                    <div style={{ textAlign: "right", fontSize: 11, fontWeight: 700, color: "var(--muted)", marginTop: 4 }}>
+                      {billing.usage.projectsLimit ? `${Math.round((billing.usage.projectsUsed / billing.usage.projectsLimit) * 100)}%` : "0%"}
+                    </div>
+                  </div>
+
+                  {/* Users */}
+                  <div style={{ padding: 16, border: "1px solid var(--line-2)", borderRadius: 12, background: "var(--surface)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--brand-050)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon name="crm" size={16} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>Users</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{billing.usage.usersUsed} of {billing.usage.usersLimit ?? "unlimited"} used</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden", marginTop: 12 }}>
+                      <div style={{ height: "100%", width: `${billing.usage.usersLimit ? Math.min(100, (billing.usage.usersUsed / billing.usage.usersLimit) * 100) : 10}%`, background: "var(--brand)", borderRadius: 999 }} />
+                    </div>
+                    <div style={{ textAlign: "right", fontSize: 11, fontWeight: 700, color: "var(--muted)", marginTop: 4 }}>
+                      {billing.usage.usersLimit ? `${Math.round((billing.usage.usersUsed / billing.usage.usersLimit) * 100)}%` : "10%"}
+                    </div>
+                  </div>
+
+                  {/* Templates */}
+                  <div style={{ padding: 16, border: "1px solid var(--line-2)", borderRadius: 12, background: "var(--surface)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--brand-050)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon name="document" size={16} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>Templates</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{billing.usage.templatesUsed} of {billing.usage.templatesLimit ?? "unlimited"} used</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden", marginTop: 12 }}>
+                      <div style={{ height: "100%", width: `${billing.usage.templatesLimit ? Math.min(100, (billing.usage.templatesUsed / billing.usage.templatesLimit) * 100) : 50}%`, background: "var(--brand)", borderRadius: 999 }} />
+                    </div>
+                    <div style={{ textAlign: "right", fontSize: 11, fontWeight: 700, color: "var(--muted)", marginTop: 4 }}>
+                      {billing.usage.templatesLimit ? `${Math.round((billing.usage.templatesUsed / billing.usage.templatesLimit) * 100)}%` : "50%"}
+                    </div>
+                  </div>
+
+                  {/* Landing Pages */}
+                  <div style={{ padding: 16, border: "1px solid var(--line-2)", borderRadius: 12, background: "var(--surface)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--brand-050)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon name="globe" size={16} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>Landing Pages</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{billing.usage.landingPagesUsed} of {billing.usage.landingPagesLimit ?? "unlimited"} used</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden", marginTop: 12 }}>
+                      <div style={{ height: "100%", width: "100%", background: "var(--brand)", borderRadius: 999 }} />
+                    </div>
+                    <div style={{ textAlign: "right", fontSize: 14, fontWeight: 700, color: "var(--brand)", marginTop: 4 }}>
+                      ∞
+                    </div>
+                  </div>
+                </div>
+              ) : <p className="muted">Loading usage statistics…</p>}
+            </Card>
+
+            {/* Plans & Packages */}
+            <Card
+              icon="sparkles"
+              title="Plans & Packages"
+              sub="Choose the plan that fits your needs"
               action={(
-                <div className="seg">
-                  <span className={plansCycle === "monthly" ? "on" : ""} onClick={() => setPlansCycle("monthly")}>Monthly</span>
-                  <span className={plansCycle === "yearly" ? "on" : ""} onClick={() => setPlansCycle("yearly")}>Yearly</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div className="seg">
+                    <span className={plansCycle === "monthly" ? "on" : ""} onClick={() => setPlansCycle("monthly")}>Monthly</span>
+                    <span className={plansCycle === "yearly" ? "on" : ""} onClick={() => setPlansCycle("yearly")}>Yearly</span>
+                  </div>
+                  <span style={{ background: "var(--green-050)", color: "var(--green)", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>Save up to 20%</span>
                 </div>
               )}
             >
               {plansLoading ? <p className="muted">Loading plans…</p> : (
-                <div className="plans-grid">
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20 }}>
                   {plans.map((p) => {
                     const isCurrent = billing?.plan?.id === p.id;
+                    const isPendingTarget = pendingChangeRequest?.targetPlanId === p.id;
                     const price = plansCycle === "yearly" ? p.priceYearly : p.priceMonthly;
+                    const iconSymbol = p.name.toLowerCase().includes("starter") ? "🚀" : p.name.toLowerCase().includes("pro max") ? "⚡" : "👑";
                     return (
-                      <div key={p.id} className={`plan-card${isCurrent ? " current" : ""}`} style={{ ["--pc" as string]: p.color }}>
-                        {p.isPopular ? <span className="plan-flag">Most popular</span> : null}
-                        <div className="plan-name">{p.name}</div>
-                        <div className="plan-price">{formatMoney(price, billing?.subscription?.currency ?? "INR")}<span className="muted"> / {plansCycle === "yearly" ? "year" : "month"}</span></div>
-                        <PlanLimitsSelect limits={p.limits} />
-                        <button className={`btn ${isCurrent ? "" : "btn-primary"}`} disabled={isCurrent || changeLoading} onClick={() => void handleChangePlan(p.id)} style={isCurrent ? { opacity: 0.7, cursor: "default" } : undefined}>
-                          {isCurrent ? "Current plan" : `Switch to ${p.name}`}
+                      <div
+                        key={p.id}
+                        style={{
+                          padding: 24,
+                          borderRadius: 16,
+                          border: isCurrent ? "2px solid var(--brand)" : "1px solid var(--line-2)",
+                          background: "var(--surface)",
+                          position: "relative",
+                          display: "flex",
+                          flexDirection: "column",
+                          boxShadow: isCurrent ? "0 8px 30px -10px rgba(79, 70, 229, 0.25)" : "none",
+                        }}
+                      >
+                        {isCurrent ? (
+                          <span style={{ position: "absolute", top: 16, right: 16, background: "var(--brand)", color: "#fff", padding: "4px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>
+                            Current Plan
+                          </span>
+                        ) : p.isPopular ? (
+                          <span style={{ position: "absolute", top: 16, right: 16, background: "var(--amber-050)", color: "var(--amber)", padding: "4px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700 }}>
+                            Most popular
+                          </span>
+                        ) : null}
+
+                        <div style={{ width: 42, height: 42, borderRadius: 12, background: "var(--brand-050)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, marginBottom: 14 }}>
+                          {iconSymbol}
+                        </div>
+
+                        <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px" }}>{p.name}</h3>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 6 }}>
+                          <span style={{ fontSize: 26, fontWeight: 800, fontFamily: "var(--display)" }}>{formatMoney(price, billing?.subscription?.currency ?? "INR")}</span>
+                          <span className="muted" style={{ fontSize: 12.5 }}> / {plansCycle === "yearly" ? "month" : "month"}</span>
+                        </div>
+                        <p className="muted" style={{ fontSize: 12.5, marginBottom: 18, minHeight: 36 }}>{p.description || "Perfect for teams getting started"}</p>
+
+                        <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16, flex: 1, marginBottom: 20 }}>
+                          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
+                            {(p.features && p.features.length > 0 ? p.features : [
+                              `${p.limits?.templates ?? "Unlimited"} Templates`,
+                              `${p.limits?.projects ?? "Unlimited"} Projects`,
+                              `${p.limits?.users ?? "Unlimited"} Users`,
+                              `${p.limits?.landingPages ?? "Unlimited"} Landing pages`,
+                              "Email & Chat support",
+                              "Custom branding",
+                            ]).map((feat, idx) => (
+                              <li key={idx} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--ink-2)" }}>
+                                <span style={{ color: "var(--green)", fontWeight: 700 }}>✓</span>
+                                <span>{feat}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <button
+                          className={`btn ${isCurrent ? "" : isPendingTarget ? "btn-ghost" : "btn-primary"}`}
+                          disabled={isCurrent || !!pendingChangeRequest}
+                          onClick={() => setRequestModalPlan(p)}
+                          style={{
+                            width: "100%",
+                            padding: "12px",
+                            borderRadius: 10,
+                            fontWeight: 600,
+                            ...(isCurrent && { background: "var(--surface-2)", color: "var(--muted)", border: "1px solid var(--line)", cursor: "default" }),
+                          }}
+                        >
+                          {isCurrent
+                            ? "✓ Current Plan"
+                            : isPendingTarget
+                            ? "Request Pending"
+                            : `Switch to ${p.name}`}
                         </button>
                       </div>
                     );
@@ -1588,7 +1855,90 @@ export default function OrgSettingsPage() {
                 </div>
               )}
             </Card>
-            <Card icon="document" title="Invoices">
+
+            <Modal
+              open={!!requestModalPlan}
+              onClose={() => setRequestModalPlan(null)}
+              title="Request Package Change"
+              description="Review package change details before submitting for Super Admin approval."
+              size="md"
+              footer={
+                <>
+                  <button className="btn btn-ghost" onClick={() => setRequestModalPlan(null)}>
+                    Cancel
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => void handleSubmitPackageChangeRequest()}
+                    disabled={submittingRequest}
+                  >
+                    {submittingRequest ? "Submitting Request…" : "Confirm Change Request"}
+                  </button>
+                </>
+              }
+            >
+              {requestModalPlan ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ padding: 12, background: "var(--surface-2)", borderRadius: 10, fontSize: 13 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span className="muted">Current Package:</span>
+                      <strong>{billing?.plan?.name ?? "Current Plan"}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span className="muted">New Requested Package:</span>
+                      <strong style={{ color: "var(--brand)" }}>{requestModalPlan.name} ({plansCycle})</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span className="muted">Price Difference:</span>
+                      <strong>
+                        {formatMoney(
+                          (plansCycle === "yearly" ? requestModalPlan.priceYearly : requestModalPlan.priceMonthly) -
+                            (billing?.plan ? (plansCycle === "yearly" ? billing.plan.priceYearly : billing.plan.priceMonthly) : 0),
+                          billing?.subscription?.currency ?? "INR"
+                        )} / {plansCycle === "yearly" ? "year" : "month"}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 13 }}>
+                    <b style={{ display: "block", marginBottom: 8 }}>Key Feature & Limit Changes:</b>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, background: "var(--surface)", border: "1px solid var(--line-2)", borderRadius: 8, padding: 12 }}>
+                      <div>
+                        <span className="muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 600 }}>Current ({billing?.plan?.name}):</span>
+                        <ul style={{ margin: "6px 0 0", paddingLeft: 16, fontSize: 12, lineHeight: 1.6 }}>
+                          <li>Projects: {billing?.plan?.limits?.projects ?? "Unlimited"}</li>
+                          <li>Users: {billing?.plan?.limits?.users ?? "Unlimited"}</li>
+                          <li>Templates: {billing?.plan?.limits?.templates ?? "Unlimited"}</li>
+                          <li>Landing Pages: {billing?.plan?.limits?.landingPages ?? "Unlimited"}</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <span className="muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 600 }}>New ({requestModalPlan.name}):</span>
+                        <ul style={{ margin: "6px 0 0", paddingLeft: 16, fontSize: 12, lineHeight: 1.6, color: "var(--brand)" }}>
+                          <li>Projects: {requestModalPlan.limits?.projects ?? "Unlimited"}</li>
+                          <li>Users: {requestModalPlan.limits?.users ?? "Unlimited"}</li>
+                          <li>Templates: {requestModalPlan.limits?.templates ?? "Unlimited"}</li>
+                          <li>Landing Pages: {requestModalPlan.limits?.landingPages ?? "Unlimited"}</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: "10px 14px", background: "rgba(79, 70, 229, 0.06)", border: "1px solid rgba(79, 70, 229, 0.2)", borderRadius: 8, fontSize: 12.5, color: "var(--ink)" }}>
+                    <Icon name="info" size={14} style={{ verticalAlign: "-2px", marginRight: 6, color: "var(--brand)" }} />
+                    This request will be submitted for <strong>Super Admin approval</strong>. Your organisation will continue using your current active package until approved.
+                  </div>
+                </div>
+              ) : null}
+            </Modal>
+
+            {/* Invoices Card */}
+            <Card
+              icon="document"
+              title="Invoices"
+              sub="View and download your billing history"
+              action={<span style={{ fontSize: 13, color: "var(--brand)", fontWeight: 600, cursor: "pointer" }}>View All Invoices →</span>}
+            >
               {invoicesLoading ? <p className="muted">Loading invoices…</p> : invoices.length === 0 ? <p className="muted" style={{ marginTop: 0 }}>No invoices yet.</p> : (
                 <div className="inv-table">
                   <div className="inv-row inv-head"><span>Invoice</span><span>Date</span><span>Plan</span><span>Amount</span><span>Status</span><span /></div>
@@ -1596,8 +1946,8 @@ export default function OrgSettingsPage() {
                     <div className="inv-row" key={inv.id}>
                       <span className="mono">{inv.number}</span><span>{formatDate(inv.issuedAt)}</span><span>{inv.planName}</span>
                       <span>{formatMoney(inv.amount, inv.currency)}</span>
-                      <span><span className={`badge ${INVOICE_STATUS_BADGE[inv.status] ?? "b-gray"}`}>{INVOICE_STATUS_LABEL[inv.status] ?? inv.status}</span></span>
-                      <span><button className="btn btn-ghost" disabled title="PDF download coming soon">Download</button></span>
+                      <span><span className={`badge ${INVOICE_STATUS_BADGE[inv.status] ?? "b-amber"}`}>{INVOICE_STATUS_LABEL[inv.status] ?? inv.status}</span></span>
+                      <span><button className="btn btn-ghost btn-sm" disabled style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>⬇ Download</button></span>
                     </div>
                   ))}
                 </div>

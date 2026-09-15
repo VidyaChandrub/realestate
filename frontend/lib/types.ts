@@ -849,6 +849,52 @@ export interface OrgBillingSummary {
   };
 }
 
+export type PackageChangeRequestStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "cancelled";
+
+export interface PackageChangeRequestRow {
+  id: string;
+  orgId: string;
+  currentPlanId: string;
+  targetPlanId: string;
+  billingCycle: "monthly" | "yearly";
+  status: PackageChangeRequestStatus;
+  rejectionReason?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  organisation?: {
+    id: string;
+    name: string;
+    slug: string;
+    city: string;
+  };
+  requestedBy?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  };
+  reviewedBy?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
+  currentPlan?: Plan | OrgBillingPlan;
+  targetPlan?: Plan | OrgBillingPlan;
+}
+
+export interface PackageChangeRequestsListResponse {
+  data: PackageChangeRequestRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 // POST /org/billing/plan — org-self-service upgrade / downgrade
 export interface ChangePlanInput {
   planId: string;
@@ -2506,3 +2552,16 @@ export interface CreateTeamMessageInput {
   leadId?: string;
   assignedTo?: string;
 }
+
+export interface AvailableTemplateSummary extends OrgTemplateSummary {
+  isAssigned: boolean;
+}
+
+export interface AvailableTemplatesResponse {
+  data: AvailableTemplateSummary[];
+  assignedCount: number;
+  maxAllowed: number | null;
+  remainingQuota: number | null;
+  planName: string;
+}
+
