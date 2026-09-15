@@ -22,6 +22,7 @@ export interface PlanLimits {
   projects: number | null;
   users: number | null;
   templates: number | null;
+  landingPages: number | null;
 }
 
 /** All unlimited — the shape written when no limits are supplied. */
@@ -29,14 +30,15 @@ const UNLIMITED_LIMITS: PlanLimits = {
   projects: null,
   users: null,
   templates: null,
+  landingPages: null,
 };
 
 /**
  * Coerce a (possibly loose / legacy / partial) limits value to the canonical
- * `{ projects, users, templates }` numeric shape. A field is a non-negative
- * integer, or `null` meaning unlimited. Legacy string values ("3", "All",
- * "Unlimited", "—") are tolerated so rows that predate the numeric migration
- * still read sensibly.
+ * `{ projects, users, templates, landingPages }` numeric shape. A field is a
+ * non-negative integer, or `null` meaning unlimited. Legacy string values
+ * ("3", "All", "Unlimited", "—") are tolerated so rows that predate the
+ * numeric migration still read sensibly.
  */
 export function normalizeLimits(raw: unknown): PlanLimits {
   const src =
@@ -56,6 +58,7 @@ export function normalizeLimits(raw: unknown): PlanLimits {
     projects: one(src.projects),
     users: one(src.users),
     templates: one(src.templates),
+    landingPages: one(src.landingPages),
   };
 }
 

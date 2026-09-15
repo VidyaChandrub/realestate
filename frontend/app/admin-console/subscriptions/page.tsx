@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
-import { apiFetch, getPlanCapabilities } from "@/lib/api";
+import { apiFetch, getPlanCapabilities, getPlatformConfig, updatePlatformConfig } from "@/lib/api";
 import { Icon } from "@/components/icons";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
@@ -16,10 +16,11 @@ function fmtLimit(n: number | null | undefined): string {
   return n == null ? "Unlimited" : String(n);
 }
 
-const LIMIT_ROWS: { key: "projects" | "users" | "templates"; label: string }[] = [
+const LIMIT_ROWS: { key: "projects" | "users" | "templates" | "landingPages"; label: string }[] = [
   { key: "projects", label: "Projects" },
   { key: "users", label: "Users" },
   { key: "templates", label: "Templates" },
+  { key: "landingPages", label: "Landing pages" },
 ];
 
 const PLAN_BADGE_OPTIONS = [
@@ -63,7 +64,7 @@ export default function SuperAdminSubscriptionsPage() {
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [planForm, setPlanForm] = useState<Partial<Plan> & { features?: string[] }>({
     name: "", priceMonthly: 3000, priceYearly: 30000, description: "", features: [],
-    limits: { projects: null, users: null, templates: null }, capabilities: {},
+    limits: { projects: null, users: null, templates: null, landingPages: null }, capabilities: {},
   });
   const [featureInput, setFeatureInput] = useState("");
   const [savingPlan, setSavingPlan] = useState(false);
@@ -81,14 +82,48 @@ export default function SuperAdminSubscriptionsPage() {
     currency: "INR",
     taxRate: "18",
     invoicePrefix: "INV-2026-",
-    graceDays: "7",
     autoRenew: true,
     proration: true,
     emailReceipts: true,
     pastDueEmails: true,
   });
 
+  // Subscription-expiry policy — persisted through /admin/platform-config.
+  const [expiryPolicy, setExpiryPolicy] = useState({
+    billingExpiryNotifyDays: "3",
+    billingGracePeriodDays: "7",
+    billingExpiryBehavior: "restrict" as "restrict" | "cancel",
+    billingExpiryMessage: "",
+  });
+  const [savingPolicy, setSavingPolicy] = useState(false);
+
   const notify = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2800); };
+
+  async function loadExpiryPolicy() {
+    try {
+      const cfg = await getPlatformConfig();
+      setExpiryPolicy({
+        billingExpiryNotifyDays: String(cfg.billingExpiryNotifyDays ?? 3),
+        billingGracePeriodDays: String(cfg.billingGracePeriodDays ?? 7),
+        billingExpiryBehavior: cfg.billingExpiryBehavior === "cancel" ? "cancel" : "restrict",
+        billingExpiryMessage: cfg.billingExpiryMessage ?? "",
+      });
+    } catch { /* keep defaults */ }
+  }
+  async function saveExpiryPolicy() {
+    setSavingPolicy(true);
+    try {
+      await updatePlatformConfig({
+        billingExpiryNotifyDays: Math.max(0, Math.floor(Number(expiryPolicy.billingExpiryNotifyDays) || 0)),
+        billingGracePeriodDays: Math.max(0, Math.floor(Number(expiryPolicy.billingGracePeriodDays) || 0)),
+        billingExpiryBehavior: expiryPolicy.billingExpiryBehavior,
+        billingExpiryMessage: expiryPolicy.billingExpiryMessage,
+      });
+      notify("Expiry policy saved — applies on the next lifecycle sweep");
+      await loadExpiryPolicy();
+    } catch (e: any) { notify(e.message || "Save failed"); }
+    finally { setSavingPolicy(false); }
+  }
 
   async function fetchPlans() {
     setPlansLoading(true);
@@ -131,7 +166,7 @@ export default function SuperAdminSubscriptionsPage() {
     } catch {}
   }
 
-  useEffect(() => { fetchPlans(); fetchOverview(); fetchOrgs(); fetchCapabilities(); }, []);
+  useEffect(() => { fetchPlans(); fetchOverview(); fetchOrgs(); fetchCapabilities(); loadExpiryPolicy(); }, []);
   useEffect(() => { if (tab === 2) fetchSubs(1); }, [tab]);
   // debounce search for subs
   useEffect(() => {
@@ -142,12 +177,21 @@ export default function SuperAdminSubscriptionsPage() {
 
   const filteredSubs = useMemo(() => subs, [subs]);
 
+  async function renewRow(id: string) {
+    try {
+      const updated = await apiFetch<Subscription>(`/admin/subscriptions/${id}/renew`, { method: "POST" });
+      setSubs(prev => prev.map(s => s.id === updated.id ? updated : s));
+      notify("Subscription renewed in place");
+      fetchOverview();
+    } catch (e: any) { notify(e.message || "Renewal failed"); }
+  }
+
   const openCreate = () => {
     setEditingPlan(null);
     setPlanForm({
       name: "", priceMonthly: 3500, priceYearly: 35000, description: "",
       features: ["Everything you need to get started"],
-      limits: { projects: 3, users: 2, templates: 20 },
+      limits: { projects: 3, users: 2, templates: 20, landingPages: 5 },
       capabilities: {},
     });
     setFeatureInput("");
@@ -158,20 +202,20 @@ export default function SuperAdminSubscriptionsPage() {
     setPlanForm({
       ...p,
       features: [...(p.features || [])],
-      limits: { ...(p.limits ?? { projects: null, users: null, templates: null }) },
+      limits: { ...(p.limits ?? { projects: null, users: null, templates: null, landingPages: null }) },
       capabilities: { ...(p.capabilities ?? {}) },
     });
     setFeatureInput("");
     setPlanModalOpen(true);
   };
-  const formLimit = (key: "projects" | "users" | "templates"): number | null => {
+  const formLimit = (key: "projects" | "users" | "templates" | "landingPages"): number | null => {
     const v = planForm.limits?.[key];
     return v == null ? null : v;
   };
-  const setFormLimit = (key: "projects" | "users" | "templates", value: number | null) => {
+  const setFormLimit = (key: "projects" | "users" | "templates" | "landingPages", value: number | null) => {
     setPlanForm(p => ({
       ...p,
-      limits: { projects: null, users: null, templates: null, ...(p.limits ?? {}), [key]: value },
+      limits: { projects: null, users: null, templates: null, landingPages: null, ...(p.limits ?? {}), [key]: value },
     }));
   };
   const toggleCapability = (key: string, on: boolean) => {
@@ -184,6 +228,7 @@ export default function SuperAdminSubscriptionsPage() {
       projects: formLimit("projects"),
       users: formLimit("users"),
       templates: formLimit("templates"),
+      landingPages: formLimit("landingPages"),
     };
     // Only send capability keys that are true — the backend treats a missing
     // key as false, and this keeps the payload tidy.
@@ -525,12 +570,26 @@ export default function SuperAdminSubscriptionsPage() {
                       <td><span className={`badge ${s.plan?.badge || "b-indigo"}`}>{s.plan?.name ?? "—"}</span></td>
                       <td>₹{s.amount.toLocaleString("en-IN")}</td>
                       <td><span className="badge b-gray">{s.billingCycle}</span></td>
-                      <td><span className={`badge ${s.status==="active"?"b-green":s.status==="past_due"?"b-amber":s.status==="trial"?"b-sky":"b-gray"}`} style={{ gap: 6 }}>{s.status}</span></td>
+                      <td>
+                        <span className={`badge ${s.status==="active"?"b-green":s.status==="past_due"?"b-amber":s.status==="trial"?"b-sky":s.status==="expired"?"b-rose":"b-gray"}`} style={{ gap: 6 }}>
+                          {s.status}
+                          {s.status === "expired" && s.graceEndsAt ? ` · grace to ${new Date(s.graceEndsAt).toLocaleDateString("en-IN", { day:"2-digit", month:"short" })}` : ""}
+                        </span>
+                      </td>
                       <td>{s.renewsAt ? new Date(s.renewsAt).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric"}) : "—"}</td>
                       <td>₹{s.mrr?.toLocaleString("en-IN") ?? s.amount.toLocaleString("en-IN")}</td>
                       <td>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button className="btn btn-ghost btn-sm" onClick={() => { setUpgradeTarget(s); setUpgradePlanId(s.planId); setUpgradeCycle(s.billingCycle); }}>Change</button>
+                          {(s.status === "expired" || s.status === "cancelled" || s.status === "past_due") && (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ color: "var(--green)" }}
+                              onClick={() => void renewRow(s.id)}
+                            >
+                              Renew
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -550,8 +609,64 @@ export default function SuperAdminSubscriptionsPage() {
         {tab === 4 && (
           <div style={{ padding: 20, display: "grid", gap: 18 }}>
             <div className="card">
-              <div className="card-h"><div className="t">Billing Settings</div><span className="chip">Local only</span></div>
+              <div className="card-h">
+                <div className="t">Subscription expiry policy</div>
+                <span className="chip" style={{ background: "var(--green-050)", color: "var(--green)", border: "1px solid var(--green-100)" }}>API-wired</span>
+              </div>
               <div style={{ padding: 18, display: "grid", gap: 16, maxWidth: 720 }}>
+                <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.6, marginTop: -6 }}>
+                  Controls what happens when an organisation&apos;s subscription term ends. Applied by the lifecycle
+                  sweep (~hourly + on every billing read / publish attempt) from{" "}
+                  <span className="mono" style={{ fontWeight: 700 }}>/admin/platform-config</span> — saved values are
+                  enforced synchronously and retroactively.
+                </div>
+                <div className="row2">
+                  <div className="field">
+                    <label>Notify days before expiry</label>
+                    <input className="inp" type="number" min={0} value={expiryPolicy.billingExpiryNotifyDays} onChange={e => setExpiryPolicy(p => ({ ...p, billingExpiryNotifyDays: e.target.value }))} />
+                    <div className="hint">How many days before renewsAt the &quot;expiring soon&quot; popup fires for org members.</div>
+                  </div>
+                  <div className="field">
+                    <label>Grace period (days)</label>
+                    <input className="inp" type="number" min={0} value={expiryPolicy.billingGracePeriodDays} onChange={e => setExpiryPolicy(p => ({ ...p, billingGracePeriodDays: e.target.value }))} />
+                    <div className="hint">Days a past-due subscription stays fully usable before action is taken.</div>
+                  </div>
+                </div>
+                <div className="field">
+                  <label>When grace period ends</label>
+                  <select value={expiryPolicy.billingExpiryBehavior} onChange={e => setExpiryPolicy(p => ({ ...p, billingExpiryBehavior: e.target.value as "restrict" | "cancel" }))}>
+                    <option value="restrict">Restrict organisation (expired → publishing paused)</option>
+                    <option value="cancel">Cancel subscription (blocked effectively)</option>
+                  </select>
+                  <div className="hint">
+                    Restrict keeps the organisation open with publishing paused; Cancel soft-cancels the
+                    subscription (renewable in place by an admin).
+                  </div>
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label>Expiry notification message</label>
+                  <textarea
+                    value={expiryPolicy.billingExpiryMessage}
+                    onChange={e => setExpiryPolicy(p => ({ ...p, billingExpiryMessage: e.target.value }))}
+                    placeholder="Your plan has expired — renew to keep publishing…"
+                    style={{ minHeight: 84 }}
+                  />
+                  <div className="hint">Shown in the in-app expiry popup. Keep the {`{date}`} placeholder? Leave blank for the <span className="mono">/admin/platform-config</span> default message.</div>
+                </div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button className="btn btn-ghost" onClick={loadExpiryPolicy}>Reset</button>
+                  <button className="btn btn-primary" onClick={saveExpiryPolicy} disabled={savingPolicy}>{savingPolicy ? "Saving…" : "Save expiry policy"}</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-h"><div className="t">Invoicing</div><span className="chip">Local only</span></div>
+              <div style={{ padding: 18, display: "grid", gap: 16, maxWidth: 720 }}>
+                <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.6, marginTop: -6 }}>
+                  Frontend-only preview of invoice defaults — not yet persisted. Expiry/grace fields above are the
+                  live, API-backed policy.
+                </div>
                 <div className="row2">
                   <div className="field"><label>Currency</label>
                     <select value={billingSettings.currency} onChange={e => setBillingSettings(s => ({ ...s, currency: e.target.value }))}>
@@ -564,7 +679,7 @@ export default function SuperAdminSubscriptionsPage() {
                 </div>
                 <div className="row2">
                   <div className="field"><label>Invoice prefix</label><input className="inp" value={billingSettings.invoicePrefix} onChange={e => setBillingSettings(s => ({ ...s, invoicePrefix: e.target.value }))} /></div>
-                  <div className="field"><label>Grace days (past due)</label><input className="inp" value={billingSettings.graceDays} onChange={e => setBillingSettings(s => ({ ...s, graceDays: e.target.value }))} /></div>
+                  <div className="field"><label>Renewal grace days</label><input className="inp" value={expiryPolicy.billingGracePeriodDays} onChange={e => setExpiryPolicy(p => ({ ...p, billingGracePeriodDays: e.target.value }))} /></div>
                 </div>
                 {[
                   ["Auto-renew subscriptions", "autoRenew", "Charge automatically on renewal date"],
@@ -583,7 +698,7 @@ export default function SuperAdminSubscriptionsPage() {
                 ))}
                 <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                   <button className="btn btn-ghost" onClick={() => notify("Billing settings reset (mock)")}>Reset</button>
-                  <button className="btn btn-primary" onClick={() => notify("Billing settings saved (frontend only)")}>Save billing settings</button>
+                  <button className="btn btn-primary" onClick={() => notify("Invoicing preview saved (frontend only)")}>Save invoicing preview</button>
                 </div>
               </div>
             </div>

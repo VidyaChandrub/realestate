@@ -52,4 +52,9 @@ export class SubscriptionsController {
   cancel(@Param('id') id: string) {
     return this.subscriptionsService.remove(id);
   }
+
+  @Post(':id/renew')
+  renew(@Param('id') id: string) {
+    return this.subscriptionsService.renew(id);
+  }
 }

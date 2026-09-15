@@ -630,6 +630,7 @@ export interface PlanLimits {
   projects: number | null;
   users: number | null;
   templates: number | null;
+  landingPages: number | null;
 }
 
 /** One entry of the plan capability catalog (`GET /admin/plans/capabilities`). */
@@ -664,11 +665,12 @@ export interface Subscription {
   orgId: string;
   planId: string;
   billingCycle: "monthly" | "yearly";
-  status: "active" | "past_due" | "trial" | "cancelled" | "paused";
+  status: "active" | "past_due" | "trial" | "cancelled" | "paused" | "expired";
   amount: number;
   currency: string;
   mrr: number | null;
   renewsAt: string | null;
+  graceEndsAt: string | null;
   startedAt: string;
   cancelledAt: string | null;
   createdAt: string;
@@ -740,7 +742,7 @@ export interface CreateSubscriptionInput {
 export interface UpdateSubscriptionInput {
   planId?: string;
   billingCycle?: "monthly" | "yearly";
-  status?: "active" | "past_due" | "trial" | "cancelled" | "paused";
+  status?: "active" | "past_due" | "trial" | "cancelled" | "paused" | "expired";
   currency?: string;
   renewsAt?: string;
 }
@@ -803,16 +805,29 @@ export interface OrgBillingPlan {
   color: string;
   badge: string;
   isPopular: boolean;
-  limits: { projects?: string; users?: string; templates?: string } | null;
+  limits: PlanLimits | null;
+  /** { <capability key>: boolean }; a missing key means false. */
+  capabilities?: Record<string, boolean>;
 }
 
+export type SubscriptionStatus =
+  | "active"
+  | "past_due"
+  | "trial"
+  | "cancelled"
+  | "paused"
+  | "expired";
+
 export interface OrgBillingSubscription {
-  status: "active" | "past_due" | "trial" | "cancelled" | "paused";
+  id?: string;
+  status: SubscriptionStatus;
   billingCycle: "monthly" | "yearly";
   amount: number;
   currency: string;
   startedAt: string;
   renewsAt: string | null;
+  /** End of the platform-configurable grace window once the term lapses. */
+  graceEndsAt: string | null;
   cancelledAt: string | null;
 }
 
@@ -829,6 +844,8 @@ export interface OrgBillingSummary {
     projectsLimit: number | null;
     usersUsed: number;
     usersLimit: number | null;
+    landingPagesUsed: number;
+    landingPagesLimit: number | null;
   };
 }
 
@@ -848,6 +865,36 @@ export interface ChangePlanResult {
   currency: string;
   renewsAt: string | null;
   startedAt: string;
+}
+
+// POST /org/billing/renew — extends the current term on the same plan,
+// clearing any grace/expired state.
+export interface BillingRenewResult {
+  id: string;
+  status: SubscriptionStatus;
+  renewsAt: string | null;
+  graceEndsAt: string | null;
+}
+
+/** Backend-persisted lead form (GET/POST/PATCH/DELETE /org/forms and
+ *  /admin/forms). `content` is the full FormDefinition JSON tree. */
+export interface LeadFormRecord {
+  id: string;
+  orgId: string | null;
+  name: string;
+  content: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateFormInput {
+  name: string;
+  content: Record<string, unknown>;
+}
+
+export interface UpdateFormInput {
+  name?: string;
+  content?: Record<string, unknown>;
 }
 
 // GET /org/billing/invoices — derived from the active subscription (no payment
@@ -1879,7 +1926,7 @@ export interface AdminLeadsParams {
   search?: string;
 }
 
-/** GET /admin/platform-config — Super Admin platform subdomain / DNS config. */
+/** GET /admin/platform-config — Super Admin platform subdomain / DNS + billing policy. */
 export interface PlatformConfig {
   id: string | null;
   subdomainMode: string; // localhost | production
@@ -1890,6 +1937,12 @@ export interface PlatformConfig {
   infraCname: string | null;
   infraNs1: string | null;
   infraNs2: string | null;
+  // Subscription expiry & grace-period policy (Super Admin configurable —
+  // read by the expiry sweep that drains subscriptions into past_due/expired).
+  billingExpiryNotifyDays: number; // days before renewsAt the "expiring soon" popup fires
+  billingGracePeriodDays: number; // days a past_due subscription stays usable
+  billingExpiryBehavior: "restrict" | "cancel"; // what happens after the grace window
+  billingExpiryMessage: string; // popup body for expiring / past-due events
   updatedAt: string | null;
 }
 
@@ -1902,6 +1955,10 @@ export interface UpdatePlatformConfigInput {
   infraCname?: string;
   infraNs1?: string;
   infraNs2?: string;
+  billingExpiryNotifyDays?: number;
+  billingGracePeriodDays?: number;
+  billingExpiryBehavior?: "restrict" | "cancel";
+  billingExpiryMessage?: string;
 }
 
 /** GET /admin/org-domain-requests/:id/verify — live DNS + site check for an org subdomain. */
@@ -1944,7 +2001,19 @@ export type NotificationType =
   | "organisation_rejected"
   | "support_ticket_created"
   | "support_ticket_message"
-  | "support_ticket_status_changed";
+  | "support_ticket_status_changed"
+  | "subscription_expiring"
+  | "subscription_past_due"
+  | "subscription_expired";
+
+/** True when the notification is a subscription-lifecycle popup. */
+export function isSubscriptionNotification(type: NotificationType): boolean {
+  return (
+    type === "subscription_expiring" ||
+    type === "subscription_past_due" ||
+    type === "subscription_expired"
+  );
+}
 
 export interface AppNotification {
   id: string;
@@ -2334,4 +2403,83 @@ export interface UpdateTeamInput {
 export interface SetTeamMembersInput {
   userId: string;
   role: TeamMemberRoleValue;
+}
+
+// --- Team Chat (org/team-chat) -------------------------------------------
+// Channels + direct messages over plain REST (the frontend polls — no
+// websockets, matching Support tickets). A tagged lead is `lead` on a message;
+// `assignedTo` is the free-text "handed to" label copied at send time.
+
+export type TeamChatThreadKind = "channel" | "dm";
+
+export interface TeamChatSender {
+  id: string;
+  name: string;
+}
+
+export interface TeamChatLeadCard {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  project: string | null;
+  interest: string | null;
+  status: string | null;
+}
+
+export interface TeamChatMessage {
+  id: string;
+  channelId: string;
+  body: string;
+  leadId: string | null;
+  assignedTo: string | null;
+  createdAt: string;
+  sender: TeamChatSender;
+  lead: TeamChatLeadCard | null;
+}
+
+export interface TeamChatChannelSummary {
+  id: string;
+  kind: TeamChatThreadKind;
+  name: string;
+  teamId: string | null;
+  /** Present for DMs — the *other* participant. */
+  otherUser?: { id: string; name: string };
+  unread: number;
+  lastMessagePreview: string;
+  lastMessageAt: string;
+  memberCount: number;
+}
+
+export interface TeamChannelInfo {
+  id: string;
+  kind: TeamChatThreadKind;
+  name: string;
+  teamId: string | null;
+  teamName: string | null;
+  memberCount: number;
+  otherUser?: { id: string; name: string };
+}
+
+export interface TeamChatOverview {
+  channels: TeamChatChannelSummary[];
+  dms: TeamChatChannelSummary[];
+}
+
+export interface TeamChatDetail {
+  channel: TeamChannelInfo;
+  messages: TeamChatMessage[];
+  members: { id: string; name: string }[];
+  sharedLeads: TeamChatLeadCard[];
+}
+
+export interface CreateTeamChannelInput {
+  name: string;
+  teamId?: string;
+}
+
+export interface CreateTeamMessageInput {
+  body: string;
+  leadId?: string;
+  assignedTo?: string;
 }

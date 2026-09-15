@@ -27,6 +27,10 @@ const EMPTY_CONFIG: PlatformConfig = {
   infraCname: "",
   infraNs1: "",
   infraNs2: "",
+  billingExpiryNotifyDays: 3,
+  billingGracePeriodDays: 7,
+  billingExpiryBehavior: "restrict",
+  billingExpiryMessage: "",
   updatedAt: null,
 };
 

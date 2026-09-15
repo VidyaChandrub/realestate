@@ -192,32 +192,28 @@ export function AvatarStack({
   );
 }
 
-/** Cross-page nav shown on every Teams screen. Team Chat isn't a real
- *  feature yet — its link stays inert rather than routing anywhere. */
-export function TeamsSubNav({ active }: { active: "teams" | "onboarding" }) {
+/** Cross-page nav shown on every Teams / Team Chat / Onboarding screen. */
+export function TeamsSubNav({
+  active,
+}: {
+  active: "teams" | "chat" | "onboarding";
+}) {
   return (
     <Reveal delay={1}>
       <div className="tabs">
         <Link href="/org/teams" className={active === "teams" ? "active" : ""}>
           Teams
         </Link>
-        <span
-          title="Team Chat isn't available yet"
-          aria-disabled="true"
-          style={{
-            padding: "11px 16px",
-            fontSize: 13.5,
-            fontWeight: 600,
-            color: "var(--muted)",
-            borderBottom: "2px solid transparent",
-            whiteSpace: "nowrap",
-            cursor: "not-allowed",
-            opacity: 0.55,
-          }}
+        <Link
+          href="/org/team-chat"
+          className={active === "chat" ? "active" : ""}
         >
           Team Chat
-        </span>
-        <Link href="/org/teams/onboard" className={active === "onboarding" ? "active" : ""}>
+        </Link>
+        <Link
+          href="/org/teams/onboard"
+          className={active === "onboarding" ? "active" : ""}
+        >
           Onboarding
         </Link>
       </div>

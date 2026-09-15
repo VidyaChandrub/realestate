@@ -92,11 +92,26 @@ export default function OrgLandingPagesPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [packagePrompt, setPackagePrompt] = useState<{ title: string; body: string } | null>(null);
 
   const notify = (m: string) => {
     setToast(m);
     setTimeout(() => setToast(null), 2800);
   };
+
+  // Plan / subscription errors (quota exceeded, expired, plan lacks Publishing)
+  // open the upgrade modal with a link to Org Settings → Billing; anything else
+  // just becomes a toast. The backend messages are written to hint at the right
+  // action ("Upgrade" / "Renew" / "Choose a plan"), so a keyword match suffices.
+  const PACKAGE_HINT = /plan|subscription|upgrade|renew|publishing|unlimited|expired/i;
+  function handleActionError(err: unknown, fallback: string, action: string) {
+    const msg = err instanceof Error ? err.message : fallback;
+    if (PACKAGE_HINT.test(msg)) {
+      setPackagePrompt({ title: `${action} needs your plan`, body: msg });
+    } else {
+      notify(msg);
+    }
+  }
 
   const fetchList = useCallback(() => {
     if (!accessToken) return;
@@ -125,7 +140,7 @@ export default function OrgLandingPagesPage() {
       notify("Published");
       fetchList();
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Failed to publish.");
+      handleActionError(err, "Failed to publish.", "Publishing");
     } finally {
       setBusyId(null);
     }
@@ -139,7 +154,7 @@ export default function OrgLandingPagesPage() {
       notify("Unpublished");
       fetchList();
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Failed to unpublish.");
+      handleActionError(err, "Failed to unpublish.", "Publishing");
     } finally {
       setBusyId(null);
     }
@@ -169,7 +184,7 @@ export default function OrgLandingPagesPage() {
       notify("Duplicated — new draft created");
       fetchList();
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Failed to duplicate.");
+      handleActionError(err, "Failed to duplicate.", "Duplicating");
     } finally {
       setBusyId(null);
     }
@@ -208,7 +223,11 @@ export default function OrgLandingPagesPage() {
       });
       router.push(orgBuilderPath(created.id));
     } catch (err) {
-      setScratchError(err instanceof Error ? err.message : "Failed to create page.");
+      handleActionError(err, "Failed to create page.", "Creating");
+      if (!packagePrompt) {
+        setScratchError(err instanceof Error ? err.message : "Failed to create page.");
+      }
+      setScratchOpen(false);
       setScratchSubmitting(false);
     }
   }
@@ -476,6 +495,28 @@ export default function OrgLandingPagesPage() {
           if (!deleting) setDeleteTarget(null);
         }}
       />
+
+      <Modal
+        open={!!packagePrompt}
+        onClose={() => setPackagePrompt(null)}
+        title={packagePrompt?.title ?? "Upgrade required"}
+        description="Your current plan limits what you can do here."
+        footer={
+          <>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => setPackagePrompt(null)}>
+              Not now
+            </button>
+            <Link className="btn btn-primary btn-sm" href="/org/settings?section=billing" onClick={() => setPackagePrompt(null)}>
+              Manage plan
+            </Link>
+          </>
+        }
+      >
+        <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6 }}>{packagePrompt?.body}</p>
+        <p className="muted" style={{ fontSize: 12.5, marginBottom: 0 }}>
+          Open Org Settings → Billing to upgrade your plan or renew your subscription — you won&apos;t lose any drafts.
+        </p>
+      </Modal>
 
       {toast ? (
         <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}>

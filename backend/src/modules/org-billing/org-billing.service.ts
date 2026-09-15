@@ -4,9 +4,14 @@ import { PrismaService } from '../../database/prisma.service';
 import {
   assertPlanFitsCurrentUsage,
   countBillableOrgUsers,
+  countOrgLandingPages,
   countOrgProjects,
   resolveLimit,
 } from '../../common/utils/plan-quota.util';
+import {
+  applyOrgSubscriptionLifecycle,
+  renewOrgSubscription,
+} from '../../common/utils/subscription-lifecycle.util';
 import type { ChangePlanDto } from './dto/change-plan.dto';
 
 export interface InvoiceRow {
@@ -40,10 +45,15 @@ export class OrgBillingService {
   constructor(private readonly prisma: PrismaService) {}
 
   async get(orgId: string) {
+    // Lazy lifecycle pass — a term that lapsed (or a grace period that ended)
+    // since the last timer tick is reflected here on first read, so the UI
+    // never shows a stale status.
+    await applyOrgSubscriptionLifecycle(this.prisma, orgId);
+
     // At most one non-cancelled subscription per org — enforced by
     // SubscriptionsService.create(), not a DB constraint. Mirrors that
     // same lookup rather than assuming a unique index exists.
-    const [subscription, templatesUsed, projectsUsed, usersUsed] =
+    const [subscription, templatesUsed, projectsUsed, usersUsed, landingPagesUsed] =
       await Promise.all([
         this.prisma.subscription.findFirst({
           where: { orgId, status: { not: 'cancelled' } },
@@ -52,6 +62,7 @@ export class OrgBillingService {
         this.prisma.organisationTemplate.count({ where: { orgId } }),
         countOrgProjects(this.prisma, orgId),
         countBillableOrgUsers(this.prisma, orgId),
+        countOrgLandingPages(this.prisma, orgId),
       ]);
 
     if (!subscription) {
@@ -65,12 +76,14 @@ export class OrgBillingService {
           projectsLimit: null,
           usersUsed,
           usersLimit: null,
+          landingPagesUsed,
+          landingPagesLimit: null,
         },
       };
     }
 
     // Infinity -> null so the UI renders "unlimited" without a magic number.
-    const asLimit = (key: 'projects' | 'users' | 'templates') => {
+    const asLimit = (key: 'projects' | 'users' | 'templates' | 'landingPages') => {
       const n = resolveLimit(subscription.plan, key);
       return n === Infinity ? null : n;
     };
@@ -86,14 +99,17 @@ export class OrgBillingService {
         badge: subscription.plan.badge,
         isPopular: subscription.plan.isPopular,
         limits: subscription.plan.limits,
+        capabilities: subscription.plan.capabilities,
       },
       subscription: {
+        id: subscription.id,
         status: subscription.status,
         billingCycle: subscription.billingCycle,
         amount: subscription.amount,
         currency: subscription.currency,
         startedAt: subscription.startedAt,
         renewsAt: subscription.renewsAt,
+        graceEndsAt: subscription.graceEndsAt,
         cancelledAt: subscription.cancelledAt,
       },
       // `*Limit: null` = unlimited on this plan.
@@ -104,7 +120,40 @@ export class OrgBillingService {
         projectsLimit: asLimit('projects'),
         usersUsed,
         usersLimit: asLimit('users'),
+        landingPagesUsed,
+        landingPagesLimit: asLimit('landingPages'),
       },
+    };
+  }
+
+  /**
+   * Renew the org's current subscription on its existing plan. Ends any grace
+   * window / expired state and pushes renewsAt one full cycle out. Plan or
+   * billing-cycle changes stay the business of changePlan.
+   */
+  async renew(orgId: string) {
+    await applyOrgSubscriptionLifecycle(this.prisma, orgId);
+    const renewed = await renewOrgSubscription(this.prisma, orgId);
+
+    await this.prisma.auditLog
+      .create({
+        data: {
+          orgId,
+          action: 'subscription_renewed',
+          entity: 'Subscription',
+          entityId: renewed.id,
+          metadata: { renewsAt: renewed.renewsAt },
+        },
+      })
+      .catch(() => {
+        /* audit log is best-effort */
+      });
+
+    return {
+      id: renewed.id,
+      status: renewed.status,
+      renewsAt: renewed.renewsAt,
+      graceEndsAt: renewed.graceEndsAt,
     };
   }
 
@@ -132,9 +181,25 @@ export class OrgBillingService {
 
     let subscription: any;
     if (existing) {
+      const data: Record<string, unknown> = {
+        planId: plan.id,
+        billingCycle: billingCycle as any,
+        amount,
+        mrr,
+      };
+      // Choosing a plan is a fresh commitment to a billing term — an org whose
+      // subscription lapsed (expired/paused) comes back to life here, and the
+      // renewsAt clock restarts for the new term.
+      if (existing.status === 'expired' || existing.status === 'paused') {
+        data.status = 'active';
+        data.graceEndsAt = null;
+        data.renewsAt = new Date(
+          Date.now() + (billingCycle === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000,
+        );
+      }
       subscription = await this.prisma.subscription.update({
         where: { id: existing.id },
-        data: { planId: plan.id, billingCycle: billingCycle as any, amount, mrr },
+        data: data as any,
         include: { plan: true },
       });
     } else {

@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class UpdatePlatformConfigDto {
   @IsOptional()
@@ -38,4 +38,29 @@ export class UpdatePlatformConfigDto {
   @IsString()
   @MaxLength(253)
   infraNs2?: string;
+
+  /** Days before renewsAt the "expiring soon" popup notification fires. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(90)
+  billingExpiryNotifyDays?: number;
+
+  /** Days a past_due subscription stays usable before the expiry behaviour. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  billingGracePeriodDays?: number;
+
+  /** What happens when the grace period lapses: 'restrict' | 'cancel'. */
+  @IsOptional()
+  @IsIn(['restrict', 'cancel'])
+  billingExpiryBehavior?: 'restrict' | 'cancel';
+
+  /** Notification body for the expiring / past-due popups. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  billingExpiryMessage?: string;
 }

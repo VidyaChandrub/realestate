@@ -7,12 +7,17 @@ import { BadRequestException } from '@nestjs/common';
 // (signup, admin activate/approve, project creation, user invite, template
 // assignment, plan downgrade) needs identical parsing.
 
-export type PlanLimitKey = 'projects' | 'users' | 'templates';
+export type PlanLimitKey =
+  | 'projects'
+  | 'users'
+  | 'templates'
+  | 'landingPages';
 
 const LIMIT_NOUN: Record<PlanLimitKey, string> = {
   projects: 'project',
   users: 'user',
   templates: 'template',
+  landingPages: 'landing page',
 };
 
 /** Resolve a plan limit to a number; `Infinity` means unlimited. */
@@ -90,12 +95,18 @@ export function assertTemplateQuota(
 //               user has freed their seat).
 //   - projects: every project counts, regardless of status.
 //   - templates: assigned OrganisationTemplate rows.
+//   - landingPages: LandingPage rows with pageType 'landing' — thank-you
+//               companion pages are linked from a landing page, not sold
+//               separately, so they do NOT consume an extra slot.
 
 interface UserCountPrisma {
   user: { count: (args: any) => Promise<number> };
 }
 interface ProjectCountPrisma {
   project: { count: (args: any) => Promise<number> };
+}
+interface LandingPageCountPrisma {
+  landingPage: { count: (args: any) => Promise<number> };
 }
 
 export function countBillableOrgUsers(
@@ -114,9 +125,21 @@ export function countOrgProjects(
   return prisma.project.count({ where: { orgId } });
 }
 
+export function countOrgLandingPages(
+  prisma: LandingPageCountPrisma,
+  orgId: string,
+): Promise<number> {
+  return prisma.landingPage.count({
+    where: { orgId, pageType: 'landing' },
+  });
+}
+
 // --- Downgrade guard ---
 
-interface CountPrisma extends UserCountPrisma, ProjectCountPrisma {
+interface CountPrisma
+  extends UserCountPrisma,
+    ProjectCountPrisma,
+    LandingPageCountPrisma {
   organisationTemplate: { count: (args: any) => Promise<number> };
 }
 
@@ -131,14 +154,25 @@ export async function assertPlanFitsCurrentUsage(
   orgId: string,
   targetPlan: { name?: string; limits: unknown } | null | undefined,
 ): Promise<void> {
-  const [projects, users, templates] = await Promise.all([
+  const [projects, users, templates, landingPages] = await Promise.all([
     countOrgProjects(prisma, orgId),
     countBillableOrgUsers(prisma, orgId),
     prisma.organisationTemplate.count({ where: { orgId } }),
+    countOrgLandingPages(prisma, orgId),
   ]);
 
-  const usage: Record<PlanLimitKey, number> = { projects, users, templates };
-  for (const key of ['projects', 'users', 'templates'] as PlanLimitKey[]) {
+  const usage: Record<PlanLimitKey, number> = {
+    projects,
+    users,
+    templates,
+    landingPages,
+  };
+  for (const key of [
+    'projects',
+    'users',
+    'templates',
+    'landingPages',
+  ] as PlanLimitKey[]) {
     const max = resolveLimit(targetPlan, key);
     if (usage[key] > max) {
       const noun = LIMIT_NOUN[key];

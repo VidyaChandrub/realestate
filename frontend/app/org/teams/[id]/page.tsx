@@ -444,9 +444,9 @@ export default function TeamDetailPage() {
                 <Link className="btn btn-primary btn-block" href={`/org/teams/onboard?team=${team.id}`}>
                   <Icon name="users" size={14} /> Onboard member
                 </Link>
-                <button type="button" className="btn btn-soft btn-block" onClick={() => notify("Team Chat isn't available yet.")}>
+                <Link className="btn btn-soft btn-block" href={`/org/team-chat?team=${team.id}`}>
                   <Icon name="mail" size={14} /> Open team chat
-                </button>
+                </Link>
                 <button type="button" className="btn btn-ghost btn-block" onClick={() => notify("Exporting reports isn't available yet.")}>
                   <Icon name="download" size={14} /> Export report
                 </button>

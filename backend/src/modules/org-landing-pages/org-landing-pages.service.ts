@@ -19,6 +19,10 @@ import {
   snapshotFromStandaloneUnit,
   type PropertyBinding,
 } from '../../common/utils/landing-page-property.util';
+import {
+  assertOrgCanPublish,
+  assertOrgLandingPageQuota,
+} from '../../common/utils/subscription-lifecycle.util';
 
 @Injectable()
 export class OrgLandingPagesService {
@@ -46,6 +50,12 @@ export class OrgLandingPagesService {
     if (dto.projectId && dto.unitId) {
       throw new BadRequestException('Choose a project or a standalone unit, not both.');
     }
+
+    // Package ceiling — creating a landing page consumes one slot, so verify
+    // the plan's `landingPages` limit (null = unlimited) before copying. The
+    // thank-you companion created below is linked to this page and does NOT
+    // consume a separate slot.
+    await assertOrgLandingPageQuota(this.prisma, orgId, 1);
 
     if (!dto.templateId) {
       return this.createBlank(orgId, dto);
@@ -363,6 +373,13 @@ export class OrgLandingPagesService {
 
   async publish(orgId: string, id: string) {
     const page = await this.getOwned(orgId, id);
+
+    // Publishing is a package-gated action: a usable subscription (active /
+    // trial / inside grace) AND the `publishing` plan capability. Drafting and
+    // editing stay open to everyone so builders can prepare work while waiting
+    // on an upgrade/renewal — the gate fires exactly at publish.
+    await assertOrgCanPublish(this.prisma, orgId);
+
     const updated = await this.prisma.landingPage.update({
       where: { id },
       data: { status: 'published', publishedAt: new Date() },
@@ -408,6 +425,10 @@ export class OrgLandingPagesService {
 
   async duplicate(orgId: string, id: string) {
     const page = await this.getOwned(orgId, id);
+
+    // Copying a page adds another slot against the plan's landingPages quota.
+    await assertOrgLandingPageQuota(this.prisma, orgId, 1);
+
     const slug = await generateUniqueLandingPageSlug(this.prisma, orgId, `${page.name} copy`);
     const copy = await this.prisma.landingPage.create({
       data: {

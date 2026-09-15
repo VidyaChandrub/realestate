@@ -196,6 +196,7 @@ model Organisation {
   organisationTemplates OrganisationTemplate[]
   landingPages          LandingPage[]
   typographySets        TypographySet[]
+  leadForms             LeadForm[]
   orgDomainRequests     OrgDomainRequest[]
   trackingEvents        TrackingEvent[]
   projects              Project[]
@@ -204,6 +205,8 @@ model Organisation {
   units                 Unit[]
   emailConfig           EmailConfig?
   supportTickets        SupportTicket[]
+  teamChannels          TeamChannel[]
+  teamMessages          TeamMessage[]
 
   @@map("organisations")
   @@schema("identity")
@@ -263,6 +266,10 @@ model User {
   raisedSupportTickets SupportTicket[]   @relation("SupportTicketRaisedBy")
   closedSupportTickets SupportTicket[]   @relation("SupportTicketClosedBy")
   sentSupportMessages  SupportMessage[]  @relation("SupportMessageSender")
+  teamChannelsCreated  TeamChannel[]     @relation("TeamChannelCreatedBy")
+  teamChannelsDm       TeamChannel[]     @relation("TeamChannelDmUser")
+  teamChannelMembers   TeamChannelMember[]
+  sentTeamMessages     TeamMessage[]     @relation("TeamMessageSender")
 
   @@map("users")
   @@schema("identity")
@@ -389,6 +396,7 @@ model Team {
   members      TeamMember[]
   moduleAccess TeamModuleAccess[]
   projects     TeamProject[]
+  channels     TeamChannel[]
 
   @@index([orgId])
   @@index([teamLeadId])
@@ -506,6 +514,85 @@ model UserModulePermission {
 }
 
 // ---------------------------------------------------------------------------
+// Team Chat — internal chat for each team (channels + direct messages). Plain
+// REST + the frontend polls, no websockets — same call/response model as
+// Support tickets. A channel is either a team channel (`kind` = 'channel',
+// optionally linked to a Team row so its members auto-join) or a two-person
+// DM (`kind` = 'dm', `name` = the other user). Tagging a Lead attaches its id
+// to a message so the UI can render a "shared lead" card; `assignedTo` is a
+// free-text label ("Rohit", "NRI Desk") copied at send time so later renames
+// never rewrite chat history.
+// ---------------------------------------------------------------------------
+
+model TeamChannel {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  kind        String   @default("channel") // channel | dm
+  name        String
+  // channel → the Team it was created from (nullable for ad-hoc channels);
+  // dm      → always null.
+  teamId      String?  @map("team_id")
+  // dm → the *other* participant (never the creator). Null for channels.
+  dmUserId    String?  @map("dm_user_id")
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  organisation Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  team         Team?            @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdBy    User?            @relation("TeamChannelCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  dmUser       User?            @relation("TeamChannelDmUser", fields: [dmUserId], references: [id], onDelete: SetNull)
+  members      TeamChannelMember[]
+  messages     TeamMessage[]
+
+  @@index([orgId])
+  @@index([teamId])
+  @@map("team_channels")
+  @@schema("access")
+}
+
+// Membership for a channel plus the per-user last-read marker. `lastReadAt`
+// null = the user has never opened the channel yet (every message counts as
+// unread until they do). Opening a channel (GET detail) stamps it to now.
+model TeamChannelMember {
+  channelId  String    @map("channel_id")
+  userId     String    @map("user_id")
+  lastReadAt DateTime? @map("last_read_at")
+  joinedAt   DateTime  @default(now()) @map("joined_at")
+
+  channel TeamChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, userId])
+  @@index([userId])
+  @@map("team_channel_members")
+  @@schema("access")
+}
+
+model TeamMessage {
+  id         String   @id @default(uuid())
+  channelId  String   @map("channel_id")
+  orgId      String   @map("org_id")
+  senderId   String   @map("sender_id")
+  body       String
+  // Tagged lead card — links the tagged Lead row.
+  leadId     String?  @map("lead_id")
+  // Free-text "assigned to" label ("Rohit", "NRI Desk", "this channel").
+  assignedTo String?  @map("assigned_to")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  channel TeamChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  sender  User        @relation("TeamMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  lead    Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, createdAt])
+  @@index([orgId])
+  @@map("team_messages")
+  @@schema("access")
+}
+
+// ---------------------------------------------------------------------------
 // audit — logging, kept separate the same way QuesPro isolates "audit"
 // ---------------------------------------------------------------------------
 
@@ -548,6 +635,15 @@ enum NotificationType {
   support_ticket_created
   support_ticket_message
   support_ticket_status_changed
+  // Subscription lifecycle — created by the expiry sweep (and the org's own
+  // billing read when the sweep hasn't run yet). subscription_expiring fires
+  // `notifyDays` before renewsAt; subscription_past_due fires the moment the
+  // term ends and the grace period begins; subscription_expired fires once the
+  // grace period lapses without a renewal (or the subscription is cancelled by
+  // the configured post-grace behaviour).
+  subscription_expiring
+  subscription_past_due
+  subscription_expired
 
   @@schema("audit")
 }
@@ -720,6 +816,10 @@ enum SubscriptionStatus {
   trial
   cancelled
   paused
+  // Set when the subscription's grace period ends without renewal and the
+  // platform's configured expiry behaviour is 'restrict'. Publishing and
+  // other quota-gated actions are blocked until the org renews.
+  expired
 
   @@schema("billing")
 }
@@ -762,6 +862,11 @@ model Subscription {
   amount       Int
   currency     String             @default("INR")
   renewsAt     DateTime?          @map("renews_at")
+  // End of the platform-configurable grace period once the term has lapsed.
+  // Set on the active/trial -> past_due transition and cleared on renewal.
+  // When the sweep runs after this datetime and the status is still past_due,
+  // the configured expiry behaviour is applied (see lifetime.utils).
+  graceEndsAt  DateTime?          @map("grace_ends_at")
   mrr          Int? // monthly recurring normalized value
   startedAt    DateTime           @default(now()) @map("started_at")
   cancelledAt  DateTime?          @map("cancelled_at")
@@ -863,6 +968,27 @@ model TypographySet {
   // (WHERE org_id IS NULL) outside what this schema DSL can express.
   @@unique([orgId, name])
   @@map("typography_sets")
+  @@schema("templates")
+}
+
+// Lead capture forms — the org-scoped Form Builder library. orgId null =
+// platform-wide form owned by the Super Admin; org forms are strictly
+// per-organisation. The definition is stored whole (the FormDefinition JSON
+// the FormDesigner edits) so the frontend round-trips it unchanged; `name`
+// is a denormalised copy for cheap listing.
+model LeadForm {
+  id        String   @id @default(uuid())
+  orgId     String?  @map("org_id")
+  name      String
+  content   Json // { id, embed, fields, ... } — the form definition as-is
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organisation Organisation? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([updatedAt])
+  @@map("lead_forms")
   @@schema("templates")
 }
 
@@ -1001,6 +1127,7 @@ model Lead {
   project    Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   callLogs   CallLog[]
   activities ActivityEvent[]
+  teamMessages TeamMessage[]
 
   @@index([orgId])
   @@index([landingPageId])
@@ -1546,7 +1673,27 @@ model PlatformConfig {
   infraCname String? @map("infra_cname")
   infraNs1   String? @map("infra_ns1")
   infraNs2   String? @map("infra_ns2")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // ---------------------------------------------------------------------------
+  // Subscription expiry & grace-period policy (Super Admin configurable). All
+  // four are read by the expiry sweep (subscription-lifecycle util) when a
+  // subscription's term lapses and by the "expiring soon" notification job:
+  //   - billingExpiryNotifyDays  how many days BEFORE renewsAt the expiring
+  //                              popup notification is raised.
+  //   - billingGracePeriodDays   how long a past_due subscription stays usable
+  //                              after the term ends before the behaviour below.
+  //   - billingExpiryBehavior    what happens once the grace period lapses:
+  //                              'restrict' = status switches to `expired` and
+  //                              quota-gated actions (publishing, etc.) stop;
+  //                              'cancel'    = the subscription is cancelled.
+  //   - billingExpiryMessage     the notification body used for the expiring /
+  //                              past_due popups (title is derived).
+  // ---------------------------------------------------------------------------
+  billingExpiryNotifyDays Int     @default(3) @map("billing_expiry_notify_days")
+  billingGracePeriodDays  Int     @default(7) @map("billing_grace_period_days")
+  billingExpiryBehavior   String  @default("restrict") @map("billing_expiry_behavior") // restrict | cancel
+  billingExpiryMessage    String  @default("Your subscription is due for renewal soon. Renew to keep your landing pages and features running without interruption.") @map("billing_expiry_message")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("platform_configs")
   @@schema("identity")

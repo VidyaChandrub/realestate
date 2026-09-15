@@ -10,12 +10,13 @@ import { Icon, type IconName } from "@/components/icons";
 import { loadTemplates } from "@/lib/openpage/store";
 import { orgBuilderPath } from "@/lib/openpage/paths";
 import {
+  getOrgBilling,
   getOrgNotifications,
   getOrgUnreadNotifications,
   markAllOrgNotificationsRead,
   markOrgNotificationRead,
 } from "@/lib/api";
-import type { OrgNotification } from "@/lib/types";
+import type { OrgBillingSummary, OrgNotification } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 
 type NavItem = {
@@ -55,12 +56,14 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/org/landing-pages", icon: "document", label: "Landing Pages", tip: "Landing Pages" },
       { href: "/org/templates", icon: "puzzle", label: "Templates", tip: "Templates" },
+      { href: "/org/forms", icon: "document", label: "Lead Forms", tip: "Lead Forms" },
     ],
   },
   {
     grp: "Team",
     items: [
       { href: "/org/teams", icon: "team", label: "Teams", tip: "Teams" },
+      { href: "/org/team-chat", icon: "mail", label: "Team Chat", tip: "Team Chat" },
       { href: "/org/users", icon: "profile", label: "Users", tip: "Users" },
       { href: "/org/roles-permissions", icon: "lock", label: "Roles & Permissions", tip: "Roles & Permissions" },
     ],
@@ -95,10 +98,12 @@ const CRUMB_MAP: Record<string, string> = {
   "/org/whatsapp/settings": "WhatsApp Settings",
   "/org/websites": "Websites",
   "/org/landing-pages": "Landing Pages",
+  "/org/forms": "Lead Forms",
   "/org/templates": "Templates",
   "/org/integrations": "Integrations",
   "/org/sales-agents": "Sales Agents",
   "/org/teams": "Teams",
+  "/org/team-chat": "Team Chat",
   "/org/users": "Users",
   "/org/roles-permissions": "Roles & Permissions",
   "/org/publish-approvals": "Publish & Approvals",
@@ -132,6 +137,57 @@ function initials(firstName: string | null, lastName: string | null): string {
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase())
     .join("");
+}
+
+// ---------------------------------------------------------------------------
+// Subscription expiry popup — the persistent, dismissible banner org members
+// see while their subscription is past_due / expired / cancelled / paused.
+// It mirrors the backend lifecycle (which the billing read applies lazily),
+// so the banner appears the moment a status transitions even before the
+// hourly sweep fires. Dismissal is per-key for the session; if the state
+// changes (key changes) or the page reloads, the banner comes back.
+// ---------------------------------------------------------------------------
+
+type ExpiryBanner = {
+  key: string;
+  tone: "rose" | "amber";
+  title: string;
+  body: string;
+};
+
+function expiryBannerFromBilling(billing: OrgBillingSummary | null): ExpiryBanner | null {
+  const sub = billing?.subscription;
+  if (!sub) return null;
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+
+  if (sub.status === "expired") {
+    return {
+      key: "expired",
+      tone: "rose",
+      title: "Your subscription has expired",
+      body: "Publishing is paused. Renew to keep your landing pages and features running.",
+    };
+  }
+  if (sub.status === "past_due") {
+    return {
+      key: `past_due:${sub.graceEndsAt ?? "open"}`,
+      tone: "amber",
+      title: "Your subscription is past due",
+      body: sub.graceEndsAt
+        ? `Your term has ended — renew by ${fmt(sub.graceEndsAt)} to avoid any interruption.`
+        : "Renew within the grace period to avoid any interruption.",
+    };
+  }
+  if (sub.status === "cancelled" || sub.status === "paused") {
+    return {
+      key: sub.status,
+      tone: "rose",
+      title: sub.status === "cancelled" ? "Your subscription is cancelled" : "Your subscription is paused",
+      body: "Choose a plan or renew from Org Settings → Billing to keep using the platform.",
+    };
+  }
+  return null;
 }
 
 export function OrgAdminShell({ children }: { children: ReactNode }) {
@@ -216,6 +272,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
 
   const [rawNotifications, setRawNotifications] = useState<OrgNotification[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [expiryBanner, setExpiryBanner] = useState<ExpiryBanner | null>(null);
   const { toast } = useToast();
   // Notification ids already flashed (or seen on the first poll after
   // mount, which seeds this without flashing the org's whole history).
@@ -247,13 +304,37 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
     }
   }, [accessToken, toast]);
 
+  // Keeps the subscription-expiry popup in sync with the backend.
+  const dismissedExpiryRef = useRef<Set<string>>(new Set());
+
+  const pollBilling = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const billing = await getOrgBilling();
+      const next = expiryBannerFromBilling(billing);
+      setExpiryBanner((current) => {
+        const candidateKey = next ? next.key : null;
+        if (current?.key === candidateKey) return current;
+        if (candidateKey && dismissedExpiryRef.current.has(candidateKey)) return null;
+        return next;
+      });
+    } catch {
+      // The billing module is permission-gated — non-admins simply don't get
+      // the banner; their bell notifications still surface the popup.
+    }
+  }, [accessToken]);
+
   useEffect(() => {
     if (!accessToken) return;
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
     void pollNotifications();
-    const id = window.setInterval(() => void pollNotifications(), 30000);
+    void pollBilling();
+    const id = window.setInterval(() => {
+      void pollNotifications();
+      void pollBilling();
+    }, 30000);
     return () => window.clearInterval(id);
-  }, [accessToken, pollNotifications]);
+  }, [accessToken, pollNotifications, pollBilling]);
 
   useEffect(() => {
     if (!notificationOpen || !accessToken) return;
@@ -344,8 +425,9 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                 if (item.href.startsWith("/org/calling")) return hasPermission("calling", "view");
                 if (item.href.startsWith("/org/whatsapp")) return hasPermission("whatsapp", "view");
                 if (item.href.startsWith("/org/landing-pages") || item.href.startsWith("/org/templates")) return hasPermission("websites", "view");
+                if (item.href.startsWith("/org/forms")) return hasPermission("forms", "view");
                 if (item.href.startsWith("/org/sales-agents")) return hasPermission("sales_agents", "view");
-                if (item.href.startsWith("/org/teams")) return hasPermission("teams", "view");
+                if (item.href.startsWith("/org/teams") || item.href.startsWith("/org/team-chat")) return hasPermission("teams", "view");
                 if (item.href.startsWith("/org/users")) return hasPermission("users", "view");
                 if (item.href.startsWith("/org/roles-permissions")) return user.role === "organisation_admin";
                 if (item.href.startsWith("/org/integrations")) return hasPermission("integrations", "view");
@@ -712,6 +794,79 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
             </div>
           </div>
         </header>
+        {expiryBanner ? (
+          <div
+            role="alert"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              margin: "16px 24px 0",
+              padding: "12px 16px",
+              borderRadius: 14,
+              border: `1px solid ${
+                expiryBanner.tone === "rose" ? "rgba(244, 63, 94, 0.25)" : "rgba(245, 158, 11, 0.3)"
+              }`,
+              background:
+                expiryBanner.tone === "rose"
+                  ? "rgba(244, 63, 94, 0.07)"
+                  : "rgba(245, 158, 11, 0.07)",
+            }}
+          >
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                flex: "0 0 auto",
+                background: expiryBanner.tone === "rose" ? "#f43f5e" : "#f59e0b",
+                boxShadow: `0 0 0 4px ${expiryBanner.tone === "rose" ? "#f43f5e" : "#f59e0b"}22`,
+              }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>{expiryBanner.title}</div>
+              <div style={{ fontSize: 12.5, color: "#475569", marginTop: 2 }}>{expiryBanner.body}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push("/org/settings?section=billing")}
+              style={{
+                flex: "0 0 auto",
+                border: "none",
+                borderRadius: 10,
+                padding: "8px 14px",
+                background: "#4f46e5",
+                color: "#fff",
+                fontSize: 12.5,
+                fontWeight: 700,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Renew now
+            </button>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => {
+                dismissedExpiryRef.current.add(expiryBanner.key);
+                setExpiryBanner(null);
+              }}
+              style={{
+                flex: "0 0 auto",
+                border: "none",
+                background: "transparent",
+                color: "#94a3b8",
+                fontSize: 16,
+                lineHeight: 1,
+                cursor: "pointer",
+                padding: 6,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
         <div className="page">
           <LeadStagesProvider>{children}</LeadStagesProvider>
         </div>

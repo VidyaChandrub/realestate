@@ -23,6 +23,12 @@ export interface PlanCapabilityDef {
 
 export const PLAN_CAPABILITY_CATALOG: readonly PlanCapabilityDef[] = [
   {
+    key: 'publishing',
+    label: 'Publishing',
+    description:
+      'Publish landing pages to a live URL. Without it, drafts stay offline.',
+  },
+  {
     key: 'customDomain',
     label: 'Custom domain',
     description: "Map the organisation's own domain to its published site.",
