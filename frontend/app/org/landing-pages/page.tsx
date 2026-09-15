@@ -103,15 +103,16 @@ export default function OrgLandingPagesPage() {
   // open the upgrade modal with a link to Org Settings → Billing; anything else
   // just becomes a toast. The backend messages are written to hint at the right
   // action ("Upgrade" / "Renew" / "Choose a plan"), so a keyword match suffices.
-  const PACKAGE_HINT = /plan|subscription|upgrade|renew|publishing|unlimited|expired/i;
+  const PACKAGE_HINT = /plan|subscription|upgrade|renew|publishing|unlimited|expired|limit|published|maximum/i;
   function handleActionError(err: unknown, fallback: string, action: string) {
     const msg = err instanceof Error ? err.message : fallback;
     if (PACKAGE_HINT.test(msg)) {
-      setPackagePrompt({ title: `${action} needs your plan`, body: msg });
+      setPackagePrompt({ title: `${action} limit reached`, body: msg });
     } else {
       notify(msg);
     }
   }
+
 
   const fetchList = useCallback(() => {
     if (!accessToken) return;

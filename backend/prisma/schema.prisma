@@ -207,6 +207,7 @@ model Organisation {
   supportTickets        SupportTicket[]
   teamChannels          TeamChannel[]
   teamMessages          TeamMessage[]
+  packageChangeRequests PackageChangeRequest[]
 
   @@map("organisations")
   @@schema("identity")
@@ -270,6 +271,8 @@ model User {
   teamChannelsDm       TeamChannel[]     @relation("TeamChannelDmUser")
   teamChannelMembers   TeamChannelMember[]
   sentTeamMessages     TeamMessage[]     @relation("TeamMessageSender")
+  packageChangeRequests PackageChangeRequest[] @relation("PackageChangeRequestedBy")
+  packageChangeReviews  PackageChangeRequest[] @relation("PackageChangeReviewedBy")
 
   @@map("users")
   @@schema("identity")
@@ -644,6 +647,9 @@ enum NotificationType {
   subscription_expiring
   subscription_past_due
   subscription_expired
+  package_change_request
+  package_change_approved
+  package_change_rejected
 
   @@schema("audit")
 }
@@ -848,6 +854,8 @@ model Plan {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   subscriptions Subscription[]
+  currentPlanRequests PackageChangeRequest[] @relation("CurrentPlanRequests")
+  targetPlanRequests  PackageChangeRequest[] @relation("TargetPlanRequests")
 
   @@map("plans")
   @@schema("billing")
@@ -882,6 +890,42 @@ model Subscription {
   @@map("subscriptions")
   @@schema("billing")
 }
+
+enum PackageChangeRequestStatus {
+  pending
+  approved
+  rejected
+  cancelled
+
+  @@schema("billing")
+}
+
+model PackageChangeRequest {
+  id              String                     @id @default(uuid())
+  orgId           String                     @map("org_id")
+  requestedById   String                     @map("requested_by_id")
+  currentPlanId   String                     @map("current_plan_id")
+  targetPlanId    String                     @map("target_plan_id")
+  billingCycle    BillingCycle               @default(monthly) @map("billing_cycle")
+  status          PackageChangeRequestStatus @default(pending)
+  rejectionReason String?                    @map("rejection_reason")
+  reviewedAt      DateTime?                  @map("reviewed_at")
+  reviewedById    String?                    @map("reviewed_by_id")
+  createdAt       DateTime                   @default(now()) @map("created_at")
+  updatedAt       DateTime                   @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  requestedBy  User         @relation("PackageChangeRequestedBy", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy   User?        @relation("PackageChangeReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  currentPlan  Plan         @relation("CurrentPlanRequests", fields: [currentPlanId], references: [id], onDelete: Restrict)
+  targetPlan   Plan         @relation("TargetPlanRequests", fields: [targetPlanId], references: [id], onDelete: Restrict)
+
+  @@index([orgId])
+  @@index([status])
+  @@map("package_change_requests")
+  @@schema("billing")
+}
+
 
 model OrganisationTemplate {
   orgId      String   @map("org_id")

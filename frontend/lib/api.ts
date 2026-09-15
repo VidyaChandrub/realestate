@@ -44,6 +44,8 @@ import type {
   CrmLeadStatus,
   OrgLandingPagesListResponse,
   OrgBillingSummary,
+  PackageChangeRequestRow,
+  PackageChangeRequestsListResponse,
   OrgUnitsListResponse,
   Unit,
   CreateUnitInput,
@@ -510,6 +512,78 @@ export async function renewSubscription(): Promise<BillingRenewResult> {
   return apiFetch<BillingRenewResult>("/org/billing/renew", {
     method: "POST",
   });
+}
+
+// --- Package Change Requests (Org Admin & Super Admin) ---
+
+export async function getOrgPackageChangeRequest(): Promise<{
+  pendingRequest: PackageChangeRequestRow | null;
+}> {
+  return apiFetch<{ pendingRequest: PackageChangeRequestRow | null }>(
+    "/org/billing/package-change-request",
+  );
+}
+
+export async function submitPackageChangeRequest(input: {
+  targetPlanId: string;
+  billingCycle?: "monthly" | "yearly";
+}): Promise<PackageChangeRequestRow> {
+  return apiFetch<PackageChangeRequestRow>("/org/billing/package-change-request", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function cancelPackageChangeRequest(
+  id: string,
+): Promise<{ success: boolean; message: string }> {
+  return apiFetch<{ success: boolean; message: string }>(
+    `/org/billing/package-change-request/${id}/cancel`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function getAdminPackageChangeRequests(params?: {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<PackageChangeRequestsListResponse> {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.search) q.set("search", params.search);
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  const s = q.toString();
+  return apiFetch<PackageChangeRequestsListResponse>(
+    `/admin/package-change-requests${s ? `?${s}` : ""}`,
+  );
+}
+
+export async function approvePackageChangeRequest(
+  id: string,
+): Promise<{ success: boolean; message: string }> {
+  return apiFetch<{ success: boolean; message: string }>(
+    `/admin/package-change-requests/${id}/approve`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function rejectPackageChangeRequest(
+  id: string,
+  rejectionReason?: string,
+): Promise<{ success: boolean; message: string }> {
+  return apiFetch<{ success: boolean; message: string }>(
+    `/admin/package-change-requests/${id}/reject`,
+    {
+      method: "POST",
+      body: JSON.stringify({ rejectionReason }),
+    },
+  );
 }
 
 export async function submitLead(input: LeadSubmission): Promise<void> {

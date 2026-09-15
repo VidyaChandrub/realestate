@@ -42,6 +42,7 @@ import { AdminLeadsModule } from './modules/admin-leads/admin-leads.module';
 import { SupportModule } from './modules/support/support.module';
 import { TeamChatModule } from './modules/team-chat/team-chat.module';
 import { FormsModule } from './modules/forms/forms.module';
+import { PackageChangeRequestsModule } from './modules/package-change-requests/package-change-requests.module';
 
 @Module({
   imports: [
@@ -86,8 +87,10 @@ import { FormsModule } from './modules/forms/forms.module';
     SupportModule,
     TeamChatModule,
     FormsModule,
+    PackageChangeRequestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
+

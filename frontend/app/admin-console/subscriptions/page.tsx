@@ -5,11 +5,11 @@ import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Seg } from "@/components/superadmin/seg";
-import { apiFetch, getPlanCapabilities, getPlatformConfig, updatePlatformConfig } from "@/lib/api";
+import { apiFetch, approvePackageChangeRequest, getAdminPackageChangeRequests, getPlanCapabilities, getPlatformConfig, rejectPackageChangeRequest, updatePlatformConfig } from "@/lib/api";
 import { Icon } from "@/components/icons";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import type { Plan, PlanCapability, Subscription, BillingOverview, OrganisationListResponse } from "@/lib/types";
+import type { Plan, PlanCapability, Subscription, BillingOverview, OrganisationListResponse, PackageChangeRequestRow } from "@/lib/types";
 
 /** Display a numeric limit, or "Unlimited" for null. */
 function fmtLimit(n: number | null | undefined): string {
@@ -20,8 +20,9 @@ const LIMIT_ROWS: { key: "projects" | "users" | "templates" | "landingPages"; la
   { key: "projects", label: "Projects" },
   { key: "users", label: "Users" },
   { key: "templates", label: "Templates" },
-  { key: "landingPages", label: "Landing pages" },
+  { key: "landingPages", label: "Maximum Published Landing Pages" },
 ];
+
 
 const PLAN_BADGE_OPTIONS = [
   { value: "b-indigo", label: "Indigo" },
@@ -57,6 +58,15 @@ export default function SuperAdminSubscriptionsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
   const [deletingPlan, setDeletingPlan] = useState(false);
+
+  const [requests, setRequests] = useState<PackageChangeRequestRow[]>([]);
+  const [requestsTotal, setRequestsTotal] = useState(0);
+  const [requestsPage, setRequestsPage] = useState(1);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestFilterStatus, setRequestFilterStatus] = useState<string>("pending");
+  const [rejectModalReq, setRejectModalReq] = useState<PackageChangeRequestRow | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const [capabilities, setCapabilities] = useState<PlanCapability[]>([]);
 
@@ -166,8 +176,58 @@ export default function SuperAdminSubscriptionsPage() {
     } catch {}
   }
 
+  async function fetchPackageChangeRequests(status = requestFilterStatus, page = 1) {
+    setRequestsLoading(true);
+    try {
+      const res = await getAdminPackageChangeRequests({
+        status: status === "all" ? undefined : status,
+        page,
+        limit: 20,
+      });
+      setRequests(res.data);
+      setRequestsTotal(res.total);
+      setRequestsPage(res.page);
+    } catch (e: any) {
+      notify(e.message || "Failed to load package change requests");
+    } finally {
+      setRequestsLoading(false);
+    }
+  }
+
+  async function handleApproveRequest(id: string) {
+    setActionLoadingId(id);
+    try {
+      await approvePackageChangeRequest(id);
+      notify("Package change request approved! New package activated.");
+      await fetchPackageChangeRequests(requestFilterStatus, requestsPage);
+      await fetchSubs();
+      await fetchOverview();
+    } catch (e: any) {
+      notify(e.message || "Approval failed");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  async function handleRejectRequest() {
+    if (!rejectModalReq) return;
+    setActionLoadingId(rejectModalReq.id);
+    try {
+      await rejectPackageChangeRequest(rejectModalReq.id, rejectionReason.trim());
+      notify("Package change request rejected.");
+      setRejectModalReq(null);
+      setRejectionReason("");
+      await fetchPackageChangeRequests(requestFilterStatus, requestsPage);
+    } catch (e: any) {
+      notify(e.message || "Rejection failed");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   useEffect(() => { fetchPlans(); fetchOverview(); fetchOrgs(); fetchCapabilities(); loadExpiryPolicy(); }, []);
   useEffect(() => { if (tab === 2) fetchSubs(1); }, [tab]);
+  useEffect(() => { if (tab === 3) fetchPackageChangeRequests(); }, [tab, requestFilterStatus]);
   // debounce search for subs
   useEffect(() => {
     if (tab !== 2) return;
@@ -351,7 +411,7 @@ export default function SuperAdminSubscriptionsPage() {
         </div>
         <div className="actions">
           <button className="btn btn-ghost" onClick={() => notify("CSV exported")}>⤓ Export CSV</button>
-          <button className="btn btn-primary" onClick={openCreate}>＋ Create Plan</button>
+          <Link className="btn btn-primary" href="/admin-console/subscriptions/plans/create">＋ Create Plan</Link>
         </div>
       </div>
 
@@ -368,6 +428,7 @@ export default function SuperAdminSubscriptionsPage() {
             "Overview",
             "Plans & Pricing",
             "Organisation Subscriptions",
+            "Package Change Requests",
             "Payments",
             "Billing Settings",
           ].map((label, i) => (
@@ -417,7 +478,7 @@ export default function SuperAdminSubscriptionsPage() {
               <div className="card" style={{ padding: 18 }}>
                 <div style={{ fontWeight: 700, marginBottom: 10 }}>Quick actions</div>
                 <div style={{ display: "grid", gap: 8 }}>
-                  <button className="btn btn-primary btn-block" onClick={openCreate}>＋ Create Plan</button>
+                  <Link className="btn btn-primary btn-block" href="/admin-console/subscriptions/plans/create">＋ Create Plan</Link>
                   <button className="btn btn-ghost btn-block" onClick={() => setTab(1)}>View Plans & Pricing →</button>
                   <button className="btn btn-ghost btn-block" onClick={() => setAssignOpen(true)}>Assign Subscription →</button>
                   <button className="btn btn-ghost btn-block" onClick={() => setTab(2)}>Manage Organisation Subscriptions →</button>
@@ -449,7 +510,7 @@ export default function SuperAdminSubscriptionsPage() {
               <div className="card" style={{ padding: 18 }}>
                 <div style={{ fontWeight: 700, marginBottom: 10 }}>Distribution — API</div>
                 <div style={{ display: "grid", gap: 10 }}>
-                  {(overview?.distribution || []).length === 0 ? <div style={{ color:"var(--muted)", fontSize:13 }}>No subscriptions yet — assign a plan to see distribution.</div> :
+                  {(overview?.distribution || []).length === 0 ? <div style={{ color:"var(--muted)", fontSize13: true }}>No subscriptions yet — assign a plan to see distribution.</div> :
                   overview?.distribution.map(d => (
                     <div key={d.planId} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <span className={`badge ${d.badge}`} style={{ minWidth: 80, justifyContent: "center" }}>{d.planName}</span>
@@ -470,7 +531,7 @@ export default function SuperAdminSubscriptionsPage() {
                 <div className="t" style={{ fontWeight: 700 }}>Plans & Pricing</div>
                 <div className="x" style={{ fontSize: 12.5, color: "var(--muted)" }}>{plans.length} plans · {billingCycle} billing · API-wired</div>
               </div>
-              <button className="btn btn-primary" onClick={openCreate}>＋ Create Plan</button>
+              <Link className="btn btn-primary" href="/admin-console/subscriptions/plans/create">＋ Create Plan</Link>
             </div>
 
             {plansLoading ? <div style={{ padding: 24, textAlign:"center", color:"var(--muted)"}}>Loading plans…</div> : plans.length===0 ? <div style={{ padding:24, textAlign:"center", color:"var(--muted)"}}>No plans yet — create one.</div> :
@@ -502,7 +563,7 @@ export default function SuperAdminSubscriptionsPage() {
                       </ul>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => openEdit(p)}>Edit Plan</button>
+                      <Link className="btn btn-ghost btn-sm" style={{ flex: 1, textAlign: "center" }} href={`/admin-console/subscriptions/plans/${p.id}/edit`}>Edit Plan</Link>
                       <button className="btn btn-ghost btn-sm" onClick={() => deletePlan(p.id)} style={{ color: "var(--rose)" }}>Delete</button>
                     </div>
                   </div>
@@ -601,12 +662,141 @@ export default function SuperAdminSubscriptionsPage() {
         )}
 
         {tab === 3 && (
+          <div style={{ padding: 0 }}>
+            <div style={{ padding: "16px 20px", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", borderBottom: "1px solid var(--line)" }}>
+              <div style={{ fontWeight: 700 }}>Package Change Requests</div>
+              <span className="chip">{requestsTotal} requests</span>
+              <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+                {[
+                  { label: "Pending Approval", val: "pending" },
+                  { label: "All", val: "all" },
+                  { label: "Approved", val: "approved" },
+                  { label: "Rejected", val: "rejected" },
+                  { label: "Cancelled", val: "cancelled" },
+                ].map((st) => (
+                  <button
+                    key={st.val}
+                    onClick={() => { setRequestFilterStatus(st.val); void fetchPackageChangeRequests(st.val, 1); }}
+                    className={`btn btn-sm ${requestFilterStatus === st.val ? "btn-primary" : "btn-ghost"}`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="tbl-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Organisation</th>
+                    <th>Requested By</th>
+                    <th>Current Plan</th>
+                    <th>Target Plan</th>
+                    <th>Cycle</th>
+                    <th>Request Date</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requestsLoading ? (
+                    <tr><td colSpan={8} style={{ textAlign: "center", padding: "24px", color: "var(--muted)" }}>Loading requests…</td></tr>
+                  ) : requests.length === 0 ? (
+                    <tr><td colSpan={8} style={{ textAlign: "center", padding: "24px", color: "var(--muted)" }}>No package change requests found.</td></tr>
+                  ) : (
+                    requests.map((r) => (
+                      <tr key={r.id}>
+                        <td>
+                          <Link className="u" href={`/admin-console/organisation-detail/${r.orgId}`}>
+                            <span>
+                              <span className="nm">{r.organisation?.name ?? r.orgId}</span>
+                              <br />
+                              <span className="sm">{r.organisation?.city ?? ""}</span>
+                            </span>
+                          </Link>
+                        </td>
+                        <td>
+                          <div>
+                            <span style={{ fontWeight: 600 }}>{r.requestedBy ? `${r.requestedBy.firstName ?? ""} ${r.requestedBy.lastName ?? ""}`.trim() || r.requestedBy.email : "Admin"}</span>
+                            <br />
+                            <span className="sm" style={{ color: "var(--muted)" }}>{r.requestedBy?.email}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`badge ${r.currentPlan?.badge || "b-gray"}`}>
+                            {r.currentPlan?.name ?? "Current Plan"}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`badge ${r.targetPlan?.badge || "b-indigo"}`}>
+                            {r.targetPlan?.name ?? "Target Plan"}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="badge b-gray">{r.billingCycle}</span>
+                        </td>
+                        <td>{new Date(r.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                        <td>
+                          <span
+                            className={`badge ${
+                              r.status === "pending"
+                                ? "b-amber"
+                                : r.status === "approved"
+                                ? "b-green"
+                                : r.status === "rejected"
+                                ? "b-rose"
+                                : "b-gray"
+                            }`}
+                          >
+                            {r.status === "pending" ? "Pending Approval" : r.status}
+                          </span>
+                          {r.rejectionReason ? (
+                            <div className="sm" style={{ color: "var(--rose)", marginTop: 2, fontSize: 11 }}>
+                              Reason: {r.rejectionReason}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td>
+                          {r.status === "pending" ? (
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button
+                                className="btn btn-primary btn-sm"
+                                disabled={actionLoadingId === r.id}
+                                onClick={() => void handleApproveRequest(r.id)}
+                              >
+                                {actionLoadingId === r.id ? "Approving…" : "Approve"}
+                              </button>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                style={{ color: "var(--rose)" }}
+                                disabled={actionLoadingId === r.id}
+                                onClick={() => { setRejectModalReq(r); setRejectionReason(""); }}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                              {r.reviewedAt ? `Reviewed on ${new Date(r.reviewedAt).toLocaleDateString()}` : "Completed"}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {tab === 4 && (
           <div style={{ padding: 20, display: "grid", gap: 18 }}>
             <div className="card"><div className="card-h"><div className="t">Payments</div><span className="chip">Placeholder — API to be added</span></div><div style={{ padding:16, color:"var(--muted)", fontSize:13}}>Payments & invoices are UI-only placeholders; subscriptions API is live. Wire Razorpay/Stripe webhooks to create billing.payments next.</div></div>
           </div>
         )}
 
-        {tab === 4 && (
+        {tab === 5 && (
           <div style={{ padding: 20, display: "grid", gap: 18 }}>
             <div className="card">
               <div className="card-h">
@@ -912,6 +1102,41 @@ export default function SuperAdminSubscriptionsPage() {
                 <option value="yearly">Yearly</option>
               </select>
             </div>
+      </Modal>
+
+      <Modal
+        open={!!rejectModalReq}
+        onClose={() => { setRejectModalReq(null); setRejectionReason(""); }}
+        title="Reject Package Change Request"
+        description={rejectModalReq ? `Rejecting request from ${rejectModalReq.organisation?.name ?? "Organisation"}` : undefined}
+        size="md"
+        footer={
+          <>
+            <button className="btn btn-ghost" onClick={() => { setRejectModalReq(null); setRejectionReason(""); }}>Cancel</button>
+            <button
+              className="btn btn-danger"
+              onClick={() => void handleRejectRequest()}
+              disabled={actionLoadingId === rejectModalReq?.id}
+            >
+              {actionLoadingId === rejectModalReq?.id ? "Rejecting…" : "Reject Request"}
+            </button>
+          </>
+        }
+      >
+        <div className="field">
+          <label>Rejection Reason (Optional)</label>
+          <textarea
+            className="inp"
+            rows={3}
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+            placeholder="Enter reason for rejecting this request..."
+            style={{ width: "100%", padding: 10 }}
+          />
+          <div className="hint" style={{ marginTop: 4 }}>
+            This reason will be logged and shown to the Organisation Admin.
+          </div>
+        </div>
       </Modal>
 
       {toast ? <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}><div className="card" style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, boxShadow: "var(--sh-lg)", border: "1px solid var(--line)" }}><span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--green)" }} />{toast}</div></div> : null}
