@@ -510,7 +510,7 @@ export default function SuperAdminSubscriptionsPage() {
               <div className="card" style={{ padding: 18 }}>
                 <div style={{ fontWeight: 700, marginBottom: 10 }}>Distribution — API</div>
                 <div style={{ display: "grid", gap: 10 }}>
-                  {(overview?.distribution || []).length === 0 ? <div style={{ color:"var(--muted)", fontSize13: true }}>No subscriptions yet — assign a plan to see distribution.</div> :
+                  {(overview?.distribution || []).length === 0 ? <div style={{ color:"var(--muted)", fontSize: 13 }}>No subscriptions yet — assign a plan to see distribution.</div> :
                   overview?.distribution.map(d => (
                     <div key={d.planId} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <span className={`badge ${d.badge}`} style={{ minWidth: 80, justifyContent: "center" }}>{d.planName}</span>

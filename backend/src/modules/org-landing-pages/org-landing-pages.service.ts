@@ -51,6 +51,8 @@ export class OrgLandingPagesService {
       throw new BadRequestException('Choose a project or a standalone unit, not both.');
     }
 
+    await assertOrgLandingPageQuota(this.prisma, orgId);
+
     if (!dto.templateId) {
       return this.createBlank(orgId, dto);
     }
@@ -419,6 +421,10 @@ export class OrgLandingPagesService {
 
   async duplicate(orgId: string, id: string) {
     const page = await this.getOwned(orgId, id);
+
+    if (page.pageType === 'landing') {
+      await assertOrgLandingPageQuota(this.prisma, orgId);
+    }
 
     const slug = await generateUniqueLandingPageSlug(this.prisma, orgId, `${page.name} copy`);
     const copy = await this.prisma.landingPage.create({
