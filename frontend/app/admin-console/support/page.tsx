@@ -1,27 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
 import { Reveal } from "@/components/superadmin/reveal";
+import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 import { Icon } from "@/components/icons";
-import { getAdminSupportTickets } from "@/lib/api";
-import type { SupportTicketStatus, SupportTicketSummary } from "@/lib/types";
+import { useToast } from "@/components/ui/toast";
+import {
+  assignAdminSupportTicket,
+  getAdminSupportTickets,
+  getPlatformTeam,
+} from "@/lib/api";
+import type {
+  PlatformTeamMember,
+  SupportTicketStatus,
+  SupportTicketSummary,
+} from "@/lib/types";
 
 const STATUS_TABS: { label: string; value: SupportTicketStatus | null }[] = [
   { label: "All", value: null },
   { label: "Open", value: "open" },
-  { label: "Ongoing", value: "ongoing" },
+  { label: "In Progress", value: "ongoing" },
+  { label: "On Hold", value: "on_hold" },
   { label: "Resolved", value: "resolved" },
 ];
 
 const STATUS_BADGE: Record<SupportTicketStatus, string> = {
   open: "b-amber",
   ongoing: "b-sky",
+  on_hold: "b-violet",
   resolved: "b-green",
 };
 const STATUS_LABEL: Record<SupportTicketStatus, string> = {
   open: "Open",
-  ongoing: "Ongoing",
+  ongoing: "In Progress",
+  on_hold: "On Hold",
   resolved: "Resolved",
 };
 const PRIORITY_BADGE: Record<string, string> = {
@@ -48,12 +62,52 @@ function timeAgo(iso: string): string {
 }
 
 export default function AdminSupportPage() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  // Only the system Super Admin role can assign tickets (enforced again
+  // server-side) — every other Platform Team member's list is already
+  // scoped to their own assigned tickets, so the column is read-only for them.
+  const canAssign = Boolean(user?.platformUnrestricted);
+
   const [statusTab, setStatusTab] = useState(0);
   const [search, setSearch] = useState("");
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [platformTeam, setPlatformTeam] = useState<PlatformTeamMember[]>([]);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!canAssign) return;
+    getPlatformTeam()
+      .then((members) => setPlatformTeam(members.filter((m) => m.status === "active")))
+      .catch(() => {
+        // Non-fatal — the dropdown just falls back to "Unassigned only" if
+        // this fails; the list itself doesn't depend on it.
+      });
+  }, [canAssign]);
+
+  const assignTicket = useCallback(
+    async (ticketId: string, assigneeId: string | null) => {
+      setAssigningId(ticketId);
+      try {
+        const res = await assignAdminSupportTicket(ticketId, { assigneeId });
+        setTickets((prev) =>
+          prev.map((t) => (t.id === ticketId ? { ...t, assignedTo: res.ticket.assignedTo ?? null } : t)),
+        );
+      } catch (err) {
+        toast({
+          title: "Couldn't assign ticket",
+          description: err instanceof Error ? err.message : undefined,
+          variant: "error",
+        });
+      } finally {
+        setAssigningId(null);
+      }
+    },
+    [toast],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -124,7 +178,7 @@ export default function AdminSupportPage() {
         <Reveal delay={3}>
           <div className="stat">
             <div className="top">
-              <span className="label">Ongoing</span>
+              <span className="label">In Progress</span>
               <span className="ic ic-sky"><Icon name="mail" size={17} /></span>
             </div>
             <div className="value">{loading ? "—" : ongoingCount}</div>
@@ -184,14 +238,15 @@ export default function AdminSupportPage() {
                   <th>Category</th>
                   <th>Priority</th>
                   <th>Status</th>
+                  <th>Assignee</th>
                   <th>Updated</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="muted">Loading…</td></tr>
+                  <tr><td colSpan={8} className="muted">Loading…</td></tr>
                 ) : tickets.length === 0 ? (
-                  <tr><td colSpan={7} className="muted">No tickets match this filter.</td></tr>
+                  <tr><td colSpan={8} className="muted">No tickets match this filter.</td></tr>
                 ) : (
                   tickets.map((t) => (
                     <tr key={t.id}>
@@ -225,9 +280,33 @@ export default function AdminSupportPage() {
                         </span>
                       </td>
                       <td>
-                        <span className={`badge ${STATUS_BADGE[t.status]}`}>
-                          {STATUS_LABEL[t.status]}
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <span className={`badge ${STATUS_BADGE[t.status]}`}>
+                            {STATUS_LABEL[t.status]}
+                          </span>
+                          {t.status === "on_hold" && t.holdReason ? (
+                            <ReasonInfoPopover reason={t.holdReason} label="On-hold reason" />
+                          ) : null}
                         </span>
+                      </td>
+                      <td>
+                        {canAssign ? (
+                          <select
+                            value={t.assignedTo?.id ?? ""}
+                            disabled={assigningId === t.id}
+                            onChange={(e) => void assignTicket(t.id, e.target.value || null)}
+                            style={{ fontSize: 12.5, maxWidth: 160 }}
+                          >
+                            <option value="">Unassigned</option>
+                            {platformTeam.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="muted">{t.assignedTo?.name ?? "Unassigned"}</span>
+                        )}
                       </td>
                       <td className="muted">{timeAgo(t.updatedAt)}</td>
                     </tr>

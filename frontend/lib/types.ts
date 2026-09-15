@@ -2002,6 +2002,7 @@ export type NotificationType =
   | "support_ticket_created"
   | "support_ticket_message"
   | "support_ticket_status_changed"
+  | "support_ticket_assigned"
   | "subscription_expiring"
   | "subscription_past_due"
   | "subscription_expired";
@@ -2070,7 +2071,7 @@ export interface OrgNotificationsListResponse {
 
 // --- Support tickets ---------------------------------------------------
 
-export type SupportTicketStatus = "open" | "ongoing" | "resolved";
+export type SupportTicketStatus = "open" | "ongoing" | "on_hold" | "resolved";
 export type SupportTicketPriority = "normal" | "high" | "urgent";
 export type SupportTicketCategory =
   | "Billing"
@@ -2106,7 +2107,14 @@ export interface SupportTicketSummary {
    *  viewer — drives the list's "new activity" dot. Clears once the ticket
    *  is opened (or its bell notification is marked read). */
   hasUnread: boolean;
+  /** Only meaningful while status is "on_hold" — the reason a Super Admin
+   *  gave when pausing it, shown behind the list's info tooltip. */
+  holdReason: string | null;
   organisation?: { id: string; name: string };
+  /** Support Management (admin) only — the Platform Team member this ticket
+   *  is assigned to, if any. A non-super-admin viewer's list is already
+   *  server-scoped to their own assigned tickets (see getAdminSupportTickets). */
+  assignedTo?: SupportTicketActor | null;
 }
 
 export interface SupportTicketsListResponse {
@@ -2141,8 +2149,14 @@ export interface SupportTicketDetail {
   raisedBy: SupportTicketActor;
   closedBy: SupportTicketActor | null;
   closedAt: string | null;
+  /** Only meaningful while status is "on_hold" — see SupportTicketSummary. */
+  holdReason: string | null;
+  heldBy: SupportTicketActor | null;
+  heldAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Support Management (admin) only — see SupportTicketSummary. */
+  assignedTo?: SupportTicketActor | null;
 }
 
 export interface SupportTicketDetailResponse {
@@ -2161,6 +2175,15 @@ export interface CreateSupportTicketInput {
 export interface CreateSupportMessageInput {
   body: string;
   attachmentUrls?: string[];
+}
+
+export interface HoldSupportTicketInput {
+  reason: string;
+}
+
+/** null unassigns the ticket. */
+export interface AssignSupportTicketInput {
+  assigneeId: string | null;
 }
 
 export interface ListSupportTicketsParams {

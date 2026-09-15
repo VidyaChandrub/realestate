@@ -6,6 +6,9 @@ import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { SupportService } from './support.service';
 import { CreateSupportMessageDto } from './dto/create-support-message.dto';
 import { ListSupportTicketsQueryDto } from './dto/list-support-tickets-query.dto';
+import { CreateSupportUploadUrlDto } from './dto/create-support-upload-url.dto';
+import { HoldSupportTicketDto } from './dto/hold-support-ticket.dto';
+import { AssignSupportTicketDto } from './dto/assign-support-ticket.dto';
 
 // Support Management (Super Admin console): every organisation's tickets in
 // one place. SuperAdminGuard derives the required platform permission
@@ -15,6 +18,13 @@ import { ListSupportTicketsQueryDto } from './dto/list-support-tickets-query.dto
 @Controller('admin/support')
 export class AdminSupportController {
   constructor(private readonly service: SupportService) {}
+
+  @Post('upload-url')
+  createUploadUrl(@Body() dto: CreateSupportUploadUrlDto) {
+    // No orgId — a Platform Team reply's attachment is a platform-level
+    // upload, not scoped to any one organisation (see SupportService).
+    return this.service.createUploadUrl(undefined, dto);
+  }
 
   @Get()
   list(@CurrentUser() user: JwtPayload, @Query() query: ListSupportTicketsQueryDto) {
@@ -33,6 +43,29 @@ export class AdminSupportController {
     @Body() dto: CreateSupportMessageDto,
   ) {
     return this.service.addAdminMessage(user, id, dto);
+  }
+
+  @Post(':id/hold')
+  hold(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: HoldSupportTicketDto,
+  ) {
+    return this.service.holdTicket(user, id, dto);
+  }
+
+  @Post(':id/resume')
+  resume(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.service.resumeTicket(user, id);
+  }
+
+  @Post(':id/assign')
+  assign(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: AssignSupportTicketDto,
+  ) {
+    return this.service.assignTicket(user, id, dto);
   }
 
   @Post(':id/close')

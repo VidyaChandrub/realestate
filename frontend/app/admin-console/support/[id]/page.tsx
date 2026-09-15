@@ -6,20 +6,26 @@ import { useParams } from "next/navigation";
 import {
   addAdminSupportMessage,
   closeAdminSupportTicket,
+  createAdminSupportUploadUrl,
   getAdminSupportTicket,
+  holdAdminSupportTicket,
+  resumeAdminSupportTicket,
 } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
+import { Modal } from "@/components/ui/modal";
 import type { SupportMessage, SupportTicketDetail } from "@/lib/types";
 
 const STATUS_BADGE: Record<string, string> = {
   open: "b-amber",
   ongoing: "b-sky",
+  on_hold: "b-violet",
   resolved: "b-green",
 };
 const STATUS_LABEL: Record<string, string> = {
   open: "Open",
-  ongoing: "Ongoing",
+  ongoing: "In Progress",
+  on_hold: "On Hold",
   resolved: "Resolved",
 };
 const PRIORITY_BADGE: Record<string, string> = {
@@ -35,6 +41,21 @@ function formatWhen(iso: string): string {
   return `${d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} · ${d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+async function uploadSupportFile(file: File): Promise<string> {
+  const { uploadUrl, publicUrl } = await createAdminSupportUploadUrl({
+    filename: file.name,
+    contentType: file.type,
+    size: file.size,
+  });
+  const put = await fetch(uploadUrl, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": file.type },
+  });
+  if (!put.ok) throw new Error(`Upload failed (${put.status}).`);
+  return publicUrl;
+}
+
 export default function AdminSupportTicketPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
@@ -45,10 +66,20 @@ export default function AdminSupportTicketPage() {
   const [notFound, setNotFound] = useState(false);
 
   const [reply, setReply] = useState("");
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
+  const [attachmentNames, setAttachmentNames] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
+
+  const [holdModalOpen, setHoldModalOpen] = useState(false);
+  const [holdReason, setHoldReason] = useState("");
+  const [holdError, setHoldError] = useState<string | null>(null);
+  const [holdSubmitting, setHoldSubmitting] = useState(false);
+  const [resuming, setResuming] = useState(false);
 
   const load = useCallback(async (silent: boolean) => {
     if (!id) return;
@@ -80,14 +111,45 @@ export default function AdminSupportTicketPage() {
     threadEndRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length]);
 
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const urls: string[] = [];
+      const names: string[] = [];
+      for (const file of Array.from(files).slice(0, 10 - attachmentUrls.length)) {
+        urls.push(await uploadSupportFile(file));
+        names.push(file.name);
+      }
+      setAttachmentUrls((prev) => [...prev, ...urls]);
+      setAttachmentNames((prev) => [...prev, ...names]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Attachment upload failed.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function removeAttachment(index: number) {
+    setAttachmentUrls((prev) => prev.filter((_, i) => i !== index));
+    setAttachmentNames((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function send() {
-    if (!reply.trim()) return;
+    if (!reply.trim() && attachmentUrls.length === 0) return;
     setSending(true);
     setError(null);
     try {
-      const message = await addAdminSupportMessage(id, { body: reply.trim() });
+      const message = await addAdminSupportMessage(id, {
+        body: reply.trim() || "(attachment)",
+        attachmentUrls: attachmentUrls.length ? attachmentUrls : undefined,
+      });
       setMessages((prev) => [...prev, message]);
       setReply("");
+      setAttachmentUrls([]);
+      setAttachmentNames([]);
       // A reply to a still-`open` ticket moves it to `ongoing` server-side.
       setTicket((prev) => (prev && prev.status === "open" ? { ...prev, status: "ongoing" } : prev));
     } catch (err) {
@@ -108,6 +170,47 @@ export default function AdminSupportTicketPage() {
       setError(err instanceof Error ? err.message : "Failed to close ticket.");
     } finally {
       setClosing(false);
+    }
+  }
+
+  function openHoldModal() {
+    setHoldReason("");
+    setHoldError(null);
+    setHoldModalOpen(true);
+  }
+
+  async function submitHold() {
+    const reason = holdReason.trim();
+    if (!reason) {
+      setHoldError("Please enter an on-hold reason.");
+      return;
+    }
+    setHoldError(null);
+    setHoldSubmitting(true);
+    try {
+      const res = await holdAdminSupportTicket(id, { reason });
+      setTicket(res.ticket);
+      setMessages(res.messages);
+      setHoldModalOpen(false);
+      setHoldReason("");
+    } catch (err) {
+      setHoldError(err instanceof Error ? err.message : "Failed to put ticket on hold.");
+    } finally {
+      setHoldSubmitting(false);
+    }
+  }
+
+  async function resume() {
+    setResuming(true);
+    setError(null);
+    try {
+      const res = await resumeAdminSupportTicket(id);
+      setTicket(res.ticket);
+      setMessages(res.messages);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resume ticket.");
+    } finally {
+      setResuming(false);
     }
   }
 
@@ -149,10 +252,20 @@ export default function AdminSupportTicketPage() {
           </h1>
           <div className="sub">
             {ticket.organisation.name} · {ticket.category} · Raised by {ticket.raisedBy.name} ({ticket.raisedBy.email}) · {formatWhen(ticket.createdAt)}
+            {" · "}Assigned to {ticket.assignedTo?.name ?? "no one yet"}
           </div>
         </div>
         <div className="actions">
           <Link href="/admin-console/support" className="btn btn-ghost">← Back</Link>
+          {ticket.status === "on_hold" ? (
+            <button className="btn btn-ghost" type="button" disabled={resuming} onClick={() => void resume()}>
+              {resuming ? "Resuming…" : "▶ Resume ticket"}
+            </button>
+          ) : ticket.status !== "resolved" ? (
+            <button className="btn btn-ghost" type="button" onClick={openHoldModal}>
+              ⏸ Hold
+            </button>
+          ) : null}
           {ticket.status !== "resolved" ? (
             <button className="btn btn-primary" type="button" disabled={closing} onClick={() => void close()}>
               {closing ? "Closing…" : "✅ Close ticket"}
@@ -167,6 +280,17 @@ export default function AdminSupportTicketPage() {
             ✅ <b>Resolved</b> by {ticket.closedBy?.name ?? "you"}
             {ticket.closedAt ? ` on ${formatWhen(ticket.closedAt)}` : ""}. The organisation now sees this
             ticket as Resolved.
+          </div>
+        </Reveal>
+      ) : null}
+
+      {ticket.status === "on_hold" ? (
+        <Reveal delay={1}>
+          <div className="help" style={{ marginBottom: 18 }}>
+            ⏸ <b>On hold</b> by {ticket.heldBy?.name ?? "you"}
+            {ticket.heldAt ? ` on ${formatWhen(ticket.heldAt)}` : ""}
+            {ticket.holdReason ? `: ${ticket.holdReason}` : ""}. The organisation sees this ticket as On
+            Hold too.
           </div>
         </Reveal>
       ) : null}
@@ -246,11 +370,36 @@ export default function AdminSupportTicketPage() {
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                 />
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/png,image/jpeg,application/pdf"
+                  style={{ display: "none" }}
+                  onChange={(e) => void handleFiles(e.target.files)}
+                />
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Icon name="upload" size={13} /> {uploading ? "Uploading…" : "Attach"}
+                  </button>
+                  {attachmentNames.map((name, i) => (
+                    <span key={`${name}-${i}`} className="chip">
+                      {name}
+                      <button type="button" className="x-btn" aria-label={`Remove ${name}`} onClick={() => removeAttachment(i)}>
+                        ✕
+                      </button>
+                    </span>
+                  ))}
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"
-                    disabled={sending || !reply.trim()}
+                    style={{ marginLeft: "auto" }}
+                    disabled={sending || uploading || (!reply.trim() && attachmentUrls.length === 0)}
                     onClick={() => void send()}
                   >
                     {sending ? "Sending…" : "Send"}
@@ -261,6 +410,70 @@ export default function AdminSupportTicketPage() {
           </div>
         </div>
       </Reveal>
+
+      <Modal
+        open={holdModalOpen}
+        onClose={() => {
+          if (!holdSubmitting) {
+            setHoldModalOpen(false);
+            setHoldReason("");
+            setHoldError(null);
+          }
+        }}
+        title="Put ticket on hold?"
+        description={
+          <>
+            <strong>#{ticket.code}</strong> will show as <strong>On Hold</strong> to both Support
+            Management and the organisation. A reason is required — it&apos;s shown to both sides
+            behind an info icon next to the status.
+          </>
+        }
+        closeDisabled={holdSubmitting}
+        footer={
+          <>
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={() => {
+                setHoldModalOpen(false);
+                setHoldReason("");
+                setHoldError(null);
+              }}
+              disabled={holdSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() => void submitHold()}
+              disabled={holdSubmitting}
+            >
+              {holdSubmitting ? "Saving…" : "⏸ Put on hold"}
+            </button>
+          </>
+        }
+      >
+        <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6 }}>
+          On-hold reason <span style={{ color: "var(--rose)" }}>*</span>
+        </label>
+        <textarea
+          style={{ minHeight: 90, resize: "vertical", ...(holdError ? { borderColor: "var(--rose)" } : {}) }}
+          placeholder="Why is this ticket being put on hold?"
+          value={holdReason}
+          onChange={(e) => {
+            setHoldReason(e.target.value);
+            if (holdError) setHoldError(null);
+          }}
+          disabled={holdSubmitting}
+          autoFocus
+          maxLength={500}
+          aria-invalid={holdError ? true : undefined}
+        />
+        <div style={{ marginTop: 6, fontSize: 11.5, color: holdError ? "var(--rose)" : "var(--faint)", fontWeight: holdError ? 600 : 400 }}>
+          {holdError ?? `${holdReason.length}/500`}
+        </div>
+      </Modal>
     </>
   );
 }
