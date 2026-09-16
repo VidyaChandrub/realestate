@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/modal";
-import { apiFetch, createCrmLead } from "@/lib/api";
-import type { CrmLead, ProjectsListResponse } from "@/lib/types";
+import { createCrmLead } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import {
+  InventoryBindFields,
+  inventoryBindPayload,
+  type InventoryBindValue,
+} from "@/components/org/inventory-bind-fields";
+import type { CrmLead } from "@/lib/types";
 
 export function AddLeadModal({
   open,
@@ -16,11 +22,13 @@ export function AddLeadModal({
   onCreated: (lead: CrmLead) => void;
   projectId?: string;
 }) {
+  const { accessToken } = useAuth();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [selectedProjectId, setSelectedProjectId] = useState(projectId ?? "");
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [selectedInventory, setSelectedInventory] = useState<InventoryBindValue>(
+    projectId ? { kind: "project", id: projectId } : { kind: "none" },
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -29,13 +37,8 @@ export function AddLeadModal({
     setName("");
     setPhone("");
     setEmail("");
-    setSelectedProjectId(projectId ?? "");
+    setSelectedInventory(projectId ? { kind: "project", id: projectId } : { kind: "none" });
     setError("");
-    if (!projectId) {
-      apiFetch<ProjectsListResponse>("/org/projects?page=1&limit=100")
-        .then((res) => setProjects(res.data.map((p) => ({ id: p.id, name: p.name }))))
-        .catch(() => setProjects([]));
-    }
   }, [open, projectId]);
 
   async function submit() {
@@ -46,8 +49,9 @@ export function AddLeadModal({
     setSaving(true);
     setError("");
     try {
+      const inventory = inventoryBindPayload(selectedInventory);
       const lead = await createCrmLead({
-        projectId: selectedProjectId || undefined,
+        ...inventory,
         formName: "Manual lead",
         source: "crm",
         data: {
@@ -82,17 +86,11 @@ export function AddLeadModal({
           <input className="inp" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
         </label>
         {!projectId ? (
-          <label className="field">
-            <span>Project</span>
-            <select className="inp" value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)}>
-              <option value="">No project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <InventoryBindFields
+            accessToken={accessToken}
+            value={selectedInventory}
+            onChange={setSelectedInventory}
+          />
         ) : null}
         {error ? <div className="muted" style={{ color: "#b91c1c" }}>{error}</div> : null}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
