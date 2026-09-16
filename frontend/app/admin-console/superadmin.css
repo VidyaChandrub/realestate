@@ -268,7 +268,10 @@
 }
 
 .superadmin .app.collapsed .nav a .lbl {
-  opacity: 0;
+  /* display:none (not just opacity:0) takes it out of the flex layout —
+     otherwise its full text width still counts toward `justify-content:
+     center` on the 76px collapsed rail, pushing the icon off-center. */
+  display: none;
 }
 
 .superadmin .app.collapsed .nav a {
@@ -1896,8 +1899,12 @@
     width: var(--side);
   }
 
-  .superadmin .app.collapsed .sidebar .s-name,
+  .superadmin .app.collapsed .sidebar .s-name {
+    opacity: 1;
+  }
+
   .superadmin .app.collapsed .nav a .lbl {
+    display: inline;
     opacity: 1;
   }
 

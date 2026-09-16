@@ -17,6 +17,8 @@ import { OnboardingAccountDto } from './dto/onboarding-account.dto';
 import { OnboardingOrganisationDto } from './dto/onboarding-organisation.dto';
 import { ResumeSignupDto } from './dto/resume-signup.dto';
 import { ResolveDraftDto } from './dto/resolve-draft.dto';
+import { RestartDraftDto } from './dto/restart-draft.dto';
+import { PreviewDraftDto } from './dto/preview-draft.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.interface';
 import {
   nextOnboardingStep,
@@ -509,6 +511,35 @@ export class AuthService {
     return this.buildResumePayload(user);
   }
 
+  // Step 1 collision, "Continue previous setup" branch (preview half) — same
+  // no-password read as resumeSignup above, just keyed by id instead of
+  // email so a phone-matched collision (new email, old phone) still
+  // resolves. Deliberately read-only: identity fields are left exactly as
+  // saved so the frontend can prefill Step 1 with the draft's *actual* data
+  // rather than whatever was just retyped on the collision attempt. Actually
+  // persisting any edits happens later, via resumeExistingDraft below, once
+  // the person re-submits Step 1.
+  async previewDraft(dto: PreviewDraftDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: dto.existingUserId },
+      include: { userRoles: { include: { role: true } } },
+    });
+    if (!user) {
+      throw new NotFoundException('No signup in progress for this account');
+    }
+    if (user.onboardingStep === 'completed') {
+      throw new ConflictException(
+        'This account has already finished setup — please sign in instead.',
+      );
+    }
+
+    if (!user.emailVerifiedAt) {
+      await this.issueEmailVerification(user);
+    }
+
+    return this.buildResumePayload(user);
+  }
+
   // Step 1 collision, "Continue previous setup" branch — the caller picked
   // up their old draft and (optionally) edited name/email/phone/password on
   // the retry. Updates those fields on the SAME user row (onboardingStep is
@@ -569,8 +600,10 @@ export class AuthService {
 
   // Step 1 collision, "Start fresh instead" branch. The selected signup is
   // explicitly discarded, including its draft organisation and onboarding
-  // records, before a new account is created from the submitted values.
-  async restartExistingDraft(dto: ResolveDraftDto) {
+  // records. A replacement account is intentionally not created here: the
+  // next Step 1 submit must be the normal new-signup flow so verification is
+  // requested only after the user has filled the blank form again.
+  async restartExistingDraft(dto: RestartDraftDto) {
     const existingUser = await this.prisma.user.findUnique({
       where: { id: dto.existingUserId },
     });
@@ -583,28 +616,7 @@ export class AuthService {
       );
     }
 
-    const normalizedPhone = normalizePhoneNumber(dto.phone_number);
-    if (dto.work_email !== existingUser.email) {
-      const emailTaken = await this.prisma.user.findUnique({
-        where: { email: dto.work_email },
-      });
-      if (emailTaken) {
-        throw new ConflictException('Email already registered to another account.');
-      }
-    }
-    if (normalizedPhone !== existingUser.phoneNumber) {
-      const phoneTaken = await this.prisma.user.findFirst({
-        where: { phoneNumber: normalizedPhone, id: { not: existingUser.id } },
-      });
-      if (phoneTaken) {
-        throw new ConflictException(
-          'This phone number is already registered to another account.',
-        );
-      }
-    }
-
-    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
-    const replacement = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       if (existingUser.orgId) {
         const organisation = await tx.organisation.findUnique({
           where: { id: existingUser.orgId },
@@ -624,30 +636,9 @@ export class AuthService {
         await tx.user.delete({ where: { id: existingUser.id } });
       }
 
-      return tx.user.create({
-        data: {
-          firstName: dto.first_name,
-          lastName: dto.last_name,
-          email: dto.work_email,
-          phoneNumber: normalizedPhone,
-          passwordHash,
-          status: 'active',
-          onboardingStep: 'account',
-        },
-      });
     });
 
-    const tokens = await this.issueTokens(replacement.id, null, []);
-    await this.issueEmailVerification(replacement);
-
-    return {
-      status: 'created' as const,
-      user: toSafeUser(replacement),
-      onboardingStep: replacement.onboardingStep,
-      nextStep: nextOnboardingStep(replacement.onboardingStep),
-      email_verification_required: true,
-      ...tokens,
-    };
+    return { status: 'restarted' as const };
   }
 
   // Shared by resumeSignup and resumeExistingDraft — everything after the

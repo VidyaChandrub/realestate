@@ -13,6 +13,8 @@ import { OnboardingAccountDto } from './dto/onboarding-account.dto';
 import { OnboardingOrganisationDto } from './dto/onboarding-organisation.dto';
 import { ResumeSignupDto } from './dto/resume-signup.dto';
 import { ResolveDraftDto } from './dto/resolve-draft.dto';
+import { RestartDraftDto } from './dto/restart-draft.dto';
+import { PreviewDraftDto } from './dto/preview-draft.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
@@ -40,6 +42,15 @@ export class AuthController {
     return this.authService.resumeSignup(dto);
   }
 
+  // "Continue previous setup" preview — read-only fetch of the draft the
+  // Step 1 collision matched, keyed by id (the match may have been on
+  // phone number with a brand-new email). See AuthService.previewDraft.
+  @Post('signup/step1/preview')
+  @HttpCode(200)
+  previewDraft(@Body() dto: PreviewDraftDto) {
+    return this.authService.previewDraft(dto);
+  }
+
   // "You already started this" popup — one of these two fires once the
   // caller picks an option, see AuthService.resumeExistingDraft /
   // restartExistingDraft.
@@ -51,7 +62,7 @@ export class AuthController {
 
   @Post('signup/step1/restart')
   @HttpCode(200)
-  restartExistingDraft(@Body() dto: ResolveDraftDto) {
+  restartExistingDraft(@Body() dto: RestartDraftDto) {
     return this.authService.restartExistingDraft(dto);
   }
 

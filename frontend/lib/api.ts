@@ -338,8 +338,22 @@ export async function resumeSignup(
   });
 }
 
-// "You already started this" popup — either continue the old draft or
-// restart it, both carrying whatever was just retyped on Step 1.
+// "You already started this" popup, "Continue previous setup" — read-only
+// fetch of the draft as it was actually saved (not whatever was just
+// retyped on the collision attempt), so Step 1 can be prefilled with it for
+// review before the person re-submits.
+export async function previewDraft(
+  input: { existingUserId: string },
+): Promise<ResumeSignupResponse> {
+  return apiFetch<ResumeSignupResponse>("/auth/signup/step1/preview", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// Step 1 re-submit for an already-resumed draft — either "Continue previous
+// setup" 's downstream re-submit, or "start fresh"'s complement — both
+// carrying whatever was just retyped on Step 1.
 export async function resumeExistingDraft(
   input: ResolveDraftInput,
 ): Promise<ResumeSignupResponse> {
@@ -350,9 +364,9 @@ export async function resumeExistingDraft(
 }
 
 export async function restartExistingDraft(
-  input: ResolveDraftInput,
-): Promise<SignupStep1Response> {
-  return apiFetch<SignupStep1Response>("/auth/signup/step1/restart", {
+  input: { existingUserId: string },
+): Promise<{ status: "restarted" }> {
+  return apiFetch<{ status: "restarted" }>("/auth/signup/step1/restart", {
     method: "POST",
     body: JSON.stringify(input),
   });

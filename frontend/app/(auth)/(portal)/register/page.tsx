@@ -15,6 +15,7 @@ import {
   completeOnboardingStep,
   createOrganisationStep,
   getLogoUploadUrl,
+  previewDraft,
   resumeExistingDraft,
   resumeSignup,
   restartExistingDraft,
@@ -87,11 +88,6 @@ const ONBOARDING_ORDER: OnboardingStep[] = [
   "completed",
 ];
 
-function uiStepForOnboardingStep(step: OnboardingStep): number {
-  const idx = ONBOARDING_ORDER.indexOf(step);
-  return Math.min(Math.max(idx + 1, 1), TOTAL);
-}
-
 // Label of the furthest step a draft has actually completed — for the
 // "you already started this" popup's message. STEPS and ONBOARDING_ORDER
 // share the same 0-indexed ordering for every step short of 'completed'
@@ -99,6 +95,20 @@ function uiStepForOnboardingStep(step: OnboardingStep): number {
 function completedStepLabel(step: OnboardingStep): string {
   const idx = ONBOARDING_ORDER.indexOf(step);
   return STEPS[idx]?.label ?? "your account";
+}
+
+// The step-1 Mobile field holds just the national number the user typed
+// (see updatePhoneNumber below); what's persisted server-side is the
+// fully-qualified "+<code> <digits>" string. Strip the calling code back
+// off so a resumed draft's phone re-populates that same national-only field
+// instead of showing the dial code baked into the digits.
+function stripCallingCode(storedNumber: string, callingCode: string | null): string {
+  const digits = storedNumber.replace(/\D/g, "");
+  const codeDigits = (callingCode ?? "").replace(/\D/g, "");
+  if (codeDigits && digits.startsWith(codeDigits)) {
+    return digits.slice(codeDigits.length);
+  }
+  return digits;
 }
 
 const ORG_TYPES: { v: string; ic: IconName; b: string; s: string }[] = [
@@ -133,6 +143,15 @@ const CHANNELS: { ic: IconName; b: string; s: string }[] = [
 export default function RegisterPage() {
   const router = useRouter();
   const { applyAuthTokens, logout, user } = useAuth();
+
+  // The account id this wizard instance has itself confirmed, server-side,
+  // is a valid not-yet-completed draft — via signupStep1's own success, the
+  // silent mount-resume, or "Continue previous setup" (see applyResumedState
+  // and commitStep's Step 1 branch). Intentionally separate from the `user`
+  // above: that comes from auth-context/localStorage and can be a stale
+  // leftover from an earlier, unrelated visit, which must never be trusted
+  // to route a fresh Step 1 submit into resumeExistingDraft.
+  const resumedAccountIdRef = useRef<string | null>(null);
 
   const [cur, setCur] = useState(0);
   const [form, setForm] = useState({
@@ -428,6 +447,50 @@ export default function RegisterPage() {
   // OnboardingService methods this calls).
   async function commitStep(n: number): Promise<boolean> {
     if (n === 1) {
+      // This page instance is handling Step 1 itself (fresh signup or a
+      // resume, either way via direct user action) — mark the silent
+      // mount-resume effect below as already "done" so it can't fire off
+      // the back of the user/onboarding_step change applyTokens is about to
+      // cause and reset `cur` back to Step 1 out from under a fresh signup
+      // that just correctly advanced to Step 2.
+      didResumeRef.current = true;
+
+      // This exact wizard instance already confirmed *with the server* that
+      // it's resuming a specific not-yet-completed account (mount-resume,
+      // "Continue previous setup", or Step 1 already having succeeded once
+      // this visit — see the three places that set resumedAccountIdRef).
+      // Re-submitting Step 1 in that case must update THAT account
+      // (resumeExistingDraft) rather than signupStep1, which would find it
+      // by email/phone and treat it as a fresh collision with itself,
+      // re-showing the "Welcome back" popup.
+      //
+      // Deliberately NOT keyed off the `user` from auth context: that can
+      // be a stale session left over in this browser from an earlier,
+      // unrelated visit (or a since-deleted "start fresh" draft) — trusting
+      // it here misrouted a brand new signup into resumeExistingDraft with
+      // an existingUserId nothing in the database matches, surfacing "No
+      // signup in progress for this account" instead of ever reaching
+      // signupStep1's real, server-side email/phone collision check.
+      if (resumedAccountIdRef.current) {
+        const resumed = await resumeExistingDraft({
+          existingUserId: resumedAccountIdRef.current,
+          first_name: form.first_name,
+          last_name: form.last_name,
+          work_email: form.work_email,
+          phone_number: phoneCallingCode ? `${phoneCallingCode} ${form.phone_number}` : form.phone_number,
+          password: form.password,
+        });
+        applyTokens(resumed.user, resumed);
+        resumedAccountIdRef.current = resumed.user.id;
+        if (resumed.email_verification_required || !resumed.user.email_verified_at) {
+          setAwaitingVerification(true);
+          setVerifyCode("");
+          setVerifyError(null);
+          return false;
+        }
+        return true;
+      }
+
       const res = await signupStep1({
         first_name: form.first_name,
         last_name: form.last_name,
@@ -457,6 +520,7 @@ export default function RegisterPage() {
         return false;
       }
       applyTokens(res.user, res);
+      resumedAccountIdRef.current = res.user.id;
       if (res.email_verification_required || !res.user.email_verified_at) {
         setAwaitingVerification(true);
         setVerifyCode("");
@@ -551,16 +615,33 @@ export default function RegisterPage() {
   // Shared by handleContinueDraft (and, previously, the old silent-resume
   // branch) — restores every downstream step's local state from whatever
   // the backend has saved for this draft.
+  //
+  // Deliberately always lands the wizard back on Step 1 (never jumps ahead
+  // to whatever step the draft had reached) — every field the draft already
+  // has is prefilled there so the person can review/edit before clicking
+  // through, rather than being dropped mid-flow on a page they don't
+  // recognise. See STEPS/ONBOARDING_ORDER above for how a resume used to
+  // jump straight to `resumed.nextStep`.
   function applyResumedState(resumed: ResumeSignupResponse) {
     applyTokens(resumed.user, resumed);
+    resumedAccountIdRef.current = resumed.user.id;
+    const resumedCountry = resumed.organisation?.country ?? form.country;
+    const resumedCallingCode = callingCodeForCountry(resumedCountry);
     setForm((prev) => ({
       ...prev,
       first_name: resumed.user.first_name ?? prev.first_name,
       last_name: resumed.user.last_name ?? prev.last_name,
       work_email: resumed.user.email ?? prev.work_email,
+      phone_number: resumed.user.phone_number
+        ? stripCallingCode(resumed.user.phone_number, resumedCallingCode)
+        : prev.phone_number,
+      // Never recoverable from its hash, and leaving whatever was typed on
+      // the collision attempt sitting here would look like "old" data it
+      // isn't — clear it so Step 1 visibly asks for it again.
+      password: "",
       company_name: resumed.organisation?.name ?? prev.company_name,
       subdomain: resumed.organisation?.subdomain ?? prev.subdomain,
-      country: resumed.organisation?.country ?? prev.country,
+      country: resumedCountry,
       city: resumed.organisation?.city ?? prev.city,
     }));
     if (resumed.organisation) {
@@ -583,7 +664,7 @@ export default function RegisterPage() {
       setResumeAfterVerify(resumed.nextStep);
       return;
     }
-    setCur(uiStepForOnboardingStep(resumed.nextStep) - 1);
+    setCur(0);
     window.scrollTo(0, 0);
   }
 
@@ -611,7 +692,9 @@ export default function RegisterPage() {
       setAwaitingVerification(false);
       setVerifyCode("");
       if (resumeAfterVerify) {
-        setCur(uiStepForOnboardingStep(resumeAfterVerify) - 1);
+        // Same rule as applyResumedState: land back on Step 1 (prefilled),
+        // not wherever the resumed draft had reached.
+        setCur(0);
         setResumeAfterVerify(null);
       } else {
         setCur((c) => Math.max(c, 1));
@@ -637,22 +720,21 @@ export default function RegisterPage() {
     }
   }
 
-  // "Continue previous setup" — updates the old draft's identity fields
-  // with whatever's currently typed (name/email/phone/password may all
-  // have changed on this retry) and picks up wherever it left off.
+  // "Continue previous setup" — a read-only preview of the draft exactly as
+  // it was saved (ignores whatever was just retyped on this collision
+  // attempt) so Step 1 lands back with the OLD data prefilled for review —
+  // not the new name/password just typed, and not skipped ahead to
+  // whichever step the draft had reached. The person can edit any field
+  // (password included — it can't be recovered from its hash, so that one
+  // starts blank) and it's only actually saved once they click Continue
+  // again, which commitStep's Step 1 branch routes through
+  // resumeExistingDraft for exactly this reason.
   async function handleContinueDraft() {
     if (!draftCollision) return;
     setDraftError(null);
     setDraftBusy("resume");
     try {
-      const resumed = await resumeExistingDraft({
-        existingUserId: draftCollision.existingUserId,
-        first_name: form.first_name,
-        last_name: form.last_name,
-        work_email: form.work_email,
-        phone_number: phoneCallingCode ? `${phoneCallingCode} ${form.phone_number}` : form.phone_number,
-        password: form.password,
-      });
+      const resumed = await previewDraft({ existingUserId: draftCollision.existingUserId });
       applyResumedState(resumed);
       setDraftCollision(null);
     } catch (err) {
@@ -663,11 +745,9 @@ export default function RegisterPage() {
     }
   }
 
-  // "Start fresh instead" — same identity update, but the wizard restarts
-  // at Step 2 with a clean slate rather than resuming; every downstream
-  // local field is reset so nothing from the abandoned draft lingers on
-  // screen (the backend leaves the old org row in place and it gets
-  // overwritten in place as these steps are re-submitted).
+  // "Start fresh instead" permanently removes the abandoned draft. No new
+  // account is created until the user submits the blank Step 1 again, which
+  // keeps verification and collision detection on the normal signup path.
   async function handleStartFreshDraft() {
     if (!draftCollision) return;
     setDraftError(null);
@@ -675,25 +755,31 @@ export default function RegisterPage() {
     try {
       const res = await restartExistingDraft({
         existingUserId: draftCollision.existingUserId,
-        first_name: form.first_name,
-        last_name: form.last_name,
-        work_email: form.work_email,
-        phone_number: phoneCallingCode ? `${phoneCallingCode} ${form.phone_number}` : form.phone_number,
-        password: form.password,
       });
-      if (res.status !== "created") {
-        // Shouldn't happen — restart always creates a fresh 'account' step —
-        // but keep the popup open with a message rather than silently no-op.
+      if (res.status !== "restarted") {
         setDraftError("Couldn't start a fresh setup — please try again.");
         return;
       }
-      applyTokens(res.user, res);
-      if (res.email_verification_required || !res.user.email_verified_at) {
-        setAwaitingVerification(true);
-        setVerifyCode("");
-        setVerifyError(null);
-      }
-      setForm((prev) => ({ ...prev, company_name: "", subdomain: "", city: "" }));
+      await logout();
+      didResumeRef.current = true;
+      resumedAccountIdRef.current = null;
+      setAwaitingVerification(false);
+      setVerifyCode("");
+      setVerifyError(null);
+      setResumeAfterVerify(null);
+      setForm({
+        first_name: "",
+        last_name: "",
+        company_name: "",
+        subdomain: "",
+        work_email: "",
+        phone_number: "",
+        city: "",
+        country: "",
+        password: "",
+      });
+      setCurrency("");
+      setTimezone("");
       setOrgType("developer");
       setTeamSize("2–10");
       setRera("");
@@ -704,8 +790,10 @@ export default function RegisterPage() {
       setBillingCycle("monthly");
       setSelectedTemplateIds([]);
       setAgreedToTerms(false);
+      setFieldErrors({});
+      setGeneralError(null);
       setDraftCollision(null);
-      setCur(uiStepForOnboardingStep(res.nextStep) - 1);
+      setCur(0);
       window.scrollTo(0, 0);
     } catch (err) {
       const { general } = mapApiFieldErrors(err, FIELD_KEYS);
