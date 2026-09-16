@@ -121,20 +121,6 @@ export default function SuperAdminOrganisationsPage() {
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [rejectError, setRejectError] = useState<string | null>(null);
 
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    name: "",
-    city: "",
-    adminFirstName: "",
-    adminLastName: "",
-    adminEmail: "",
-    adminPhone: "",
-    adminPassword: "",
-    status: "active",
-  });
-  const [createFormError, setCreateFormError] = useState<string | null>(null);
-  const [createSubmitting, setCreateSubmitting] = useState(false);
-
   const notify = (m:string)=>{ setToast(m); setTimeout(()=>setToast(null),2500); };
 
   useEffect(() => {
@@ -308,32 +294,6 @@ export default function SuperAdminOrganisationsPage() {
           <div className="sub">
             Every developer, agency and brokerage on the iPixxel Realty platform. Direct creation, approve/reject/activate/deactivate/delete.
           </div>
-        </div>
-        <div className="actions">
-          <button
-            className="btn btn-ghost"
-            type="button"
-            onClick={() => {
-              fetchSummary();
-              fetchList();
-            }}
-            disabled={loading}
-            title="Refresh"
-          >
-            <Icon name="refresh" size={16} />
-            <span style={{ marginLeft: 6 }}>Refresh</span>
-          </button>
-          <button
-            className="btn btn-primary"
-            type="button"
-            onClick={() => {
-              setCreateFormError(null);
-              setCreateModalOpen(true);
-            }}
-          >
-            <Icon name="plus" size={16} />
-            <span style={{ marginLeft: 6 }}>Create Organisation</span>
-          </button>
         </div>
       </div>
 

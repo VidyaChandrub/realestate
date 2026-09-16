@@ -11,7 +11,14 @@ import {
 } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
+import { MessageAttachments } from "@/components/support/message-attachments";
 import type { SupportMessage, SupportTicketDetail } from "@/lib/types";
+
+// A reply sent with only attachments (no typed text) still needs a non-empty
+// `body` for the backend — this is the placeholder the composer sends in
+// that case. Hide it in the thread now that attachments render their own
+// preview, so the bubble isn't just a redundant "(attachment)" label.
+const ATTACHMENT_ONLY_BODY = "(attachment)";
 
 const STATUS_BADGE: Record<string, string> = {
   open: "b-amber",
@@ -247,22 +254,8 @@ export default function OrgSupportTicketPage() {
                       whiteSpace: "pre-wrap",
                     }}
                   >
-                    {m.body}
-                    {m.attachmentUrls.length > 0 ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
-                        {m.attachmentUrls.map((url) => (
-                          <a
-                            key={url}
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{ color: mine ? "#fff" : "var(--brand)", textDecoration: "underline", fontSize: 12.5 }}
-                          >
-                            📎 Attachment
-                          </a>
-                        ))}
-                      </div>
-                    ) : null}
+                    {m.body === ATTACHMENT_ONLY_BODY && m.attachmentUrls.length > 0 ? null : m.body}
+                    <MessageAttachments urls={m.attachmentUrls} mine={mine} />
                   </div>
                   <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
                     {mine ? m.sender.name : "iPixxel Support"} · {formatWhen(m.createdAt)}
