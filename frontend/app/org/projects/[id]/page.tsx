@@ -928,7 +928,11 @@ export default function OrgProjectOverviewPage() {
             </div>
           </Reveal>
 
-          {/* Assigned Sales Team Widget */}
+          {/* Assigned Sales Team Widget — HIDDEN as of the Team↔Project
+              pivot. Project Manager and Sales Agent assignment now live on
+              the Team (see the Teams module / OrgTeamsService). Commented
+              out, not deleted — Project.manager and ProjectSalesAgent keep
+              working and keep their data; this is UI hiding only.
           <Reveal delay={3}>
             <div className="card">
               <div className="card-h"><span className="t">Assigned Project Team</span></div>
@@ -965,6 +969,7 @@ export default function OrgProjectOverviewPage() {
               </div>
             </div>
           </Reveal>
+          */}
 
           {/* Access & Governance Controls */}
           <Reveal delay={3}>

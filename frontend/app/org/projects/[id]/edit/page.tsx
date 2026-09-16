@@ -92,14 +92,14 @@ function withCurrent(options: string[], value: string): string[] {
  *
  * The rules themselves come from lib/project-validation — the same module the
  * create wizard uses — so the two can't drift. Only the *placement* differs:
- * this page is one scrolling form. The project-manager field (step 6) lives in
- * the Team & access section, alongside the other access controls.
+ * this page is one scrolling form. Step 6 (Team & access) is hidden there
+ * (see PROJECT_STEPS) and owns no required fields any more, so it has no
+ * entry here.
  */
 const STEP_SECTION: Record<number, string> = {
   0: "sec-basics",
   2: "sec-pricing",
   3: "sec-location",
-  6: "sec-team",
 };
 
 const NAV = [
@@ -108,7 +108,10 @@ const NAV = [
   ["sec-location", "Location"],
   ["sec-inventory", "Inventory & specs"],
   ["sec-marketing", "Marketing"],
-  ["sec-team", "Team & access"],
+  // "Team & access" hidden — Project Manager, Sales team and Sales Agent
+  // assignment moved to the Teams module. Its Visibility & approvals
+  // sub-section (not part of that pivot) survives, renamed, below.
+  ["sec-visibility", "Visibility & approvals"],
   ["sec-media", "Documents & media"],
 ] as const;
 
@@ -1174,7 +1177,13 @@ export default function OrgProjectEditPage() {
             </div>
           </div>
 
-          {/* TEAM & ACCESS */}
+          {/* TEAM & ACCESS — HIDDEN as of the Team↔Project pivot. Project
+              Manager, Sales team and Sales Agent assignment now live on the
+              Team, not the Project (see OrgTeamsService / the Teams module).
+              Commented out, not deleted — reversible by uncommenting and
+              restoring the "sec-team" NAV/STEP_SECTION entries above.
+              Project.managerId, salesTeam and ProjectSalesAgent keep working
+              and keep their data; this is UI hiding only.
           <div className="card" id="sec-team" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Team &amp; access</span></div>
             <div className="card-b">
@@ -1219,6 +1228,16 @@ export default function OrgProjectEditPage() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+          */}
+
+          {/* VISIBILITY & APPROVALS — split out of the hidden Team & access
+              card above: these three are real, backend-persisted settings
+              unrelated to the Team↔Project pivot, so they stay reachable. */}
+          <div className="card" id="sec-visibility" style={{ scrollMarginTop: 128 }}>
+            <div className="card-h"><span className="t">Visibility &amp; approvals</span></div>
+            <div className="card-b">
               <div className="sw-row"><div className="tx"><b>Require manager approval on bookings</b></div><div className={`switch ${requireBookingApproval ? "on" : ""}`} onClick={() => setRequireBookingApproval(!requireBookingApproval)} /></div>
               <div className="sw-row"><div className="tx"><b>Visible to telecallers</b></div><div className={`switch ${visibleToTelecallers ? "on" : ""}`} onClick={() => setVisibleToTelecallers(!visibleToTelecallers)} /></div>
               <div className="sw-row" style={{ borderBottom: 0 }}><div className="tx"><b>Publish to public website</b></div><div className={`switch ${publishedToWebsite ? "on" : ""}`} onClick={() => setPublishedToWebsite(!publishedToWebsite)} /></div>

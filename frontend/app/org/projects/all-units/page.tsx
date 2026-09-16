@@ -238,6 +238,7 @@ export default function AllUnitsPage() {
                 <tr>
                   <th>Unit</th>
                   <th>Project</th>
+                  <th>Team</th>
                   <th>Configuration</th>
                   <th>Carpet</th>
                   <th>Tower</th>
@@ -254,13 +255,13 @@ export default function AllUnitsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={13} className="muted">
+                    <td colSpan={14} className="muted">
                       Loading…
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="muted">
+                    <td colSpan={14} className="muted">
                       No units match this filter.
                     </td>
                   </tr>
@@ -288,6 +289,13 @@ export default function AllUnitsPage() {
                             </Link>
                           ) : (
                             <span className="muted">Standalone</span>
+                          )}
+                        </td>
+                        <td>
+                          {u.teams.length > 0 ? (
+                            u.teams.map((t) => t.name).join(", ")
+                          ) : (
+                            <span className="muted">Unassigned</span>
                           )}
                         </td>
                         <td>{u.configuration ?? "—"}</td>

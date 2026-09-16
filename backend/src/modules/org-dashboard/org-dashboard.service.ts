@@ -7,6 +7,7 @@ import {
   actorLeadOrClauses,
   canSeeAllLeads,
 } from '../../common/utils/lead-scope.util';
+import { actorAccessibleProjectIds } from '../../common/utils/team-scope.util';
 
 function parseBudgetValue(data: unknown): number {
   if (!data || typeof data !== 'object') return 0;
@@ -61,10 +62,15 @@ export class OrgDashboardService {
     const seeAllLeads = canSeeAllLeads(actor.roles);
     const leadWhere: Prisma.LeadWhereInput = { orgId };
     const callWhere: Prisma.CallLogWhereInput = { orgId };
+    // Team↔Project pivot: same team-scope rule as ProjectsService.list —
+    // see team-scope.util.ts. Resolved once here and reused below for the
+    // project widget, rather than a second, independently-duplicated copy.
+    let accessibleProjectIds: string[] | null = null;
 
     if (!seeAllLeads) {
       leadWhere.OR = await actorLeadOrClauses(this.prisma, orgId, actor.sub);
       callWhere.agentId = actor.sub;
+      accessibleProjectIds = await actorAccessibleProjectIds(this.prisma, orgId, actor.sub);
     }
 
     if (query.projectId) {
@@ -141,14 +147,7 @@ export class OrgDashboardService {
       this.prisma.project.findMany({
         where: {
           orgId,
-          ...(!seeAllLeads
-            ? {
-                OR: [
-                  { managerId: actor.sub },
-                  { salesAgents: { some: { userId: actor.sub } } },
-                ],
-              }
-            : {}),
+          ...(!seeAllLeads ? { id: { in: accessibleProjectIds ?? [] } } : {}),
         },
         select: {
           id: true,

@@ -38,17 +38,26 @@ export interface ProjectRequiredValues {
   managerId: string;
 }
 
-/** The wizard's steps, in order. The rail and the step headers both read this. */
+/**
+ * The wizard's steps, in order. The rail and the step headers both read this.
+ *
+ * "Team & access" (index 6) is `hidden: true` — Team, Project Manager and
+ * Sales Agent assignment moved to the Teams module (see OrgTeamsService).
+ * The step is skipped, not removed: its index stays 6 so `step === 6` checks
+ * elsewhere don't need renumbering, and un-hiding it later is a one-line
+ * revert. See add-new-project/page.tsx's goNext/goBack/rail, which skip any
+ * step marked hidden.
+ */
 export const PROJECT_STEPS = [
-  { label: "Project basics", sub: "Name, type, RERA" },
-  { label: "Inventory & config", sub: "Unit types & sizes" },
-  { label: "Pricing & payment", sub: "Price, plans, offers" },
-  { label: "Location", sub: "Address & connectivity" },
-  { label: "Amenities & specs", sub: "Features & finishes" },
-  { label: "Marketing & leads", sub: "Sources, budget, AI" },
-  { label: "Team & access", sub: "Manager, agents" },
-  { label: "Documents & media", sub: "Brochure, photos" },
-  { label: "Review & launch", sub: "Confirm & publish" },
+  { label: "Project basics", sub: "Name, type, RERA", hidden: false },
+  { label: "Inventory & config", sub: "Unit types & sizes", hidden: false },
+  { label: "Pricing & payment", sub: "Price, plans, offers", hidden: false },
+  { label: "Location", sub: "Address & connectivity", hidden: false },
+  { label: "Amenities & specs", sub: "Features & finishes", hidden: false },
+  { label: "Marketing & leads", sub: "Sources, budget, AI", hidden: false },
+  { label: "Team & access", sub: "Manager, agents", hidden: true },
+  { label: "Documents & media", sub: "Brochure, photos", hidden: false },
+  { label: "Review & launch", sub: "Confirm & publish", hidden: false },
 ] as const;
 
 /**
@@ -71,10 +80,14 @@ export function projectRequirements(
       { id: "address", label: "Full address", error: "Full address is required.", filled: !!v.address.trim() },
       { id: "city", label: "City", error: "City is required.", filled: !!v.city.trim() },
     ],
-    6: [
-      { id: "managerId", label: "Project manager", error: "Assign a project manager.", filled: !!v.managerId },
-    ],
+    // Step 6 (Team & access) is hidden — see PROJECT_STEPS — so it owns no
+    // required fields for now. Project manager moved to the Teams module.
   };
+}
+
+/** Whether a step index is currently hidden from the wizard (see PROJECT_STEPS). */
+export function isHiddenStep(index: number): boolean {
+  return PROJECT_STEPS[index]?.hidden ?? false;
 }
 
 /** The unfilled required fields on one step. */

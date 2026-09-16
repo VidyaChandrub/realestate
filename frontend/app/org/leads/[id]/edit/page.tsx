@@ -12,7 +12,7 @@ import { isValidLoosePhone, LOOSE_PHONE_MESSAGE } from "@/lib/phone";
 import {
   apiFetch,
   assignCrmLead,
-  getCrmAssignableUsers,
+  getCrmAssignableUsersForProject,
   getCrmLead,
   getOrgCatalogOptions,
   updateCrmLead,
@@ -204,13 +204,20 @@ export default function OrgLeadEditPage() {
     apiFetch<ProjectsListResponse>("/org/projects?page=1&limit=100")
       .then((res) => setProjects(res.data.map((p) => ({ id: p.id, name: p.name }))))
       .catch(() => setProjects([]));
-    getCrmAssignableUsers()
-      .then((res) => setAssignees(res.data.map((a) => ({ id: a.id, name: a.name }))))
-      .catch(() => setAssignees([]));
     getOrgCatalogOptions()
       .then((rows) => setCatalog(rows))
       .catch((e) => setCatalogError(e instanceof Error ? e.message : "Failed to load option lists."));
   }, [canEditLead]);
+
+  // Re-fetched whenever the lead's project changes — narrowed to that
+  // project's assigned team(s) (falls back to the org-wide list when the
+  // project has no team assigned, or no project is selected).
+  useEffect(() => {
+    if (!canEditLead) return;
+    getCrmAssignableUsersForProject(form?.projectId || null)
+      .then((res) => setAssignees(res.data.map((a) => ({ id: a.id, name: a.name }))))
+      .catch(() => setAssignees([]));
+  }, [canEditLead, form?.projectId]);
 
   /** Sorted option list for one catalog category ([] until the fetch lands). */
   const catOptions = useMemo(() => {

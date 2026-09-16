@@ -21,6 +21,7 @@ import {
 } from "@/lib/specifications";
 import {
   allMissing,
+  isHiddenStep,
   missingOn,
   projectRequirements,
   PROJECT_STEPS as STEPS,
@@ -256,11 +257,15 @@ export default function AddNewProjectPage() {
   // value). Fetched from /org/settings.
   const [orgName, setOrgName] = useState("");
 
-  // Step 7 — team
+  // Step 7 — team. UI hidden (see the commented-out step render below);
+  // state and setters kept so a resumed old draft or an un-hide still works.
   const [managerId, setManagerId] = useState("");
   const [managers, setManagers] = useState<OrgUser[]>([]);
   const [salesAgents, setSalesAgents] = useState<Array<{ id: string; name: string }>>([]);
-  const [salesTeam, setSalesTeam] = useState("Ahmedabad — West");
+  // Legacy hardcoded field, retired (never the real Team entity) — default
+  // is now "" so it's simply omitted on submit rather than always sending
+  // a bogus "Ahmedabad — West" for every new project.
+  const [salesTeam, setSalesTeam] = useState("");
   // User ids of the agents ticked in Step 7.
   const [agentAssign, setAgentAssign] = useState<string[]>([]);
   const [requireApproval, setRequireApproval] = useState(true);
@@ -450,29 +455,41 @@ export default function AddNewProjectPage() {
 
   // Continue: check this step's own required fields right here. Anything
   // missing blocks the move and surfaces inline + in the footer summary.
+  // Hidden steps (see PROJECT_STEPS) are skipped over, not landed on.
   function goNext() {
     markValidated(step);
     if (missingOnStep(step).length > 0) return;
     setJumpWarning(null);
-    setStep((s) => Math.min(STEPS.length - 1, s + 1));
+    setStep((s) => {
+      let next = Math.min(STEPS.length - 1, s + 1);
+      while (isHiddenStep(next) && next < STEPS.length - 1) next += 1;
+      return next;
+    });
   }
 
   function goBack() {
     setJumpWarning(null);
-    setStep((s) => Math.max(0, s - 1));
+    setStep((s) => {
+      let prev = Math.max(0, s - 1);
+      while (isHiddenStep(prev) && prev > 0) prev -= 1;
+      return prev;
+    });
   }
 
   // Step-rail navigation. Going back to an earlier (or the current) step is
   // free. Jumping *ahead* out of a step with missing required fields raises a
-  // warning first rather than silently navigating away from it.
+  // warning first rather than silently navigating away from it. The rail
+  // never renders a button for a hidden step, so `target` should never be
+  // one — the skip below is just a defensive fallback.
   function goToStep(target: number) {
-    if (target <= step || missingOnStep(step).length === 0) {
+    const resolved = isHiddenStep(target) ? (target < step ? target - 1 : target + 1) : target;
+    if (resolved <= step || missingOnStep(step).length === 0) {
       setJumpWarning(null);
-      setStep(target);
+      setStep(resolved);
       return;
     }
     markValidated(step);
-    setJumpWarning({ to: target, missing: missingOnStep(step).map((f) => f.label) });
+    setJumpWarning({ to: resolved, missing: missingOnStep(step).map((f) => f.label) });
   }
 
   // Filled specification rows, for the Review step's read-only summary.
@@ -582,7 +599,10 @@ export default function AddNewProjectPage() {
   }
 
   function applyDraft(d: WizardDraft) {
-    setStep(typeof d.step === "number" ? d.step : 0);
+    // A draft saved before "Team & access" was hidden could have step: 6 —
+    // land on the next visible step instead of a step with nothing to show.
+    const resumeStep = typeof d.step === "number" ? d.step : 0;
+    setStep(isHiddenStep(resumeStep) ? Math.min(resumeStep + 1, STEPS.length - 1) : resumeStep);
     setName(d.name ?? ""); setProjectType(d.projectType ?? ""); setTagline(d.tagline ?? "");
     setReraId(d.reraId ?? ""); setStatus(d.status ?? "active"); setLaunchDate(d.launchDate ?? "");
     setPossession(d.possession ?? ""); setConstructionStage(d.constructionStage ?? "Under construction");
@@ -605,7 +625,7 @@ export default function AddNewProjectPage() {
     setLeadGoal(d.leadGoal ?? ""); setLandingPage(d.landingPage ?? "Create new from template…");
     setAiCalling(d.aiCalling ?? true); setWhatsappAuto(d.whatsappAuto ?? true); setRoundRobin(d.roundRobin ?? true);
     setAiKnowledgeBase(d.aiKnowledgeBase ?? true);
-    setManagerId(d.managerId ?? ""); setSalesTeam(d.salesTeam ?? "Ahmedabad — West"); setAgentAssign(d.agentAssign ?? []);
+    setManagerId(d.managerId ?? ""); setSalesTeam(d.salesTeam ?? ""); setAgentAssign(d.agentAssign ?? []);
     setRequireApproval(d.requireApproval ?? true); setVisibleTele(d.visibleTele ?? true); setPublishWeb(d.publishWeb ?? false);
     setCoverImageUrl(d.coverImageUrl ?? null); setGalleryUrls(d.galleryUrls ?? []);
     setBrochureUrl(d.brochureUrl ?? null); setReraCertificateUrl(d.reraCertificateUrl ?? null);
@@ -633,7 +653,9 @@ export default function AddNewProjectPage() {
     setHydrated(true);
   }
 
-  const pct = Math.round(((step + 1) / STEPS.length) * 100);
+  const visibleStepCount = STEPS.filter((s) => !s.hidden).length;
+  const visibleStepNumber = (index: number) => STEPS.slice(0, index + 1).filter((s) => !s.hidden).length;
+  const pct = Math.round((visibleStepNumber(step) / visibleStepCount) * 100);
   const selectedManager = managers.find((m) => m.id === managerId) ?? null;
 
   const openTemplateInVisualBuilder = useCallback(async (tplTarget?: OrgTemplateSummary) => {
@@ -1013,12 +1035,16 @@ export default function AddNewProjectPage() {
               <div className="wz-prog"><i style={{ width: `${pct}%` }} /></div>
               <div className="wz-steps">
                 {STEPS.map((s, i) => {
+                  // Hidden steps (see PROJECT_STEPS) get no rail button at
+                  // all — index i is preserved everywhere else, this just
+                  // skips rendering it here.
+                  if (s.hidden) return null;
                   // A step earns its green tick only by passing its own
                   // required-field check — one bypassed via "Go to X anyway"
                   // shows an alert instead, and flips to the tick by itself
                   // once the user goes back and fills it in.
                   const status = stepStatus(i, step, requiredByStep);
-                  const { className, glyph } = stepIndicator(status, i);
+                  const { className, glyph } = stepIndicator(status, visibleStepNumber(i) - 1);
                   return (
                     <button
                       key={i}
@@ -1096,7 +1122,7 @@ export default function AddNewProjectPage() {
             {/* STEP 1 — Basics */}
             {step === 0 && (
               <div className="wz-pane on">
-                <div className="q-h"><div className="st">Step 1 of 9</div><h2>Project basics</h2><div className="sub">The essentials that identify this development across the CRM, website and ads.</div></div>
+                <div className="q-h"><div className="st">Step {visibleStepNumber(0)} of {visibleStepCount}</div><h2>Project basics</h2><div className="sub">The essentials that identify this development across the CRM, website and ads.</div></div>
 
                 {/* PREDEFINED TEMPLATE SELECTOR BANNER */}
                 <div
@@ -1224,7 +1250,7 @@ export default function AddNewProjectPage() {
             {/* STEP 2 — Inventory */}
             {step === 1 && (
               <div className="wz-pane on">
-                <div className="q-h"><div className="st">Step 2 of 9</div><h2>Inventory &amp; configuration</h2><div className="sub">Which unit types this project offers and the overall inventory picture.</div></div>
+                <div className="q-h"><div className="st">Step {visibleStepNumber(1)} of {visibleStepCount}</div><h2>Inventory &amp; configuration</h2><div className="sub">Which unit types this project offers and the overall inventory picture.</div></div>
                 <div className="q-sec">
                   <div className="lbl">🏠 Unit configurations (select all)</div>
                   <div className="field">
@@ -1266,7 +1292,7 @@ export default function AddNewProjectPage() {
             {/* STEP 3 — Pricing */}
             {step === 2 && (
               <div className="wz-pane on">
-                <div className="q-h"><div className="st">Step 3 of 9</div><h2>Pricing &amp; payment</h2><div className="sub">How units are priced and the payment structure buyers will see.</div></div>
+                <div className="q-h"><div className="st">Step {visibleStepNumber(2)} of {visibleStepCount}</div><h2>Pricing &amp; payment</h2><div className="sub">How units are priced and the payment structure buyers will see.</div></div>
                 <div className="q-sec">
                   <div className="lbl">💰 Pricing</div>
                   <div className="grid g2">
@@ -1310,7 +1336,7 @@ export default function AddNewProjectPage() {
             {/* STEP 4 — Location */}
             {step === 3 && (
               <div className="wz-pane on">
-                <div className="q-h"><div className="st">Step 4 of 9</div><h2>Location &amp; connectivity</h2><div className="sub">Where the project is and what surrounds it — powers maps and ad targeting.</div></div>
+                <div className="q-h"><div className="st">Step {visibleStepNumber(3)} of {visibleStepCount}</div><h2>Location &amp; connectivity</h2><div className="sub">Where the project is and what surrounds it — powers maps and ad targeting.</div></div>
                 <div className="q-sec">
                   <div className="lbl">📍 Address</div>
                   <div className={fieldClass("address")}><label>Full address <span className="req">*</span></label><textarea className="inp" rows={2} placeholder="Survey No. 214, SG Highway, Bopal, Ahmedabad, Gujarat 380058" value={address} onChange={(e) => setAddress(e.target.value)} />{invalid("address") && <div className="field-err">Full address is required.</div>}</div>
@@ -1340,7 +1366,7 @@ export default function AddNewProjectPage() {
             {/* STEP 5 — Amenities */}
             {step === 4 && (
               <div className="wz-pane on">
-                <div className="q-h"><div className="st">Step 5 of 9</div><h2>Amenities &amp; specifications</h2><div className="sub">Lifestyle features and build quality — shown on the project page and brochures.</div></div>
+                <div className="q-h"><div className="st">Step {visibleStepNumber(4)} of {visibleStepCount}</div><h2>Amenities &amp; specifications</h2><div className="sub">Lifestyle features and build quality — shown on the project page and brochures.</div></div>
                 <div className="q-sec">
                   <div className="lbl">🏊 Amenities (select all)</div>
                   <div className="field">
@@ -1372,7 +1398,7 @@ export default function AddNewProjectPage() {
             {/* STEP 6 — Marketing */}
             {step === 5 && (
               <div className="wz-pane on">
-                <div className="q-h"><div className="st">Step 6 of 9</div><h2>Marketing &amp; lead sources</h2><div className="sub">Where leads come from and how they&apos;ll be worked — connect ads, AI calling and WhatsApp.</div></div>
+                <div className="q-h"><div className="st">Step {visibleStepNumber(5)} of {visibleStepCount}</div><h2>Marketing &amp; lead sources</h2><div className="sub">Where leads come from and how they&apos;ll be worked — connect ads, AI calling and WhatsApp.</div></div>
                 <div className="q-sec">
                   <div className="lbl">📣 Ad sources (enable &amp; set budget)</div>
                   <div className="sw-row"><div className="tx"><b>Meta Ads (Facebook / Instagram)</b><small>Lead-form &amp; click campaigns</small></div><div className={`switch ${metaAds ? "on" : ""}`} onClick={() => setMetaAds(!metaAds)} /></div>
@@ -1470,7 +1496,16 @@ export default function AddNewProjectPage() {
               </div>
             )}
 
-            {/* STEP 7 — Team */}
+            {/* STEP 7 — Team & access. HIDDEN as of the Team↔Project pivot:
+                Project Manager, Sales team and Sales Agent assignment now
+                live on the Team, not the Project (see OrgTeamsService /
+                the Teams module). Commented out, not deleted — reversible
+                by uncommenting and removing `hidden: true` on this step in
+                lib/project-validation.ts. Project.managerId, salesTeam and
+                ProjectSalesAgent keep working and keep their data; this is
+                UI hiding only. The step's other sub-section (Visibility &
+                approvals) was NOT part of this pivot and was moved into
+                Step 8 below so those real settings stay reachable.
             {step === 6 && (
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 7 of 9</div><h2>Team &amp; access</h2><div className="sub">Who owns this project and which agents can work its leads.</div></div>
@@ -1501,19 +1536,14 @@ export default function AddNewProjectPage() {
                     )}
                   </div>
                 </div>
-                <div className="q-sec">
-                  <div className="lbl">🔐 Visibility &amp; approvals</div>
-                  <div className="sw-row"><div className="tx"><b>Require manager approval on bookings</b><small>Bookings move to Pending until approved</small></div><div className={`switch ${requireApproval ? "on" : ""}`} onClick={() => setRequireApproval(!requireApproval)} /></div>
-                  <div className="sw-row"><div className="tx"><b>Visible to telecallers</b><small>Show in the calling dashboard queue</small></div><div className={`switch ${visibleTele ? "on" : ""}`} onClick={() => setVisibleTele(!visibleTele)} /></div>
-                  <div className="sw-row"><div className="tx"><b>Publish to public website</b><small>List on skylinedev.in projects page</small></div><div className={`switch ${publishWeb ? "on" : ""}`} onClick={() => setPublishWeb(!publishWeb)} /></div>
-                </div>
               </div>
             )}
+            */}
 
             {/* STEP 8 — Documents */}
             {step === 7 && (
               <div className="wz-pane on">
-                <div className="q-h"><div className="st">Step 8 of 9</div><h2>Documents &amp; media</h2><div className="sub">Upload the assets that power the public page, brochures and AI knowledge base.</div></div>
+                <div className="q-h"><div className="st">Step {visibleStepNumber(7)} of {visibleStepCount}</div><h2>Documents &amp; media</h2><div className="sub">Upload the assets that power the public page, brochures and AI knowledge base.</div></div>
                 <div className="q-sec">
                   <div className="lbl">🖼️ Images</div>
                   <div className="grid g2">
@@ -1538,13 +1568,22 @@ export default function AddNewProjectPage() {
                   </div>
                   <div className="sw-row"><div className="tx"><b>Add to AI knowledge base</b><small>Let AI calling &amp; WhatsApp answer from these documents</small></div><div className={`switch ${aiKnowledgeBase ? "on" : ""}`} onClick={() => setAiKnowledgeBase(!aiKnowledgeBase)} /></div>
                 </div>
+                {/* Moved here from the now-hidden Step 7 — these three are
+                    real, backend-persisted project settings unrelated to
+                    the Team↔Project pivot, so they stay reachable. */}
+                <div className="q-sec">
+                  <div className="lbl">🔐 Visibility &amp; approvals</div>
+                  <div className="sw-row"><div className="tx"><b>Require manager approval on bookings</b><small>Bookings move to Pending until approved</small></div><div className={`switch ${requireApproval ? "on" : ""}`} onClick={() => setRequireApproval(!requireApproval)} /></div>
+                  <div className="sw-row"><div className="tx"><b>Visible to telecallers</b><small>Show in the calling dashboard queue</small></div><div className={`switch ${visibleTele ? "on" : ""}`} onClick={() => setVisibleTele(!visibleTele)} /></div>
+                  <div className="sw-row" style={{ borderBottom: 0 }}><div className="tx"><b>Publish to public website</b><small>List on skylinedev.in projects page</small></div><div className={`switch ${publishWeb ? "on" : ""}`} onClick={() => setPublishWeb(!publishWeb)} /></div>
+                </div>
               </div>
             )}
 
             {/* STEP 9 — Review */}
             {step === 8 && (
               <div className="wz-pane on">
-                <div className="q-h"><div className="st">Step 9 of 9</div><h2>Review &amp; launch</h2><div className="sub">Confirm the details below, then publish. You can edit everything later from the project page.</div></div>
+                <div className="q-h"><div className="st">Step {visibleStepNumber(8)} of {visibleStepCount}</div><h2>Review &amp; launch</h2><div className="sub">Confirm the details below, then publish. You can edit everything later from the project page.</div></div>
                 <div className="rev">
                   <div className="rev-grid">
                     <div>
@@ -1624,9 +1663,16 @@ export default function AddNewProjectPage() {
                           )}
                         </div>
                       </div>
+                      {/* Manager/Agents rows hidden with Step 7 above — Team,
+                          Project Manager and Sales Agent assignment now
+                          live on the Team. Uncomment alongside that step to
+                          restore:
                       <div className="q-sec"><div className="lbl">👤 Team &amp; access</div>
                         <div className="sp"><span className="k">Manager</span><span className="v">{selectedManager ? userLabel(selectedManager) : "Unassigned"}</span></div>
                         <div className="sp"><span className="k">Agents</span><span className="v">{agentAssign.length} assigned</span></div>
+                      </div>
+                      */}
+                      <div className="q-sec"><div className="lbl">🔐 Visibility &amp; approvals</div>
                         <div className="sp"><span className="k">Booking approval</span><span className="v">{requireApproval ? "Required" : "Not required"}</span></div>
                         <div className="sp"><span className="k">Visible to telecallers</span><span className="v"><span className={`badge ${visibleTele ? "b-green" : "b-gray"}`}>{visibleTele ? "On" : "Off"}</span></span></div>
                         <div className="sp"><span className="k">Publish to website</span><span className="v"><span className={`badge ${publishWeb ? "b-green" : "b-gray"}`}>{publishWeb ? "On" : "Off"}</span></span></div>

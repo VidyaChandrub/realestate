@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
-import { SwitchRow, TeamsSubNav, displayName, useOrgUsersList } from "@/components/org/team-fields";
+import { SwitchRow, TeamsSubNav, displayName, useOrgManagersList, useOrgUsersList } from "@/components/org/team-fields";
+import { TEAM_MEMBER_ROLE_LABEL } from "@/lib/teams";
 import { ApiError, getTeam, updateTeam } from "@/lib/api";
 import type { TeamDetail, TeamStatus } from "@/lib/types";
 
@@ -13,7 +14,11 @@ export default function EditTeamPage() {
   const router = useRouter();
   const teamId = params?.id as string;
 
-  const { users, loading: usersLoading, error: usersError } = useOrgUsersList();
+  // Only used to know each existing member's org-wide role, so the Team
+  // Lead options below can exclude org admins — this page has no member
+  // picker of its own (membership stays managed from the detail page).
+  const { users, loading: usersLoading } = useOrgUsersList();
+  const { managers, loading: managersLoading, error: managersError } = useOrgManagersList();
 
   const [team, setTeam] = useState<TeamDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,6 +27,7 @@ export default function EditTeamPage() {
   const [name, setName] = useState("");
   const [status, setStatus] = useState<TeamStatus>("active");
   const [leadId, setLeadId] = useState("");
+  const [projectManagerId, setProjectManagerId] = useState("");
   const [region, setRegion] = useState("");
   const [workingHours, setWorkingHours] = useState("");
   const [description, setDescription] = useState("");
@@ -35,6 +41,7 @@ export default function EditTeamPage() {
         setName(t.name);
         setStatus(t.status);
         setLeadId(t.teamLead?.id ?? "");
+        setProjectManagerId(t.projectManager?.id ?? "");
         setRegion(t.region ?? "");
         setWorkingHours(t.workingHours ?? "");
         setDescription(t.description ?? "");
@@ -51,6 +58,25 @@ export default function EditTeamPage() {
       .finally(() => setLoading(false));
   }, [teamId]);
 
+  // Team lead can only be one of this team's current members — never an
+  // org admin, even if one was added as a plain member.
+  const teamLeadOptions = useMemo(() => {
+    if (!team) return [];
+    const roleKeyByUserId = new Map(users.map((u) => [u.id, u.role?.key]));
+    return team.members.filter((m) => roleKeyByUserId.get(m.id) !== "admin");
+  }, [team, users]);
+
+  // If the saved lead falls out of that list (removed as a member, or an
+  // admin who's no longer eligible), clear the selection — but only once
+  // the org users fetch (used for the admin-role check) has actually
+  // resolved, so a valid lead isn't cleared mid-load.
+  useEffect(() => {
+    if (!team || usersLoading) return;
+    if (leadId && !teamLeadOptions.some((m) => m.id === leadId)) {
+      setLeadId("");
+    }
+  }, [team, usersLoading, leadId, teamLeadOptions]);
+
   async function handleSubmit() {
     if (!name.trim()) {
       setSubmitError("Team name is required.");
@@ -63,6 +89,7 @@ export default function EditTeamPage() {
         name: name.trim(),
         status,
         teamLeadId: leadId || null,
+        projectManagerId: projectManagerId || null,
         region: region.trim() || null,
         workingHours: workingHours.trim() || null,
         description: description.trim() || null,
@@ -134,24 +161,52 @@ export default function EditTeamPage() {
               checked={status === "active"}
               onToggle={(on) => setStatus(on ? "active" : "inactive")}
             />
-            <div className="row2" style={{ marginTop: 14 }}>
-              <div className="field">
-                <label>Team name <span className="req">*</span></label>
-                <input className="inp" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
+            <div className="field" style={{ marginTop: 14 }}>
+              <label>Team name <span className="req">*</span></label>
+              <input className="inp" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="row2">
               <div className="field">
                 <label>Team lead</label>
-                <select value={leadId} onChange={(e) => setLeadId(e.target.value)} disabled={usersLoading || !!usersError}>
+                <select value={leadId} onChange={(e) => setLeadId(e.target.value)} disabled={usersLoading}>
                   <option value="">
-                    {usersLoading ? "Loading…" : usersError ? "Couldn't load users" : "No lead assigned"}
+                    {usersLoading
+                      ? "Loading…"
+                      : teamLeadOptions.length === 0
+                        ? "No eligible members yet"
+                        : "No lead assigned"}
                   </option>
-                  {users.map((u) => (
+                  {teamLeadOptions.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name} — {TEAM_MEMBER_ROLE_LABEL[m.role]}</option>
+                  ))}
+                </select>
+                <div className="hint">
+                  Chosen from this team&apos;s members — org admins aren&apos;t eligible. Add or remove members from
+                  the team page.
+                </div>
+              </div>
+              <div className="field">
+                <label>Project manager</label>
+                <select
+                  value={projectManagerId}
+                  onChange={(e) => setProjectManagerId(e.target.value)}
+                  disabled={managersLoading || !!managersError}
+                >
+                  <option value="">
+                    {managersLoading ? "Loading…" : managersError ? "Couldn't load managers" : "No project manager assigned"}
+                  </option>
+                  {team.projectManager && !managers.some((u) => u.id === team.projectManager!.id) ? (
+                    <option value={team.projectManager.id}>{team.projectManager.name} (current)</option>
+                  ) : null}
+                  {managers.map((u) => (
                     <option key={u.id} value={u.id}>{displayName(u)}</option>
                   ))}
                 </select>
-                {usersError ? (
-                  <div className="hint" style={{ color: "var(--rose)" }}>Couldn&apos;t load org users — {usersError}</div>
-                ) : null}
+                {managersError ? (
+                  <div className="hint" style={{ color: "var(--rose)" }}>Couldn&apos;t load managers — {managersError}</div>
+                ) : (
+                  <div className="hint">Only users with the Manager role can be picked here.</div>
+                )}
               </div>
             </div>
             <div className="row2">

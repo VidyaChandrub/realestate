@@ -58,6 +58,7 @@ export interface SafeOrganisation {
   subdomain_status: string;
   custom_domain: string | null;
   custom_domain_status: string;
+  single_team_membership: boolean;
 }
 
 export interface UpdateOrganisationSettingsInput {
@@ -82,6 +83,7 @@ export interface UpdateOrganisationSettingsInput {
   unitPriceBasis?: UnitPriceBasis;
   supportEmail?: string;
   supportPhone?: string;
+  singleTeamMembership?: boolean;
 }
 
 export interface AuthTokens {
@@ -456,8 +458,9 @@ export interface OrgUser {
   approvedAt?: string | null;
   createdAt: string;
   mustChangePassword: boolean;
-  // Always false today — Teams have no creation/membership UI yet.
   hasTeam: boolean;
+  // Names of every team this user currently has a TeamMember row on.
+  teams: string[];
 }
 
 export interface OrgUsersListResponse {
@@ -990,6 +993,9 @@ export interface Project {
   possession: string | null;
   managerId: string | null;
   manager: ProjectManager | null;
+  /** Team(s) currently assigned to this project (see TeamProject) — plural
+   *  since nothing enforces one team per project yet. Empty if unassigned. */
+  teams: { id: string; name: string }[];
   status: ProjectStatus;
   priceMin: number | null;
   priceMax: number | null;
@@ -1068,6 +1074,7 @@ export interface PublicProject extends Project {
 
 export interface ProjectListRow extends Project {
   unitTypeCount: number;
+  unitCount: number;
 }
 
 /** A sales user assigned to a project (GET/PUT /org/projects/:id/sales-agents). */
@@ -1433,6 +1440,10 @@ export interface OrgUnitRow {
   updatedAt: string;
   /** Null for a standalone unit. */
   project: { id: string; name: string; currency: string } | null;
+  /** The team(s) covering this unit — from the unit's own TeamUnit link if
+   *  standalone, or from its project's TeamProject assignment otherwise.
+   *  Plural since nothing enforces one team per project/unit yet. */
+  teams: { id: string; name: string }[];
 }
 
 export interface OrgUnitsListResponse {
@@ -2402,6 +2413,11 @@ export interface TeamLeadSummary {
   name: string;
 }
 
+/** Same shape as TeamLeadSummary — the org user assigned as this team's
+ *  project manager. Unlike Team Leader, must hold the `manager` role
+ *  (enforced server-side, not just by the picker). */
+export type TeamProjectManagerSummary = TeamLeadSummary;
+
 export interface TeamMemberPreview {
   id: string;
   name: string;
@@ -2420,8 +2436,11 @@ export interface Team {
   createdAt: string;
   updatedAt: string;
   teamLead: TeamLeadSummary | null;
+  projectManager: TeamProjectManagerSummary | null;
   memberCount: number;
   projectCount: number;
+  /** Standalone units (Unit.projectId is null) assigned directly to this team. */
+  unitCount: number;
   memberPreviews: TeamMemberPreview[];
   /** Real, derived from Lead.assignedToId + status — not yet won/lost. */
   activeLeads: number;
@@ -2436,6 +2455,7 @@ export interface TeamMemberRow {
   email: string;
   name: string;
   role: TeamMemberRoleValue;
+  orgRole: OrgUserRole | null;
   joinedAt: string;
   activeLeads: number;
   conversionPct: number;
@@ -2444,17 +2464,36 @@ export interface TeamMemberRow {
 export interface TeamProjectRow {
   id: string;
   name: string;
+  status: ProjectStatus;
+  location: string | null;
+  priceMin: number | null;
+  priceMax: number | null;
+  currency: string;
+  unitCount: number;
+  unitTypeCount: number;
+  assignedAt: string;
+}
+
+export interface TeamUnitRow {
+  id: string;
+  unitNo: string;
+  configuration: string | null;
+  status: UnitStatus;
+  price: number | null;
+  carpetSqft: number | null;
   assignedAt: string;
 }
 
 export interface TeamDetail extends Team {
   members: TeamMemberRow[];
   projects: TeamProjectRow[];
+  units: TeamUnitRow[];
 }
 
 export interface CreateTeamInput {
   name: string;
   teamLeadId?: string;
+  projectManagerId?: string;
   region?: string;
   workingHours?: string;
   description?: string;
@@ -2464,6 +2503,7 @@ export interface UpdateTeamInput {
   name?: string;
   status?: TeamStatus;
   teamLeadId?: string | null;
+  projectManagerId?: string | null;
   region?: string | null;
   workingHours?: string | null;
   description?: string | null;

@@ -1,27 +1,36 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import {
+  MemberPicker,
   SwitchRow,
   TeamsSubNav,
-  ToggleChips,
   displayName,
+  isEligibleTeamMember,
+  useOrgManagersList,
   useOrgProjectsList,
+  useOrgStandaloneUnitsList,
   useOrgUsersList,
+  useSingleTeamMembership,
 } from "@/components/org/team-fields";
 import { MODULE_DEFS } from "@/lib/teams";
-import { createTeam, setTeamMembers, setTeamProjects } from "@/lib/api";
+import { formatMoney, formatMoneyRange } from "@/lib/money";
+import { createTeam, setTeamMembers, setTeamProjects, setTeamUnits, updateTeam } from "@/lib/api";
 
 export default function CreateTeamPage() {
   const router = useRouter();
   const { users, loading: usersLoading, error: usersError } = useOrgUsersList();
+  const { managers, loading: managersLoading, error: managersError } = useOrgManagersList();
   const { projects, loading: projectsLoading, error: projectsError } = useOrgProjectsList();
+  const { units, loading: unitsLoading, error: unitsError } = useOrgStandaloneUnitsList();
+  const singleTeamMembership = useSingleTeamMembership();
 
   const [name, setName] = useState("");
   const [leadId, setLeadId] = useState("");
+  const [projectManagerId, setProjectManagerId] = useState("");
   const [region, setRegion] = useState("");
   const [workingHours, setWorkingHours] = useState("10:00 AM – 7:00 PM");
   const [description, setDescription] = useState("");
@@ -36,19 +45,31 @@ export default function CreateTeamPage() {
     reports: true,
   });
   const [projectIds, setProjectIds] = useState<Set<string>>(new Set());
+  const [unitIds, setUnitIds] = useState<Set<string>>(new Set());
   const [autoAssign, setAutoAssign] = useState(true);
   const [createChatChannel, setCreateChatChannel] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const userOptions = useMemo(
-    () => users.map((u) => ({ id: u.id, label: displayName(u) })),
-    [users],
+  // Admins/super admins already have full org-wide access and are never
+  // eligible to be added as a team member (enforced server-side too — see
+  // OrgTeamsService.setMembers). Managers stay eligible.
+  const eligibleUsers = useMemo(() => users.filter(isEligibleTeamMember), [users]);
+
+  // Team lead can only be nominated from the members already picked above.
+  const teamLeadOptions = useMemo(
+    () => eligibleUsers.filter((u) => memberIds.has(u.id)),
+    [eligibleUsers, memberIds],
   );
-  const projectOptions = useMemo(
-    () => projects.map((p) => ({ id: p.id, label: p.name })),
-    [projects],
-  );
+
+  // If the currently-picked lead falls out of that list (deselected as a
+  // member, or was never eligible), clear the selection rather than let a
+  // stale id sit in state — the server would reject it anyway.
+  useEffect(() => {
+    if (leadId && !teamLeadOptions.some((u) => u.id === leadId)) {
+      setLeadId("");
+    }
+  }, [leadId, teamLeadOptions]);
 
   const modulesEnabled = Object.values(moduleAccess).filter(Boolean).length;
 
@@ -70,6 +91,15 @@ export default function CreateTeamPage() {
     });
   }
 
+  function toggleUnit(id: string) {
+    setUnitIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   async function handleSubmit() {
     if (!name.trim()) {
       setSubmitError("Team name is required.");
@@ -78,9 +108,12 @@ export default function CreateTeamPage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
+      // teamLeadId can't be sent at creation — the server rejects it until
+      // the team actually has members (see OrgTeamsService.create). So:
+      // create the team, add members, *then* set the lead.
       const team = await createTeam({
         name: name.trim(),
-        teamLeadId: leadId || undefined,
+        projectManagerId: projectManagerId || undefined,
         region: region.trim() || undefined,
         workingHours: workingHours.trim() || undefined,
         description: description.trim() || undefined,
@@ -95,8 +128,14 @@ export default function CreateTeamPage() {
           [...memberIds].map((userId) => ({ userId, role: "sales_agent" as const })),
         );
       }
+      if (leadId) {
+        await updateTeam(team.id, { teamLeadId: leadId });
+      }
       if (projectIds.size > 0) {
         await setTeamProjects(team.id, [...projectIds]);
+      }
+      if (unitIds.size > 0) {
+        await setTeamUnits(team.id, [...unitIds]);
       }
 
       router.push(`/org/teams/${team.id}`);
@@ -117,7 +156,7 @@ export default function CreateTeamPage() {
           </div>
           <h1>Create a team</h1>
           <div className="sub">
-            Name the team, set its lead, choose members, and grant project access.
+            Name the team, choose its members, nominate a lead from among them, and grant project access.
           </div>
         </div>
         <div className="actions">
@@ -134,25 +173,29 @@ export default function CreateTeamPage() {
         <div className="card" style={{ padding: 26 }}>
           <div className="sec">
             <div className="lbl">🏷️ Basics</div>
-            <div className="row2">
-              <div className="field">
-                <label>Team name <span className="req">*</span></label>
-                <input className="inp" placeholder="e.g. Sales Team West" value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div className="field">
-                <label>Team lead</label>
-                <select value={leadId} onChange={(e) => setLeadId(e.target.value)} disabled={usersLoading || !!usersError}>
-                  <option value="">
-                    {usersLoading ? "Loading…" : usersError ? "Couldn't load users" : "No lead assigned"}
-                  </option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>{displayName(u)}</option>
-                  ))}
-                </select>
-                {usersError ? (
-                  <div className="hint" style={{ color: "var(--rose)" }}>Couldn&apos;t load org users — {usersError}</div>
-                ) : null}
-              </div>
+            <div className="field">
+              <label>Team name <span className="req">*</span></label>
+              <input className="inp" placeholder="e.g. Sales Team West" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>Project manager</label>
+              <select
+                value={projectManagerId}
+                onChange={(e) => setProjectManagerId(e.target.value)}
+                disabled={managersLoading || !!managersError}
+              >
+                <option value="">
+                  {managersLoading ? "Loading…" : managersError ? "Couldn't load managers" : "No project manager assigned"}
+                </option>
+                {managers.map((u) => (
+                  <option key={u.id} value={u.id}>{displayName(u)}</option>
+                ))}
+              </select>
+              {managersError ? (
+                <div className="hint" style={{ color: "var(--rose)" }}>Couldn&apos;t load managers — {managersError}</div>
+              ) : (
+                <div className="hint">Only users with the Manager role can be picked here.</div>
+              )}
             </div>
             <div className="row2">
               <div className="field">
@@ -172,21 +215,36 @@ export default function CreateTeamPage() {
 
           <div className="sec">
             <div className="lbl">🧑‍💼 Members</div>
-            <div className="field" style={{ marginBottom: 0 }}>
+            <div className="field">
               <label>Add members</label>
-              <ToggleChips
-                options={userOptions}
+              <MemberPicker
+                users={eligibleUsers}
+                usersLoading={usersLoading}
+                usersError={usersError}
                 selected={memberIds}
                 onToggle={toggleMember}
-                loading={usersLoading}
-                error={usersError}
-                loadingLabel="Loading org users…"
-                emptyLabel="No org users yet — add users in Users first."
+                singleTeamMembership={singleTeamMembership}
               />
               <div className="hint">
                 Added as Sales Agent by default — change a member&apos;s role from the team page, or onboard
                 someone directly with a specific role from the Onboarding tab.
               </div>
+            </div>
+            <div className="field" style={{ marginBottom: 0 }}>
+              <label>Team lead</label>
+              <select value={leadId} onChange={(e) => setLeadId(e.target.value)} disabled={usersLoading || !!usersError}>
+                <option value="">
+                  {teamLeadOptions.length === 0 ? "Pick members above first" : "No lead assigned"}
+                </option>
+                {teamLeadOptions.map((u) => (
+                  <option key={u.id} value={u.id}>{displayName(u)}</option>
+                ))}
+              </select>
+              {usersError ? (
+                <div className="hint" style={{ color: "var(--rose)" }}>Couldn&apos;t load org users — {usersError}</div>
+              ) : (
+                <div className="hint">Chosen from the members added above — org admins aren&apos;t eligible.</div>
+              )}
             </div>
           </div>
 
@@ -208,17 +266,96 @@ export default function CreateTeamPage() {
 
           <div className="sec">
             <div className="lbl">🏗️ Project access</div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <ToggleChips
-                options={projectOptions}
-                selected={projectIds}
-                onToggle={toggleProject}
-                loading={projectsLoading}
-                error={projectsError}
-                loadingLabel="Loading projects…"
-                emptyLabel="No projects yet — create one in Projects first."
-              />
+            <div className="hint" style={{ marginBottom: 10 }}>
+              Toggle the projects this team should access. Selections are saved when you create the team.
             </div>
+            {projectsError ? (
+              <div className="hint" style={{ color: "var(--rose)" }}>
+                Couldn&apos;t load projects — {projectsError}
+              </div>
+            ) : projectsLoading ? (
+              <div className="hint">Loading projects…</div>
+            ) : projects.length === 0 ? (
+              <div className="hint">No projects yet — create one in Projects first.</div>
+            ) : (
+              <div className="tbl-wrap">
+                <table className="tbl">
+                  <thead>
+                    <tr><th>Project</th><th>Status</th><th>Location</th><th>Price range</th><th>Units</th><th>Access</th></tr>
+                  </thead>
+                  <tbody>
+                    {projects.map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.name}</td>
+                        <td><span className={`badge ${p.status === "active" ? "b-green" : "b-gray"}`}>{p.status === "active" ? "Active" : "Inactive"}</span></td>
+                        <td>{p.location ?? "—"}</td>
+                        <td>{formatMoneyRange(p.priceMin, p.priceMax, p.currency)}</td>
+                        <td>{p.unitCount} unit{p.unitCount === 1 ? "" : "s"} · {p.unitTypeCount} type{p.unitTypeCount === 1 ? "" : "s"}</td>
+                        <td>
+                          <div
+                            className={`switch ${projectIds.has(p.id) ? "on" : ""}`}
+                            role="switch"
+                            aria-checked={projectIds.has(p.id)}
+                            tabIndex={0}
+                            onClick={() => toggleProject(p.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") toggleProject(p.id);
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="sec">
+            <div className="lbl">🏠 Unit access</div>
+            <div className="hint" style={{ marginBottom: 10 }}>
+              Standalone units only — a unit that belongs to a project follows that project&apos;s access instead. Selections are saved when you create the team.
+            </div>
+            {unitsError ? (
+              <div className="hint" style={{ color: "var(--rose)" }}>
+                Couldn&apos;t load units — {unitsError}
+              </div>
+            ) : unitsLoading ? (
+              <div className="hint">Loading units…</div>
+            ) : units.length === 0 ? (
+              <div className="hint">No standalone units yet — create one in All Units first.</div>
+            ) : (
+              <div className="tbl-wrap">
+                <table className="tbl">
+                  <thead>
+                    <tr><th>Unit</th><th>Status</th><th>Configuration</th><th>Carpet</th><th>Price</th><th>Access</th></tr>
+                  </thead>
+                  <tbody>
+                    {units.map((u) => (
+                      <tr key={u.id}>
+                        <td className="mono">{u.unitNo}</td>
+                        <td><span className={`badge ${u.status === "available" ? "b-green" : "b-gray"}`}>{u.status}</span></td>
+                        <td>{u.configuration ?? "—"}</td>
+                        <td>{u.carpetSqft != null ? `${u.carpetSqft.toLocaleString("en-IN")} sqft` : "—"}</td>
+                        <td>{formatMoney(u.price, "INR")}</td>
+                        <td>
+                          <div
+                            className={`switch ${unitIds.has(u.id) ? "on" : ""}`}
+                            role="switch"
+                            aria-checked={unitIds.has(u.id)}
+                            tabIndex={0}
+                            onClick={() => toggleUnit(u.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") toggleUnit(u.id);
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div className="sec">
@@ -248,6 +385,7 @@ export default function CreateTeamPage() {
               <div style={{ display: "flex", justifyContent: "space-between" }}><span className="muted">Members</span><b>{memberIds.size} selected</b></div>
               <div style={{ display: "flex", justifyContent: "space-between" }}><span className="muted">Modules (preview)</span><b>{modulesEnabled} enabled</b></div>
               <div style={{ display: "flex", justifyContent: "space-between" }}><span className="muted">Projects</span><b>{projectIds.size}</b></div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}><span className="muted">Standalone units</span><b>{unitIds.size}</b></div>
               <div style={{ display: "flex", justifyContent: "space-between" }}><span className="muted">Chat channel (preview)</span><b>{createChatChannel ? "Yes" : "No"}</b></div>
             </div>
           </div>

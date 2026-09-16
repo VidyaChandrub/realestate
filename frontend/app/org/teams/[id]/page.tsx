@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
@@ -9,15 +9,20 @@ import { Icon } from "@/components/icons";
 import { Seg } from "@/components/superadmin/seg";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import {
+  MemberPicker,
   RowActionMenu,
   RowActionItem,
   SwitchRow,
   TeamsSubNav,
   initialsFor,
   useOrgProjectsList,
+  useOrgStandaloneUnitsList,
+  useOrgUsersList,
+  useSingleTeamMembership,
 } from "@/components/org/team-fields";
 import { MODULE_DEFS, ROLE_BADGE_CLASS, TEAM_MEMBER_ROLE_LABEL } from "@/lib/teams";
-import { ApiError, deleteTeam, getTeam, setTeamMembers, setTeamProjects, updateTeam } from "@/lib/api";
+import { formatMoney, formatMoneyRange } from "@/lib/money";
+import { ApiError, deleteTeam, getTeam, setTeamMembers, setTeamProjects, setTeamUnits, updateTeam } from "@/lib/api";
 import type { TeamDetail } from "@/lib/types";
 
 const TABS = ["Members", "Access & permissions", "Performance", "Activity"] as const;
@@ -71,38 +76,64 @@ export default function TeamDetailPage() {
   }, [load]);
 
   const { projects, loading: projectsLoading, error: projectsError } = useOrgProjectsList();
+  const { units, loading: unitsLoading, error: unitsError } = useOrgStandaloneUnitsList();
 
   // --- Access tab: module access + lead-routing are preview-only (no
   // backend). Project access is real.
   const [moduleAccess, setModuleAccess] = useState<Record<string, boolean>>(DEFAULT_MODULE_ACCESS);
   const [autoAssign, setAutoAssign] = useState(true);
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set());
-  const [savingAccess, setSavingAccess] = useState(false);
+  const [savingProjectId, setSavingProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     if (team) setSelectedProjectIds(new Set(team.projects.map((p) => p.id)));
   }, [team?.id]);
 
-  function toggleProject(id: string) {
-    setSelectedProjectIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  async function toggleProject(id: string) {
+    if (!team || savingProjectId) return;
+    const next = new Set(selectedProjectIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedProjectIds(next);
+    setSavingProjectId(id);
+    try {
+      const rows = await setTeamProjects(team.id, [...next]);
+      setTeam((prev) => (prev ? { ...prev, projects: rows, projectCount: rows.length } : prev));
+      notify("Project access updated.");
+    } catch (err) {
+      setSelectedProjectIds(new Set(team.projects.map((project) => project.id)));
+      notify(err instanceof Error ? err.message : "Failed to update project access.");
+    } finally {
+      setSavingProjectId(null);
+    }
   }
 
-  async function saveProjectAccess() {
-    if (!team) return;
-    setSavingAccess(true);
+  // --- Access tab: standalone unit access. Same idempotent-replace shape
+  // as project access — a project-bound unit is never offered here, since
+  // it inherits its team via the project's own access (see TeamUnit).
+  const [selectedUnitIds, setSelectedUnitIds] = useState<Set<string>>(new Set());
+  const [savingUnitId, setSavingUnitId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (team) setSelectedUnitIds(new Set(team.units.map((u) => u.id)));
+  }, [team?.id]);
+
+  async function toggleUnit(id: string) {
+    if (!team || savingUnitId) return;
+    const next = new Set(selectedUnitIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedUnitIds(next);
+    setSavingUnitId(id);
     try {
-      const rows = await setTeamProjects(team.id, [...selectedProjectIds]);
-      setTeam((prev) => (prev ? { ...prev, projects: rows, projectCount: rows.length } : prev));
-      notify("Project access saved.");
+      const rows = await setTeamUnits(team.id, [...next]);
+      setTeam((prev) => (prev ? { ...prev, units: rows, unitCount: rows.length } : prev));
+      notify("Unit access updated.");
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Failed to save project access.");
+      setSelectedUnitIds(new Set(team.units.map((unit) => unit.id)));
+      notify(err instanceof Error ? err.message : "Failed to update unit access.");
     } finally {
-      setSavingAccess(false);
+      setSavingUnitId(null);
     }
   }
 
@@ -115,11 +146,85 @@ export default function TeamDetailPage() {
     try {
       const next = team.members.filter((m) => m.id !== userId).map((m) => ({ userId: m.id, role: m.role }));
       const rows = await setTeamMembers(team.id, next);
-      setTeam((prev) => (prev ? { ...prev, members: rows, memberCount: rows.length } : prev));
+      // The backend clears teamLeadId if the removed member was the lead
+      // (see OrgTeamsService.setMembers) — mirror that locally so the UI
+      // doesn't keep showing a lead who's no longer on the team.
+      setTeam((prev) =>
+        prev
+          ? {
+              ...prev,
+              members: rows,
+              memberCount: rows.length,
+              teamLead: prev.teamLead?.id === userId ? null : prev.teamLead,
+            }
+          : prev,
+      );
     } catch (err) {
       notify(err instanceof Error ? err.message : "Failed to remove member.");
     } finally {
       setMemberBusy(null);
+    }
+  }
+
+  // --- Members tab: add existing org users. Reuses the same picker/rule as
+  // Create team (MemberPicker) — never a second implementation. The list
+  // excludes anyone already on this team, and setTeamMembers is a full
+  // replace (see backend OrgTeamsService.setMembers), so the current
+  // roster is always sent back alongside the newly picked ids.
+  const { users: allOrgUsers, loading: allUsersLoading, error: allUsersError } = useOrgUsersList();
+  const singleTeamMembership = useSingleTeamMembership();
+  const [addPanelOpen, setAddPanelOpen] = useState(false);
+  const [newMemberIds, setNewMemberIds] = useState<Set<string>>(new Set());
+  const [addingMembers, setAddingMembers] = useState(false);
+  const [addMembersError, setAddMembersError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAddPanelOpen(false);
+    setNewMemberIds(new Set());
+    setAddMembersError(null);
+  }, [teamId]);
+
+  const addableUsers = useMemo(() => {
+    if (!team) return allOrgUsers;
+    const existingIds = new Set(team.members.map((m) => m.id));
+    return allOrgUsers.filter(
+      (u) => !existingIds.has(u.id) && u.role?.key !== "admin" && u.role?.key !== "super_admin",
+    );
+  }, [allOrgUsers, team]);
+
+  function toggleNewMember(id: string) {
+    setNewMemberIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function closeAddPanel() {
+    setAddPanelOpen(false);
+    setNewMemberIds(new Set());
+    setAddMembersError(null);
+  }
+
+  async function addExistingMembers() {
+    if (!team || newMemberIds.size === 0) return;
+    setAddingMembers(true);
+    setAddMembersError(null);
+    try {
+      const next = [
+        ...team.members.map((m) => ({ userId: m.id, role: m.role })),
+        ...[...newMemberIds].map((userId) => ({ userId, role: "sales_agent" as const })),
+      ];
+      const rows = await setTeamMembers(team.id, next);
+      const added = newMemberIds.size;
+      setTeam((prev) => (prev ? { ...prev, members: rows, memberCount: rows.length } : prev));
+      closeAddPanel();
+      notify(`Added ${added} member${added === 1 ? "" : "s"}.`);
+    } catch (err) {
+      setAddMembersError(err instanceof Error ? err.message : "Failed to add members.");
+    } finally {
+      setAddingMembers(false);
     }
   }
 
@@ -231,6 +336,7 @@ export default function TeamDetailPage() {
           </h1>
           <div className="sub">
             Team lead: {team.teamLead ? team.teamLead.name : "Not assigned"}
+            {" · Project manager: "}{team.projectManager ? team.projectManager.name : "Not assigned"}
             {team.region ? ` · Region: ${team.region}` : ""} · Created{" "}
             {new Date(team.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })} ·{" "}
             {team.memberPreviews.length} members
@@ -238,7 +344,21 @@ export default function TeamDetailPage() {
         </div>
         <div className="actions">
           <Link className="btn btn-ghost" href="/org/teams"><Icon name="chevron-left" size={14} /> Back</Link>
-          <Link className="btn btn-ghost" href={`/org/teams/onboard?team=${team.id}`}><Icon name="plus" size={15} /> Add member</Link>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setTabIndex(0);
+              setAddPanelOpen(true);
+            }}
+          >
+            <Icon name="users" size={15} /> Add existing member
+          </button>
+          {/* Onboarding entry point hidden as of the Team↔Project pivot —
+              "Add existing member" above covers the common case. Commented
+              out, not deleted; /org/teams/onboard still works directly.
+          <Link className="btn btn-ghost" href={`/org/teams/onboard?team=${team.id}`}><Icon name="plus" size={15} /> Onboard new member</Link>
+          */}
           <Link className="btn btn-primary" href={`/org/teams/${team.id}/edit`}>
             <Icon name="edit" size={14} /> Edit team
           </Link>
@@ -309,7 +429,11 @@ export default function TeamDetailPage() {
                               </div>
                             </td>
                             <td>
-                              <span className={`badge ${ROLE_BADGE_CLASS[m.role]}`}>
+                              {/* Org role (real access) and team role (seniority label
+                                  on this team) are two separate things — show both
+                                  rather than one standing in for the other. */}
+                              <div>{m.orgRole?.name ?? "No org role"}</div>
+                              <span className={`badge ${ROLE_BADGE_CLASS[m.role]}`} style={{ marginTop: 3, display: "inline-block" }}>
                                 {TEAM_MEMBER_ROLE_LABEL[m.role]}
                               </span>
                             </td>
@@ -334,9 +458,54 @@ export default function TeamDetailPage() {
                     </tbody>
                   </table>
                 </div>
-                <div style={{ marginTop: 14 }}>
-                  <Link className="btn btn-soft btn-sm" href={`/org/teams/onboard?team=${team.id}`}>＋ Add / onboard member</Link>
+                <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" className="btn btn-soft btn-sm" onClick={() => setAddPanelOpen((v) => !v)}>
+                    {addPanelOpen ? "✕ Close" : "＋ Add existing member"}
+                  </button>
+                  {/* Onboarding entry point hidden — commented out, not
+                      deleted; /org/teams/onboard still works directly.
+                  <Link className="btn btn-ghost btn-sm" href={`/org/teams/onboard?team=${team.id}`}>
+                    Onboard a brand-new member
+                  </Link>
+                  */}
                 </div>
+
+                {addPanelOpen ? (
+                  <div className="card" style={{ marginTop: 14, background: "var(--surface-2)", boxShadow: "none" }}>
+                    <div className="card-b">
+                      <div className="field" style={{ marginBottom: 10 }}>
+                        <label>Pick existing org users to add</label>
+                        <MemberPicker
+                          users={addableUsers}
+                          usersLoading={allUsersLoading}
+                          usersError={allUsersError}
+                          selected={newMemberIds}
+                          onToggle={toggleNewMember}
+                          currentTeamName={team.name}
+                          singleTeamMembership={singleTeamMembership}
+                        />
+                      </div>
+                      {addMembersError ? (
+                        <div className="hint" style={{ color: "var(--rose)", marginBottom: 10 }}>{addMembersError}</div>
+                      ) : null}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          disabled={newMemberIds.size === 0 || addingMembers}
+                          onClick={addExistingMembers}
+                        >
+                          {addingMembers
+                            ? "Adding…"
+                            : `Add ${newMemberIds.size} member${newMemberIds.size === 1 ? "" : "s"}`}
+                        </button>
+                        <button type="button" className="btn btn-ghost btn-sm" disabled={addingMembers} onClick={closeAddPanel}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -361,6 +530,7 @@ export default function TeamDetailPage() {
                 <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".4px", margin: "18px 0 6px" }}>
                   Project access
                 </div>
+                <div className="hint" style={{ marginBottom: 10 }}>Toggle access to update it immediately.</div>
                 {projectsError ? (
                   <div className="hint" style={{ color: "var(--rose)" }}>
                     Couldn&apos;t load projects — {projectsError}
@@ -370,16 +540,57 @@ export default function TeamDetailPage() {
                 ) : projects.length === 0 ? (
                   <div className="hint">No projects yet — create one in Projects first.</div>
                 ) : (
-                  projects.map((p) => (
-                    <SwitchRow
-                      key={p.id}
-                      title={p.name}
-                      checked={selectedProjectIds.has(p.id)}
-                      onToggle={() => toggleProject(p.id)}
-                    />
-                  ))
+                  <div className="tbl-wrap">
+                    <table className="tbl">
+                      <thead><tr><th>Project</th><th>Status</th><th>Location</th><th>Price range</th><th>Units</th><th>Access</th></tr></thead>
+                      <tbody>
+                        {projects.map((p) => (
+                          <tr key={p.id}>
+                            <td><Link href={`/org/projects/${p.id}`} className="brand-link">{p.name}</Link></td>
+                            <td><span className={`badge ${p.status === "active" ? "b-green" : "b-gray"}`}>{p.status === "active" ? "Active" : "Inactive"}</span></td>
+                            <td>{p.location ?? "—"}</td>
+                            <td>{formatMoneyRange(p.priceMin, p.priceMax, p.currency)}</td>
+                            <td>{p.unitCount} unit{p.unitCount === 1 ? "" : "s"} · {p.unitTypeCount} type{p.unitTypeCount === 1 ? "" : "s"}</td>
+                            <td><div className={`switch ${selectedProjectIds.has(p.id) ? "on" : ""}`} role="switch" aria-checked={selectedProjectIds.has(p.id)} tabIndex={0} onClick={() => toggleProject(p.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleProject(p.id); }} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
-
+                <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".4px", margin: "18px 0 6px" }}>
+                  Unit access
+                </div>
+                <div className="hint" style={{ marginBottom: 10 }}>
+                  Standalone units only — a unit that belongs to a project follows that project&apos;s access instead.
+                </div>
+                {unitsError ? (
+                  <div className="hint" style={{ color: "var(--rose)" }}>
+                    Couldn&apos;t load units — {unitsError}
+                  </div>
+                ) : unitsLoading ? (
+                  <div className="hint">Loading units…</div>
+                ) : units.length === 0 ? (
+                  <div className="hint">No standalone units yet — create one in All Units first.</div>
+                ) : (
+                  <div className="tbl-wrap">
+                    <table className="tbl">
+                      <thead><tr><th>Unit</th><th>Status</th><th>Configuration</th><th>Carpet</th><th>Price</th><th>Access</th></tr></thead>
+                      <tbody>
+                        {units.map((u) => (
+                          <tr key={u.id}>
+                            <td><Link href={`/org/units/${u.id}`} className="brand-link mono">{u.unitNo}</Link></td>
+                            <td><span className={`badge ${u.status === "available" ? "b-green" : "b-gray"}`}>{u.status}</span></td>
+                            <td>{u.configuration ?? "—"}</td>
+                            <td>{u.carpetSqft != null ? `${u.carpetSqft.toLocaleString("en-IN")} sqft` : "—"}</td>
+                            <td>{formatMoney(u.price, "INR")}</td>
+                            <td><div className={`switch ${selectedUnitIds.has(u.id) ? "on" : ""}`} role="switch" aria-checked={selectedUnitIds.has(u.id)} tabIndex={0} onClick={() => toggleUnit(u.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") toggleUnit(u.id); }} /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
                 <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".4px", margin: "18px 0 6px" }}>
                   Lead routing
                 </div>
@@ -392,12 +603,6 @@ export default function TeamDetailPage() {
                   checked={autoAssign}
                   onToggle={setAutoAssign}
                 />
-
-                <div style={{ marginTop: 14 }}>
-                  <button type="button" className="btn btn-primary btn-sm" disabled={savingAccess} onClick={saveProjectAccess}>
-                    {savingAccess ? "Saving…" : "Save project access"}
-                  </button>
-                </div>
               </div>
             ) : null}
 
@@ -439,11 +644,46 @@ export default function TeamDetailPage() {
 
           <Reveal delay={4}>
             <div className="card">
+              <div className="card-h"><span className="t">Project manager</span></div>
+              <div className="card-b" style={{ textAlign: "center" }}>
+                {team.projectManager ? (
+                  <>
+                    <span className="av" style={{ width: 56, height: 56, fontSize: 18, borderRadius: 16, margin: "0 auto 8px", display: "inline-flex" }}>
+                      {initialsFor(team.projectManager.name)}
+                    </span>
+                    <div style={{ fontWeight: 700 }}>{team.projectManager.name}</div>
+                    <div className="muted" style={{ fontSize: 12.5 }}>{team.projectManager.email}</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="muted" style={{ marginBottom: 10 }}>No project manager assigned</div>
+                    <Link className="btn btn-ghost btn-sm" href={`/org/teams/${team.id}/edit`}>Assign a manager</Link>
+                  </>
+                )}
+              </div>
+            </div>
+          </Reveal>
+
+          <Reveal delay={4}>
+            <div className="card">
               <div className="card-h"><span className="t">Quick actions</span></div>
               <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                <Link className="btn btn-primary btn-block" href={`/org/teams/onboard?team=${team.id}`}>
-                  <Icon name="users" size={14} /> Onboard member
+                <button
+                  type="button"
+                  className="btn btn-primary btn-block"
+                  onClick={() => {
+                    setTabIndex(0);
+                    setAddPanelOpen(true);
+                  }}
+                >
+                  <Icon name="users" size={14} /> Add existing member
+                </button>
+                {/* Onboarding entry point hidden — commented out, not
+                    deleted; /org/teams/onboard still works directly.
+                <Link className="btn btn-soft btn-block" href={`/org/teams/onboard?team=${team.id}`}>
+                  <Icon name="plus" size={14} /> Onboard a brand-new member
                 </Link>
+                */}
                 <Link className="btn btn-soft btn-block" href={`/org/team-chat?team=${team.id}`}>
                   <Icon name="mail" size={14} /> Open team chat
                 </Link>

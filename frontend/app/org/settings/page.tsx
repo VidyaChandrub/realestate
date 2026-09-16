@@ -639,6 +639,81 @@ function PricingBasisCard() {
   );
 }
 
+/**
+ * Org Settings → Scoring & Assignment. A real, wired setting (unlike the
+ * decorative Toggle rows elsewhere in this section) — governs whether
+ * OrgTeamsService.setMembers rejects adding someone already on another team.
+ */
+function TeamExclusivityCard() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState(false);
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    apiFetch<SafeOrganisation>("/org/settings")
+      .then((o) => setEnabled(o.single_team_membership))
+      .catch((e) => setErr(e instanceof Error ? e.message : "Failed to load this setting."));
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  async function toggle() {
+    if (enabled === null || saving) return;
+    const next = !enabled;
+    const previous = enabled;
+    setEnabled(next);
+    setSaving(true);
+    setErr(null);
+    setSavedAt(false);
+    try {
+      await apiFetch("/org/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ singleTeamMembership: next }),
+      });
+      setSavedAt(true);
+    } catch (e) {
+      setEnabled(previous);
+      setErr(e instanceof Error ? e.message : "Couldn't change this setting.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card
+      icon="team"
+      title="Team exclusivity"
+      sub="Whether a member can belong to more than one team at once"
+    >
+      {err ? <div className="form-alert">{err}</div> : null}
+      {enabled === null ? (
+        <p className="muted" style={{ margin: 0 }}>Loading…</p>
+      ) : (
+        <>
+          <div className="swrow" style={{ borderBottom: 0 }}>
+            <div className="tx">
+              <b>One team per member</b>
+              <div className="muted">
+                When on, adding someone who&apos;s already on a different team is blocked until they&apos;re removed from it.
+              </div>
+            </div>
+            <div
+              className={`switch${enabled ? " on" : ""}`}
+              onClick={() => void toggle()}
+              style={{ cursor: saving ? "wait" : "pointer" }}
+            />
+          </div>
+          <div className="hint" style={{ marginTop: 10 }}>
+            Applies when adding members on Create/Edit team.
+            {savedAt ? <b> Saved.</b> : null}
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 function CatalogSection({
   groups = CATALOG_GROUPS,
   heading,
@@ -1441,6 +1516,7 @@ export default function OrgSettingsPage() {
               <div className="swrow"><div className="tx"><b>Skip offline agents</b><div className="muted">Only assign to agents who are online.</div></div><Toggle on /></div>
               <div className="swrow" style={{ borderBottom: 0 }}><div className="tx"><b>Cap leads per agent/day</b></div><input className="inp" style={{ width: 80 }} defaultValue="25" /></div>
             </Card>
+            <TeamExclusivityCard />
           </div>
 
           {/* AUTOMATION */}

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch } from "@/lib/api";
-import type { OrgUser, OrgUsersListResponse, ProjectListRow, ProjectsListResponse, Team } from "@/lib/types";
+import { apiFetch, getOrgUnits } from "@/lib/api";
+import type { OrgUnitRow, OrgUser, OrgUsersListResponse, ProjectListRow, ProjectsListResponse, SafeOrganisation, Team } from "@/lib/types";
 
 /** Org users, fetched from the real `/org/users` endpoint — Teams has no
  *  user data of its own, so pickers (team lead, members, reports-to) use
@@ -43,6 +43,64 @@ export function useOrgUsersList() {
   return { users, loading, error };
 }
 
+/** Org users holding the `manager` role — the candidate list for any
+ *  "Project manager" picker (Team's new projectManagerId field here; the
+ *  project wizard/edit pages use the same `/org/users?role=manager` query
+ *  inline today — not touched by this hook, which only serves Teams). The
+ *  role filter is UI convenience only; the actual role requirement is
+ *  enforced server-side. */
+export function useOrgManagersList() {
+  const { accessToken } = useAuth();
+  const [managers, setManagers] = useState<OrgUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    let mounted = true;
+    apiFetch<OrgUsersListResponse>("/org/users?role=manager&limit=100&status=active", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((res) => {
+        if (mounted) {
+          setManagers(res.data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          setError(err instanceof Error ? err.message : "Failed to load managers.");
+          setLoading(false);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [accessToken]);
+
+  return { managers, loading, error };
+}
+
+/** Org Settings → Teams "one team per member". Governs whether a member
+ *  picker (Create team, or Team detail's "add existing members") blocks
+ *  picking someone already on a different team — the "Already in…" badge
+ *  itself is shown regardless of this setting. */
+export function useSingleTeamMembership() {
+  const { accessToken } = useAuth();
+  const [singleTeamMembership, setSingleTeamMembership] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    apiFetch<SafeOrganisation>("/org/settings", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((o) => setSingleTeamMembership(o.single_team_membership))
+      .catch(() => {});
+  }, [accessToken]);
+
+  return singleTeamMembership;
+}
+
 /** The org's real projects — used for Project/template access pickers.
  *  Grants themselves are mocked (no Team backend), but the project list
  *  itself is not. */
@@ -76,6 +134,53 @@ export function useOrgProjectsList() {
   }, [accessToken]);
 
   return { projects, loading, error };
+}
+
+/** The org's standalone units (Unit.projectId is null) — the candidate list
+ *  for a Team's unit-access picker. A project-bound unit is never offered
+ *  here: it inherits its team via the project's own TeamProject assignment
+ *  (see TeamUnit's schema comment) instead of a second, possibly-conflicting
+ *  direct link. */
+export function useOrgStandaloneUnitsList() {
+  const { accessToken } = useAuth();
+  const [units, setUnits] = useState<OrgUnitRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    let mounted = true;
+    getOrgUnits({ standalone: true, limit: 100 })
+      .then((res) => {
+        if (mounted) {
+          setUnits(res.data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (mounted) {
+          setError(err instanceof Error ? err.message : "Failed to load units.");
+          setLoading(false);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [accessToken]);
+
+  return { units, loading, error };
+}
+
+// Org admins and super admins already have full org-wide access — team
+// membership would grant them nothing, so they're never eligible to be
+// added as a team member (Managers remain eligible: a manager can
+// legitimately be on a team, and Team Leader is chosen from members).
+// Enforced server-side too (see OrgTeamsService.setMembers) — this is UI
+// convenience, not the source of truth.
+const INELIGIBLE_MEMBER_ROLE_KEYS = new Set(['admin', 'super_admin']);
+
+export function isEligibleTeamMember(u: OrgUser): boolean {
+  return !u.role || !INELIGIBLE_MEMBER_ROLE_KEYS.has(u.role.key);
 }
 
 export function displayName(u: OrgUser): string {
@@ -210,12 +315,18 @@ export function TeamsSubNav({
         >
           Team Chat
         </Link>
+        {/* Onboarding tab hidden as of the Team↔Project pivot — "Add
+            existing member" on a team's own page covers the common case.
+            Commented out, not deleted; /org/teams/onboard still works
+            directly, including its own TeamsSubNav render with
+            active="onboarding" (which now shows no tab highlighted).
         <Link
           href="/org/teams/onboard"
           className={active === "onboarding" ? "active" : ""}
         >
           Onboarding
         </Link>
+        */}
       </div>
     </Reveal>
   );
@@ -412,6 +523,13 @@ export function RowActionItem({
 export interface ChipOption {
   id: string;
   label: string;
+  /** Muted secondary text shown right after the label (e.g. an org role name) —
+   *  informational only, distinct from `badge` below which flags a conflict. */
+  subLabel?: string;
+  /** Small secondary label shown next to this option (e.g. "Already in Sales West"). */
+  badge?: string;
+  /** Blocks selecting this option (an already-selected one can still be toggled off). */
+  disabled?: boolean;
 }
 
 /** Generic chip multi/single-select — mirrors the org catalog's
@@ -457,17 +575,90 @@ export function ToggleChips({
     <div className="opts" data-single={single || undefined}>
       {options.map((o) => {
         const on = selected.has(o.id);
+        const blocked = !on && o.disabled;
         return (
           <span
             key={o.id}
             className={`opt ${single ? "rad " : ""}${on ? "on" : ""}`}
-            onClick={() => onToggle(o.id)}
+            onClick={() => {
+              if (blocked) return;
+              onToggle(o.id);
+            }}
+            style={blocked ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
+            title={blocked ? "Already on another team — remove them from it first." : undefined}
           >
             <span className="b">{on ? (single ? "●" : "✓") : ""}</span>
             {o.label}
+            {o.subLabel ? (
+              <span className="muted" style={{ marginLeft: 6, fontSize: 11 }}>
+                {o.subLabel}
+              </span>
+            ) : null}
+            {o.badge ? (
+              <span
+                className="badge b-amber"
+                style={{ marginLeft: 6, fontSize: 10.5, verticalAlign: 1 }}
+              >
+                {o.badge}
+              </span>
+            ) : null}
           </span>
         );
       })}
     </div>
+  );
+}
+
+/** The one existing-org-user member picker — org users as chips, with the
+ *  "Already in {team}" badge and (when the org's single-team-membership
+ *  setting is on) disabled-until-removed for anyone on a *different* team.
+ *  Used by Create team and by Team detail's "Add existing members" panel —
+ *  don't build a second version of this list; extend this one. */
+export function MemberPicker({
+  users,
+  usersLoading,
+  usersError,
+  selected,
+  onToggle,
+  currentTeamName,
+  singleTeamMembership,
+}: {
+  users: OrgUser[];
+  usersLoading: boolean;
+  usersError: string | null;
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  /** This team's own name — excluded from a member's badge/disabled state
+   *  so "already on this team" (which is fine) never reads as a conflict. */
+  currentTeamName?: string;
+  singleTeamMembership: boolean;
+}) {
+  const options = useMemo(
+    () =>
+      users
+        .filter((u) => u.role?.key !== "admin" && u.role?.key !== "super_admin")
+        .map((u) => {
+        const otherTeams = currentTeamName ? u.teams.filter((t) => t !== currentTeamName) : u.teams;
+        return {
+          id: u.id,
+          label: displayName(u),
+          subLabel: u.role?.name ?? "No role",
+          badge: otherTeams.length > 0 ? `Already in ${otherTeams.join(", ")}` : undefined,
+          disabled: singleTeamMembership && otherTeams.length > 0,
+        };
+        }),
+    [users, currentTeamName, singleTeamMembership],
+  );
+
+  return (
+    <ToggleChips
+      options={options}
+      selected={selected}
+      onToggle={onToggle}
+      loading={usersLoading}
+      error={usersError}
+      loadingLabel="Loading org users…"
+      emptyLabel="No org users yet — add users in Users first."
+    />
   );
 }

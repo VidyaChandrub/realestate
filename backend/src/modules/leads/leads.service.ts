@@ -17,7 +17,10 @@ import {
   actorLeadOrClauses,
   canSeeAllLeads,
 } from '../../common/utils/lead-scope.util';
-import { listLeadAssignableUsers } from '../../common/utils/lead-assignee.util';
+import {
+  listLeadAssignableUsers,
+  listTeamScopedLeadAssignees,
+} from '../../common/utils/lead-assignee.util';
 
 /** Sentinel org id for Super Admin template captures (Lead.orgId has no FK). */
 export const PLATFORM_LEAD_ORG_ID = 'platform';
@@ -991,6 +994,12 @@ export class LeadsService {
    */
   async listAssignableUsers(orgId: string) {
     const data = await listLeadAssignableUsers(this.prisma, orgId);
+    return { data, total: data.length };
+  }
+
+  /** Team-scoped variant for the lead edit page only — see listTeamScopedLeadAssignees. */
+  async listTeamScopedAssignableUsers(orgId: string, projectId?: string) {
+    const data = await listTeamScopedLeadAssignees(this.prisma, orgId, projectId ?? null);
     return { data, total: data.length };
   }
 

@@ -117,3 +117,37 @@ export async function listLeadAssignableUsers(
         : null,
     }));
 }
+
+type TeamScopedAssigneePrisma = LeadAssigneePrisma &
+  Pick<PrismaService, 'teamProject' | 'teamMember'>;
+
+// A separate, narrower picker for the lead edit page's "Owner / agent"
+// dropdown only — NOT used by the project Sales Agent picker, and does not
+// touch listLeadAssignableUsers. Starts from the same eligible-for-CRM list,
+// then narrows it to members of whichever team(s) are assigned to the
+// lead's project.
+//
+// Fallback when the project has no team assigned (or the lead has no
+// project): returns the full org-wide eligible list rather than an empty
+// one, so assignment is never blocked for leads outside a team's scope.
+export async function listTeamScopedLeadAssignees(
+  prisma: TeamScopedAssigneePrisma,
+  orgId: string,
+  projectId: string | null | undefined,
+): Promise<LeadAssignableUser[]> {
+  const all = await listLeadAssignableUsers(prisma, orgId);
+  if (!projectId) return all;
+
+  const teamProjects = await prisma.teamProject.findMany({
+    where: { projectId, team: { orgId, status: 'active' } },
+    select: { teamId: true },
+  });
+  if (teamProjects.length === 0) return all;
+
+  const members = await prisma.teamMember.findMany({
+    where: { teamId: { in: teamProjects.map((tp) => tp.teamId) } },
+    select: { userId: true },
+  });
+  const memberIds = new Set(members.map((m) => m.userId));
+  return all.filter((u) => memberIds.has(u.id));
+}

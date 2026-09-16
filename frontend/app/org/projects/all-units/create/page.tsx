@@ -593,6 +593,11 @@ export default function UnitCreatePage() {
               </div>
             </div>
 
+            {/* Team & access — HIDDEN as of the Team↔Project pivot. Manager
+                and Sales Agent assignment for a standalone unit now live on
+                the Team (see the Teams module / OrgTeamsService). Commented
+                out, not deleted — Unit.managerId and UnitSalesAgent keep
+                working and keep their data; this is UI hiding only.
             {standalone ? (
               <div className="sec">
                 <div className="lbl"><Icon name="users" size={15} /> Team &amp; access</div>
@@ -643,6 +648,7 @@ export default function UnitCreatePage() {
                 </div>
               </div>
             ) : null}
+            */}
 
             <div className="sec">
               <div className="lbl"><Icon name="document" size={15} /> Media &amp; documents</div>

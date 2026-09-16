@@ -400,7 +400,7 @@ export async function listOrgUsers(
       where,
       include: {
         userRoles: { include: { role: true } },
-        teamMembers: true,
+        teamMembers: { include: { team: { select: { name: true } } } },
       },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
@@ -423,10 +423,8 @@ export async function listOrgUsers(
       approvedAt: user.approvedAt,
       createdAt: user.createdAt,
       mustChangePassword: user.mustChangePassword,
-      // Teams have no creation/membership UI yet, so this is always false in
-      // practice today — computed for real (not hardcoded) so it needs no
-      // reshaping once team membership ships.
       hasTeam: user.teamMembers.length > 0,
+      teams: user.teamMembers.map((tm) => tm.team.name),
     })),
     total,
     page,
@@ -443,7 +441,7 @@ export async function getOrgUserById(
     where: { id, orgId },
     include: {
       userRoles: { include: { role: true } },
-      teamMembers: true,
+      teamMembers: { include: { team: { select: { name: true } } } },
     },
   });
   if (!user) {
@@ -456,6 +454,7 @@ export async function getOrgUserById(
       ? { key: user.userRoles[0].role.key, name: user.userRoles[0].role.name }
       : null,
     hasTeam: user.teamMembers.length > 0,
+    teams: user.teamMembers.map((tm) => tm.team.name),
   };
 }
 

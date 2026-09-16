@@ -6,11 +6,18 @@ export class CreateTeamDto {
   @MaxLength(200)
   name: string;
 
-  // FK to an org user (verified server-side to belong to the caller's org,
-  // same rule as Project.managerId).
+  // Rejected server-side if present: a team lead must already be a member
+  // (see OrgTeamsService.create/assertTeamLeadIsMember), and a team being
+  // created has no members yet. Set it via update() after adding members.
   @IsOptional()
   @IsUUID()
   teamLeadId?: string;
+
+  // FK to an org user who must hold the `manager` role — verified
+  // server-side in OrgTeamsService, same rule Project.managerId enforces.
+  @IsOptional()
+  @IsUUID()
+  projectManagerId?: string;
 
   @IsOptional()
   @IsString()

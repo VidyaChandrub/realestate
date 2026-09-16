@@ -21,10 +21,19 @@ export class UpdateTeamDto {
   status?: TeamStatus;
 
   // Explicit null clears the lead; omit the field to leave it untouched.
+  // Must already be a TeamMember on this team — verified server-side in
+  // OrgTeamsService.assertTeamLeadIsMember.
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
   @IsUUID()
   teamLeadId?: string | null;
+
+  // Explicit null clears the project manager; omit to leave untouched. Must
+  // hold the `manager` role — verified server-side in OrgTeamsService.
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  projectManagerId?: string | null;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)

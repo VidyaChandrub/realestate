@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -23,6 +22,10 @@ import {
   assertLimit,
   countOrgProjects,
 } from '../../common/utils/plan-quota.util';
+import {
+  actorAccessibleProjectIds,
+  actorAccessibleUnitIds,
+} from '../../common/utils/team-scope.util';
 
 // Columns a PATCH may set on a Project, and the coercion each needs. Keeps
 // update() free of a 12-branch if-ladder while still only touching the keys
@@ -88,9 +91,15 @@ type UnitRow = Prisma.UnitGetPayload<{ include: typeof UNIT_INCLUDE }>;
 // The manager relation is expanded on every project response so the client
 // never needs a second round-trip just to show a name — same approach as
 // OrgLandingPages including `sourceTemplate: { select: { id, name } }`.
+// `teams` is the reverse of TeamProject (Team↔Project pivot) — a project can
+// in principle be claimed by more than one team (nothing enforces
+// exclusivity there yet), so this is a list, not a single value.
 const PROJECT_INCLUDE = {
   manager: {
     select: { id: true, firstName: true, lastName: true, email: true },
+  },
+  teams: {
+    select: { team: { select: { id: true, name: true } } },
   },
 } satisfies Prisma.ProjectInclude;
 
@@ -238,13 +247,12 @@ export class ProjectsService {
       andConditions.push({ name: { contains: query.search, mode: 'insensitive' } });
     }
 
+    // Team↔Project pivot: visibility flows through team membership (see
+    // team-scope.util.ts), not Project.managerId / ProjectSalesAgent —
+    // those no longer grant access on their own.
     if (actor && !actor.roles?.includes('admin') && !actor.roles?.includes('super_admin')) {
-      andConditions.push({
-        OR: [
-          { managerId: actor.sub },
-          { salesAgents: { some: { userId: actor.sub } } },
-        ],
-      });
+      const projectIds = await actorAccessibleProjectIds(this.prisma, orgId, actor.sub);
+      andConditions.push({ id: { in: projectIds } });
     }
 
     const where: Prisma.ProjectWhereInput = andConditions.length > 1 ? { AND: andConditions } : andConditions[0]!;
@@ -257,7 +265,7 @@ export class ProjectsService {
         take: limit,
         include: {
           ...PROJECT_INCLUDE,
-          _count: { select: { unitTypes: true } },
+          _count: { select: { unitTypes: true, units: true } },
         },
       }),
       this.prisma.project.count({ where }),
@@ -266,6 +274,7 @@ export class ProjectsService {
     const data = rows.map((row) => ({
       ...this.serializeProject(row),
       unitTypeCount: row._count.unitTypes,
+      unitCount: row._count.units,
     }));
 
     return { data, total, page, limit };
@@ -1117,24 +1126,28 @@ export class ProjectsService {
       where.unitNo = { contains: query.search, mode: 'insensitive' };
     }
 
-    // Non-admin members only see units they have access to: a project-bound
-    // unit if they manage that project or are one of its assigned sales
-    // agents, or a standalone unit they were directly assigned to as manager
-    // or sales agent. Mirrors ProjectsService.list's own-project scoping —
-    // without this, "All Units" leaked every project's inventory to whoever
-    // could open the page.
+    // Non-admin members only see units they have access to via a team: a
+    // project-bound unit if its project is reachable through one of their
+    // teams, or a standalone unit directly assigned to one of their teams
+    // (TeamUnit) — see team-scope.util.ts. Project.managerId /
+    // ProjectSalesAgent / Unit.managerId / UnitSalesAgent no longer grant
+    // access on their own. Mirrors ProjectsService.list's scoping — without
+    // this, "All Units" leaked every project's inventory to whoever could
+    // open the page.
     if (
       actor &&
       !actor.roles?.includes('admin') &&
       !actor.roles?.includes('super_admin')
     ) {
+      const [projectIds, unitIds] = await Promise.all([
+        actorAccessibleProjectIds(this.prisma, orgId, actor.sub),
+        actorAccessibleUnitIds(this.prisma, orgId, actor.sub),
+      ]);
       where.AND = [
         {
           OR: [
-            { project: { managerId: actor.sub } },
-            { project: { salesAgents: { some: { userId: actor.sub } } } },
-            { projectId: null, managerId: actor.sub },
-            { projectId: null, salesAgents: { some: { userId: actor.sub } } },
+            { projectId: { in: projectIds } },
+            { id: { in: unitIds } },
           ],
         },
       ];
@@ -1148,7 +1161,18 @@ export class ProjectsService {
         take: limit,
         include: {
           ...UNIT_INCLUDE,
-          project: { select: { id: true, name: true, currency: true } },
+          project: {
+            select: {
+              id: true,
+              name: true,
+              currency: true,
+              teams: { select: { team: { select: { id: true, name: true } } } },
+            },
+          },
+          // Only ever populated for a standalone unit (projectId null) — a
+          // project-bound unit's team comes from `project.teams` above
+          // instead (see TeamUnit's schema comment).
+          teams: { select: { team: { select: { id: true, name: true } } } },
         },
       }),
       this.prisma.unit.count({ where }),
@@ -1189,6 +1213,13 @@ export class ProjectsService {
       project: u.project
         ? { id: u.project.id, name: u.project.name, currency: u.project.currency }
         : null,
+      // A project-bound unit's team comes from its project's assignment; a
+      // standalone unit's comes from its own direct TeamUnit link. Plural —
+      // nothing enforces one team per project/unit yet (see PROJECT_INCLUDE).
+      teams: (u.project ? u.project.teams : u.teams).map((t) => ({
+        id: t.team.id,
+        name: t.team.name,
+      })),
     }));
 
     return { data, total, page, limit, counts };
@@ -1207,14 +1238,14 @@ export class ProjectsService {
     });
     if (!project) throw new NotFoundException('Project not found');
 
+    // Team↔Project pivot: same team-scope rule as list() — see
+    // team-scope.util.ts. A project outside the actor's teams 404s exactly
+    // like a non-existent id (never leaks that it exists via a 403), same
+    // pattern as LeadsService.assertCanAccessLead.
     if (actor && !actor.roles?.includes('admin') && !actor.roles?.includes('super_admin')) {
-      const isManager = project.managerId === actor.sub;
-      const isSales = await this.prisma.projectSalesAgent.findFirst({
-        where: { projectId: id, userId: actor.sub },
-        select: { userId: true },
-      });
-      if (!isManager && !isSales) {
-        throw new ForbiddenException('You do not have access to this project');
+      const projectIds = await actorAccessibleProjectIds(this.prisma, orgId, actor.sub);
+      if (!projectIds.includes(id)) {
+        throw new NotFoundException('Project not found');
       }
     }
 
@@ -1463,6 +1494,9 @@ export class ProjectsService {
             name: managerName,
           }
         : null,
+      // Expanded the same way as manager — every team currently claiming
+      // this project (see the PROJECT_INCLUDE comment on why it's plural).
+      teams: project.teams.map((t) => ({ id: t.team.id, name: t.team.name })),
       status: project.status,
       priceMin: project.priceMin,
       priceMax: project.priceMax,
