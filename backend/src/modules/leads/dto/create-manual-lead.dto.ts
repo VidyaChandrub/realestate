@@ -7,6 +7,10 @@ export class CreateManualLeadDto {
 
   @IsOptional()
   @IsUUID()
+  unitId?: string;
+
+  @IsOptional()
+  @IsUUID()
   assignedToId?: string;
 
   @IsOptional()

@@ -612,6 +612,7 @@ export async function submitLead(input: LeadSubmission): Promise<void> {
 
 export async function createCrmLead(input: {
   projectId?: string;
+  unitId?: string;
   assignedToId?: string;
   formName?: string;
   source?: string;

@@ -205,7 +205,17 @@ export class LeadsService {
   }
 
   async createFromCrm(orgId: string, actor: JwtPayload, dto: CreateManualLeadDto) {
-    const data = normalizeLeadData(dto.data ?? {});
+    let unitId: string | undefined;
+    if (dto.unitId) {
+      const unit = await this.prisma.unit.findFirst({
+        where: { id: dto.unitId, orgId, projectId: null },
+        select: { id: true },
+      });
+      if (!unit) throw new NotFoundException('Standalone unit not found');
+      unitId = unit.id;
+    }
+
+    const data = normalizeLeadData(dto.data ?? {}, { unitId });
     const contact = leadContactFromData(data);
     if (!contact.fullName && !contact.phone && !contact.email) {
       throw new BadRequestException('Enter a name, phone, or email for the lead');
