@@ -75,6 +75,7 @@ export function toSafeOrganisation(organisation: Organisation) {
     custom_domain: organisation.customDomain,
     custom_domain_status: organisation.customDomainStatus,
     rejection_reason: organisation.rejectionReason,
+    single_team_membership: organisation.singleTeamMembership,
   };
 }
 
@@ -113,6 +114,7 @@ export function buildOrganisationUpdateData(
   dto: Partial<Record<(typeof ORGANISATION_EDITABLE_FIELDS)[number], string>> & {
     industry?: OrgIndustry;
     unitPriceBasis?: UnitPriceBasis;
+    singleTeamMembership?: boolean;
   },
 ): Prisma.OrganisationUpdateInput {
   const data: Prisma.OrganisationUpdateInput = {};
@@ -126,6 +128,9 @@ export function buildOrganisationUpdateData(
   }
   if (dto.unitPriceBasis !== undefined) {
     data.unitPriceBasis = dto.unitPriceBasis;
+  }
+  if (dto.singleTeamMembership !== undefined) {
+    data.singleTeamMembership = dto.singleTeamMembership;
   }
   return data;
 }

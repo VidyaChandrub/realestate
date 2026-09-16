@@ -97,6 +97,7 @@ import type {
   SetTeamMembersInput,
   TeamMemberRow,
   TeamProjectRow,
+  TeamUnitRow,
   CreateOrgUserInput,
   OrgUser,
   TeamChatOverview,
@@ -690,6 +691,15 @@ export async function updateCrmLeadNextAction(
 
 export async function getCrmAssignableUsers(): Promise<CrmAssignableResponse> {
   return apiFetch<CrmAssignableResponse>("/org/leads/assignable");
+}
+
+/** Team-scoped variant for the lead edit page's Owner / agent dropdown only —
+ *  narrowed to members of the team(s) assigned to the lead's project. */
+export async function getCrmAssignableUsersForProject(
+  projectId: string | null,
+): Promise<CrmAssignableResponse> {
+  const qs = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
+  return apiFetch<CrmAssignableResponse>(`/org/leads/assignable-for-project${qs}`);
 }
 
 export async function assignCrmLead(
@@ -1447,6 +1457,16 @@ export function setTeamProjects(
   return apiFetch<TeamProjectRow[]>(`/org/teams/${id}/projects`, {
     method: "PUT",
     body: JSON.stringify({ projectIds }),
+  });
+}
+
+export function setTeamUnits(
+  id: string,
+  unitIds: string[],
+): Promise<TeamUnitRow[]> {
+  return apiFetch<TeamUnitRow[]>(`/org/teams/${id}/units`, {
+    method: "PUT",
+    body: JSON.stringify({ unitIds }),
   });
 }
 

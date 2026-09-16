@@ -161,6 +161,11 @@ model Organisation {
   // only for now, no enforcement reads this yet (see prompt: out of scope).
   enabledModules String[] @default([]) @map("enabled_modules")
 
+  // Org Settings → Teams. When on, a user already on a TeamMember row for
+  // one team is rejected from being added to a different team (see
+  // OrgTeamsService.setMembers) until removed from their current team.
+  singleTeamMembership Boolean @default(false) @map("single_team_membership")
+
   // The organisation's own site identity, chosen at registration and/or later
   // from the Org Settings → Domain screen. subdomain is the organisation's
   // primary platform address (e.g. skylinedev.ipixxel.ae) and is auto-activated
@@ -255,7 +260,8 @@ model User {
   auditLogs       AuditLog[]
   managedProjects Project[]
   salesProjects   ProjectSalesAgent[]
-  ledTeams        Team[]
+  ledTeams        Team[]                 @relation("TeamLead")
+  managedTeams    Team[]                 @relation("TeamProjectManager")
   assignedLeads   Lead[]
   callLogs        CallLog[]
   activityEvents  ActivityEvent[]
@@ -390,21 +396,30 @@ model Team {
   // same rule as Project.managerId). Null = no lead assigned; SetNull so
   // deleting the lead's user account never deletes the team.
   teamLeadId   String?    @map("team_lead_id")
+  // FK to an org user who must hold the `manager` role (verified
+  // server-side — see OrgTeamsService.assertProjectManager — same rule
+  // Project.managerId enforces, unlike teamLeadId above which accepts any
+  // org user). Null = no project manager assigned; SetNull for the same
+  // reason as teamLeadId.
+  projectManagerId String? @map("project_manager_id")
   region       String?
   workingHours String?    @map("working_hours")
   description  String?    @default("")
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  organisation Organisation       @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  teamLead     User?              @relation(fields: [teamLeadId], references: [id], onDelete: SetNull)
-  members      TeamMember[]
-  moduleAccess TeamModuleAccess[]
-  projects     TeamProject[]
-  channels     TeamChannel[]
+  organisation   Organisation       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  teamLead       User?              @relation("TeamLead", fields: [teamLeadId], references: [id], onDelete: SetNull)
+  projectManager User?              @relation("TeamProjectManager", fields: [projectManagerId], references: [id], onDelete: SetNull)
+  members        TeamMember[]
+  moduleAccess   TeamModuleAccess[]
+  projects       TeamProject[]
+  units          TeamUnit[]
+  channels       TeamChannel[]
 
   @@index([orgId])
   @@index([teamLeadId])
+  @@index([projectManagerId])
   @@map("teams")
   @@schema("access")
 }
@@ -453,6 +468,26 @@ model TeamProject {
   @@id([teamId, projectId])
   @@index([projectId])
   @@map("team_projects")
+  @@schema("access")
+}
+
+// A team's assigned STANDALONE units (Unit.projectId is null) — same plain
+// many-to-many, replace-wholesale-on-write shape as TeamProject, one level
+// down. A project-bound unit is never linked here: it inherits its team via
+// the project's own TeamProject assignment, so there's exactly one path to
+// "which team owns this unit," never two that could disagree. Enforced
+// server-side in OrgTeamsService.setUnits, not just by the picker.
+model TeamUnit {
+  teamId     String   @map("team_id")
+  unitId     String   @map("unit_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, unitId])
+  @@index([unitId])
+  @@map("team_units")
   @@schema("access")
 }
 
@@ -1395,6 +1430,10 @@ model Project {
   possession        String?
   // FK to the org user who runs this project. Nullable — a project can be
   // unassigned. ON DELETE SET NULL: removing the user leaves the project.
+  // Team↔Project pivot: no longer grants visibility (see team-scope.util.ts)
+  // — kept for the (currently hidden, reversible) Project-module UI and any
+  // other reader of this field. Only Team.projectManagerId / TeamMember /
+  // Team.teamLeadId govern who can see a project or its leads now.
   managerId         String?       @map("manager_id")
   status            ProjectStatus @default(active)
   priceMin          Int?          @map("price_min") // rupees
@@ -1487,6 +1526,10 @@ model Project {
 // Sales users assigned to work a project's leads (Step 7 of the wizard).
 // Plain many-to-many, same shape as OrganisationTemplate: composite id, both
 // sides cascade-delete. Links straight to User — no team concept here.
+// Team↔Project pivot: no longer grants visibility (see team-scope.util.ts)
+// — kept for the (currently hidden, reversible) Project-module UI and any
+// other reader of this table. TeamProject via team membership governs who
+// can see a project's leads now.
 model ProjectSalesAgent {
   projectId  String   @map("project_id")
   userId     String   @map("user_id")
@@ -1604,6 +1647,7 @@ model Unit {
   createdBy    User?            @relation("UnitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy    User?            @relation("UnitUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   salesAgents  UnitSalesAgent[]
+  teams        TeamUnit[]
 
   @@index([orgId])
   @@index([projectId])

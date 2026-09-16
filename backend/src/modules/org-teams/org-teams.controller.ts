@@ -19,6 +19,7 @@ import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { SetTeamMembersDto } from './dto/set-team-members.dto';
 import { SetTeamProjectsDto } from './dto/set-team-projects.dto';
+import { SetTeamUnitsDto } from './dto/set-team-units.dto';
 
 // Deliberately guarded by OrgAdminGuard only — NOT PermissionGuard /
 // @RequirePermission. Teams has no dependency on the org-wide RBAC module
@@ -85,5 +86,19 @@ export class OrgTeamsController {
     @Body() dto: SetTeamProjectsDto,
   ) {
     return this.service.setProjects(user.orgId as string, id, dto.projectIds);
+  }
+
+  @Get(':id/units')
+  listUnits(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.service.listUnits(user.orgId as string, id);
+  }
+
+  @Put(':id/units')
+  setUnits(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: SetTeamUnitsDto,
+  ) {
+    return this.service.setUnits(user.orgId as string, id, dto.unitIds);
   }
 }

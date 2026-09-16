@@ -54,9 +54,14 @@ export default function OrgTeamsPage() {
           </div>
         </div>
         <div className="actions">
+          {/* Onboarding entry point hidden as of the Team↔Project pivot —
+              add an existing user to a team from the team's own page
+              instead. Commented out, not deleted; /org/teams/onboard still
+              works if linked to directly.
           <Link className="btn btn-ghost" href="/org/teams/onboard">
             <Icon name="users" size={15} /> Onboard member
           </Link>
+          */}
           <Link className="btn btn-primary" href="/org/teams/create">
             <Icon name="plus" size={15} /> Create team
           </Link>
@@ -160,6 +165,9 @@ export default function OrgTeamsPage() {
                     >
                       Open team
                     </Link>
+                    {/* Onboarding entry point hidden — use "Add existing
+                        member" on the team's own page instead. Commented
+                        out, not deleted.
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
@@ -170,6 +178,7 @@ export default function OrgTeamsPage() {
                     >
                       Add member
                     </button>
+                    */}
                   </div>
                 </div>
               </div>

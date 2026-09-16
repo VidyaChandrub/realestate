@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../../database/prisma.service';
+import { resolveActorTeamScope } from './team-scope.util';
 
 // NOTE: this is a hard-coded role-key check. A custom role that an org grants
 // org-wide lead access to will NOT be recognised here — it only matches the
@@ -22,83 +23,80 @@ function landingPageIdOf(
 /**
  * The OR clauses that define which leads a non-admin user may see.
  *
- * Two tiers of project-derived visibility:
- *   - Projects the user MANAGES (`project.managerId`)  → every lead on the
- *     project, assigned or not.
- *   - Projects the user is a SALES AGENT on (`project_sales_agents`) → only
- *     leads with NO individual assignee. An explicit `assignedToId` on a lead
- *     overrides project-level visibility, so once a lead is assigned to someone
- *     else the project's other agents no longer see it.
+ * Visibility now flows through team membership (see team-scope.util.ts),
+ * not the legacy `Project.managerId` / `ProjectSalesAgent` links directly —
+ * those no longer grant access on their own (see the comments on those
+ * fields in schema.prisma). Two tiers, same shape as before:
+ *   - ELEVATED (the actor is the project's team's Team Leader or Project
+ *     Manager) → every lead on the project, assigned or not.
+ *   - RESTRICTED (a plain team member) → only leads with NO individual
+ *     assignee. An explicit `assignedToId` on a lead overrides project-level
+ *     visibility, so once a lead is assigned to someone else the project's
+ *     other team members no longer see it.
  *
  * Plus the user's own directly-assigned leads, always.
  *
  * Nothing is materialised onto `Lead.assignedToId` — adding or removing a
- * project agent takes effect immediately across that project's unassigned
+ * team's project takes effect immediately across that project's unassigned
  * leads because visibility is resolved here at query time.
  */
 export async function actorLeadOrClauses(
-  prisma: Pick<PrismaService, 'project' | 'projectSalesAgent'>,
+  prisma: Pick<PrismaService, 'project' | 'teamMember' | 'team' | 'teamProject' | 'teamUnit'>,
   orgId: string,
   actorId: string,
 ): Promise<Prisma.LeadWhereInput[]> {
-  const [managed, salesLinks] = await Promise.all([
-    prisma.project.findMany({
-      where: { orgId, managerId: actorId },
-      select: { id: true, name: true, marketing: true },
-    }),
-    prisma.projectSalesAgent.findMany({
-      where: { userId: actorId, project: { orgId } },
-      select: {
-        projectId: true,
-        project: { select: { name: true, marketing: true } },
-      },
-    }),
-  ]);
+  const scope = await resolveActorTeamScope(prisma, orgId, actorId);
 
-  const managedProjectIds = managed.map((p) => p.id);
-  const managedLandingPageIds = managed
-    .map((p) => landingPageIdOf(p.marketing))
-    .filter((id): id is string => id !== null);
-  const managedProjectNames = managed
-    .map((p) => p.name)
-    .filter((n): n is string => typeof n === 'string' && n.length > 0);
-
-  const salesProjectIds = salesLinks.map((l) => l.projectId);
-  const salesLandingPageIds = salesLinks
-    .map((l) => landingPageIdOf(l.project?.marketing))
-    .filter((id): id is string => id !== null);
-  const salesProjectNames = salesLinks
-    .map((l) => l.project?.name)
-    .filter((n): n is string => typeof n === 'string' && n.length > 0);
+  const allProjectIds = [...scope.elevatedProjectIds, ...scope.restrictedProjectIds];
+  const projects = allProjectIds.length
+    ? await prisma.project.findMany({
+        where: { id: { in: allProjectIds }, orgId },
+        select: { id: true, name: true, marketing: true },
+      })
+    : [];
+  const projectById = new Map(projects.map((p) => [p.id, p]));
 
   const orClauses: Prisma.LeadWhereInput[] = [{ assignedToId: actorId }];
 
-  // Managed projects — everything.
-  if (managedProjectIds.length > 0) {
-    orClauses.push({ projectId: { in: managedProjectIds } });
-  }
-  if (managedLandingPageIds.length > 0) {
-    orClauses.push({ landingPageId: { in: managedLandingPageIds } });
-  }
-  for (const name of managedProjectNames) {
-    orClauses.push({ data: { path: ['project'], equals: name } });
+  // Elevated (Team Leader / Project Manager) — everything.
+  if (scope.elevatedProjectIds.length > 0) {
+    orClauses.push({ projectId: { in: scope.elevatedProjectIds } });
+    const landingPageIds = scope.elevatedProjectIds
+      .map((id) => landingPageIdOf(projectById.get(id)?.marketing))
+      .filter((id): id is string => id !== null);
+    if (landingPageIds.length > 0) {
+      orClauses.push({ landingPageId: { in: landingPageIds } });
+    }
+    for (const id of scope.elevatedProjectIds) {
+      const name = projectById.get(id)?.name;
+      if (name) orClauses.push({ data: { path: ['project'], equals: name } });
+    }
   }
 
-  // Sales-agent projects — only leads with no individual assignee.
-  if (salesProjectIds.length > 0) {
-    orClauses.push({ assignedToId: null, projectId: { in: salesProjectIds } });
-  }
-  if (salesLandingPageIds.length > 0) {
+  // Restricted (plain team member) — only leads with no individual assignee.
+  if (scope.restrictedProjectIds.length > 0) {
     orClauses.push({
       assignedToId: null,
-      landingPageId: { in: salesLandingPageIds },
+      projectId: { in: scope.restrictedProjectIds },
     });
-  }
-  for (const name of salesProjectNames) {
-    orClauses.push({
-      assignedToId: null,
-      data: { path: ['project'], equals: name },
-    });
+    const landingPageIds = scope.restrictedProjectIds
+      .map((id) => landingPageIdOf(projectById.get(id)?.marketing))
+      .filter((id): id is string => id !== null);
+    if (landingPageIds.length > 0) {
+      orClauses.push({
+        assignedToId: null,
+        landingPageId: { in: landingPageIds },
+      });
+    }
+    for (const id of scope.restrictedProjectIds) {
+      const name = projectById.get(id)?.name;
+      if (name) {
+        orClauses.push({
+          assignedToId: null,
+          data: { path: ['project'], equals: name },
+        });
+      }
+    }
   }
 
   return orClauses;

@@ -23,6 +23,10 @@ describe('LeadsService', () => {
     template: { findUnique: jest.Mock };
     project: { findMany: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     projectSalesAgent: { findMany: jest.Mock; findFirst: jest.Mock };
+    teamMember: { findMany: jest.Mock };
+    team: { findMany: jest.Mock };
+    teamProject: { findMany: jest.Mock };
+    teamUnit: { findMany: jest.Mock };
     user: { findFirst: jest.Mock; findMany: jest.Mock };
     roleModulePermission: { findMany: jest.Mock };
     userModulePermission: { findMany: jest.Mock };
@@ -51,6 +55,10 @@ describe('LeadsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
       },
+      teamMember: { findMany: jest.fn().mockResolvedValue([]) },
+      team: { findMany: jest.fn().mockResolvedValue([]) },
+      teamProject: { findMany: jest.fn().mockResolvedValue([]) },
+      teamUnit: { findMany: jest.fn().mockResolvedValue([]) },
       user: { findFirst: jest.fn(), findMany: jest.fn() },
       roleModulePermission: { findMany: jest.fn().mockResolvedValue([]) },
       userModulePermission: { findMany: jest.fn().mockResolvedValue([]) },
@@ -113,25 +121,36 @@ describe('LeadsService', () => {
       );
     });
 
-    it('sales user sees leads on projects they are assigned to', async () => {
+    it('sales user sees leads on projects their team is assigned to', async () => {
       prisma.lead.findMany.mockResolvedValue([]);
       prisma.lead.count.mockResolvedValue(0);
+      // Team↔Project pivot: visibility now comes from team membership, not
+      // ProjectSalesAgent — see team-scope.util.ts. sales-9 is a plain
+      // member (not team lead / project manager) of team-1, which has
+      // proj-5 assigned.
+      prisma.teamMember.findMany.mockResolvedValue([{ teamId: 'team-1' }]);
+      prisma.team.findMany.mockImplementation(({ where }: any) => {
+        if (where.projectManagerId) return Promise.resolve([]);
+        return Promise.resolve([{ id: 'team-1', teamLeadId: null, projectManagerId: null }]);
+      });
+      prisma.teamProject.findMany.mockResolvedValue([{ projectId: 'proj-5' }]);
+      prisma.teamUnit.findMany.mockResolvedValue([]);
       prisma.project.findMany.mockResolvedValue([]);
-      prisma.projectSalesAgent.findMany.mockResolvedValue([{ projectId: 'proj-5' }]);
 
       await service.list('org-1', actor({ roles: ['sales'], sub: 'sales-9' }));
 
-      expect(prisma.projectSalesAgent.findMany).toHaveBeenCalledWith(
+      expect(prisma.teamProject.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId: 'sales-9', project: { orgId: 'org-1' } },
+          where: { teamId: { in: ['team-1'] } },
         }),
       );
 
       const call = prisma.lead.findMany.mock.calls[0][0];
       const andClauses = call.where.AND;
       const orClause = andClauses.find((c: any) => Array.isArray(c.OR));
-      // Project-agent visibility is scoped to leads with no individual
-      // assignee — an explicit lead assignment overrides it.
+      // Restricted-tier (plain team member) visibility is scoped to leads
+      // with no individual assignee — an explicit lead assignment
+      // overrides it.
       expect(orClause.OR).toEqual([
         { assignedToId: 'sales-9' },
         { assignedToId: null, projectId: { in: ['proj-5'] } },

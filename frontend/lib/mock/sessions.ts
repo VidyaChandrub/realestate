@@ -33,6 +33,7 @@ export const DEMO_ORGANISATION = {
   subdomain_status: "active",
   custom_domain: null,
   custom_domain_status: "none",
+  single_team_membership: false,
 };
 
 export interface MockAccount {

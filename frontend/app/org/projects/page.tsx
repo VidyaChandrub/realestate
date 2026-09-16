@@ -20,7 +20,7 @@ const STATUS_FOR_TAB: (ProjectStatus | undefined)[] = [
   "inactive",
 ];
 
-function managerInitials(name: string | null | undefined): string {
+function nameInitials(name: string | null | undefined): string {
   if (!name) return "—";
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "—";
@@ -28,6 +28,12 @@ function managerInitials(name: string | null | undefined): string {
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+/** Team-name display for a project — plural since nothing enforces one team
+ *  per project yet (see backend PROJECT_INCLUDE); joined when more than one. */
+function teamNameOf(p: { teams: { id: string; name: string }[] }): string | null {
+  return p.teams.length > 0 ? p.teams.map((t) => t.name).join(", ") : null;
 }
 
 const COVER_GRADIENTS = [
@@ -266,7 +272,7 @@ export default function OrgProjectsPage() {
                     <div className="pmeta">
                       <div><span className="k">Starting</span><b>{formatMoney(p.priceMin, p.currency)}</b></div>
                       <div><span className="k">Unit types</span><b>{p.unitTypeCount}</b></div>
-                      <div><span className="k">Manager</span>                      <b><span className="u"><span className="av xs">{managerInitials(p.manager?.name)}</span></span></b></div>
+                      <div><span className="k">Team</span><b><span className="u"><span className="av xs">{nameInitials(teamNameOf(p))}</span></span></b></div>
                     </div>
                     <div className="row gap-8">
                       <span className="btn btn-soft btn-sm">Open</span>
@@ -289,7 +295,7 @@ export default function OrgProjectsPage() {
                 <thead>
                   <tr>
                     <th>Project</th>
-                    <th>Manager</th>
+                    <th>Team</th>
                     <th>Status</th>
                     <th>Price range</th>
                     <th>Unit types</th>
@@ -310,8 +316,8 @@ export default function OrgProjectsPage() {
                         </td>
                         <td>
                           <div className="u">
-                            <span className="av">{managerInitials(p.manager?.name)}</span>
-                            <span className="nm">{p.manager?.name ?? "Unassigned"}</span>
+                            <span className="av">{nameInitials(teamNameOf(p))}</span>
+                            <span className="nm">{teamNameOf(p) ?? "Unassigned"}</span>
                           </div>
                         </td>
                         <td>

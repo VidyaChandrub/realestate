@@ -69,6 +69,22 @@ export class LeadsController {
     return this.service.listAssignableUsers(user.orgId as string);
   }
 
+  /**
+   * Team-scoped variant of the above, for the lead edit page's Owner / agent
+   * dropdown only — narrowed to members of the team(s) assigned to the given
+   * project. Falls back to the full org-wide list when the project has no
+   * team assigned (or no projectId is given). Must be before :id.
+   */
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('crm', 'edit')
+  @Get('assignable-for-project')
+  listTeamScopedAssignableUsers(
+    @CurrentUser() user: JwtPayload,
+    @Query('projectId') projectId?: string,
+  ) {
+    return this.service.listTeamScopedAssignableUsers(user.orgId as string, projectId);
+  }
+
   @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
   @RequirePermission('crm', 'view')
   @Get(':id')

@@ -274,15 +274,19 @@ export default function StandaloneUnitPage() {
     },
     { k: "Location / address", v: unit.addressLine ?? "—" },
     { k: "Owner / seller", v: unit.ownerName ?? "—" },
-    { k: "Manager", v: unit.manager?.name ?? "Unassigned" },
-    {
-      k: "Assigned agents",
-      v:
-        unit.salesAgentIds
-          .map((id) => salesAgentCandidates.find((c) => c.id === id)?.name)
-          .filter((n): n is string => Boolean(n))
-          .join(", ") || "None",
-    },
+    // Manager / Assigned agents rows hidden as of the Team↔Project pivot —
+    // that assignment now lives on the Team, not the unit (see the Teams
+    // module / OrgTeamsService). Commented out, not deleted; Unit.managerId
+    // and UnitSalesAgent keep working and keep their data.
+    // { k: "Manager", v: unit.manager?.name ?? "Unassigned" },
+    // {
+    //   k: "Assigned agents",
+    //   v:
+    //     unit.salesAgentIds
+    //       .map((id) => salesAgentCandidates.find((c) => c.id === id)?.name)
+    //       .filter((n): n is string => Boolean(n))
+    //       .join(", ") || "None",
+    // },
     {
       k: "Created by",
       v: unit.createdBy
@@ -489,6 +493,11 @@ export default function StandaloneUnitPage() {
               </div>
             </div>
 
+            {/* Team & access — HIDDEN as of the Team↔Project pivot. Manager
+                and Sales Agent assignment now live on the Team (see the
+                Teams module / OrgTeamsService). Commented out, not deleted
+                — Unit.managerId and UnitSalesAgent keep working and keep
+                their data; this is UI hiding only.
             <div className="sec">
               <div className="lbl">👤 Team &amp; access</div>
               <div className="grid g2">
@@ -539,6 +548,7 @@ export default function StandaloneUnitPage() {
                 </div>
               </div>
             </div>
+            */}
 
             <div className="sec">
               <div className="lbl">🖼️ Media &amp; documents</div>

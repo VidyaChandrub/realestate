@@ -22,6 +22,15 @@ import type { TeamMemberRoleValue } from "@/lib/types";
 // only ever hold an acceptable value.
 const PHONE_NUMBER_REGEX = /^\+?\d{1,15}$/;
 
+// De-emphasised as of the Team↔Project pivot — adding an existing user to a
+// team now has a real path ("Add existing member" on the team's own page),
+// so this "always create a brand-new user" flow is hidden rather than
+// removed. Flip back to true (and restore the nav/entry-point links
+// commented out alongside this — see team-fields.tsx's TeamsSubNav, and the
+// Teams list/detail pages) to fully reinstate it; the rest of this file's
+// logic is untouched.
+const ONBOARDING_ENABLED = false;
+
 function sanitizePhone(raw: string): string {
   const hasPlus = raw.trimStart().startsWith("+");
   const digits = raw.replace(/\D/g, "").slice(0, 15);
@@ -140,6 +149,29 @@ export default function OnboardMemberPage() {
       setSubmitError(err instanceof Error ? err.message : "Failed to add member.");
       setSubmitting(false);
     }
+  }
+
+  if (!ONBOARDING_ENABLED) {
+    return (
+      <>
+        <div className="page-head reveal in">
+          <div>
+            <div className="eyebrow"><Icon name="users" size={14} /> Onboarding</div>
+            <h1>Onboarding is temporarily unavailable</h1>
+            <div className="sub">
+              To add someone who already has an account, open a team&apos;s page and use &quot;Add existing
+              member&quot;. To create a brand-new account, use Users instead.
+            </div>
+          </div>
+          <div className="actions">
+            <Link className="btn btn-primary" href="/org/teams">
+              <Icon name="chevron-left" size={14} /> Back to Teams
+            </Link>
+          </div>
+        </div>
+        <TeamsSubNav active="onboarding" />
+      </>
+    );
   }
 
   return (

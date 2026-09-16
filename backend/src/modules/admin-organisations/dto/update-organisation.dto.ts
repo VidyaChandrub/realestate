@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsNotEmpty,
@@ -125,4 +126,10 @@ export class UpdateOrganisationDto {
   @IsString()
   @MaxLength(30)
   supportPhone?: string;
+
+  // Org Settings → Teams: when true, a member can only belong to one team
+  // at a time (enforced in OrgTeamsService.setMembers).
+  @IsOptional()
+  @IsBoolean()
+  singleTeamMembership?: boolean;
 }
