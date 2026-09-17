@@ -7,27 +7,18 @@ import type {
   ApiErrorBody,
   AssignLeadInput,
   AuthTokens,
-  BusinessDetailsInput,
-  BusinessDetailsStepResponse,
   ChangePasswordInput,
   ChangePlanInput,
   ChangePlanResult,
   BillingRenewResult,
-  CompleteOnboardingResult,
   CreateOrgCatalogOptionInput,
   CrmAssignee,
   CrmAssignableResponse,
   CrmLead,
   CrmLeadListResponse,
-  InviteStepInput,
-  InviteStepResponse,
-  SeatUsage,
   InvoiceRow,
   LeadSubmission,
-  LogoUploadUrlInput,
   LogoUploadUrlResult,
-  ModulesStepInput,
-  ModulesStepResponse,
   NotificationsListResponse,
   OrgNotificationsListResponse,
   CreateSupportTicketInput,
@@ -56,7 +47,6 @@ import type {
   ProjectSalesAgent,
   OnboardingAccountInput,
   OnboardingOrganisationInput,
-  OnboardingStepResult,
   OrgDomainInfo,
   OrganisationStepResponse,
   Plan,
@@ -70,10 +60,6 @@ import type {
   SalesAgentsListResponse,
   SignupStep1Response,
   SubdomainAvailability,
-  SubscriptionStepInput,
-  SubscriptionStepResponse,
-  TemplatesStepInput,
-  TemplatesStepResponse,
   UnreadNotificationsResponse,
   UpdateOrgCatalogOptionInput,
   UserProfile,
@@ -381,63 +367,68 @@ export async function createOrganisationStep(
   });
 }
 
-export async function saveBusinessDetailsStep(
-  input: BusinessDetailsInput,
-): Promise<BusinessDetailsStepResponse> {
-  return apiFetch<BusinessDetailsStepResponse>("/onboarding/business-details", {
-    method: "PATCH",
-    body: JSON.stringify(input),
-  });
-}
-
-export async function getLogoUploadUrl(
-  input: LogoUploadUrlInput,
-): Promise<LogoUploadUrlResult> {
-  return apiFetch<LogoUploadUrlResult>("/onboarding/logo-upload-url", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
-export async function saveSubscriptionStep(
-  input: SubscriptionStepInput,
-): Promise<SubscriptionStepResponse> {
-  return apiFetch<SubscriptionStepResponse>("/onboarding/subscription", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
-export async function saveTemplatesStep(
-  input: TemplatesStepInput,
-): Promise<TemplatesStepResponse> {
-  return apiFetch<TemplatesStepResponse>("/onboarding/templates", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
-export async function saveModulesStep(
-  input: ModulesStepInput,
-): Promise<ModulesStepResponse> {
-  return apiFetch<ModulesStepResponse>("/onboarding/modules", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
-export async function saveInviteStep(
-  input: InviteStepInput,
-): Promise<InviteStepResponse> {
-  return apiFetch<InviteStepResponse>("/onboarding/invite", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
-export async function getOnboardingSeats(): Promise<SeatUsage> {
-  return apiFetch<SeatUsage>("/onboarding/seats");
-}
+// The wrappers below (Business Details, Subscription, Templates, Modules,
+// Invite, seats) called the 6 wizard-step routes removed by the onboarding
+// simplification — commented out alongside the backend controller and the
+// frontend panes that called them. See onboarding.controller.ts for why.
+//
+// export async function saveBusinessDetailsStep(
+//   input: BusinessDetailsInput,
+// ): Promise<BusinessDetailsStepResponse> {
+//   return apiFetch<BusinessDetailsStepResponse>("/onboarding/business-details", {
+//     method: "PATCH",
+//     body: JSON.stringify(input),
+//   });
+// }
+//
+// export async function getLogoUploadUrl(
+//   input: LogoUploadUrlInput,
+// ): Promise<LogoUploadUrlResult> {
+//   return apiFetch<LogoUploadUrlResult>("/onboarding/logo-upload-url", {
+//     method: "POST",
+//     body: JSON.stringify(input),
+//   });
+// }
+//
+// export async function saveSubscriptionStep(
+//   input: SubscriptionStepInput,
+// ): Promise<SubscriptionStepResponse> {
+//   return apiFetch<SubscriptionStepResponse>("/onboarding/subscription", {
+//     method: "POST",
+//     body: JSON.stringify(input),
+//   });
+// }
+//
+// export async function saveTemplatesStep(
+//   input: TemplatesStepInput,
+// ): Promise<TemplatesStepResponse> {
+//   return apiFetch<TemplatesStepResponse>("/onboarding/templates", {
+//     method: "POST",
+//     body: JSON.stringify(input),
+//   });
+// }
+//
+// export async function saveModulesStep(
+//   input: ModulesStepInput,
+// ): Promise<ModulesStepResponse> {
+//   return apiFetch<ModulesStepResponse>("/onboarding/modules", {
+//     method: "POST",
+//     body: JSON.stringify(input),
+//   });
+// }
+//
+// export async function saveInviteStep(
+//   input: InviteStepInput,
+// ): Promise<InviteStepResponse> {
+//   return apiFetch<InviteStepResponse>("/onboarding/invite", {
+//     method: "POST",
+//     body: JSON.stringify(input),
+//   });
+// }
+//
+// export async function getOnboardingSeats(): Promise<SeatUsage> {
+//   return apiFetch<SeatUsage>("/onboarding/seats");
+// }
 
 export async function verifyEmail(
   email: string,
@@ -458,11 +449,13 @@ export async function resendVerification(
   });
 }
 
-export async function completeOnboardingStep(): Promise<CompleteOnboardingResult> {
-  return apiFetch<CompleteOnboardingResult>("/onboarding/complete", {
-    method: "POST",
-  });
-}
+// export async function completeOnboardingStep(): Promise<CompleteOnboardingResult> {
+//   return apiFetch<CompleteOnboardingResult>("/onboarding/complete", {
+//     method: "POST",
+//   });
+// }
+// Onboarding now completes atomically inside createOrganisationStep — see
+// AuthService.createOrganisationStep.
 
 export async function getInvoices(): Promise<InvoiceRow[]> {
   return apiFetch<InvoiceRow[]>("/org/billing/invoices");

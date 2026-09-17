@@ -20,10 +20,12 @@ import { ResolveDraftDto } from './dto/resolve-draft.dto';
 import { RestartDraftDto } from './dto/restart-draft.dto';
 import { PreviewDraftDto } from './dto/preview-draft.dto';
 import { JwtPayload } from '../../common/types/jwt-payload.interface';
+import { nextOnboardingStep } from '../../common/utils/onboarding.util';
 import {
-  nextOnboardingStep,
-  furthestOnboardingStep,
-} from '../../common/utils/onboarding.util';
+  assignBasicPlanIfMissing,
+  finalizeLegacyOnboardingDraft,
+  isLegacyOnboardingStep,
+} from '../../common/utils/onboarding-finalize.util';
 import {
   generateNumericCode,
   generateRandomToken,
@@ -498,6 +500,13 @@ export class AuthService {
     if (!user) {
       throw new NotFoundException('No signup in progress for this email');
     }
+    // Legacy draft parked on a step the simplified wizard removed — finish
+    // it up and fall through to the "already finished" branch below rather
+    // than resuming into a wizard step the frontend no longer renders.
+    if (user.orgId && isLegacyOnboardingStep(user.onboardingStep)) {
+      await finalizeLegacyOnboardingDraft(this.prisma, user.orgId, user.id);
+      user.onboardingStep = 'completed';
+    }
     if (user.onboardingStep === 'completed') {
       throw new ConflictException(
         'This account has already finished setup — please sign in instead.',
@@ -527,6 +536,10 @@ export class AuthService {
     if (!user) {
       throw new NotFoundException('No signup in progress for this account');
     }
+    if (user.orgId && isLegacyOnboardingStep(user.onboardingStep)) {
+      await finalizeLegacyOnboardingDraft(this.prisma, user.orgId, user.id);
+      user.onboardingStep = 'completed';
+    }
     if (user.onboardingStep === 'completed') {
       throw new ConflictException(
         'This account has already finished setup — please sign in instead.',
@@ -551,6 +564,10 @@ export class AuthService {
     });
     if (!existingUser) {
       throw new NotFoundException('No signup in progress for this account');
+    }
+    if (existingUser.orgId && isLegacyOnboardingStep(existingUser.onboardingStep)) {
+      await finalizeLegacyOnboardingDraft(this.prisma, existingUser.orgId, existingUser.id);
+      existingUser.onboardingStep = 'completed';
     }
     if (existingUser.onboardingStep === 'completed') {
       throw new ConflictException(
@@ -681,11 +698,14 @@ export class AuthService {
     };
   }
 
-  // Step 2 (Organisation). JwtAuthGuard only — no org exists yet on first
-  // call, so OrgAdminGuard can't be used. Creates the Organisation, sets
-  // User.orgId, assigns the creating user the admin role (replicating what
-  // the old atomic signup() did at creation time, just moved here), then
-  // reissues the JWT so it carries the real orgId from this point on.
+  // Step 2 (Organisation) — now the FINAL step of the simplified 2-step
+  // wizard. JwtAuthGuard only — no org exists yet on first call, so
+  // OrgAdminGuard can't be used. Creates the Organisation, sets User.orgId,
+  // assigns the creating user the admin role, assigns the seeded Basic plan,
+  // activates the organisation immediately (no Super Admin approval gate —
+  // see OrgApprovedGuard/finalizeLegacyOnboardingDraft), marks onboarding
+  // completed, then reissues the JWT so it carries the real orgId. The user
+  // can log straight into the dashboard from here.
   //
   // Idempotent-ish: if the caller's user already has an orgId (a resumed
   // or repeated Step 2 submit), this updates that same organisation in
@@ -703,28 +723,16 @@ export class AuthService {
     }
 
     if (user.orgId) {
-      return this.updateOrganisationStep(user.id, user.orgId, user.onboardingStep, dto);
+      return this.updateOrganisationStep(user.id, user.orgId, dto);
     }
 
     const slug = await generateUniqueOrgSlug(this.prisma, dto.company_name);
 
-    // Every organisation gets a unique platform subdomain as its default login
-    // URL. A user-typed subdomain stays pending for Super Admin approval; an
-    // auto-generated one (from the org slug) is active immediately.
-    let subdomain: string | null = null;
-    let subdomainAuto = false;
-    if (dto.subdomain) {
-      if (!isValidSubdomain(dto.subdomain)) {
-        throw new ConflictException(
-          'Subdomain is invalid. Use 2-63 lowercase letters, digits or hyphens (e.g. skylinedev).',
-        );
-      }
-      subdomain = normalizeSubdomain(dto.subdomain);
-      await this.assertSubdomainAvailable(subdomain);
-    } else {
-      subdomain = await this.uniqueSubdomain(slug);
-      subdomainAuto = true;
-    }
+    // Every organisation gets a unique, auto-generated platform subdomain as
+    // its default login URL — the wizard no longer offers a custom one (see
+    // OnboardingOrganisationDto), so this is always the auto path, active
+    // immediately (no Super Admin approval needed for it).
+    const subdomain = await this.uniqueSubdomain(slug);
 
     let customDomain: string | null = null;
     if (dto.custom_domain) {
@@ -744,12 +752,12 @@ export class AuthService {
         data: {
           name: dto.company_name,
           slug,
-          // 'draft', not 'pending': the wizard has 6 steps left after this
-          // one, and nothing here is actually ready for Super Admin review
-          // yet. Flips to 'pending' — with the "awaiting approval" audit
-          // log/notification — once OnboardingService.complete() runs, see
-          // there for why.
-          status: 'draft',
+          // Active immediately — the approval gate is gone, and this is the
+          // wizard's last step. (Still 'draft'/'pending' for the old atomic
+          // signup() fallback, which OrgApprovedGuard/finalizeLegacyOnboardingDraft
+          // still know how to self-heal if that path is ever hit.)
+          status: 'active',
+          city: dto.city ?? null,
           industry: dto.industry ?? null,
           teamSize: dto.teamSize ?? null,
           country: dto.country ?? null,
@@ -757,7 +765,7 @@ export class AuthService {
           timezone: dto.timezone ?? 'Asia/Kolkata',
           subdomain,
           customDomain,
-          subdomainStatus: subdomainAuto ? 'active' : 'pending',
+          subdomainStatus: 'active',
           customDomainStatus: customDomain ? 'pending' : 'none',
         },
       });
@@ -766,19 +774,17 @@ export class AuthService {
         data: { userId: user.id, roleId: adminRole.id },
       });
 
-      if (subdomain) {
-        await tx.orgDomainRequest.create({
-          data: {
-            orgId: organisation.id,
-            kind: 'subdomain',
-            subdomain,
-            status: subdomainAuto ? 'approved' : 'pending',
-            requestedBy: user.id,
-            reviewedAt: subdomainAuto ? new Date() : undefined,
-            reviewedBy: subdomainAuto ? user.id : undefined,
-          },
-        });
-      }
+      await tx.orgDomainRequest.create({
+        data: {
+          orgId: organisation.id,
+          kind: 'subdomain',
+          subdomain,
+          status: 'approved',
+          requestedBy: user.id,
+          reviewedAt: new Date(),
+          reviewedBy: user.id,
+        },
+      });
       if (customDomain) {
         await tx.orgDomainRequest.create({
           data: {
@@ -791,11 +797,14 @@ export class AuthService {
         });
       }
 
+      await assignBasicPlanIfMissing(tx, organisation.id);
+
       const updatedUser = await tx.user.update({
         where: { id: user.id },
         data: {
           orgId: organisation.id,
-          onboardingStep: furthestOnboardingStep(user.onboardingStep, 'organisation'),
+          onboardingStep: 'completed',
+          termsAcceptedAt: new Date(),
         },
       });
 
@@ -813,47 +822,35 @@ export class AuthService {
     };
   }
 
-  // Re-submit path for Step 2 — the org already exists for this user.
-  // Updates the same row (name / country / currency / timezone always;
-  // subdomain only if actually sent and different, re-validated for
-  // availability against everyone except itself).
+  // Re-submit path for Step 2 — the org already exists for this user (a
+  // resume, or a repeat submit). Updates the same row (name / city /
+  // country / currency / timezone always) and finalizes onboarding again —
+  // harmless if already completed, and self-heals a legacy draft that
+  // reached this step under the old multi-step flow. Subdomain is never
+  // taken from the request (see OnboardingOrganisationDto) — only
+  // auto-assigned here if the org somehow still doesn't have one.
   private async updateOrganisationStep(
     userId: string,
     orgId: string,
-    currentStep: OnboardingStep,
     dto: OnboardingOrganisationDto,
   ) {
     const current = await this.prisma.organisation.findUniqueOrThrow({
       where: { id: orgId },
     });
 
-    let subdomainUpdate: { subdomain: string | null; subdomainStatus: string; auto?: boolean } | null = null;
-    if (dto.subdomain !== undefined) {
-      if (dto.subdomain) {
-        if (!isValidSubdomain(dto.subdomain)) {
-          throw new ConflictException(
-            'Subdomain is invalid. Use 2-63 lowercase letters, digits or hyphens (e.g. skylinedev).',
-          );
-        }
-        const normalized = normalizeSubdomain(dto.subdomain);
-        if (normalized !== current.subdomain) {
-          await this.assertSubdomainAvailable(normalized);
-        }
-        subdomainUpdate = { subdomain: normalized, subdomainStatus: 'pending' };
-      } else {
-        subdomainUpdate = { subdomain: null, subdomainStatus: 'none' };
-      }
-    } else if (!current.subdomain) {
+    let subdomainUpdate: { subdomain: string; subdomainStatus: string } | null = null;
+    if (!current.subdomain) {
       // Auto-assign a unique subdomain the first time (resumed/organisation
       // step with no subdomain yet) — it becomes the org's default login URL.
       const auto = await this.uniqueSubdomain(current.slug, orgId);
-      subdomainUpdate = { subdomain: auto, subdomainStatus: 'active', auto: true };
+      subdomainUpdate = { subdomain: auto, subdomainStatus: 'active' };
     }
 
     const organisation = await this.prisma.organisation.update({
       where: { id: orgId },
       data: {
         name: dto.company_name,
+        city: dto.city ?? current.city,
         industry: dto.industry ?? current.industry,
         teamSize: dto.teamSize ?? current.teamSize,
         country: dto.country ?? current.country,
@@ -865,14 +862,14 @@ export class AuthService {
 
     if (subdomainUpdate?.subdomain) {
       const pendingSub = await this.prisma.orgDomainRequest.findFirst({
-        where: { orgId, kind: 'subdomain', status: 'pending' },
+        where: { orgId, kind: 'subdomain', status: { in: ['pending', 'approved'] } },
       });
       if (pendingSub) {
         await this.prisma.orgDomainRequest.update({
           where: { id: pendingSub.id },
-          data: { subdomain: subdomainUpdate.subdomain },
+          data: { subdomain: subdomainUpdate.subdomain, status: 'approved', reviewedAt: new Date(), reviewedBy: userId },
         });
-      } else if (subdomainUpdate.auto) {
+      } else {
         await this.prisma.orgDomainRequest.create({
           data: {
             orgId,
@@ -884,18 +881,10 @@ export class AuthService {
             reviewedBy: userId,
           },
         });
-      } else {
-        await this.prisma.orgDomainRequest.create({
-          data: {
-            orgId,
-            kind: 'subdomain',
-            subdomain: subdomainUpdate.subdomain,
-            status: 'pending',
-            requestedBy: userId,
-          },
-        });
       }
     }
+
+    await assignBasicPlanIfMissing(this.prisma, orgId);
 
     const userRoles = await this.prisma.userRole.findMany({
       where: { userId },
@@ -905,7 +894,10 @@ export class AuthService {
 
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
-      data: { onboardingStep: furthestOnboardingStep(currentStep, 'organisation') },
+      data: {
+        onboardingStep: 'completed',
+        termsAcceptedAt: new Date(),
+      },
     });
 
     const tokens = await this.issueTokens(userId, organisation.id, roles);
@@ -972,6 +964,21 @@ export class AuthService {
 
     const roles = user.roles;
     const isSuperAdmin = roles.includes('super_admin');
+
+    // Self-heal a draft parked on a step the simplified 2-step wizard
+    // removed (Business Details, Subscription, Templates, Modules, Invite,
+    // Connect) — assigns Basic and activates the org if needed, so nobody
+    // stays stuck behind a wizard step that no longer exists. Best-effort:
+    // a failure here must not block an otherwise-valid login.
+    if (user.orgId && isLegacyOnboardingStep(user.onboardingStep)) {
+      try {
+        await finalizeLegacyOnboardingDraft(this.prisma, user.orgId, user.id);
+        user.onboardingStep = 'completed';
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Legacy onboarding finalize failed for user ${user.id}: ${message}`);
+      }
+    }
 
     if (dto.host && !isSuperAdmin) {
       try {

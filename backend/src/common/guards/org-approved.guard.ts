@@ -7,6 +7,10 @@ import {
 import { Request } from 'express';
 import { PrismaService } from '../../database/prisma.service';
 import { JwtPayload } from '../types/jwt-payload.interface';
+import {
+  finalizeLegacyOnboardingDraft,
+  isLegacyOnboardingStep,
+} from '../utils/onboarding-finalize.util';
 
 // Gates real dashboard/business functionality behind Super Admin approval.
 // Deliberately a SEPARATE guard from OrgAdminGuard (role + orgId presence)
@@ -82,27 +86,38 @@ export class OrgApprovedGuard implements CanActivate {
     if (!organisation) {
       throw new ForbiddenException('Organisation not found');
     }
-    // Draft/pending are expected during signup — they must NOT be tagged
-    // ORG_INACTIVE or the frontend will force-logout mid-wizard.
-    if (organisation.status === 'pending') {
-      throw new ForbiddenException({
-        statusCode: 403,
-        error: 'ORG_NOT_READY',
-        message:
-          'Organisation pending approval — please wait for super admin approval',
+    // Draft/pending are expected mid-signup under the old atomic signup()
+    // fallback — they must NOT be tagged ORG_INACTIVE or the frontend will
+    // force-logout mid-wizard. The simplified wizard's Step 2 activates the
+    // org immediately, so a request that gets here with a draft/pending org
+    // is almost always a leftover from before that change — self-heal it
+    // rather than leave the org admin stuck behind an approval gate that no
+    // longer exists in the UI.
+    if (organisation.status === 'pending' || organisation.status === 'draft') {
+      const requester = await this.prisma.user.findUnique({
+        where: { id: request.user.sub },
+        select: { onboardingStep: true },
       });
-    }
-    if (organisation.status === 'draft') {
-      throw new ForbiddenException({
-        statusCode: 403,
-        error: 'ORG_NOT_READY',
-        message: 'Organisation not yet activated',
-      });
-    }
-    if (organisation.status === 'disabled') {
+      if (requester && isLegacyOnboardingStep(requester.onboardingStep)) {
+        await finalizeLegacyOnboardingDraft(this.prisma, orgId, request.user.sub);
+        // Falls through to the checks below — organisation is now 'active'.
+      } else if (organisation.status === 'pending') {
+        throw new ForbiddenException({
+          statusCode: 403,
+          error: 'ORG_NOT_READY',
+          message:
+            'Organisation pending approval — please wait for super admin approval',
+        });
+      } else {
+        throw new ForbiddenException({
+          statusCode: 403,
+          error: 'ORG_NOT_READY',
+          message: 'Organisation not yet activated',
+        });
+      }
+    } else if (organisation.status === 'disabled') {
       throw orgInactive('Organisation is disabled');
-    }
-    if (organisation.status === 'rejected') {
+    } else if (organisation.status === 'rejected') {
       throw orgInactive('Organisation registration was rejected');
     }
 

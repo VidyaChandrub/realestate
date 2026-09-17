@@ -244,6 +244,10 @@ model User {
   // (Account) has actually completed.
   onboardingStep OnboardingStep @default(account) @map("onboarding_step")
   emailVerifiedAt DateTime? @map("email_verified_at")
+  // Terms of Service & Privacy Policy acceptance — checked at signup Step 2
+  // (Organisation). Set once, never cleared; this is a compliance record,
+  // not a live "currently agreed" flag.
+  termsAcceptedAt DateTime? @map("terms_accepted_at")
 
   organisation    Organisation?          @relation(fields: [orgId], references: [id])
   userRoles       UserRole[]
@@ -874,6 +878,13 @@ model Plan {
   badge        String   @default("b-indigo")
   isPopular    Boolean  @default(false) @map("is_popular")
   isActive     Boolean  @default(true) @map("is_active")
+  // The platform's default onboarding plan (seeded "Basic") — editable like
+  // any other plan, but AdminPlansService.remove() refuses to delete it so
+  // every-new-org auto-assignment (see onboarding-finalize.util.ts) always
+  // has a target. Never set via the API; only by seed. Deliberately not a
+  // slug check — renaming the plan in the admin UI must not silently drop
+  // the protection.
+  isSystem     Boolean  @default(false) @map("is_system")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

@@ -561,12 +561,58 @@ async function seedDemoPlanAndSubscription() {
   }
 }
 
+// The platform's default onboarding plan — every newly onboarded org is
+// auto-assigned this the moment Step 2 (Organisation) completes (see
+// onboarding-finalize.util.ts), since the simplified 2-step wizard no
+// longer has a Subscription step. Editable from Super Admin → Plans like
+// any other plan, but `isSystem: true` means it can never be deleted
+// (AdminPlansService.remove()) — auto-assignment always needs a target.
+//
+// Limits are sized so a brand-new org can immediately do the thing
+// onboarding promises — create a project, add units, capture leads —
+// without hitting a wall on its first day: 3 projects (room to try more
+// than one before settling in), 5 users (founding admin + a small starting
+// team), 1 template (so the Templates page isn't a hard "upgrade to pick
+// anything" wall), 3 landing pages. `publishing: true` is load-bearing —
+// without it, assertOrgCanPublish() blocks every publish/republish past
+// the very first auto-provisioned page, which would defeat the point of a
+// "just get started" plan.
+async function seedBasicPlan() {
+  await prisma.plan.upsert({
+    where: { slug: 'basic' },
+    update: {},
+    create: {
+      name: 'Basic',
+      slug: 'basic',
+      description: 'The default plan for every new workspace — enough to create a project, add units and start capturing leads.',
+      priceMonthly: 0,
+      priceYearly: 0,
+      features: [
+        '3 projects',
+        '5 team members',
+        '1 template',
+        '3 landing pages',
+        'Publishing',
+      ],
+      limits: { projects: 3, users: 5, templates: 1, landingPages: 3 },
+      capabilities: { publishing: true },
+      color: '#eef0fe',
+      badge: 'b-slate',
+      isPopular: false,
+      isActive: true,
+      isSystem: true,
+    },
+  });
+  console.log('Basic plan seeded (isSystem, auto-assigned at onboarding).');
+}
+
 async function main() {
   await seedRoles();
   await seedSuperAdmin();
   await seedDemoOrg();
   await seedEmailTables();
   await seedDemoPlanAndSubscription();
+  await seedBasicPlan();
 }
 
 main()

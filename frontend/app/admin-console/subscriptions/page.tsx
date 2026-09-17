@@ -545,6 +545,7 @@ export default function SuperAdminSubscriptionsPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                       <span className={`badge ${p.badge || "b-indigo"}`} style={{ textTransform: "capitalize" }}>{p.name}</span>
                       <span style={{ fontSize: 11, color: "var(--muted)" }}>{p.slug}</span>
+                      {p.isSystem ? <span className="chip" title="The platform's default onboarding plan — auto-assigned to every new organisation">Default</span> : null}
                     </div>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 4 }}>
                       <span style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.03, fontFamily: "var(--display)" }}>₹{price.toLocaleString("en-IN")}</span>
@@ -564,7 +565,11 @@ export default function SuperAdminSubscriptionsPage() {
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                       <Link className="btn btn-ghost btn-sm" style={{ flex: 1, textAlign: "center" }} href={`/admin-console/subscriptions/plans/${p.id}/edit`}>Edit Plan</Link>
-                      <button className="btn btn-ghost btn-sm" onClick={() => deletePlan(p.id)} style={{ color: "var(--rose)" }}>Delete</button>
+                      {!p.isSystem ? (
+                        <button className="btn btn-ghost btn-sm" onClick={() => deletePlan(p.id)} style={{ color: "var(--rose)" }}>Delete</button>
+                      ) : (
+                        <button className="btn btn-ghost btn-sm" disabled title="The default onboarding plan can't be deleted" style={{ color: "var(--muted)", cursor: "not-allowed" }}>Delete</button>
+                      )}
                     </div>
                   </div>
                 );
