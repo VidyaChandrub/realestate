@@ -207,6 +207,10 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
       router.replace("/login");
       return;
     }
+    if (user.onboarding_step !== "completed") {
+      router.replace("/register");
+      return;
+    }
     if (user.must_change_password) {
       router.replace("/change-password");
       return;

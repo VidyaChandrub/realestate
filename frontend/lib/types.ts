@@ -23,6 +23,7 @@ export interface SafeUser {
   created_at: string;
   onboarding_step: OnboardingStep;
   email_verified_at?: string | null;
+  country?: string | null;
 }
 
 export interface SafeOrganisation {
@@ -116,6 +117,7 @@ export interface OnboardingAccountInput {
   work_email: string;
   phone_number: string;
   password: string;
+  country: string;
 }
 
 export type SignupStep1Response =
@@ -137,8 +139,13 @@ export type SignupStep1Response =
 // "You already started this" popup — resolves an exists_incomplete match by
 // either continuing the old draft or restarting it, both with whatever was
 // just retyped on Step 1. See AuthService.resumeExistingDraft/restartExistingDraft.
-export interface ResolveDraftInput extends OnboardingAccountInput {
+export interface ResolveDraftInput {
   existingUserId: string;
+  first_name: string;
+  last_name: string;
+  work_email: string;
+  phone_number: string;
+  country: string;
 }
 
 export interface ResumeSignupResponse extends AuthTokens {
@@ -155,7 +162,13 @@ export interface OnboardingOrganisationInput {
   company_name: string;
   industry?: OrgIndustry;
   teamSize?: string;
-  subdomain?: string;
+  // Moved here from the removed Business Details step.
+  city?: string;
+  // Terms of Service & Privacy Policy — moved here from the removed
+  // Templates step. Must be true.
+  agreedToTerms: boolean;
+  // No `subdomain` — the simplified wizard doesn't collect one; every org
+  // gets a unique auto-generated one instead (see AuthService).
   custom_domain?: string;
   country?: string;
   currency?: string;
@@ -169,91 +182,9 @@ export interface OrganisationStepResponse extends AuthTokens {
   nextStep: OnboardingStep;
 }
 
-export interface OnboardingStepResult {
-  onboardingStep: OnboardingStep;
-  nextStep: OnboardingStep;
-}
-
-// /onboarding/complete has no "next" wizard step — instead it reports
-// whether the org is actually usable yet, so the frontend can show a
-// holding screen for a still-pending org instead of a dashboard that
-// 403s on its first real request (see backend OrgApprovedGuard).
-export interface CompleteOnboardingResult {
-  onboardingStep: OnboardingStep;
-  organisationStatus: string;
-}
-
-export interface BusinessDetailsInput {
-  city?: string;
-  reraLicenseNo?: string;
-  gstin?: string;
-  brandColour?: string;
-  logoUrl?: string;
-}
-
-export interface BusinessDetailsStepResponse extends OnboardingStepResult {
-  organisation: SafeOrganisation;
-}
-
-export interface SubscriptionStepInput {
-  planId: string;
-  billingCycle?: "monthly" | "yearly";
-}
-
-export interface SubscriptionStepResponse extends OnboardingStepResult {
-  subscription: { id: string; planId: string; billingCycle: string };
-}
-
-export interface TemplatesStepInput {
-  templateIds: string[];
-}
-
-export interface TemplatesStepResponse extends OnboardingStepResult {
-  templateIds: string[];
-}
-
-export interface ModulesStepInput {
-  enabledModules?: string[];
-  skip?: boolean;
-}
-
-export interface ModulesStepResponse extends OnboardingStepResult {
-  enabledModules: string[];
-}
-
-export interface InviteEntry {
-  email: string;
-  role: string;
-}
-
-export interface InviteStepInput {
-  invites: InviteEntry[];
-}
-
-export interface SeatUsage {
-  used: number;
-  /** null = unlimited on the current plan. */
-  limit: number | null;
-}
-
-export interface InviteFailure {
-  email: string;
-  reason: string;
-  kind: "quota" | "duplicate" | "error";
-}
-
-export interface InviteStepResponse extends OnboardingStepResult {
-  sent: { email?: string | null }[];
-  failed: InviteFailure[];
-  seats: SeatUsage;
-}
-
-export interface LogoUploadUrlInput {
-  filename: string;
-  contentType: string;
-  size: number;
-}
-
+// Kept live — not onboarding-specific. Shared presigned-upload-URL response
+// shape, also used by support-ticket attachment uploads
+// (createSupportUploadUrl / createAdminSupportUploadUrl in lib/api.ts).
 export interface LogoUploadUrlResult {
   uploadUrl: string;
   publicUrl: string;
@@ -313,15 +244,6 @@ export interface UserProfile {
 export interface ChangePasswordInput {
   current_password: string;
   new_password: string;
-}
-
-export interface OrganisationRegistrationInput {
-  organisation_name: string;
-  work_email: string;
-  first_name: string;
-  last_name: string;
-  phone_number: string;
-  password: string;
 }
 
 export type SendViaChannel = "email" | "whatsapp" | "sms";
@@ -393,8 +315,35 @@ export interface OrganisationSummary {
   pending?: number;
   disabled?: number;
   draft?: number;
+  // Step 1 (Account) drafts that never became an Organisation — not part of
+  // `draft` above, which counts real Organisation.status === 'draft' rows.
+  pendingSignups?: number;
   onTrial: null;
   suspended: null;
+}
+
+// A Step 1 (Account) draft that never reached Step 2 — has no orgId, so it
+// can never be shown as an OrganisationListRow (no fake org id). Only
+// email-verified rows are ever returned by the backend (see
+// PENDING_SIGNUP_WHERE) — unverified throwaway signups are filtered out,
+// not just hidden client-side.
+export interface PendingSignupRow {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  phoneNumber: string | null;
+  country: string | null;
+  onboardingStep: OnboardingStep;
+  emailVerifiedAt: string;
+  createdAt: string;
+}
+
+export interface PendingSignupListResponse {
+  data: PendingSignupRow[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface OrganisationDetail {
@@ -614,6 +563,11 @@ export interface OrgTemplateSummary {
   category: string | null;
   template: string;
   updatedAt: string;
+  // How many of this org's own landing pages were built from this
+  // template — 0 for anything never assigned. Lets the frontend disable
+  // "Remove" up front instead of letting someone confirm an action the
+  // backend guard (unassignTemplate) is just going to reject.
+  landingPageCount: number;
 }
 
 export interface OrgTemplatesListResponse {
@@ -656,6 +610,8 @@ export interface Plan {
   badge: string;
   isPopular: boolean;
   isActive: boolean;
+  /** The seeded default onboarding plan (Basic) — editable, never deletable. */
+  isSystem: boolean;
   createdAt: string;
   updatedAt: string;
 }

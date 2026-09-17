@@ -21,6 +21,7 @@ export function ConfirmModal({
   busy = false,
   onConfirm,
   onClose,
+  containerClassName,
 }: {
   open: boolean;
   title: string;
@@ -31,9 +32,11 @@ export function ConfirmModal({
   busy?: boolean;
   onConfirm: () => void;
   onClose: () => void;
+  /** Pass e.g. "z-[60]" when opening this on top of an already-open Modal — both default to the same stacking context otherwise. */
+  containerClassName?: string;
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={title} size="sm" closeDisabled={busy}>
+    <Modal open={open} onClose={onClose} title={title} size="sm" closeDisabled={busy} containerClassName={containerClassName}>
       <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
         {/* Icon */}
         <div

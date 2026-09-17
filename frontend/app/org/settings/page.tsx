@@ -104,7 +104,7 @@ function Toggle({ on = false }: { on?: boolean }) {
 }
 
 interface GeneralBrandingForm {
-  name: string; legalName: string; industry: OrgIndustry | ""; reraLicenseNo: string; gstin: string;
+  name: string; legalName: string; industry: OrgIndustry | "";
   supportEmail: string; supportPhone: string;
   city: string; country: string; addressLine1: string; addressLine2: string; state: string; postalCode: string;
   timezone: string; currency: string; defaultLanguage: string; brandColour: string;
@@ -114,7 +114,6 @@ interface GeneralBrandingForm {
 function formToOrg(org: SafeOrganisation): GeneralBrandingForm {
   return {
     name: org.name, legalName: org.legal_name ?? "", industry: org.industry ?? "",
-    reraLicenseNo: org.rera_license_no ?? "", gstin: org.gstin ?? "",
     supportEmail: org.support_email ?? "", supportPhone: org.support_phone ?? "",
     city: org.city, country: org.country ?? "", addressLine1: org.address_line1 ?? "", addressLine2: org.address_line2 ?? "",
     state: org.state ?? "", postalCode: org.postal_code ?? "", timezone: org.timezone, currency: org.currency,
@@ -1091,8 +1090,6 @@ export default function OrgSettingsPage() {
         logoUrl: form.logoUrl, faviconUrl: form.faviconUrl,
         legalName: form.legalName || undefined,
         industry: form.industry || undefined,
-        reraLicenseNo: form.reraLicenseNo || undefined,
-        gstin: form.gstin || undefined,
         supportEmail: form.supportEmail || undefined,
         supportPhone: form.supportPhone || undefined,
       };
@@ -1221,10 +1218,6 @@ export default function OrgSettingsPage() {
                     {INDUSTRY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
-              </div>
-              <div className="row2">
-                <div className="field"><label>RERA / license no.</label><input className="inp inp-mono" value={form.reraLicenseNo} onChange={(e) => updateForm({ reraLicenseNo: e.target.value })} placeholder="PR/GJ/AHM/2026/00842" /></div>
-                <div className="field"><label>GSTIN</label><input className="inp inp-mono" value={form.gstin} onChange={(e) => updateForm({ gstin: e.target.value })} placeholder="24AABCS1234F1Z5" /></div>
               </div>
               <div className="row2">
                 <div className="field"><label>Support email</label><input className="inp" type="email" value={form.supportEmail} onChange={(e) => updateForm({ supportEmail: e.target.value })} placeholder="care@skylinedev.in" /></div>

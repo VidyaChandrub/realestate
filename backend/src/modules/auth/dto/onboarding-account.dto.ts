@@ -25,4 +25,12 @@ export class OnboardingAccountDto {
   @IsNotEmpty()
   @MaxLength(72)
   password: string;
+
+  // Stored on User (not Organisation — none exists yet) purely so a resume
+  // before Step 2 can restore the Country select and strip the dial code
+  // back off the phone number. See User.country's schema comment.
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  country: string;
 }

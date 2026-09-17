@@ -29,6 +29,7 @@ import { AssignSubdomainDto } from './dto/assign-subdomain.dto';
 import { CreateOrgUserDto } from '../org-users/dto/create-org-user.dto';
 import { UpdateOrgUserStatusDto } from '../org-users/dto/update-org-user-status.dto';
 import { ListOrgUsersQueryDto } from '../org-users/dto/list-org-users-query.dto';
+import { ListPendingSignupsQueryDto } from './dto/list-pending-signups-query.dto';
 
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 @Controller('admin/organisations')
@@ -45,6 +46,23 @@ export class AdminOrganisationsController {
   @Get('summary')
   summary() {
     return this.adminOrganisationsService.summary();
+  }
+
+  // Declared before the generic ':id' routes below so "pending-signups"
+  // isn't captured as an :id — same trick as 'summary' above.
+  @Get('pending-signups')
+  listPendingSignups(@Query() query: ListPendingSignupsQueryDto) {
+    return this.adminOrganisationsService.listPendingSignups(query);
+  }
+
+  @Get('pending-signups/:id')
+  getPendingSignupById(@Param('id') id: string) {
+    return this.adminOrganisationsService.getPendingSignupById(id);
+  }
+
+  @Delete('pending-signups/:id')
+  deletePendingSignup(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
+    return this.adminOrganisationsService.deletePendingSignup(id, actor);
   }
 
   @Get(':id')

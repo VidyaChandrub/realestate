@@ -156,6 +156,11 @@ export class PlansService {
   async remove(id: string) {
     const plan = await this.prisma.plan.findUnique({ where: { id } });
     if (!plan) throw new NotFoundException('Plan not found');
+    if (plan.isSystem) {
+      throw new ConflictException(
+        `"${plan.name}" is the platform's default onboarding plan and cannot be deleted — edit it instead.`,
+      );
+    }
     const subs = await this.prisma.subscription.count({ where: { planId: id, status: { not: 'cancelled' } } });
     if (subs > 0) throw new ConflictException('Cannot delete plan with active subscriptions — archive it instead');
     await this.prisma.plan.delete({ where: { id } });
@@ -178,6 +183,7 @@ function toPlanResponse(plan: any) {
     badge: plan.badge,
     isPopular: plan.isPopular,
     isActive: plan.isActive,
+    isSystem: plan.isSystem,
     createdAt: plan.createdAt,
     updatedAt: plan.updatedAt,
   };

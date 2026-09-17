@@ -12,10 +12,6 @@ import { InviteDto } from './dto/invite.dto';
 export class TeamController {
   constructor(private readonly teamService: TeamService) {}
 
-  // Org-facing, not part of the signup wizard (that's
-  // OnboardingController's own /onboarding/invite, deliberately exempt
-  // from OrgApprovedGuard since every org is 'pending' throughout it) —
-  // real team invites wait for approval like everything else dashboard-side.
   @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
   @RequirePermission('users', 'add')
   @Post('invite')

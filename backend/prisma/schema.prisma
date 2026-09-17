@@ -243,7 +243,18 @@ model User {
   // Defaults to 'account' since a User row is only ever created once Step 1
   // (Account) has actually completed.
   onboardingStep OnboardingStep @default(account) @map("onboarding_step")
+  // Collected at signup Step 1 (Account) — no Organisation exists yet at
+  // that point to hold it. Purely for restoring the Country select and
+  // stripping the dial code back off the phone number on resume (see
+  // AuthService.resumeSignup / stripCallingCode on the frontend); the
+  // Organisation's own `country` (set at Step 2) is the source of truth
+  // once an org exists.
+  country String? @map("country")
   emailVerifiedAt DateTime? @map("email_verified_at")
+  // Terms of Service & Privacy Policy acceptance — checked at signup Step 2
+  // (Organisation). Set once, never cleared; this is a compliance record,
+  // not a live "currently agreed" flag.
+  termsAcceptedAt DateTime? @map("terms_accepted_at")
 
   organisation    Organisation?          @relation(fields: [orgId], references: [id])
   userRoles       UserRole[]
@@ -874,6 +885,13 @@ model Plan {
   badge        String   @default("b-indigo")
   isPopular    Boolean  @default(false) @map("is_popular")
   isActive     Boolean  @default(true) @map("is_active")
+  // The platform's default onboarding plan (seeded "Basic") — editable like
+  // any other plan, but AdminPlansService.remove() refuses to delete it so
+  // every-new-org auto-assignment (see onboarding-finalize.util.ts) always
+  // has a target. Never set via the API; only by seed. Deliberately not a
+  // slug check — renaming the plan in the admin UI must not silently drop
+  // the protection.
+  isSystem     Boolean  @default(false) @map("is_system")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

@@ -15,7 +15,6 @@ import type {
   AuthTokens,
   LoginInput,
   LoginResponse,
-  OrganisationRegistrationInput,
   PermissionAction,
   Permissions,
   SafeUser,
@@ -35,15 +34,7 @@ const STORAGE_KEYS = {
   accessToken: "be.access_token",
   refreshToken: "be.refresh_token",
   user: "be.user",
-  orgSetup: "be.org_setup",
-  verifiedEmail: "be.verified_email",
 } as const;
-
-export interface OrgSetupState {
-  organisationName: string;
-  email: string;
-  step: "verify-email" | "onboarding";
-}
 
 interface AuthContextValue {
   user: SessionUser | null;
@@ -64,10 +55,6 @@ interface AuthContextValue {
     email: string,
     password: string,
   ) => Promise<void>;
-  mockRegister: (input: OrganisationRegistrationInput) => Promise<OrgSetupState>;
-  completeEmailVerification: (code: string) => boolean;
-  completeOnboarding: () => void;
-  getOrgSetup: () => OrgSetupState | null;
   hasPermission: (module: string, action: PermissionAction) => boolean;
   isOrgAdmin: () => boolean;
   refreshPermissions: () => Promise<Permissions | null>;
@@ -290,44 +277,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
-  const mockRegister = useCallback(
-    async (input: OrganisationRegistrationInput) => {
-      const setup: OrgSetupState = {
-        organisationName: input.organisation_name,
-        email: input.work_email,
-        step: "verify-email",
-      };
-      localStorage.setItem(STORAGE_KEYS.orgSetup, JSON.stringify(setup));
-      return setup;
-    },
-    [],
-  );
-
-  const getOrgSetup = useCallback((): OrgSetupState | null => {
-    if (typeof window === "undefined") return null;
-    const raw = localStorage.getItem(STORAGE_KEYS.orgSetup);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as OrgSetupState;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const completeEmailVerification = useCallback((code: string) => {
-    if (code.trim().length !== 6) return false;
-    const setup = getOrgSetup();
-    if (!setup) return false;
-    localStorage.setItem(STORAGE_KEYS.verifiedEmail, setup.email);
-    const next: OrgSetupState = { ...setup, step: "onboarding" };
-    localStorage.setItem(STORAGE_KEYS.orgSetup, JSON.stringify(next));
-    return true;
-  }, [getOrgSetup]);
-
-  const completeOnboarding = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEYS.orgSetup);
-  }, []);
-
   const logout = useCallback(async () => {
     const refreshToken = localStorage.getItem(STORAGE_KEYS.refreshToken);
     if (refreshToken && !refreshToken.startsWith("mock-refresh-")) {
@@ -513,10 +462,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applyAuthTokens,
       logout,
       mockLogin,
-      mockRegister,
-      completeEmailVerification,
-      completeOnboarding,
-      getOrgSetup,
       hasPermission,
       isOrgAdmin,
       refreshPermissions,
@@ -530,10 +475,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       applyAuthTokens,
       logout,
       mockLogin,
-      mockRegister,
-      completeEmailVerification,
-      completeOnboarding,
-      getOrgSetup,
       hasPermission,
       isOrgAdmin,
       refreshPermissions,
