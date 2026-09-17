@@ -47,8 +47,9 @@ const STEP1_FIELD_LABELS: Record<string, string> = {
 
 // Simplified wizard — just Account and Organisation. Every other step
 // (Business Details, Subscription, Templates, Modules, Invite, Connect) was
-// removed; see backend/src/modules/onboarding/onboarding.controller.ts for
-// why and what replaces each one.
+// removed: City and Terms of Service moved into Organisation; the rest have
+// in-app equivalents post-signup (Org Settings, Templates page, Users page)
+// or, for Connect, were never implemented in the first place.
 const STEPS = [
   { n: 1, label: "Your account", sub: "Admin login" },
   { n: 2, label: "Organisation", sub: "Name, city & type" },

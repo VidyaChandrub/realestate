@@ -9,8 +9,5 @@ import { TeamController } from './team.controller';
   imports: [AuthModule],
   controllers: [TeamController],
   providers: [TeamService, OrgApprovedGuard, PermissionGuard],
-  // Reused directly by OnboardingModule's Invite-team step — same
-  // provisioning logic, no need to duplicate it.
-  exports: [TeamService],
 })
 export class TeamModule {}
