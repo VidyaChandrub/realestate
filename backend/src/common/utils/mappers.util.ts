@@ -21,6 +21,10 @@ type SafeUserSource = Pick<
 > & {
   emailVerifiedAt?: Date | null;
   approvedAt?: Date | null;
+  // Optional (not in the Pick list) rather than required: the login SQL
+  // fallback path (Prisma unavailable) doesn't select it, same treatment as
+  // emailVerifiedAt/approvedAt above.
+  country?: string | null;
 };
 
 // Strips password_hash and other internal fields before a user ever reaches a response.
@@ -38,6 +42,7 @@ export function toSafeUser(user: SafeUserSource) {
     created_at: user.createdAt,
     onboarding_step: user.onboardingStep,
     email_verified_at: user.emailVerifiedAt ?? null,
+    country: user.country ?? null,
   };
 }
 

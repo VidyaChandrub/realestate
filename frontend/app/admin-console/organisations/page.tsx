@@ -7,7 +7,13 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
-import type { OrganisationListResponse, OrganisationListRow, OrganisationSummary } from "@/lib/types";
+import type {
+  OrganisationListResponse,
+  OrganisationListRow,
+  OrganisationSummary,
+  PendingSignupListResponse,
+  PendingSignupRow,
+} from "@/lib/types";
 import { Icon } from "@/components/icons";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
@@ -95,6 +101,20 @@ const STATUS_PILLS: { value: string; label: string }[] = [
   { value: "draft", label: "Draft" },
 ];
 
+// Not an Organisation.status value — a separate mode entirely. These rows
+// have no orgId, so they can never be one of the OrganisationListRow above
+// (a fake org id would enable organisation actions against something that
+// isn't one). Kept as its own statusFilter value purely so the existing
+// pill-row UI can drive it, not because it's actually a status.
+const PENDING_SIGNUPS_FILTER = "pending_signups";
+
+function daysAgo(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
+}
+
 export default function SuperAdminOrganisationsPage() {
   const router = useRouter();
   const { accessToken, isLoading: authLoading } = useAuth();
@@ -121,6 +141,14 @@ export default function SuperAdminOrganisationsPage() {
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [rejectError, setRejectError] = useState<string | null>(null);
 
+  // Pending signups — a separate dataset entirely (Users, not
+  // Organisations), fetched only while that filter is selected.
+  const [pendingSignupsResult, setPendingSignupsResult] = useState<PendingSignupListResponse | null>(null);
+  const [pendingSignupsLoading, setPendingSignupsLoading] = useState(false);
+  const [pendingSignupsError, setPendingSignupsError] = useState<string | null>(null);
+  const [signupDrawer, setSignupDrawer] = useState<PendingSignupRow | null>(null);
+  const [deletingSignupId, setDeletingSignupId] = useState<string | null>(null);
+
   const notify = (m:string)=>{ setToast(m); setTimeout(()=>setToast(null),2500); };
 
   useEffect(() => {
@@ -146,7 +174,10 @@ export default function SuperAdminOrganisationsPage() {
   },[accessToken]);
 
   const fetchList = useCallback(()=>{
-    if (!accessToken) return;
+    // Pending signups aren't organisations — status isn't even a valid
+    // value for this endpoint (see ORG_LIST_STATUS_VALUES) — fetchPendingSignups
+    // below owns that dataset instead.
+    if (!accessToken || statusFilter === PENDING_SIGNUPS_FILTER) return;
     setLoading(true);
     setError(null);
     const params = new URLSearchParams({
@@ -160,8 +191,23 @@ export default function SuperAdminOrganisationsPage() {
     }).then(setResult).catch((err) => setError(err instanceof Error ? err.message : "Failed to load organisations.")).finally(() => setLoading(false));
   },[accessToken, statusFilter, search, page]);
 
+  const fetchPendingSignups = useCallback(() => {
+    if (!accessToken || statusFilter !== PENDING_SIGNUPS_FILTER) return;
+    setPendingSignupsLoading(true);
+    setPendingSignupsError(null);
+    const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
+    if (search) params.set("search", search);
+    apiFetch<PendingSignupListResponse>(`/admin/organisations/pending-signups?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then(setPendingSignupsResult)
+      .catch((err) => setPendingSignupsError(err instanceof Error ? err.message : "Failed to load pending signups."))
+      .finally(() => setPendingSignupsLoading(false));
+  }, [accessToken, statusFilter, search, page]);
+
   useEffect(()=>{ fetchSummary(); },[fetchSummary]);
   useEffect(()=>{ fetchList(); },[fetchList]);
+  useEffect(()=>{ fetchPendingSignups(); },[fetchPendingSignups]);
 
   const handleApprove = async (id:string) => {
     if (!accessToken) return;
@@ -246,6 +292,33 @@ export default function SuperAdminOrganisationsPage() {
     });
   };
 
+  // Hard delete, not a status flip — see AdminOrganisationsService.deletePendingSignup
+  // for why (a disabled row would permanently squat on that email/phone).
+  const handleDeleteSignup = (row: PendingSignupRow) => {
+    if (!accessToken) return;
+    setConfirmState({
+      title: "Delete this signup permanently?",
+      message: `${row.email} will be removed entirely — they can sign up again with the same email or phone number afterwards. This cannot be undone.`,
+      run: async () => {
+        setDeletingSignupId(row.id);
+        try {
+          await apiFetch(`/admin/organisations/pending-signups/${row.id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          notify("Deleted");
+          setSignupDrawer(null);
+          fetchPendingSignups();
+          fetchSummary();
+        } catch (e: any) {
+          notify(e.message || "Delete failed");
+        } finally {
+          setDeletingSignupId(null);
+        }
+      },
+    });
+  };
+
   // Same handlers as before, just surfaced through the row's kebab menu
   // instead of a row of buttons — approve/reject/activate/deactivate/delete
   // behaviour is unchanged, only the presentation moved.
@@ -279,11 +352,18 @@ export default function SuperAdminOrganisationsPage() {
     return null;
   }
 
+  const isPendingSignupsView = statusFilter === PENDING_SIGNUPS_FILTER;
   const rows = result?.data ?? [];
   const total = result?.total ?? 0;
   const from = total === 0 ? 0 : (page - 1) * LIMIT + 1;
   const to = Math.min(page * LIMIT, total);
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+
+  const signupRows = pendingSignupsResult?.data ?? [];
+  const signupTotal = pendingSignupsResult?.total ?? 0;
+  const signupFrom = signupTotal === 0 ? 0 : (page - 1) * LIMIT + 1;
+  const signupTo = Math.min(page * LIMIT, signupTotal);
+  const signupTotalPages = Math.max(1, Math.ceil(signupTotal / LIMIT));
 
   return (
     <>
@@ -326,6 +406,12 @@ export default function SuperAdminOrganisationsPage() {
           accent="#8b5cf6"
           sub="Abandoned mid-signup"
         />
+        <StatTile
+          label="Pending signups"
+          value={summary ? <CountUp value={summary.pendingSignups ?? 0} /> : "—"}
+          accent="#0ea5e9"
+          sub="Verified, no organisation yet"
+        />
       </div>
 
       {/* Filter + search toolbar */}
@@ -361,11 +447,25 @@ export default function SuperAdminOrganisationsPage() {
               {p.label}
             </button>
           ))}
+          {/* Separate from the pills above on purpose — these rows have no
+              orgId, so mixing them into the same "Organisations" table
+              would either need a fake org id (enabling organisation actions
+              against something that isn't one) or special-casing every row
+              action. Own tab, own count, own table below. */}
+          <button
+            className={`btn ${isPendingSignupsView ? "btn-primary" : "btn-ghost"} btn-sm`}
+            onClick={() => {
+              setStatusFilter(PENDING_SIGNUPS_FILTER);
+              setPage(1);
+            }}
+          >
+            Pending signups ({summary?.pendingSignups ?? 0})
+          </button>
         </div>
         <div style={{ position: "relative", flex: 1, minWidth: 220, maxWidth: 340 }}>
           <input
             className="inp"
-            placeholder="Search by name, city or email…"
+            placeholder={isPendingSignupsView ? "Search by name, email or phone…" : "Search by name, city or email…"}
             style={{ paddingLeft: 38, height: 34, fontSize: 13 }}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
@@ -378,11 +478,124 @@ export default function SuperAdminOrganisationsPage() {
           className="muted"
           style={{ marginLeft: "auto", alignSelf: "center", fontSize: 12 }}
         >
-          {loading ? "Loading…" : `${total} organisation${total === 1 ? "" : "s"}`}
+          {isPendingSignupsView
+            ? pendingSignupsLoading
+              ? "Loading…"
+              : `${signupTotal} signup${signupTotal === 1 ? "" : "s"}`
+            : loading
+              ? "Loading…"
+              : `${total} organisation${total === 1 ? "" : "s"}`}
         </span>
       </div>
 
       {/* Table */}
+      {isPendingSignupsView ? (
+      <Reveal delay={3}>
+        <div className="card">
+          <div className="card-h">
+            <span className="t">Pending Signups</span>
+            <span className="muted" style={{ fontSize: 12.5 }}>
+              {pendingSignupsLoading ? "Loading…" : `Showing ${signupFrom}–${signupTo} of ${signupTotal}`}
+            </span>
+          </div>
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Step 1</th>
+                  <th>Email verification</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Age</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingSignupsError ? (
+                  <tr>
+                    <td colSpan={9} className="muted">{pendingSignupsError}</td>
+                  </tr>
+                ) : !pendingSignupsLoading && signupRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="muted">No pending signups right now.</td>
+                  </tr>
+                ) : (
+                  signupRows.map((s) => {
+                    const name = [s.firstName, s.lastName].filter(Boolean).join(" ") || "—";
+                    return (
+                      <tr key={s.id}>
+                        <td>
+                          <button
+                            type="button"
+                            className="u"
+                            style={{ cursor: "pointer", background: "none", border: "none", padding: 0, textAlign: "left" }}
+                            onClick={() => setSignupDrawer(s)}
+                          >
+                            <span className="av">{initials(name === "—" ? s.email : name)}</span>
+                            <span>
+                              <span className="nm">{name}</span>
+                              <br />
+                              <span className="sm">Signup draft</span>
+                            </span>
+                          </button>
+                        </td>
+                        <td>{s.email}</td>
+                        <td>{s.phoneNumber ?? "—"}</td>
+                        <td><span className="badge b-green">Complete</span></td>
+                        <td><span className="badge b-green">Verified</span></td>
+                        <td><span className="badge b-gray">Active · No organisation</span></td>
+                        <td>{formatDate(s.createdAt)}</td>
+                        <td>{daysAgo(s.createdAt)}</td>
+                        <td>
+                          <RowActionsMenu
+                            actions={[
+                              { key: "view", label: "View", onClick: () => setSignupDrawer(s) },
+                              {
+                                key: "delete",
+                                label: "Delete",
+                                danger: true,
+                                onClick: () => handleDeleteSignup(s),
+                                disabled: deletingSignupId === s.id,
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+          {signupTotalPages > 1 ? (
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 18px" }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Prev
+              </button>
+              <span className="muted" style={{ fontSize: 12.5, alignSelf: "center" }}>
+                Page {page} of {signupTotalPages}
+              </span>
+              <button
+                className="btn btn-ghost btn-sm"
+                type="button"
+                disabled={page >= signupTotalPages}
+                onClick={() => setPage((p) => Math.min(signupTotalPages, p + 1))}
+              >
+                Next →
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </Reveal>
+      ) : (
       <Reveal delay={3}>
         <div className="card">
           <div className="card-h">
@@ -514,6 +727,7 @@ export default function SuperAdminOrganisationsPage() {
           ) : null}
         </div>
       </Reveal>
+      )}
       {toast ? <div style={{ position:"fixed", right:20, bottom:20, zIndex:500}}><div className="card" style={{ padding:"12px 16px", boxShadow:"var(--sh-lg)"}}>{toast}</div></div> : null}
       <ConfirmModal
         open={confirmState !== null}
@@ -589,6 +803,81 @@ export default function SuperAdminOrganisationsPage() {
             <div style={{ marginTop: 6, fontSize: 11.5, color: rejectError ? "var(--rose)" : "var(--faint)", fontWeight: rejectError ? 600 : 400 }}>
               {rejectError ?? `${rejectReason.length}/500`}
             </div>
+      </Modal>
+
+      {/* Pending signup detail drawer — account info + onboarding state
+          only. No password field anywhere: there is nothing to show (it's
+          a hash) and nothing here should ever let a Super Admin set one on
+          someone else's still-forming account. */}
+      <Modal
+        open={!!signupDrawer}
+        onClose={() => setSignupDrawer(null)}
+        title="Signup draft"
+        description={signupDrawer ? signupDrawer.email : undefined}
+        size="sm"
+        footer={
+          signupDrawer ? (
+            <button
+              className="btn btn-danger"
+              type="button"
+              onClick={() => handleDeleteSignup(signupDrawer)}
+              disabled={deletingSignupId === signupDrawer.id}
+            >
+              {deletingSignupId === signupDrawer.id ? "Deleting…" : "Delete signup"}
+            </button>
+          ) : undefined
+        }
+      >
+        {signupDrawer ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <div className="muted" style={{ fontSize: 11.5, marginBottom: 2 }}>Name</div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>
+                {[signupDrawer.firstName, signupDrawer.lastName].filter(Boolean).join(" ") || "—"}
+              </div>
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: 11.5, marginBottom: 2 }}>Email</div>
+              <div style={{ fontSize: 13.5 }}>{signupDrawer.email}</div>
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: 11.5, marginBottom: 2 }}>Phone</div>
+              <div style={{ fontSize: 13.5 }}>{signupDrawer.phoneNumber ?? "—"}</div>
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: 11.5, marginBottom: 2 }}>Country</div>
+              <div style={{ fontSize: 13.5 }}>{signupDrawer.country ?? "—"}</div>
+            </div>
+            <div style={{ display: "flex", gap: 20 }}>
+              <div>
+                <div className="muted" style={{ fontSize: 11.5, marginBottom: 4 }}>Step 1</div>
+                <span className="badge b-green">Complete</span>
+              </div>
+              <div>
+                <div className="muted" style={{ fontSize: 11.5, marginBottom: 4 }}>Email verification</div>
+                <span className="badge b-green">Verified</span>
+              </div>
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: 11.5, marginBottom: 4 }}>Status</div>
+              <span className="badge b-gray">Active · No organisation</span>
+            </div>
+            <div style={{ display: "flex", gap: 20 }}>
+              <div>
+                <div className="muted" style={{ fontSize: 11.5, marginBottom: 2 }}>Created</div>
+                <div style={{ fontSize: 13 }}>{formatDate(signupDrawer.createdAt)}</div>
+              </div>
+              <div>
+                <div className="muted" style={{ fontSize: 11.5, marginBottom: 2 }}>Age</div>
+                <div style={{ fontSize: 13 }}>{daysAgo(signupDrawer.createdAt)}</div>
+              </div>
+            </div>
+            <div>
+              <div className="muted" style={{ fontSize: 11.5, marginBottom: 2 }}>Verified</div>
+              <div style={{ fontSize: 13 }}>{formatDate(signupDrawer.emailVerifiedAt)}</div>
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </>
   );

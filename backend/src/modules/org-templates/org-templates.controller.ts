@@ -40,8 +40,8 @@ export class OrgTemplatesController {
 
   @RequirePermission('websites', 'view')
   @Get(':id')
-  getById(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
-    return this.orgTemplatesService.getById(id, user.orgId);
+  getById(@Param('id') id: string) {
+    return this.orgTemplatesService.getById(id);
   }
 }
 

@@ -45,6 +45,21 @@ import { EmailService } from '../email/email.service';
 
 const BCRYPT_COST_FACTOR = 12;
 
+// A "Pending signup" (Super Admin's Organisations screen) is a Step 1
+// (Account) draft that never became an Organisation: no orgId, so it can
+// never be represented as an organisation row — a fake orgId would enable
+// organisation actions (approve/reject/activate/delete-org) against
+// something that isn't one. `emailVerifiedAt: { not: null }` is the one
+// deliberate narrowing from "every incomplete Step 1 user": someone who
+// typed a throwaway address and never clicked the verification link is
+// junk, not a real stalled signup, and shouldn't clutter this list.
+const PENDING_SIGNUP_WHERE: Prisma.UserWhereInput = {
+  status: 'active',
+  orgId: null,
+  onboardingStep: { not: 'completed' },
+  emailVerifiedAt: { not: null },
+};
+
 @Injectable()
 export class AdminOrganisationsService {
   // Ephemeral, single-instance only: bridges the temp password generated in
@@ -421,7 +436,7 @@ export class AdminOrganisationsService {
   }
 
   async summary() {
-    const [total, active, pending, disabled, draft] = await Promise.all([
+    const [total, active, pending, disabled, draft, pendingSignups] = await Promise.all([
       this.prisma.organisation.count({ where: { status: { not: 'draft' } } }),
       this.prisma.organisation.count({ where: { status: 'active' } }),
       this.prisma.organisation.count({ where: { status: 'pending' } }),
@@ -429,9 +444,124 @@ export class AdminOrganisationsService {
       // as "not usable right now" in the Super Admin UI.
       this.prisma.organisation.count({ where: { status: { in: ['disabled', 'rejected'] } } }),
       this.prisma.organisation.count({ where: { status: 'draft' } }),
+      this.prisma.user.count({ where: PENDING_SIGNUP_WHERE }),
     ]);
 
-    return { total, active, pending, disabled, draft, onTrial: null, suspended: null };
+    return { total, active, pending, disabled, draft, pendingSignups, onTrial: null, suspended: null };
+  }
+
+  // Step 1 (Account) drafts that never became an Organisation — a
+  // completely different kind of "incomplete" from Organisation.status ===
+  // 'draft' (which the list()/summary() `draft` bucket above already
+  // covers): these users have no orgId at all, so there's no organisation
+  // row to show them as. Only verified ones surface here — the concern is
+  // real people who stalled, not throwaway addresses that never came back
+  // to click the verification link. See listPendingSignups for why
+  // unverified rows are filtered out rather than just delayed.
+  async listPendingSignups(query: { page?: number; limit?: number; search?: string }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const where: Prisma.UserWhereInput = {
+      ...PENDING_SIGNUP_WHERE,
+      ...(query.search
+        ? {
+            OR: [
+              { firstName: { contains: query.search, mode: 'insensitive' } },
+              { lastName: { contains: query.search, mode: 'insensitive' } },
+              { email: { contains: query.search, mode: 'insensitive' } },
+              { phoneNumber: { contains: query.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phoneNumber: true,
+          country: true,
+          onboardingStep: true,
+          emailVerifiedAt: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { data: rows, total, page, limit };
+  }
+
+  // Single-row fetch for the detail drawer — same PENDING_SIGNUP_WHERE gate
+  // as the list, so a stale drawer reference to a user who has since
+  // verified... no, completed onboarding, or was deleted, 404s instead of
+  // quietly showing (possibly stale) data. Never selects passwordHash.
+  async getPendingSignupById(id: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, ...PENDING_SIGNUP_WHERE },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phoneNumber: true,
+        country: true,
+        onboardingStep: true,
+        emailVerifiedAt: true,
+        createdAt: true,
+      },
+    });
+    if (!user) {
+      throw new NotFoundException('Pending signup not found');
+    }
+    return user;
+  }
+
+  // Hard delete, not a status flip — a stale, never-finished signup has no
+  // organisation and no real data to preserve, and disabling it would just
+  // leave a dead row permanently squatting on that email/phone, blocking
+  // the person from ever signing up properly later. Re-checks
+  // PENDING_SIGNUP_WHERE itself (not just "does this id exist") so this can
+  // never be pointed at a real, completed account.
+  //
+  // Deferred policy (not built): auto-notify at 7 days, auto-delete at
+  // 30-90 days. Skipped for now — current volume is near zero and the
+  // project has no @nestjs/schedule (or any cron mechanism) installed;
+  // adding one is a real architectural decision, not something to smuggle
+  // in for a handful of rows. This manual action is the entire cleanup
+  // story until volume actually justifies that investment.
+  async deletePendingSignup(id: string, actor: JwtPayload) {
+    const user = await this.prisma.user.findFirst({
+      where: { id, ...PENDING_SIGNUP_WHERE },
+      select: { id: true, email: true },
+    });
+    if (!user) {
+      throw new NotFoundException('Pending signup not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: {
+          orgId: null,
+          actorId: actor.sub,
+          action: 'pending_signup_deleted',
+          entity: 'User',
+          entityId: id,
+          metadata: { email: user.email },
+        },
+      });
+    });
+
+    return { success: true };
   }
 
   async getById(id: string) {

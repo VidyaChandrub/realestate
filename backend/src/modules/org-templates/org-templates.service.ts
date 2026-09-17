@@ -57,6 +57,11 @@ export class OrgTemplatesService {
       this.prisma.template.count({ where }),
     ]);
 
+    const landingPageCounts = await this.landingPageCountsByTemplate(
+      orgId,
+      templates.map((t) => t.id),
+    );
+
     return {
       data: templates.map((t) => {
         const mapped = toLandingPageData(t);
@@ -68,12 +73,37 @@ export class OrgTemplatesService {
           category: mapped.category,
           template: mapped.template,
           updatedAt: mapped.updatedAt,
+          landingPageCount: landingPageCounts.get(t.id) ?? 0,
         };
       }),
       total,
       page,
       limit,
     };
+  }
+
+  // Shared by list() and getAvailable() — the frontend needs this per
+  // template so it can disable/explain "Remove" before the person clicks
+  // it, rather than letting them confirm an action the API guard (see
+  // unassignTemplate below) is just going to reject anyway. A template that
+  // was never assigned to this org can't have any (create() only allows
+  // building from an assigned template), so callers only need to look this
+  // up for assigned ids.
+  private async landingPageCountsByTemplate(
+    orgId: string | null | undefined,
+    templateIds: string[],
+  ): Promise<Map<string, number>> {
+    if (!orgId || templateIds.length === 0) return new Map();
+    const grouped = await this.prisma.landingPage.groupBy({
+      by: ['sourceTemplateId'],
+      where: { orgId, sourceTemplateId: { in: templateIds } },
+      _count: { _all: true },
+    });
+    return new Map(
+      grouped
+        .filter((g): g is typeof g & { sourceTemplateId: string } => g.sourceTemplateId !== null)
+        .map((g) => [g.sourceTemplateId, g._count._all]),
+    );
   }
 
   async getAvailable(orgId: string) {
@@ -98,6 +128,11 @@ export class OrgTemplatesService {
       ? Math.max(0, maxAllowed - assignedCount)
       : null;
 
+    // Only assigned templates can possibly have any (see
+    // landingPageCountsByTemplate's comment) — no point counting for the
+    // rest of the catalog.
+    const landingPageCounts = await this.landingPageCountsByTemplate(orgId, [...assignedSet]);
+
     const data = allPublishedTemplates.map((t) => {
       const mapped = toLandingPageData(t);
       return {
@@ -109,6 +144,7 @@ export class OrgTemplatesService {
         template: mapped.template,
         updatedAt: mapped.updatedAt,
         isAssigned: assignedSet.has(t.id),
+        landingPageCount: landingPageCounts.get(t.id) ?? 0,
       };
     });
 
@@ -164,12 +200,28 @@ export class OrgTemplatesService {
     };
   }
 
+  // Removal is blocked, not just discouraged, when the org actually built
+  // something from this template — otherwise a 1-template plan lets someone
+  // cycle assign -> build a landing page -> unassign -> assign a different
+  // template -> build again, drawing on as many templates as their
+  // landingPages quota allows while only ever paying for one slot at a
+  // time. A template nothing was built from stays freely removable, so a
+  // mistaken pick is still correctable.
   async unassignTemplate(templateId: string, orgId: string) {
     const existing = await this.prisma.organisationTemplate.findUnique({
       where: { orgId_templateId: { orgId, templateId } },
     });
     if (!existing) {
       throw new NotFoundException('Template assignment not found');
+    }
+
+    const landingPageCount = await this.prisma.landingPage.count({
+      where: { orgId, sourceTemplateId: templateId },
+    });
+    if (landingPageCount > 0) {
+      throw new BadRequestException(
+        `Can't remove this template — ${landingPageCount} landing page${landingPageCount === 1 ? '' : 's'} in your workspace ${landingPageCount === 1 ? 'was' : 'were'} built from it. Delete ${landingPageCount === 1 ? 'that page' : 'those pages'} first if you want to free up this slot.`,
+      );
     }
 
     await this.prisma.organisationTemplate.delete({
@@ -179,24 +231,19 @@ export class OrgTemplatesService {
     return { success: true, message: 'Template removed from your organisation' };
   }
 
-  async getById(id: string, orgId?: string | null) {
-    // Same eligibility filter as the list — a draft/paid/thank-you id must
-    // 404 here, not just be hidden by the UI.
+  // Deliberately NOT gated on assignment — this is the "preview before you
+  // spend one of your plan's template slots" read, reused by both the "My
+  // Templates" page's own preview and the "Add Template to Workspace"
+  // modal's preview. ELIGIBLE_WHERE (published + pageType 'landing') is the
+  // only gate: draft/scheduled/password/unpublished templates and
+  // thank-you companion pages still 404, same as everywhere else a
+  // template id is resolved.
+  async getById(id: string) {
     const template = await this.prisma.template.findFirst({
       where: { id, ...ELIGIBLE_WHERE },
     });
     if (!template) {
       throw new NotFoundException('Template not found');
-    }
-    // Must be assigned to this org — no assignment record means no access,
-    // regardless of how many (if any) other templates are assigned.
-    const assignment = orgId
-      ? await this.prisma.organisationTemplate.findUnique({
-          where: { orgId_templateId: { orgId, templateId: id } },
-        })
-      : null;
-    if (!assignment) {
-      throw new NotFoundException('Template not assigned to your organisation');
     }
     return toLandingPageData(template, { includeContent: true });
   }

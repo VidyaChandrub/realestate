@@ -23,6 +23,7 @@ export interface SafeUser {
   created_at: string;
   onboarding_step: OnboardingStep;
   email_verified_at?: string | null;
+  country?: string | null;
 }
 
 export interface SafeOrganisation {
@@ -116,6 +117,7 @@ export interface OnboardingAccountInput {
   work_email: string;
   phone_number: string;
   password: string;
+  country: string;
 }
 
 export type SignupStep1Response =
@@ -137,8 +139,13 @@ export type SignupStep1Response =
 // "You already started this" popup — resolves an exists_incomplete match by
 // either continuing the old draft or restarting it, both with whatever was
 // just retyped on Step 1. See AuthService.resumeExistingDraft/restartExistingDraft.
-export interface ResolveDraftInput extends OnboardingAccountInput {
+export interface ResolveDraftInput {
   existingUserId: string;
+  first_name: string;
+  last_name: string;
+  work_email: string;
+  phone_number: string;
+  country: string;
 }
 
 export interface ResumeSignupResponse extends AuthTokens {
@@ -308,8 +315,35 @@ export interface OrganisationSummary {
   pending?: number;
   disabled?: number;
   draft?: number;
+  // Step 1 (Account) drafts that never became an Organisation — not part of
+  // `draft` above, which counts real Organisation.status === 'draft' rows.
+  pendingSignups?: number;
   onTrial: null;
   suspended: null;
+}
+
+// A Step 1 (Account) draft that never reached Step 2 — has no orgId, so it
+// can never be shown as an OrganisationListRow (no fake org id). Only
+// email-verified rows are ever returned by the backend (see
+// PENDING_SIGNUP_WHERE) — unverified throwaway signups are filtered out,
+// not just hidden client-side.
+export interface PendingSignupRow {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  phoneNumber: string | null;
+  country: string | null;
+  onboardingStep: OnboardingStep;
+  emailVerifiedAt: string;
+  createdAt: string;
+}
+
+export interface PendingSignupListResponse {
+  data: PendingSignupRow[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface OrganisationDetail {
@@ -529,6 +563,11 @@ export interface OrgTemplateSummary {
   category: string | null;
   template: string;
   updatedAt: string;
+  // How many of this org's own landing pages were built from this
+  // template — 0 for anything never assigned. Lets the frontend disable
+  // "Remove" up front instead of letting someone confirm an action the
+  // backend guard (unassignTemplate) is just going to reject.
+  landingPageCount: number;
 }
 
 export interface OrgTemplatesListResponse {

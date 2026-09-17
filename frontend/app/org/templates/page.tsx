@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutTemplate, Search, Plus, Check } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
@@ -42,6 +43,16 @@ export default function OrgTemplatesPage() {
   const [availableError, setAvailableError] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignMessage, setAssignMessage] = useState<string | null>(null);
+
+  // Remove (unassign) — reachable from both the main grid's own card and
+  // the "Already Selected" card inside the Add Template modal, so it's
+  // surfaced at the page level rather than owned by either one.
+  const [removeConfirm, setRemoveConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  // Shown instead of the confirm dialog when landingPageCount > 0. The
+  // button stays clickable so the user gets the explanation in context.
+  const [removeBlocked, setRemoveBlocked] = useState<{ name: string; message: string } | null>(null);
 
   function openUseTemplate(id: string, defaultName: string) {
     setUseTemplate({ id, name: defaultName });
@@ -140,8 +151,8 @@ export default function OrgTemplatesPage() {
     loadAvailableTemplates();
   }
 
-  async function handleAssignTemplate(templateId: string) {
-    if (!accessToken) return;
+  async function handleAssignTemplate(templateId: string): Promise<boolean> {
+    if (!accessToken) return false;
     setAssigningId(templateId);
     setAssignMessage(null);
     setAvailableError(null);
@@ -153,10 +164,62 @@ export default function OrgTemplatesPage() {
       setAssignMessage(res.message);
       loadAvailableTemplates();
       fetchAssignedTemplates();
+      return true;
     } catch (err) {
       setAvailableError(err instanceof Error ? err.message : "Failed to add template.");
+      return false;
     } finally {
       setAssigningId(null);
+    }
+  }
+
+  // Confirm-then-remove — reachable from the main grid and from the Add
+  // Template modal's "Already Selected" card. The backend blocks this
+  // (400, with a landing-page count in the message) if anything was built
+  // from the template; that message is surfaced as-is, not swallowed into
+  // a generic error, since it's the actual reason and names what to do
+  // about it (delete those pages first).
+  function requestRemoveTemplate(id: string, name: string) {
+    setRemoveError(null);
+    // Re-check locally before opening confirmation so a known-blocked action
+    // gets the explanation immediately rather than a doomed confirmation.
+    const count =
+      rows.find((r) => r.id === id)?.landingPageCount ??
+      availableData?.data.find((t) => t.id === id)?.landingPageCount ??
+      0;
+    if (count > 0) {
+      const message = `Can't remove this template — ${count} landing page${count === 1 ? "" : "s"} in your workspace ${count === 1 ? "was" : "were"} built from it. Delete ${count === 1 ? "that page" : "those pages"} first if you want to free up this slot.`;
+      setRemoveBlocked({ name, message });
+      return;
+    }
+    setRemoveConfirm({ id, name });
+  }
+
+  async function confirmRemoveTemplate() {
+    if (!removeConfirm || !accessToken) return;
+    const { id } = removeConfirm;
+    setRemovingId(id);
+    try {
+      await apiFetch<{ success: boolean; message: string }>(`/org/templates/${id}/assign`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      setRemoveConfirm(null);
+      setAssignMessage("Template removed from your organisation");
+      // Refresh both datasets regardless of which one is currently visible
+      // — the grid and the Add Template modal's quota banner ("1 of 1
+      // Selected" / "Quota Full") must both reflect this without a reload,
+      // and whichever one isn't on screen right now will be fetched fresh
+      // the next time it's opened anyway.
+      fetchAssignedTemplates();
+      loadAvailableTemplates();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to remove template.";
+      setRemoveError(message);
+      setAvailableError(message);
+      setRemoveConfirm(null);
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -191,6 +254,15 @@ export default function OrgTemplatesPage() {
   ).sort();
 
   const previewCfg = previewData ? ensureConfig(previewData) : null;
+  // A template previewed from "Add Template to Workspace" isn't assigned
+  // yet — "Use this template" (which creates a landing page immediately)
+  // would 403 there, so the CTA becomes "Add to Workspace" instead until
+  // it's actually assigned. Checked against both data sources since preview
+  // can be opened from either the assigned-templates grid or the add modal.
+  const previewedIsAssigned =
+    !!previewId &&
+    (rows.some((r) => r.id === previewId) ||
+      (availableData?.data.find((t) => t.id === previewId)?.isAssigned ?? false));
 
   return (
     <>
@@ -208,6 +280,22 @@ export default function OrgTemplatesPage() {
           </button>
         </div>
       </div>
+
+      {removeError ? (
+        <div
+          style={{
+            padding: "10px 14px",
+            background: "var(--rose-050, #fef2f2)",
+            color: "var(--rose, #e11d48)",
+            border: "1px solid var(--rose-100, #fecdd3)",
+            borderRadius: 8,
+            fontSize: 13,
+            marginBottom: 16,
+          }}
+        >
+          {removeError}
+        </div>
+      ) : null}
 
       <Reveal delay={1}>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
@@ -281,6 +369,8 @@ export default function OrgTemplatesPage() {
               delay={i % 6}
               onPreview={() => openPreview(row.id)}
               onUse={() => openUseTemplate(row.id, row.name)}
+              onRemove={() => requestRemoveTemplate(row.id, row.name)}
+              removing={removingId === row.id}
             />
           ))}
         </div>
@@ -414,25 +504,47 @@ export default function OrgTemplatesPage() {
                           <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{tmpl.template}</div>
                         </div>
 
-                        <div style={{ marginTop: "auto", paddingTop: 8 }}>
+                        <div style={{ marginTop: "auto", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                          {/* Preview works regardless of assignment — picking
+                              blind is a bad experience when a plan only
+                              allows one or two template slots. */}
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            type="button"
+                            onClick={() => openPreview(tmpl.id)}
+                            style={{ width: "100%", justifyContent: "center" }}
+                          >
+                            Preview
+                          </button>
                           {isAssigned ? (
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 4,
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: "var(--indigo, #6366f1)",
-                                background: "var(--indigo-050, #eef2ff)",
-                                padding: "6px 12px",
-                                borderRadius: 8,
-                                width: "100%",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Check size={14} /> Already Selected
-                            </span>
+                            <>
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  color: "var(--indigo, #6366f1)",
+                                  background: "var(--indigo-050, #eef2ff)",
+                                  padding: "6px 12px",
+                                  borderRadius: 8,
+                                  width: "100%",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <Check size={14} /> Already Selected
+                              </span>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                type="button"
+                                disabled={removingId === tmpl.id}
+                                onClick={() => requestRemoveTemplate(tmpl.id, tmpl.name)}
+                                style={{ width: "100%", justifyContent: "center", color: "var(--rose)" }}
+                              >
+                                {removingId === tmpl.id ? "Removing…" : "Remove"}
+                              </button>
+                            </>
                           ) : (
                             <button
                               className="btn btn-primary btn-sm"
@@ -466,14 +578,29 @@ export default function OrgTemplatesPage() {
         size="full"
         flush
         headerActions={
-          <button
-            className="btn btn-primary btn-sm"
-            type="button"
-            disabled={!previewData}
-            onClick={() => previewData && openUseTemplate(previewData.id, previewData.name)}
-          >
-            Use this template
-          </button>
+          previewedIsAssigned ? (
+            <button
+              className="btn btn-primary btn-sm"
+              type="button"
+              disabled={!previewData}
+              onClick={() => previewData && openUseTemplate(previewData.id, previewData.name)}
+            >
+              Use this template
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary btn-sm"
+              type="button"
+              disabled={!previewData || assigningId === previewId}
+              onClick={async () => {
+                if (!previewId) return;
+                const ok = await handleAssignTemplate(previewId);
+                if (ok) closePreview();
+              }}
+            >
+              {assigningId === previewId ? "Adding…" : "+ Add to Workspace"}
+            </button>
+          )
         }
       >
             <div style={{ flex: 1, overflowY: "auto", background: "#f4f5f8", minHeight: 360 }}>
@@ -538,6 +665,37 @@ export default function OrgTemplatesPage() {
               <div style={{ color: "var(--rose)", fontSize: 12.5, marginTop: 8 }}>{useError}</div>
             ) : null}
       </Modal>
+
+      <ConfirmModal
+        open={!!removeConfirm}
+        title="Remove this template?"
+        message={
+          removeConfirm
+            ? `"${removeConfirm.name}" will be removed from your workspace, freeing up a slot on your plan. This doesn't delete anything you've already built from it — any landing pages you made from this template stay exactly as they are.`
+            : undefined
+        }
+        confirmLabel="Remove template"
+        destructive
+        busy={removingId === removeConfirm?.id}
+        onConfirm={confirmRemoveTemplate}
+        onClose={() => setRemoveConfirm(null)}
+      />
+
+      <Modal
+        open={!!removeBlocked}
+        onClose={() => setRemoveBlocked(null)}
+        title="Template can't be removed"
+        size="sm"
+        footer={
+          <button className="btn btn-primary btn-sm" type="button" onClick={() => setRemoveBlocked(null)}>
+            Close
+          </button>
+        }
+      >
+        <p style={{ margin: 0, color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
+          {removeBlocked?.message}
+        </p>
+      </Modal>
     </>
   );
 }
@@ -547,11 +705,15 @@ function OrgTemplateCard({
   delay,
   onPreview,
   onUse,
+  onRemove,
+  removing,
 }: {
   row: OrgTemplateSummary;
   delay: number;
   onPreview: () => void;
   onUse: () => void;
+  onRemove: () => void;
+  removing: boolean;
 }) {
   return (
     <Reveal delay={delay}>
@@ -574,12 +736,21 @@ function OrgTemplateCard({
               {row.template}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
+          <div style={{ display: "flex", gap: 8, marginTop: "auto", flexWrap: "wrap" }}>
             <button className="btn btn-ghost btn-sm" type="button" onClick={onPreview}>
               Preview
             </button>
             <button className="btn btn-primary btn-sm" type="button" onClick={onUse}>
               Use this template
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              type="button"
+              onClick={onRemove}
+              disabled={removing}
+              style={{ color: "var(--rose)" }}
+            >
+              {removing ? "Removing…" : "Remove"}
             </button>
           </div>
         </div>

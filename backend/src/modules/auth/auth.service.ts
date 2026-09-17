@@ -463,6 +463,7 @@ export class AuthService {
         lastName: dto.last_name,
         email: dto.work_email,
         phoneNumber: normalizedPhone,
+        country: dto.country,
         passwordHash,
         status: 'active',
         onboardingStep: 'account',
@@ -595,7 +596,6 @@ export class AuthService {
       }
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
     const updated = await this.prisma.user.update({
       where: { id: existingUser.id },
       data: {
@@ -603,7 +603,7 @@ export class AuthService {
         lastName: dto.last_name,
         email: dto.work_email,
         phoneNumber: normalizedPhone,
-        passwordHash,
+        country: dto.country,
       },
       include: { userRoles: { include: { role: true } } },
     });
@@ -1033,12 +1033,9 @@ export class AuthService {
     // Backend access stays blocked until the flag clears (SuperAdminGuard /
     // OrgApprovedGuard), so this is a redirect hint, not the enforcement.
 
-    const isOrgAdmin = roles.includes('admin');
     const stillInDraftSignup =
       !isSuperAdmin &&
-      isOrgAdmin &&
-      user.onboardingStep !== 'completed' &&
-      (orgStatus === null || orgStatus === 'draft');
+      user.onboardingStep !== 'completed';
 
     return {
       user: safeUser,

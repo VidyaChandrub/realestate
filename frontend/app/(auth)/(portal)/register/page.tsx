@@ -144,6 +144,7 @@ export default function RegisterPage() {
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [resendState, setResendState] = useState<"idle" | "sent">("idle");
   const [resumeAfterVerify, setResumeAfterVerify] = useState<OnboardingStep | null>(null);
+  const [resumingDraft, setResumingDraft] = useState(false);
   // Set when Step 1's email or mobile matches someone's still-in-progress
   // signup — the popup asks whether to continue that draft or start fresh
   // with whatever was just typed, see handleContinueDraft/handleStartFreshDraft.
@@ -192,13 +193,14 @@ export default function RegisterPage() {
   function validateStep(n: number): boolean {
     setGeneralError(null);
     if (n === 1) {
-      const required: (keyof typeof form)[] = ["first_name", "last_name", "work_email", "country", "phone_number", "password"];
+      const required: (keyof typeof form)[] = ["first_name", "last_name", "work_email", "country", "phone_number"];
+      if (!resumingDraft) required.push("password");
       for (const k of required) {
         if (!form[k]?.trim()) { setGeneralError(`${STEP1_FIELD_LABELS[k] ?? k.replace(/_/g, " ")} is required`); return false; }
       }
       const phoneError = validatePhoneForCountry(form.phone_number, form.country);
       if (phoneError) { setGeneralError(phoneError); return false; }
-      if (form.password.length < 8) { setGeneralError("Password must be at least 8 characters"); return false; }
+      if (!resumingDraft && form.password.length < 8) { setGeneralError("Password must be at least 8 characters"); return false; }
       return true;
     }
     if (n === 2) {
@@ -254,7 +256,7 @@ export default function RegisterPage() {
           last_name: form.last_name,
           work_email: form.work_email,
           phone_number: phoneCallingCode ? `${phoneCallingCode} ${form.phone_number}` : form.phone_number,
-          password: form.password,
+          country: form.country,
         });
         applyTokens(resumed.user, resumed);
         resumedAccountIdRef.current = resumed.user.id;
@@ -277,6 +279,7 @@ export default function RegisterPage() {
         // fully-qualified number, not just the digits.
         phone_number: phoneCallingCode ? `${phoneCallingCode} ${form.phone_number}` : form.phone_number,
         password: form.password,
+        country: form.country,
       });
       if (res.status === "exists_completed") {
         setAccountExists(true);
@@ -328,15 +331,18 @@ export default function RegisterPage() {
   // branch) — restores every downstream step's local state from whatever
   // the backend has saved for this draft.
   //
-  // Deliberately always lands the wizard back on Step 1 (never jumps ahead
-  // to whatever step the draft had reached) — every field the draft already
-  // has is prefilled there so the person can review/edit before clicking
-  // through, rather than being dropped mid-flow on a page they don't
-  // recognise.
+  // Restore saved account details and continue at the next step when the
+  // account is already verified; unverified drafts stop for verification.
   function applyResumedState(resumed: ResumeSignupResponse) {
     applyTokens(resumed.user, resumed);
     resumedAccountIdRef.current = resumed.user.id;
-    const resumedCountry = resumed.organisation?.country ?? form.country;
+    setResumingDraft(true);
+    // Organisation.country (once Step 2 has run) is the source of truth;
+    // before that, fall back to the country captured on the User at Step 1
+    // (see User.country's schema comment) — without it, resuming a
+    // pre-Step-2 draft had nothing to restore the Country select from, so
+    // the phone field rendered the dial code and local number concatenated.
+    const resumedCountry = resumed.organisation?.country ?? resumed.user.country ?? form.country;
     const resumedCallingCode = callingCodeForCountry(resumedCountry);
     setForm((prev) => ({
       ...prev,
@@ -365,22 +371,30 @@ export default function RegisterPage() {
       setResumeAfterVerify(resumed.nextStep);
       return;
     }
-    setCur(0);
+    setCur(resumed.user.email_verified_at && resumed.user.onboarding_step === "account" ? 1 : 0);
     window.scrollTo(0, 0);
   }
 
   const didResumeRef = useRef(false);
   useEffect(() => {
     if (didResumeRef.current) return;
-    if (!user || user.role === "super_admin" || user.role === "team_member") return;
+    if (!user || user.role === "super_admin") return;
     if (user.onboarding_step === "completed") return;
     didResumeRef.current = true;
     resumeSignup(user.email)
-      .then((resumed) => applyResumedState(resumed))
+      .then((resumed) => {
+        setDraftCollision({
+          existingUserId: resumed.user.id,
+          firstName: resumed.user.first_name,
+          lastName: resumed.user.last_name,
+          onboardingStep: resumed.user.onboarding_step,
+        });
+      })
       .catch(() => {
         didResumeRef.current = false;
       });
-    // Resume once when an incomplete session is already present (e.g. after login).
+    // Present the same explicit draft choice used by a fresh signup collision
+    // when an incomplete user reaches the wizard from login or /org.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.onboarding_step]);
 
@@ -464,6 +478,7 @@ export default function RegisterPage() {
       await logout();
       didResumeRef.current = true;
       resumedAccountIdRef.current = null;
+      setResumingDraft(false);
       setAwaitingVerification(false);
       setVerifyCode("");
       setVerifyError(null);
@@ -736,12 +751,12 @@ export default function RegisterPage() {
                   {fieldErrors.phone_number ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.phone_number}</div> : null}
                 </div>
               </div>
-              <div className="field" style={{ marginBottom: 0 }}>
+              {!resumingDraft ? <div className="field" style={{ marginBottom: 0 }}>
                 <label>Password <span className="req">*</span></label>
                 <PasswordInput value={form.password} onChange={update("password")} placeholder="••••••••••" autoComplete="new-password" />
                 <div className="hint">Min 8 characters.</div>
                 {fieldErrors.password ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.password}</div> : null}
-              </div>
+              </div> : null}
             </div>
           </div>
 

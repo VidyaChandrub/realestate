@@ -127,8 +127,13 @@ export class OrgApprovedGuard implements CanActivate {
         status: true,
         mustChangePassword: true,
         tokenInvalidBefore: true,
+        onboardingStep: true,
       },
     });
+
+    if (user && user.onboardingStep !== 'completed') {
+      throw new ForbiddenException('Onboarding incomplete');
+    }
 
     // Account disapproved / deactivated after this token was issued — reject
     // immediately so a still-valid access JWT cannot keep working (mirrors the

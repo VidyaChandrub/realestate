@@ -243,6 +243,13 @@ model User {
   // Defaults to 'account' since a User row is only ever created once Step 1
   // (Account) has actually completed.
   onboardingStep OnboardingStep @default(account) @map("onboarding_step")
+  // Collected at signup Step 1 (Account) — no Organisation exists yet at
+  // that point to hold it. Purely for restoring the Country select and
+  // stripping the dial code back off the phone number on resume (see
+  // AuthService.resumeSignup / stripCallingCode on the frontend); the
+  // Organisation's own `country` (set at Step 2) is the source of truth
+  // once an org exists.
+  country String? @map("country")
   emailVerifiedAt DateTime? @map("email_verified_at")
   // Terms of Service & Privacy Policy acceptance — checked at signup Step 2
   // (Organisation). Set once, never cleared; this is a compliance record,

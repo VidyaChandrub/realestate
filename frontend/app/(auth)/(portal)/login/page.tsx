@@ -60,9 +60,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       const session = await login({ email, password });
-      const resumeOrgSignup =
-        session.role === "organisation_admin" &&
-        session.onboarding_step !== "completed";
+      const resumeOrgSignup = session.onboarding_step !== "completed";
       if (resumeOrgSignup) {
         router.push("/register");
         router.refresh();
