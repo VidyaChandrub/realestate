@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions } from "@/lib/api";
 import { parseAmount, parseCount, parseInteger } from "@/lib/parse";
+import { currencyPrefix, formatMoney } from "@/lib/money";
 import { prefillFromUnitType, type PrefillField } from "@/lib/unit-prefill";
 import { plannedMixRemoval } from "@/lib/unit-types";
 import { Reveal } from "@/components/superadmin/reveal";
@@ -66,23 +67,6 @@ const FILTERS = ["All", "Available", "Booked", "Held", "Sold"] as const;
 
 // Bucket key for units with no tower set — grouped together as "All units".
 const NO_TOWER = "__NO_TOWER__";
-
-/** Derived ₹/sqft — never stored, so it can't drift from the real price. */
-function pricePerSqft(
-  price: number | null,
-  carpetSqft: number | null,
-): string | null {
-  if (!price || !carpetSqft) return null;
-  return `₹${Math.round(price / carpetSqft).toLocaleString("en-IN")}/sqft`;
-}
-
-
-function compactRupees(value: number | null): string {
-  if (value == null) return "—";
-  if (value >= 1e7) return `₹${(value / 1e7).toFixed(2).replace(/\.?0+$/, "")} Cr`;
-  if (value >= 1e5) return `₹${(value / 1e5).toFixed(2).replace(/\.?0+$/, "")} L`;
-  return `₹${value.toLocaleString("en-IN")}`;
-}
 
 interface UnitTypeForm {
   name: string;
@@ -782,14 +766,13 @@ export default function OrgProjectUnitsPage() {
                       <div>
                         <div className="k">Price</div>
                         <div className="v">
-                          {compactRupees(ut?.price ?? null)}
+                          {ut?.price != null ? formatMoney(ut.price, project?.currency ?? "INR") : "—"}
                         </div>
                       </div>
                       <div>
-                        <div className="k">₹/sqft</div>
+                        <div className="k">{currencyPrefix(project?.currency ?? "INR").trim()}/sqft ({PRICE_BASIS_LABEL[priceBasis]})</div>
                         <div className="v">
-                          {pricePerSqft(ut?.price ?? null, ut?.carpetSqft ?? null) ??
-                            "—"}
+                          {pricePerSqftLabel(ut?.price ?? null, ut?.carpetSqft ?? null, ut?.builtupSqft ?? null, priceBasis, project?.currency ?? "INR") || "—"}
                         </div>
                       </div>
                     </div>
@@ -941,7 +924,7 @@ export default function OrgProjectUnitsPage() {
                   <th>Floor</th>
                   <th>Facing</th>
                   <th>Parking</th>
-                  <th>Price ₹</th>
+                  <th>Price {currencyPrefix(project?.currency ?? "INR").trim()}</th>
                   <th>Created by</th>
                   <th>Updated by</th>
                   <th>Status</th>
@@ -973,11 +956,11 @@ export default function OrgProjectUnitsPage() {
                       <td>{row.parking ?? "—"}</td>
                       <td>
                         {row.price != null
-                          ? row.price.toLocaleString("en-IN")
+                          ? formatMoney(row.price, project?.currency ?? "INR")
                           : "—"}
                         {row.pricePerSqft != null ? (
                           <div className="hint" style={{ marginTop: 2 }}>
-                            {row.pricePerSqft.toLocaleString("en-IN")} / sqft ({PRICE_BASIS_LABEL[row.pricePerSqftBasis]})
+                            {formatMoney(row.pricePerSqft, project?.currency ?? "INR", 2)} / sqft ({PRICE_BASIS_LABEL[row.pricePerSqftBasis]})
                           </div>
                         ) : null}
                       </td>
@@ -1164,7 +1147,7 @@ export default function OrgProjectUnitsPage() {
             </div>
           </div>
           <div className="field">
-            <label>Base price (₹)</label>
+            <label>Base price ({currencyPrefix(project?.currency ?? "INR").trim()})</label>
             <input
               className="inp"
               type="number"
@@ -1347,7 +1330,7 @@ export default function OrgProjectUnitsPage() {
               <div className="lbl"><Icon name="billing" size={15} /> Pricing &amp; status</div>
               <div className="grid g3">
                 <div className="field">
-                  <label>Price (₹)</label>
+                  <label>Price ({currencyPrefix(project?.currency ?? "INR").trim()})</label>
                   <input
                     className="inp"
                     type="number"

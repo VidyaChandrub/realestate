@@ -77,6 +77,7 @@ const UNIT_ACTOR_SELECT = {
 } as const;
 
 const UNIT_INCLUDE = {
+  project: { select: { currency: true } },
   createdBy: UNIT_ACTOR_SELECT,
   updatedBy: UNIT_ACTOR_SELECT,
   manager: UNIT_ACTOR_SELECT,
@@ -185,7 +186,8 @@ export class ProjectsService {
           amenities: (dto.amenities ?? []) as unknown as Prisma.InputJsonValue,
           // Onboarding-wizard fields (Steps 3-8).
           bookingAmount: dto.bookingAmount ?? null,
-          currency: dto.currency ?? 'INR',
+          // Required on the DTO now (@IsNotEmpty) — no silent INR fallback.
+          currency: dto.currency,
           priceIncludes: dto.priceIncludes ?? [],
           paymentPlan: dto.paymentPlan ?? null,
           offers: dto.offers ?? null,
@@ -350,8 +352,70 @@ export class ProjectsService {
   }
 
   async update(orgId: string, id: string, dto: UpdateProjectDto, actor?: JwtPayload) {
-    await this.getOwnedProject(orgId, id, actor);
+    const existingProject = await this.getOwnedProject(orgId, id, actor);
     if (dto.managerId) await this.assertOrgUser(orgId, dto.managerId);
+
+    // Block a currency switch once real unit/unit-type prices exist — those
+    // numbers were entered under the old currency and would be silently
+    // reinterpreted (₹1,00,00,000 becoming AED 1,00,00,000) rather than
+    // converted. Deliberately NOT checking the project's own priceMin/
+    // priceMax/baseRate/bookingAmount here: priceMin is a mandatory field on
+    // every project (required at creation, never nullable through the edit
+    // form's own validation), so including it would make this block
+    // permanent for every project that exists, not a guard against stale
+    // data. Those headline price fields are edited on this exact form, in
+    // the same request as the currency change, so the person changing
+    // currency is already looking at them — unlike a unit's price, which
+    // lives on a different page and is easy to forget about.
+    if (dto.currency !== undefined && dto.currency !== existingProject.currency) {
+      const [pricedUnit, pricedUnitType] = await Promise.all([
+        this.prisma.unit.findFirst({
+          where: { projectId: id, price: { not: null } },
+          select: { id: true },
+        }),
+        this.prisma.unitType.findFirst({
+          where: { projectId: id, price: { not: null } },
+          select: { id: true },
+        }),
+      ]);
+
+      if (pricedUnit || pricedUnitType) {
+        throw new BadRequestException(
+          'Currency cannot be changed after unit or unit-type prices have been entered. Clear all unit and unit-type prices first.',
+        );
+      }
+
+      // The project's own headline price fields can't be required-empty the
+      // way unit prices are (priceMin is mandatory), so instead require them
+      // to actually be RE-ENTERED alongside a currency change: if a field
+      // already holds a value and the submitted value is exactly the same
+      // number, that's the old amount sitting there unchanged under a new
+      // currency label — the same silent-reinterpretation bug, just not
+      // caught by the block above. A genuinely different number (including
+      // one the user retyped identically on purpose) passes through.
+      const HEADLINE_PRICE_FIELDS: {
+        key: 'priceMin' | 'priceMax' | 'baseRate' | 'bookingAmount';
+        label: string;
+      }[] = [
+        { key: 'priceMin', label: 'Price range — from' },
+        { key: 'priceMax', label: 'Price range — to' },
+        { key: 'baseRate', label: 'Price per sqft' },
+        { key: 'bookingAmount', label: 'Booking amount' },
+      ];
+      const stale = HEADLINE_PRICE_FIELDS.filter(({ key }) => {
+        const oldVal = existingProject[key];
+        if (oldVal == null) return false;
+        const newVal = dto[key] !== undefined ? dto[key] : oldVal;
+        return newVal === oldVal;
+      });
+      if (stale.length > 0) {
+        throw new BadRequestException(
+          `Currency changed — re-enter these in the new currency before saving: ${stale
+            .map((f) => f.label)
+            .join(', ')}.`,
+        );
+      }
+    }
 
     const data: Prisma.ProjectUncheckedUpdateInput = {};
     for (const key of PROJECT_SCALARS) {
@@ -419,13 +483,58 @@ export class ProjectsService {
   // re-submitting is idempotent (delete-all + recreate in one transaction).
   // -------------------------------------------------------------------------
 
-  /**
-   * Org members who may be assigned to a project as sales agents — the same
-   * "who can hold a lead" rule the Lead Center assignee picker uses. Kept
-   * org-level (no projectId) because the eligible set doesn't vary by project.
-   */
+  /** Existing CRM-eligible candidates used by lead and standalone-unit flows. */
   async listSalesAgentCandidates(orgId: string) {
     const data = await listLeadAssignableUsers(this.prisma, orgId);
+    return { data, total: data.length };
+  }
+
+  /** Active org members available to assign to projects, with role and
+   * existing project membership context for the assignment picker. */
+  async listProjectAssigneeCandidates(orgId: string) {
+    const users = await this.prisma.user.findMany({
+      where: { orgId, status: 'active' },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        userRoles: {
+          where: { role: { status: 'active' } },
+          select: { role: { select: { key: true, name: true } } },
+        },
+        managedProjects: { select: { id: true, name: true } },
+        salesProjects: {
+          select: { project: { select: { id: true, name: true } } },
+        },
+      },
+    });
+
+    const data = users.map((user) => {
+      const projects = new Map<string, { id: string; name: string; role: string }>();
+      for (const project of user.managedProjects) {
+        projects.set(project.id, { ...project, role: 'Manager' });
+      }
+      for (const assignment of user.salesProjects) {
+        if (!projects.has(assignment.project.id)) {
+          projects.set(assignment.project.id, {
+            ...assignment.project,
+            role: 'Sales agent',
+          });
+        }
+      }
+
+      return {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+        role: user.userRoles[0]?.role ?? null,
+        projects: [...projects.values()],
+      };
+    });
     return { data, total: data.length };
   }
 
@@ -453,10 +562,9 @@ export class ProjectsService {
   }
 
   /**
-   * Every id must be someone the shared "who can hold a lead" rule allows —
-   * never trusted from the body. Same list `listSalesAgentCandidates` shows,
-   * so a direct API call can't attach anyone the picker wouldn't offer. Used
-   * by both a project's sales agents and a standalone unit's.
+  * Every id must be an active member of the caller's org. Project assignment
+  * intentionally supports every org role; the separate standalone-unit and
+  * lead assignment paths retain their narrower CRM eligibility rule.
    *
    * Callers must pass only the ids being newly added to the set, not the
    * whole resubmitted list — an id that's already assigned may have since
@@ -494,7 +602,21 @@ export class ProjectsService {
       ).map((r) => r.userId),
     );
     const newIds = unique.filter((id) => !currentIds.has(id));
-    await this.assertAssignableAgents(orgId, newIds);
+    if (newIds.length > 0) {
+      const eligible = new Set(
+        (
+          await this.prisma.user.findMany({
+            where: { orgId, status: 'active', id: { in: newIds } },
+            select: { id: true },
+          })
+        ).map((user) => user.id),
+      );
+      if (eligible.size !== newIds.length) {
+        throw new BadRequestException(
+          'Assigned users must be active members of this organisation',
+        );
+      }
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.projectSalesAgent.deleteMany({ where: { projectId } });
@@ -1562,7 +1684,12 @@ export class ProjectsService {
   ): number | null {
     const area = basis === 'builtup' ? unit.builtupSqft : unit.carpetSqft;
     if (!unit.price || !area) return null;
-    return Math.round(unit.price / area);
+    // Never stored — derived fresh on every read — so unlike the price
+    // itself (a real Int column) there's no reason to round it to a whole
+    // unit. In real estate the difference between 2.50 and 2.72 per sqft is
+    // real money at project scale, so keep two decimal places rather than
+    // rounding both down to a misleadingly identical "3".
+    return Math.round((unit.price / area) * 100) / 100;
   }
 
   private serializeUnit(unit: UnitRow, basis: UnitPriceBasis) {
@@ -1570,6 +1697,7 @@ export class ProjectsService {
       id: unit.id,
       orgId: unit.orgId,
       projectId: unit.projectId,
+      currency: unit.project?.currency ?? null,
       configuration: unit.configuration,
       variantLabel: unit.variantLabel,
       unitNo: unit.unitNo,

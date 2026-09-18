@@ -212,6 +212,16 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
       return;
     }
     if (user.onboarding_step !== "completed") {
+      // Same explicit signal /login sets before sending an incomplete
+      // account to /register (see login/page.tsx) — this is a real,
+      // already-authenticated session landing here on its own (e.g. a
+      // bookmarked /org URL), so the wizard's "Welcome back" resume dialog
+      // is the right call, not a bug.
+      try {
+        window.sessionStorage.setItem("register_resume_intent", "1");
+      } catch {
+        // best-effort — worst case the wizard falls back to a blank form.
+      }
       router.replace("/register");
       return;
     }

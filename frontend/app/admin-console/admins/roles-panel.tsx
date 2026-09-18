@@ -77,7 +77,7 @@ export function PlatformRolesPanel({
     canApprove: boolean;
   }[]>([]);
   const [permLoading, setPermLoading] = useState(false);
-  const [permSaving, setPermSaving] = useState(false);
+  const [savingPermission, setSavingPermission] = useState<string | null>(null);
   const [permError, setPermError] = useState<string | null>(null);
 
   const notify = (msg: string) => {
@@ -177,36 +177,62 @@ export function PlatformRolesPanel({
     }
   }
 
-  function togglePerm(
+  async function togglePerm(
     moduleKey: string,
     action: "canView" | "canAdd" | "canEdit" | "canDelete" | "canApprove",
   ) {
-    setPermRows((prev) =>
-      prev.map((item) => {
-        if (item.moduleKey !== moduleKey) return item;
-        const nextVal = !item[action];
-        const updated = { ...item, [action]: nextVal };
-        if (nextVal && action !== "canView") updated.canView = true;
-        if (!nextVal && action === "canView") {
-          updated.canAdd = false;
-          updated.canEdit = false;
-          updated.canDelete = false;
-          updated.canApprove = false;
-        }
-        return updated;
-      }),
+    if (!permRole || permRole.key === "super_admin") return;
+    const permissionKey = `${moduleKey}:${action}`;
+    const nextRows = permRows.map((item) => {
+      if (item.moduleKey !== moduleKey) return item;
+      const nextVal = !item[action];
+      const updated = { ...item, [action]: nextVal };
+      if (nextVal && action !== "canView") updated.canView = true;
+      if (!nextVal && action === "canView") {
+        updated.canAdd = false;
+        updated.canEdit = false;
+        updated.canDelete = false;
+        updated.canApprove = false;
+      }
+      return updated;
+    });
+    const nextValue = nextRows.find((item) => item.moduleKey === moduleKey)?.[action] ?? false;
+    const moduleLabel = nextRows.find((item) => item.moduleKey === moduleKey)?.label ?? "module";
+
+    await savePermissionRows(nextRows, permissionKey, `${action.replace("can", "")} permission ${nextValue ? "enabled" : "removed"} for ${moduleLabel}`);
+  }
+
+  async function setModulePermissions(moduleKey: string, enabled: boolean) {
+    if (!permRole || permRole.key === "super_admin") return;
+    const item = permRows.find((row) => row.moduleKey === moduleKey);
+    if (!item) return;
+    const nextRows = permRows.map((row) =>
+      row.moduleKey === moduleKey
+        ? { ...row, canView: enabled, canAdd: enabled, canEdit: enabled, canDelete: enabled, canApprove: enabled }
+        : row,
+    );
+    await savePermissionRows(
+      nextRows,
+      `${moduleKey}:all`,
+      `${item.label} permissions ${enabled ? "enabled" : "removed"}`,
     );
   }
 
-  async function savePerms() {
+  async function savePermissionRows(
+    nextRows: typeof permRows,
+    permissionKey: string,
+    successMessage: string,
+  ) {
     if (!permRole) return;
-    setPermSaving(true);
+    const previousRows = permRows;
+    setPermRows(nextRows);
+    setSavingPermission(permissionKey);
     setPermError(null);
     try {
       await apiFetch(`/admin/platform-roles/${permRole.id}/permissions`, {
         method: "PUT",
         body: JSON.stringify({
-          permissions: permRows.map((p) => ({
+          permissions: nextRows.map((p) => ({
             moduleKey: p.moduleKey,
             canView: p.canView,
             canAdd: p.canAdd,
@@ -216,13 +242,12 @@ export function PlatformRolesPanel({
           })),
         }),
       });
-      notify(`Console permissions saved for ${permRole.name}`);
-      setPermRole(null);
-      onPermissionEditing?.(false);
+      notify(successMessage);
     } catch (err) {
-      setPermError(err instanceof Error ? err.message : "Failed to save permissions");
+      setPermRows(previousRows);
+      notify(err instanceof Error ? err.message : "Failed to update permission");
     } finally {
-      setPermSaving(false);
+      setSavingPermission(null);
     }
   }
 
@@ -255,14 +280,9 @@ export function PlatformRolesPanel({
             <div className="sub">Super Admin console modules only — these are not organisation CRM/project permissions.</div>
           </div>
           <div className="actions">
-            <button className="btn btn-ghost" type="button" onClick={() => { setPermRole(null); onPermissionEditing?.(false); }} disabled={permSaving}>
+            <button className="btn btn-ghost" type="button" onClick={() => { setPermRole(null); onPermissionEditing?.(false); }} disabled={savingPermission !== null}>
               ← Back
             </button>
-            {!locked ? (
-              <button className="btn btn-primary" type="button" onClick={() => void savePerms()} disabled={permSaving || permLoading}>
-                {permSaving ? "Saving…" : "Save permissions"}
-              </button>
-            ) : null}
           </div>
         </div>
         {permError ? <div className="form-alert">{permError}</div> : null}
@@ -272,45 +292,85 @@ export function PlatformRolesPanel({
           </div>
         ) : null}
         <div className="card">
-          <div className="tbl-wrap">
+          <div className="platform-permissions-list">
             {permLoading ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--muted)" }}>Loading…</div>
             ) : (
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Console module</th>
-                    <th style={{ textAlign: "center" }}>View</th>
-                    <th style={{ textAlign: "center" }}>Add</th>
-                    <th style={{ textAlign: "center" }}>Edit</th>
-                    <th style={{ textAlign: "center" }}>Delete</th>
-                    <th style={{ textAlign: "center" }}>Approve</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {permRows.map((item) => (
-                    <tr key={item.moduleKey}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{item.label}</div>
-                        <div className="muted" style={{ fontSize: 12 }}>{item.description}</div>
-                      </td>
-                      {(["canView", "canAdd", "canEdit", "canDelete", "canApprove"] as const).map((action) => (
-                        <td key={action} style={{ textAlign: "center" }}>
-                          <input
-                            type="checkbox"
-                            checked={locked ? true : item[action]}
-                            disabled={locked || permSaving}
-                            onChange={() => togglePerm(item.moduleKey, action)}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div>
+                <div className="platform-permissions-heading">
+                  <span>Console module</span>
+                  <span>Permissions</span>
+                </div>
+                {permRows.map((item) => (
+                  <div className="platform-permission-row" key={item.moduleKey}>
+                    <div className="platform-permission-module">
+                      <div style={{ fontWeight: 700 }}>{item.label}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>{item.description}</div>
+                    </div>
+                    <div className="platform-permission-actions">
+                      {(item.moduleKey === "admin_organisations"
+                        ? [
+                            { key: "canView", permission: "canView", label: "View" },
+                            { key: "activate", permission: "canAdd", label: "Activate" },
+                            { key: "deactivate", permission: "canApprove", label: "Deactivate" },
+                            { key: "canEdit", permission: "canEdit", label: "Edit" },
+                            { key: "canDelete", permission: "canDelete", label: "Delete" },
+                          ]
+                        : [
+                            { key: "canView", permission: "canView", label: "View" },
+                            { key: "canAdd", permission: "canAdd", label: "Add" },
+                            { key: "canEdit", permission: "canEdit", label: "Edit" },
+                            { key: "canDelete", permission: "canDelete", label: "Delete" },
+                            { key: "canApprove", permission: "canApprove", label: "Approve" },
+                          ]
+                      ).map(({ key, permission, label }) => {
+                        const enabled = locked || item[permission as keyof typeof item];
+                        return (
+                          <button
+                            className={`platform-permission-pill${enabled ? " is-enabled" : ""}`}
+                            key={key}
+                            type="button"
+                            disabled={locked || savingPermission !== null}
+                            onClick={() => void togglePerm(item.moduleKey, permission as "canView" | "canAdd" | "canEdit" | "canDelete" | "canApprove")}
+                            aria-pressed={enabled}
+                            aria-label={`${label} permission for ${item.label}`}
+                          >
+                            <span className="platform-permission-dot" aria-hidden="true" />
+                            {label}
+                          </button>
+                        );
+                      })}
+                      <span className="platform-permission-separator" aria-hidden="true" />
+                      <button
+                        className="platform-permission-bulk"
+                        type="button"
+                        disabled={locked || savingPermission !== null}
+                        onClick={() => void setModulePermissions(item.moduleKey, true)}
+                      >
+                        All
+                      </button>
+                      <button
+                        className="platform-permission-bulk"
+                        type="button"
+                        disabled={locked || savingPermission !== null}
+                        onClick={() => void setModulePermissions(item.moduleKey, false)}
+                      >
+                        None
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
+        {toast ? (
+          <div className="platform-permission-toast" role="status">
+            <span className="platform-permission-toast-icon" aria-hidden="true">✓</span>
+            <span>{toast}</span>
+            <button type="button" onClick={() => setToast(null)} aria-label="Dismiss notification">×</button>
+          </div>
+        ) : null}
       </>
     );
   }
@@ -683,8 +743,19 @@ export function PlatformRolesPanel({
       />
 
       {toast ? (
-        <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}>
-          <div className="card" style={{ padding: "12px 16px" }}>{toast}</div>
+        <div style={{ position: "fixed", top: 20, right: 20, zIndex: 500 }}>
+          <div
+            className="card"
+            role="status"
+            style={{
+              padding: "12px 16px",
+              borderLeft: "3px solid #10b981",
+              boxShadow: "var(--sh-lg)",
+              background: "#ffffff",
+            }}
+          >
+            {toast}
+          </div>
         </div>
       ) : null}
     </>

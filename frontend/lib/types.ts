@@ -1066,6 +1066,8 @@ export interface Unit {
   orgId: string;
   /** Null for a standalone unit (no project). */
   projectId: string | null;
+  /** Project currency for project-bound units; null for standalone units. */
+  currency?: string | null;
   /** A `unit_type` catalog label. Null only on legacy/imported rows. */
   configuration: string | null;
   /** A `unit_variant` catalog label ("Type A"). Optional — blank is valid. */
@@ -1169,7 +1171,8 @@ export interface CreateProjectInput {
   // Onboarding-wizard fields (Steps 3-8) — all optional; wired progressively
   // by Pieces B-E. `null` is accepted on update to clear a field.
   bookingAmount?: number;
-  currency?: "INR" | "AED" | "USD";
+  /** Any code from lib/countries.ts's CURRENCY_OPTIONS, not just INR/AED/USD. */
+  currency?: string;
   priceIncludes?: string[];
   paymentPlan?: string;
   offers?: string;
@@ -1218,7 +1221,8 @@ export interface UpdateProjectInput {
   salesTeam?: string | null;
   amenities?: Amenity[];
   bookingAmount?: number | null;
-  currency?: "INR" | "AED" | "USD";
+  /** Any code from lib/countries.ts's CURRENCY_OPTIONS, not just INR/AED/USD. */
+  currency?: string;
   priceIncludes?: string[];
   paymentPlan?: string | null;
   offers?: string | null;
@@ -1564,6 +1568,21 @@ export interface CrmAssignableUser {
 
 export interface CrmAssignableResponse {
   data: CrmAssignableUser[];
+  total: number;
+}
+
+export interface ProjectAssigneeCandidate {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  name: string;
+  role: { key: string; name: string } | null;
+  projects: Array<{ id: string; name: string; role: string }>;
+}
+
+export interface ProjectAssigneeCandidatesResponse {
+  data: ProjectAssigneeCandidate[];
   total: number;
 }
 

@@ -120,7 +120,7 @@ export function getResetPasswordEmailHtml(params: {
         <a href="${resetUrl}" class="btn" target="_blank">Reset Password</a>
       </div>
 
-      <p style="font-size: 13px; color: #64748b; margin-top: 24px;">This link will expire in 60 minutes. If you did not request a password reset, no further action is required and your account remains secure.</p>
+      <p style="font-size: 13px; color: #64748b; margin-top: 24px;">This link will expire in 5 minutes. If you did not request a password reset, no further action is required and your account remains secure.</p>
     </div>
     <div class="footer">
       &copy; ${new Date().getFullYear()} iPixxel Realty. All rights reserved.

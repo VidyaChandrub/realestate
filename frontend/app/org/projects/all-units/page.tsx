@@ -304,11 +304,11 @@ export default function AllUnitsPage() {
                           {u.price != null
                             ? formatMoney(u.price, ccy)
                             : psf != null
-                              ? `${formatMoney(psf, ccy)}/sqft (${PRICE_BASIS_LABEL[u.pricePerSqftBasis]})`
+                              ? `${formatMoney(psf, ccy, 2)}/sqft (${PRICE_BASIS_LABEL[u.pricePerSqftBasis]})`
                               : "—"}
                           {u.price != null && psf != null ? (
                             <div className="hint">
-                              {formatMoney(psf, ccy)}/sqft ({PRICE_BASIS_LABEL[u.pricePerSqftBasis]})
+                              {formatMoney(psf, ccy, 2)}/sqft ({PRICE_BASIS_LABEL[u.pricePerSqftBasis]})
                             </div>
                           ) : null}
                         </td>

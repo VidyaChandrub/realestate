@@ -117,7 +117,11 @@ function daysAgo(iso: string): string {
 
 export default function SuperAdminOrganisationsPage() {
   const router = useRouter();
-  const { accessToken, isLoading: authLoading } = useAuth();
+  const { accessToken, isLoading: authLoading, hasPermission } = useAuth();
+  const canViewOrganisations = hasPermission("admin_organisations", "view");
+  const canActivateOrganisations = hasPermission("admin_organisations", "add");
+  const canDeactivateOrganisations = hasPermission("admin_organisations", "approve");
+  const canDeleteOrganisations = hasPermission("admin_organisations", "delete");
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchInput, setSearchInput] = useState("");
@@ -328,23 +332,22 @@ export default function SuperAdminOrganisationsPage() {
     // only thing worth doing here is deleting it (or reaching out using
     // the contact details already shown in the row).
     if (o.status === "draft") {
-      return [{ key: "delete", label: "Delete", danger: true, onClick: () => handleDelete(o.id), disabled: rowBusy }];
+      return canDeleteOrganisations
+        ? [{ key: "delete", label: "Delete", danger: true, onClick: () => handleDelete(o.id), disabled: rowBusy }]
+        : [];
     }
     const actions: RowAction[] = [];
-    if (o.status === "pending") {
-      actions.push({ key: "approve", label: "Approve", onClick: () => handleApprove(o.id), disabled: rowBusy });
-      actions.push({ key: "reject", label: "Reject", onClick: () => handleReject(o.id, o.name), disabled: rowBusy });
-    } else if (o.status === "active") {
-      actions.push({ key: "deactivate", label: "Deactivate", onClick: () => handleDeactivate(o.id), disabled: rowBusy });
-    } else {
-      actions.push({ key: "activate", label: "Activate", onClick: () => handleActivate(o.id), disabled: rowBusy });
+    if (o.status === "active" && canDeactivateOrganisations) {
+        actions.push({ key: "deactivate", label: "Deactivate", onClick: () => handleDeactivate(o.id), disabled: rowBusy });
+    } else if (o.status !== "active" && canActivateOrganisations) {
+        actions.push({ key: "activate", label: "Activate", onClick: () => handleActivate(o.id), disabled: rowBusy });
     }
-    actions.push({
-      key: "view",
-      label: o.status === "pending" ? "Edit" : "View",
-      onClick: () => router.push(`/admin-console/organisation-detail/${o.id}`),
-    });
-    actions.push({ key: "delete", label: "Delete", danger: true, onClick: () => handleDelete(o.id), disabled: rowBusy });
+    if (canViewOrganisations) {
+      actions.push({ key: "view", label: "View", onClick: () => router.push(`/admin-console/organisation-detail/${o.id}`) });
+    }
+    if (canDeleteOrganisations) {
+      actions.push({ key: "delete", label: "Delete", danger: true, onClick: () => handleDelete(o.id), disabled: rowBusy });
+    }
     return actions;
   };
 

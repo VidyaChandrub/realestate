@@ -27,6 +27,7 @@ import type {
   CreateOrgCatalogOptionInput,
   CrmAssignee,
   CrmAssignableResponse,
+  ProjectAssigneeCandidatesResponse,
   CrmLead,
   CrmLeadListResponse,
   InvoiceRow,
@@ -397,6 +398,14 @@ export async function resendVerification(
     method: "POST",
     body: JSON.stringify({ email }),
   });
+}
+
+export async function validateResetToken(
+  token: string,
+): Promise<{ valid: boolean }> {
+  return apiFetch<{ valid: boolean }>(
+    `/auth/reset-password/validate?token=${encodeURIComponent(token)}`,
+  );
 }
 
 export async function getInvoices(): Promise<InvoiceRow[]> {
@@ -1094,9 +1103,9 @@ export async function getProjectSalesAgents(
  * "who can hold a lead" rule the Lead Center assignee picker uses (permission
  * based, admins/managers excluded). Server-enforced on the PUT as well.
  */
-export async function getProjectSalesAgentCandidates(): Promise<CrmAssignableResponse> {
-  return apiFetch<CrmAssignableResponse>(
-    "/org/projects/sales-agent-candidates",
+export async function getProjectSalesAgentCandidates(): Promise<ProjectAssigneeCandidatesResponse> {
+  return apiFetch<ProjectAssigneeCandidatesResponse>(
+    "/org/projects/project-assignee-candidates",
   );
 }
 

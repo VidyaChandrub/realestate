@@ -13,6 +13,7 @@ export default function ForgotPasswordPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setSent(false);
     setIsSubmitting(true);
     try {
       await apiFetch<{ success: boolean }>(
@@ -90,16 +91,14 @@ export default function ForgotPasswordPage() {
             <div className="help reveal in" data-delay="2" style={{ marginTop: 20, color: "var(--rose)", borderColor: "var(--rose-050)", background: "var(--rose-050)" }}>
               {error}
             </div>
-          ) : null}
-
-          {sent ? (
+          ) : sent ? (
             <div className="help reveal in" data-delay="2" style={{ marginTop: 20 }}>
-              📩 If an account exists for <b>{email}</b>, a reset link is on its way. The link is valid
-              for <b>60 minutes</b>.
+              📩 A reset link has been sent to <b>{email}</b>. The link is valid
+              for <b>5 minutes</b>.
             </div>
           ) : (
             <div className="help reveal in" data-delay="2" style={{ marginTop: 20 }}>
-              📩 The reset link is valid for <b>60 minutes</b>. If it expires, just request a new one.
+              📩 The reset link is valid for <b>5 minutes</b>. If it expires, just request a new one.
             </div>
           )}
 

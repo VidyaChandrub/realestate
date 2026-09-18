@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectSalesAgentCandidates, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
-import { CURRENCY_LABELS, PROJECT_CURRENCIES } from "@/lib/money";
+import { CURRENCY_OPTIONS } from "@/lib/countries";
 import {
   CatalogOptions,
   ConfigSizePriceTable,
@@ -36,6 +36,7 @@ import type {
   OrgUser,
   OrgUsersListResponse,
   ProjectDetail,
+  ProjectAssigneeCandidate,
   ProjectStatus,
   SafeOrganisation,
   UnitType,
@@ -80,7 +81,9 @@ const CONSTRUCTION_STAGES = [
   "Finishing",
   "Ready to move",
 ];
-const SALES_TEAMS = ["Ahmedabad — West", "Ahmedabad — Core", "NRI Desk"];
+// Intentionally unused for now — only ever fed the hidden "Sales team" dropdown
+// (see sec-team below). Kept, not deleted, for when that field returns.
+// const SALES_TEAMS = ["Ahmedabad — West", "Ahmedabad — Core", "NRI Desk"];
 
 /** The option list plus the current value, when that value has fallen off it. */
 function withCurrent(options: string[], value: string): string[] {
@@ -197,7 +200,7 @@ export default function OrgProjectEditPage() {
   const [aiKnowledgeBase, setAiKnowledgeBase] = useState(false);
 
   // --- Team & access ---
-  const [salesUsers, setSalesUsers] = useState<Array<{ id: string; name: string }>>([]);
+  const [salesUsers, setSalesUsers] = useState<ProjectAssigneeCandidate[]>([]);
   const [salesTeam, setSalesTeam] = useState("");
   const [agentAssign, setAgentAssign] = useState<string[]>([]);
   const [requireBookingApproval, setRequireBookingApproval] = useState(false);
@@ -329,7 +332,7 @@ export default function OrgProjectEditPage() {
     // "Who can hold a lead" — resolved server-side (permission-based, admins
     // and managers excluded), and the same rule the PUT enforces.
     getProjectSalesAgentCandidates()
-      .then((res) => setSalesUsers(res.data.map((u) => ({ id: u.id, name: u.name }))))
+      .then((res) => setSalesUsers(res.data))
       .catch(() => setSalesUsers([]));
     apiFetch<SafeOrganisation>("/org/settings", auth)
       .then((o) => setOrgName(o.name))
@@ -367,7 +370,7 @@ export default function OrgProjectEditPage() {
   const amenityOptions = (catalog ?? []).filter((o) => o.category === "amenity");
   // --- Required fields, from the shared rules (see STEP_SECTION) -----------
   const requirements = projectRequirements({
-    name, projectType, reraId, priceMin, address: addressLine, city, managerId,
+    name, projectType, reraId, currency, priceMin, address: addressLine, city, managerId,
   });
   const missingFields = allMissing(requirements);
   /** The inline message for a field, once Save has been attempted. */
@@ -580,7 +583,7 @@ export default function OrgProjectEditPage() {
         priceMax: parseAmount(priceMax) ?? null,
         baseRate: parseAmount(baseRate) ?? null,
         bookingAmount: parseAmount(bookingAmount) ?? null,
-        currency: currency as (typeof PROJECT_CURRENCIES)[number],
+        currency,
         priceIncludes,
         paymentPlan: paymentPlan || null,
         offers: offers.trim() || null,
@@ -839,6 +842,16 @@ export default function OrgProjectEditPage() {
                 ) : null}
                 {fieldError("projectType") ? <div className="field-err">{fieldError("projectType")}</div> : null}
               </div>
+              <div className={fieldClass("currency")}>
+                <label>Currency <span className="req">*</span></label>
+                <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                  {CURRENCY_OPTIONS.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+                <div className="hint">Every price on this project — unit types, units, price range — is in this currency.</div>
+                {fieldError("currency") ? <div className="field-err">{fieldError("currency")}</div> : null}
+              </div>
               <div className="field">
                 <label>Short tagline</label>
                 <input className="inp" placeholder="e.g. 2 &amp; 3 BHK homes on SG Highway" value={tagline} onChange={(e) => setTagline(e.target.value)} />
@@ -896,14 +909,7 @@ export default function OrgProjectEditPage() {
                 <div className="field"><label>Price per sqft</label><MoneyInput currency={currency} value={baseRate} onChange={setBaseRate} placeholder="6,400" /></div>
                 <div className="field"><label>Booking amount</label><MoneyInput currency={currency} value={bookingAmount} onChange={setBookingAmount} placeholder="1,00,000" /></div>
               </div>
-              <div className="field">
-                <label>Currency</label>
-                <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                  {PROJECT_CURRENCIES.map((c) => (
-                    <option key={c} value={c}>{CURRENCY_LABELS[c]}</option>
-                  ))}
-                </select>
-              </div>
+              <div className="hint mb-14">Prices above are in {currency} — set in Basics.</div>
               <div className="field">
                 <label>What&apos;s included in the price?</label>
                 <CatalogOptions
@@ -1078,6 +1084,7 @@ export default function OrgProjectEditPage() {
                 configurations={selectedConfigs}
                 rows={configRows}
                 onChange={updateConfigRow}
+                currency={currency}
                 hint="Optional. Filling these in means adding a unit prefills its area and price from here instead of asking for them again. Changing them later never alters units that already exist."
               />
               <div className="row3">
@@ -1167,10 +1174,13 @@ export default function OrgProjectEditPage() {
                   ) : null}
                 </select>
               </div>
-              <div className="sw-row"><div className="tx"><b>AI voice calling</b><small>Auto-call &amp; qualify new leads</small></div><div className={`switch ${aiCalling ? "on" : ""}`} onClick={() => setAiCalling(!aiCalling)} /></div>
-              <div className="sw-row"><div className="tx"><b>WhatsApp auto-welcome</b></div><div className={`switch ${whatsappWelcome ? "on" : ""}`} onClick={() => setWhatsappWelcome(!whatsappWelcome)} /></div>
+              {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row"><div className="tx"><b>AI voice calling</b><small>Auto-call &amp; qualify new leads</small></div><div className={`switch ${aiCalling ? "on" : ""}`} onClick={() => setAiCalling(!aiCalling)} /></div> */}
+              {/* Intentionally hidden: the backing WhatsApp auto-welcome feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row"><div className="tx"><b>WhatsApp auto-welcome</b></div><div className={`switch ${whatsappWelcome ? "on" : ""}`} onClick={() => setWhatsappWelcome(!whatsappWelcome)} /></div> */}
               <div className="sw-row"><div className="tx"><b>Round-robin assignment</b></div><div className={`switch ${roundRobin ? "on" : ""}`} onClick={() => setRoundRobin(!roundRobin)} /></div>
-              <div className="sw-row" style={{ borderBottom: 0 }}><div className="tx"><b>Add to AI knowledge base</b></div><div className={`switch ${aiKnowledgeBase ? "on" : ""}`} onClick={() => setAiKnowledgeBase(!aiKnowledgeBase)} /></div>
+              {/* Intentionally hidden: the backing AI knowledge-base feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row" style={{ borderBottom: 0 }}><div className="tx"><b>Add to AI knowledge base</b></div><div className={`switch ${aiKnowledgeBase ? "on" : ""}`} onClick={() => setAiKnowledgeBase(!aiKnowledgeBase)} /></div> */}
             </div>
           </div>
 
@@ -1192,6 +1202,11 @@ export default function OrgProjectEditPage() {
                   </select>
                   {fieldError("managerId") ? <div className="field-err">{fieldError("managerId")}</div> : null}
                 </div>
+                {/* Intentionally hidden: this is a free-text regional label ("Ahmedabad — West"), not a
+                    reference to the real Team model (org-teams module) — Project.salesTeam is stored
+                    and echoed back but never read anywhere in the backend. May return once it's wired
+                    to real teams. */}
+                {/*
                 <div className="field">
                   <label>Sales team</label>
                   <select value={salesTeam} onChange={(e) => setSalesTeam(e.target.value)}>
@@ -1201,27 +1216,38 @@ export default function OrgProjectEditPage() {
                     ))}
                   </select>
                 </div>
+                */}
               </div>
               <div className="field">
                 <label>Assigned sales agents</label>
                 {salesUsers.length === 0 ? (
                   <div className="hint">No assignable users in your organisation yet — add them under Users.</div>
                 ) : (
-                  <div className="opts">
+                  <div className="opts project-assignee-options">
                     {salesUsers.map((u) => {
                       const on = agentAssign.includes(u.id);
                       return (
-                        <span key={u.id} className={`opt ${on ? "on" : ""}`} onClick={() => setAgentAssign((prev) => (on ? prev.filter((x) => x !== u.id) : [...prev, u.id]))}>
-                          <span className="b">{on ? "✓" : ""}</span>{u.name}
+                        <span key={u.id} className={`opt project-assignee-option ${on ? "on" : ""}`} onClick={() => setAgentAssign((prev) => (on ? prev.filter((x) => x !== u.id) : [...prev, u.id]))}>
+                          <span className="b">{on ? "✓" : ""}</span>
+                          <span className="project-assignee-meta">
+                            <b>{u.name}</b>
+                            <small className="project-assignee-role">{u.role?.name ?? "No role"}</small>
+                            {u.projects.length > 0 ? (
+                              <small className="project-assignee-projects">Already assigned: {u.projects.map((p) => `${p.name} (${p.role})`).join(", ")}</small>
+                            ) : null}
+                          </span>
                         </span>
                       );
                     })}
                   </div>
                 )}
               </div>
-              <div className="sw-row"><div className="tx"><b>Require manager approval on bookings</b></div><div className={`switch ${requireBookingApproval ? "on" : ""}`} onClick={() => setRequireBookingApproval(!requireBookingApproval)} /></div>
-              <div className="sw-row"><div className="tx"><b>Visible to telecallers</b></div><div className={`switch ${visibleToTelecallers ? "on" : ""}`} onClick={() => setVisibleToTelecallers(!visibleToTelecallers)} /></div>
-              <div className="sw-row" style={{ borderBottom: 0 }}><div className="tx"><b>Publish to public website</b></div><div className={`switch ${publishedToWebsite ? "on" : ""}`} onClick={() => setPublishedToWebsite(!publishedToWebsite)} /></div>
+              {/* Intentionally hidden: the backing booking approval feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row"><div className="tx"><b>Require manager approval on bookings</b></div><div className={`switch ${requireBookingApproval ? "on" : ""}`} onClick={() => setRequireBookingApproval(!requireBookingApproval)} /></div> */}
+              {/* Intentionally hidden: the backing telecaller visibility feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row"><div className="tx"><b>Visible to telecallers</b></div><div className={`switch ${visibleToTelecallers ? "on" : ""}`} onClick={() => setVisibleToTelecallers(!visibleToTelecallers)} /></div> */}
+              {/* Intentionally hidden: the backing public website publishing feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row" style={{ borderBottom: 0 }}><div className="tx"><b>Publish to public website</b></div><div className={`switch ${publishedToWebsite ? "on" : ""}`} onClick={() => setPublishedToWebsite(!publishedToWebsite)} /></div> */}
             </div>
           </div>
 

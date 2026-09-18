@@ -250,7 +250,11 @@ function AssetUploadField({
 export default function SuperAdminOrganisationDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { accessToken, isLoading: authLoading } = useAuth();
+  const { accessToken, isLoading: authLoading, hasPermission } = useAuth();
+  const canEditOrganisation = hasPermission("admin_organisations", "edit");
+  const canActivateOrganisation = hasPermission("admin_organisations", "add");
+  const canDeactivateOrganisation = hasPermission("admin_organisations", "approve");
+  const canDeleteOrganisation = hasPermission("admin_organisations", "delete");
 
   const [tab, setTab] = useState<Tab>("Overview");
   const [org, setOrg] = useState<OrganisationDetail | null>(null);
@@ -630,7 +634,7 @@ export default function SuperAdminOrganisationDetailPage() {
               <div className="card">
                 <div className="card-h">
                   <span className="t">Organisation details</span>
-                  {!editing ? (
+                  {!editing && canEditOrganisation ? (
                     <button className="btn btn-ghost btn-sm" onClick={startEdit}>
                       Edit
                     </button>
@@ -1395,20 +1399,24 @@ export default function SuperAdminOrganisationDetailPage() {
                 <span className="t">Danger zone</span>
               </div>
               <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <button
-                  className="btn btn-ghost btn-block"
-                  onClick={() => setStatusModalOpen(true)}
-                  disabled={statusSubmitting}
-                >
-                  {org.status === "active" ? <><Icon name="close" size={14} /> Suspend organisation</> : <><Icon name="chevron-right" size={14} /> Reactivate organisation</>}
-                </button>
-                <button
-                  className="btn btn-ghost btn-block"
-                  style={{ color: "var(--rose)", borderColor: "var(--rose-050)" }}
-                  onClick={() => setDeleteModalOpen(true)}
-                >
-                  <Icon name="trash" size={14} /> Delete organisation
-                </button>
+                {(org.status === "active" ? canDeactivateOrganisation : canActivateOrganisation) ? (
+                  <button
+                    className="btn btn-ghost btn-block"
+                    onClick={() => setStatusModalOpen(true)}
+                    disabled={statusSubmitting}
+                  >
+                    {org.status === "active" ? <><Icon name="close" size={14} /> Deactivate organisation</> : <><Icon name="chevron-right" size={14} /> Activate organisation</>}
+                  </button>
+                ) : null}
+                {canDeleteOrganisation ? (
+                  <button
+                    className="btn btn-ghost btn-block"
+                    style={{ color: "var(--rose)", borderColor: "var(--rose-050)" }}
+                    onClick={() => setDeleteModalOpen(true)}
+                  >
+                    <Icon name="trash" size={14} /> Delete organisation
+                  </button>
+                ) : null}
               </div>
             </div>
           </Reveal>

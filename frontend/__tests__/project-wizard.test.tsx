@@ -38,6 +38,7 @@ vi.mock("@/lib/api", () => ({
   }),
   getOrgCatalogOptions: vi.fn(async () => CATALOG),
   getOrgLandingPages: vi.fn(async () => []),
+  getProjectSalesAgentCandidates: vi.fn(async () => ({ data: [], total: 0 })),
   setProjectSalesAgents: vi.fn(async () => ({})),
 }));
 

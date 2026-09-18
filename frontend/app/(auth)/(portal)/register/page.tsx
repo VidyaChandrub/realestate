@@ -143,6 +143,8 @@ export default function RegisterPage() {
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [resendState, setResendState] = useState<"idle" | "sent">("idle");
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendSecondsLeft, setResendSecondsLeft] = useState(0);
   const [resumeAfterVerify, setResumeAfterVerify] = useState<OnboardingStep | null>(null);
   const [resumingDraft, setResumingDraft] = useState(false);
   // Set when Step 1's email or mobile matches someone's still-in-progress
@@ -264,6 +266,8 @@ export default function RegisterPage() {
           setAwaitingVerification(true);
           setVerifyCode("");
           setVerifyError(null);
+          startResendCooldown(form.work_email);
+          markAwaitingVerification(form.work_email);
           return false;
         }
         return true;
@@ -304,6 +308,8 @@ export default function RegisterPage() {
         setAwaitingVerification(true);
         setVerifyCode("");
         setVerifyError(null);
+        startResendCooldown(form.work_email);
+        markAwaitingVerification(form.work_email);
         return false;
       }
       return true;
@@ -368,6 +374,8 @@ export default function RegisterPage() {
       setAwaitingVerification(true);
       setVerifyCode("");
       setVerifyError(null);
+      startResendCooldown(resumed.user.email ?? form.work_email);
+      markAwaitingVerification(resumed.user.email ?? form.work_email);
       setResumeAfterVerify(resumed.nextStep);
       return;
     }
@@ -380,6 +388,60 @@ export default function RegisterPage() {
     if (didResumeRef.current) return;
     if (!user || user.role === "super_admin") return;
     if (user.onboarding_step === "completed") return;
+
+    // A reload or dev-mode hot-reload remounts this component, resetting
+    // didResumeRef — without this check that looked exactly like a brand
+    // new visit and called resumeSignup below, which silently re-issues
+    // (and re-emails) a fresh verification code even though the user is
+    // just sitting on the "enter your code" screen they were already on.
+    // sessionStorage survives the remount, so it's the source of truth for
+    // "this tab already has a code out for this email" instead of in-memory
+    // state that a remount wipes.
+    let alreadyAwaiting = false;
+    try {
+      alreadyAwaiting = window.sessionStorage.getItem(awaitingVerificationKey(user.email)) === "1";
+    } catch {
+      alreadyAwaiting = false;
+    }
+    if (alreadyAwaiting) {
+      didResumeRef.current = true;
+      resumedAccountIdRef.current = user.id;
+      // form resets to blank on every fresh mount — without this, the
+      // restored verify screen shows "We sent a code to ." and both Verify
+      // and Resend silently operate on an empty email (the DTO's @IsEmail
+      // check rejects it, surfacing as "wrong code" / "couldn't resend"
+      // even though the code the user has is genuinely correct).
+      setForm((prev) => ({
+        ...prev,
+        first_name: user.first_name ?? prev.first_name,
+        last_name: user.last_name ?? prev.last_name,
+        work_email: user.email,
+      }));
+      setAwaitingVerification(true);
+      setVerifyCode("");
+      setVerifyError(null);
+      return;
+    }
+
+    // Beyond the in-progress-verification case above, only auto-resume (and
+    // pop the "Welcome back" dialog) when /login just explicitly sent us
+    // here for THIS reason — a real, password-verified sign-in for an
+    // account that hasn't finished onboarding (see login/page.tsx). Without
+    // this check, merely loading /register with a stale-but-still-valid
+    // access token from some earlier, never-finished signup attempt (no
+    // password re-entered, nothing typed) triggered the exact same dialog
+    // on a blank form, which read as a bug rather than a deliberate resume.
+    // One-shot: consumed immediately so a later plain reload of /register
+    // in the same tab doesn't keep re-triggering it.
+    let hasResumeIntent = false;
+    try {
+      hasResumeIntent = window.sessionStorage.getItem("register_resume_intent") === "1";
+      if (hasResumeIntent) window.sessionStorage.removeItem("register_resume_intent");
+    } catch {
+      hasResumeIntent = false;
+    }
+    if (!hasResumeIntent) return;
+
     didResumeRef.current = true;
     resumeSignup(user.email)
       .then((resumed) => {
@@ -398,6 +460,79 @@ export default function RegisterPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.onboarding_step]);
 
+  // 60s resend cooldown, kept in sessionStorage (keyed by email) rather than
+  // plain component state — a page refresh mid-cooldown re-reads the same
+  // stored deadline instead of handing back a fresh 60s, so the cooldown
+  // can't be trivially bypassed by reloading.
+  const RESEND_COOLDOWN_MS = 60_000;
+
+  function resendCooldownKey(email: string) {
+    return `verify_resend_cooldown:${email.trim().toLowerCase()}`;
+  }
+
+  function readResendSecondsLeft(email: string): number {
+    if (typeof window === "undefined" || !email) return 0;
+    try {
+      const raw = window.sessionStorage.getItem(resendCooldownKey(email));
+      if (!raw) return 0;
+      const endsAt = Number(raw);
+      if (!Number.isFinite(endsAt)) return 0;
+      return Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+    } catch {
+      return 0;
+    }
+  }
+
+  function startResendCooldown(email: string) {
+    setResendSecondsLeft(Math.ceil(RESEND_COOLDOWN_MS / 1000));
+    if (typeof window === "undefined" || !email) return;
+    try {
+      window.sessionStorage.setItem(resendCooldownKey(email), String(Date.now() + RESEND_COOLDOWN_MS));
+    } catch {
+      // sessionStorage unavailable (private mode, etc.) — the in-memory
+      // state set above still enforces the cooldown for this page view.
+    }
+  }
+
+  // Marks "this tab already has a verification code out for this email" —
+  // separate from the cooldown above, and kept around for as long as the
+  // account is unverified (not just 60s). The mount-resume effect below
+  // reads this so that a reload/hot-reload of the "enter your code" screen
+  // restores that screen locally instead of calling resumeSignup again,
+  // which would silently re-issue (and re-email) a fresh code even though
+  // nothing the user did asked for one.
+  function awaitingVerificationKey(email: string) {
+    return `verify_awaiting:${email.trim().toLowerCase()}`;
+  }
+
+  function markAwaitingVerification(email: string) {
+    if (typeof window === "undefined" || !email) return;
+    try {
+      window.sessionStorage.setItem(awaitingVerificationKey(email), "1");
+    } catch {
+      // best-effort — worst case a reload re-triggers the resume flow.
+    }
+  }
+
+  function clearAwaitingVerification(email: string) {
+    if (typeof window === "undefined" || !email) return;
+    try {
+      window.sessionStorage.removeItem(awaitingVerificationKey(email));
+    } catch {
+      // best-effort
+    }
+  }
+
+  useEffect(() => {
+    if (!awaitingVerification) return;
+    setResendSecondsLeft(readResendSecondsLeft(form.work_email));
+    const interval = window.setInterval(() => {
+      setResendSecondsLeft(readResendSecondsLeft(form.work_email));
+    }, 1000);
+    return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingVerification, form.work_email]);
+
   async function handleVerifyEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setVerifyError(null);
@@ -406,6 +541,7 @@ export default function RegisterPage() {
       await verifyEmail(form.work_email, verifyCode);
       setAwaitingVerification(false);
       setVerifyCode("");
+      clearAwaitingVerification(form.work_email);
       if (resumeAfterVerify) {
         // Same rule as applyResumedState: land back on Step 1 (prefilled),
         // not wherever the resumed draft had reached.
@@ -424,14 +560,19 @@ export default function RegisterPage() {
   }
 
   async function handleResendVerification() {
+    if (resendBusy || resendSecondsLeft > 0) return;
     setVerifyError(null);
+    setResendBusy(true);
     try {
       await resendVerification(form.work_email);
       setResendState("sent");
+      startResendCooldown(form.work_email);
       window.setTimeout(() => setResendState("idle"), 2000);
     } catch (err) {
       const { general } = mapApiFieldErrors(err, FIELD_KEYS);
       setVerifyError(general ?? "Couldn't resend the code. Please try again.");
+    } finally {
+      setResendBusy(false);
     }
   }
 
@@ -650,13 +791,18 @@ export default function RegisterPage() {
             </form>
             <p className="muted" style={{ textAlign: "center", marginTop: 20, fontSize: 13.5 }}>
               Didn&apos;t receive it?{" "}
-              <button
-                type="button"
-                onClick={handleResendVerification}
-                style={{ color: "var(--brand)", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}
-              >
-                {resendState === "sent" ? "Code re-sent" : "Resend code"}
-              </button>
+              {resendSecondsLeft > 0 ? (
+                <span>Resend code in {resendSecondsLeft}s</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resendBusy}
+                  style={{ color: "var(--brand)", fontWeight: 600, background: "none", border: "none", cursor: resendBusy ? "default" : "pointer" }}
+                >
+                  {resendBusy ? "Sending…" : resendState === "sent" ? "Code re-sent" : "Resend code"}
+                </button>
+              )}
             </p>
           </div>
         </div>

@@ -82,7 +82,14 @@ export function pricePerSqftLabel(
   const area = basis === "builtup" ? builtupSqft : carpetSqft;
   if (!price || !area) return "";
   const sym = currencyPrefix(currency).trim() || "₹";
-  const value = Math.round(price / area).toLocaleString("en-IN");
+  // Two decimal places, not rounded to a whole unit: this is derived, never
+  // stored, so nothing forces it to be an integer the way the price itself
+  // is — and in real estate 2.50 vs. 2.72 per sqft is a real difference at
+  // project scale, not noise to round away.
+  const value = (Math.round((price / area) * 100) / 100).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   return `${sym}${value} / sqft (${PRICE_BASIS_LABEL[basis]})`;
 }
 
@@ -480,12 +487,14 @@ export function ConfigSizePriceTable({
   rows,
   onChange,
   hint,
+  currency = "INR",
 }: {
   /** Labels currently selected, in display order. */
   configurations: string[];
   rows: ConfigSizePriceRow[];
   onChange: (key: string | number, patch: Partial<ConfigSizePriceRow>) => void;
   hint?: React.ReactNode;
+  currency?: string;
 }) {
   if (configurations.length === 0) return null;
   return (
@@ -497,7 +506,7 @@ export function ConfigSizePriceTable({
           <span>Configuration</span>
           <span>Carpet (sqft)</span>
           <span>Built-up (sqft)</span>
-          <span>Price (₹)</span>
+          <span>Price ({currencyPrefix(currency).trim() || "₹"})</span>
           <span>Planned units</span>
         </div>
         {configurations.map((label) => {
@@ -514,7 +523,7 @@ export function ConfigSizePriceTable({
                 aria-label={`Built-up area for ${label}`}
                 value={row.builtupSqft}
                 onChange={(e) => onChange(row.key, { builtupSqft: e.target.value })} />
-              <input className="inp" type="number" min={0} placeholder="64,00,000"
+              <input className="inp" type="number" min={0} placeholder={currency === "INR" ? "64,00,000" : "640,000"}
                 aria-label={`Price for ${label}`}
                 value={row.price}
                 onChange={(e) => onChange(row.key, { price: e.target.value })} />
