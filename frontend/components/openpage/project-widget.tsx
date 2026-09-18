@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { Device, SectionInstance, SiteConfig } from "@/lib/openpage/types";
 import type { Project, PublicProject, EnquiryUnit } from "@/lib/types";
+import { formatMoneyRange } from "@/lib/money";
 import { apiFetch, submitLead } from "@/lib/api";
 import { isFieldVisible } from "@/lib/openpage/form-logic";
 import { bumpTracking } from "@/lib/openpage/tracking";
@@ -617,12 +618,8 @@ function ProjectCard({
   compact?: boolean;
 }) {
   const W = wt();
-  const priceLabel =
-    project.priceMin && project.priceMax
-      ? `₹${(project.priceMin / 100000).toFixed(0)}L – ₹${(project.priceMax / 100000).toFixed(0)}L`
-      : project.priceMin
-        ? `From ₹${(project.priceMin / 100000).toFixed(0)}L`
-        : "Price on request";
+  const formattedPrice = formatMoneyRange(project.priceMin, project.priceMax, project.currency);
+  const priceLabel = formattedPrice === "—" ? "Price on request" : formattedPrice;
   return (
     <div
       style={{

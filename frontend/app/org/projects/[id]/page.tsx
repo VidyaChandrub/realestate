@@ -498,7 +498,7 @@ export default function OrgProjectOverviewPage() {
                   </div>
                   <div className="sp">
                     <div className="k">Base Rate</div>
-                    <div className="v">{project.baseRate ? `₹${project.baseRate.toLocaleString("en-IN")}/sqft` : "—"}</div>
+                    <div className="v">{project.baseRate ? `${formatMoney(project.baseRate, project.currency)}/sqft` : "—"}</div>
                   </div>
                   <div className="sp">
                     <div className="k">Booking Token</div>
@@ -639,15 +639,19 @@ export default function OrgProjectOverviewPage() {
                   <span className="muted">Not configured.</span>
                 ) : (
                   <div className="spec-grid">
-                    <div className="sp"><div className="k">Ad sources</div><div className="v">{mkt.adSources?.length ? mkt.adSources.join(", ") : "—"}</div></div>
+                    {/* Intentionally hidden: ad-source settings are not implemented yet and may return later. */}
+                    {/* <div className="sp"><div className="k">Ad sources</div><div className="v">{mkt.adSources?.length ? mkt.adSources.join(", ") : "—"}</div></div> */}
                     <div className="sp"><div className="k">Monthly budget</div><div className="v">{formatMoney(mkt.monthlyBudget ?? null, project.currency)}</div></div>
                     <div className="sp"><div className="k">Target CPL</div><div className="v">{formatMoney(mkt.targetCpl ?? null, project.currency)}</div></div>
                     <div className="sp"><div className="k">Monthly lead goal</div><div className="v">{mkt.leadGoal ? `${mkt.leadGoal} leads` : "—"}</div></div>
                     <div className="sp"><div className="k">Landing page</div><div className="v">{mkt.landingPageChoice || "—"}</div></div>
-                    <div className="sp"><div className="k">AI voice calling</div><div className="v">{onOff(mkt.aiCallingEnabled)}</div></div>
-                    <div className="sp"><div className="k">WhatsApp auto-welcome</div><div className="v">{onOff(mkt.whatsappWelcomeEnabled)}</div></div>
+                    {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
+                    {/* <div className="sp"><div className="k">AI voice calling</div><div className="v">{onOff(mkt.aiCallingEnabled)}</div></div> */}
+                    {/* Intentionally hidden: the backing WhatsApp auto-welcome feature is not implemented yet and may return later. */}
+                    {/* <div className="sp"><div className="k">WhatsApp auto-welcome</div><div className="v">{onOff(mkt.whatsappWelcomeEnabled)}</div></div> */}
                     <div className="sp"><div className="k">Round-robin assignment</div><div className="v">{onOff(mkt.roundRobinEnabled)}</div></div>
-                    <div className="sp"><div className="k">AI knowledge base</div><div className="v">{onOff(mkt.aiKnowledgeBaseEnabled)}</div></div>
+                    {/* Intentionally hidden: the backing AI knowledge-base feature is not implemented yet and may return later. */}
+                    {/* <div className="sp"><div className="k">AI knowledge base</div><div className="v">{onOff(mkt.aiKnowledgeBaseEnabled)}</div></div> */}
                   </div>
                 )}
               </div>
@@ -966,7 +970,12 @@ export default function OrgProjectOverviewPage() {
             </div>
           </Reveal>
 
-          {/* Access & Governance Controls */}
+          {/* Intentionally hidden: booking approval and telecaller visibility are
+              not implemented yet and may return later. "Published to website"
+              is covered by the real Website & Landing Page card above (which
+              reads the same field meaningfully) — showing it again here, next
+              to two dead fields, made it look like another decorative toggle. */}
+          {/*
           <Reveal delay={3}>
             <div className="card">
               <div className="card-h"><span className="t">Governance &amp; Access</span></div>
@@ -979,6 +988,7 @@ export default function OrgProjectOverviewPage() {
               </div>
             </div>
           </Reveal>
+          */}
         </div>
       </div>
       <Modal

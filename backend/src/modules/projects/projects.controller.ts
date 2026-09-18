@@ -72,6 +72,12 @@ export class ProjectsController {
     return this.service.listSalesAgentCandidates(user.orgId as string);
   }
 
+  @Get('project-assignee-candidates')
+  @RequirePermission('projects', 'view')
+  listProjectAssigneeCandidates(@CurrentUser() user: JwtPayload) {
+    return this.service.listProjectAssigneeCandidates(user.orgId as string);
+  }
+
   @Get(':id')
   @RequirePermission('projects', 'view')
   getById(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
