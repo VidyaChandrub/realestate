@@ -3417,3 +3417,14 @@
   margin-top: 6px;
   line-height: 1.5;
 }
+
+.org .page {
+  width: auto;
+  margin: 22px;
+  padding: 24px 28px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh);
+  min-height: calc(100vh - 64px - 44px);
+}

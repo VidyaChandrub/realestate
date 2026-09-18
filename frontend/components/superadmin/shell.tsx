@@ -36,6 +36,8 @@ const NAV_MODULE: Record<string, string> = {
   "/admin-console/audit-logs": "admin_audit_logs",
   "/admin-console/settings": "admin_settings",
   "/admin-console/support": "admin_support",
+  "/admin-console/media": "admin_templates",
+  "/admin-console/reports": "admin_dashboard",
 };
 
 const NAV_GROUPS: NavGroup[] = [
@@ -90,6 +92,20 @@ const NAV_GROUPS: NavGroup[] = [
         activeMatch: ["/admin-console/leads"],
       },
       { href: "/admin-console/subscriptions", icon: "billing", label: "Subscriptions", tip: "Plans and subscriptions", activeMatch: ["/admin-console/subscriptions"] },
+      {
+        href: "/admin-console/media",
+        icon: "document",
+        label: "Media Library",
+        tip: "Global Media Assets across all Organisations",
+        activeMatch: ["/admin-console/media"],
+      },
+      {
+        href: "/admin-console/reports",
+        icon: "reports",
+        label: "Reports & Analytics",
+        tip: "Platform reports & analytics dashboard",
+        activeMatch: ["/admin-console/reports"],
+      },
     ],
   },
   {
@@ -119,6 +135,7 @@ const CRUMB_MAP: Record<string, string> = {
   "/admin-console/email": "Email & SMTP",
   "/admin-console/audit-logs": "Audit Logs",
   "/admin-console/settings": "Settings",
+  "/admin-console/reports": "Reports & Analytics",
   "/admin-console/support": "Support Management",
 };
 

@@ -20,7 +20,9 @@ export type UploadField =
   | 'favicon'
   // A support-ticket attachment (screenshot / PDF) — org side, from the
   // Support & Help "Contact support" form or a reply in the chat thread.
-  | 'supportAttachment';
+  | 'supportAttachment'
+  // General media library upload — images, videos, documents, icons, logos
+  | 'media';
 
 export const UPLOAD_FIELDS: readonly UploadField[] = [
   'amenityIcon',
@@ -32,6 +34,7 @@ export const UPLOAD_FIELDS: readonly UploadField[] = [
   'logo',
   'favicon',
   'supportAttachment',
+  'media',
 ] as const;
 
 export interface FieldRule {
@@ -103,6 +106,29 @@ export const FIELD_RULES: Record<UploadField, FieldRule> = {
     maxBytes: 10 * MB,
     label: 'attachment',
   },
+  media: {
+    mimeTypes: [
+      ...IMAGE_MIMES,
+      'image/svg+xml',
+      'image/x-icon',
+      'image/vnd.microsoft.icon',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'video/mp4',
+      'video/webm',
+      'video/quicktime',
+      'audio/mpeg',
+      'audio/wav',
+      'audio/ogg',
+      'application/zip',
+      'application/x-zip-compressed',
+    ],
+    maxBytes: 100 * MB,
+    label: 'media asset',
+  },
 };
 
 export interface CreateUploadUrlInput {
@@ -119,6 +145,7 @@ export interface CreateUploadUrlInput {
   unitTypeId?: string;
   templateId?: string;
   landingPageId?: string;
+  folder?: string;
 }
 
 export interface CreateUploadUrlResult {

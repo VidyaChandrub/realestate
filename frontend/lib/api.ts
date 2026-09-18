@@ -1,4 +1,17 @@
 import type {
+  AgentPerformanceStat,
+  FunnelStageStat,
+  LeadSourceStat,
+  ProjectAnalyticsStat,
+  ReportsFilterInput,
+  ReportsSummary,
+  CreateMediaUploadUrlInput,
+  CreateMediaUploadUrlResult,
+  MediaFileItem,
+  MediaListResponse,
+  MediaStatsResponse,
+  RegisterMediaInput,
+  UpdateMediaInput,
   AdminAuditLogsExportResponse,
   AdminAuditLogsListResponse,
   AdminAuditLogsMeta,
@@ -1264,6 +1277,11 @@ export async function getAdminLeadsMeta(): Promise<import("./types").AdminLeadsM
   return apiFetch<import("./types").AdminLeadsMeta>("/admin/leads/meta");
 }
 
+export async function getAdminOrganisationsList(): Promise<{ id: string; name: string }[]> {
+  const meta = await getAdminLeadsMeta().catch(() => ({ organisations: [] }));
+  return meta.organisations || [];
+}
+
 export async function getPlatformTeam(): Promise<PlatformTeamMember[]> {
   return apiFetch<PlatformTeamMember[]>("/admin/platform-team");
 }
@@ -1419,3 +1437,276 @@ export function sendTeamMessage(
     },
   );
 }
+
+// --- Media Library (Org & Super Admin) -------------------------------------
+
+export function getOrgMedia(params?: {
+  search?: string;
+  category?: string;
+  folder?: string;
+  page?: number;
+  limit?: number;
+}): Promise<MediaListResponse> {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.category) query.set("category", params.category);
+  if (params?.folder) query.set("folder", params.folder);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+
+  const qs = query.toString();
+  return apiFetch<MediaListResponse>(`/org/media${qs ? `?${qs}` : ""}`);
+}
+
+export function getOrgMediaStats(): Promise<MediaStatsResponse> {
+  return apiFetch<MediaStatsResponse>("/org/media/stats");
+}
+
+export function createOrgMediaUploadUrl(
+  input: CreateMediaUploadUrlInput,
+): Promise<CreateMediaUploadUrlResult> {
+  return apiFetch<CreateMediaUploadUrlResult>("/org/media/upload-url", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function registerOrgMedia(
+  input: RegisterMediaInput,
+): Promise<MediaFileItem> {
+  return apiFetch<MediaFileItem>("/org/media/register", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateOrgMedia(
+  id: string,
+  input: UpdateMediaInput,
+): Promise<MediaFileItem> {
+  return apiFetch<MediaFileItem>(`/org/media/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteOrgMedia(id: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/org/media/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function bulkDeleteOrgMedia(
+  ids: string[],
+): Promise<{ success: boolean; count: number }> {
+  return apiFetch<{ success: boolean; count: number }>("/org/media/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
+// --- Super Admin Media Library ---------------------------------------------
+
+export function getAdminMedia(params?: {
+  orgId?: string;
+  search?: string;
+  category?: string;
+  folder?: string;
+  page?: number;
+  limit?: number;
+}): Promise<MediaListResponse> {
+  const query = new URLSearchParams();
+  if (params?.orgId) query.set("orgId", params.orgId);
+  if (params?.search) query.set("search", params.search);
+  if (params?.category) query.set("category", params.category);
+  if (params?.folder) query.set("folder", params.folder);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+
+  const qs = query.toString();
+  return apiFetch<MediaListResponse>(`/admin/media${qs ? `?${qs}` : ""}`);
+}
+
+export function getAdminMediaStats(): Promise<MediaStatsResponse> {
+  return apiFetch<MediaStatsResponse>("/admin/media/stats");
+}
+
+export function createAdminMediaUploadUrl(
+  input: CreateMediaUploadUrlInput,
+): Promise<CreateMediaUploadUrlResult> {
+  return apiFetch<CreateMediaUploadUrlResult>("/admin/media/upload-url", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function registerAdminMedia(
+  input: RegisterMediaInput,
+): Promise<MediaFileItem> {
+  return apiFetch<MediaFileItem>("/admin/media/register", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateAdminMedia(
+  id: string,
+  input: UpdateMediaInput,
+): Promise<MediaFileItem> {
+  return apiFetch<MediaFileItem>(`/admin/media/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteAdminMedia(id: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/admin/media/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function bulkDeleteAdminMedia(
+  ids: string[],
+): Promise<{ success: boolean; count: number }> {
+  return apiFetch<{ success: boolean; count: number }>("/admin/media/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
+// --- Upload file directly helper ------------------------------------------
+
+export async function uploadFileToMediaLibrary(
+  file: File,
+  folder = "general",
+  onProgress?: (percent: number) => void,
+): Promise<MediaFileItem> {
+  // 1. Get presigned upload URL
+  const { uploadUrl, publicUrl, key, category } = await createOrgMediaUploadUrl({
+    filename: file.name,
+    contentType: file.type || "application/octet-stream",
+    size: file.size,
+    folder,
+  });
+
+  // 2. Upload file directly to R2
+  const res = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+    },
+    body: file,
+  });
+
+  if (!res.ok) {
+    throw new Error(`Upload failed (${res.status}): ${res.statusText}`);
+  }
+
+  // 3. Register media item in DB
+  return registerOrgMedia({
+    name: file.name,
+    filename: file.name,
+    storedKey: key,
+    publicUrl,
+    mimeType: file.type || "application/octet-stream",
+    size: file.size,
+    category,
+    folder,
+  });
+}
+
+// --- Reports & Analytics --------------------------------------------------
+
+function buildReportsQuery(params?: ReportsFilterInput): string {
+  const query = new URLSearchParams();
+  if (params?.preset) query.set("preset", params.preset);
+  if (params?.startDate) query.set("startDate", params.startDate);
+  if (params?.endDate) query.set("endDate", params.endDate);
+  if (params?.projectId) query.set("projectId", params.projectId);
+  if (params?.agentId) query.set("agentId", params.agentId);
+  if (params?.source) query.set("source", params.source);
+  if (params?.orgId) query.set("orgId", params.orgId);
+  const qs = query.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export function getOrgReportsSummary(params?: ReportsFilterInput): Promise<ReportsSummary> {
+  return apiFetch<ReportsSummary>(`/org/reports/summary${buildReportsQuery(params)}`);
+}
+
+export function getOrgReportsLeadSources(params?: ReportsFilterInput): Promise<LeadSourceStat[]> {
+  return apiFetch<LeadSourceStat[]>(`/org/reports/lead-sources${buildReportsQuery(params)}`);
+}
+
+export function getOrgReportsFunnel(params?: ReportsFilterInput): Promise<FunnelStageStat[]> {
+  return apiFetch<FunnelStageStat[]>(`/org/reports/funnel${buildReportsQuery(params)}`);
+}
+
+export function getOrgReportsAgentPerformance(params?: ReportsFilterInput): Promise<AgentPerformanceStat[]> {
+  return apiFetch<AgentPerformanceStat[]>(`/org/reports/agent-performance${buildReportsQuery(params)}`);
+}
+
+export function getOrgReportsProjectAnalytics(params?: ReportsFilterInput): Promise<ProjectAnalyticsStat[]> {
+  return apiFetch<ProjectAnalyticsStat[]>(`/org/reports/projects${buildReportsQuery(params)}`);
+}
+
+export async function downloadCsvFile(url: string, filename: string): Promise<void> {
+  const { accessToken } = readTokens();
+  const headers: Record<string, string> = {};
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
+  }
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    if (res.status === 401 && (await tryRefresh())) {
+      return downloadCsvFile(url, filename);
+    }
+    throw new Error(`CSV download failed with status ${res.status}`);
+  }
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
+export async function downloadOrgReportCsv(params?: ReportsFilterInput, type = "leads"): Promise<void> {
+  const qs = buildReportsQuery({ ...params });
+  const typeParam = `type=${type}`;
+  const fullQs = qs ? `${qs}&${typeParam}` : `?${typeParam}`;
+  const filename = `org-report-${type}-${Date.now()}.csv`;
+  await downloadCsvFile(`${API_BASE}/org/reports/export/csv${fullQs}`, filename);
+}
+
+export function getAdminReportsSummary(params?: ReportsFilterInput): Promise<ReportsSummary> {
+  return apiFetch<ReportsSummary>(`/admin/reports/summary${buildReportsQuery(params)}`);
+}
+
+export function getAdminReportsLeadSources(params?: ReportsFilterInput): Promise<LeadSourceStat[]> {
+  return apiFetch<LeadSourceStat[]>(`/admin/reports/lead-sources${buildReportsQuery(params)}`);
+}
+
+export function getAdminReportsFunnel(params?: ReportsFilterInput): Promise<FunnelStageStat[]> {
+  return apiFetch<FunnelStageStat[]>(`/admin/reports/funnel${buildReportsQuery(params)}`);
+}
+
+export function getAdminReportsAgentPerformance(params?: ReportsFilterInput): Promise<AgentPerformanceStat[]> {
+  return apiFetch<AgentPerformanceStat[]>(`/admin/reports/agent-performance${buildReportsQuery(params)}`);
+}
+
+export function getAdminReportsProjectAnalytics(params?: ReportsFilterInput): Promise<ProjectAnalyticsStat[]> {
+  return apiFetch<ProjectAnalyticsStat[]>(`/admin/reports/projects${buildReportsQuery(params)}`);
+}
+
+export async function downloadAdminReportCsv(params?: ReportsFilterInput, type = "leads"): Promise<void> {
+  const qs = buildReportsQuery({ ...params });
+  const typeParam = `type=${type}`;
+  const fullQs = qs ? `${qs}&${typeParam}` : `?${typeParam}`;
+  const filename = `admin-report-${type}-${Date.now()}.csv`;
+  await downloadCsvFile(`${API_BASE}/admin/reports/export/csv${fullQs}`, filename);
+}
+

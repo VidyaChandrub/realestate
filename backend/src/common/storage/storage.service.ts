@@ -5,7 +5,9 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import * as fs from 'fs';
+import * as path from 'path';
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   CreateUploadUrlInput,
@@ -20,15 +22,7 @@ const PRESIGN_TTL_SECONDS = 10 * 60;
 
 /**
  * Generic object-storage helper for the whole backend (Cloudflare R2, which
- * is S3-compatible). Used by Projects (media) and the Templates / Landing
- * Pages builder (content images); any module can inject StorageService —
- * see storage.types.ts to add a new field rule.
- *
- * The bucket is public-read: everything issued here is a marketing asset
- * (icons, floor plans, brochures, walkthrough videos) meant to be visible
- * on public landing pages. No PII, documents, or user data goes in it. The
- * protection that matters is WRITE scoping — every key is prefixed with the
- * caller's own orgId, taken from the JWT, never from the request body.
+ * is S3-compatible, with local disk storage fallback in dev mode).
  */
 @Injectable()
 export class StorageService {
@@ -43,31 +37,21 @@ export class StorageService {
       R2_BUCKET_NAME,
       R2_PUBLIC_URL,
     } = process.env;
-    if (
-      !R2_ENDPOINT ||
-      !R2_ACCESS_KEY_ID ||
-      !R2_SECRET_ACCESS_KEY ||
-      !R2_BUCKET_NAME ||
-      !R2_PUBLIC_URL
-    ) {
-      this.logger.error(
-        'R2 storage is not configured — set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME and R2_PUBLIC_URL in the environment.',
-      );
-      throw new ServiceUnavailableException(
-        'File uploads are not configured on this server yet.',
-      );
+    if (!this.isConfigured()) {
+      return {
+        endpoint: '',
+        accessKeyId: '',
+        secretAccessKey: '',
+        bucket: 'local-dev',
+        publicUrl: process.env.PUBLIC_BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`,
+      };
     }
     return {
-      // Full S3-API endpoint URL. For Cloudflare R2 this is
-      // https://<account-id>.r2.cloudflarestorage.com — but keeping it as
-      // one var means pointing at MinIO / Backblaze / another provider is a
-      // pure config change.
-      endpoint: R2_ENDPOINT.replace(/\/+$/, ''),
-      accessKeyId: R2_ACCESS_KEY_ID,
-      secretAccessKey: R2_SECRET_ACCESS_KEY,
-      bucket: R2_BUCKET_NAME,
-      // No trailing slash — we join with `/${key}` below.
-      publicUrl: R2_PUBLIC_URL.replace(/\/+$/, ''),
+      endpoint: (R2_ENDPOINT || '').replace(/\/+$/, ''),
+      accessKeyId: R2_ACCESS_KEY_ID || '',
+      secretAccessKey: R2_SECRET_ACCESS_KEY || '',
+      bucket: R2_BUCKET_NAME || 'media',
+      publicUrl: (R2_PUBLIC_URL || '').replace(/\/+$/, ''),
     };
   }
 
@@ -78,25 +62,31 @@ export class StorageService {
       region: 'auto',
       endpoint,
       credentials: { accessKeyId, secretAccessKey },
-      // Newer AWS SDKs default to adding an `x-amz-checksum-crc32` to every
-      // request. For a *presigned* PUT that checksum is baked in at signing
-      // time against an empty body, so the real browser upload then fails a
-      // checksum check on R2. Only send checksums when the operation
-      // actually requires one.
       requestChecksumCalculation: 'WHEN_REQUIRED',
       responseChecksumValidation: 'WHEN_REQUIRED',
     });
     return this.client;
   }
 
-  /** True when all five R2_* vars are present — lets callers 501 cleanly. */
+  /** True when all five R2_* vars are present and not placeholders. */
   isConfigured(): boolean {
+    const {
+      R2_ENDPOINT,
+      R2_ACCESS_KEY_ID,
+      R2_SECRET_ACCESS_KEY,
+      R2_BUCKET_NAME,
+      R2_PUBLIC_URL,
+    } = process.env;
+
     return Boolean(
-      process.env.R2_ENDPOINT &&
-        process.env.R2_ACCESS_KEY_ID &&
-        process.env.R2_SECRET_ACCESS_KEY &&
-        process.env.R2_BUCKET_NAME &&
-        process.env.R2_PUBLIC_URL,
+      R2_ENDPOINT &&
+        !R2_ENDPOINT.includes('your-account-id') &&
+        R2_ACCESS_KEY_ID &&
+        !R2_ACCESS_KEY_ID.includes('r2-access-key-id') &&
+        R2_SECRET_ACCESS_KEY &&
+        R2_BUCKET_NAME &&
+        R2_PUBLIC_URL &&
+        !R2_PUBLIC_URL.includes('example.com'),
     );
   }
 
@@ -124,8 +114,24 @@ export class StorageService {
       );
     }
 
-    const { bucket, publicUrl } = this.env();
     const key = this.buildKey(input);
+
+    // --- Local storage fallback when R2 is not configured ---
+    if (!this.isConfigured()) {
+      const port = process.env.PORT || '4000';
+      const baseUrl = process.env.PUBLIC_BACKEND_URL || `http://localhost:${port}`;
+      const uploadUrl = `${baseUrl}/uploads/local-put?key=${encodeURIComponent(key)}`;
+      const publicUrl = `${baseUrl}/uploads/${key}`;
+
+      return {
+        uploadUrl,
+        publicUrl,
+        key,
+        expiresIn: PRESIGN_TTL_SECONDS,
+      };
+    }
+
+    const { bucket, publicUrl } = this.env();
 
     const uploadUrl = await getSignedUrl(
       this.s3(),
@@ -145,6 +151,33 @@ export class StorageService {
     };
   }
 
+  async deleteObject(key: string): Promise<void> {
+    if (!key) return;
+    if (!this.isConfigured()) {
+      try {
+        const safeKey = path.normalize(key).replace(/^(\.\.[\/\\])+/, '');
+        const localPath = path.join(process.cwd(), 'uploads', safeKey);
+        if (fs.existsSync(localPath)) {
+          fs.unlinkSync(localPath);
+        }
+      } catch (err) {
+        this.logger.error(`Failed to delete local storage key "${key}": ${err}`);
+      }
+      return;
+    }
+    try {
+      const { bucket } = this.env();
+      await this.s3().send(
+        new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: key,
+        }),
+      );
+    } catch (err) {
+        this.logger.error(`Failed to delete storage key "${key}": ${err}`);
+    }
+  }
+
   // Key layout is decided here, server-side. Org-scoped content lives under
   // a single top-level `org/{orgId}/` prefix; platform-level content (no
   // orgId — e.g. the Super Admin template builder) under `platform/`. The
@@ -153,13 +186,17 @@ export class StorageService {
   private buildKey(input: CreateUploadUrlInput): string {
     const safeName = sanitizeFilename(input.filename);
     const unique = `${randomUUID()}-${safeName}`;
-    const root = input.orgId ? ['org', input.orgId] : ['platform'];
+    const now = new Date();
+    const year = now.getFullYear().toString();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
 
-    // Builder images: the `images/` folder already names the field, so the
-    // key is .../images/{uuid}-{filename} (no trailing field segment).
+    const root = input.orgId ? ['org', input.orgId] : ['platform'];
+    const timePath = [year, month];
+
     if (input.landingPageId) {
       return [
         ...root,
+        ...timePath,
         'landing-pages',
         seg(input.landingPageId),
         'images',
@@ -167,12 +204,17 @@ export class StorageService {
       ].join('/');
     }
     if (input.templateId) {
-      return [...root, 'templates', seg(input.templateId), 'images', unique].join(
-        '/',
-      );
+      return [
+        ...root,
+        ...timePath,
+        'templates',
+        seg(input.templateId),
+        'images',
+        unique,
+      ].join('/');
     }
 
-    const parts = [...root];
+    const parts = [...root, ...timePath];
     if (input.projectId) {
       parts.push('projects', input.projectId);
       if (input.unitTypeId) {
@@ -180,14 +222,12 @@ export class StorageService {
       } else if (input.field === 'amenityIcon') {
         parts.push('amenities');
       } else {
-        // Unit-type media uploaded from the "new unit type" form, before
-        // the row exists — reparenting isn't worth it, the file is small.
         parts.push('unit-types', '_pending');
       }
     } else {
-      parts.push('_unscoped');
+      parts.push(input.folder || 'general');
     }
-    parts.push(input.field, unique);
+    parts.push(unique);
     return parts.join('/');
   }
 }

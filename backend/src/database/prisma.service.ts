@@ -49,6 +49,26 @@ export class PrismaService
           "can_approve" BOOLEAN,
           CONSTRAINT "user_module_permissions_pkey" PRIMARY KEY ("org_id", "user_id", "module_key")
         )`,
+      `CREATE TABLE IF NOT EXISTS "identity"."media_files" (
+          "id" TEXT NOT NULL,
+          "org_id" TEXT,
+          "uploaded_by_id" TEXT,
+          "name" TEXT NOT NULL,
+          "filename" TEXT NOT NULL,
+          "stored_key" TEXT NOT NULL,
+          "public_url" TEXT NOT NULL,
+          "mime_type" TEXT NOT NULL,
+          "size" INTEGER NOT NULL,
+          "category" TEXT NOT NULL DEFAULT 'image',
+          "folder" TEXT NOT NULL DEFAULT 'general',
+          "alt" TEXT,
+          "tags" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+          "metadata" JSONB,
+          "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "media_files_pkey" PRIMARY KEY ("id")
+        )`,
+      `ALTER TABLE "identity"."media_files" ADD COLUMN IF NOT EXISTS "alt" TEXT`,
     ];
     for (const sql of statements) {
       try {

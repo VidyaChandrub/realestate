@@ -349,10 +349,25 @@ export function DynamicLeadForm({
   };
 
   if (done) {
-    const ink = variant === "dark" ? "#fff" : form.style?.textColor || wt.ink;
+    const ink = variant === "dark" ? "#ffffff" : form.style?.textColor || wt.ink || "#0f172a";
+    const thankYouBg = variant === "dark" ? "rgba(16, 185, 129, 0.16)" : "#f0fdf4";
+    const thankYouBorder = variant === "dark" ? "rgba(16, 185, 129, 0.35)" : "#bbf7d0";
     return (
-      <div style={{ fontSize: 13.5, fontWeight: 700, color: ink, lineHeight: 1.5 }}>
-        <div>{form.successTitle || form.thankYou || "Thanks — our team will call you shortly."}</div>
+      <div style={{ fontSize: 14, color: ink, lineHeight: 1.6 }}>
+        <div
+          style={{
+            padding: "16px 20px",
+            borderRadius: 12,
+            background: thankYouBg,
+            border: `1px solid ${thankYouBorder}`,
+            color: variant === "dark" ? "#6ee7b7" : "#15803d",
+            fontWeight: 700,
+            fontSize: 14,
+            marginBottom: download ? 12 : 0,
+          }}
+        >
+          {form.successTitle || form.thankYou || "Thanks — our team will call you shortly."}
+        </div>
         {download ? (
           <div style={{ marginTop: 12 }}>
             {download.kind === "image" ? (

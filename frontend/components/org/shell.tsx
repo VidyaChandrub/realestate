@@ -42,6 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/org/leads", icon: "target", label: "Lead Center", tip: "Lead Center" },
       { href: "/org/projects", icon: "building", label: "Projects", tip: "Projects" },
       { href: "/org/sales-agents", icon: "users", label: "Sales Agents", tip: "Sales Agents" },
+      { href: "/org/reports", icon: "reports", label: "Reports & Analytics", tip: "Reports & Analytics" },
     ],
   },
   {
@@ -57,6 +58,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/org/landing-pages", icon: "document", label: "Landing Pages", tip: "Landing Pages" },
       { href: "/org/templates", icon: "puzzle", label: "Templates", tip: "Templates" },
       { href: "/org/forms", icon: "document", label: "Lead Forms", tip: "Lead Forms" },
+      { href: "/org/media", icon: "document", label: "Media Library", tip: "Central Media & Assets Repository" },
     ],
   },
   {
@@ -99,9 +101,11 @@ const CRUMB_MAP: Record<string, string> = {
   "/org/websites": "Websites",
   "/org/landing-pages": "Landing Pages",
   "/org/forms": "Lead Forms",
+  "/org/media": "Media Library",
   "/org/templates": "Templates",
   "/org/integrations": "Integrations",
   "/org/sales-agents": "Sales Agents",
+  "/org/reports": "Reports & Analytics",
   "/org/teams": "Teams",
   "/org/team-chat": "Team Chat",
   "/org/users": "Users",
@@ -428,9 +432,10 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                 if (item.href.startsWith("/org/projects")) return hasPermission("projects", "view");
                 if (item.href.startsWith("/org/calling")) return hasPermission("calling", "view");
                 if (item.href.startsWith("/org/whatsapp")) return hasPermission("whatsapp", "view");
-                if (item.href.startsWith("/org/landing-pages") || item.href.startsWith("/org/templates")) return hasPermission("websites", "view");
+                if (item.href.startsWith("/org/landing-pages") || item.href.startsWith("/org/templates") || item.href.startsWith("/org/media")) return hasPermission("websites", "view");
                 if (item.href.startsWith("/org/forms")) return hasPermission("forms", "view");
                 if (item.href.startsWith("/org/sales-agents")) return hasPermission("sales_agents", "view");
+                if (item.href.startsWith("/org/reports")) return hasPermission("crm", "view") || hasPermission("dashboard", "view");
                 if (item.href.startsWith("/org/teams") || item.href.startsWith("/org/team-chat")) return hasPermission("teams", "view");
                 if (item.href.startsWith("/org/users")) return hasPermission("users", "view");
                 if (item.href.startsWith("/org/roles-permissions")) return user.role === "organisation_admin";

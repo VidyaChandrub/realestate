@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/icons";
+import { Modal } from "@/components/ui/modal";
 import {
   exportAdminAuditLogs,
   getAdminAuditLogs,
@@ -16,15 +17,13 @@ import type {
 
 const PAGE_SIZE = 20;
 
-const AV_TONES = ["", "a2", "a3", "a4", "a5"];
-
-const ACTION_BADGES = [
-  "b-gray",
-  "b-indigo",
-  "b-green",
-  "b-amber",
-  "b-rose",
-  "b-violet",
+const AV_TONES = [
+  "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+  "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)",
+  "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+  "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+  "linear-gradient(135deg, #ec4899 0%, #db2777 100%)",
+  "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
 ];
 
 function hashString(input: string): number {
@@ -36,41 +35,70 @@ function hashString(input: string): number {
   return Math.abs(h);
 }
 
-function formatDateTime(value: string): string {
+function formatDateTime(value: string): { dateStr: string; timeStr: string; relative: string } {
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
+  if (Number.isNaN(d.getTime())) return { dateStr: value, timeStr: "", relative: "" };
+  
   const day = String(d.getDate()).padStart(2, "0");
-  const months = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const yyyy = d.getFullYear();
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${day} ${months[d.getMonth()]} ${yyyy}, ${hh}:${mm}`;
+  
+  const dateStr = `${day} ${months[d.getMonth()]} ${yyyy}`;
+  const timeStr = `${hh}:${mm}`;
+
+  const diffMs = Date.now() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMin / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  let relative = "";
+  if (diffMin < 1) relative = "Just now";
+  else if (diffMin < 60) relative = `${diffMin}m ago`;
+  else if (diffHours < 24) relative = `${diffHours}h ago`;
+  else relative = `${diffDays}d ago`;
+
+  return { dateStr, timeStr, relative };
 }
 
-function actorInitials(actor: AdminAuditLogActor | null): { initials: string; tone: string } {
+function actorInitials(actor: AdminAuditLogActor | null): { initials: string; bg: string } {
   if (actor) {
     const first = actor.firstName?.[0] ?? "";
     const last = actor.lastName?.[0] ?? "";
     const initials = (first + last) || actor.email.slice(0, 2).toUpperCase();
     return {
       initials: initials.toUpperCase(),
-      tone: AV_TONES[hashString(actor.email || actor.id) % AV_TONES.length],
+      bg: AV_TONES[hashString(actor.email || actor.id) % AV_TONES.length],
     };
   }
-  return { initials: "—", tone: "a5" };
+  return { initials: "SYS", bg: "linear-gradient(135deg, #64748b 0%, #475569 100%)" };
 }
 
-function moduleBadge(entry: AdminAuditLogEntry): string {
-  const b = ACTION_BADGES[hashString(entry.action || entry.moduleKey || "x") % ACTION_BADGES.length];
-  return b;
+function actionBadgeStyle(action: string): { bg: string; color: string; border: string; label: string } {
+  const act = action.toLowerCase();
+  if (act.includes("create") || act.includes("add") || act.includes("register") || act.includes("publish")) {
+    return { bg: "rgba(16, 185, 129, 0.1)", color: "#059669", border: "rgba(16, 185, 129, 0.25)", label: action };
+  }
+  if (act.includes("update") || act.includes("edit") || act.includes("change") || act.includes("patch") || act.includes("renew")) {
+    return { bg: "rgba(79, 70, 229, 0.1)", color: "#4f46e5", border: "rgba(79, 70, 229, 0.25)", label: action };
+  }
+  if (act.includes("delete") || act.includes("remove") || act.includes("cancel") || act.includes("revoke") || act.includes("reject")) {
+    return { bg: "rgba(239, 68, 68, 0.1)", color: "#dc2626", border: "rgba(239, 68, 68, 0.25)", label: action };
+  }
+  if (act.includes("login") || act.includes("auth") || act.includes("verify") || act.includes("approve")) {
+    return { bg: "rgba(245, 158, 11, 0.1)", color: "#d97706", border: "rgba(245, 158, 11, 0.25)", label: action };
+  }
+  if (act.includes("export") || act.includes("download") || act.includes("view")) {
+    return { bg: "rgba(14, 165, 233, 0.1)", color: "#0284c7", border: "rgba(14, 165, 233, 0.25)", label: action };
+  }
+  return { bg: "#f1f5f9", color: "#475569", border: "#cbd5e1", label: action };
 }
 
 function displayModuleKey(moduleKey: string | null): string {
-  if (!moduleKey) return "system";
-  return moduleKey.replace(/^admin_/, "").replace(/_/g, " ");
+  if (!moduleKey) return "System Core";
+  const name = moduleKey.replace(/^admin_/, "").replace(/_/g, " ");
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 function csvCell(value: unknown): string {
@@ -104,7 +132,7 @@ function downloadCsv(filename: string, rows: AdminAuditLogEntry[]) {
     r.createdAt,
     r.actor
       ? [r.actor.firstName, r.actor.lastName].filter(Boolean).join(" ")
-      : "",
+      : "System",
     r.actor?.email ?? "",
     r.organisation?.name ?? "",
     r.moduleKey ?? "",
@@ -144,6 +172,11 @@ export default function SuperAdminAuditLogsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Inspector modal state
+  const [inspectEntry, setInspectEntry] = useState<AdminAuditLogEntry | null>(null);
+  const [copiedJson, setCopiedJson] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -229,281 +262,718 @@ export default function SuperAdminAuditLogsPage() {
     }
   }
 
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const copyMetadataJson = (json: unknown) => {
+    navigator.clipboard.writeText(JSON.stringify(json, null, 2));
+    setCopiedJson(true);
+    setTimeout(() => setCopiedJson(false), 2000);
+  };
+
   return (
-    <>
-      <div className="page-head reveal in">
+    <div style={{ maxWidth: 1400, margin: "0 auto", paddingBottom: 40 }}>
+      {/* Top Header */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 16,
+          flexWrap: "wrap",
+          marginBottom: 24,
+        }}
+      >
         <div>
-          <div className="eyebrow">
-            <Icon name="shield" size={14} /> System
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "3px 10px",
+                borderRadius: 999,
+                background: "rgba(79, 70, 229, 0.08)",
+                color: "#4f46e5",
+                fontSize: 12,
+                fontWeight: 700,
+                border: "1px solid rgba(79, 70, 229, 0.15)",
+              }}
+            >
+              <Icon name="shield" size={14} /> Security &amp; Compliance Audit
+            </span>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "3px 10px",
+                borderRadius: 999,
+                background: "rgba(16, 185, 129, 0.08)",
+                color: "#059669",
+                fontSize: 11.5,
+                fontWeight: 700,
+                border: "1px solid rgba(16, 185, 129, 0.2)",
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#10b981",
+                  boxShadow: "0 0 8px #10b981",
+                }}
+              />
+              Live Activity Stream
+            </span>
           </div>
-          <h1>Audit Logs</h1>
-          <div className="sub">
-            Live platform activity from the API — every significant action across organisations.
-          </div>
+          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: "#0f172a", tracking: "-0.02em" }}>
+            Platform Audit Logs
+          </h1>
+          <p style={{ margin: "4px 0 0", fontSize: 13.5, color: "#64748b" }}>
+            Real-time security trail and administrative activity dispatches across all tenant organisations.
+          </p>
         </div>
-        <div className="actions">
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <button
-            className="btn btn-ghost"
+            type="button"
             onClick={() => void fetchList()}
             disabled={loading}
-            title="Refresh"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 16px",
+              borderRadius: 10,
+              border: "1px solid #cbd5e1",
+              background: "#fff",
+              color: "#334155",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+            }}
           >
-            <Icon name="refresh" size={16} />
-            <span style={{ marginLeft: 6 }}>Refresh</span>
+            <Icon name="refresh" size={15} className={loading ? "spin" : ""} />
+            Refresh Stream
           </button>
+
           <button
-            className="btn btn-ghost"
+            type="button"
             onClick={() => void handleExport()}
             disabled={exporting}
-            title="Export CSV"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 18px",
+              borderRadius: 10,
+              border: "none",
+              background: "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(79, 70, 229, 0.3)",
+            }}
           >
-            <Icon name="download" size={16} />
-            <span style={{ marginLeft: 6 }}>
-              {exporting ? "Exporting…" : "Export CSV"}
-            </span>
+            <Icon name="download" size={15} />
+            {exporting ? "Generating CSV…" : "Export Audit Trail"}
           </button>
         </div>
       </div>
 
-      <div className="card reveal" style={{ marginBottom: 18 }}>
+      {/* Metrics Banner */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 14,
+          marginBottom: 20,
+        }}
+      >
         <div
-          className="card-b"
           style={{
+            background: "#fff",
+            borderRadius: 14,
+            padding: "16px 20px",
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
             display: "flex",
-            gap: 12,
-            flexWrap: "wrap",
             alignItems: "center",
+            gap: 14,
           }}
         >
-          <div style={{ position: "relative", flex: 1, minWidth: 220 }}>
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              background: "rgba(79, 70, 229, 0.08)",
+              color: "#4f46e5",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="shield" size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Total Logged Events
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", marginTop: 2 }}>
+              {total.toLocaleString()}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 14,
+            padding: "16px 20px",
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              background: "rgba(14, 165, 233, 0.08)",
+              color: "#0ea5e9",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="users" size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Active Admin Actors
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", marginTop: 2 }}>
+              {meta?.actors?.length ?? "—"}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 14,
+            padding: "16px 20px",
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              background: "rgba(16, 185, 129, 0.08)",
+              color: "#10b981",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="puzzle" size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Monitored Modules
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", marginTop: 2 }}>
+              {meta?.modules?.length ?? "—"}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 14,
+            padding: "16px 20px",
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+          }}
+        >
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              background: "rgba(245, 158, 11, 0.08)",
+              color: "#d97706",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="building" size={22} />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Organisations Tracked
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", marginTop: 2 }}>
+              {meta?.organisations?.length ?? "—"}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Control Box */}
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 16,
+          padding: 18,
+          border: "1px solid #e2e8f0",
+          boxShadow: "0 2px 6px rgba(15, 23, 42, 0.03)",
+          marginBottom: 20,
+        }}
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, alignItems: "center" }}>
+          {/* Search */}
+          <div style={{ position: "relative", gridColumn: "span 2" }}>
+            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }}>
+              <Icon name="search" size={16} />
+            </span>
             <input
-              className="inp"
-              placeholder="Search actions, entities, actor names, orgs…"
-              style={{ paddingLeft: 38 }}
+              type="text"
+              placeholder="Search actions, entities, actor names, orgs, IDs…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-            />
-            <span
               style={{
-                position: "absolute",
-                left: 13,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--faint)",
+                width: "100%",
+                padding: "9px 12px 9px 38px",
+                borderRadius: 10,
+                border: "1px solid #cbd5e1",
+                fontSize: 13,
+                outline: "none",
+                background: "#f8fafc",
+                fontWeight: 500,
               }}
-            >
-              <Icon name="search" size={14} />
-            </span>
+            />
+            {searchInput ? (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "none", color: "#94a3b8", cursor: "pointer", fontSize: 16 }}
+              >
+                ×
+              </button>
+            ) : null}
           </div>
+
+          {/* Actor Select */}
           <select
-            className="inp"
-            style={{ maxWidth: 200 }}
             value={actorId}
             onChange={(e) => {
               setActorId(e.target.value);
               setPage(1);
             }}
+            style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, background: "#f8fafc", color: "#1e293b", fontWeight: 500 }}
           >
-            <option value="">All actors</option>
+            <option value="">All Actors &amp; Admins</option>
             {(meta?.actors ?? []).map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name || a.email}
               </option>
             ))}
           </select>
+
+          {/* Action Select */}
           <select
-            className="inp"
-            style={{ maxWidth: 220 }}
             value={action}
             onChange={(e) => {
               setAction(e.target.value);
               setPage(1);
             }}
+            style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, background: "#f8fafc", color: "#1e293b", fontWeight: 500 }}
           >
-            <option value="">All actions</option>
+            <option value="">All Action Types</option>
             {(meta?.actions ?? []).map((a) => (
               <option key={a.value} value={a.value}>
                 {a.label}
               </option>
             ))}
           </select>
+
+          {/* Module Select */}
           <select
-            className="inp"
-            style={{ maxWidth: 200 }}
             value={moduleKey}
             onChange={(e) => {
               setModuleKey(e.target.value);
               setPage(1);
             }}
+            style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, background: "#f8fafc", color: "#1e293b", fontWeight: 500 }}
           >
-            <option value="">All modules</option>
+            <option value="">All Modules</option>
             {(meta?.modules ?? []).map((m) => (
               <option key={m.key} value={m.key}>
-                {m.key.replace(/^admin_/, "").replace(/_/g, " ")}
+                {displayModuleKey(m.key)}
               </option>
             ))}
           </select>
+
+          {/* Org Select */}
           <select
-            className="inp"
-            style={{ maxWidth: 200 }}
             value={orgId}
             onChange={(e) => {
               setOrgId(e.target.value);
               setPage(1);
             }}
+            style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, background: "#f8fafc", color: "#1e293b", fontWeight: 500 }}
           >
-            <option value="">All organisations</option>
+            <option value="">All Organisations</option>
             {(meta?.organisations ?? []).map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name}
               </option>
             ))}
           </select>
-          <input
-            className="inp"
-            type="date"
-            style={{ maxWidth: 170 }}
-            value={dateFrom}
-            onChange={(e) => {
-              setDateFrom(e.target.value);
-              setPage(1);
-            }}
-          />
-          <input
-            className="inp"
-            type="date"
-            style={{ maxWidth: 170 }}
-            value={dateTo}
-            onChange={(e) => {
-              setDateTo(e.target.value);
-              setPage(1);
-            }}
-          />
-          {hasFilters ? (
-            <button className="btn btn-ghost btn-sm" onClick={clearFilters}>
-              Clear filters
-            </button>
-          ) : null}
+
+          {/* Date From */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#f8fafc", padding: "4px 8px", borderRadius: 10, border: "1px solid #cbd5e1" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>FROM</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setPage(1);
+              }}
+              style={{ border: "none", background: "none", fontSize: 12.5, color: "#1e293b", outline: "none", flex: 1 }}
+            />
+          </div>
+
+          {/* Date To */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#f8fafc", padding: "4px 8px", borderRadius: 10, border: "1px solid #cbd5e1" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>TO</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setPage(1);
+              }}
+              style={{ border: "none", background: "none", fontSize: 12.5, color: "#1e293b", outline: "none", flex: 1 }}
+            />
+          </div>
         </div>
+
+        {/* Active Filter Chips */}
+        {hasFilters ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 12, borderTop: "1px dashed #e2e8f0", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Active Filters:</span>
+            {search ? (
+              <span style={{ background: "rgba(79, 70, 229, 0.08)", color: "#4f46e5", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                Search: "{search}"
+                <button type="button" onClick={() => { setSearchInput(""); setSearch(""); }} style={{ border: "none", background: "none", cursor: "pointer", color: "#4f46e5", fontWeight: 700 }}>×</button>
+              </span>
+            ) : null}
+            {actorId ? (
+              <span style={{ background: "rgba(14, 165, 233, 0.08)", color: "#0284c7", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                Actor Selected
+                <button type="button" onClick={() => setActorId("")} style={{ border: "none", background: "none", cursor: "pointer", color: "#0284c7", fontWeight: 700 }}>×</button>
+              </span>
+            ) : null}
+            {action ? (
+              <span style={{ background: "rgba(16, 185, 129, 0.08)", color: "#059669", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                Action: {action}
+                <button type="button" onClick={() => setAction("")} style={{ border: "none", background: "none", cursor: "pointer", color: "#059669", fontWeight: 700 }}>×</button>
+              </span>
+            ) : null}
+            {moduleKey ? (
+              <span style={{ background: "rgba(139, 92, 246, 0.08)", color: "#7c3aed", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                Module: {displayModuleKey(moduleKey)}
+                <button type="button" onClick={() => setModuleKey("")} style={{ border: "none", background: "none", cursor: "pointer", color: "#7c3aed", fontWeight: 700 }}>×</button>
+              </span>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={clearFilters}
+              style={{ padding: "3px 10px", borderRadius: 20, border: "1px solid #cbd5e1", background: "#fff", fontSize: 12, fontWeight: 600, color: "#ef4444", cursor: "pointer", marginLeft: "auto" }}
+            >
+              Clear All Filters
+            </button>
+          </div>
+        ) : null}
       </div>
 
+      {/* Error alert */}
       {error ? (
         <div
-          className="card"
-          style={{ marginBottom: 12, padding: "12px 16px", color: "var(--rose)" }}
+          style={{
+            background: "rgba(239, 68, 68, 0.08)",
+            border: "1px solid rgba(239, 68, 68, 0.25)",
+            color: "#dc2626",
+            padding: "12px 16px",
+            borderRadius: 12,
+            fontSize: 13,
+            fontWeight: 600,
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
         >
-          {error}
+          <Icon name="alert" size={16} /> {error}
         </div>
       ) : null}
 
-      <div className="card reveal">
-        <div className="card-h">
-          <span className="t">Activity</span>
-          <span className="muted" style={{ fontSize: 12 }}>
-            {loading ? "Loading…" : `${total.toLocaleString()} event${total === 1 ? "" : "s"}`}
-          </span>
+      {/* Audit Log Table Card */}
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 16,
+          border: "1px solid #e2e8f0",
+          boxShadow: "0 4px 16px rgba(15, 23, 42, 0.03)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "14px 20px",
+            borderBottom: "1px solid #f1f5f9",
+            background: "#f8fafc",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontWeight: 800, fontSize: 14, color: "#0f172a" }}>Event Activity Log</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b", background: "#e2e8f0", padding: "2px 8px", borderRadius: 999 }}>
+              {loading ? "Refreshing…" : `${total.toLocaleString()} records`}
+            </span>
+          </div>
+          <span style={{ fontSize: 12, color: "#94a3b8" }}>Showing Page {page} of {totalPages}</span>
         </div>
-        <div className="tbl-wrap">
-          <table className="tbl">
+
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, textAlign: "left" }}>
             <thead>
-              <tr>
-                <th>Time</th>
-                <th>Actor</th>
-                <th>Organisation</th>
-                <th>Module</th>
-                <th>Action</th>
-                <th>Entity</th>
-                <th>Details</th>
+              <tr style={{ borderBottom: "1px solid #e2e8f0", background: "#f8fafc", color: "#64748b", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <th style={{ padding: "12px 18px", width: 170 }}>Timestamp</th>
+                <th style={{ padding: "12px 18px" }}>Actor / User</th>
+                <th style={{ padding: "12px 18px" }}>Organisation</th>
+                <th style={{ padding: "12px 18px" }}>Module</th>
+                <th style={{ padding: "12px 18px" }}>Action</th>
+                <th style={{ padding: "12px 18px" }}>Target Entity</th>
+                <th style={{ padding: "12px 18px", textAlign: "right" }}>Inspect</th>
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && !loading ? (
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid #f8fafc" }}>
+                    <td colSpan={7} style={{ padding: "16px 18px", textAlign: "center", color: "#94a3b8" }}>
+                      Loading platform audit stream…
+                    </td>
+                  </tr>
+                ))
+              ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="muted">
-                    No audit log entries match the current filters.
+                  <td colSpan={7} style={{ padding: 40, textAlign: "center" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#f1f5f9", color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon name="shield" size={24} />
+                      </div>
+                      <span style={{ fontWeight: 700, color: "#334155", fontSize: 15 }}>No Audit Log Entries Found</span>
+                      <span style={{ color: "#94a3b8", fontSize: 13 }}>Try clearing filters or search query to view all platform events.</span>
+                      {hasFilters ? (
+                        <button
+                          type="button"
+                          onClick={clearFilters}
+                          style={{ marginTop: 6, padding: "7px 16px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", color: "#4f46e5", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}
+                        >
+                          Reset Filters
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ) : (
-                rows.map((l) => {
-                  const av = actorInitials(l.actor);
+                rows.map((r) => {
+                  const av = actorInitials(r.actor);
+                  const badge = actionBadgeStyle(r.actionLabel || r.action);
+                  const dt = formatDateTime(r.createdAt);
+
                   return (
-                    <tr key={l.id}>
-                      <td>
-                        <span className="mono">{formatDateTime(l.createdAt)}</span>
+                    <tr
+                      key={r.id}
+                      style={{
+                        borderBottom: "1px solid #f1f5f9",
+                        transition: "background 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      {/* Timestamp */}
+                      <td style={{ padding: "14px 18px", whiteSpace: "nowrap" }}>
+                        <div style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#1e293b" }}>{dt.dateStr}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                          <span>{dt.timeStr}</span>
+                          <span>•</span>
+                          <span style={{ color: "#4f46e5", fontWeight: 600 }}>{dt.relative}</span>
+                        </div>
                       </td>
-                      <td>
-                        <span className="u">
-                          <span className={`av ${av.tone}`}>{av.initials}</span>
-                          <span className="nm">
-                            {l.actor
-                              ? [l.actor.firstName, l.actor.lastName]
-                                  .filter(Boolean)
-                                  .join(" ") || l.actor.email
-                              : "System"}
-                            {l.actor ? (
-                              <span className="muted" style={{ fontWeight: 400, fontSize: 11 }}>
-                                {l.actor.email}
-                              </span>
-                            ) : null}
-                          </span>
-                        </span>
-                      </td>
-                      <td>{l.organisation?.name ?? <span className="muted">—</span>}</td>
-                      <td>
-                        <span className="badge b-gray">
-                          {displayModuleKey(l.moduleKey)}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`badge ${moduleBadge(l)}`}>
-                          {l.actionLabel}
-                        </span>
-                      </td>
-                      <td>
-                        {l.entity ? (
-                          <>
-                            <div style={{ fontWeight: 600, fontSize: 12.5 }}>
-                              {l.entity}
+
+                      {/* Actor */}
+                      <td style={{ padding: "14px 18px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div
+                            style={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: 10,
+                              background: av.bg,
+                              color: "#fff",
+                              fontWeight: 800,
+                              fontSize: 11.5,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {av.initials}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 13 }}>
+                              {r.actor
+                                ? [r.actor.firstName, r.actor.lastName].filter(Boolean).join(" ") || r.actor.email
+                                : "System Automation"}
                             </div>
-                            {l.entityId ? (
-                              <div className="muted mono" style={{ fontSize: 11 }}>
-                                {l.entityId}
+                            {r.actor?.email ? (
+                              <div style={{ fontSize: 11.5, color: "#64748b" }}>{r.actor.email}</div>
+                            ) : (
+                              <div style={{ fontSize: 11, color: "#94a3b8" }}>Automated Background Service</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Organisation */}
+                      <td style={{ padding: "14px 18px" }}>
+                        {r.organisation?.name ? (
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 8, background: "#f1f5f9", border: "1px solid #e2e8f0", fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                            <Icon name="building" size={13} style={{ color: "#64748b" }} />
+                            {r.organisation.name}
+                          </div>
+                        ) : (
+                          <span style={{ color: "#94a3b8", fontSize: 12, fontStyle: "italic" }}>Global Platform</span>
+                        )}
+                      </td>
+
+                      {/* Module */}
+                      <td style={{ padding: "14px 18px" }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "3px 9px",
+                            borderRadius: 6,
+                            background: "#f8fafc",
+                            border: "1px solid #cbd5e1",
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: "#475569",
+                          }}
+                        >
+                          {displayModuleKey(r.moduleKey)}
+                        </span>
+                      </td>
+
+                      {/* Action */}
+                      <td style={{ padding: "14px 18px" }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "4px 10px",
+                            borderRadius: 20,
+                            background: badge.bg,
+                            color: badge.color,
+                            border: `1px solid ${badge.border}`,
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {badge.label}
+                        </span>
+                      </td>
+
+                      {/* Target Entity */}
+                      <td style={{ padding: "14px 18px" }}>
+                        {r.entity ? (
+                          <div>
+                            <span style={{ fontWeight: 700, fontSize: 12.5, color: "#0f172a" }}>{r.entity}</span>
+                            {r.entityId ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                                <code style={{ fontSize: 11, background: "#f1f5f9", padding: "1px 5px", borderRadius: 4, color: "#64748b", fontFamily: "monospace" }}>
+                                  {r.entityId.length > 18 ? `${r.entityId.slice(0, 18)}…` : r.entityId}
+                                </code>
+                                <button
+                                  type="button"
+                                  onClick={() => copyToClipboard(r.entityId!, r.id)}
+                                  style={{ border: "none", background: "none", cursor: "pointer", color: copiedId === r.id ? "#10b981" : "#94a3b8", fontSize: 10 }}
+                                  title="Copy Entity ID"
+                                >
+                                  {copiedId === r.id ? "✓" : "📋"}
+                                </button>
                               </div>
                             ) : null}
-                          </>
+                          </div>
                         ) : (
-                          <span className="muted">—</span>
+                          <span style={{ color: "#cbd5e1" }}>—</span>
                         )}
                       </td>
-                      <td>
-                        {l.metadata &&
-                        typeof l.metadata === "object" &&
-                        Object.keys(l.metadata as object).length > 0 ? (
-                          <details style={{ fontSize: 11.5 }}>
-                            <summary
-                              className="muted"
-                              style={{ cursor: "pointer" }}
-                            >
-                              View
-                            </summary>
-                            <pre
-                              className="mono"
-                              style={{
-                                margin: "6px 0 0",
-                                padding: 8,
-                                borderRadius: 8,
-                                background: "var(--surface-2, #f1f5f9)",
-                                fontSize: 11,
-                                whiteSpace: "pre-wrap",
-                                wordBreak: "break-word",
-                              }}
-                            >
-                              {JSON.stringify(l.metadata, null, 2)}
-                            </pre>
-                          </details>
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
+
+                      {/* Inspect Button */}
+                      <td style={{ padding: "14px 18px", textAlign: "right" }}>
+                        <button
+                          type="button"
+                          onClick={() => setInspectEntry(r)}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                            padding: "6px 12px",
+                            borderRadius: 8,
+                            border: "1px solid #cbd5e1",
+                            background: "#fff",
+                            color: "#4f46e5",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                          }}
+                        >
+                          <Icon name="eye" size={13} /> Inspect
+                        </button>
                       </td>
                     </tr>
                   );
@@ -512,40 +982,236 @@ export default function SuperAdminAuditLogsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Footer */}
         {totalPages > 1 ? (
           <div
             style={{
+              padding: "14px 20px",
+              background: "#f8fafc",
+              borderTop: "1px solid #e2e8f0",
               display: "flex",
-              justifyContent: "flex-end",
-              gap: 8,
-              padding: "14px 18px",
+              alignItems: "center",
+              justifyContent: "space-between",
             }}
           >
-            <button
-              className="btn btn-ghost btn-sm"
-              type="button"
-              disabled={page <= 1 || loading}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              ← Prev
-            </button>
-            <span
-              className="muted"
-              style={{ fontSize: 12.5, alignSelf: "center" }}
-            >
-              Page {page} of {totalPages}
-            </span>
-            <button
-              className="btn btn-ghost btn-sm"
-              type="button"
-              disabled={page >= totalPages || loading}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next →
-            </button>
+            <div style={{ fontSize: 12.5, color: "#64748b", fontWeight: 600 }}>
+              Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, total)} of {total.toLocaleString()} events
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                type="button"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "6px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: page <= 1 ? "#f1f5f9" : "#fff",
+                  color: page <= 1 ? "#94a3b8" : "#334155",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  cursor: page <= 1 ? "not-allowed" : "pointer",
+                }}
+              >
+                <Icon name="chevron-left" size={14} /> Previous
+              </button>
+
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0f172a", padding: "0 8px" }}>
+                Page {page} of {totalPages}
+              </span>
+
+              <button
+                type="button"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "6px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: page >= totalPages ? "#f1f5f9" : "#fff",
+                  color: page >= totalPages ? "#94a3b8" : "#334155",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  cursor: page >= totalPages ? "not-allowed" : "pointer",
+                }}
+              >
+                Next <Icon name="chevron-right" size={14} />
+              </button>
+            </div>
           </div>
         ) : null}
       </div>
-    </>
+
+      {/* Inspector Modal */}
+      <Modal
+        open={!!inspectEntry}
+        onClose={() => setInspectEntry(null)}
+        title="Audit Event Inspection Payload"
+        description="Detailed record metadata, target references and raw payload."
+        size="lg"
+        footer={
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={() => inspectEntry?.metadata && copyMetadataJson(inspectEntry.metadata)}
+              disabled={!inspectEntry?.metadata}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 14px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: "#fff",
+                color: "#334155",
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              {copiedJson ? "✓ Copied Payload JSON" : "📋 Copy Raw JSON"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setInspectEntry(null)}
+              style={{
+                padding: "8px 18px",
+                borderRadius: 8,
+                border: "none",
+                background: "#4f46e5",
+                color: "#fff",
+                fontSize: 12.5,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Close Inspector
+            </button>
+          </div>
+        }
+      >
+        {inspectEntry ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, paddingTop: 4 }}>
+            {/* Top Summary Box */}
+            <div style={{ background: "#f8fafc", borderRadius: 12, padding: 16, border: "1px solid #e2e8f0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <span style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>
+                  {inspectEntry.actionLabel || inspectEntry.action}
+                </span>
+                <span
+                  style={{
+                    padding: "3px 10px",
+                    borderRadius: 20,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    ...actionBadgeStyle(inspectEntry.action),
+                  }}
+                >
+                  {inspectEntry.action}
+                </span>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 12.5 }}>
+                <div>
+                  <span style={{ color: "#64748b", fontWeight: 600 }}>Event ID:</span>{" "}
+                  <code style={{ fontSize: 11, background: "#fff", padding: "2px 6px", borderRadius: 4, border: "1px solid #cbd5e1" }}>
+                    {inspectEntry.id}
+                  </code>
+                </div>
+                <div>
+                  <span style={{ color: "#64748b", fontWeight: 600 }}>Timestamp:</span>{" "}
+                  <span style={{ fontWeight: 700, color: "#1e293b" }}>{inspectEntry.createdAt}</span>
+                </div>
+                <div>
+                  <span style={{ color: "#64748b", fontWeight: 600 }}>Module Category:</span>{" "}
+                  <span style={{ fontWeight: 700, color: "#475569" }}>{displayModuleKey(inspectEntry.moduleKey)}</span>
+                </div>
+                <div>
+                  <span style={{ color: "#64748b", fontWeight: 600 }}>Target Entity:</span>{" "}
+                  <span style={{ fontWeight: 700, color: "#0f172a" }}>{inspectEntry.entity || "N/A"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actor & Org Side by Side */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {/* Actor Box */}
+              <div style={{ background: "#fff", borderRadius: 12, padding: 14, border: "1px solid #e2e8f0" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: 8 }}>
+                  Actor Information
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>
+                  {inspectEntry.actor
+                    ? [inspectEntry.actor.firstName, inspectEntry.actor.lastName].filter(Boolean).join(" ") || inspectEntry.actor.email
+                    : "System Automation"}
+                </div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                  {inspectEntry.actor?.email || "Automated Platform Process"}
+                </div>
+                {inspectEntry.actor?.id ? (
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, fontFamily: "monospace" }}>
+                    User ID: {inspectEntry.actor.id}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Org Box */}
+              <div style={{ background: "#fff", borderRadius: 12, padding: 14, border: "1px solid #e2e8f0" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#64748b", textTransform: "uppercase", marginBottom: 8 }}>
+                  Organisation Context
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>
+                  {inspectEntry.organisation?.name || "Global Platform Scope"}
+                </div>
+                {inspectEntry.organisation?.id ? (
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4, fontFamily: "monospace" }}>
+                    Org ID: {inspectEntry.organisation.id}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>System-wide event</div>
+                )}
+              </div>
+            </div>
+
+            {/* Metadata JSON Code Box */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>
+                  Event Metadata Payload ({inspectEntry.metadata ? "JSON" : "Empty"})
+                </span>
+              </div>
+              <pre
+                style={{
+                  margin: 0,
+                  padding: 14,
+                  borderRadius: 10,
+                  background: "#0f172a",
+                  color: "#38bdf8",
+                  fontSize: 12,
+                  fontFamily: "monospace",
+                  lineHeight: 1.5,
+                  overflowX: "auto",
+                  maxHeight: 280,
+                  border: "1px solid #1e293b",
+                }}
+              >
+                {inspectEntry.metadata && Object.keys(inspectEntry.metadata as object).length > 0
+                  ? JSON.stringify(inspectEntry.metadata, null, 2)
+                  : "// No extra metadata parameters attached to this audit event."}
+              </pre>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+    </div>
   );
 }

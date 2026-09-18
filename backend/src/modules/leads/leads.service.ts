@@ -95,9 +95,9 @@ export class LeadsService {
       if (!page) {
         throw new NotFoundException('Landing page not found');
       }
-      if (page.status !== 'published' && page.status !== 'draft') {
+      if (page.status !== 'published') {
         throw new BadRequestException(
-          'Leads can only be submitted from a published or draft landing page',
+          'Leads can only be submitted from a published landing page',
         );
       }
       orgId = page.orgId;

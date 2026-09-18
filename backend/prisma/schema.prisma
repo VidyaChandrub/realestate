@@ -208,6 +208,7 @@ model Organisation {
   teamChannels          TeamChannel[]
   teamMessages          TeamMessage[]
   packageChangeRequests PackageChangeRequest[]
+  mediaFiles            MediaFile[]
 
   @@map("organisations")
   @@schema("identity")
@@ -273,6 +274,7 @@ model User {
   notifications   Notification[]
   createdUnits    Unit[]                 @relation("UnitCreatedBy")
   updatedUnits    Unit[]                 @relation("UnitUpdatedBy")
+  uploadedMedia   MediaFile[]            @relation("UploadedMedia")
   managedUnits    Unit[]                 @relation("UnitManager")
   unitSalesAgentAssignments UnitSalesAgent[]
   raisedSupportTickets SupportTicket[]   @relation("SupportTicketRaisedBy")
@@ -1784,3 +1786,37 @@ model PlatformConfig {
   @@map("platform_configs")
   @@schema("identity")
 }
+
+// ---------------------------------------------------------------------------
+// Media Library — Central media repository for organisations and Super Admin
+// ---------------------------------------------------------------------------
+
+model MediaFile {
+  id           String   @id @default(uuid())
+  orgId        String?  @map("org_id")
+  uploadedById String?  @map("uploaded_by_id")
+  name         String
+  filename     String
+  storedKey    String   @map("stored_key")
+  publicUrl    String   @map("public_url")
+  mimeType     String   @map("mime_type")
+  size         Int
+  category     String   @default("image") // 'image' | 'video' | 'document' | 'icon' | 'other'
+  folder       String   @default("general")
+  alt          String?
+  tags         String[] @default([])
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  organisation Organisation? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  uploadedBy   User?         @relation("UploadedMedia", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([category])
+  @@index([folder])
+  @@index([createdAt])
+  @@map("media_files")
+  @@schema("identity")
+}
+

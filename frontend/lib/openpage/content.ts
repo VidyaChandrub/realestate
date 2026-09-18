@@ -123,7 +123,7 @@ export function siteFromLandingPage(page: LandingPageData): SiteConfig {
     raw.content?.config?.site,
   ];
   for (const stored of candidates) {
-    if (stored && isOpenPageSite(stored) && (siteBlocks(stored).length > 0 || Array.isArray(stored.forms))) {
+    if (stored && isOpenPageSite(stored)) {
       const site = normalizeSite({ ...stored, name: stored.name || page.name });
       const binding = (cfg as { propertyBinding?: SiteConfig["propertyBinding"] } | undefined)?.propertyBinding
         ?? site.propertyBinding;
@@ -148,7 +148,7 @@ export function siteFromLandingPage(page: LandingPageData): SiteConfig {
   if (page.sections?.length) {
     return migrateLegacySections(page);
   }
-  return normalizeSite(buildRealEstateTemplate("premium", page.name || "Landing page"));
+  return normalizeSite(buildRealEstateTemplate("blank", page.name || "Landing page"));
 }
 
 function migrateLegacySections(page: LandingPageData): SiteConfig {
