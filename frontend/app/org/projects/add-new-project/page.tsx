@@ -1375,10 +1375,14 @@ export default function AddNewProjectPage() {
                 <div className="q-h"><div className="st">Step 6 of 9</div><h2>Marketing &amp; lead sources</h2><div className="sub">Where leads come from and how they&apos;ll be worked — connect ads, AI calling and WhatsApp.</div></div>
                 <div className="q-sec">
                   <div className="lbl">📣 Ad sources (enable &amp; set budget)</div>
-                  <div className="sw-row"><div className="tx"><b>Meta Ads (Facebook / Instagram)</b><small>Lead-form &amp; click campaigns</small></div><div className={`switch ${metaAds ? "on" : ""}`} onClick={() => setMetaAds(!metaAds)} /></div>
-                  <div className="sw-row"><div className="tx"><b>Google Ads</b><small>Search &amp; Performance Max</small></div><div className={`switch ${googleAds ? "on" : ""}`} onClick={() => setGoogleAds(!googleAds)} /></div>
-                  <div className="sw-row"><div className="tx"><b>LinkedIn Ads</b><small>Premium / NRI targeting</small></div><div className={`switch ${linkedinAds ? "on" : ""}`} onClick={() => setLinkedinAds(!linkedinAds)} /></div>
-                  <div className="sw-row"><div className="tx"><b>Housing / 99acres / MagicBricks</b><small>Portal listings</small></div><div className={`switch ${portalAds ? "on" : ""}`} onClick={() => setPortalAds(!portalAds)} /></div>
+                  {/* Intentionally hidden: the backing Meta Ads feature is not implemented yet and may return later. */}
+                  {/* <div className="sw-row"><div className="tx"><b>Meta Ads (Facebook / Instagram)</b><small>Lead-form &amp; click campaigns</small></div><div className={`switch ${metaAds ? "on" : ""}`} onClick={() => setMetaAds(!metaAds)} /></div> */}
+                  {/* Intentionally hidden: the backing Google Ads feature is not implemented yet and may return later. */}
+                  {/* <div className="sw-row"><div className="tx"><b>Google Ads</b><small>Search &amp; Performance Max</small></div><div className={`switch ${googleAds ? "on" : ""}`} onClick={() => setGoogleAds(!googleAds)} /></div> */}
+                  {/* Intentionally hidden: the backing LinkedIn Ads feature is not implemented yet and may return later. */}
+                  {/* <div className="sw-row"><div className="tx"><b>LinkedIn Ads</b><small>Premium / NRI targeting</small></div><div className={`switch ${linkedinAds ? "on" : ""}`} onClick={() => setLinkedinAds(!linkedinAds)} /></div> */}
+                  {/* Intentionally hidden: the backing portal ads feature is not implemented yet and may return later. */}
+                  {/* <div className="sw-row"><div className="tx"><b>Housing / 99acres / MagicBricks</b><small>Portal listings</small></div><div className={`switch ${portalAds ? "on" : ""}`} onClick={() => setPortalAds(!portalAds)} /></div> */}
                 </div>
                 <div className="q-sec">
                   <div className="lbl">🎯 Targets &amp; landing</div>
@@ -1463,8 +1467,10 @@ export default function AddNewProjectPage() {
                 </div>
                 <div className="q-sec">
                   <div className="lbl">🤖 Automation &amp; assignment</div>
-                  <div className="sw-row"><div className="tx"><b>AI voice calling</b><small>Auto-call &amp; qualify new leads within 60s</small></div><div className={`switch ${aiCalling ? "on" : ""}`} onClick={() => setAiCalling(!aiCalling)} /></div>
-                  <div className="sw-row"><div className="tx"><b>WhatsApp auto-welcome</b><small>Send brochure + book site visit</small></div><div className={`switch ${whatsappAuto ? "on" : ""}`} onClick={() => setWhatsappAuto(!whatsappAuto)} /></div>
+                  {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
+                  {/* <div className="sw-row"><div className="tx"><b>AI voice calling</b><small>Auto-call &amp; qualify new leads within 60s</small></div><div className={`switch ${aiCalling ? "on" : ""}`} onClick={() => setAiCalling(!aiCalling)} /></div> */}
+                  {/* Intentionally hidden: the backing WhatsApp auto-welcome feature is not implemented yet and may return later. */}
+                  {/* <div className="sw-row"><div className="tx"><b>WhatsApp auto-welcome</b><small>Send brochure + book site visit</small></div><div className={`switch ${whatsappAuto ? "on" : ""}`} onClick={() => setWhatsappAuto(!whatsappAuto)} /></div> */}
                   <div className="sw-row"><div className="tx"><b>Round-robin assignment</b><small>Distribute leads across the sales team</small></div><div className={`switch ${roundRobin ? "on" : ""}`} onClick={() => setRoundRobin(!roundRobin)} /></div>
                 </div>
               </div>
@@ -1501,12 +1507,15 @@ export default function AddNewProjectPage() {
                     )}
                   </div>
                 </div>
+                {/* Intentionally hidden: the Visibility & approvals controls are not implemented yet and may return later. */}
+                {/*
                 <div className="q-sec">
                   <div className="lbl">🔐 Visibility &amp; approvals</div>
                   <div className="sw-row"><div className="tx"><b>Require manager approval on bookings</b><small>Bookings move to Pending until approved</small></div><div className={`switch ${requireApproval ? "on" : ""}`} onClick={() => setRequireApproval(!requireApproval)} /></div>
                   <div className="sw-row"><div className="tx"><b>Visible to telecallers</b><small>Show in the calling dashboard queue</small></div><div className={`switch ${visibleTele ? "on" : ""}`} onClick={() => setVisibleTele(!visibleTele)} /></div>
                   <div className="sw-row"><div className="tx"><b>Publish to public website</b><small>List on skylinedev.in projects page</small></div><div className={`switch ${publishWeb ? "on" : ""}`} onClick={() => setPublishWeb(!publishWeb)} /></div>
                 </div>
+                */}
               </div>
             )}
 
@@ -1536,7 +1545,8 @@ export default function AddNewProjectPage() {
                     <MediaUpload field="brochure" label="Brochure (PDF)" value={brochureUrl} onChange={setBrochureUrl} />
                     <MediaUpload field="brochure" label="RERA certificate (PDF)" value={reraCertificateUrl} onChange={setReraCertificateUrl} />
                   </div>
-                  <div className="sw-row"><div className="tx"><b>Add to AI knowledge base</b><small>Let AI calling &amp; WhatsApp answer from these documents</small></div><div className={`switch ${aiKnowledgeBase ? "on" : ""}`} onClick={() => setAiKnowledgeBase(!aiKnowledgeBase)} /></div>
+                  {/* Intentionally hidden: the backing AI knowledge-base feature is not implemented yet and may return later. */}
+                  {/* <div className="sw-row"><div className="tx"><b>Add to AI knowledge base</b><small>Let AI calling &amp; WhatsApp answer from these documents</small></div><div className={`switch ${aiKnowledgeBase ? "on" : ""}`} onClick={() => setAiKnowledgeBase(!aiKnowledgeBase)} /></div> */}
                 </div>
               </div>
             )}
@@ -1578,12 +1588,15 @@ export default function AddNewProjectPage() {
                     </div>
                     <div>
                       <div className="q-sec"><div className="lbl">📣 Marketing</div>
-                        <div className="sp"><span className="k">Sources</span><span className="v">{[metaAds && "Meta", googleAds && "Google", linkedinAds && "LinkedIn", portalAds && "Portals"].filter(Boolean).join(", ") || "—"}</span></div>
+                        {/* Intentionally hidden: ad-source settings are not implemented yet and may return later. */}
+                        {/* <div className="sp"><span className="k">Sources</span><span className="v">{[metaAds && "Meta", googleAds && "Google", linkedinAds && "LinkedIn", portalAds && "Portals"].filter(Boolean).join(", ") || "—"}</span></div> */}
                         <div className="sp"><span className="k">Monthly budget</span><span className="v">{monthlyBudget ? formatRupees(monthlyBudget) : "—"}</span></div>
                         <div className="sp"><span className="k">Target CPL</span><span className="v">{targetCpl ? formatRupees(targetCpl) : "—"}</span></div>
                         <div className="sp"><span className="k">Lead goal</span><span className="v">{leadGoal || "—"}</span></div>
-                        <div className="sp"><span className="k">AI calling</span><span className="v"><span className={`badge ${aiCalling ? "b-green" : "b-gray"}`}>{aiCalling ? "On" : "Off"}</span></span></div>
-                        <div className="sp"><span className="k">WhatsApp welcome</span><span className="v"><span className={`badge ${whatsappAuto ? "b-green" : "b-gray"}`}>{whatsappAuto ? "On" : "Off"}</span></span></div>
+                        {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
+                        {/* <div className="sp"><span className="k">AI calling</span><span className="v"><span className={`badge ${aiCalling ? "b-green" : "b-gray"}`}>{aiCalling ? "On" : "Off"}</span></span></div> */}
+                        {/* Intentionally hidden: the backing WhatsApp auto-welcome feature is not implemented yet and may return later. */}
+                        {/* <div className="sp"><span className="k">WhatsApp welcome</span><span className="v"><span className={`badge ${whatsappAuto ? "b-green" : "b-gray"}`}>{whatsappAuto ? "On" : "Off"}</span></span></div> */}
                         <div className="sp"><span className="k">Round-robin</span><span className="v"><span className={`badge ${roundRobin ? "b-green" : "b-gray"}`}>{roundRobin ? "On" : "Off"}</span></span></div>
                       </div>
                       <div className="q-sec"><div className="lbl">🌐 Project Template &amp; Website</div>
@@ -1627,9 +1640,12 @@ export default function AddNewProjectPage() {
                       <div className="q-sec"><div className="lbl">👤 Team &amp; access</div>
                         <div className="sp"><span className="k">Manager</span><span className="v">{selectedManager ? userLabel(selectedManager) : "Unassigned"}</span></div>
                         <div className="sp"><span className="k">Agents</span><span className="v">{agentAssign.length} assigned</span></div>
+                        {/* Intentionally hidden: booking approval, telecaller visibility, and public website publishing are not implemented yet and may return later. */}
+                        {/*
                         <div className="sp"><span className="k">Booking approval</span><span className="v">{requireApproval ? "Required" : "Not required"}</span></div>
                         <div className="sp"><span className="k">Visible to telecallers</span><span className="v"><span className={`badge ${visibleTele ? "b-green" : "b-gray"}`}>{visibleTele ? "On" : "Off"}</span></span></div>
                         <div className="sp"><span className="k">Publish to website</span><span className="v"><span className={`badge ${publishWeb ? "b-green" : "b-gray"}`}>{publishWeb ? "On" : "Off"}</span></span></div>
+                        */}
                       </div>
                       <div className="q-sec"><div className="lbl">📄 Media</div>
                         <div className="sp"><span className="k">Cover image</span><span className="v">{coverImageUrl ? "✓ Uploaded" : "—"}</span></div>
@@ -1637,7 +1653,8 @@ export default function AddNewProjectPage() {
                         <div className="sp"><span className="k">Brochure</span><span className="v">{brochureUrl ? "✓ Uploaded" : "—"}</span></div>
                         <div className="sp"><span className="k">RERA certificate</span><span className="v">{reraCertificateUrl ? "✓ Uploaded" : "—"}</span></div>
                         <div className="sp"><span className="k">Project floor / site plan</span><span className="v">{floorPlanUrls.length ? `${floorPlanUrls.length} plan${floorPlanUrls.length > 1 ? "s" : ""}` : "—"}</span></div>
-                        <div className="sp"><span className="k">AI knowledge</span><span className="v"><span className={`badge ${aiKnowledgeBase ? "b-green" : "b-gray"}`}>{aiKnowledgeBase ? "On" : "Off"}</span></span></div>
+                        {/* Intentionally hidden: the backing AI knowledge-base feature is not implemented yet and may return later. */}
+                        {/* <div className="sp"><span className="k">AI knowledge</span><span className="v"><span className={`badge ${aiKnowledgeBase ? "b-green" : "b-gray"}`}>{aiKnowledgeBase ? "On" : "Off"}</span></span></div> */}
                       </div>
                     </div>
                   </div>

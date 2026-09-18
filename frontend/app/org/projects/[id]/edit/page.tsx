@@ -1167,10 +1167,13 @@ export default function OrgProjectEditPage() {
                   ) : null}
                 </select>
               </div>
-              <div className="sw-row"><div className="tx"><b>AI voice calling</b><small>Auto-call &amp; qualify new leads</small></div><div className={`switch ${aiCalling ? "on" : ""}`} onClick={() => setAiCalling(!aiCalling)} /></div>
-              <div className="sw-row"><div className="tx"><b>WhatsApp auto-welcome</b></div><div className={`switch ${whatsappWelcome ? "on" : ""}`} onClick={() => setWhatsappWelcome(!whatsappWelcome)} /></div>
+              {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row"><div className="tx"><b>AI voice calling</b><small>Auto-call &amp; qualify new leads</small></div><div className={`switch ${aiCalling ? "on" : ""}`} onClick={() => setAiCalling(!aiCalling)} /></div> */}
+              {/* Intentionally hidden: the backing WhatsApp auto-welcome feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row"><div className="tx"><b>WhatsApp auto-welcome</b></div><div className={`switch ${whatsappWelcome ? "on" : ""}`} onClick={() => setWhatsappWelcome(!whatsappWelcome)} /></div> */}
               <div className="sw-row"><div className="tx"><b>Round-robin assignment</b></div><div className={`switch ${roundRobin ? "on" : ""}`} onClick={() => setRoundRobin(!roundRobin)} /></div>
-              <div className="sw-row" style={{ borderBottom: 0 }}><div className="tx"><b>Add to AI knowledge base</b></div><div className={`switch ${aiKnowledgeBase ? "on" : ""}`} onClick={() => setAiKnowledgeBase(!aiKnowledgeBase)} /></div>
+              {/* Intentionally hidden: the backing AI knowledge-base feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row" style={{ borderBottom: 0 }}><div className="tx"><b>Add to AI knowledge base</b></div><div className={`switch ${aiKnowledgeBase ? "on" : ""}`} onClick={() => setAiKnowledgeBase(!aiKnowledgeBase)} /></div> */}
             </div>
           </div>
 
@@ -1219,9 +1222,12 @@ export default function OrgProjectEditPage() {
                   </div>
                 )}
               </div>
-              <div className="sw-row"><div className="tx"><b>Require manager approval on bookings</b></div><div className={`switch ${requireBookingApproval ? "on" : ""}`} onClick={() => setRequireBookingApproval(!requireBookingApproval)} /></div>
-              <div className="sw-row"><div className="tx"><b>Visible to telecallers</b></div><div className={`switch ${visibleToTelecallers ? "on" : ""}`} onClick={() => setVisibleToTelecallers(!visibleToTelecallers)} /></div>
-              <div className="sw-row" style={{ borderBottom: 0 }}><div className="tx"><b>Publish to public website</b></div><div className={`switch ${publishedToWebsite ? "on" : ""}`} onClick={() => setPublishedToWebsite(!publishedToWebsite)} /></div>
+              {/* Intentionally hidden: the backing booking approval feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row"><div className="tx"><b>Require manager approval on bookings</b></div><div className={`switch ${requireBookingApproval ? "on" : ""}`} onClick={() => setRequireBookingApproval(!requireBookingApproval)} /></div> */}
+              {/* Intentionally hidden: the backing telecaller visibility feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row"><div className="tx"><b>Visible to telecallers</b></div><div className={`switch ${visibleToTelecallers ? "on" : ""}`} onClick={() => setVisibleToTelecallers(!visibleToTelecallers)} /></div> */}
+              {/* Intentionally hidden: the backing public website publishing feature is not implemented yet and may return later. */}
+              {/* <div className="sw-row" style={{ borderBottom: 0 }}><div className="tx"><b>Publish to public website</b></div><div className={`switch ${publishedToWebsite ? "on" : ""}`} onClick={() => setPublishedToWebsite(!publishedToWebsite)} /></div> */}
             </div>
           </div>
 
