@@ -399,6 +399,14 @@ export async function resendVerification(
   });
 }
 
+export async function validateResetToken(
+  token: string,
+): Promise<{ valid: boolean }> {
+  return apiFetch<{ valid: boolean }>(
+    `/auth/reset-password/validate?token=${encodeURIComponent(token)}`,
+  );
+}
+
 export async function getInvoices(): Promise<InvoiceRow[]> {
   return apiFetch<InvoiceRow[]>("/org/billing/invoices");
 }

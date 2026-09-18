@@ -1200,9 +1200,8 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<{ success: boolean }> {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    // Always report success to avoid account enumeration.
     if (!user) {
-      return { success: true };
+      throw new NotFoundException('No account exists for this email address');
     }
 
     await this.prisma.passwordResetToken.updateMany({
@@ -1215,7 +1214,7 @@ export class AuthService {
       data: {
         userId: user.id,
         tokenHash: hashToken(token),
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       },
     });
 
@@ -1238,6 +1237,20 @@ export class AuthService {
     }
 
     return { success: true };
+  }
+
+  async validateResetToken(token: string): Promise<{ valid: boolean }> {
+    if (!token) {
+      return { valid: false };
+    }
+    const entry = await this.prisma.passwordResetToken.findFirst({
+      where: {
+        tokenHash: hashToken(token),
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+    return { valid: Boolean(entry) };
   }
 
   async resetPassword(
@@ -1324,20 +1337,29 @@ export class AuthService {
       return { success: true };
     }
 
-    const latest = await this.prisma.emailVerificationToken.findFirst({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (latest && Date.now() - latest.createdAt.getTime() < 30_000) {
-      return { success: true };
-    }
-
     await this.issueEmailVerification(user);
     return { success: true };
   }
 
+  // Single choke point for sending a verification email. Every caller
+  // (fresh signup, the various resume-draft paths that re-issue one on
+  // return, and the explicit "Resend code" button) goes through here, so
+  // the 60s minimum-interval guard lives in exactly one place and can't be
+  // bypassed by a caller that forgets to check it — e.g. two of those
+  // callers firing close together (a double-click, a retried request, a
+  // dev-mode remount re-resuming the same in-progress draft) can otherwise
+  // each independently decide "no recent token, send one" and mail the
+  // user twice.
   private async issueEmailVerification(user: User) {
     if (user.emailVerifiedAt) {
+      return;
+    }
+
+    const latest = await this.prisma.emailVerificationToken.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (latest && Date.now() - latest.createdAt.getTime() < 60_000) {
       return;
     }
 

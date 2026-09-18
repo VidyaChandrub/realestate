@@ -67,7 +67,7 @@ export class AdminRolesService {
   }
 
   getOrgRolePermissions(roleId: string) {
-    return this.getRolePermissions(roleId, ORG_SCOPES, PERMISSION_MODULES, ['super_admin', 'admin']);
+    return this.getRolePermissions(roleId, ORG_SCOPES, PERMISSION_MODULES, ['super_admin'], ['admin']);
   }
 
   getPlatformRolePermissions(roleId: string) {
@@ -80,7 +80,7 @@ export class AdminRolesService {
       ORG_SCOPES,
       PERMISSION_MODULES,
       dto.permissions,
-      ['super_admin', 'admin'],
+      ['super_admin'],
     );
   }
 
@@ -271,6 +271,7 @@ export class AdminRolesService {
     allowed: RoleScope[],
     catalog: ModuleDefinition[],
     unrestrictedKeys: string[],
+    unrestrictedFallbackKeys: string[] = [],
   ) {
     const role = await this.prisma.role.findUnique({
       where: { id: roleId },
@@ -291,7 +292,8 @@ export class AdminRolesService {
       where: { orgId: SYSTEM_ORG_ID, roleId },
     });
 
-    const isUnrestricted = unrestrictedKeys.includes(role.key);
+    const isUnrestricted = unrestrictedKeys.includes(role.key)
+      || (unrestrictedFallbackKeys.includes(role.key) && systemRows.length === 0);
     const rowMap = new Map(systemRows.map((r) => [r.moduleKey, r]));
 
     const permissions = catalog.map((def) => {

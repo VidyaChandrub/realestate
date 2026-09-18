@@ -109,7 +109,10 @@ export class SuperAdminGuard implements CanActivate {
       return true;
     }
 
-    const action = actionFromHttpMethod(request.method);
+    const action =
+      request.method === 'PATCH' && /\/admin\/organisations\/[^/]+\/status$/.test(path)
+        ? request.body?.status === 'disabled' ? 'approve' : 'add'
+        : actionFromHttpMethod(request.method);
     const rows = await this.prisma.roleModulePermission.findMany({
       where: {
         orgId: SYSTEM_ORG_ID,

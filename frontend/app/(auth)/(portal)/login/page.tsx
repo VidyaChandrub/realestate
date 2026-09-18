@@ -62,6 +62,19 @@ export default function LoginPage() {
       const session = await login({ email, password });
       const resumeOrgSignup = session.onboarding_step !== "completed";
       if (resumeOrgSignup) {
+        // Explicit signal for /register's mount-resume effect: this visit is
+        // a real, password-verified "continue my incomplete setup" — as
+        // opposed to /register simply being loaded/reloaded while an old
+        // access token from some earlier, never-finished signup happens to
+        // still be sitting in localStorage. Without this, the wizard can't
+        // tell those two apart and used to pop the "Welcome back" dialog on
+        // a blank form just because a stale token was present.
+        try {
+          window.sessionStorage.setItem("register_resume_intent", "1");
+        } catch {
+          // best-effort — worst case the wizard falls back to a blank form
+          // instead of auto-resuming, which is the safe direction to fail in.
+        }
         router.push("/register");
         router.refresh();
         return;

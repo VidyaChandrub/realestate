@@ -126,6 +126,11 @@ export class AuthController {
     return this.authService.forgotPassword(dto.email);
   }
 
+  @Get('reset-password/validate')
+  validateResetToken(@Query('token') token: string) {
+    return this.authService.validateResetToken(token);
+  }
+
   @Post('reset-password')
   @HttpCode(200)
   resetPassword(@Body() dto: ResetPasswordDto) {
