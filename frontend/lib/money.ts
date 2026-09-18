@@ -1,29 +1,29 @@
 // Currency-aware price formatting for projects. The number is assumed to
 // already be in `currency` — there is NO FX conversion here (deliberately
 // deferred). INR keeps the Indian lakh/crore short forms the app already
-// used; AED/USD use plain international thousands grouping.
+// used; every other currency uses plain international thousands grouping.
+//
+// The currency LIST a project can pick from is not this file's concern —
+// it's `lib/countries.ts`'s `CURRENCY_OPTIONS` (same list Settings →
+// Localization uses), so the two never drift apart. This file only knows how
+// to print an amount once a currency code has been chosen.
 
-export const PROJECT_CURRENCIES = ["INR", "AED", "USD"] as const;
-export type ProjectCurrency = (typeof PROJECT_CURRENCIES)[number];
-
-export const CURRENCY_LABELS: Record<ProjectCurrency, string> = {
-  INR: "INR — Indian Rupee (₹)",
-  AED: "AED — UAE Dirham",
-  USD: "USD — US Dollar ($)",
-};
-
-const PREFIX: Record<string, string> = { INR: "₹", AED: "AED ", USD: "$" };
+// Only currencies with a short, unambiguous, Latin symbol get one. Everything
+// else (AED, SAR, QAR, OMR, ...) shows its ISO code instead — several Gulf
+// currencies otherwise share the same generic "﷼" glyph, and a plain code
+// reads better in a business dashboard than a right-to-left glyph anyway.
+const SYMBOL: Record<string, string> = { INR: "₹", USD: "$" };
 
 function prefix(currency: string): string {
-  return PREFIX[currency] ?? `${currency} `;
+  return SYMBOL[currency] ?? `${currency} `;
 }
 
-/** The display prefix for a currency ("₹", "$", "AED "). */
+/** The display prefix for a currency ("₹", "$", "AED ", "GBP "). */
 export function currencyPrefix(currency: string): string {
   return prefix(currency);
 }
 
-/** Compact price. INR: "₹62 L" / "₹1.2 Cr". AED/USD: "AED 620,000" / "$62,000". */
+/** Compact price. INR: "₹62 L" / "₹1.2 Cr". Everything else: "AED 620,000" / "$62,000". */
 export function formatMoney(
   value: number | null | undefined,
   currency: string,

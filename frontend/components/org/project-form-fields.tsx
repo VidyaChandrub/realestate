@@ -480,12 +480,14 @@ export function ConfigSizePriceTable({
   rows,
   onChange,
   hint,
+  currency = "INR",
 }: {
   /** Labels currently selected, in display order. */
   configurations: string[];
   rows: ConfigSizePriceRow[];
   onChange: (key: string | number, patch: Partial<ConfigSizePriceRow>) => void;
   hint?: React.ReactNode;
+  currency?: string;
 }) {
   if (configurations.length === 0) return null;
   return (
@@ -497,7 +499,7 @@ export function ConfigSizePriceTable({
           <span>Configuration</span>
           <span>Carpet (sqft)</span>
           <span>Built-up (sqft)</span>
-          <span>Price (₹)</span>
+          <span>Price ({currencyPrefix(currency).trim() || "₹"})</span>
           <span>Planned units</span>
         </div>
         {configurations.map((label) => {
@@ -514,7 +516,7 @@ export function ConfigSizePriceTable({
                 aria-label={`Built-up area for ${label}`}
                 value={row.builtupSqft}
                 onChange={(e) => onChange(row.key, { builtupSqft: e.target.value })} />
-              <input className="inp" type="number" min={0} placeholder="64,00,000"
+              <input className="inp" type="number" min={0} placeholder={currency === "INR" ? "64,00,000" : "640,000"}
                 aria-label={`Price for ${label}`}
                 value={row.price}
                 onChange={(e) => onChange(row.key, { price: e.target.value })} />

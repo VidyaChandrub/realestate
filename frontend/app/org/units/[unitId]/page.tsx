@@ -13,7 +13,7 @@ import {
   updateStandaloneUnit,
 } from "@/lib/api";
 import { parseAmount, parseCount } from "@/lib/parse";
-import { formatMoney } from "@/lib/money";
+import { currencyPrefix, formatMoney } from "@/lib/money";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import {
@@ -247,6 +247,7 @@ export default function StandaloneUnitPage() {
   // The unit response carries the org's basis, so the live edit figure and the
   // stored one can't disagree.
   const basis = unit.pricePerSqftBasis;
+  const currency = unit.currency ?? "INR";
   const psqft = pricePerSqftLabel(
     parseAmount(form.price),
     parseCount(form.carpetSqft),
@@ -267,10 +268,10 @@ export default function StandaloneUnitPage() {
     },
     { k: "Facing", v: unit.facing ?? "—" },
     { k: "Parking", v: unit.parking ?? "—" },
-    { k: "Price", v: unit.price != null ? formatMoney(unit.price, "INR") : "—" },
+    { k: "Price", v: unit.price != null ? formatMoney(unit.price, currency) : "—" },
     {
-      k: `₹/sqft (${PRICE_BASIS_LABEL[basis]})`,
-      v: pricePerSqftLabel(unit.price, unit.carpetSqft, unit.builtupSqft, basis) || "—",
+      k: `${currencyPrefix(currency).trim() || "₹"}/sqft (${PRICE_BASIS_LABEL[basis]})`,
+      v: pricePerSqftLabel(unit.price, unit.carpetSqft, unit.builtupSqft, basis, currency) || "—",
     },
     { k: "Location / address", v: unit.addressLine ?? "—" },
     { k: "Owner / seller", v: unit.ownerName ?? "—" },

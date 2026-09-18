@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectSalesAgentCandidates, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
-import { CURRENCY_LABELS, PROJECT_CURRENCIES } from "@/lib/money";
+import { CURRENCY_OPTIONS } from "@/lib/countries";
 import {
   CatalogOptions,
   ConfigSizePriceTable,
@@ -367,7 +367,7 @@ export default function OrgProjectEditPage() {
   const amenityOptions = (catalog ?? []).filter((o) => o.category === "amenity");
   // --- Required fields, from the shared rules (see STEP_SECTION) -----------
   const requirements = projectRequirements({
-    name, projectType, reraId, priceMin, address: addressLine, city, managerId,
+    name, projectType, reraId, currency, priceMin, address: addressLine, city, managerId,
   });
   const missingFields = allMissing(requirements);
   /** The inline message for a field, once Save has been attempted. */
@@ -580,7 +580,7 @@ export default function OrgProjectEditPage() {
         priceMax: parseAmount(priceMax) ?? null,
         baseRate: parseAmount(baseRate) ?? null,
         bookingAmount: parseAmount(bookingAmount) ?? null,
-        currency: currency as (typeof PROJECT_CURRENCIES)[number],
+        currency,
         priceIncludes,
         paymentPlan: paymentPlan || null,
         offers: offers.trim() || null,
@@ -839,6 +839,16 @@ export default function OrgProjectEditPage() {
                 ) : null}
                 {fieldError("projectType") ? <div className="field-err">{fieldError("projectType")}</div> : null}
               </div>
+              <div className={fieldClass("currency")}>
+                <label>Currency <span className="req">*</span></label>
+                <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                  {CURRENCY_OPTIONS.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+                <div className="hint">Every price on this project — unit types, units, price range — is in this currency.</div>
+                {fieldError("currency") ? <div className="field-err">{fieldError("currency")}</div> : null}
+              </div>
               <div className="field">
                 <label>Short tagline</label>
                 <input className="inp" placeholder="e.g. 2 &amp; 3 BHK homes on SG Highway" value={tagline} onChange={(e) => setTagline(e.target.value)} />
@@ -896,14 +906,7 @@ export default function OrgProjectEditPage() {
                 <div className="field"><label>Price per sqft</label><MoneyInput currency={currency} value={baseRate} onChange={setBaseRate} placeholder="6,400" /></div>
                 <div className="field"><label>Booking amount</label><MoneyInput currency={currency} value={bookingAmount} onChange={setBookingAmount} placeholder="1,00,000" /></div>
               </div>
-              <div className="field">
-                <label>Currency</label>
-                <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                  {PROJECT_CURRENCIES.map((c) => (
-                    <option key={c} value={c}>{CURRENCY_LABELS[c]}</option>
-                  ))}
-                </select>
-              </div>
+              <div className="hint mb-14">Prices above are in {currency} — set in Basics.</div>
               <div className="field">
                 <label>What&apos;s included in the price?</label>
                 <CatalogOptions
@@ -1078,6 +1081,7 @@ export default function OrgProjectEditPage() {
                 configurations={selectedConfigs}
                 rows={configRows}
                 onChange={updateConfigRow}
+                currency={currency}
                 hint="Optional. Filling these in means adding a unit prefills its area and price from here instead of asking for them again. Changing them later never alters units that already exist."
               />
               <div className="row3">

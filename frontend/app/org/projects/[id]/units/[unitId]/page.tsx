@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
+import { currencyPrefix, formatMoney } from "@/lib/money";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectTabs } from "@/components/org/project-tabs";
 import {
@@ -35,17 +36,6 @@ const STATUS_LABEL: Record<UnitStatus, string> = {
   held: "Held",
   sold: "Sold",
 };
-
-function compactRupees(value: number | null): string {
-  if (value == null) return "—";
-  if (value >= 1e7) {
-    return `₹${(value / 1e7).toFixed(2).replace(/\.?0+$/, "")} Cr`;
-  }
-  if (value >= 1e5) {
-    return `₹${(value / 1e5).toFixed(2).replace(/\.?0+$/, "")} L`;
-  }
-  return `₹${value.toLocaleString("en-IN")}`;
-}
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -185,8 +175,8 @@ export default function OrgProjectUnitDetailPage() {
     { k: "Facing", v: unit?.facing ?? "—" },
     { k: "Parking", v: unit?.parking ?? "—" },
     {
-      k: `₹/sqft (${PRICE_BASIS_LABEL[priceBasis]})`,
-      v: pricePerSqftLabel(effectivePrice, carpet, builtup, priceBasis) || "—",
+      k: `${currencyPrefix(project?.currency ?? "INR").trim()}/sqft (${PRICE_BASIS_LABEL[priceBasis]})`,
+      v: pricePerSqftLabel(effectivePrice, carpet, builtup, priceBasis, project?.currency ?? "INR") || "—",
     },
     { k: "Tower", v: unit?.tower ?? "—" },
     // Units have no possession date of their own — this is the project's,
@@ -195,7 +185,7 @@ export default function OrgProjectUnitDetailPage() {
   ];
 
   const kvRows: { k: string; v: string }[] = [
-    { k: "Base price", v: effectivePrice != null ? compactRupees(effectivePrice) : "—" },
+    { k: "Base price", v: effectivePrice != null ? formatMoney(effectivePrice, project?.currency ?? "INR") : "—" },
     { k: "Status", v: unit ? STATUS_LABEL[unit.status] : "—" },
     { k: "Tower", v: unit?.tower ?? "—" },
     { k: "Floor", v: unit?.floor != null ? String(unit.floor) : "—" },
@@ -359,10 +349,10 @@ export default function OrgProjectUnitDetailPage() {
                   <div className="pricebox">
                     <div className="muted fs-12">Price</div>
                     <div style={{ fontSize: 24, fontWeight: 800 }}>
-                      {compactRupees(effectivePrice)}
+                      {effectivePrice != null ? formatMoney(effectivePrice, project?.currency ?? "INR") : "—"}
                     </div>
                     <div className="muted fs-12-5">
-                      {pricePerSqftLabel(effectivePrice, carpet, builtup, priceBasis) || "Price per sqft"} · all-inclusive
+                      {pricePerSqftLabel(effectivePrice, carpet, builtup, priceBasis, project?.currency ?? "INR") || "Price per sqft"} · all-inclusive
                     </div>
                   </div>
                   <div className="kv mt-16">

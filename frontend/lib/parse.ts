@@ -21,14 +21,24 @@ export function parseInteger(value: string): number | undefined {
 }
 
 /**
- * Integer rupees. Strips the ₹ sign, spaces, commas and any trailing unit
- * text: "₹ 62,00,000" → 6200000, "6,400 / sqft" → 6400, "" → undefined.
+ * Integer amount. Strips a currency sign, spaces, thousands separators and
+ * any trailing unit text, and — unlike a plain digit-strip — actually parses
+ * a decimal point rather than dropping it, then rounds to the nearest whole
+ * unit (every amount column is an `Int`, there's no cents/paise storage):
+ * "₹ 62,00,000" → 6200000, "6,400 / sqft" → 6400, "2086.44" → 2086, "" →
+ * undefined. Before this, the decimal point was stripped along with every
+ * other non-digit character, so "2086.44" silently became 208644 — the
+ * whole and fractional parts concatenated into a number roughly 100x too
+ * large, with no error or warning.
  */
 export function parseAmount(value: string): number | undefined {
-  const digits = value.replace(/[^\d]/g, "");
-  if (!digits) return undefined;
-  const n = Number(digits);
-  return Number.isFinite(n) ? n : undefined;
+  const cleaned = value.replace(/[^\d.]/g, "");
+  const parts = cleaned.split(".");
+  const normalised =
+    parts.length > 1 ? `${parts[0]}.${parts.slice(1).join("")}` : parts[0];
+  if (!normalised || normalised === ".") return undefined;
+  const n = Number(normalised);
+  return Number.isFinite(n) ? Math.round(n) : undefined;
 }
 
 /**

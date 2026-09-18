@@ -77,6 +77,7 @@ const UNIT_ACTOR_SELECT = {
 } as const;
 
 const UNIT_INCLUDE = {
+  project: { select: { currency: true } },
   createdBy: UNIT_ACTOR_SELECT,
   updatedBy: UNIT_ACTOR_SELECT,
   manager: UNIT_ACTOR_SELECT,
@@ -185,7 +186,8 @@ export class ProjectsService {
           amenities: (dto.amenities ?? []) as unknown as Prisma.InputJsonValue,
           // Onboarding-wizard fields (Steps 3-8).
           bookingAmount: dto.bookingAmount ?? null,
-          currency: dto.currency ?? 'INR',
+          // Required on the DTO now (@IsNotEmpty) — no silent INR fallback.
+          currency: dto.currency,
           priceIncludes: dto.priceIncludes ?? [],
           paymentPlan: dto.paymentPlan ?? null,
           offers: dto.offers ?? null,
@@ -350,8 +352,70 @@ export class ProjectsService {
   }
 
   async update(orgId: string, id: string, dto: UpdateProjectDto, actor?: JwtPayload) {
-    await this.getOwnedProject(orgId, id, actor);
+    const existingProject = await this.getOwnedProject(orgId, id, actor);
     if (dto.managerId) await this.assertOrgUser(orgId, dto.managerId);
+
+    // Block a currency switch once real unit/unit-type prices exist — those
+    // numbers were entered under the old currency and would be silently
+    // reinterpreted (₹1,00,00,000 becoming AED 1,00,00,000) rather than
+    // converted. Deliberately NOT checking the project's own priceMin/
+    // priceMax/baseRate/bookingAmount here: priceMin is a mandatory field on
+    // every project (required at creation, never nullable through the edit
+    // form's own validation), so including it would make this block
+    // permanent for every project that exists, not a guard against stale
+    // data. Those headline price fields are edited on this exact form, in
+    // the same request as the currency change, so the person changing
+    // currency is already looking at them — unlike a unit's price, which
+    // lives on a different page and is easy to forget about.
+    if (dto.currency !== undefined && dto.currency !== existingProject.currency) {
+      const [pricedUnit, pricedUnitType] = await Promise.all([
+        this.prisma.unit.findFirst({
+          where: { projectId: id, price: { not: null } },
+          select: { id: true },
+        }),
+        this.prisma.unitType.findFirst({
+          where: { projectId: id, price: { not: null } },
+          select: { id: true },
+        }),
+      ]);
+
+      if (pricedUnit || pricedUnitType) {
+        throw new BadRequestException(
+          'Currency cannot be changed after unit or unit-type prices have been entered. Clear all unit and unit-type prices first.',
+        );
+      }
+
+      // The project's own headline price fields can't be required-empty the
+      // way unit prices are (priceMin is mandatory), so instead require them
+      // to actually be RE-ENTERED alongside a currency change: if a field
+      // already holds a value and the submitted value is exactly the same
+      // number, that's the old amount sitting there unchanged under a new
+      // currency label — the same silent-reinterpretation bug, just not
+      // caught by the block above. A genuinely different number (including
+      // one the user retyped identically on purpose) passes through.
+      const HEADLINE_PRICE_FIELDS: {
+        key: 'priceMin' | 'priceMax' | 'baseRate' | 'bookingAmount';
+        label: string;
+      }[] = [
+        { key: 'priceMin', label: 'Price range — from' },
+        { key: 'priceMax', label: 'Price range — to' },
+        { key: 'baseRate', label: 'Price per sqft' },
+        { key: 'bookingAmount', label: 'Booking amount' },
+      ];
+      const stale = HEADLINE_PRICE_FIELDS.filter(({ key }) => {
+        const oldVal = existingProject[key];
+        if (oldVal == null) return false;
+        const newVal = dto[key] !== undefined ? dto[key] : oldVal;
+        return newVal === oldVal;
+      });
+      if (stale.length > 0) {
+        throw new BadRequestException(
+          `Currency changed — re-enter these in the new currency before saving: ${stale
+            .map((f) => f.label)
+            .join(', ')}.`,
+        );
+      }
+    }
 
     const data: Prisma.ProjectUncheckedUpdateInput = {};
     for (const key of PROJECT_SCALARS) {
@@ -1570,6 +1634,7 @@ export class ProjectsService {
       id: unit.id,
       orgId: unit.orgId,
       projectId: unit.projectId,
+      currency: unit.project?.currency ?? null,
       configuration: unit.configuration,
       variantLabel: unit.variantLabel,
       unitNo: unit.unitNo,

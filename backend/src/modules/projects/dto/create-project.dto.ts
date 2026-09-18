@@ -148,9 +148,14 @@ export class CreateProjectDto {
   @Min(0)
   bookingAmount?: number;
 
-  @IsOptional()
+  // Mandatory, unlike the rest of this section: every price entered anywhere
+  // on the project (here, on a unit type, or later on a unit) is denominated
+  // in it, so it must be picked before any of those numbers can mean
+  // anything. Not defaulted to INR — a silent default is exactly how a Gulf
+  // project would end up with rupee-labelled prices by accident.
+  @IsNotEmpty()
   @IsIn(PROJECT_CURRENCY_VALUES)
-  currency?: (typeof PROJECT_CURRENCY_VALUES)[number];
+  currency!: (typeof PROJECT_CURRENCY_VALUES)[number];
 
   @IsOptional()
   @IsArray()

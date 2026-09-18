@@ -498,7 +498,7 @@ export default function OrgProjectOverviewPage() {
                   </div>
                   <div className="sp">
                     <div className="k">Base Rate</div>
-                    <div className="v">{project.baseRate ? `₹${project.baseRate.toLocaleString("en-IN")}/sqft` : "—"}</div>
+                    <div className="v">{project.baseRate ? `${formatMoney(project.baseRate, project.currency)}/sqft` : "—"}</div>
                   </div>
                   <div className="sp">
                     <div className="k">Booking Token</div>

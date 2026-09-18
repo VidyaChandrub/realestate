@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectSalesAgentCandidates, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
-import { CURRENCY_LABELS, formatMoneyRange, PROJECT_CURRENCIES } from "@/lib/money";
+import { formatMoney, formatMoneyRange } from "@/lib/money";
+import { CURRENCY_OPTIONS } from "@/lib/countries";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import {
   CatalogOptions,
@@ -81,10 +82,10 @@ const CATALOG_STEPS = new Set([0, 1, 2, 3, 4]);
 // free), and Publish re-checks everything. The rules themselves live in
 // lib/project-validation, shared with the edit page.
 
-// 150000 -> "₹ 1,50,000". Unparseable input falls back to the raw text.
-function formatRupees(value: string): string {
+// Format a raw money input for the review summary. Unparseable input falls back to the raw text.
+function formatProjectMoney(value: string, currency: string): string {
   const n = parseAmount(value);
-  return n === undefined ? value.trim() || "—" : `₹ ${n.toLocaleString("en-IN")}`;
+  return n === undefined ? value.trim() || "—" : formatMoney(n, currency);
 }
 
 // ["2 BHK", "3 BHK"] -> "2 & 3 BHK"; anything not "<x> BHK" -> plain join.
@@ -420,8 +421,8 @@ export default function AddNewProjectPage() {
   // --- Required fields, per step. The rules live in lib/project-validation
   // so the edit page enforces exactly the same set. ---
   const requiredByStep = useMemo(
-    () => projectRequirements({ name, projectType, reraId, priceMin, address, city, managerId }),
-    [name, projectType, reraId, priceMin, address, city, managerId],
+    () => projectRequirements({ name, projectType, reraId, currency, priceMin, address, city, managerId }),
+    [name, projectType, reraId, currency, priceMin, address, city, managerId],
   );
 
   const missingOnStep = useCallback(
@@ -763,7 +764,7 @@ export default function AddNewProjectPage() {
         amenities: amenities.map((a) => ({ name: a, iconUrl: null })),
         // Step 3 — pricing & payment (remaining fields)
         bookingAmount: parseAmount(bookingAmount),
-        currency: currency as (typeof PROJECT_CURRENCIES)[number],
+        currency,
         priceIncludes: priceIncludes.length ? priceIncludes : undefined,
         paymentPlan: paymentPlan || undefined,
         offers: offers.trim() || undefined,
@@ -1204,6 +1205,14 @@ export default function AddNewProjectPage() {
                     />
                     {invalid("projectType") && <div className="field-err">Pick a project type.</div>}
                   </div>
+                  <div className={fieldClass("currency")}>
+                    <label>Currency <span className="req">*</span></label>
+                    <select className="inp" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                      {CURRENCY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                    <div className="hint">Every price on this project — unit types, units, price range — is in this currency. Locked in here, before Step 2 asks for the first one.</div>
+                    {invalid("currency") && <div className="field-err">Pick a currency before entering any prices.</div>}
+                  </div>
                   <div className="field"><label>Short tagline</label><input className="inp" placeholder="e.g. 2 &amp; 3 BHK homes on SG Highway" value={tagline} onChange={(e) => setTagline(e.target.value)} /><div className="hint">Shown on the public page and ad landing pages.</div></div>
                 </div>
                 <div className="q-sec">
@@ -1246,6 +1255,7 @@ export default function AddNewProjectPage() {
                     configurations={selectedConfigs}
                     rows={unitTypes}
                     onChange={updateUnitType}
+                    currency={currency}
                     hint="Optional, and editable later from the project's Edit page or the Units page. Filling these in means adding a unit prefills its area and price from here instead of asking for them again."
                   />
                   <div className="field mb-0"><label>Total land area</label>
@@ -1270,14 +1280,14 @@ export default function AddNewProjectPage() {
                 <div className="q-sec">
                   <div className="lbl">💰 Pricing</div>
                   <div className="grid g2">
-                    <div className={fieldClass("priceMin")}><label>Price range — from <span className="req">*</span></label><MoneyInput placeholder="62,00,000" value={priceMin} onChange={setPriceMin} />{invalid("priceMin") && <div className="field-err">Enter the starting price.</div>}</div>
-                    <div className="field"><label>Price range — to</label><MoneyInput placeholder="1,20,00,000" value={priceMax} onChange={setPriceMax} /></div>
+                    <div className={fieldClass("priceMin")}><label>Price range — from <span className="req">*</span></label><MoneyInput currency={currency} placeholder="62,00,000" value={priceMin} onChange={setPriceMin} />{invalid("priceMin") && <div className="field-err">Enter the starting price.</div>}</div>
+                    <div className="field"><label>Price range — to</label><MoneyInput currency={currency} placeholder="1,20,00,000" value={priceMax} onChange={setPriceMax} /></div>
                   </div>
-                  <div className="grid g3">
-                    <div className="field"><label>Price per sqft</label><MoneyInput placeholder="6,400" value={baseRate} onChange={setBaseRate} /></div>
-                    <div className="field"><label>Booking amount</label><MoneyInput placeholder="1,00,000" value={bookingAmount} onChange={setBookingAmount} /></div>
-                    <div className="field"><label>Currency</label><select className="inp" value={currency} onChange={(e) => setCurrency(e.target.value)}>{PROJECT_CURRENCIES.map((c) => <option key={c} value={c}>{CURRENCY_LABELS[c]}</option>)}</select></div>
+                  <div className="grid g2">
+                    <div className="field"><label>Price per sqft</label><MoneyInput currency={currency} placeholder="6,400" value={baseRate} onChange={setBaseRate} /></div>
+                    <div className="field"><label>Booking amount</label><MoneyInput currency={currency} placeholder="1,00,000" value={bookingAmount} onChange={setBookingAmount} /></div>
                   </div>
+                  <div className="hint mb-14">Prices above are in {currency} — set on Step 1.</div>
                   <div className="field"><label>What&apos;s included in the price?</label>
                     <CatalogOptions
                       category="price_includes"
@@ -1387,8 +1397,8 @@ export default function AddNewProjectPage() {
                 <div className="q-sec">
                   <div className="lbl">🎯 Targets &amp; landing</div>
                   <div className="grid g3">
-                    <div className="field"><label>Monthly ad budget</label><MoneyInput placeholder="1,50,000" value={monthlyBudget} onChange={setMonthlyBudget} /></div>
-                    <div className="field"><label>Target CPL</label><MoneyInput placeholder="300" value={targetCpl} onChange={setTargetCpl} /></div>
+                    <div className="field"><label>Monthly ad budget</label><MoneyInput currency={currency} placeholder="1,50,000" value={monthlyBudget} onChange={setMonthlyBudget} /></div>
+                    <div className="field"><label>Target CPL</label><MoneyInput currency={currency} placeholder="300" value={targetCpl} onChange={setTargetCpl} /></div>
                     <div className="field"><label>Monthly lead goal</label><input className="inp" type="number" placeholder="400" value={leadGoal} onChange={(e) => setLeadGoal(e.target.value)} /></div>
                   </div>
                   <div className="field"><label>Landing page</label>
@@ -1590,8 +1600,8 @@ export default function AddNewProjectPage() {
                       <div className="q-sec"><div className="lbl">📣 Marketing</div>
                         {/* Intentionally hidden: ad-source settings are not implemented yet and may return later. */}
                         {/* <div className="sp"><span className="k">Sources</span><span className="v">{[metaAds && "Meta", googleAds && "Google", linkedinAds && "LinkedIn", portalAds && "Portals"].filter(Boolean).join(", ") || "—"}</span></div> */}
-                        <div className="sp"><span className="k">Monthly budget</span><span className="v">{monthlyBudget ? formatRupees(monthlyBudget) : "—"}</span></div>
-                        <div className="sp"><span className="k">Target CPL</span><span className="v">{targetCpl ? formatRupees(targetCpl) : "—"}</span></div>
+                        <div className="sp"><span className="k">Monthly budget</span><span className="v">{monthlyBudget ? formatProjectMoney(monthlyBudget, currency) : "—"}</span></div>
+                        <div className="sp"><span className="k">Target CPL</span><span className="v">{targetCpl ? formatProjectMoney(targetCpl, currency) : "—"}</span></div>
                         <div className="sp"><span className="k">Lead goal</span><span className="v">{leadGoal || "—"}</span></div>
                         {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
                         {/* <div className="sp"><span className="k">AI calling</span><span className="v"><span className={`badge ${aiCalling ? "b-green" : "b-gray"}`}>{aiCalling ? "On" : "Off"}</span></span></div> */}
