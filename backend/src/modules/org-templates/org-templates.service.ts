@@ -1,10 +1,17 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { toLandingPageData } from '../admin-templates/template.mapper';
 import { ListOrgTemplatesQueryDto } from './dto/list-org-templates-query.dto';
 import { resolveTemplateQuota } from '../../common/utils/plan-quota.util';
-import { getOrgActivePlan } from '../../common/utils/subscription-lifecycle.util';
+import { getOrgActivePlan, canPlanAccessTier } from '../../common/utils/subscription-lifecycle.util';
+
+export { canPlanAccessTier } from '../../common/utils/subscription-lifecycle.util';
 
 // Templates are plan-quota based, not per-template priced — access is
 // entirely determined by the OrganisationTemplate assignment made at
@@ -24,8 +31,13 @@ export class OrgTemplatesService {
     const limit = query.limit ?? 20;
 
     const where: Prisma.TemplateWhereInput = { ...ELIGIBLE_WHERE };
-    if (query.category) {
-      where.category = query.category;
+    if (query.categoryId) {
+      where.categoryId = query.categoryId;
+    } else if (query.category) {
+      where.templateCategory = { name: { equals: query.category, mode: 'insensitive' } };
+    }
+    if (query.tier) {
+      where.tier = query.tier as any;
     }
     if (query.search) {
       where.OR = [
@@ -50,6 +62,7 @@ export class OrgTemplatesService {
     const [templates, total] = await Promise.all([
       this.prisma.template.findMany({
         where,
+        include: { templateCategory: true },
         orderBy: { updatedAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -70,6 +83,8 @@ export class OrgTemplatesService {
           name: mapped.name,
           slug: mapped.slug,
           thumbnail: mapped.thumbnail,
+          tier: t.tier,
+          categoryId: t.categoryId,
           category: mapped.category,
           template: mapped.template,
           updatedAt: mapped.updatedAt,
@@ -114,7 +129,8 @@ export class OrgTemplatesService {
     const [allPublishedTemplates, assignedRecords] = await Promise.all([
       this.prisma.template.findMany({
         where: ELIGIBLE_WHERE,
-        orderBy: { updatedAt: 'desc' },
+        include: { templateCategory: true },
+        orderBy: [{ tier: 'asc' }, { updatedAt: 'desc' }],
       }),
       this.prisma.organisationTemplate.findMany({
         where: { orgId },
@@ -135,16 +151,21 @@ export class OrgTemplatesService {
 
     const data = allPublishedTemplates.map((t) => {
       const mapped = toLandingPageData(t);
+      const access = canPlanAccessTier(plan, t.tier);
       return {
         id: mapped.id,
         name: mapped.name,
         slug: mapped.slug,
         thumbnail: mapped.thumbnail,
+        tier: t.tier,
+        categoryId: t.categoryId,
         category: mapped.category,
         template: mapped.template,
         updatedAt: mapped.updatedAt,
         isAssigned: assignedSet.has(t.id),
         landingPageCount: landingPageCounts.get(t.id) ?? 0,
+        isLocked: !access.allowed,
+        lockReason: access.reason ?? null,
       };
     });
 
@@ -165,6 +186,15 @@ export class OrgTemplatesService {
       throw new NotFoundException('Template not found or not published');
     }
 
+    const activePlanInfo = await getOrgActivePlan(this.prisma, orgId);
+    const plan = activePlanInfo?.plan;
+
+    // Check tier access
+    const access = canPlanAccessTier(plan, template.tier);
+    if (!access.allowed) {
+      throw new ForbiddenException(access.reason);
+    }
+
     const existing = await this.prisma.organisationTemplate.findUnique({
       where: { orgId_templateId: { orgId, templateId } },
     });
@@ -172,8 +202,6 @@ export class OrgTemplatesService {
       return { success: true, message: 'Template is already assigned to your organisation' };
     }
 
-    const activePlanInfo = await getOrgActivePlan(this.prisma, orgId);
-    const plan = activePlanInfo?.plan;
     const maxAllowed = resolveTemplateQuota(plan);
     const currentCount = await this.prisma.organisationTemplate.count({
       where: { orgId },
@@ -241,6 +269,7 @@ export class OrgTemplatesService {
   async getById(id: string) {
     const template = await this.prisma.template.findFirst({
       where: { id, ...ELIGIBLE_WHERE },
+      include: { templateCategory: true },
     });
     if (!template) {
       throw new NotFoundException('Template not found');

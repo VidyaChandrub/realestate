@@ -32,6 +32,9 @@ export type TemplateRow = {
   status?: LandingPageData["status"];
   domain: string;
   designId: string;
+  tier?: "free" | "paid" | "premium";
+  category?: string | null;
+  categoryId?: string | null;
 };
 
 export function findPreset(pages: LandingPageData[], designId: string) {
@@ -57,6 +60,9 @@ export function buildTemplateRows(pages: LandingPageData[]): TemplateRow[] {
       status: page?.status,
       domain: page ? page.domain || localPreviewPath(page) : "Not created yet",
       designId: design.id,
+      tier: page?.tier ?? "free",
+      category: page?.category ?? design.category,
+      categoryId: page?.categoryId ?? null,
     };
   });
 
@@ -76,10 +82,34 @@ export function buildTemplateRows(pages: LandingPageData[]): TemplateRow[] {
         status: p.status,
         domain: p.domain || localPreviewPath(p),
         designId: p.designId ?? "tpl-blank",
+        tier: p.tier ?? "free",
+        category: p.category ?? null,
+        categoryId: p.categoryId ?? null,
       };
     });
 
   return [...presets, ...customs];
+}
+
+export function tierStyle(tier?: "free" | "paid" | "premium"): { cls: string; label: string } {
+  switch (tier) {
+    case "premium":
+      return { cls: "b-violet", label: "Premium" };
+    case "paid":
+      return { cls: "b-indigo", label: "Paid" };
+    case "free":
+    default:
+      return { cls: "b-green", label: "Free" };
+  }
+}
+
+export function TierBadge({ tier }: { tier?: "free" | "paid" | "premium" }) {
+  const t = tierStyle(tier);
+  return (
+    <span className={`badge ${t.cls}`} style={{ textTransform: "capitalize", fontWeight: 600 }}>
+      {t.label}
+    </span>
+  );
 }
 
 export type TemplateStats = {

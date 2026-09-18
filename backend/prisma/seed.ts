@@ -296,6 +296,16 @@ async function seedDemoOrg() {
     applyChoices(form);
   }
 
+  const realEstateCat = await prisma.templateCategory.upsert({
+    where: { slug: 'real-estate' },
+    update: {},
+    create: {
+      name: 'Real Estate',
+      slug: 'real-estate',
+      tier: 'free',
+    },
+  });
+
   const template = await prisma.template.upsert({
     where: { slug: 'skyline-heights-builder' },
     update: {
@@ -305,7 +315,8 @@ async function seedDemoOrg() {
       pageType: 'landing',
       designId: 'tpl-estatepro',
       baseDesignName: 'Builder',
-      category: 'Real Estate',
+      tier: 'free',
+      categoryId: realEstateCat.id,
       content: asTemplateJson(templateSource),
     },
     create: {
@@ -316,7 +327,8 @@ async function seedDemoOrg() {
       pageType: 'landing',
       designId: 'tpl-estatepro',
       baseDesignName: 'Builder',
-      category: 'Real Estate',
+      tier: 'free',
+      categoryId: realEstateCat.id,
       content: asTemplateJson(templateSource),
     },
   });

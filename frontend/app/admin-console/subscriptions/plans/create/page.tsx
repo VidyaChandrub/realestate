@@ -12,8 +12,9 @@ import { Icon, type IconName } from "@/components/icons";
 const LIMIT_CONFIG = [
   { key: "projects" as const, label: "Projects", icon: "building" as IconName, hint: "Maximum number of projects." },
   { key: "users" as const, label: "Users", icon: "users" as IconName, hint: "Maximum number of user seats." },
-  { key: "templates" as const, label: "Templates", icon: "puzzle" as IconName, hint: "Maximum number of templates." },
-  { key: "landingPages" as const, label: "Landing Pages", icon: "globe" as IconName, hint: "Maximum published landing pages." },
+  { key: "templates" as const, label: "Templates", icon: "templates" as IconName, hint: "Maximum number of assigned templates." },
+  { key: "landingPagesCreate" as const, label: "Created Landing Pages", icon: "landing" as IconName, hint: "Maximum landing pages created (drafts + live)." },
+  { key: "landingPages" as const, label: "Published Landing Pages", icon: "globe" as IconName, hint: "Maximum published landing pages simultaneously." },
 ];
 
 function fmtLimit(n: number | null | undefined): string {
@@ -41,6 +42,7 @@ export default function CreatePlanPage() {
       projects: 3 as number | null,
       users: 2 as number | null,
       templates: 20 as number | null,
+      landingPagesCreate: null as number | null,
       landingPages: 5 as number | null,
     },
     capabilities: {} as Record<string, boolean>,

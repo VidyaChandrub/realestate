@@ -2,13 +2,33 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutTemplate, Search, Plus, Check } from "lucide-react";
+import {
+  Check,
+  ExternalLink,
+  Eye,
+  FolderPlus,
+  Grid,
+  Layers,
+  LayoutTemplate,
+  List,
+  Lock,
+  Monitor,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Smartphone,
+  Sparkles,
+  Tablet,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
-import { TemplateCover } from "@/components/superadmin/templates/shared";
+import { TemplateCover, TierBadge } from "@/components/superadmin/templates/shared";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
 import { siteFromLandingPage } from "@/lib/openpage/content";
 import { ensureConfig } from "@/lib/openpage/site-config";
@@ -20,7 +40,12 @@ import {
   type InventoryBindValue,
 } from "@/components/org/inventory-bind-fields";
 import type { LandingPageData } from "@/lib/openpage/types";
-import type { LandingPageRow, OrgTemplateSummary, OrgTemplatesListResponse, AvailableTemplatesResponse } from "@/lib/types";
+import type {
+  LandingPageRow,
+  OrgTemplateSummary,
+  OrgTemplatesListResponse,
+  AvailableTemplatesResponse,
+} from "@/lib/types";
 import "@/app/openpage.css";
 
 const LIMIT = 12;
@@ -29,6 +54,7 @@ export default function OrgTemplatesPage() {
   const { accessToken } = useAuth();
   const router = useRouter();
 
+  // Create page from template state
   const [useTemplate, setUseTemplate] = useState<{ id: string; name: string } | null>(null);
   const [useName, setUseName] = useState("");
   const [useBind, setUseBind] = useState<InventoryBindValue>({ kind: "none" });
@@ -43,16 +69,35 @@ export default function OrgTemplatesPage() {
   const [availableError, setAvailableError] = useState<string | null>(null);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignMessage, setAssignMessage] = useState<string | null>(null);
+  const [addModalTierFilter, setAddModalTierFilter] = useState<string>("all");
+  const [addModalCategoryFilter, setAddModalCategoryFilter] = useState<string>("all");
+  const [upgradePrompt, setUpgradePrompt] = useState<{ title: string; body: string } | null>(null);
 
-  // Remove (unassign) — reachable from both the main grid's own card and
-  // the "Already Selected" card inside the Add Template modal, so it's
-  // surfaced at the page level rather than owned by either one.
+  // Remove (unassign)
   const [removeConfirm, setRemoveConfirm] = useState<{ id: string; name: string } | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
-  // Shown instead of the confirm dialog when landingPageCount > 0. The
-  // button stays clickable so the user gets the explanation in context.
   const [removeBlocked, setRemoveBlocked] = useState<{ name: string; message: string } | null>(null);
+
+  // Filters & Search
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [tierFilter, setTierFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<"grid" | "compact">("grid");
+
+  // Assigned Templates list
+  const [result, setResult] = useState<OrgTemplatesListResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // In-app Responsive Preview
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<LandingPageData | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
 
   function openUseTemplate(id: string, defaultName: string) {
     setUseTemplate({ id, name: defaultName });
@@ -91,27 +136,14 @@ export default function OrgTemplatesPage() {
     }
   }
 
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("");
-  const [page, setPage] = useState(1);
-
-  const [result, setResult] = useState<OrgTemplatesListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const [previewId, setPreviewId] = useState<string | null>(null);
-  const [previewData, setPreviewData] = useState<LandingPageData | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-
   const fetchAssignedTemplates = useCallback(() => {
     if (!accessToken) return;
     setLoading(true);
     setLoadError(null);
     const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
     if (search) params.set("search", search);
-    if (category) params.set("category", category);
+    if (category && category !== "all") params.set("category", category);
+    if (tierFilter && tierFilter !== "all") params.set("tier", tierFilter);
 
     apiFetch<OrgTemplatesListResponse>(`/org/templates?${params.toString()}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -119,19 +151,7 @@ export default function OrgTemplatesPage() {
       .then(setResult)
       .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load templates."))
       .finally(() => setLoading(false));
-  }, [accessToken, page, search, category]);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setSearch(searchInput.trim());
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [searchInput]);
-
-  useEffect(() => {
-    fetchAssignedTemplates();
-  }, [fetchAssignedTemplates]);
+  }, [accessToken, page, search, category, tierFilter]);
 
   const loadAvailableTemplates = useCallback(() => {
     if (!accessToken) return;
@@ -144,6 +164,19 @@ export default function OrgTemplatesPage() {
       .catch((err) => setAvailableError(err instanceof Error ? err.message : "Failed to load available templates."))
       .finally(() => setAvailableLoading(false));
   }, [accessToken]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
+    fetchAssignedTemplates();
+    loadAvailableTemplates();
+  }, [fetchAssignedTemplates, loadAvailableTemplates]);
 
   function openAddModal() {
     setAddModalOpen(true);
@@ -173,16 +206,8 @@ export default function OrgTemplatesPage() {
     }
   }
 
-  // Confirm-then-remove — reachable from the main grid and from the Add
-  // Template modal's "Already Selected" card. The backend blocks this
-  // (400, with a landing-page count in the message) if anything was built
-  // from the template; that message is surfaced as-is, not swallowed into
-  // a generic error, since it's the actual reason and names what to do
-  // about it (delete those pages first).
   function requestRemoveTemplate(id: string, name: string) {
     setRemoveError(null);
-    // Re-check locally before opening confirmation so a known-blocked action
-    // gets the explanation immediately rather than a doomed confirmation.
     const count =
       rows.find((r) => r.id === id)?.landingPageCount ??
       availableData?.data.find((t) => t.id === id)?.landingPageCount ??
@@ -206,11 +231,6 @@ export default function OrgTemplatesPage() {
       });
       setRemoveConfirm(null);
       setAssignMessage("Template removed from your organisation");
-      // Refresh both datasets regardless of which one is currently visible
-      // — the grid and the Add Template modal's quota banner ("1 of 1
-      // Selected" / "Quota Full") must both reflect this without a reload,
-      // and whichever one isn't on screen right now will be fetched fresh
-      // the next time it's opened anyway.
       fetchAssignedTemplates();
       loadAvailableTemplates();
     } catch (err) {
@@ -245,125 +265,561 @@ export default function OrgTemplatesPage() {
 
   const rows = result?.data ?? [];
   const total = result?.total ?? 0;
-  const from = total === 0 ? 0 : (page - 1) * LIMIT + 1;
-  const to = Math.min(page * LIMIT, total);
-  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
-  const isFiltered = Boolean(search || category);
-  const categories = Array.from(
-    new Set(rows.map((r) => r.category).filter((c): c is string => Boolean(c))),
+  const isFiltered = Boolean(search || (category && category !== "all") || (tierFilter && tierFilter !== "all"));
+
+  const allCategories = Array.from(
+    new Set(
+      [
+        ...rows.map((r) => r.category),
+        ...(availableData?.data ?? []).map((t) => t.category),
+      ].filter((c): c is string => Boolean(c)),
+    ),
   ).sort();
 
   const previewCfg = previewData ? ensureConfig(previewData) : null;
-  // A template previewed from "Add Template to Workspace" isn't assigned
-  // yet — "Use this template" (which creates a landing page immediately)
-  // would 403 there, so the CTA becomes "Add to Workspace" instead until
-  // it's actually assigned. Checked against both data sources since preview
-  // can be opened from either the assigned-templates grid or the add modal.
+  const previewedTmpl = availableData?.data.find((t) => t.id === previewId);
   const previewedIsAssigned =
     !!previewId &&
-    (rows.some((r) => r.id === previewId) ||
-      (availableData?.data.find((t) => t.id === previewId)?.isAssigned ?? false));
+    (rows.some((r) => r.id === previewId) || (previewedTmpl?.isAssigned ?? false));
+
+  const filteredAvailable = (availableData?.data ?? []).filter((t) => {
+    if (addModalTierFilter !== "all" && (t.tier ?? "free") !== addModalTierFilter) return false;
+    if (addModalCategoryFilter !== "all" && t.category !== addModalCategoryFilter) return false;
+    return true;
+  });
 
   return (
-    <>
-      <div className="page-head reveal in" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 60 }}>
+      {/* Studio Header */}
+      <div
+        className="reveal in"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
-          <div className="eyebrow">
-            <LayoutTemplate size={13} /> Website
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 11,
+              fontWeight: 800,
+              color: "var(--brand, #4f46e5)",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: 4,
+            }}
+          >
+            <LayoutTemplate size={13} />
+            <span>WEBSITE &amp; DESIGN SYSTEM</span>
           </div>
-          <h1>Templates</h1>
-          <div className="sub">Ready-made templates granted to your organisation.</div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
+            Templates Studio
+          </h1>
+          <div className="sub" style={{ marginTop: 4, maxWidth: 680, fontSize: 13.5, color: "var(--muted)" }}>
+            High-converting real estate landing page templates granted to your organisation.
+          </div>
         </div>
-        <div className="actions" style={{ marginTop: 8 }}>
-          <button className="btn btn-primary" type="button" onClick={openAddModal} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <Plus size={15} /> Add Template
+
+        {/* Global Header Actions & Quota Telemetry */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {availableData && (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "var(--surface)",
+                border: "1px solid var(--line-2)",
+                padding: "6px 14px",
+                borderRadius: 12,
+                fontSize: 12.5,
+              }}
+            >
+              <span style={{ color: "var(--muted)" }}>Package:</span>
+              <strong style={{ color: "var(--brand)" }}>{availableData.planName}</strong>
+              <span style={{ color: "var(--line-2)" }}>|</span>
+              <span style={{ color: "var(--muted)" }}>Assigned:</span>
+              <strong style={{ color: "var(--ink)" }}>
+                {availableData.assignedCount} of {availableData.maxAllowed == null ? "Unlimited" : availableData.maxAllowed}
+              </strong>
+            </div>
+          )}
+
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={openAddModal}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              borderRadius: 11,
+              fontWeight: 700,
+              padding: "9px 18px",
+            }}
+          >
+            <Plus size={16} /> Add Template from Plan
           </button>
         </div>
       </div>
 
-      {removeError ? (
+      {removeError && (
         <div
           style={{
-            padding: "10px 14px",
+            padding: "12px 16px",
             background: "var(--rose-050, #fef2f2)",
             color: "var(--rose, #e11d48)",
             border: "1px solid var(--rose-100, #fecdd3)",
-            borderRadius: 8,
+            borderRadius: 12,
             fontSize: 13,
-            marginBottom: 16,
+            fontWeight: 600,
           }}
         >
           {removeError}
         </div>
-      ) : null}
+      )}
 
-      <Reveal delay={1}>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 18 }}>
-          <div style={{ position: "relative", flex: 1, minWidth: 220, maxWidth: 340 }}>
+      {/* Floating & Sticky Control Toolbar */}
+      <div
+        style={{
+          position: "sticky",
+          top: 12,
+          zIndex: 30,
+          background: "rgba(255, 255, 255, 0.88)",
+          backdropFilter: "blur(18px)",
+          WebkitBackdropFilter: "blur(18px)",
+          border: "1px solid var(--line-2)",
+          borderRadius: 16,
+          padding: "12px 16px",
+          boxShadow: "0 10px 28px -10px rgba(14, 21, 37, 0.08), 0 2px 6px rgba(14, 21, 37, 0.03)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        {/* Toolbar Top Row: Search, Tier Pills, and View Modes */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          {/* Search box */}
+          <div style={{ position: "relative", minWidth: 240, maxWidth: 340, flex: 1 }}>
+            <Search
+              size={15}
+              style={{
+                position: "absolute",
+                left: 12,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--muted)",
+                pointerEvents: "none",
+              }}
+            />
             <input
+              type="text"
               className="inp"
-              placeholder="Search templates…"
-              style={{ paddingLeft: 38 }}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search your assigned templates…"
+              style={{
+                paddingLeft: 36,
+                paddingRight: searchInput ? 32 : 12,
+                height: 38,
+                borderRadius: 10,
+                fontSize: 13,
+                width: "100%",
+              }}
             />
-            <Search
-              size={16}
-              style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--faint)" }}
-            />
-          </div>
-          <select
-            style={{ width: 180, flexShrink: 0 }}
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">All categories</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <span className="muted" style={{ fontSize: 12.5, marginLeft: "auto" }}>
-            {loading ? "Loading…" : `Showing ${from}–${to} of ${total}`}
-          </span>
-        </div>
-      </Reveal>
-
-      {loadError ? (
-        <Reveal delay={2}>
-          <div className="card" style={{ textAlign: "center", padding: "60px 24px" }}>
-            <div className="muted">{loadError}</div>
-          </div>
-        </Reveal>
-      ) : !loading && rows.length === 0 ? (
-        <Reveal delay={2}>
-          <div className="card" style={{ textAlign: "center", padding: "60px 24px" }}>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, color: "var(--faint)" }}>
-              <LayoutTemplate size={40} />
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>
-              {isFiltered ? "No templates match this filter" : "No templates added yet"}
-            </div>
-            <div className="muted" style={{ fontSize: 13.5, marginBottom: 16 }}>
-              {isFiltered
-                ? "Try a different search or category."
-                : "You haven't selected any templates for your workspace yet. Click 'Add Template' to choose from your plan's available templates."}
-            </div>
-            {!isFiltered && (
-              <button className="btn btn-primary" type="button" onClick={openAddModal}>
-                <Plus size={15} style={{ marginRight: 6 }} /> Add Template from Package
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                style={{
+                  position: "absolute",
+                  right: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  color: "var(--muted)",
+                  padding: 2,
+                }}
+              >
+                <X size={14} />
               </button>
             )}
           </div>
-        </Reveal>
+
+          {/* Tier Pills */}
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              background: "var(--surface-2, #f8fafc)",
+              padding: 3,
+              borderRadius: 10,
+              border: "1px solid var(--line-2)",
+            }}
+          >
+            {(["all", "free", "paid", "premium"] as const).map((t) => {
+              const active = tierFilter === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    setTierFilter(t);
+                    setPage(1);
+                  }}
+                  style={{
+                    border: "none",
+                    background: active ? "var(--surface)" : "transparent",
+                    color: active ? "var(--ink)" : "var(--muted)",
+                    fontWeight: active ? 700 : 500,
+                    fontSize: 12.5,
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    boxShadow: active ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                    textTransform: "capitalize",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {t === "all" ? "All Tiers" : t}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* View mode toggle */}
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              background: "var(--surface-2, #f8fafc)",
+              padding: 3,
+              borderRadius: 10,
+              border: "1px solid var(--line-2)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode("grid")}
+              title="Spacious Grid"
+              style={{
+                border: "none",
+                background: viewMode === "grid" ? "var(--surface)" : "transparent",
+                color: viewMode === "grid" ? "var(--ink)" : "var(--muted)",
+                padding: "6px 10px",
+                borderRadius: 8,
+                cursor: "pointer",
+                boxShadow: viewMode === "grid" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              <Grid size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("compact")}
+              title="Compact Grid"
+              style={{
+                border: "none",
+                background: viewMode === "compact" ? "var(--surface)" : "transparent",
+                color: viewMode === "compact" ? "var(--ink)" : "var(--muted)",
+                padding: "6px 10px",
+                borderRadius: 8,
+                cursor: "pointer",
+                boxShadow: viewMode === "compact" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              <LayoutTemplate size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* Toolbar Row 2: Category Chips Ribbon */}
+        {allCategories.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              overflowX: "auto",
+              paddingBottom: 2,
+              scrollbarWidth: "none",
+            }}
+          >
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", flexShrink: 0 }}>
+              Categories:
+            </span>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCategory("all");
+                setPage(1);
+              }}
+              style={{
+                flexShrink: 0,
+                border: "1px solid",
+                borderColor: category === "all" ? "var(--ink)" : "var(--line-2)",
+                background: category === "all" ? "var(--ink)" : "var(--surface)",
+                color: category === "all" ? "#ffffff" : "var(--ink)",
+                fontSize: 12,
+                fontWeight: category === "all" ? 700 : 500,
+                padding: "4px 12px",
+                borderRadius: 999,
+                cursor: "pointer",
+              }}
+            >
+              All
+            </button>
+
+            {allCategories.map((c) => {
+              const active = category === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => {
+                    setCategory(active ? "all" : c);
+                    setPage(1);
+                  }}
+                  style={{
+                    flexShrink: 0,
+                    border: "1px solid",
+                    borderColor: active ? "var(--brand)" : "var(--line-2)",
+                    background: active ? "var(--brand-050)" : "var(--surface)",
+                    color: active ? "var(--brand)" : "var(--ink)",
+                    fontSize: 12,
+                    fontWeight: active ? 700 : 500,
+                    padding: "4px 12px",
+                    borderRadius: 999,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Main Content Area */}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--muted)" }}>
+          <RefreshCw size={28} className="animate-spin" style={{ margin: "0 auto 12px" }} />
+          <div>Loading assigned templates…</div>
+        </div>
+      ) : loadError ? (
+        <div className="card" style={{ textAlign: "center", padding: "60px 24px" }}>
+          <div style={{ color: "var(--rose)", fontWeight: 600 }}>{loadError}</div>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={fetchAssignedTemplates}
+            style={{ marginTop: 12 }}
+          >
+            Try Again
+          </button>
+        </div>
+      ) : rows.length === 0 ? (
+        /* Rich Discovery Hero Empty State */
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <div
+            style={{
+              background: "linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(124, 58, 237, 0.04) 100%)",
+              border: "1px solid var(--brand-100, #e0e3fd)",
+              borderRadius: 20,
+              padding: "44px 32px",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 16,
+                background: "var(--brand)",
+                color: "#ffffff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 8px 24px -4px rgba(79, 70, 229, 0.4)",
+                marginBottom: 16,
+              }}
+            >
+              <Sparkles size={28} />
+            </div>
+
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--ink)", margin: "0 0 8px" }}>
+              {isFiltered ? "No templates match your filters" : "Supercharge Your Real Estate Marketing"}
+            </h2>
+            <p style={{ maxWidth: 580, fontSize: 14, color: "var(--ink-2)", margin: "0 0 24px", lineHeight: 1.6 }}>
+              {isFiltered
+                ? "Try clearing your search query or switching tiers and categories."
+                : "Select high-converting landing page designs tailored for luxury residences, commercial spaces, and multi-unit towers. Included in your subscription plan."}
+            </p>
+
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+              {isFiltered ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setSearchInput("");
+                    setCategory("all");
+                    setTierFilter("all");
+                  }}
+                >
+                  Clear Filters
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={openAddModal}
+                  style={{
+                    padding: "10px 22px",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    borderRadius: 12,
+                    boxShadow: "0 4px 14px rgba(79, 70, 229, 0.35)",
+                  }}
+                >
+                  <Plus size={16} /> Browse &amp; Add Templates from Plan
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Preview of Available Catalog */}
+          {availableData && availableData.data.length > 0 && !isFiltered && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "var(--ink)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Available in Your Plan Catalog
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={openAddModal}
+                  style={{ fontWeight: 600, color: "var(--brand)" }}
+                >
+                  View All ({availableData.data.length}) →
+                </button>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                  gap: 16,
+                }}
+              >
+                {availableData.data.slice(0, 4).map((tmpl) => (
+                  <div
+                    key={tmpl.id}
+                    className="card"
+                    style={{
+                      padding: 0,
+                      borderRadius: 16,
+                      overflow: "hidden",
+                      border: "1px solid var(--line-2)",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <div style={{ position: "relative" }}>
+                      <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent="#4f46e5" height={160}>
+                        <div style={{ position: "absolute", top: 10, left: 10 }}>
+                          <TierBadge tier={tmpl.tier} />
+                        </div>
+                        {tmpl.category && (
+                          <div style={{ position: "absolute", top: 10, right: 10 }}>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                background: "rgba(15,20,36,0.7)",
+                                color: "#fff",
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                backdropFilter: "blur(4px)",
+                              }}
+                            >
+                              {tmpl.category}
+                            </span>
+                          </div>
+                        )}
+                      </TemplateCover>
+                    </div>
+
+                    <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{tmpl.name}</div>
+                      <div style={{ marginTop: "auto", display: "flex", gap: 6, paddingTop: 6 }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => openPreview(tmpl.id)}
+                          style={{ flex: 1, justifyContent: "center" }}
+                        >
+                          Preview
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleAssignTemplate(tmpl.id)}
+                          disabled={assigningId === tmpl.id || tmpl.isLocked}
+                          style={{ flex: 1, justifyContent: "center" }}
+                        >
+                          {assigningId === tmpl.id ? "Adding…" : "+ Add"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
-        <div className="grid g3">
+        /* Visual Card Gallery Grid of Assigned Templates */
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              viewMode === "compact"
+                ? "repeat(auto-fill, minmax(270px, 1fr))"
+                : "repeat(auto-fill, minmax(320px, 1fr))",
+            gap: viewMode === "compact" ? 16 : 22,
+          }}
+        >
           {rows.map((row, i) => (
-            <OrgTemplateCard
+            <OrgVisualTemplateCard
               key={row.id}
               row={row}
               delay={i % 6}
@@ -376,7 +832,8 @@ export default function OrgTemplatesPage() {
         </div>
       )}
 
-      {totalPages > 1 ? (
+      {/* Pagination */}
+      {result && Math.ceil(total / LIMIT) > 1 && (
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
           <button
             className="btn btn-ghost btn-sm"
@@ -387,53 +844,211 @@ export default function OrgTemplatesPage() {
             ← Prev
           </button>
           <span className="muted" style={{ fontSize: 12.5, alignSelf: "center" }}>
-            Page {page} of {totalPages}
+            Page {page} of {Math.ceil(total / LIMIT)}
           </span>
           <button
             className="btn btn-ghost btn-sm"
             type="button"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= Math.ceil(total / LIMIT)}
+            onClick={() => setPage((p) => Math.min(Math.ceil(total / LIMIT), p + 1))}
           >
             Next →
           </button>
         </div>
-      ) : null}
+      )}
+
+      {/* Interactive Responsive Device Preview Modal */}
+      {previewId && (
+        <Modal
+          open={!!previewId}
+          onClose={closePreview}
+          title={previewData?.name ?? previewedTmpl?.name ?? "Template Preview"}
+          headerActions={
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              {previewedTmpl && <TierBadge tier={previewedTmpl.tier} />}
+              {previewedTmpl?.category && (
+                <span className="badge b-gray" style={{ fontWeight: 600 }}>
+                  {previewedTmpl.category}
+                </span>
+              )}
+            </div>
+          }
+          footer={
+            <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", justifyContent: "space-between" }}>
+              {/* Device Viewport Toggle */}
+              <div
+                style={{
+                  display: "inline-flex",
+                  background: "var(--surface-2, #f8fafc)",
+                  borderRadius: 8,
+                  padding: 2,
+                  border: "1px solid var(--line-2)",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice("desktop")}
+                  title="Desktop View"
+                  style={{
+                    border: "none",
+                    background: previewDevice === "desktop" ? "var(--surface)" : "transparent",
+                    color: previewDevice === "desktop" ? "var(--brand)" : "var(--muted)",
+                    padding: "5px 9px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Monitor size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice("tablet")}
+                  title="Tablet View"
+                  style={{
+                    border: "none",
+                    background: previewDevice === "tablet" ? "var(--surface)" : "transparent",
+                    color: previewDevice === "tablet" ? "var(--brand)" : "var(--muted)",
+                    padding: "5px 9px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Tablet size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDevice("mobile")}
+                  title="Mobile View"
+                  style={{
+                    border: "none",
+                    background: previewDevice === "mobile" ? "var(--surface)" : "transparent",
+                    color: previewDevice === "mobile" ? "var(--brand)" : "var(--muted)",
+                    padding: "5px 9px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Smartphone size={15} />
+                </button>
+              </div>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                {previewedIsAssigned ? (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      const id = previewId;
+                      const name = previewData?.name ?? previewedTmpl?.name ?? "Landing Page";
+                      closePreview();
+                      openUseTemplate(id, name);
+                    }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700 }}
+                  >
+                    <Sparkles size={14} /> Use this template
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={async () => {
+                      const id = previewId;
+                      const ok = await handleAssignTemplate(id);
+                      if (ok) closePreview();
+                    }}
+                    disabled={assigningId === previewId || previewedTmpl?.isLocked}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700 }}
+                  >
+                    <Plus size={14} /> Add to Workspace
+                  </button>
+                )}
+              </div>
+            </div>
+          }
+        >
+          <div
+            style={{
+              background: "#0f172a",
+              borderRadius: 14,
+              padding: previewDevice === "desktop" ? "8px" : "24px 12px",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: 520,
+              maxHeight: "75vh",
+              overflow: "hidden",
+            }}
+          >
+            {previewLoading ? (
+              <div style={{ color: "#ffffff", padding: 40, textAlign: "center" }}>
+                <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
+                <div>Loading preview canvas…</div>
+              </div>
+            ) : previewError ? (
+              <div style={{ color: "var(--rose)", padding: 20 }}>{previewError}</div>
+            ) : previewData ? (
+              <div
+                style={{
+                  width:
+                    previewDevice === "desktop"
+                      ? "100%"
+                      : previewDevice === "tablet"
+                      ? 768
+                      : 375,
+                  height: 520,
+                  background: "#ffffff",
+                  borderRadius: previewDevice === "desktop" ? 8 : 16,
+                  overflowY: "auto",
+                  boxShadow: "0 20px 50px rgba(0, 0, 0, 0.5)",
+                  transition: "width 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                  border: previewDevice !== "desktop" ? "8px solid #334155" : "none",
+                }}
+              >
+                <SiteRenderer
+                  site={siteFromLandingPage(previewData)}
+                  live
+                />
+              </div>
+            ) : null}
+          </div>
+        </Modal>
+      )}
 
       {/* Add Template Modal */}
       <Modal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
-        title="Add Template to Workspace"
-        description="Select remaining templates included in your package plan."
+        title="Add Templates to Workspace"
+        description="Select templates granted under your subscription plan to build landing pages."
         size="lg"
       >
         <div>
           {availableLoading ? (
             <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
-              Loading available package templates…
+              <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
+              <div>Loading available plan templates…</div>
             </div>
           ) : availableError ? (
-            <div style={{ padding: "16px 0", color: "var(--rose)", fontSize: 13 }}>
-              {availableError}
-            </div>
+            <div style={{ padding: "16px 0", color: "var(--rose)", fontSize: 13 }}>{availableError}</div>
           ) : availableData ? (
             <div>
-              {/* Quota Banner */}
+              {/* Quota Telemetry Banner */}
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  justify: "space-between",
+                  justifyContent: "space-between",
                   padding: "12px 16px",
                   background: "var(--surface-2, #f8fafc)",
-                  borderRadius: 10,
+                  borderRadius: 12,
                   border: "1px solid var(--line)",
                   marginBottom: 16,
+                  flexWrap: "wrap",
+                  gap: 10,
                 }}
               >
                 <div>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>
                     {availableData.planName} Package
                   </span>
                   <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
@@ -449,35 +1064,59 @@ export default function OrgTemplatesPage() {
                       ? "b-indigo"
                       : "b-green"
                   }`}
-                  style={{ fontSize: 12, padding: "4px 10px" }}
+                  style={{ fontWeight: 700 }}
                 >
                   {availableData.remainingQuota === 0
-                    ? "Quota Full"
+                    ? "Quota Reached"
                     : availableData.remainingQuota != null
-                    ? `${availableData.remainingQuota} Available`
-                    : "Unlimited"}
+                    ? `${availableData.remainingQuota} remaining slots`
+                    : "Unlimited access"}
                 </span>
               </div>
 
-              {assignMessage && (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    background: "var(--green-050, #f0fdf4)",
-                    color: "var(--green, #16a34a)",
-                    border: "1px solid var(--green-100, #bbf7d0)",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    marginBottom: 16,
-                  }}
+              {/* Filters in modal */}
+              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+                <select
+                  className="inp"
+                  style={{ width: 140, height: 36 }}
+                  value={addModalTierFilter}
+                  onChange={(e) => setAddModalTierFilter(e.target.value)}
                 >
-                  {assignMessage}
-                </div>
-              )}
+                  <option value="all">All Tiers</option>
+                  <option value="free">Free</option>
+                  <option value="paid">Paid</option>
+                  <option value="premium">Premium</option>
+                </select>
+                <select
+                  className="inp"
+                  style={{ width: 180, height: 36 }}
+                  value={addModalCategoryFilter}
+                  onChange={(e) => setAddModalCategoryFilter(e.target.value)}
+                >
+                  <option value="all">All Categories</option>
+                  {allCategories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <span className="muted" style={{ fontSize: 12.5, marginLeft: "auto" }}>
+                  {filteredAvailable.length} templates
+                </span>
+              </div>
 
               {/* Template Cards Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16, maxHeight: 420, overflowY: "auto", paddingRight: 4 }}>
-                {availableData.data.map((tmpl) => {
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                  gap: 14,
+                  maxHeight: 440,
+                  overflowY: "auto",
+                  paddingRight: 4,
+                }}
+              >
+                {filteredAvailable.map((tmpl) => {
                   const isAssigned = tmpl.isAssigned;
                   const isQuotaFull = availableData.remainingQuota === 0 && !isAssigned;
 
@@ -485,29 +1124,52 @@ export default function OrgTemplatesPage() {
                     <div
                       key={tmpl.id}
                       style={{
-                        border: isAssigned ? "2px solid var(--indigo, #6366f1)" : "1px solid var(--line)",
-                        borderRadius: 12,
+                        border: isAssigned ? "2px solid var(--brand, #4f46e5)" : "1px solid var(--line-2)",
+                        borderRadius: 14,
                         overflow: "hidden",
-                        background: "#fff",
+                        background: "var(--surface)",
                         display: "flex",
                         flexDirection: "column",
                         position: "relative",
                       }}
                     >
-                      <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent={isAssigned ? "#6366f1" : "#94a3b8"} />
-                      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                            <span style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{tmpl.name}</span>
-                            {tmpl.category && <span className="badge b-gray" style={{ fontSize: 10 }}>{tmpl.category}</span>}
+                      <div style={{ position: "relative" }}>
+                        <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent={isAssigned ? "#4f46e5" : "#94a3b8"} height={150}>
+                          <div style={{ position: "absolute", top: 8, left: 8 }}>
+                            <TierBadge tier={tmpl.tier} />
                           </div>
-                          <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{tmpl.template}</div>
-                        </div>
+                          {tmpl.isLocked && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: 8,
+                                right: 8,
+                                background: "rgba(15, 23, 42, 0.8)",
+                                color: "#f59e0b",
+                                padding: "3px 8px",
+                                borderRadius: 6,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4,
+                                backdropFilter: "blur(4px)",
+                                zIndex: 2,
+                              }}
+                            >
+                              <Lock size={12} /> Locked
+                            </div>
+                          )}
+                        </TemplateCover>
+                      </div>
+
+                      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{tmpl.name}</div>
+                        {tmpl.category && (
+                          <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{tmpl.category}</div>
+                        )}
 
                         <div style={{ marginTop: "auto", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-                          {/* Preview works regardless of assignment — picking
-                              blind is a bad experience when a plan only
-                              allows one or two template slots. */}
                           <button
                             className="btn btn-ghost btn-sm"
                             type="button"
@@ -516,47 +1178,62 @@ export default function OrgTemplatesPage() {
                           >
                             Preview
                           </button>
-                          {isAssigned ? (
-                            <>
-                              <span
-                                style={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 4,
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  color: "var(--indigo, #6366f1)",
-                                  background: "var(--indigo-050, #eef2ff)",
-                                  padding: "6px 12px",
-                                  borderRadius: 8,
-                                  width: "100%",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                <Check size={14} /> Already Selected
-                              </span>
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                type="button"
-                                disabled={removingId === tmpl.id}
-                                onClick={() => requestRemoveTemplate(tmpl.id, tmpl.name)}
-                                style={{ width: "100%", justifyContent: "center", color: "var(--rose)" }}
-                              >
-                                {removingId === tmpl.id ? "Removing…" : "Remove"}
-                              </button>
-                            </>
+                          {tmpl.isLocked ? (
+                            <button
+                              className="btn btn-sm"
+                              type="button"
+                              onClick={() => {
+                                setUpgradePrompt({
+                                  title: `${tmpl.tier === "premium" ? "Premium" : "Paid"} Template Locked`,
+                                  body:
+                                    tmpl.lockReason ??
+                                    "This template is not available on your current plan. Please upgrade your subscription to unlock it.",
+                                });
+                              }}
+                              style={{
+                                width: "100%",
+                                justifyContent: "center",
+                                background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                                color: "#fff",
+                                border: "none",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                fontWeight: 700,
+                              }}
+                            >
+                              <Lock size={13} /> Upgrade to Unlock
+                            </button>
+                          ) : isAssigned ? (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: "var(--brand)",
+                                background: "var(--brand-050)",
+                                padding: "6px 12px",
+                                borderRadius: 8,
+                                width: "100%",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Check size={14} /> Added to Workspace
+                            </span>
                           ) : (
                             <button
                               className="btn btn-primary btn-sm"
                               type="button"
-                              disabled={isQuotaFull || assigningId === tmpl.id}
                               onClick={() => handleAssignTemplate(tmpl.id)}
-                              style={{ width: "100%", justifyContent: "center" }}
+                              disabled={assigningId === tmpl.id || isQuotaFull}
+                              style={{ width: "100%", justifyContent: "center", fontWeight: 700 }}
                             >
                               {assigningId === tmpl.id
                                 ? "Adding…"
                                 : isQuotaFull
-                                ? "Package Limit Reached"
+                                ? "Quota Full"
                                 : "+ Add to Workspace"}
                             </button>
                           )}
@@ -571,136 +1248,147 @@ export default function OrgTemplatesPage() {
         </div>
       </Modal>
 
-      <Modal
-        open={!!previewId}
-        onClose={closePreview}
-        title={previewData?.name ?? "Loading preview…"}
-        size="full"
-        flush
-        headerActions={
-          previewedIsAssigned ? (
-            <button
-              className="btn btn-primary btn-sm"
-              type="button"
-              disabled={!previewData}
-              onClick={() => previewData && openUseTemplate(previewData.id, previewData.name)}
-            >
-              Use this template
-            </button>
-          ) : (
-            <button
-              className="btn btn-primary btn-sm"
-              type="button"
-              disabled={!previewData || assigningId === previewId}
-              onClick={async () => {
-                if (!previewId) return;
-                const ok = await handleAssignTemplate(previewId);
-                if (ok) closePreview();
-              }}
-            >
-              {assigningId === previewId ? "Adding…" : "+ Add to Workspace"}
-            </button>
-          )
-        }
-      >
-            <div style={{ flex: 1, overflowY: "auto", background: "#f4f5f8", minHeight: 360 }}>
-              {previewLoading ? (
-                <div style={{ padding: 60, textAlign: "center", color: "var(--muted, #64748b)" }}>Loading preview…</div>
-              ) : previewError ? (
-                <div style={{ padding: 60, textAlign: "center", color: "var(--muted, #64748b)" }}>{previewError}</div>
-              ) : previewData && previewCfg ? (
-                <div className="ps-app">
-                  <SiteRenderer
-                    site={siteFromLandingPage(previewData)}
-                    live
-                    pageId={previewData.id}
-                    projectName={previewData.name}
-                    forms={previewCfg.forms as never}
-                  />
-                </div>
-              ) : null}
-            </div>
-      </Modal>
-
+      {/* Use Template Modal */}
       <Modal
         open={!!useTemplate}
-        onClose={() => {
-          if (!useSubmitting) setUseTemplate(null);
-        }}
-        title={useTemplate ? `Use “${useTemplate.name}”` : "Use template"}
-        description="This creates your own editable copy — the shared template is never changed. Bind a project or standalone unit so only that listing’s details fill the page."
-        closeDisabled={useSubmitting}
-        containerClassName="z-[60]"
+        onClose={() => setUseTemplate(null)}
+        title="Create Landing Page"
+        description={useTemplate ? `Start a new landing page based on "${useTemplate.name}".` : undefined}
         footer={
           <>
-            <button className="btn btn-ghost btn-sm" type="button" onClick={() => setUseTemplate(null)} disabled={useSubmitting}>
+            <button className="btn btn-ghost" type="button" onClick={() => setUseTemplate(null)}>
               Cancel
             </button>
-            <button className="btn btn-primary btn-sm" type="button" onClick={confirmUseTemplate} disabled={useSubmitting}>
-              {useSubmitting ? "Creating…" : "Create page"}
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled={useSubmitting}
+              onClick={confirmUseTemplate}
+              style={{ fontWeight: 700 }}
+            >
+              {useSubmitting ? "Creating…" : "Create & Launch Builder"}
             </button>
           </>
         }
       >
-            <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
-              Page name
-            </label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {useError && (
+            <div
+              style={{
+                padding: "8px 12px",
+                background: "var(--rose-050)",
+                color: "var(--rose)",
+                borderRadius: 8,
+                fontSize: 13,
+              }}
+            >
+              {useError}
+            </div>
+          )}
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Landing Page Name</label>
             <input
               className="inp"
-              autoFocus
+              placeholder="e.g. Skyline Residence Launch"
               value={useName}
               onChange={(e) => setUseName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && confirmUseTemplate()}
-              disabled={useSubmitting}
+              autoFocus
             />
-            <div style={{ height: 12 }} />
-            <InventoryBindFields
-              accessToken={accessToken}
-              value={useBind}
-              onChange={setUseBind}
-              disabled={useSubmitting}
-              onAvailabilityChange={setUseHasInventory}
-            />
-            {useError ? (
-              <div style={{ color: "var(--rose)", fontSize: 12.5, marginTop: 8 }}>{useError}</div>
-            ) : null}
+          </div>
+
+          <InventoryBindFields
+            accessToken={accessToken}
+            value={useBind}
+            onChange={setUseBind}
+            onAvailabilityChange={setUseHasInventory}
+          />
+        </div>
       </Modal>
 
+      {/* Remove Confirm Modal */}
       <ConfirmModal
         open={!!removeConfirm}
-        title="Remove this template?"
+        title="Remove Template from Workspace?"
         message={
           removeConfirm
-            ? `"${removeConfirm.name}" will be removed from your workspace, freeing up a slot on your plan. This doesn't delete anything you've already built from it — any landing pages you made from this template stay exactly as they are.`
-            : undefined
+            ? `Are you sure you want to remove "${removeConfirm.name}"? You can re-add it anytime if you have quota remaining.`
+            : ""
         }
-        confirmLabel="Remove template"
+        confirmLabel={removingId ? "Removing…" : "Remove Template"}
         destructive
-        busy={removingId === removeConfirm?.id}
         onConfirm={confirmRemoveTemplate}
         onClose={() => setRemoveConfirm(null)}
       />
 
+      {/* Remove Blocked Modal */}
       <Modal
         open={!!removeBlocked}
         onClose={() => setRemoveBlocked(null)}
-        title="Template can't be removed"
-        size="sm"
+        title="Template In Use"
         footer={
-          <button className="btn btn-primary btn-sm" type="button" onClick={() => setRemoveBlocked(null)}>
-            Close
+          <button className="btn btn-primary" type="button" onClick={() => setRemoveBlocked(null)}>
+            Understood
           </button>
         }
       >
-        <p style={{ margin: 0, color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.6 }}>
           {removeBlocked?.message}
-        </p>
+        </div>
       </Modal>
-    </>
+
+      {/* Upgrade Prompt Modal */}
+      <Modal
+        open={!!upgradePrompt}
+        onClose={() => setUpgradePrompt(null)}
+        title={upgradePrompt?.title ?? "Subscription Upgrade"}
+        footer={
+          <>
+            <button className="btn btn-ghost" type="button" onClick={() => setUpgradePrompt(null)}>
+              Close
+            </button>
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() => {
+                setUpgradePrompt(null);
+                router.push("/org/settings?section=billing");
+              }}
+              style={{ fontWeight: 700 }}
+            >
+              View Subscription Plans →
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 10,
+              background: "#fef3c7",
+              color: "#d97706",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Lock size={20} />
+          </div>
+          <div>
+            <p style={{ margin: 0, fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.6 }}>
+              {upgradePrompt?.body}
+            </p>
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }
 
-function OrgTemplateCard({
+/* Modern Visual Card for Assigned Org Templates with Hover Quick Overlay */
+function OrgVisualTemplateCard({
   row,
   delay,
   onPreview,
@@ -715,42 +1403,251 @@ function OrgTemplateCard({
   onRemove: () => void;
   removing: boolean;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <Reveal delay={delay}>
-      <div className="card hover" style={{ padding: 0, display: "flex", flexDirection: "column", height: "100%" }}>
-        <button
-          type="button"
-          onClick={onPreview}
-          title="Preview"
-          style={{ display: "block", width: "100%", border: "none", padding: 0, cursor: "pointer", background: "transparent" }}
-        >
-          <TemplateCover thumbnail={row.thumbnail ?? "hero"} accent="#6D5DFC" />
-        </button>
-        <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontWeight: 700, fontSize: 14.5 }}>{row.name}</span>
-              {row.category ? <span className="badge b-indigo">{row.category}</span> : null}
+      <div
+        className="card template-visual-card"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          padding: 0,
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          borderRadius: 18,
+          overflow: "hidden",
+          border: hovered ? "1px solid var(--brand-100, #c7d2fe)" : "1px solid var(--line-2)",
+          boxShadow: hovered
+            ? "0 14px 34px -10px rgba(79, 70, 229, 0.18), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
+            : "0 2px 8px -2px rgba(14, 21, 37, 0.05)",
+          transform: hovered ? "translateY(-4px)" : "none",
+          transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+          background: "var(--surface)",
+          position: "relative",
+        }}
+      >
+        {/* Cover Preview Container */}
+        <div style={{ position: "relative", overflow: "hidden" }}>
+          <TemplateCover thumbnail={row.thumbnail ?? "hero"} accent="#4f46e5" height={188} radius="18px 18px 0 0">
+            {/* Top Badges */}
+            <div
+              style={{
+                position: "absolute",
+                top: 12,
+                left: 12,
+                zIndex: 2,
+                display: "flex",
+                gap: 6,
+                alignItems: "center",
+              }}
+            >
+              <TierBadge tier={row.tier} />
             </div>
-            <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
-              {row.template}
+
+            {row.category && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  right: 12,
+                  zIndex: 2,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.02em",
+                    background: "rgba(15, 20, 36, 0.72)",
+                    color: "#ffffff",
+                    padding: "3px 9px",
+                    borderRadius: 999,
+                    backdropFilter: "blur(6px)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                  }}
+                >
+                  {row.category}
+                </span>
+              </div>
+            )}
+
+            {/* Quick Hover Action Overlay */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.88) 100%)",
+                backdropFilter: "blur(3px)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                opacity: hovered ? 1 : 0,
+                pointerEvents: hovered ? "auto" : "none",
+                transition: "opacity 0.22s ease-in-out",
+                zIndex: 4,
+                padding: 16,
+              }}
+            >
+              <button
+                type="button"
+                onClick={onUse}
+                style={{
+                  width: "100%",
+                  maxWidth: 190,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  background: "var(--brand, #4f46e5)",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "9px 16px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 6px 18px rgba(79, 70, 229, 0.4)",
+                  transition: "transform 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "none")}
+              >
+                <Sparkles size={14} /> Create Landing Page
+              </button>
+
+              <button
+                type="button"
+                onClick={onPreview}
+                style={{
+                  width: "100%",
+                  maxWidth: 190,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  background: "rgba(255, 255, 255, 0.18)",
+                  color: "#ffffff",
+                  border: "1px solid rgba(255, 255, 255, 0.35)",
+                  borderRadius: 10,
+                  padding: "8px 16px",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  backdropFilter: "blur(8px)",
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.28)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.18)")}
+              >
+                <Eye size={14} /> Quick Preview
+              </button>
+            </div>
+          </TemplateCover>
+        </div>
+
+        {/* Card Body */}
+        <div
+          className="card-b"
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            padding: "16px 18px 16px",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 15.5,
+                color: "var(--ink)",
+                lineHeight: 1.3,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={row.name}
+            >
+              {row.name}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                color: "var(--muted)",
+                marginTop: 6,
+              }}
+            >
+              <span>Built pages:</span>
+              <strong style={{ color: "var(--ink)" }}>{row.landingPageCount}</strong>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: "auto", flexWrap: "wrap" }}>
-            <button className="btn btn-ghost btn-sm" type="button" onClick={onPreview}>
-              Preview
-            </button>
-            <button className="btn btn-primary btn-sm" type="button" onClick={onUse}>
-              Use this template
-            </button>
+
+          {/* Action Footer */}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginTop: 14,
+              alignItems: "center",
+              paddingTop: 10,
+              borderTop: "1px solid var(--line)",
+            }}
+          >
             <button
+              type="button"
+              onClick={onUse}
+              className="btn btn-primary btn-sm"
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontWeight: 700,
+                borderRadius: 9,
+              }}
+            >
+              <Sparkles size={13} /> Use
+            </button>
+
+            <button
+              type="button"
+              onClick={onPreview}
               className="btn btn-ghost btn-sm"
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontWeight: 600,
+                borderRadius: 9,
+              }}
+            >
+              <Eye size={13} /> Preview
+            </button>
+
+            <button
               type="button"
               onClick={onRemove}
               disabled={removing}
-              style={{ color: "var(--rose)" }}
+              className="btn btn-ghost btn-sm"
+              title="Remove template"
+              style={{
+                padding: "6px 8px",
+                color: "var(--rose)",
+                borderRadius: 8,
+              }}
             >
-              {removing ? "Removing…" : "Remove"}
+              <Trash2 size={13} />
             </button>
           </div>
         </div>
@@ -758,4 +1655,3 @@ function OrgTemplateCard({
     </Reveal>
   );
 }
-

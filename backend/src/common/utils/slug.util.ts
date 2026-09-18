@@ -67,3 +67,19 @@ export async function generateUniqueLandingPageSlug(
 
   return candidate;
 }
+
+export async function generateUniqueCategorySlug(
+  prisma: Pick<PrismaService, 'templateCategory'>,
+  name: string,
+): Promise<string> {
+  const base = slugify(name);
+  let candidate = base;
+  let suffix = 1;
+
+  while (await prisma.templateCategory.findUnique({ where: { slug: candidate } })) {
+    suffix += 1;
+    candidate = `${base}-${suffix}`;
+  }
+
+  return candidate;
+}

@@ -168,6 +168,9 @@ interface ApiTemplate {
   designId: string;
   pageType: "landing" | "thank-you";
   parentPageId: string | null;
+  tier?: "free" | "paid" | "premium";
+  categoryId?: string | null;
+  templateCategory?: { id: string; name: string; slug: string; tier: "free" | "paid" | "premium" } | null;
   category: string | null;
   isPaid: boolean;
   createdAt: string;
@@ -214,6 +217,9 @@ function fromApiTemplate(raw: ApiTemplate): LandingPageData {
     designId: raw.designId,
     pageType: raw.pageType,
     parentPageId: raw.parentPageId ?? undefined,
+    tier: raw.tier ?? (raw.isPaid ? "paid" : "free"),
+    categoryId: raw.categoryId ?? null,
+    templateCategory: raw.templateCategory ?? null,
     isPaid: raw.isPaid,
     category: raw.category,
   };
@@ -343,6 +349,8 @@ export interface CreateTemplateInput {
   pageType?: "landing" | "thank-you";
   parentPageId?: string;
   thumbnail?: string;
+  tier?: "free" | "paid" | "premium";
+  categoryId?: string | null;
   isPaid?: boolean;
   category?: string;
   sections: SectionInstance[];
@@ -363,6 +371,8 @@ export async function createTemplate(input: CreateTemplateInput): Promise<Landin
       pageType: input.pageType,
       parentPageId: input.parentPageId,
       thumbnail: input.thumbnail,
+      tier: input.tier,
+      categoryId: input.categoryId,
       isPaid: input.isPaid,
       category: input.category,
       content: toContentBody({
@@ -384,12 +394,63 @@ async function patchTemplate(id: string, record: LandingPageData): Promise<Landi
       status: record.status,
       domain: record.domain,
       thumbnail: record.thumbnail,
+      tier: record.tier,
+      categoryId: record.categoryId,
       isPaid: record.isPaid,
       category: record.category,
       content: toContentBody(record),
     }),
   });
   return fromApiTemplate(raw);
+}
+
+export interface TemplateCategory {
+  id: string;
+  name: string;
+  slug: string;
+  tier: "free" | "paid" | "premium";
+  templateCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function loadTemplateCategories(): Promise<TemplateCategory[]> {
+  try {
+    return await apiFetch<TemplateCategory[]>("/admin/template-categories");
+  } catch {
+    return [];
+  }
+}
+
+export async function createTemplateCategory(data: {
+  name: string;
+  slug?: string;
+  tier?: "free" | "paid" | "premium";
+}): Promise<TemplateCategory> {
+  return await apiFetch<TemplateCategory>("/admin/template-categories", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateTemplateCategory(
+  id: string,
+  data: {
+    name?: string;
+    slug?: string;
+    tier?: "free" | "paid" | "premium";
+  },
+): Promise<TemplateCategory> {
+  return await apiFetch<TemplateCategory>(`/admin/template-categories/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteTemplateCategory(id: string): Promise<void> {
+  await apiFetch(`/admin/template-categories/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 // LandingPageUpdateDto only accepts name/slug/thumbnail/content — status,

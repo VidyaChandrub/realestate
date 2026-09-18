@@ -29,6 +29,16 @@ export const PLAN_CAPABILITY_CATALOG: readonly PlanCapabilityDef[] = [
       'Publish landing pages to a live URL. Without it, drafts stay offline.',
   },
   {
+    key: 'paidTemplates',
+    label: 'Paid templates',
+    description: 'Access and use Paid tier landing page templates.',
+  },
+  {
+    key: 'premiumTemplates',
+    label: 'Premium templates',
+    description: 'Access and use exclusive Premium tier templates and designs.',
+  },
+  {
     key: 'customDomain',
     label: 'Custom domain',
     description: "Map the organisation's own domain to its published site.",

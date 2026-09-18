@@ -22,4 +22,12 @@ export class ListOrgTemplatesQueryDto {
   @IsOptional()
   @IsString()
   category?: string;
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsString()
+  tier?: string;
 }

@@ -561,6 +561,8 @@ export interface OrgTemplateSummary {
   slug: string;
   thumbnail: string | null;
   category: string | null;
+  categoryId?: string | null;
+  tier?: "free" | "paid" | "premium";
   template: string;
   updatedAt: string;
   // How many of this org's own landing pages were built from this
@@ -585,6 +587,7 @@ export interface PlanLimits {
   users: number | null;
   templates: number | null;
   landingPages: number | null;
+  landingPagesCreate?: number | null;
 }
 
 /** One entry of the plan capability catalog (`GET /admin/plans/capabilities`). */
@@ -2511,6 +2514,8 @@ export interface CreateTeamMessageInput {
 
 export interface AvailableTemplateSummary extends OrgTemplateSummary {
   isAssigned: boolean;
+  isLocked?: boolean;
+  lockReason?: string | null;
 }
 
 export interface AvailableTemplatesResponse {

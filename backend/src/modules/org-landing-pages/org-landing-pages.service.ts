@@ -374,7 +374,7 @@ export class OrgLandingPagesService {
     // trial / inside grace) AND the `publishing` plan capability. Drafting and
     // editing stay open to everyone so builders can prepare work while waiting
     // on an upgrade/renewal — the gate fires exactly at publish.
-    await assertOrgCanPublish(this.prisma, orgId);
+    await assertOrgCanPublish(this.prisma, orgId, page.id);
 
     const updated = await this.prisma.landingPage.update({
       where: { id },

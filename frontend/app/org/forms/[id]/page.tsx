@@ -61,19 +61,14 @@ export default function OrgFormEditorPage() {
 
   return (
     <>
-      <div style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Link href="/org/forms" className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
-          <ChevronLeft size={15} /> Back to Lead Forms
-        </Link>
-        <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save Form"}
-        </button>
-      </div>
       <div className="superadmin">
         <FormDesigner
           form={form}
           onChange={(next) => setForm((prev) => ({ ...next, backendId: prev?.backendId ?? "" }))}
           onSave={() => void handleSave()}
+          backHref="/org/forms"
+          backLabel="Back to Lead Forms"
+          isSaving={saving}
         />
       </div>
 

@@ -5,8 +5,14 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Copy, Eye, LayoutTemplate, Pencil, X } from "lucide-react";
 import { Reveal } from "@/components/superadmin/reveal";
-import { StatusBadge, TemplateCover, manageHref, statusStyle } from "@/components/superadmin/templates/shared";
-import { loadTemplate, duplicateTemplate, saveTemplate } from "@/lib/openpage/persist";
+import { StatusBadge, TemplateCover, TierBadge, manageHref, statusStyle } from "@/components/superadmin/templates/shared";
+import {
+  loadTemplate,
+  duplicateTemplate,
+  saveTemplate,
+  loadTemplateCategories,
+  type TemplateCategory,
+} from "@/lib/openpage/persist";
 import { builderPath, templatePreviewPath } from "@/lib/openpage/paths";
 import { ensureConfig } from "@/lib/openpage/site-config";
 import type { LandingPageData } from "@/lib/openpage/types";
@@ -35,7 +41,13 @@ export default function SuperAdminTemplateDetailPage() {
   const [slug, setSlug] = useState("");
   const [status, setStatus] = useState<LandingPageData["status"]>("draft");
   const [domain, setDomain] = useState("");
-  const [isPaid, setIsPaid] = useState(false);
+  const [tier, setTier] = useState<"free" | "paid" | "premium">("free");
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [categories, setCategories] = useState<TemplateCategory[]>([]);
+
+  useEffect(() => {
+    loadTemplateCategories().then(setCategories).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!params.id) return;
@@ -55,7 +67,8 @@ export default function SuperAdminTemplateDetailPage() {
     setSlug(template.slug);
     setStatus(template.status);
     setDomain(template.domain);
-    setIsPaid(template.isPaid ?? false);
+    setTier(template.tier ?? (template.isPaid ? "paid" : "free"));
+    setCategoryId(template.categoryId ?? "");
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [template]);
 
@@ -89,7 +102,8 @@ export default function SuperAdminTemplateDetailPage() {
     slug !== template.slug ||
     status !== template.status ||
     domain !== template.domain ||
-    isPaid !== (template.isPaid ?? false);
+    tier !== (template.tier ?? (template.isPaid ? "paid" : "free")) ||
+    categoryId !== (template.categoryId ?? "");
 
   async function save() {
     if (!template) return;
@@ -101,7 +115,9 @@ export default function SuperAdminTemplateDetailPage() {
       slug: cleanSlug,
       status,
       domain: domain.trim(),
-      isPaid,
+      tier,
+      categoryId: categoryId || null,
+      isPaid: tier !== "free",
     });
     setTemplate(updated);
     setSlug(cleanSlug);
@@ -180,6 +196,11 @@ export default function SuperAdminTemplateDetailPage() {
                   <span className="t">About</span>
                 </div>
                 <div className="card-b" style={{ display: "grid", gap: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span className="muted" style={{ fontSize: 13 }}>Template tier</span>
+                    <TierBadge tier={template.tier} />
+                  </div>
+                  <MetaRow label="Category" value={template.category || "Unassigned"} />
                   <MetaRow label="Base design" value={template.template} />
                   <MetaRow label="URL slug" value={`/${template.slug}`} mono />
                   <MetaRow label="Domain" value={template.domain || "Not connected"} mono={!!template.domain} />
@@ -219,7 +240,7 @@ export default function SuperAdminTemplateDetailPage() {
           <div className="grid g-2-1">
             <div className="card">
               <div className="card-h">
-                <span className="t">Template settings</span>
+                <span className="t">Template details</span>
               </div>
               <div className="card-b">
                 <div className="field">
@@ -247,20 +268,52 @@ export default function SuperAdminTemplateDetailPage() {
                     <input className="inp" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="e.g. homes.example.com" />
                   </div>
                 </div>
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label>Pricing</label>
-                  <select className="inp" value={isPaid ? "paid" : "free"} onChange={(e) => setIsPaid(e.target.value === "paid")}>
-                    <option value="free">Free</option>
-                    <option value="paid">Paid</option>
-                  </select>
+                <div className="row2">
+                  <div className="field">
+                    <label>Template Category</label>
+                    <select
+                      className="inp"
+                      value={categoryId}
+                      onChange={(e) => {
+                        const nextCatId = e.target.value;
+                        setCategoryId(nextCatId);
+                        const selected = categories.find((c) => c.id === nextCatId);
+                        if (selected && selected.tier) {
+                          setTier(selected.tier);
+                        }
+                      }}
+                    >
+                      <option value="">Unassigned</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.tier})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="hint">Categorizes template in library for users.</div>
+                  </div>
+                  <div className="field">
+                    <label>Access Tier</label>
+                    <select
+                      className="inp"
+                      value={tier}
+                      onChange={(e) => setTier(e.target.value as "free" | "paid" | "premium")}
+                    >
+                      <option value="free">Free (Available to all users)</option>
+                      <option value="paid">Paid (Starter, Pro &amp; higher)</option>
+                      <option value="premium">Premium (Pro Max / Enterprise only)</option>
+                    </select>
+                    <div className="hint">Controls which plans can use this template.</div>
+                  </div>
                 </div>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
                   <button type="button" className="btn btn-ghost" disabled={!dirty} onClick={() => {
                     setName(template.name);
                     setSlug(template.slug);
                     setStatus(template.status);
                     setDomain(template.domain);
-                    setIsPaid(template.isPaid ?? false);
+                    setTier(template.tier ?? (template.isPaid ? "paid" : "free"));
+                    setCategoryId(template.categoryId ?? "");
                   }}>
                     Reset
                   </button>

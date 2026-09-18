@@ -577,6 +577,9 @@ export interface LandingPageData {
   /** For thank-you pages: the landing page id they belong to. */
   parentPageId?: string;
   /** Server-persisted fields (backend persistence layer). */
+  tier?: "free" | "paid" | "premium";
+  categoryId?: string | null;
+  templateCategory?: { id: string; name: string; slug: string; tier: "free" | "paid" | "premium" } | null;
   isPaid?: boolean;
   category?: string | null;
   /** ISO timestamp from the backend — `updated` is still the display string derived from this. */
