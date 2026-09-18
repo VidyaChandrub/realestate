@@ -18,6 +18,9 @@ export type TemplateKindValue = (typeof TEMPLATE_KIND_VALUES)[number];
 export const TEMPLATE_PAGE_TYPE_VALUES = ['landing', 'thank-you'] as const;
 export type TemplatePageTypeValue = (typeof TEMPLATE_PAGE_TYPE_VALUES)[number];
 
+export const TEMPLATE_TIER_VALUES = ['free', 'paid', 'premium'] as const;
+export type TemplateTierValue = (typeof TEMPLATE_TIER_VALUES)[number];
+
 export class CreateTemplateDto {
   @IsString()
   @IsNotEmpty()
@@ -60,6 +63,14 @@ export class CreateTemplateDto {
   @IsString()
   @MaxLength(200)
   thumbnail?: string;
+
+  @IsOptional()
+  @IsIn(TEMPLATE_TIER_VALUES)
+  tier?: TemplateTierValue;
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
 
   @IsOptional()
   @IsBoolean()

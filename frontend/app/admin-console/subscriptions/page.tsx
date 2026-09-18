@@ -65,10 +65,11 @@ const SPARK_PATHS = [
   "M 0 26 Q 20 22, 40 18 T 84 12",
 ];
 
-const LIMIT_ROWS: { key: "projects" | "users" | "templates" | "landingPages"; label: string }[] = [
+const LIMIT_ROWS: { key: "projects" | "users" | "templates" | "landingPages" | "landingPagesCreate"; label: string }[] = [
   { key: "projects", label: "Projects" },
   { key: "users", label: "Users" },
   { key: "templates", label: "Templates" },
+  { key: "landingPagesCreate", label: "Created Landing Pages (Drafts + Live)" },
   { key: "landingPages", label: "Maximum Published Landing Pages" },
 ];
 
@@ -352,15 +353,15 @@ export default function SuperAdminSubscriptionsPage() {
     setPlanModalOpen(true);
   };
 
-  const formLimit = (key: "projects" | "users" | "templates" | "landingPages"): number | null => {
-    const v = planForm.limits?.[key];
+  const formLimit = (key: "projects" | "users" | "templates" | "landingPages" | "landingPagesCreate"): number | null => {
+    const v = (planForm.limits as any)?.[key];
     return v == null ? null : v;
   };
 
-  const setFormLimit = (key: "projects" | "users" | "templates" | "landingPages", value: number | null) => {
+  const setFormLimit = (key: "projects" | "users" | "templates" | "landingPages" | "landingPagesCreate", value: number | null) => {
     setPlanForm((p) => ({
       ...p,
-      limits: { projects: null, users: null, templates: null, landingPages: null, ...(p.limits ?? {}), [key]: value },
+      limits: { projects: null, users: null, templates: null, landingPages: null, landingPagesCreate: null, ...(p.limits ?? {}), [key]: value },
     }));
   };
 
@@ -406,6 +407,7 @@ export default function SuperAdminSubscriptionsPage() {
       projects: formLimit("projects"),
       users: formLimit("users"),
       templates: formLimit("templates"),
+      landingPagesCreate: formLimit("landingPagesCreate"),
       landingPages: formLimit("landingPages"),
     };
     const capMap: Record<string, boolean> = {};

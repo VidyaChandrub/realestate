@@ -9,6 +9,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { TemplateContentDto } from './template-content.dto';
+import { TEMPLATE_TIER_VALUES, type TemplateTierValue } from './create-template.dto';
 
 const TEMPLATE_STATUS_VALUES = [
   'draft',
@@ -44,6 +45,14 @@ export class UpdateTemplateDto {
   @IsString()
   @MaxLength(200)
   thumbnail?: string;
+
+  @IsOptional()
+  @IsIn(TEMPLATE_TIER_VALUES)
+  tier?: TemplateTierValue;
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string | null;
 
   @IsOptional()
   @IsBoolean()

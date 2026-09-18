@@ -11,13 +11,15 @@ export type PlanLimitKey =
   | 'projects'
   | 'users'
   | 'templates'
-  | 'landingPages';
+  | 'landingPages'
+  | 'landingPagesCreate';
 
 const LIMIT_NOUN: Record<PlanLimitKey, string> = {
   projects: 'project',
   users: 'user',
   templates: 'template',
-  landingPages: 'landing page',
+  landingPages: 'published landing page',
+  landingPagesCreate: 'created landing page',
 };
 
 /** Resolve a plan limit to a number; `Infinity` means unlimited. */
@@ -130,6 +132,15 @@ export function countOrgLandingPages(
   orgId: string,
 ): Promise<number> {
   return prisma.landingPage.count({
+    where: { orgId, pageType: 'landing', status: 'published' },
+  });
+}
+
+export function countOrgTotalLandingPages(
+  prisma: LandingPageCountPrisma,
+  orgId: string,
+): Promise<number> {
+  return prisma.landingPage.count({
     where: { orgId, pageType: 'landing' },
   });
 }
@@ -154,11 +165,12 @@ export async function assertPlanFitsCurrentUsage(
   orgId: string,
   targetPlan: { name?: string; limits: unknown } | null | undefined,
 ): Promise<void> {
-  const [projects, users, templates, landingPages] = await Promise.all([
+  const [projects, users, templates, landingPages, landingPagesCreate] = await Promise.all([
     countOrgProjects(prisma, orgId),
     countBillableOrgUsers(prisma, orgId),
     prisma.organisationTemplate.count({ where: { orgId } }),
     countOrgLandingPages(prisma, orgId),
+    countOrgTotalLandingPages(prisma, orgId),
   ]);
 
   const usage: Record<PlanLimitKey, number> = {
@@ -166,12 +178,14 @@ export async function assertPlanFitsCurrentUsage(
     users,
     templates,
     landingPages,
+    landingPagesCreate,
   };
   for (const key of [
     'projects',
     'users',
     'templates',
     'landingPages',
+    'landingPagesCreate',
   ] as PlanLimitKey[]) {
     const max = resolveLimit(targetPlan, key);
     if (usage[key] > max) {

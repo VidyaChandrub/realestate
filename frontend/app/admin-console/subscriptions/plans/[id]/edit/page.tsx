@@ -12,8 +12,9 @@ import { Icon, type IconName } from "@/components/icons";
 const LIMIT_CONFIG = [
   { key: "projects" as const, label: "Projects", icon: "building" as IconName, hint: "Maximum number of projects." },
   { key: "users" as const, label: "Users", icon: "users" as IconName, hint: "Maximum number of user seats." },
-  { key: "templates" as const, label: "Templates", icon: "puzzle" as IconName, hint: "Maximum number of templates." },
-  { key: "landingPages" as const, label: "Landing Pages", icon: "globe" as IconName, hint: "Maximum published landing pages." },
+  { key: "templates" as const, label: "Templates", icon: "templates" as IconName, hint: "Maximum number of assigned templates." },
+  { key: "landingPagesCreate" as const, label: "Created Landing Pages", icon: "landing" as IconName, hint: "Maximum landing pages created (drafts + live)." },
+  { key: "landingPages" as const, label: "Published Landing Pages", icon: "globe" as IconName, hint: "Maximum published landing pages simultaneously." },
 ];
 
 function fmtLimit(n: number | null | undefined): string {
@@ -45,6 +46,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
       projects: null as number | null,
       users: null as number | null,
       templates: null as number | null,
+      landingPagesCreate: null as number | null,
       landingPages: null as number | null,
     },
     capabilities: {} as Record<string, boolean>,
@@ -70,6 +72,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
               projects: p.limits?.projects ?? null,
               users: p.limits?.users ?? null,
               templates: p.limits?.templates ?? null,
+              landingPagesCreate: p.limits?.landingPagesCreate ?? null,
               landingPages: p.limits?.landingPages ?? null,
             },
             capabilities: { ...(p.capabilities || {}) },

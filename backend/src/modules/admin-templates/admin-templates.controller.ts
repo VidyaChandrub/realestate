@@ -19,6 +19,7 @@ import { ListTemplatesQueryDto } from './dto/list-templates-query.dto';
 import { ResetTemplateDto } from './dto/reset-template.dto';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 
+@UseGuards(JwtAuthGuard, SuperAdminGuard)
 @Controller('admin/templates')
 export class AdminTemplatesController {
   constructor(private readonly adminTemplatesService: AdminTemplatesService) {}

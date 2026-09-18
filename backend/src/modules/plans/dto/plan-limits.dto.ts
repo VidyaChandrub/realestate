@@ -30,4 +30,10 @@ export class PlanLimitsDto {
   @Min(0)
   @Max(1_000_000)
   landingPages?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  landingPagesCreate?: number | null;
 }

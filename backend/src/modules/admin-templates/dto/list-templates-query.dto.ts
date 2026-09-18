@@ -3,6 +3,7 @@ import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 import {
   TEMPLATE_KIND_VALUES,
   TEMPLATE_PAGE_TYPE_VALUES,
+  TEMPLATE_TIER_VALUES,
 } from './create-template.dto';
 import { TEMPLATE_STATUS_VALUES } from './update-template.dto';
 
@@ -18,6 +19,14 @@ export class ListTemplatesQueryDto {
   @IsOptional()
   @IsIn(TEMPLATE_PAGE_TYPE_VALUES)
   pageType?: (typeof TEMPLATE_PAGE_TYPE_VALUES)[number];
+
+  @IsOptional()
+  @IsIn(TEMPLATE_TIER_VALUES)
+  tier?: (typeof TEMPLATE_TIER_VALUES)[number];
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
 
   @IsOptional()
   @IsString()

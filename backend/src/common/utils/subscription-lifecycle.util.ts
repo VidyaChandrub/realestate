@@ -69,6 +69,8 @@ type PrismaLike = Pick<
   | 'notification'
   | 'user'
   | 'landingPage'
+  | 'organisationTemplate'
+  | 'template'
 >;
 
 /** Read the Super Admin's expiry policy, falling back to safe defaults. */
@@ -286,7 +288,14 @@ export async function getOrgActivePlan(
   orgId: string,
 ): Promise<{
   subscription: Subscription;
-  plan: { name: string; limits: unknown };
+  plan: {
+    id?: string;
+    name: string;
+    slug?: string;
+    priceMonthly?: number;
+    limits: unknown;
+    capabilities?: unknown;
+  };
 } | null> {
   await applyOrgSubscriptionLifecycle(prisma, orgId);
 
@@ -298,15 +307,69 @@ export async function getOrgActivePlan(
 
   return {
     subscription: sub,
-    plan: { name: (sub as any).plan?.name, limits: (sub as any).plan?.limits },
+    plan: {
+      id: (sub as any).plan?.id,
+      name: (sub as any).plan?.name,
+      slug: (sub as any).plan?.slug,
+      priceMonthly: (sub as any).plan?.priceMonthly,
+      limits: (sub as any).plan?.limits,
+      capabilities: (sub as any).plan?.capabilities,
+    },
   };
 }
 
 // --- Package gates ---------------------------------------------------------
 
+export function canPlanAccessTier(
+  plan: { slug?: string; priceMonthly?: number; capabilities?: unknown } | null | undefined,
+  tier: 'free' | 'paid' | 'premium',
+): { allowed: boolean; reason?: string } {
+  if (tier === 'free') {
+    return { allowed: true };
+  }
+
+  const capabilities = ((plan?.capabilities ?? {}) as Record<string, boolean>);
+  const slug = (plan?.slug ?? '').toLowerCase();
+  const price = typeof plan?.priceMonthly === 'number' ? plan.priceMonthly : 0;
+
+  if (tier === 'paid') {
+    const hasCapability =
+      capabilities.paidTemplates === true || capabilities.premiumTemplates === true;
+    const isPaidPlan =
+      price > 0 || slug === 'starter' || slug === 'pro' || slug === 'pro-max';
+
+    if (hasCapability || isPaidPlan) {
+      return { allowed: true };
+    }
+    return {
+      allowed: false,
+      reason: 'This is a Paid template. Upgrade to a paid plan to use it.',
+    };
+  }
+
+  if (tier === 'premium') {
+    const hasCapability = capabilities.premiumTemplates === true;
+    const isPremiumPlan =
+      slug === 'pro-max' || slug === 'premium' || slug === 'enterprise' || price >= 10000;
+
+    if (hasCapability || isPremiumPlan) {
+      return { allowed: true };
+    }
+    return {
+      allowed: false,
+      reason: 'This is a Premium template. Upgrade to the Pro Max plan to access Premium templates.',
+    };
+  }
+
+  return { allowed: true };
+}
+
 /**
- * Enforce the plan's `landingPages` quota before creating/duplicating a page.
- * Unlimited (null) never blocks. The count and error copy live in plan-quota.
+ * Enforce active subscription and landing page creation limits before
+ * creating/duplicating a landing page.
+ * Organizations can create multiple landing pages (drafts) even if publishing
+ * is disabled, up to their plan's `landingPagesCreate` limit (if specified).
+ * Publishing limits and template restrictions are strictly enforced at publish time.
  */
 export async function assertOrgLandingPageQuota(
   prisma: PrismaLike,
@@ -319,18 +382,37 @@ export async function assertOrgLandingPageQuota(
       'An active subscription is required to create landing pages. Choose a plan from Org Settings → Billing.',
     );
   }
-  const used = await countOrgLandingPages(prisma, orgId);
-  assertLimit(active.plan, 'landingPages', used, addCount);
+
+  const maxCreate = resolveLimit((active as any).plan, 'landingPagesCreate');
+  if (Number.isFinite(maxCreate)) {
+    const totalCreated = await (prisma as any).landingPage.count({
+      where: { orgId, pageType: 'landing' },
+    });
+    if (totalCreated + addCount > maxCreate) {
+      const planName = (active as any).plan?.name
+        ? `"${(active as any).plan.name}" `
+        : '';
+      throw new BadRequestException(
+        `Landing page creation limit reached. Your ${planName}package allows creating up to ${maxCreate} landing page(s) (drafts + live). You currently have ${totalCreated}. Upgrade your package to create more.`,
+      );
+    }
+  }
 }
 
 /**
- * Gate for the publish/unpublish actions. Three independent checks, each with
- * a targeted message so the UI can offer the right action (upgrade vs renew):
- *   1. a usable subscription must exist (active / trial / inside grace);
- *   2. otherwise it must not be a plan without the `publishing` capability.
- * Nothing here modifies the landing page — callers perform the write.
+ * Gate for the publish/unpublish actions.
+ * Enforces:
+ *   1. A usable subscription must exist (active / trial / inside grace);
+ *   2. Plan must include the `publishing` capability;
+ *   3. Total published landing pages limit (plan `landingPages` limit);
+ *   4. Template restrictions: template must be assigned to org, template tier must be eligible on plan,
+ *      and distinct templates published cannot exceed plan `templates` limit.
  */
-export async function assertOrgCanPublish(prisma: PrismaLike, orgId: string): Promise<void> {
+export async function assertOrgCanPublish(
+  prisma: PrismaLike,
+  orgId: string,
+  pageId?: string,
+): Promise<void> {
   // Lazy sweep so a past-due-entering-grace / expired transition is reflected
   // the moment the user hits publish instead of waiting for the timer.
   await applyOrgSubscriptionLifecycle(prisma, orgId);
@@ -369,16 +451,93 @@ export async function assertOrgCanPublish(prisma: PrismaLike, orgId: string): Pr
     );
   }
 
-  // Published landing pages limit check
+  // Retrieve target landing page to inspect source template restrictions
+  let targetPage: { id: string; sourceTemplateId: string | null } | null = null;
+  if (pageId) {
+    targetPage = await prisma.landingPage.findUnique({
+      where: { id: pageId },
+      select: { id: true, sourceTemplateId: true },
+    });
+  }
+
+  // 1. Published landing pages limit check (exclude this page if it's already published and being updated)
   if (Number.isFinite(maxPublishedAllowed)) {
     const publishedCount = await prisma.landingPage.count({
-      where: { orgId, status: 'published', pageType: 'landing' },
+      where: {
+        orgId,
+        status: 'published',
+        pageType: 'landing',
+        ...(pageId ? { id: { not: pageId } } : {}),
+      },
     });
     if (publishedCount >= maxPublishedAllowed) {
       const planName = (sub as any).plan?.name ? `"${(sub as any).plan.name}" ` : '';
       throw new ForbiddenException(
         `Publishing limit reached. Your ${planName}plan allows a maximum of ${maxPublishedAllowed} published landing page(s) simultaneously. Please unpublish an existing page or upgrade your package limit to publish this page.`,
       );
+    }
+  }
+
+  // 2. Template restrictions check (if page was created from a template)
+  if (targetPage?.sourceTemplateId) {
+    // A. Verify template is currently assigned to the organization
+    const isAssigned = await prisma.organisationTemplate.findUnique({
+      where: {
+        orgId_templateId: {
+          orgId,
+          templateId: targetPage.sourceTemplateId,
+        },
+      },
+    });
+    if (!isAssigned) {
+      throw new ForbiddenException(
+        'Cannot publish. The source template is not assigned to your organisation workspace. Please add this template to your workspace first.',
+      );
+    }
+
+    // B. Verify template tier access
+    const template = await prisma.template.findUnique({
+      where: { id: targetPage.sourceTemplateId },
+      select: { id: true, name: true, tier: true },
+    });
+    if (template) {
+      const tier = template.tier ?? 'free';
+      const access = canPlanAccessTier((sub as any).plan, tier);
+      if (!access.allowed) {
+        const tierLabel = tier === 'premium' ? 'Premium' : 'Paid';
+        throw new ForbiddenException(
+          `Cannot publish. This landing page was created from "${template.name}", which is a ${tierLabel} template. ${access.reason ?? 'Upgrade your subscription plan to publish this page.'}`,
+        );
+      }
+    }
+
+    // C. Distinct template publishing limit (if plan restricts number of templates)
+    const maxTemplatesAllowed = resolveLimit((sub as any).plan, 'templates');
+    if (Number.isFinite(maxTemplatesAllowed)) {
+      const distinctPublished = await prisma.landingPage.findMany({
+        where: {
+          orgId,
+          status: 'published',
+          pageType: 'landing',
+          ...(pageId ? { id: { not: pageId } } : {}),
+          sourceTemplateId: { not: null },
+        },
+        select: { sourceTemplateId: true },
+        distinct: ['sourceTemplateId'],
+      });
+      const publishedTemplateIds = new Set(
+        distinctPublished
+          .map((p) => p.sourceTemplateId)
+          .filter((id): id is string => Boolean(id)),
+      );
+      if (
+        !publishedTemplateIds.has(targetPage.sourceTemplateId) &&
+        publishedTemplateIds.size >= maxTemplatesAllowed
+      ) {
+        throw new ForbiddenException(
+          `Template publishing limit reached. Your plan allows publishing from a maximum of ${maxTemplatesAllowed} template(s). You already have published pages using ${publishedTemplateIds.size} different template(s). Unpublish those pages or upgrade your plan to publish from this template.`,
+        );
+      }
     }
   }
 }

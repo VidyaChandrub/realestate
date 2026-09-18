@@ -53,18 +53,13 @@ export default function SuperAdminFormEditorPage() {
   return (
     <div>
       <Toaster theme="light" position="bottom-right" />
-      <div style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Link href="/admin-console/forms" className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
-          <ChevronLeft size={15} /> Back to Forms
-        </Link>
-        <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : "Save Form"}
-        </button>
-      </div>
       <FormDesigner
         form={form}
         onChange={(next) => setForm((prev) => ({ ...next, backendId: prev?.backendId ?? "" }))}
         onSave={() => void handleSave()}
+        backHref="/admin-console/forms"
+        backLabel="Back to Forms"
+        isSaving={saving}
       />
     </div>
   );

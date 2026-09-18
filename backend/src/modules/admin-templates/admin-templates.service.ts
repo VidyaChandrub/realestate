@@ -61,6 +61,8 @@ export class AdminTemplatesService {
     };
     if (query.kind) where.kind = query.kind;
     if (query.status) where.status = query.status;
+    if (query.tier) where.tier = query.tier as any;
+    if (query.categoryId) where.categoryId = query.categoryId;
     if (query.search) {
       where.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
@@ -70,6 +72,7 @@ export class AdminTemplatesService {
 
     const templates = await this.prisma.template.findMany({
       where,
+      include: { templateCategory: true },
       orderBy: { updatedAt: 'desc' },
     });
 
@@ -88,6 +91,7 @@ export class AdminTemplatesService {
   async getPublicById(id: string) {
     const template = await this.prisma.template.findFirst({
       where: { id, status: 'published', pageType: 'landing' },
+      include: { templateCategory: true },
     });
     if (!template) {
       throw new NotFoundException('Template not found');
@@ -100,6 +104,19 @@ export class AdminTemplatesService {
       ? dto.slug
       : await generateUniqueTemplateSlug(this.prisma, dto.name);
 
+    let tier = dto.tier;
+    if (!tier && dto.categoryId) {
+      const category = await this.prisma.templateCategory.findUnique({
+        where: { id: dto.categoryId },
+      });
+      if (category) {
+        tier = category.tier as any;
+      }
+    }
+    if (!tier && dto.isPaid !== undefined) {
+      tier = dto.isPaid ? 'paid' : 'free';
+    }
+
     const created = await this.prisma.template.create({
       data: {
         name: dto.name,
@@ -111,10 +128,11 @@ export class AdminTemplatesService {
         pageType: PAGE_TYPE_TO_DB[dto.pageType ?? 'landing'],
         parentId: dto.parentPageId,
         thumbnail: dto.thumbnail,
-        isPaid: dto.isPaid ?? false,
-        category: dto.category,
+        tier: (tier ?? 'free') as any,
+        categoryId: dto.categoryId,
         content: toContentJson(dto.content),
       },
+      include: { templateCategory: true },
     });
 
     return toLandingPageData(created, { includeContent: true });
@@ -129,14 +147,26 @@ export class AdminTemplatesService {
       status: dto.status,
       domain: dto.domain,
       thumbnail: dto.thumbnail,
-      isPaid: dto.isPaid,
-      category: dto.category,
     };
+    if (dto.tier !== undefined) {
+      data.tier = dto.tier as any;
+    } else if (dto.isPaid !== undefined) {
+      data.tier = (dto.isPaid ? 'paid' : 'free') as any;
+    }
+    if (dto.categoryId !== undefined) {
+      data.templateCategory = dto.categoryId
+        ? { connect: { id: dto.categoryId } }
+        : { disconnect: true };
+    }
     if (dto.content) {
       data.content = toContentJson(dto.content);
     }
 
-    const updated = await this.prisma.template.update({ where: { id }, data });
+    const updated = await this.prisma.template.update({
+      where: { id },
+      data,
+      include: { templateCategory: true },
+    });
     return toLandingPageData(updated, { includeContent: true });
   }
 
@@ -162,6 +192,7 @@ export class AdminTemplatesService {
         status: 'draft',
         content: toContentJson(dto.content),
       },
+      include: { templateCategory: true },
     });
 
     return toLandingPageData(updated, { includeContent: true });
@@ -186,17 +217,21 @@ export class AdminTemplatesService {
         pageType: source.pageType,
         parentId: source.parentId,
         thumbnail: source.thumbnail,
-        isPaid: source.isPaid,
-        category: source.category,
+        tier: source.tier,
+        categoryId: source.categoryId,
         content: source.content as Prisma.InputJsonValue,
       },
+      include: { templateCategory: true },
     });
 
     return toLandingPageData(copy, { includeContent: true });
   }
 
   private async findOrThrow(id: string) {
-    const template = await this.prisma.template.findUnique({ where: { id } });
+    const template = await this.prisma.template.findUnique({
+      where: { id },
+      include: { templateCategory: true },
+    });
     if (!template) {
       throw new NotFoundException('Template not found');
     }

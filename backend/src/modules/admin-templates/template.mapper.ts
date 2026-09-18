@@ -33,8 +33,11 @@ export function toLandingPageData(
     designId: template.designId,
     pageType: template.pageType === 'thank_you' ? 'thank-you' : 'landing',
     parentPageId: template.parentId,
-    category: template.category,
-    isPaid: template.isPaid,
+    tier: template.tier,
+    categoryId: template.categoryId,
+    category: (template as any).templateCategory?.name ?? (template as any).category ?? null,
+    templateCategory: (template as any).templateCategory ?? null,
+    isPaid: template.tier !== 'free',
     createdAt: template.createdAt.toISOString(),
     updatedAt: template.updatedAt.toISOString(),
   };

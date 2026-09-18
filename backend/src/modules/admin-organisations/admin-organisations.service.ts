@@ -913,7 +913,7 @@ export class AdminOrganisationsService {
     await this.getRealOrganisation(id);
     const rows = await this.prisma.organisationTemplate.findMany({
       where: { orgId: id },
-      include: { template: true },
+      include: { template: { include: { templateCategory: true } } },
     });
     return rows.map((r) => ({
       templateId: r.templateId,
@@ -923,7 +923,8 @@ export class AdminOrganisationsService {
         name: r.template.name,
         slug: r.template.slug,
         thumbnail: r.template.thumbnail,
-        category: r.template.category,
+        tier: r.template.tier,
+        category: (r.template as any).templateCategory?.name ?? null,
       },
     }));
   }

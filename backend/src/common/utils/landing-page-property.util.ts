@@ -65,20 +65,42 @@ function formatInr(value: number | null | undefined): string {
 }
 
 function joinLocation(parts: Array<string | null | undefined>): string {
-  return parts.map((p) => p?.trim()).filter(Boolean).join(', ');
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of parts) {
+    if (!part) continue;
+    const pieces = part.split(',').map((p) => p.trim()).filter(Boolean);
+    for (const piece of pieces) {
+      const lower = piece.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        out.push(piece);
+      }
+    }
+  }
+  return out.join(', ');
 }
 
 export function varsFromSnapshot(s: PropertySnapshot): LandingPageVars {
   return {
     property_name: s.name,
+    project_name: s.name,
+    'project.name': s.name,
+    name: s.name,
     builder_name: s.builder,
+    'project.builder': s.builder,
     starting_price: s.startingPrice,
+    'project.price': s.startingPrice,
+    'project.priceRange': s.startingPrice,
+    price: s.startingPrice,
     rera_number: s.reraNumber,
     possession_date: s.possession,
     carpet_area: s.carpetArea,
     location: s.location,
+    'project.location': s.location,
     description: s.description,
     tagline: s.description,
+    'project.tagline': s.description,
     land_area: s.landArea,
     towers: s.towers,
     units: s.units,
@@ -87,7 +109,7 @@ export function varsFromSnapshot(s: PropertySnapshot): LandingPageVars {
 
 export function applyLandingPageVars(value: unknown, vars: LandingPageVars): unknown {
   if (typeof value === 'string') {
-    return value.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_m, key: string) =>
+    return value.replace(/\{\{([a-zA-Z0-9_.]+)\}\}/g, (_m, key: string) =>
       vars[key] != null && vars[key] !== '' ? vars[key] : `{{${key}}}`,
     );
   }
