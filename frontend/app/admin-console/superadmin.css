@@ -1266,15 +1266,15 @@
 }
 
 .superadmin .platform-permission-pill:hover:not(:disabled) {
-  border-color: #cdbf9f;
-  color: var(--ink-2);
+  border-color: var(--brand-100);
+  color: var(--brand-600);
   transform: translateY(-1px);
 }
 
 .superadmin .platform-permission-pill.is-enabled {
-  border-color: #d5c8ad;
-  background: #f5f1e8;
-  color: #665b48;
+  border-color: #c7d2fe;
+  background: var(--brand-050);
+  color: var(--brand);
 }
 
 .superadmin .platform-permission-pill:disabled {
@@ -1290,7 +1290,7 @@
 }
 
 .superadmin .platform-permission-pill.is-enabled .platform-permission-dot {
-  background: #b8a47a;
+  background: var(--brand);
 }
 
 .superadmin .platform-permission-separator {
@@ -1304,7 +1304,7 @@
   padding: 3px 2px;
   border: 0;
   background: transparent;
-  color: #a28d67;
+  color: var(--brand);
   font: inherit;
   font-size: 11px;
   font-weight: 700;
