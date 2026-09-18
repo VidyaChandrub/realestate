@@ -1199,6 +1199,188 @@
   border-bottom: none;
 }
 
+/* ---------- Platform permission pills ---------- */
+.superadmin .platform-permissions-list {
+  overflow: hidden;
+}
+
+.superadmin .platform-permissions-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.superadmin .platform-permission-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 76px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.superadmin .platform-permission-row:last-child {
+  border-bottom: none;
+}
+
+.superadmin .platform-permission-row:hover {
+  background: var(--surface-2);
+}
+
+.superadmin .platform-permission-module {
+  min-width: 180px;
+}
+
+.superadmin .platform-permission-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.superadmin .platform-permission-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.superadmin .platform-permission-pill:hover:not(:disabled) {
+  border-color: #cdbf9f;
+  color: var(--ink-2);
+  transform: translateY(-1px);
+}
+
+.superadmin .platform-permission-pill.is-enabled {
+  border-color: #d5c8ad;
+  background: #f5f1e8;
+  color: #665b48;
+}
+
+.superadmin .platform-permission-pill:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.superadmin .platform-permission-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d5d9e1;
+}
+
+.superadmin .platform-permission-pill.is-enabled .platform-permission-dot {
+  background: #b8a47a;
+}
+
+.superadmin .platform-permission-separator {
+  width: 1px;
+  height: 20px;
+  margin: 0 3px;
+  background: var(--line-2);
+}
+
+.superadmin .platform-permission-bulk {
+  padding: 3px 2px;
+  border: 0;
+  background: transparent;
+  color: #a28d67;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.superadmin .platform-permission-bulk:hover:not(:disabled) {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.superadmin .platform-permission-bulk:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.superadmin .platform-permission-toast {
+  position: fixed;
+  top: 88px;
+  right: 24px;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 11px 12px;
+  border: 1px solid #b7e4c7;
+  border-radius: 12px;
+  background: #f0fdf4;
+  color: #166534;
+  box-shadow: var(--sh-lg);
+  font-size: 13px;
+  font-weight: 600;
+  animation: platform-permission-toast-in 0.2s ease-out;
+}
+
+.superadmin .platform-permission-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #fff;
+  font-size: 13px;
+}
+
+.superadmin .platform-permission-toast button {
+  margin-left: auto;
+  padding: 0 3px;
+  border: 0;
+  background: transparent;
+  color: #4d7c5a;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@keyframes platform-permission-toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 900px) {
+  .superadmin .platform-permission-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .superadmin .platform-permission-actions {
+    justify-content: flex-start;
+  }
+}
+
 /* ---------- Row actions menu (kebab) ---------- */
 .superadmin .row-menu-trigger {
   width: 34px;

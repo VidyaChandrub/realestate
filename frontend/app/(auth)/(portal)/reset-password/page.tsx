@@ -1,13 +1,12 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, validateResetToken } from "@/lib/api";
 import { PasswordInput } from "@/components/auth/password-input";
 
 function ResetForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const token = params.get("token") ?? "";
 
@@ -16,6 +15,25 @@ function ResetForm() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tokenStatus, setTokenStatus] = useState<"checking" | "valid" | "invalid">("checking");
+
+  useEffect(() => {
+    if (!token) {
+      setTokenStatus("invalid");
+      return;
+    }
+    let cancelled = false;
+    validateResetToken(token)
+      .then((res) => {
+        if (!cancelled) setTokenStatus(res.valid ? "valid" : "invalid");
+      })
+      .catch(() => {
+        if (!cancelled) setTokenStatus("invalid");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,7 +91,18 @@ function ResetForm() {
             </p>
           </div>
 
-          {done ? (
+          {tokenStatus === "checking" ? (
+            <div className="help reveal in" data-delay="1" style={{ marginTop: 26 }}>
+              Checking your reset link…
+            </div>
+          ) : tokenStatus === "invalid" ? (
+            <div className="help reveal in" data-delay="1" style={{ marginTop: 26, color: "var(--rose)", borderColor: "var(--rose-050)", background: "var(--rose-050)" }}>
+              ⚠️ This reset link is invalid or has expired. Please{" "}
+              <Link href="/forgot-password" style={{ color: "inherit", fontWeight: 600, textDecoration: "underline" }}>
+                request a new one
+              </Link>.
+            </div>
+          ) : done ? (
             <div className="help reveal in" data-delay="1" style={{ marginTop: 26 }}>
               ✅ Password updated. You can now{" "}
               <Link href="/login" style={{ color: "var(--brand)", fontWeight: 600 }}>sign in</Link>.

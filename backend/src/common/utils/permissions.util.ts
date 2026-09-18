@@ -127,12 +127,10 @@ export type EffectivePermissions = Record<
   Partial<Record<PermissionAction, boolean>>
 >;
 
-// Roles that are never restricted by this system — the org-wide admin and the
-// platform super admin always have every permission regardless of what rows
-// exist. Only the team roles (manager/sales) are gated.
+// Platform super admin is never restricted. Organisation Admin starts with
+// full defaults, but Super Admin can explicitly revoke those defaults.
 const UNRESTRICTED_ROLES: ReadonlySet<string> = new Set([
   'super_admin',
-  'admin',
 ]);
 
 /** Defaults applied when an org has not yet customised a role for a module. */
@@ -235,7 +233,7 @@ export const ACTION_TO_COLUMN: Record<PermissionAction, string> = {
 
 // ---------------------------------------------------------------------------
 // Effective-permission computation.
-//   - super_admin / admin (org-wide) => everything, always.
+//   - super_admin => everything, always.
 //   - otherwise => role's configured rows for each module, overridden by any
 //     per-user override rows that set a non-null column for that module.
 //   - modules with no configured row fall back to DEFAULT_ROLE_PERMISSIONS.
@@ -306,7 +304,16 @@ export function computeEffectivePermissions(
   }
 
   for (const def of PERMISSION_MODULES) {
-    const roleRow = roleByModule.get(def.key);
+    const roleRow = roleByModule.get(def.key) ?? (primaryRoleKey === 'admin'
+      ? {
+          moduleKey: def.key,
+          canView: true,
+          canAdd: true,
+          canEdit: true,
+          canDelete: true,
+          canApprove: true,
+        }
+      : undefined);
     const overrideRow = overrideByModule.get(def.key);
     if (roleRow && overrideRow) {
       // Explicit override values (including false) win; null keeps the role grant.
