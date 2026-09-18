@@ -30,6 +30,28 @@ export function parseInteger(value: string): number | undefined {
  * other non-digit character, so "2086.44" silently became 208644 — the
  * whole and fractional parts concatenated into a number roughly 100x too
  * large, with no error or warning.
+ *
+ * This is THE shared parser for every project/unit/unit-type money field —
+ * price range, base rate, booking amount, ad budget/CPL, unit price,
+ * unit-type price — across the create wizard, edit page, both unit-creation
+ * modals and the all-units create flow. Route any new one through this
+ * rather than writing a local parser, so rounding can't silently diverge
+ * between two entry points for the same field.
+ *
+ * Deliberately whole-number, deliberately not revisited lightly: real-estate
+ * list prices are whole amounts in practice, and every backing column is
+ * `Int` (`Project.priceMin/priceMax/baseRate/bookingAmount`,
+ * `Unit.price`, `UnitType.price`) — changing that to a `Decimal` column is a
+ * real schema migration, not a parsing tweak. If fractional currency (cents/
+ * paise) is ever genuinely needed, store it as an integer in the currency's
+ * minor unit (e.g. cents) and convert only at the display edge, the way
+ * Stripe and most payment systems do — don't reach for a `Decimal`/`Float`
+ * column, which reintroduces the exact floating-point rounding problems
+ * integer-cents storage exists to avoid. A *derived*, never-stored figure
+ * like $/sqft (`pricePerSqftLabel` in `components/org/project-form-fields.tsx`,
+ * and `ProjectsService.pricePerSqft` on the backend) is a different case —
+ * nothing forces that to be a whole number, which is why it keeps two
+ * decimal places instead of rounding through this function.
  */
 export function parseAmount(value: string): number | undefined {
   const cleaned = value.replace(/[^\d.]/g, "");

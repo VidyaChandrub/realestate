@@ -770,11 +770,9 @@ export default function OrgProjectUnitsPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="k">{currencyPrefix(project?.currency ?? "INR").trim()}/sqft</div>
+                        <div className="k">{currencyPrefix(project?.currency ?? "INR").trim()}/sqft ({PRICE_BASIS_LABEL[priceBasis]})</div>
                         <div className="v">
-                          {ut?.price != null && ut.carpetSqft
-                            ? `${formatMoney(Math.round(ut.price / ut.carpetSqft), project?.currency ?? "INR")}/sqft`
-                            : "—"}
+                          {pricePerSqftLabel(ut?.price ?? null, ut?.carpetSqft ?? null, ut?.builtupSqft ?? null, priceBasis, project?.currency ?? "INR") || "—"}
                         </div>
                       </div>
                     </div>
@@ -962,7 +960,7 @@ export default function OrgProjectUnitsPage() {
                           : "—"}
                         {row.pricePerSqft != null ? (
                           <div className="hint" style={{ marginTop: 2 }}>
-                            {formatMoney(row.pricePerSqft, project?.currency ?? "INR")} / sqft ({PRICE_BASIS_LABEL[row.pricePerSqftBasis]})
+                            {formatMoney(row.pricePerSqft, project?.currency ?? "INR", 2)} / sqft ({PRICE_BASIS_LABEL[row.pricePerSqftBasis]})
                           </div>
                         ) : null}
                       </td>

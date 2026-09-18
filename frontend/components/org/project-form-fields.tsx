@@ -82,7 +82,14 @@ export function pricePerSqftLabel(
   const area = basis === "builtup" ? builtupSqft : carpetSqft;
   if (!price || !area) return "";
   const sym = currencyPrefix(currency).trim() || "₹";
-  const value = Math.round(price / area).toLocaleString("en-IN");
+  // Two decimal places, not rounded to a whole unit: this is derived, never
+  // stored, so nothing forces it to be an integer the way the price itself
+  // is — and in real estate 2.50 vs. 2.72 per sqft is a real difference at
+  // project scale, not noise to round away.
+  const value = (Math.round((price / area) * 100) / 100).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   return `${sym}${value} / sqft (${PRICE_BASIS_LABEL[basis]})`;
 }
 

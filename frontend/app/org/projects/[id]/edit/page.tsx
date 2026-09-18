@@ -36,6 +36,7 @@ import type {
   OrgUser,
   OrgUsersListResponse,
   ProjectDetail,
+  ProjectAssigneeCandidate,
   ProjectStatus,
   SafeOrganisation,
   UnitType,
@@ -80,7 +81,9 @@ const CONSTRUCTION_STAGES = [
   "Finishing",
   "Ready to move",
 ];
-const SALES_TEAMS = ["Ahmedabad — West", "Ahmedabad — Core", "NRI Desk"];
+// Intentionally unused for now — only ever fed the hidden "Sales team" dropdown
+// (see sec-team below). Kept, not deleted, for when that field returns.
+// const SALES_TEAMS = ["Ahmedabad — West", "Ahmedabad — Core", "NRI Desk"];
 
 /** The option list plus the current value, when that value has fallen off it. */
 function withCurrent(options: string[], value: string): string[] {
@@ -197,7 +200,7 @@ export default function OrgProjectEditPage() {
   const [aiKnowledgeBase, setAiKnowledgeBase] = useState(false);
 
   // --- Team & access ---
-  const [salesUsers, setSalesUsers] = useState<Array<{ id: string; name: string }>>([]);
+  const [salesUsers, setSalesUsers] = useState<ProjectAssigneeCandidate[]>([]);
   const [salesTeam, setSalesTeam] = useState("");
   const [agentAssign, setAgentAssign] = useState<string[]>([]);
   const [requireBookingApproval, setRequireBookingApproval] = useState(false);
@@ -329,7 +332,7 @@ export default function OrgProjectEditPage() {
     // "Who can hold a lead" — resolved server-side (permission-based, admins
     // and managers excluded), and the same rule the PUT enforces.
     getProjectSalesAgentCandidates()
-      .then((res) => setSalesUsers(res.data.map((u) => ({ id: u.id, name: u.name }))))
+      .then((res) => setSalesUsers(res.data))
       .catch(() => setSalesUsers([]));
     apiFetch<SafeOrganisation>("/org/settings", auth)
       .then((o) => setOrgName(o.name))
@@ -1199,6 +1202,11 @@ export default function OrgProjectEditPage() {
                   </select>
                   {fieldError("managerId") ? <div className="field-err">{fieldError("managerId")}</div> : null}
                 </div>
+                {/* Intentionally hidden: this is a free-text regional label ("Ahmedabad — West"), not a
+                    reference to the real Team model (org-teams module) — Project.salesTeam is stored
+                    and echoed back but never read anywhere in the backend. May return once it's wired
+                    to real teams. */}
+                {/*
                 <div className="field">
                   <label>Sales team</label>
                   <select value={salesTeam} onChange={(e) => setSalesTeam(e.target.value)}>
@@ -1208,18 +1216,26 @@ export default function OrgProjectEditPage() {
                     ))}
                   </select>
                 </div>
+                */}
               </div>
               <div className="field">
                 <label>Assigned sales agents</label>
                 {salesUsers.length === 0 ? (
                   <div className="hint">No assignable users in your organisation yet — add them under Users.</div>
                 ) : (
-                  <div className="opts">
+                  <div className="opts project-assignee-options">
                     {salesUsers.map((u) => {
                       const on = agentAssign.includes(u.id);
                       return (
-                        <span key={u.id} className={`opt ${on ? "on" : ""}`} onClick={() => setAgentAssign((prev) => (on ? prev.filter((x) => x !== u.id) : [...prev, u.id]))}>
-                          <span className="b">{on ? "✓" : ""}</span>{u.name}
+                        <span key={u.id} className={`opt project-assignee-option ${on ? "on" : ""}`} onClick={() => setAgentAssign((prev) => (on ? prev.filter((x) => x !== u.id) : [...prev, u.id]))}>
+                          <span className="b">{on ? "✓" : ""}</span>
+                          <span className="project-assignee-meta">
+                            <b>{u.name}</b>
+                            <small className="project-assignee-role">{u.role?.name ?? "No role"}</small>
+                            {u.projects.length > 0 ? (
+                              <small className="project-assignee-projects">Already assigned: {u.projects.map((p) => `${p.name} (${p.role})`).join(", ")}</small>
+                            ) : null}
+                          </span>
                         </span>
                       );
                     })}

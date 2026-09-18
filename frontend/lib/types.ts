@@ -1568,6 +1568,21 @@ export interface CrmAssignableResponse {
   total: number;
 }
 
+export interface ProjectAssigneeCandidate {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  name: string;
+  role: { key: string; name: string } | null;
+  projects: Array<{ id: string; name: string; role: string }>;
+}
+
+export interface ProjectAssigneeCandidatesResponse {
+  data: ProjectAssigneeCandidate[];
+  total: number;
+}
+
 export interface AssignLeadInput {
   assignedToId?: string | null;
   status?: CrmLeadStatus;

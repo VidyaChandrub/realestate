@@ -27,6 +27,7 @@ import type {
   CreateOrgCatalogOptionInput,
   CrmAssignee,
   CrmAssignableResponse,
+  ProjectAssigneeCandidatesResponse,
   CrmLead,
   CrmLeadListResponse,
   InvoiceRow,
@@ -1102,9 +1103,9 @@ export async function getProjectSalesAgents(
  * "who can hold a lead" rule the Lead Center assignee picker uses (permission
  * based, admins/managers excluded). Server-enforced on the PUT as well.
  */
-export async function getProjectSalesAgentCandidates(): Promise<CrmAssignableResponse> {
-  return apiFetch<CrmAssignableResponse>(
-    "/org/projects/sales-agent-candidates",
+export async function getProjectSalesAgentCandidates(): Promise<ProjectAssigneeCandidatesResponse> {
+  return apiFetch<ProjectAssigneeCandidatesResponse>(
+    "/org/projects/project-assignee-candidates",
   );
 }
 

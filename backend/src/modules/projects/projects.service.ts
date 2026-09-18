@@ -483,13 +483,58 @@ export class ProjectsService {
   // re-submitting is idempotent (delete-all + recreate in one transaction).
   // -------------------------------------------------------------------------
 
-  /**
-   * Org members who may be assigned to a project as sales agents — the same
-   * "who can hold a lead" rule the Lead Center assignee picker uses. Kept
-   * org-level (no projectId) because the eligible set doesn't vary by project.
-   */
+  /** Existing CRM-eligible candidates used by lead and standalone-unit flows. */
   async listSalesAgentCandidates(orgId: string) {
     const data = await listLeadAssignableUsers(this.prisma, orgId);
+    return { data, total: data.length };
+  }
+
+  /** Active org members available to assign to projects, with role and
+   * existing project membership context for the assignment picker. */
+  async listProjectAssigneeCandidates(orgId: string) {
+    const users = await this.prisma.user.findMany({
+      where: { orgId, status: 'active' },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        userRoles: {
+          where: { role: { status: 'active' } },
+          select: { role: { select: { key: true, name: true } } },
+        },
+        managedProjects: { select: { id: true, name: true } },
+        salesProjects: {
+          select: { project: { select: { id: true, name: true } } },
+        },
+      },
+    });
+
+    const data = users.map((user) => {
+      const projects = new Map<string, { id: string; name: string; role: string }>();
+      for (const project of user.managedProjects) {
+        projects.set(project.id, { ...project, role: 'Manager' });
+      }
+      for (const assignment of user.salesProjects) {
+        if (!projects.has(assignment.project.id)) {
+          projects.set(assignment.project.id, {
+            ...assignment.project,
+            role: 'Sales agent',
+          });
+        }
+      }
+
+      return {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+        role: user.userRoles[0]?.role ?? null,
+        projects: [...projects.values()],
+      };
+    });
     return { data, total: data.length };
   }
 
@@ -517,10 +562,9 @@ export class ProjectsService {
   }
 
   /**
-   * Every id must be someone the shared "who can hold a lead" rule allows —
-   * never trusted from the body. Same list `listSalesAgentCandidates` shows,
-   * so a direct API call can't attach anyone the picker wouldn't offer. Used
-   * by both a project's sales agents and a standalone unit's.
+  * Every id must be an active member of the caller's org. Project assignment
+  * intentionally supports every org role; the separate standalone-unit and
+  * lead assignment paths retain their narrower CRM eligibility rule.
    *
    * Callers must pass only the ids being newly added to the set, not the
    * whole resubmitted list — an id that's already assigned may have since
@@ -558,7 +602,21 @@ export class ProjectsService {
       ).map((r) => r.userId),
     );
     const newIds = unique.filter((id) => !currentIds.has(id));
-    await this.assertAssignableAgents(orgId, newIds);
+    if (newIds.length > 0) {
+      const eligible = new Set(
+        (
+          await this.prisma.user.findMany({
+            where: { orgId, status: 'active', id: { in: newIds } },
+            select: { id: true },
+          })
+        ).map((user) => user.id),
+      );
+      if (eligible.size !== newIds.length) {
+        throw new BadRequestException(
+          'Assigned users must be active members of this organisation',
+        );
+      }
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.projectSalesAgent.deleteMany({ where: { projectId } });
@@ -1626,7 +1684,12 @@ export class ProjectsService {
   ): number | null {
     const area = basis === 'builtup' ? unit.builtupSqft : unit.carpetSqft;
     if (!unit.price || !area) return null;
-    return Math.round(unit.price / area);
+    // Never stored — derived fresh on every read — so unlike the price
+    // itself (a real Int column) there's no reason to round it to a whole
+    // unit. In real estate the difference between 2.50 and 2.72 per sqft is
+    // real money at project scale, so keep two decimal places rather than
+    // rounding both down to a misleadingly identical "3".
+    return Math.round((unit.price / area) * 100) / 100;
   }
 
   private serializeUnit(unit: UnitRow, basis: UnitPriceBasis) {

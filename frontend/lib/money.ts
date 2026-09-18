@@ -23,21 +23,30 @@ export function currencyPrefix(currency: string): string {
   return prefix(currency);
 }
 
-/** Compact price. INR: "₹62 L" / "₹1.2 Cr". Everything else: "AED 620,000" / "$62,000". */
+/**
+ * Compact price. INR: "₹62 L" / "₹1.2 Cr". Everything else: "AED 620,000" /
+ * "$62,000". `decimals` defaults to 0 — every real price field is a whole-unit
+ * `Int` column, so there's nothing to show past the decimal point there. Pass
+ * a higher value only for a derived figure that isn't itself stored, like a
+ * per-sqft price, where rounding to a whole unit would hide a real
+ * difference (2.50 vs. 2.72/sqft is real money at project scale).
+ */
 export function formatMoney(
   value: number | null | undefined,
   currency: string,
+  decimals = 0,
 ): string {
   if (value == null) return "—";
   const p = prefix(currency);
+  const opts = { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
   if (currency === "INR") {
     if (value >= 1e7)
       return `${p}${(value / 1e7).toFixed(2).replace(/\.?0+$/, "")} Cr`;
     if (value >= 1e5)
       return `${p}${(value / 1e5).toFixed(2).replace(/\.?0+$/, "")} L`;
-    return `${p}${value.toLocaleString("en-IN")}`;
+    return `${p}${value.toLocaleString("en-IN", opts)}`;
   }
-  return `${p}${value.toLocaleString("en-US")}`;
+  return `${p}${value.toLocaleString("en-US", opts)}`;
 }
 
 /** "lo – hi", or a single value when only one bound is set, or "—". */
