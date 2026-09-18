@@ -2521,3 +2521,167 @@ export interface AvailableTemplatesResponse {
   planName: string;
 }
 
+// --- Media Library --------------------------------------------------------
+
+export interface MediaFileItem {
+  id: string;
+  orgId: string | null;
+  uploadedById: string | null;
+  name: string;
+  filename: string;
+  storedKey: string;
+  publicUrl: string;
+  mimeType: string;
+  size: number;
+  category: 'image' | 'video' | 'document' | 'icon' | 'logo' | 'audio' | string;
+  folder: string;
+  alt?: string | null;
+  tags: string[];
+  metadata: Record<string, any> | null;
+  createdAt: string;
+  updatedAt: string;
+  organisation?: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+  } | null;
+  uploadedBy?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
+}
+
+export interface MediaListResponse {
+  items: MediaFileItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface MediaStatsResponse {
+  totalFiles: number;
+  totalBytes: number;
+  totalFormatted: string;
+  categoryBreakdown: Record<string, { count: number; bytes: number }>;
+  folders: string[];
+  totalOrgs?: number;
+  topOrgs?: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    bytes: number;
+    formatted: string;
+  }[];
+}
+
+export interface CreateMediaUploadUrlInput {
+  field?: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  folder?: string;
+  category?: string;
+}
+
+export interface CreateMediaUploadUrlResult {
+  uploadUrl: string;
+  publicUrl: string;
+  key: string;
+  expiresIn: number;
+  category: string;
+  suggestedFolder: string;
+}
+
+export interface RegisterMediaInput {
+  name: string;
+  filename: string;
+  storedKey: string;
+  publicUrl: string;
+  mimeType: string;
+  size: number;
+  category?: string;
+  folder?: string;
+  alt?: string;
+  tags?: string[];
+  metadata?: Record<string, any>;
+}
+
+export interface UpdateMediaInput {
+  name?: string;
+  folder?: string;
+  alt?: string;
+  tags?: string[];
+  metadata?: Record<string, any>;
+}
+
+// --- Reports & Analytics --------------------------------------------------
+
+export interface ReportsFilterInput {
+  preset?: string;
+  startDate?: string;
+  endDate?: string;
+  projectId?: string;
+  agentId?: string;
+  source?: string;
+  orgId?: string;
+}
+
+export interface ReportsSummary {
+  totalLeads: number;
+  wonCount: number;
+  winRate: number;
+  totalWonRevenue: number;
+  activePipelineCount: number;
+  totalCalls: number;
+  totalTalkTimeMins: number;
+  totalUnits: number;
+  bookedUnits: number;
+  totalOrgs?: number;
+  totalLandingPages?: number;
+  totalSupportTickets?: number;
+}
+
+export interface LeadSourceStat {
+  source: string;
+  count: number;
+  percentage: number;
+}
+
+export interface FunnelStageStat {
+  stage: string;
+  label: string;
+  count: number;
+}
+
+export interface AgentPerformanceStat {
+  agentId: string;
+  name: string;
+  email: string;
+  assignedLeads: number;
+  callsMade: number;
+  wonCount: number;
+  totalRevenue: number;
+  conversionRate: number;
+}
+
+export interface ProjectAnalyticsStat {
+  projectId: string;
+  name: string;
+  city: string | null;
+  totalUnits: number;
+  availableUnits: number;
+  bookedUnits: number;
+  soldUnits: number;
+  totalLeads: number;
+  wonLeadsCount: number;
+  revenueBooked: number;
+}
+
+

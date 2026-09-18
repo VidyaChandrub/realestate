@@ -61,7 +61,8 @@ export type IconName =
   | "sun"
   | "snowflake"
   | "upload"
-  | "info";
+  | "info"
+  | "trending";
 
 interface IconProps extends SVGProps<SVGSVGElement> {
   name: IconName;
@@ -401,6 +402,12 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="10" />
       <path d="M12 16v-4M12 8h.01" />
+    </>
+  ),
+  trending: (
+    <>
+      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+      <polyline points="17 6 23 6 23 12" />
     </>
   ),
 };

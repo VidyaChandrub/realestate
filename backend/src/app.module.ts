@@ -42,9 +42,13 @@ import { SupportModule } from './modules/support/support.module';
 import { TeamChatModule } from './modules/team-chat/team-chat.module';
 import { FormsModule } from './modules/forms/forms.module';
 import { PackageChangeRequestsModule } from './modules/package-change-requests/package-change-requests.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
+import { OrgReportsModule } from './modules/org-reports/org-reports.module';
 
 @Module({
   imports: [
+    UploadsModule,
+    OrgReportsModule,
     PrismaModule,
     StorageModule,
     AuthModule,

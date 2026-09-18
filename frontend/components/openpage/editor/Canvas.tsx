@@ -107,8 +107,8 @@ export function Canvas() {
         width: `${pxWidth}px`,
         maxWidth: `${pxWidth}px`,
         ...cssVars,
-        color: 'var(--color-text-0)',
-        backgroundColor: 'var(--color-bg-1)',
+        color: (cssVars as Record<string, string>)['--op-text'] || 'var(--color-text-0)',
+        backgroundColor: (cssVars as Record<string, string>)['--op-bg'] || '#ffffff',
         borderColor: 'var(--color-border-default)',
       } as React.CSSProperties}
       onClick={(e) => {

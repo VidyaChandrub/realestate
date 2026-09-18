@@ -172,16 +172,30 @@ function overlayInventoryNode(
     if (snapshot.brochureUrl) props.pdfUrl = snapshot.brochureUrl;
     if (!props.image && snapshot.gallery[0]) props.image = snapshot.gallery[0];
   }
-  if (type === 'project-banner' || type === 'project-overview' || type === 're-pricing') {
-    if (snapshot.name && !String(props.title || '').trim()) {
-      // keep template titles; vars already rewrite {{property_name}}
+  if (type === 'project-banner') {
+    if (snapshot.name) props.headline = snapshot.name;
+    if (snapshot.location) props.location = snapshot.location;
+    if (snapshot.startingPrice) props.price = snapshot.startingPrice;
+    if (snapshot.gallery[0] && !props.image) props.image = snapshot.gallery[0];
+  }
+  if (type === 'hero') {
+    if (snapshot.name) props.headline = snapshot.name;
+    if (snapshot.description) props.subheadline = snapshot.description;
+  }
+  if (type === 'project-overview') {
+    if (snapshot.name && (!props.title || props.title === 'Project Overview')) {
+      props.title = `About ${snapshot.name}`;
     }
-    if (type === 're-pricing' && snapshot.startingPrice) {
-      props.startingPrice = snapshot.startingPrice;
-    }
-    if (type === 'project-banner' && snapshot.gallery[0] && !props.image) {
-      props.image = snapshot.gallery[0];
-    }
+    if (snapshot.description) props.body = snapshot.description;
+  }
+  if (type === 'property-details') {
+    if (snapshot.type) props.type = snapshot.type;
+    if (snapshot.status) props.status = snapshot.status;
+    if (snapshot.possession) props.possession = snapshot.possession;
+    if (snapshot.reraNumber) props.rera = snapshot.reraNumber;
+  }
+  if (type === 're-pricing' && snapshot.startingPrice) {
+    props.startingPrice = snapshot.startingPrice;
   }
   if (type === 'developer' && snapshot.builder) {
     props.name = snapshot.builder;

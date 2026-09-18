@@ -216,7 +216,7 @@ export default function OrgLandingPagesPage() {
           // blank template" flow uses — no server-side reimplementation.
           content: {
             engine: "openpage",
-            site: buildRealEstateTemplate("premium", scratchName.trim()),
+            site: buildRealEstateTemplate("blank", scratchName.trim()),
             sections: [],
             config: defaultSiteConfig({ name: scratchName.trim(), slug }),
           },

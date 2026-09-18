@@ -1,12 +1,12 @@
 import { Global, Module } from '@nestjs/common';
 import { StorageService } from './storage.service';
+import { LocalUploadController } from './local-upload.controller';
 
 // Shared object-storage kernel. Global, same as PrismaModule — import it
-// once, inject StorageService anywhere. Only Projects wires an endpoint to
-// it for now; Org Settings branding and the Landing Pages builder can adopt
-// it next without changing anything here.
+// once, inject StorageService anywhere.
 @Global()
 @Module({
+  controllers: [LocalUploadController],
   providers: [StorageService],
   exports: [StorageService],
 })

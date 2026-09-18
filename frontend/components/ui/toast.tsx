@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 import { Icon, type IconName } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
-type ToastVariant = "success" | "error" | "info" | "warning";
+type ToastVariant = "success" | "error" | "info" | "warning" | "destructive";
 
 interface Toast {
   id: string;
@@ -34,6 +34,7 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 const variantStyles: Record<ToastVariant, { icon: IconName; ring: string; iconColor: string }> = {
   success: { icon: "check", ring: "ring-emerald-200 dark:ring-emerald-500/30", iconColor: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400" },
   error: { icon: "alert", ring: "ring-red-200 dark:ring-red-500/30", iconColor: "bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400" },
+  destructive: { icon: "alert", ring: "ring-red-200 dark:ring-red-500/30", iconColor: "bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400" },
   info: { icon: "bell", ring: "ring-sky-200 dark:ring-sky-500/30", iconColor: "bg-sky-100 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400" },
   warning: { icon: "alert", ring: "ring-amber-200 dark:ring-amber-500/30", iconColor: "bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400" },
 };

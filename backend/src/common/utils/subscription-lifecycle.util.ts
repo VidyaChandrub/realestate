@@ -358,14 +358,18 @@ export async function assertOrgCanPublish(prisma: PrismaLike, orgId: string): Pr
 
   const capabilities = ((sub as any).plan?.capabilities ??
     {}) as Record<string, boolean>;
-  if (capabilities.publishing !== true) {
+  const maxPublishedAllowed = resolveLimit((sub as any).plan, 'landingPages');
+  const canPublish =
+    capabilities.publishing === true ||
+    (capabilities.publishing !== false && maxPublishedAllowed > 0);
+
+  if (!canPublish) {
     throw new ForbiddenException(
       'Your current plan does not include Publishing. Upgrade your plan from Org Settings → Billing to publish landing pages.',
     );
   }
 
   // Published landing pages limit check
-  const maxPublishedAllowed = resolveLimit((sub as any).plan, 'landingPages');
   if (Number.isFinite(maxPublishedAllowed)) {
     const publishedCount = await prisma.landingPage.count({
       where: { orgId, status: 'published', pageType: 'landing' },
