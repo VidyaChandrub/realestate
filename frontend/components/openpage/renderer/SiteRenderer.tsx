@@ -5,6 +5,7 @@ import type { SiteConfig, BlockConfig } from "@/components/openpage/blocks/types
 import { RenderBlock } from "@/components/openpage/blocks/registry";
 import { resolveTheme, themeToCSS } from "@/lib/openpage/theme-presets";
 import { useGoogleFonts } from "@/lib/openpage/useGoogleFonts";
+import { DeviceProvider } from "@/components/openpage/runtime/device";
 import { OpenPageRuntimeProvider } from "@/components/openpage/runtime/OpenPageRuntime";
 import type { FormDefinition } from "@/lib/openpage/forms-store";
 import { mergeFormLibraries } from "@/lib/openpage/resolve-form";
@@ -112,9 +113,11 @@ export function SiteRenderer({
         style={{ ...cssVars, color: "var(--color-text-0)", backgroundColor: "var(--color-bg-1)" } as React.CSSProperties}
       >
         {resolvedSite.settings ? <PageSettingsChrome settings={resolvedSite.settings} /> : null}
-        {blocks.map((block) => (
-          <RenderBlock key={block.id} block={block} />
-        ))}
+        <DeviceProvider device="auto">
+          {blocks.map((block) => (
+            <RenderBlock key={block.id} block={block} />
+          ))}
+        </DeviceProvider>
       </div>
     </OpenPageRuntimeProvider>
   );

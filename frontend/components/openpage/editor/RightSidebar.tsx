@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { MousePointer2 } from "lucide-react";
 import { useEditorStore, type RightSidebarTab } from "@/components/openpage/store/editorStore";
 import { useConfigStore } from "@/components/openpage/store/configStore";
+import { findBlock, findBlockLocation } from "@/lib/openpage/block-tree";
 import { PropertiesPanel } from './PropertiesPanel'
 import { StylePanel } from './StylePanel'
 import { TypographyPanel } from './TypographyPanel'
@@ -26,7 +27,8 @@ export function RightSidebar() {
     const page = pages.find((p) => p.id === s.activePageId) ?? pages[0]
     return page.blocks
   })
-  const selectedBlock = blocks.find((b) => b.id === selectedBlockId)
+  const selectedBlock = selectedBlockId ? findBlock(blocks, selectedBlockId) : undefined
+  const selectedLoc = selectedBlockId ? findBlockLocation(blocks, selectedBlockId) : undefined
 
   useEffect(() => {
     if (selectedBlock) setRightSidebarTab('properties')
@@ -73,7 +75,9 @@ export function RightSidebar() {
           <>
             <PropertiesPanel block={selectedBlock} />
             <div className="mt-auto px-3.5 py-2.5 font-mono text-[10.5px] text-text-3 break-all border-t border-border-subtle">
-              config.blocks[{blocks.indexOf(selectedBlock)}]
+              {selectedLoc?.sectionId
+                ? `columns[${selectedLoc.colIndex ?? 0}].blocks[${selectedLoc.index}]`
+                : `config.blocks[${selectedLoc?.index ?? blocks.indexOf(selectedBlock)}]`}
             </div>
           </>
         )}

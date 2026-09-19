@@ -1,5 +1,21 @@
 import type { CSSProperties } from "react";
 import type { BlockConfig, BlockStyle } from "@/components/openpage/blocks/types";
+import type { Device } from "@/lib/openpage/types";
+
+/** Merge the device-specific value overrides over the desktop style. */
+export function resolveBlockStyleForDevice(
+  style: BlockStyle | undefined,
+  device: Device,
+): BlockStyle | undefined {
+  if (!style || device === "desktop") return style;
+  const overrides = style.responsive?.[device];
+  if (!overrides) return style;
+  const resolved: BlockStyle = { ...style };
+  delete resolved.responsive;
+  Object.assign(resolved, overrides);
+  resolved.responsive = style.responsive;
+  return resolved;
+}
 
 /** Convert persisted BlockStyle into CSS for editor canvas and live pages. */
 export function applyBlockStyle(style?: BlockStyle): CSSProperties {
@@ -100,6 +116,19 @@ export function isHiddenOnViewport(
   if (viewport === "tablet" && style.hideOnTablet) return true;
   if (viewport === "mobile" && style.hideOnMobile) return true;
   return false;
+}
+
+/** Full device-aware render: resolved values + visibility for the active device. */
+export function applyBlockStyleForDevice(
+  style: BlockStyle | undefined,
+  device: Device,
+): CSSProperties {
+  const resolved = resolveBlockStyleForDevice(style, device);
+  const css = applyBlockStyle(resolved);
+  if (isHiddenOnViewport(resolved, device)) {
+    css.display = "none";
+  }
+  return css;
 }
 
 /** Deep-replace {{var}} tokens in any JSON-like value. */

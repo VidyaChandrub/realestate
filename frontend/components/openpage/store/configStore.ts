@@ -3,6 +3,17 @@
 import { create } from 'zustand'
 import { produce } from 'immer'
 import type { BlockConfig, BlockStyle, SiteConfig, ThemeConfig, PageConfig, GlobalWidget } from "@/components/openpage/blocks/types";
+import {
+  findBlockLocation,
+  findColumnList,
+  findSectionBlock,
+  deepCloneWithFreshIds,
+  ensureColumn,
+  insertBlock,
+  extractBlock,
+  clampIndex,
+  type BlockInsertTarget,
+} from "@/lib/openpage/block-tree";
 
 function ensurePages(config: SiteConfig): PageConfig[] {
   if (config.pages && config.pages.length > 0) return config.pages
@@ -61,6 +72,12 @@ interface ConfigState {
   insertGlobalWidget: (globalWidgetId: string, index?: number) => void
   duplicateBlocks: (ids: string[]) => void
   removeBlocks: (ids: string[]) => void
+  /** Move a block between any two containers (root ↔ column) with a single undo entry. */
+  moveBlockTo: (blockId: string, target: BlockInsertTarget) => void
+  /** Copy a block (deep, fresh ids) and insert it next to the source */
+  copyBlockNextTo: (blockId: string) => string | null
+  /** Insert a deep-cloned block at an exact target */
+  pasteBlockAt: (target: BlockInsertTarget, block: BlockConfig) => string
   undo: () => void
   redo: () => void
   canUndo: () => boolean
@@ -204,7 +221,8 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           config: produce(withPages(state.config), (draft) => {
             const page = draft.pages!.find((p) => p.id === state.activePageId)
             if (!page) return
-            const block = page.blocks.find((b) => b.id === id)
+            const located = findBlockLocation(page.blocks, id)
+            const block = located ? located.parentList[located.index] : undefined
             if (block) Object.assign(block, updates)
             draft.blocks = page.blocks
           }),
@@ -216,7 +234,8 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           config: produce(withPages(state.config), (draft) => {
             const page = draft.pages!.find((p) => p.id === state.activePageId)
             if (!page) return
-            const block = page.blocks.find((b) => b.id === id)
+            const located = findBlockLocation(page.blocks, id)
+            const block = located ? located.parentList[located.index] : undefined
             if (block) Object.assign(block.props, props)
             draft.blocks = page.blocks
           }),
@@ -228,7 +247,8 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           config: produce(withPages(state.config), (draft) => {
             const page = draft.pages!.find((p) => p.id === state.activePageId)
             if (!page) return
-            const block = page.blocks.find((b) => b.id === id)
+            const located = findBlockLocation(page.blocks, id)
+            const block = located ? located.parentList[located.index] : undefined
             if (block) {
               if (!block.style) block.style = {}
               Object.assign(block.style, style)
@@ -253,26 +273,28 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
       removeBlock: (id) =>
         set((state) => ({
           ...pushUndo(state, 'Remove block'),
-          config: mutateActivePageBlocks(withPages(state.config), state.activePageId, (blocks) =>
-            blocks.filter((b) => b.id !== id),
-          ),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            extractBlock(page.blocks, id)
+            draft.blocks = page.blocks
+          }),
         })),
 
       duplicateBlock: (id) =>
         set((state) => {
           const blocks = getPageBlocks(state.config, state.activePageId)
-          const idx = blocks.findIndex((b) => b.id === id)
-          if (idx === -1) return state
-          const original = blocks[idx]
-          const clone: BlockConfig = {
-            ...JSON.parse(JSON.stringify(original)),
-            id: `block-${Date.now()}`,
-          }
+          const located = findBlockLocation(blocks, id)
+          if (!located) return state
+          const clone = deepCloneWithFreshIds(located.parentList[located.index])
           return {
             ...pushUndo(state, 'Duplicate block'),
-            config: mutateActivePageBlocks(withPages(state.config), state.activePageId, (b) => {
-              b.splice(idx + 1, 0, clone)
-              return b
+            config: produce(withPages(state.config), (draft) => {
+              const page = draft.pages!.find((p) => p.id === state.activePageId)
+              if (!page) return
+              const loc = findBlockLocation(page.blocks, id)
+              if (loc) loc.parentList.splice(loc.index + 1, 0, clone)
+              draft.blocks = page.blocks
             }),
           }
         }),
@@ -308,9 +330,14 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
       removeBlocks: (ids) =>
         set((state) => ({
           ...pushUndo(state, 'Remove blocks'),
-          config: mutateActivePageBlocks(withPages(state.config), state.activePageId, (blocks) =>
-            blocks.filter((b) => !ids.includes(b.id)),
-          ),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            for (const id of ids) {
+              extractBlock(page.blocks, id)
+            }
+            draft.blocks = page.blocks
+          }),
         })),
 
       moveBlock: (fromIndex, toIndex) =>
@@ -344,15 +371,13 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           config: produce(withPages(state.config), (draft) => {
             const page = draft.pages!.find((p) => p.id === state.activePageId)
             if (!page) return
-            const section = page.blocks.find((b) => b.id === sectionBlockId)
+            const section = findSectionBlock(page.blocks, sectionBlockId)
             if (!section || section.type !== 'columns') return
-            const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
-            if (!cols || !cols[colIndex]) return
-            if (index !== undefined) {
-              cols[colIndex].blocks.splice(index, 0, block)
-            } else {
-              cols[colIndex].blocks.push(block)
-            }
+            ensureColumn(section, colIndex)
+            const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }>
+            const clean = cols[colIndex].blocks.filter((b) => !b.id.includes('placeholder'))
+            clean.splice(clampIndex(index, clean.length), 0, block)
+            cols[colIndex].blocks = clean
             draft.blocks = page.blocks
           }),
         })),
@@ -363,11 +388,9 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           config: produce(withPages(state.config), (draft) => {
             const page = draft.pages!.find((p) => p.id === state.activePageId)
             if (!page) return
-            const section = page.blocks.find((b) => b.id === sectionBlockId)
-            if (!section || section.type !== 'columns') return
-            const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
-            if (!cols || !cols[colIndex]) return
-            cols[colIndex].blocks = cols[colIndex].blocks.filter((b) => b.id !== blockId)
+            const col = findColumnList(page.blocks, sectionBlockId, colIndex)
+            if (!col) return
+            col.list.splice(col.list.findIndex((b) => b.id === blockId), 1)
             draft.blocks = page.blocks
           }),
         })),
@@ -378,11 +401,9 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           config: produce(withPages(state.config), (draft) => {
             const page = draft.pages!.find((p) => p.id === state.activePageId)
             if (!page) return
-            const section = page.blocks.find((b) => b.id === sectionBlockId)
-            if (!section || section.type !== 'columns') return
-            const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
-            if (!cols || !cols[colIndex]) return
-            const colBlocks = cols[colIndex].blocks
+            const col = findColumnList(page.blocks, sectionBlockId, colIndex)
+            if (!col) return
+            const colBlocks = col.list
             const [moved] = colBlocks.splice(fromIndex, 1)
             colBlocks.splice(toIndex, 0, moved)
             draft.blocks = page.blocks
@@ -392,28 +413,18 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
       duplicateBlockInColumn: (sectionBlockId, colIndex, blockId) =>
         set((state) => {
           const blocks = getPageBlocks(state.config, state.activePageId)
-          const section = blocks.find((b) => b.id === sectionBlockId)
-          if (!section || section.type !== 'columns') return state
-          const cols = (section.props.columns as Array<{ width: number; blocks: BlockConfig[] }>) ?? []
-          if (!cols[colIndex]) return state
-          const colBlocks = cols[colIndex].blocks
-          const idx = colBlocks.findIndex((b) => b.id === blockId)
-          if (idx === -1) return state
-          const original = colBlocks[idx]
-          const clone: BlockConfig = {
-            ...JSON.parse(JSON.stringify(original)),
-            id: `block-${Date.now()}`,
-          }
+          const located = findBlockLocation(blocks, blockId)
+          if (!located) return state
+          const clone = deepCloneWithFreshIds(located.parentList[located.index])
           return {
             ...pushUndo(state, 'Duplicate block in column'),
             config: produce(withPages(state.config), (draft) => {
               const page = draft.pages!.find((p) => p.id === state.activePageId)
               if (!page) return
-              const sec = page.blocks.find((b) => b.id === sectionBlockId)
-              if (!sec || sec.type !== 'columns') return
-              const c = sec.props.columns as Array<{ width: number; blocks: BlockConfig[] }>
-              if (!c || !c[colIndex]) return
-              c[colIndex].blocks.splice(idx + 1, 0, clone)
+              const col = findColumnList(page.blocks, sectionBlockId, colIndex)
+              if (!col) return
+              const idx = col.list.findIndex((b) => b.id === blockId)
+              if (idx !== -1) col.list.splice(idx + 1, 0, clone)
               draft.blocks = page.blocks
             }),
           }
@@ -425,7 +436,7 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           config: produce(withPages(state.config), (draft) => {
             const page = draft.pages!.find((p) => p.id === state.activePageId)
             if (!page) return
-            const section = page.blocks.find((b) => b.id === sectionBlockId)
+            const section = findSectionBlock(page.blocks, sectionBlockId)
             if (!section || section.type !== 'columns') return
             const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
             if (!cols || !cols[colIndex]) return
@@ -440,7 +451,7 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           config: produce(withPages(state.config), (draft) => {
             const page = draft.pages!.find((p) => p.id === state.activePageId)
             if (!page) return
-            const section = page.blocks.find((b) => b.id === sectionBlockId)
+            const section = findSectionBlock(page.blocks, sectionBlockId)
             if (!section || section.type !== 'columns') return
             const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
             if (!cols) return
@@ -457,7 +468,7 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
           config: produce(withPages(state.config), (draft) => {
             const page = draft.pages!.find((p) => p.id === state.activePageId)
             if (!page) return
-            const section = page.blocks.find((b) => b.id === sectionBlockId)
+            const section = findSectionBlock(page.blocks, sectionBlockId)
             if (!section || section.type !== 'columns') return
             const cols = section.props.columns as Array<{ width: number; blocks: BlockConfig[] }> | undefined
             if (!cols || cols.length <= 1) return
@@ -572,6 +583,72 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
             }),
           }
         }),
+
+      moveBlockTo: (blockId, target) =>
+        set((state) => {
+          const source = state.config.pages
+            ? getPageBlocks(state.config, state.activePageId)
+            : state.config.blocks
+          const located = findBlockLocation(source, blockId)
+          if (!located) return state
+
+          const sameListMove =
+            target.kind === "column"
+              ? located.sectionId === target.sectionId && located.colIndex === target.colIndex
+              : located.sectionId === null
+
+          let index = target.index
+          if (index != null && sameListMove && located.index < index) {
+            index = Math.max(0, index - 1)
+          }
+          if (sameListMove && index === located.index) return state
+
+          return {
+            ...pushUndo(state, `Move ${located.parentList[located.index].type}`),
+            config: produce(withPages(state.config), (draft) => {
+              const page = draft.pages!.find((p) => p.id === state.activePageId)
+              if (!page) return
+              const { removed } = extractBlock(page.blocks, blockId)
+              if (!removed) return
+              insertBlock(page.blocks, { ...target, index }, removed)
+              draft.blocks = page.blocks
+            }),
+          }
+        }),
+
+      copyBlockNextTo: (blockId) => {
+        const state = get()
+        const source = getPageBlocks(state.config, state.activePageId)
+        const located = findBlockLocation(source, blockId)
+        if (!located) return null
+        const clone = deepCloneWithFreshIds(located.parentList[located.index])
+        set({
+          ...pushUndo(state, 'Copy block'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const loc = findBlockLocation(page.blocks, blockId)
+            if (loc) loc.parentList.splice(loc.index + 1, 0, clone)
+            draft.blocks = page.blocks
+          }),
+        })
+        return clone.id
+      },
+
+      pasteBlockAt: (target, block) => {
+        const state = get()
+        const clone = deepCloneWithFreshIds(block)
+        set({
+          ...pushUndo(state, 'Paste block'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            insertBlock(page.blocks, target, clone)
+            draft.blocks = page.blocks
+          }),
+        })
+        return clone.id
+      },
 
       undo: () =>
         set((state) => {

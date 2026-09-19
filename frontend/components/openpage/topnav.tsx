@@ -276,16 +276,16 @@ export function TopNav({
           ) : null}
           {pageStatus ? (
             <span
-              className={`ps-draft-pill ${published ? "ps-pill--published" : "ps-pill--draft"}`}
+              className={`ps-draft-pill ${published && !unsaved ? "ps-pill--published" : "ps-pill--draft"}`}
             >
               <span
                 className="ps-dot"
-                style={{ background: published ? "#34d399" : "#fbbf24" }}
+                style={{ background: published && !unsaved ? "#34d399" : "#fbbf24" }}
               />
-              {pageStatus}
+              {unsaved ? "draft (edited)" : pageStatus}
             </span>
           ) : null}
-          {unsaved ? <span className="ps-unsaved-pill">Unsaved</span> : null}
+          {unsaved && !pageStatus ? <span className="ps-unsaved-pill">Unsaved</span> : null}
 
           {setModule ? (
             <div style={{ position: "relative" }} data-module-menu>
@@ -422,9 +422,11 @@ export function TopNav({
               ) : null}
               <button
                 type="button"
-                onClick={onPublish}
-                className="ps-topnav-btn ps-topnav-btn--publish"
-                title={published ? "Update live page" : "Publish this page"}
+                onClick={unsaved ? undefined : onPublish}
+                disabled={unsaved}
+                className={`ps-topnav-btn ps-topnav-btn--publish ${unsaved ? "ps-topnav-btn--disabled" : ""}`}
+                title={unsaved ? "Save changes before publishing" : published ? "Update live page" : "Publish this page"}
+                style={unsaved ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
               >
                 <Rocket size={14} />
                 <span className="ps-btn-label">{publishLabel}</span>

@@ -394,6 +394,14 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
     return useConfigStore.subscribe(syncCaps);
   }, [activePage, saveInBackground, toast, openLocalPreview, persistOpenPage, resource]);
 
+  // Ctrl+S (and any "op:save" CustomEvent) drives the same save the top bar
+  // button does — no duplicate code paths, and the TopNav badge reflects it.
+  useEffect(() => {
+    const onOpSave = () => apiRef.current?.save();
+    window.addEventListener("op:save", onOpSave);
+    return () => window.removeEventListener("op:save", onOpSave);
+  }, []);
+
   const patchPage = useCallback(
     (pageId: string, patch: Partial<LandingPageData>) => {
       setActivePage((prev) => {
@@ -411,6 +419,36 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
       case "builder":
         return activePage ? (
           <div className="op-root" style={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column" }}>
+            {hasUnsaved && (
+              <div
+                style={{
+                  position: "fixed",
+                  bottom: 16,
+                  right: 24,
+                  zIndex: 900,
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: "var(--color-bg-3)",
+                  boxShadow: "0 2px 12px rgba(0,0,0,.12)",
+                  fontSize: 11,
+                  color: "var(--color-text-2)",
+                  border: "1px solid var(--color-border-default)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: "var(--color-green, #22c55e)",
+                  }}
+                />
+                Auto-saving…
+              </div>
+            )}
             <EditorLayout pageId={activePage.id} captureLeads />
           </div>
         ) : (

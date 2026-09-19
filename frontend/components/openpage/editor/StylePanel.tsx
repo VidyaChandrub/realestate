@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Clipboard, Trash2 } from "lucide-react";
+import { Copy, Clipboard, Trash2, Monitor, Tablet, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import type { BlockConfig, BlockStyle } from "@/components/openpage/blocks/types";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { useEditorStore } from "@/components/openpage/store/editorStore";
+import { resolveBlockStyleForDevice } from "@/lib/openpage/block-style";
 import { Section } from "./shared-components";
 
 function SpacingInput({ label, value, onChange }: { label: string; value?: string; onChange: (v: string) => void }) {
@@ -69,9 +70,19 @@ function AlignButtons({ value, onChange }: { value?: string; onChange: (v: strin
   )
 }
 
-function ResponsiveToggle({ block }: { block: BlockConfig }) {
-  const updateBlockStyle = useConfigStore((s) => s.updateBlockStyle)
+function ResponsiveToggle({
+  block,
+  onChange,
+}: {
+  block: BlockConfig;
+  onChange: (partial: Partial<BlockStyle>) => void;
+}) {
   const style = block.style || {}
+  const hideFor = (key: "hideOnDesktop" | "hideOnTablet" | "hideOnMobile") => {
+    if (key === "hideOnDesktop") return Boolean(style.hideOnDesktop)
+    if (key === "hideOnTablet") return Boolean(style.hideOnTablet || style.responsive?.tablet?.hideOnTablet)
+    return Boolean(style.hideOnMobile || style.responsive?.mobile?.hideOnMobile)
+  }
   return (
     <div className="space-y-1.5">
       {([
@@ -82,8 +93,8 @@ function ResponsiveToggle({ block }: { block: BlockConfig }) {
         <label key={key} className="flex items-center gap-2 text-[11px] text-text-2 cursor-pointer">
           <input
             type="checkbox"
-            checked={!!style[key]}
-            onChange={(e) => updateBlockStyle(block.id, { [key]: e.target.checked })}
+            checked={hideFor(key)}
+            onChange={(e) => onChange({ [key]: e.target.checked })}
             className="w-3.5 h-3.5 rounded border-border-default bg-bg-2 accent-green cursor-pointer"
           />
           Hide on {label}
@@ -96,9 +107,22 @@ function ResponsiveToggle({ block }: { block: BlockConfig }) {
 export function StylePanel({ block }: { block: BlockConfig }) {
   const updateBlockStyle = useConfigStore((s) => s.updateBlockStyle)
   const clipboardStyle = useEditorStore((s) => s.clipboardStyle)
+  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop")
   const style = block.style || {}
+  const effectiveStyle = resolveBlockStyleForDevice(style, device) || {}
 
-  const set = (partial: Partial<BlockStyle>) => updateBlockStyle(block.id, partial)
+  // Desktop writes the base style, tablet/mobile write per-device overrides.
+  const set = (partial: Partial<BlockStyle>) => {
+    if (device === "desktop") {
+      updateBlockStyle(block.id, partial)
+      return
+    }
+    const responsive = { ...(style.responsive || {}) }
+    const overrides = { ...(responsive[device] || {}) }
+    Object.assign(overrides, partial)
+    responsive[device] = overrides
+    updateBlockStyle(block.id, { responsive })
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -134,17 +158,41 @@ export function StylePanel({ block }: { block: BlockConfig }) {
         </div>
       </div>
 
+      {/* Device tabs */}
+      <div className="flex gap-1 px-3.5 pt-2 pb-1.5 border-b border-border-default">
+        {([
+          { value: 'desktop' as const, icon: <Monitor size={12} />, label: 'Desktop' },
+          { value: 'tablet' as const, icon: <Tablet size={12} />, label: 'Tablet' },
+          { value: 'mobile' as const, icon: <Smartphone size={12} />, label: 'Mobile' },
+        ]).map(({ value, icon, label }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setDevice(value)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-semibold transition-all border ${
+              device === value
+                ? 'bg-green/10 border-green text-green'
+                : 'border-border-default bg-bg-2 text-text-3 hover:text-text-1 hover:bg-bg-3'
+            }`}
+            title={`Edit ${label} styles`}
+          >
+            {icon}
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex-1 overflow-y-auto">
         {/* Layout */}
         <Section title="Layout">
           <div className="space-y-2">
             <div>
               <label className="block text-[10px] text-text-3 mb-1">Alignment</label>
-              <AlignButtons value={style.alignment} onChange={(v) => set({ alignment: v })} />
+              <AlignButtons value={effectiveStyle.alignment} onChange={(v) => set({ alignment: v })} />
             </div>
-            <SpacingInput label="Width" value={style.width} onChange={(v) => set({ width: v })} />
-            <SpacingInput label="Max W" value={style.maxWidth} onChange={(v) => set({ maxWidth: v })} />
-            <SpacingInput label="Min H" value={style.minHeight} onChange={(v) => set({ minHeight: v })} />
+            <SpacingInput label="Width" value={effectiveStyle.width} onChange={(v) => set({ width: v })} />
+            <SpacingInput label="Max W" value={effectiveStyle.maxWidth} onChange={(v) => set({ maxWidth: v })} />
+            <SpacingInput label="Min H" value={effectiveStyle.minHeight} onChange={(v) => set({ minHeight: v })} />
           </div>
         </Section>
 
@@ -154,19 +202,19 @@ export function StylePanel({ block }: { block: BlockConfig }) {
             <div>
               <label className="block text-[10px] text-text-3 mb-1">Margin</label>
               <div className="grid grid-cols-4 gap-1">
-                <SpacingInput label="T" value={style.marginTop} onChange={(v) => set({ marginTop: v })} />
-                <SpacingInput label="R" value={style.marginRight} onChange={(v) => set({ marginRight: v })} />
-                <SpacingInput label="B" value={style.marginBottom} onChange={(v) => set({ marginBottom: v })} />
-                <SpacingInput label="L" value={style.marginLeft} onChange={(v) => set({ marginLeft: v })} />
+                <SpacingInput label="T" value={effectiveStyle.marginTop} onChange={(v) => set({ marginTop: v })} />
+                <SpacingInput label="R" value={effectiveStyle.marginRight} onChange={(v) => set({ marginRight: v })} />
+                <SpacingInput label="B" value={effectiveStyle.marginBottom} onChange={(v) => set({ marginBottom: v })} />
+                <SpacingInput label="L" value={effectiveStyle.marginLeft} onChange={(v) => set({ marginLeft: v })} />
               </div>
             </div>
             <div>
               <label className="block text-[10px] text-text-3 mb-1">Padding</label>
               <div className="grid grid-cols-4 gap-1">
-                <SpacingInput label="T" value={style.paddingTop} onChange={(v) => set({ paddingTop: v })} />
-                <SpacingInput label="R" value={style.paddingRight} onChange={(v) => set({ paddingRight: v })} />
-                <SpacingInput label="B" value={style.paddingBottom} onChange={(v) => set({ paddingBottom: v })} />
-                <SpacingInput label="L" value={style.paddingLeft} onChange={(v) => set({ paddingLeft: v })} />
+                <SpacingInput label="T" value={effectiveStyle.paddingTop} onChange={(v) => set({ paddingTop: v })} />
+                <SpacingInput label="R" value={effectiveStyle.paddingRight} onChange={(v) => set({ paddingRight: v })} />
+                <SpacingInput label="B" value={effectiveStyle.paddingBottom} onChange={(v) => set({ paddingBottom: v })} />
+                <SpacingInput label="L" value={effectiveStyle.paddingLeft} onChange={(v) => set({ paddingLeft: v })} />
               </div>
             </div>
           </div>
@@ -175,13 +223,13 @@ export function StylePanel({ block }: { block: BlockConfig }) {
         {/* Background */}
         <Section title="Background">
           <div className="space-y-1.5">
-            <ColorInput label="Color" value={style.backgroundColor} onChange={(v) => set({ backgroundColor: v })} />
-            <SpacingInput label="Image" value={style.backgroundImage} onChange={(v) => set({ backgroundImage: v })} />
+            <ColorInput label="Color" value={effectiveStyle.backgroundColor} onChange={(v) => set({ backgroundColor: v })} />
+            <SpacingInput label="Image" value={effectiveStyle.backgroundImage} onChange={(v) => set({ backgroundImage: v })} />
             <div className="grid grid-cols-2 gap-1.5">
               <div>
                 <label className="block text-[9px] text-text-3 mb-0.5">Size</label>
                 <select
-                  value={style.backgroundSize || ''}
+                  value={effectiveStyle.backgroundSize || ''}
                   onChange={(e) => set({ backgroundSize: e.target.value })}
                   className="w-full px-1.5 py-1 rounded border border-border-default bg-bg-2 text-text-0 text-[10px] outline-none focus:border-green"
                 >
@@ -193,7 +241,7 @@ export function StylePanel({ block }: { block: BlockConfig }) {
               <div>
                 <label className="block text-[9px] text-text-3 mb-0.5">Repeat</label>
                 <select
-                  value={style.backgroundRepeat || ''}
+                  value={effectiveStyle.backgroundRepeat || ''}
                   onChange={(e) => set({ backgroundRepeat: e.target.value })}
                   className="w-full px-1.5 py-1 rounded border border-border-default bg-bg-2 text-text-0 text-[10px] outline-none focus:border-green"
                 >
@@ -211,11 +259,11 @@ export function StylePanel({ block }: { block: BlockConfig }) {
         <Section title="Border" defaultOpen={false}>
           <div className="space-y-1.5">
             <div className="grid grid-cols-3 gap-1.5">
-              <SpacingInput label="W" value={style.borderWidth} onChange={(v) => set({ borderWidth: v })} />
+              <SpacingInput label="W" value={effectiveStyle.borderWidth} onChange={(v) => set({ borderWidth: v })} />
               <div>
                 <label className="block text-[9px] text-text-3 mb-0.5">Style</label>
                 <select
-                  value={style.borderStyle || ''}
+                  value={effectiveStyle.borderStyle || ''}
                   onChange={(e) => set({ borderStyle: e.target.value })}
                   className="w-full px-1.5 py-1 rounded border border-border-default bg-bg-2 text-text-0 text-[10px] outline-none focus:border-green"
                 >
@@ -225,21 +273,21 @@ export function StylePanel({ block }: { block: BlockConfig }) {
                   <option value="dotted">dotted</option>
                 </select>
               </div>
-              <SpacingInput label="R" value={style.borderRadius} onChange={(v) => set({ borderRadius: v })} />
+              <SpacingInput label="R" value={effectiveStyle.borderRadius} onChange={(v) => set({ borderRadius: v })} />
             </div>
-            <ColorInput label="Color" value={style.borderColor} onChange={(v) => set({ borderColor: v })} />
-            <SpacingInput label="Shadow" value={style.boxShadow} onChange={(v) => set({ boxShadow: v })} />
+            <ColorInput label="Color" value={effectiveStyle.borderColor} onChange={(v) => set({ borderColor: v })} />
+            <SpacingInput label="Shadow" value={effectiveStyle.boxShadow} onChange={(v) => set({ boxShadow: v })} />
           </div>
         </Section>
 
         {/* Effects */}
         <Section title="Effects" defaultOpen={false}>
           <div className="space-y-2">
-            <SpacingInput label="Opacity" value={style.opacity} onChange={(v) => set({ opacity: v })} />
+            <SpacingInput label="Opacity" value={effectiveStyle.opacity} onChange={(v) => set({ opacity: v })} />
             <div>
               <label className="block text-[10px] text-text-3 mb-1">Overflow</label>
               <select
-                value={style.overflow || ''}
+                value={effectiveStyle.overflow || ''}
                 onChange={(e) => set({ overflow: e.target.value })}
                 className="w-full px-2 py-1.5 rounded border border-border-default bg-bg-2 text-text-0 text-[11px] outline-none focus:border-green"
               >
@@ -249,19 +297,19 @@ export function StylePanel({ block }: { block: BlockConfig }) {
                 <option value="auto">auto</option>
               </select>
             </div>
-            <SpacingInput label="Z-Index" value={style.zIndex} onChange={(v) => set({ zIndex: v })} />
+            <SpacingInput label="Z-Index" value={effectiveStyle.zIndex} onChange={(v) => set({ zIndex: v })} />
           </div>
         </Section>
 
         {/* Responsive */}
         <Section title="Responsive" defaultOpen={false}>
-          <ResponsiveToggle block={block} />
+          <ResponsiveToggle block={block} onChange={set} />
         </Section>
 
         {/* Custom CSS */}
         <Section title="Custom CSS" defaultOpen={false}>
           <textarea
-            value={style.customCss || ''}
+            value={effectiveStyle.customCss || ''}
             onChange={(e) => set({ customCss: e.target.value })}
             rows={6}
             placeholder=".my-class { color: red; }"

@@ -281,18 +281,40 @@ function WidgetTile({
   const meta = blockMetadata.find((b) => b.type === type)
   if (!meta) return null
   const Icon = blockIcons[type] || Layout
+  const label = widgetLabel(type)
+  const setDraggedItem = useEditorStore((s) => s.setDraggedItem)
+
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
+      draggable
+      onDragStart={(e) => {
+        const payload = { kind: "block", type, label }
+        const str = JSON.stringify(payload)
+        e.dataTransfer.setData("application/x-openpage-drag", str)
+        e.dataTransfer.setData("text/plain", str)
+        e.dataTransfer.effectAllowed = "copy"
+        setDraggedItem({ kind: "block", type, label })
+      }}
+      onDragEnd={() => {
+        setDraggedItem(null)
+      }}
       onClick={() => onAdd(type)}
-      title={widgetLabel(type)}
-      className="flex flex-col items-center gap-1.5 p-2 rounded-md text-text-2 hover:text-text-0 hover:bg-bg-3 transition-colors"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onAdd(type)
+        }
+      }}
+      title={`${label} (click to add, or drag to column/canvas)`}
+      className="flex flex-col items-center gap-1.5 p-2 rounded-md text-text-2 hover:text-text-0 hover:bg-bg-3 transition-colors cursor-grab active:cursor-grabbing select-none group/tile"
     >
-      <div className={`rounded-md border border-border-default bg-bg-2 flex items-center justify-center ${compact ? "w-8 h-8" : "w-10 h-10"}`}>
-        <Icon size={compact ? 14 : 18} />
+      <div className={`rounded-md border border-border-default bg-bg-2 flex items-center justify-center group-hover/tile:border-green/50 group-hover/tile:bg-green-glow2 transition-all ${compact ? "w-8 h-8" : "w-10 h-10"}`}>
+        <Icon size={compact ? 14 : 18} className="group-hover/tile:text-green transition-colors" />
       </div>
-      <span className="text-[9px] leading-tight text-center line-clamp-2 w-full">{widgetLabel(type)}</span>
-    </button>
+      <span className="text-[9px] leading-tight text-center line-clamp-2 w-full font-medium">{label}</span>
+    </div>
   )
 }
 
@@ -413,13 +435,34 @@ function GlobalWidgetsPanel() {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 pb-2">
       {globalWidgets.map((gw) => (
-        <button
+        <div
           key={gw.id}
+          role="button"
+          tabIndex={0}
+          draggable
+          onDragStart={(e) => {
+            const payload = { kind: "global", globalWidgetId: gw.id, label: gw.name }
+            const str = JSON.stringify(payload)
+            e.dataTransfer.setData("application/x-openpage-drag", str)
+            e.dataTransfer.setData("text/plain", str)
+            e.dataTransfer.effectAllowed = "copy"
+            useEditorStore.getState().setDraggedItem({ kind: "global", globalWidgetId: gw.id, label: gw.name })
+          }}
+          onDragEnd={() => {
+            useEditorStore.getState().setDraggedItem(null)
+          }}
           onClick={() => {
             insertGlobalWidget(gw.id)
             toast(`Inserted "${gw.name}"`)
           }}
-          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[11px] text-text-1 hover:bg-bg-3 hover:text-text-0 transition-colors text-left group"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              insertGlobalWidget(gw.id)
+            }
+          }}
+          title={`${gw.name} (click to add, or drag to column/canvas)`}
+          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[11px] text-text-1 hover:bg-bg-3 hover:text-text-0 transition-colors text-left group cursor-grab active:cursor-grabbing select-none"
         >
           <div className="w-[22px] h-[22px] rounded border border-border-default bg-bg-3 flex items-center justify-center text-[10px] shrink-0">
             <Layers size={11} />
@@ -429,7 +472,7 @@ function GlobalWidgetsPanel() {
             <div className="text-[9px] text-text-3">{gw.block.type}</div>
           </div>
           <Plus size={11} className="text-text-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-        </button>
+        </div>
       ))}
     </div>
   )
@@ -651,11 +694,31 @@ function SectionTemplatesPanel() {
               {isOpen ? (
                 <div className="p-1.5 space-y-1 bg-bg-1">
                   {presets.map((preset) => (
-                    <button
+                    <div
                       key={preset.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
+                      draggable
+                      onDragStart={(e) => {
+                        const payload = { kind: "preset", presetId: preset.id, label: preset.name }
+                        const str = JSON.stringify(payload)
+                        e.dataTransfer.setData("application/x-openpage-drag", str)
+                        e.dataTransfer.setData("text/plain", str)
+                        e.dataTransfer.effectAllowed = "copy"
+                        useEditorStore.getState().setDraggedItem({ kind: "preset", presetId: preset.id, label: preset.name })
+                      }}
+                      onDragEnd={() => {
+                        useEditorStore.getState().setDraggedItem(null)
+                      }}
                       onClick={() => handleAdd(preset.id)}
-                      className="w-full text-left rounded-md border border-border-default px-2.5 py-2 hover:border-green hover:bg-green-glow2 transition-colors group"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          handleAdd(preset.id)
+                        }
+                      }}
+                      title={`${preset.name} (click to add, or drag to column/canvas)`}
+                      className="w-full text-left rounded-md border border-border-default px-2.5 py-2 hover:border-green hover:bg-green-glow2 transition-colors group cursor-grab active:cursor-grabbing select-none"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -664,7 +727,7 @@ function SectionTemplatesPanel() {
                         </div>
                         <Plus size={12} className="shrink-0 mt-0.5 text-text-3 group-hover:text-green" />
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               ) : null}

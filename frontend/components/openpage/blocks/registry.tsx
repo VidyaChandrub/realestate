@@ -3,11 +3,11 @@
 import type { BlockConfig } from "./types";
 import { Component, type ReactNode } from "react";
 import {
-  applyBlockStyle,
+  applyBlockStyleForDevice,
   blockAnimationClass,
   blockAnimationStyle,
-  blockResponsiveHideClass,
 } from "@/lib/openpage/block-style";
+import { useDevice } from "@/components/openpage/runtime/device";
 
 import { NavbarBlock } from "./navbar/NavbarBlock";
 import { HeroBlock } from "./hero/HeroBlock";
@@ -161,14 +161,14 @@ const blockRenderers: Record<string, React.ComponentType<{ block: BlockConfig }>
 };
 
 export function RenderBlock({ block }: { block: BlockConfig }): ReactNode {
+  const device = useDevice()
   const Renderer = blockRenderers[block.type] || PlaceholderBlock
   const style = {
-    ...applyBlockStyle(block.style),
+    ...applyBlockStyleForDevice(block.style, device),
     ...blockAnimationStyle(block),
   }
-  const className = [blockAnimationClass(block), blockResponsiveHideClass(block.style)]
-    .filter(Boolean)
-    .join(" ")
+  const animationClass = blockAnimationClass(block)
+  const className = animationClass || undefined
 
   return (
     <BlockErrorBoundary blockType={block.type}>
