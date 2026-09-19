@@ -75,19 +75,24 @@ export function RightSidebar() {
               key={id}
               type="button"
               onClick={() => setRightSidebarTab(id)}
-              className={`relative flex flex-col items-center gap-1 py-2 transition-colors group ${
-                isActive ? '' : 'text-text-3 hover:bg-bg-3'
+              className={`relative flex flex-col items-center gap-1 py-2 transition-all duration-150 group ${
+                isActive ? 'bg-bg-2/80 shadow-sm' : 'text-text-3 hover:text-text-1 hover:bg-bg-2/40'
               }`}
               title={label}
             >
-              {isActive && <span className="absolute top-0 left-1 right-1 h-[2.5px] rounded-b transition-colors" style={{ backgroundColor: color }} />}
+              {isActive && (
+                <span
+                  className="absolute top-0 left-2 right-2 h-[2px] rounded-b shadow-[0_0_8px_currentColor]"
+                  style={{ backgroundColor: color, color }}
+                />
+              )}
               <Icon
                 size={14}
                 strokeWidth={isActive ? 2.25 : 1.75}
                 style={{ color: isActive ? color : undefined }}
                 className={isActive ? 'drop-shadow-[0_0_5px_currentColor]' : 'group-hover:text-text-1'}
               />
-              <span className={`text-[8.5px] font-semibold tracking-wide ${isActive ? '' : 'text-text-3'}`} style={isActive ? { color } : undefined}>
+              <span className={`text-[9px] font-bold uppercase tracking-wider ${isActive ? '' : 'text-text-3'}`} style={isActive ? { color } : undefined}>
                 {label}
               </span>
             </button>

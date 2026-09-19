@@ -138,7 +138,25 @@ export function Canvas() {
 
   const resolved = useMemo(() => resolveTheme(theme), [theme]);
   const cssVars = useMemo(() => themeToCSS(resolved), [resolved]);
-  useGoogleFonts([resolved.fontSans, resolved.fontDisplay, resolved.fontMono]);
+
+  const blockFonts = useMemo(() => {
+    const fonts = new Set<string>();
+    function scan(list: BlockConfig[]) {
+      for (const b of list) {
+        if (b.style?.typography?.fontFamily) fonts.add(b.style.typography.fontFamily);
+        if (b.style?.responsive?.tablet?.typography?.fontFamily) fonts.add(b.style.responsive.tablet.typography.fontFamily);
+        if (b.style?.responsive?.mobile?.typography?.fontFamily) fonts.add(b.style.responsive.mobile.typography.fontFamily);
+        if (b.type === "columns") {
+          const cols = b.props.columns as Array<{ blocks?: BlockConfig[] }> | undefined;
+          cols?.forEach((c) => c.blocks && scan(c.blocks));
+        }
+      }
+    }
+    scan(blocks);
+    return Array.from(fonts);
+  }, [blocks]);
+
+  useGoogleFonts([resolved.fontSans, resolved.fontDisplay, resolved.fontMono, ...blockFonts]);
 
   const pxWidth = VIEWPORT_WIDTHS[viewport];
 

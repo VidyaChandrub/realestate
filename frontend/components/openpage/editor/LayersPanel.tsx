@@ -9,7 +9,7 @@ import {
   ImageIcon, Play, GalleryHorizontalEnd, Eye, EyeOff,
   Building2, MapPin, Home, Trees, FileText, Download, Mail, Save, Layers,
   ChevronDown, ChevronRight, Type, Box, Code2,
-  LayoutTemplate, Blocks, Globe, PanelLeftClose,
+  LayoutTemplate, Blocks, Globe, PanelLeftClose, X,
 } from "lucide-react";
 import {
   DndContext,
@@ -279,9 +279,11 @@ function SortableLayer({ block, isSelected, onSelect, onDuplicate, onRemove, onH
       ref={setNodeRef}
       style={style}
       onClick={onSelect}
-      className={`group px-2 py-1.5 my-0.5 rounded-md text-[12px] flex items-center gap-1.5 transition-all cursor-pointer select-none relative border ${
-        isSelected ? 'bg-green-glow text-green border-green/30' : 'border-transparent text-text-1 hover:bg-bg-3 hover:text-text-0 hover:border-border-default'
-      } ${isHidden ? 'opacity-50' : ''}`}
+      className={`group px-2.5 py-2 my-1 rounded-xl text-[12px] flex items-center gap-2 transition-all cursor-pointer select-none relative border ${
+        isSelected
+          ? 'bg-green/10 text-green border-green/40 shadow-sm'
+          : 'border-border-subtle/60 bg-bg-2/40 text-text-1 hover:bg-bg-3/80 hover:text-text-0 hover:border-border-hover'
+      } ${isHidden ? 'opacity-40' : ''}`}
     >
       <div
         {...attributes}
@@ -338,7 +340,7 @@ function widgetLabel(type: BlockType) {
 function WidgetTile({
   type,
   onAdd,
-  compact,
+  compact = false,
 }: {
   type: BlockType
   onAdd: (type: BlockType) => void
@@ -349,6 +351,7 @@ function WidgetTile({
   if (!meta) return null
   const Icon = blockIcons[type] || Layout
   const label = widgetLabel(type)
+  const color = widgetColor(type)
 
   return (
     <div
@@ -374,15 +377,26 @@ function WidgetTile({
         }
       }}
       title={`${label} (click to add, or drag to column/canvas)`}
-      className="flex flex-col items-center gap-1.5 p-2 rounded-md text-text-2 hover:text-text-0 hover:bg-bg-3 transition-colors cursor-grab active:cursor-grabbing select-none group/tile"
+      className={`flex flex-col items-center justify-center rounded-xl border border-border-default/60 bg-bg-2/50 hover:bg-bg-3/90 hover:border-border-hover transition-all duration-150 cursor-grab active:cursor-grabbing select-none group/tile shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
+        compact ? "p-2 gap-1.5" : "p-2.5 gap-2"
+      }`}
     >
       <div
-        className={`rounded-md border flex items-center justify-center group-hover/tile:border-green/50 group-hover/tile:scale-[1.03] transition-all ${compact ? "w-8 h-8" : "w-10 h-10"}`}
-        style={{ color: widgetColor(type), borderColor: WIDGET_COLORS[type] ? `${widgetColor(type)}3d` : undefined, backgroundColor: WIDGET_COLORS[type] ? `${widgetColor(type)}1a` : undefined }}
+        className={`rounded-lg border flex items-center justify-center transition-all group-hover/tile:scale-110 ${
+          compact ? "w-8 h-8" : "w-10 h-10"
+        }`}
+        style={{
+          color,
+          borderColor: `${color}40`,
+          backgroundColor: `${color}18`,
+          boxShadow: `0 2px 8px ${color}15`,
+        }}
       >
-        <Icon size={compact ? 14 : 18} strokeWidth={1.9} className="group-hover/tile:drop-shadow-[0_0_6px_currentColor] transition-all" />
+        <Icon size={compact ? 15 : 18} strokeWidth={2} className="transition-transform duration-200 group-hover/tile:drop-shadow-[0_0_8px_currentColor]" />
       </div>
-      <span className="text-[9px] leading-tight text-center line-clamp-2 w-full font-medium">{label}</span>
+      <span className="text-[10px] leading-tight text-center line-clamp-2 w-full font-medium text-text-2 group-hover/tile:text-text-0 transition-colors">
+        {label}
+      </span>
     </div>
   )
 }
@@ -419,24 +433,38 @@ function BlockPicker({
 
   return (
     <>
-      <input
-        autoFocus={autoFocus}
-        type="text"
-        placeholder="Search components..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        onKeyDown={onKeyDown}
-        className={`${INPUT_CLS} mb-1.5 shrink-0 bg-transparent focus:bg-bg-2`}
-      />
-      <div className={compact ? "" : "flex-1 min-h-0 overflow-y-auto overscroll-contain"}>
+      <div className="relative mb-2 shrink-0">
+        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-3" />
+        <input
+          autoFocus={autoFocus}
+          type="text"
+          placeholder="Search components..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={onKeyDown}
+          className="w-full pl-8 pr-7 py-1.5 rounded-xl border border-border-default/80 bg-bg-2/80 text-text-0 text-[11.5px] placeholder:text-text-3 outline-none transition-all hover:border-border-hover focus:border-green focus:bg-bg-2 focus:shadow-[0_0_0_3px_rgba(34,197,94,0.12)]"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-text-3 hover:text-text-1 p-0.5"
+            title="Clear search"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+
+      <div className={compact ? "" : "flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5 space-y-2.5"}>
         {q ? (
           searchTypes.length === 0 ? (
-            <div className="px-2 py-3 text-center text-[11px] text-text-3 flex items-center justify-center gap-1.5">
-              <Search size={12} />
-              No components match
+            <div className="px-2 py-6 text-center text-[11px] text-text-3 flex flex-col items-center justify-center gap-2">
+              <Search size={18} className="text-text-3/60" />
+              <span>No components match &ldquo;{search}&rdquo;</span>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-1 pt-1">
+            <div className="grid grid-cols-3 gap-1.5 pt-1">
               {searchTypes.map((type) => (
                 <WidgetTile key={type} type={type} onAdd={onAdd} compact={compact} />
               ))}
@@ -448,17 +476,24 @@ function BlockPicker({
             if (types.length === 0) return null
             const isOpen = openGroups[group.id] !== false
             return (
-              <div key={group.id} className="border-b border-border-subtle last:border-0">
+              <div key={group.id} className="rounded-xl border border-border-subtle/80 bg-bg-2/30 overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setOpenGroups((prev) => ({ ...prev, [group.id]: !isOpen }))}
-                  className="w-full flex items-center justify-between px-1.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-text-3 hover:text-text-1"
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-[10px] font-bold uppercase tracking-wider text-text-2 hover:text-text-0 hover:bg-bg-2/50 transition-colors select-none"
                 >
-                  {group.title}
-                  {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  <span className="flex items-center gap-1.5">
+                    <span>{group.title}</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-normal bg-bg-3 border border-border-default/80 text-text-3">
+                      {types.length}
+                    </span>
+                  </span>
+                  <span className={`transition-transform duration-200 ${isOpen ? "rotate-0 text-text-2" : "-rotate-90 text-text-3"}`}>
+                    <ChevronDown size={12} />
+                  </span>
                 </button>
                 {isOpen && (
-                  <div className="grid grid-cols-3 gap-1 pb-2">
+                  <div className="grid grid-cols-3 gap-1.5 p-2 pt-0.5 border-t border-border-subtle/50">
                     {types.map((type) => (
                       <WidgetTile key={`${group.id}-${type}`} type={type} onAdd={onAdd} compact={compact} />
                     ))}
@@ -600,7 +635,7 @@ export function LayersPanel() {
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden relative">
       {/* Icon nav rail */}
-      <nav className="w-[54px] shrink-0 h-full bg-bg-2 border-r border-border-default flex flex-col items-center py-2 gap-1" aria-label="Builder tools">
+      <nav className="w-[56px] shrink-0 h-full bg-[#0c0c10] border-r border-border-default/80 flex flex-col items-center py-2 gap-1.5 z-10" aria-label="Builder tools">
         {TAB_DEFS.map(({ id, label, icon: Icon, color }) => {
           const isActive = tab === id
           return (
@@ -608,21 +643,28 @@ export function LayersPanel() {
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`relative w-full flex flex-col items-center gap-1 py-2.5 rounded-lg group transition-all ${
-                isActive ? '' : 'text-text-3 hover:bg-bg-3'
+              className={`relative w-[46px] flex flex-col items-center gap-1.5 py-2.5 rounded-xl group transition-all duration-150 ${
+                isActive ? 'bg-bg-2/90 shadow-sm border border-border-subtle' : 'text-text-3 hover:text-text-1 hover:bg-bg-2/50 border border-transparent'
               }`}
               title={label}
             >
               {isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r" style={{ backgroundColor: color }} />
+                <span className="absolute -left-[5px] top-1/2 -translate-y-1/2 w-[3.5px] h-5 rounded-r shadow-[0_0_8px_currentColor]" style={{ backgroundColor: color, color }} />
               )}
-              <Icon
-                size={17}
-                strokeWidth={isActive ? 2.25 : 1.75}
-                style={{ color: isActive ? color : undefined }}
-                className={isActive ? 'drop-shadow-[0_0_5px_currentColor]' : 'group-hover:text-text-1'}
-              />
-              <span className={`text-[8.5px] font-semibold uppercase tracking-wide ${isActive ? '' : 'text-text-3'}`} style={isActive ? { color } : undefined}>
+              <div
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                  isActive ? "" : "group-hover:scale-105"
+                }`}
+                style={isActive ? { backgroundColor: `${color}1a`, color } : undefined}
+              >
+                <Icon
+                  size={16}
+                  strokeWidth={isActive ? 2.25 : 1.75}
+                  style={{ color: isActive ? color : undefined }}
+                  className={isActive ? 'drop-shadow-[0_0_8px_currentColor]' : 'group-hover:text-text-1'}
+                />
+              </div>
+              <span className={`text-[8px] font-bold uppercase tracking-wider ${isActive ? '' : 'text-text-3'}`} style={isActive ? { color } : undefined}>
                 {label}
               </span>
             </button>
@@ -644,18 +686,20 @@ export function LayersPanel() {
 
       {/* Panel content */}
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-        <div className="px-3.5 py-2.5 border-b border-border-default shrink-0">
+        <div className="px-3.5 py-3 border-b border-border-default shrink-0 bg-bg-1">
           <div className="flex items-center gap-2">
-            <activeDef.icon size={13} className="shrink-0" style={{ color: activeDef.color }} />
+            <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ backgroundColor: `${activeDef.color}18`, color: activeDef.color }}>
+              <activeDef.icon size={12} strokeWidth={2.2} />
+            </div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-text-0">{activeDef.label}</span>
             <span className="flex-1" />
             {tab === 'layers' && (
-              <span className="text-[9.5px] font-medium text-text-3 bg-bg-3 border border-border-default rounded-full px-2 py-0.5">
+              <span className="text-[9.5px] font-semibold text-text-2 bg-bg-3 border border-border-default/80 rounded-full px-2 py-0.5">
                 {blocks.length} section{blocks.length === 1 ? '' : 's'}
               </span>
             )}
           </div>
-          <div className="text-[9.5px] text-text-3 mt-0.5">{activeDef.hint}</div>
+          <div className="text-[10px] text-text-3 mt-1 leading-normal">{activeDef.hint}</div>
         </div>
 
         {tab === 'layers' ? (
