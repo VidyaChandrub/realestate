@@ -45,12 +45,14 @@ function HeroCopy({
   onSecondary,
   light,
   centered,
+  stats,
 }: {
   p: Record<string, unknown>;
   onPrimary: () => void;
   onSecondary: () => void;
   light?: boolean;
   centered?: boolean;
+  stats?: Array<{ value: string; label: string }>;
 }) {
   const text = light ? "text-white" : "text-text-0";
   const muted = light ? "text-white/80" : "text-text-1";
@@ -89,6 +91,17 @@ function HeroCopy({
           </button>
         ) : null}
       </div>
+
+      {stats && stats.length > 0 ? (
+        <div className={`flex flex-wrap gap-6 mt-6 pt-5 border-t ${light ? "border-white/20" : "border-border-default"} ${centered ? "justify-center" : ""}`}>
+          {stats.map((s, i) => (
+            <div key={i} className={light ? "text-white" : "text-text-0"}>
+              <div className="font-display text-2xl font-bold text-green">{s.value}</div>
+              <div className={`text-[11px] uppercase tracking-wider font-medium ${muted}`}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -99,6 +112,15 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
   const formId = str(p.formId);
   const forms = resolveRuntimeForms(runtime.forms);
   const form = formId ? findFormById(formId, forms) : forms[0];
+
+  const rawStats = items<Record<string, unknown>>(p.stats);
+  const stats = rawStats
+    .map((s) => ({
+      value: str(s.value ?? s.stat ?? s.title ?? ""),
+      label: str(s.label ?? s.description ?? s.subtitle ?? ""),
+    }))
+    .filter((s) => s.value || s.label);
+
   const onPrimary = () => {
     if (str(p.primaryCtaUrl)) {
       window.location.href = str(p.primaryCtaUrl);
@@ -125,7 +147,7 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/50 to-black/25" />
         <div className="relative z-10 grid @lg:grid-cols-[1.15fr_0.85fr] gap-8 items-center px-6 @md:px-12 py-16 @md:py-24 max-w-6xl mx-auto">
-          <HeroCopy p={p} onPrimary={onPrimary} onSecondary={onSecondary} light />
+          <HeroCopy p={p} onPrimary={onPrimary} onSecondary={onSecondary} light stats={stats} />
           <div id="hero-enquire" className="rounded-2xl bg-bg-1/95 backdrop-blur-md border border-border-default p-6 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
             <h3 className="text-lg font-semibold mb-1">{str(p.formTitle, "Enquire now")}</h3>
             <p className="text-text-2 text-sm mb-4">{str(p.formSubtitle, "A relationship manager will call you shortly.")}</p>
@@ -159,14 +181,13 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
         )}
         <div className="absolute inset-0 bg-black/55" />
         <div className="relative z-10 px-6 @md:px-12 py-24 max-w-3xl mx-auto flex flex-col items-center">
-          <HeroCopy p={p} onPrimary={onPrimary} onSecondary={onSecondary} light centered />
+          <HeroCopy p={p} onPrimary={onPrimary} onSecondary={onSecondary} light centered stats={stats} />
         </div>
       </section>
     );
   }
 
   if (block.variant === "stats") {
-    const stats = items<{ label: string; value: string }>(p.stats);
     return (
       <section className="relative min-h-[600px] flex flex-col justify-end overflow-hidden">
         {str(p.image) ? (
@@ -205,7 +226,7 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
       )}
       <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/45 to-black/20" />
       <div className="relative z-10 px-6 @md:px-12 py-24 max-w-3xl">
-        <HeroCopy p={p} onPrimary={onPrimary} onSecondary={onSecondary} light />
+        <HeroCopy p={p} onPrimary={onPrimary} onSecondary={onSecondary} light stats={stats} />
       </div>
     </section>
   );
@@ -976,7 +997,13 @@ export function ConstructionStatusBlock({ block }: { block: BlockConfig }) {
 
 export function DeveloperBlock({ block }: { block: BlockConfig }) {
   const p = block.props;
-  const stats = items<{ label: string; value: string }>(p.stats);
+  const rawStats = items<Record<string, unknown>>(p.stats || p.items);
+  const stats = rawStats
+    .map((s) => ({
+      value: str(s.value ?? s.stat ?? s.title ?? ""),
+      label: str(s.label ?? s.description ?? s.subtitle ?? ""),
+    }))
+    .filter((s) => s.value || s.label);
   const variant = block.variant || "default";
 
   if (variant === "split") {
@@ -995,6 +1022,16 @@ export function DeveloperBlock({ block }: { block: BlockConfig }) {
             <p className="text-[11px] uppercase tracking-[0.2em] text-green font-semibold mb-3">{str(p.title, "About the Developer")}</p>
             <h2 className="font-display text-3xl font-semibold mb-4">{str(p.name)}</h2>
             <p className="text-text-1 leading-relaxed">{str(p.body)}</p>
+            {stats.length > 0 && (
+              <div className="grid grid-cols-2 @md:grid-cols-3 gap-3 mt-6 pt-6 border-t border-border-default/60">
+                {stats.map((s, i) => (
+                  <div key={i} className="rounded-xl border border-border-default/80 bg-bg-1/80 p-3.5 text-center shadow-sm">
+                    <div className="font-display text-xl @md:text-2xl font-bold text-green mb-0.5">{s.value}</div>
+                    <div className="text-[10.5px] uppercase tracking-wider text-text-3 font-medium">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </SectionShell>
@@ -1002,18 +1039,21 @@ export function DeveloperBlock({ block }: { block: BlockConfig }) {
   }
 
   if (variant === "stats") {
+    const displayStats = stats.length
+      ? stats
+      : [
+          { label: "Projects", value: "50+" },
+          { label: "Years", value: "25+" },
+          { label: "Cities", value: "12" },
+          { label: "Homes", value: "10k+" },
+        ];
     return (
       <SectionShell id={str(p.anchor, "builder")}>
         <Title title={str(p.title, "About the Developer")} subtitle={str(p.name)} />
         <p className="max-w-2xl mx-auto text-text-1 text-center leading-relaxed mb-10">{str(p.body)}</p>
         <div className="grid grid-cols-2 @md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-          {(stats.length ? stats : [
-            { label: "Projects", value: "50+" },
-            { label: "Years", value: "25+" },
-            { label: "Cities", value: "12" },
-            { label: "Homes", value: "10k+" },
-          ]).map((s, i) => (
-            <div key={i} className="rounded-2xl border border-border-default bg-bg-2 p-5 text-center">
+          {displayStats.map((s, i) => (
+            <div key={i} className="rounded-2xl border border-border-default bg-bg-2 p-5 text-center shadow-sm">
               <div className="font-display text-2xl font-semibold text-green mb-1">{s.value}</div>
               <div className="text-[11px] uppercase tracking-wider text-text-3">{s.label}</div>
             </div>
@@ -1034,6 +1074,16 @@ export function DeveloperBlock({ block }: { block: BlockConfig }) {
           <div className="flex-1">
             <h3 className="font-semibold text-lg">{str(p.name) || str(p.title, "Developer")}</h3>
             <p className="text-text-2 text-sm mt-1 line-clamp-2">{str(p.body)}</p>
+            {stats.length > 0 && (
+              <div className="flex flex-wrap gap-6 mt-4 pt-3 border-t border-green/20">
+                {stats.map((s, i) => (
+                  <div key={i}>
+                    <div className="font-display text-lg font-bold text-green">{s.value}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-text-3">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -1046,6 +1096,16 @@ export function DeveloperBlock({ block }: { block: BlockConfig }) {
       <div className="max-w-3xl mx-auto text-center">
         <h3 className="text-xl font-semibold mb-2">{str(p.name)}</h3>
         <p className="text-text-1 leading-relaxed">{str(p.body)}</p>
+        {stats.length > 0 && (
+          <div className="grid grid-cols-2 @md:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border-default/60">
+            {stats.map((s, i) => (
+              <div key={i} className="rounded-xl border border-border-default bg-bg-1 p-4 text-center shadow-sm">
+                <div className="font-display text-xl @md:text-2xl font-bold text-green mb-1">{s.value}</div>
+                <div className="text-[11px] uppercase tracking-wider text-text-3">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </SectionShell>
   );

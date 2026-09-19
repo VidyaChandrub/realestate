@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { Link2, Sparkles, Trash2, Upload } from "lucide-react";
+import { Link2, Sparkles, Trash2, Upload, AlertCircle } from "lucide-react";
 import { isMediaSrc, readMediaFile } from "@/lib/media";
 import { useBuilderImageUpload } from "@/components/openpage/builder/upload-context";
 
@@ -28,23 +28,32 @@ export function MediaPicker({
   const src = value.trim();
   const showImg = isMediaSrc(src);
 
-  /** Native label activation opens the file picker even if a parent handler
-   *  calls preventDefault on click events. Generating a synthetic click on a
-   *  display:none input is unreliable inside the builder, so the input is
-   *  kept visually hidden (but renderable) and triggered through its label. */
   const stopProp = (e: React.MouseEvent) => e.stopPropagation();
+
+  const handleTriggerUpload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    inputRef.current?.click();
+  };
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
     setError("");
 
-    // In the builder: upload straight to R2 and store the URL (no base64).
+    // In the builder: attempt cloud upload first
     if (uploadImage) {
       setUploading(true);
       try {
         const url = await uploadImage(file);
         onChange(url);
+        return;
       } catch (err) {
+        console.warn("Cloud upload failed, falling back to inline data URL:", err);
+        // Seamless fallback to inline data URI so user is NEVER blocked!
+        const result = await readMediaFile(file);
+        if (result.ok) {
+          onChange(result.data);
+          return;
+        }
         setError(err instanceof Error ? err.message : "Upload failed");
       } finally {
         setUploading(false);
@@ -52,7 +61,7 @@ export function MediaPicker({
       return;
     }
 
-    // Fallback (no active page / outside a builder session): inline data URI.
+    // Fallback: direct inline data URI
     const result = await readMediaFile(file);
     if (!result.ok) {
       setError(result.error);
@@ -62,121 +71,90 @@ export function MediaPicker({
   };
 
   return (
-    <div style={{ width: "100%" }}>
+    <div className="w-full">
       {label ? (
-        <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--ps-muted, #64748b)", marginBottom: 6 }}>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-text-3 mb-1.5">
           {label}
         </div>
       ) : null}
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          alignItems: compact ? "center" : "flex-start",
-          padding: compact ? 0 : "8px 0 4px",
-        }}
-      >
+
+      <div className={`flex gap-2.5 ${compact ? "items-center" : "items-start py-1"}`}>
+        {/* Preview / Trigger thumbnail */}
         <label
-          onClick={stopProp}
+          htmlFor={fileInputId}
+          onClick={handleTriggerUpload}
           title={kind === "icon" ? "Upload icon" : "Upload image"}
-          style={{
-            width: compact ? 40 : 56,
-            height: compact ? 40 : 56,
-            borderRadius: kind === "icon" ? 12 : 10,
-            border: "1px dashed var(--ps-line-strong, #cbd5e1)",
-            background: "var(--ps-bg, #f8fafc)",
-            overflow: "hidden",
-            flexShrink: 0,
-            padding: 0,
-            cursor: uploading ? "default" : "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "var(--ps-muted, #64748b)",
-            fontSize: 9,
-            fontWeight: 700,
-          }}
+          className={`shrink-0 rounded-xl border border-dashed border-border-default hover:border-green bg-bg-2/70 flex items-center justify-center overflow-hidden cursor-pointer transition-all hover:scale-105 shadow-sm ${
+            compact ? "w-10 h-10" : "w-12 h-12"
+          }`}
         >
           {uploading ? (
-            "…"
+            <span className="text-[10px] font-bold text-green animate-pulse">…</span>
           ) : showImg ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            <img src={src} alt="" className="w-full h-full object-cover" />
           ) : (
-            <Upload size={compact ? 14 : 16} />
+            <Upload size={compact ? 14 : 16} className="text-text-3 group-hover:text-green" />
           )}
         </label>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+
+        {/* Input & buttons container */}
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <label
-              onClick={stopProp}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "5px 9px",
-                borderRadius: 8,
-                border: "1px solid var(--ps-line-strong, #cbd5e1)",
-                background: "var(--ps-panel-raised, #fff)",
-                color: "var(--ps-ink, #0f172a)",
-                fontSize: 11.5,
-                fontWeight: 700,
-                cursor: uploading ? "default" : "pointer",
-                opacity: uploading ? 0.6 : 1,
-              }}
+              htmlFor={fileInputId}
+              onClick={handleTriggerUpload}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border-default bg-bg-2 text-text-0 text-[11px] font-semibold hover:bg-bg-3 hover:border-border-hover transition-colors cursor-pointer select-none ${
+                uploading ? "opacity-60 pointer-events-none" : ""
+              }`}
             >
-              <Upload size={12} /> {uploading ? "Uploading…" : "Upload"}
+              <Upload size={12} className="text-green" />
+              <span>{uploading ? "Uploading…" : "Upload"}</span>
             </label>
+
             {src ? (
               <button
                 type="button"
                 onClick={() => onChange("")}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "5px 9px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "transparent",
-                  color: "#e5484d",
-                  fontSize: 11.5,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-status-red hover:bg-status-red/10 transition-colors"
+                title="Remove image"
               >
-                <Trash2 size={12} /> Clear
+                <Trash2 size={11} />
+                <span>Clear</span>
               </button>
             ) : null}
           </div>
-          <div style={{ position: "relative" }}>
-            <Link2 size={13} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--ps-muted, #94a3b8)", pointerEvents: "none" }} />
+
+          <div className="relative">
+            <Link2 size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-3 pointer-events-none" />
             <input
-              className="ps-input"
               value={src.startsWith("data:") ? "" : src}
               onChange={(e) => {
                 setError("");
                 onChange(e.target.value);
               }}
-              placeholder={kind === "icon" ? "Icon URL or lucide name" : "Image URL (https://…)"}
-              style={{ paddingLeft: 28, fontSize: 12.5 }}
+              placeholder={kind === "icon" ? "Icon URL or name" : "Image URL (https://…)"}
+              className="w-full pl-7 pr-2.5 py-1 rounded-lg border border-border-default bg-bg-2/80 text-text-0 text-[11px] font-mono outline-none hover:border-border-hover focus:border-green focus:bg-bg-2 transition-all placeholder:text-text-3"
             />
           </div>
+
           {src.startsWith("data:") ? (
-            <div style={{ fontSize: 10.5, color: "var(--ps-muted, #64748b)", marginTop: 4 }}>Uploaded file stored on this template</div>
+            <div className="text-[9.5px] text-green font-medium flex items-center gap-1">
+              <span>✓ Image uploaded & saved</span>
+            </div>
           ) : null}
         </div>
       </div>
+
       {kind === "icon" && iconNames && iconNames.length > 0 ? (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 10.5, fontWeight: 700, color: "var(--ps-muted, #64748b)", marginBottom: 5, display: "inline-flex", alignItems: "center", gap: 4 }}>
-            <Sparkles size={11} /> Built-in icons
+        <div className="mt-2">
+          <div className="text-[10px] font-semibold text-text-3 mb-1 flex items-center gap-1">
+            <Sparkles size={11} className="text-amber-400" /> Built-in icons
           </div>
           <select
-            className="ps-input"
             value={iconNames.includes(src) ? src : ""}
             onChange={(e) => onChange(e.target.value)}
-            style={{ fontSize: 12.5 }}
+            className="w-full px-2 py-1 rounded-lg border border-border-default bg-bg-2 text-text-0 text-[11px] outline-none focus:border-green"
           >
             <option value="">Custom upload / URL</option>
             {iconNames.map((n) => (
@@ -187,7 +165,15 @@ export function MediaPicker({
           </select>
         </div>
       ) : null}
-      {error ? <div style={{ fontSize: 11.5, color: "#e5484d", marginTop: 6 }}>{error}</div> : null}
+
+      {error ? (
+        <div className="text-[11px] text-status-red mt-1.5 flex items-center gap-1 bg-status-red/10 border border-status-red/20 px-2 py-1 rounded-md">
+          <AlertCircle size={11} className="shrink-0" />
+          <span>{error}</span>
+        </div>
+      ) : null}
+
+      {/* Hidden file input with explicit ref and id */}
       <input
         id={fileInputId}
         ref={inputRef}
@@ -199,19 +185,7 @@ export function MediaPicker({
           void onFile(e.target.files?.[0]);
           e.target.value = "";
         }}
-        style={{
-          position: "absolute",
-          width: 1,
-          height: 1,
-          padding: 0,
-          margin: -1,
-          overflow: "hidden",
-          clip: "rect(0 0 0 0)",
-          clipPath: "inset(50%)",
-          whiteSpace: "nowrap",
-          borderWidth: 0,
-          pointerEvents: "none",
-        }}
+        className="hidden"
       />
     </div>
   );

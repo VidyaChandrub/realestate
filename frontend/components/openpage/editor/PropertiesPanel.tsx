@@ -219,28 +219,20 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
     ],
   },
   contact: {
-    sections: [
-      {
-        title: 'Content',
-        fields: [
-          { key: 'title', label: 'Title', type: 'text' },
-          { key: 'subtitle', label: 'Subtitle', type: 'text' },
-          { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
-        ],
-      },
-    ],
+    sections: [{ title: 'Form', fields: [
+      { key: 'title', label: 'Title', type: 'text' },
+      { key: 'subtitle', label: 'Subtitle', type: 'text' },
+      { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
+    ]}],
   },
   newsletter: {
-    sections: [
-      {
-        title: 'Content',
-        fields: [
-          { key: 'title', label: 'Title', type: 'text' },
-          { key: 'subtitle', label: 'Subtitle', type: 'text' },
-          { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
-        ],
-      },
-    ],
+    sections: [{ title: 'Form', fields: [
+      { key: 'title', label: 'Title', type: 'text' },
+      { key: 'subtitle', label: 'Subtitle', type: 'text' },
+      { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
+      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
+    ]}],
   },
   logocloud: {
     sections: [
@@ -519,22 +511,6 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
     ]}],
   },
   'site-visit': {
-    sections: [{ title: 'Form', fields: [
-      { key: 'title', label: 'Title', type: 'text' },
-      { key: 'subtitle', label: 'Subtitle', type: 'text' },
-      { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
-      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
-    ]}],
-  },
-  contact: {
-    sections: [{ title: 'Form', fields: [
-      { key: 'title', label: 'Title', type: 'text' },
-      { key: 'subtitle', label: 'Subtitle', type: 'text' },
-      { key: 'formId', label: 'Form (Form Builder)', type: 'form-select' },
-      { key: 'anchor', label: 'Section ID (menu scroll)', type: 'text' },
-    ]}],
-  },
-  newsletter: {
     sections: [{ title: 'Form', fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'subtitle', label: 'Subtitle', type: 'text' },
@@ -1036,6 +1012,8 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
         const blockTemplates: Partial<Record<string, Record<string, Record<string, string>>>> = {
           testimonials: { items: { name: '', role: '', quote: '' } },
           stats: { items: { value: '', label: '' } },
+          developer: { stats: { value: '', label: '' } },
+          'project-banner': { stats: { value: '', label: '' } },
           faq: { items: { question: '', answer: '' } },
           team: { members: { name: '', role: '', avatar: '' } },
           features: { items: { icon: '', title: '', description: '' } },
