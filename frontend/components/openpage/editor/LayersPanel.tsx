@@ -9,6 +9,7 @@ import {
   ImageIcon, Play, GalleryHorizontalEnd, Eye, EyeOff,
   Building2, MapPin, Home, Trees, FileText, Download, Mail, Save, Layers,
   ChevronDown, ChevronRight, Type, Box, Code2,
+  LayoutTemplate, Blocks, Globe, PanelLeftClose,
 } from "lucide-react";
 import {
   DndContext,
@@ -192,6 +193,68 @@ const blockLabels: Partial<Record<BlockType, string>> = {
   team: 'Sales team',
 }
 
+// Per-widget accent colors used for the sidebar icons + chips. Kept as raw
+// hex so the soft alpha backgrounds can be derived inline (e.g. color+"14").
+const WIDGET_COLORS: Partial<Record<BlockType, string>> = {
+  columns: "#38bdf8",
+  navbar: "#38bdf8",
+  footer: "#38bdf8",
+  divider: "#94a3b8",
+  spacer: "#94a3b8",
+  "html-code": "#94a3b8",
+  "custom-section": "#94a3b8",
+  heading: "#e879f9",
+  text: "#e879f9",
+  button: "#f43f5e",
+  icon: "#fb923c",
+  "icon-box": "#fb923c",
+  image: "#34d399",
+  "image-box": "#a78bfa",
+  video: "#f43f5e",
+  gallery: "#34d399",
+  banner: "#f59e0b",
+  "project-banner": "#22d3ee",
+  "project-overview": "#22d3ee",
+  "property-details": "#22d3ee",
+  "unit-config": "#22d3ee",
+  "property-search": "#22d3ee",
+  "property-filters": "#22d3ee",
+  amenities: "#34d399",
+  "floor-plans": "#34d399",
+  location: "#34d399",
+  "google-maps": "#34d399",
+  "re-pricing": "#f59e0b",
+  "emi-calculator": "#f59e0b",
+  "payment-plan": "#f59e0b",
+  developer: "#a78bfa",
+  team: "#a78bfa",
+  "lead-form": "#f472b6",
+  contact: "#f472b6",
+  newsletter: "#f472b6",
+  "site-visit": "#f472b6",
+  "download-brochure": "#f472b6",
+  features: "#22d3ee",
+  testimonials: "#34d399",
+  faq: "#22d3ee",
+  cta: "#f59e0b",
+  offers: "#fb923c",
+  stats: "#22d3ee",
+  logocloud: "#94a3b8",
+  tabs: "#a78bfa",
+  countdown: "#f43f5e",
+  "social-icons": "#38bdf8",
+  anchor: "#94a3b8",
+  "construction-status": "#34d399",
+  "project-highlights": "#22d3ee",
+}
+
+function widgetColor(type: BlockType): string {
+  return WIDGET_COLORS[type] ?? "#8b8b96"
+}
+
+const INPUT_CLS =
+  "w-full px-2.5 py-1.5 rounded-lg border border-border-default bg-bg-2 text-text-0 text-[11.5px] placeholder:text-text-3 outline-none transition-[border,box-shadow,background-color] hover:border-border-hover focus:border-green focus:shadow-[0_0_0_3px_rgba(34,197,94,0.12)]"
+
 function SortableLayer({ block, isSelected, onSelect, onDuplicate, onRemove, onHide, isHidden }: {
   block: BlockConfig
   isSelected: boolean
@@ -216,8 +279,8 @@ function SortableLayer({ block, isSelected, onSelect, onDuplicate, onRemove, onH
       ref={setNodeRef}
       style={style}
       onClick={onSelect}
-      className={`group px-2 py-1.5 rounded-md text-[12px] flex items-center gap-1.5 transition-all cursor-pointer select-none relative ${
-        isSelected ? 'bg-green-glow text-green' : 'text-text-1 hover:bg-bg-3 hover:text-text-0'
+      className={`group px-2 py-1.5 my-0.5 rounded-md text-[12px] flex items-center gap-1.5 transition-all cursor-pointer select-none relative border ${
+        isSelected ? 'bg-green-glow text-green border-green/30' : 'border-transparent text-text-1 hover:bg-bg-3 hover:text-text-0 hover:border-border-default'
       } ${isHidden ? 'opacity-50' : ''}`}
     >
       <div
@@ -229,10 +292,13 @@ function SortableLayer({ block, isSelected, onSelect, onDuplicate, onRemove, onH
         <GripVertical size={11} />
       </div>
 
-      <div className={`w-[22px] h-[22px] rounded flex items-center justify-center text-[10px] shrink-0 border ${
-        isSelected ? 'border-green/30 bg-green-glow' : 'border-border-default bg-bg-3'
-      }`}>
-        <Icon size={11} />
+      <div
+        className={`w-[22px] h-[22px] rounded flex items-center justify-center text-[10px] shrink-0 border transition-colors ${
+          isSelected ? 'border-green/30 bg-green-glow' : 'bg-bg-3'
+        }`}
+        style={{ color: widgetColor(block.type), borderColor: `${widgetColor(block.type)}${isSelected ? "66" : "40"}`, backgroundColor: `${widgetColor(block.type)}${isSelected ? "1f" : "14"}` }}
+      >
+        <Icon size={11} strokeWidth={2} />
       </div>
 
       <span className="font-medium flex-1 truncate">{layerLabel}</span>
@@ -278,11 +344,11 @@ function WidgetTile({
   onAdd: (type: BlockType) => void
   compact?: boolean
 }) {
+  const setDraggedItem = useEditorStore((s) => s.setDraggedItem)
   const meta = blockMetadata.find((b) => b.type === type)
   if (!meta) return null
   const Icon = blockIcons[type] || Layout
   const label = widgetLabel(type)
-  const setDraggedItem = useEditorStore((s) => s.setDraggedItem)
 
   return (
     <div
@@ -310,8 +376,11 @@ function WidgetTile({
       title={`${label} (click to add, or drag to column/canvas)`}
       className="flex flex-col items-center gap-1.5 p-2 rounded-md text-text-2 hover:text-text-0 hover:bg-bg-3 transition-colors cursor-grab active:cursor-grabbing select-none group/tile"
     >
-      <div className={`rounded-md border border-border-default bg-bg-2 flex items-center justify-center group-hover/tile:border-green/50 group-hover/tile:bg-green-glow2 transition-all ${compact ? "w-8 h-8" : "w-10 h-10"}`}>
-        <Icon size={compact ? 14 : 18} className="group-hover/tile:text-green transition-colors" />
+      <div
+        className={`rounded-md border flex items-center justify-center group-hover/tile:border-green/50 group-hover/tile:scale-[1.03] transition-all ${compact ? "w-8 h-8" : "w-10 h-10"}`}
+        style={{ color: widgetColor(type), borderColor: WIDGET_COLORS[type] ? `${widgetColor(type)}3d` : undefined, backgroundColor: WIDGET_COLORS[type] ? `${widgetColor(type)}1a` : undefined }}
+      >
+        <Icon size={compact ? 14 : 18} strokeWidth={1.9} className="group-hover/tile:drop-shadow-[0_0_6px_currentColor] transition-all" />
       </div>
       <span className="text-[9px] leading-tight text-center line-clamp-2 w-full font-medium">{label}</span>
     </div>
@@ -357,7 +426,7 @@ function BlockPicker({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         onKeyDown={onKeyDown}
-        className="w-full px-2 py-1.5 rounded border border-border-default bg-bg-3 text-text-0 text-[11px] outline-none focus:border-green mb-1 shrink-0"
+        className={`${INPUT_CLS} mb-1.5 shrink-0 bg-transparent focus:bg-bg-2`}
       />
       <div className={compact ? "" : "flex-1 min-h-0 overflow-y-auto overscroll-contain"}>
         {q ? (
@@ -420,7 +489,6 @@ function AddComponentPopover({ onAdd, onClose }: { onAdd: (type: BlockType) => v
 function GlobalWidgetsPanel() {
   const globalWidgets = useConfigStore((s) => s.config.globalWidgets ?? EMPTY_GLOBAL_WIDGETS)
   const insertGlobalWidget = useConfigStore((s) => s.insertGlobalWidget)
-  const selectBlock = useEditorStore((s) => s.selectBlock)
 
   if (globalWidgets.length === 0) {
     return (
@@ -464,8 +532,8 @@ function GlobalWidgetsPanel() {
           title={`${gw.name} (click to add, or drag to column/canvas)`}
           className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[11px] text-text-1 hover:bg-bg-3 hover:text-text-0 transition-colors text-left group cursor-grab active:cursor-grabbing select-none"
         >
-          <div className="w-[22px] h-[22px] rounded border border-border-default bg-bg-3 flex items-center justify-center text-[10px] shrink-0">
-            <Layers size={11} />
+          <div className="w-[22px] h-[22px] rounded border flex items-center justify-center text-[10px] shrink-0" style={{ color: "#a78bfa", borderColor: "#a78bfa40", backgroundColor: "#a78bfa14" }}>
+            <Layers size={11} strokeWidth={2} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-medium truncate">{gw.name}</div>
@@ -480,6 +548,13 @@ function GlobalWidgetsPanel() {
 
 type Tab = 'layers' | 'components' | 'templates' | 'globals'
 
+const TAB_DEFS: { id: Tab; label: string; hint: string; icon: typeof Layout; color: string }[] = [
+  { id: 'templates', label: 'Templates', hint: 'Ready-made sections', icon: LayoutTemplate, color: "#f59e0b" },
+  { id: 'components', label: 'Blocks', hint: 'Drag widgets onto the canvas', icon: Blocks, color: "#38bdf8" },
+  { id: 'globals', label: 'Globals', hint: 'Reusable saved widgets', icon: Globe, color: "#a78bfa" },
+  { id: 'layers', label: 'Layers', hint: 'Page structure & reorder', icon: Layers, color: "#34d399" },
+]
+
 export function LayersPanel() {
   const blocks = useConfigStore((s) => {
     const pages = s.config.pages
@@ -488,9 +563,10 @@ export function LayersPanel() {
     return page.blocks
   })
   const { duplicateBlock, removeBlock, moveBlock, addBlock, updateBlockStyle } = useConfigStore()
-  const { selectedBlockId, selectBlock } = useEditorStore()
+  const { selectedBlockId, selectBlock, toggleLeftSidebar } = useEditorStore()
   const [showPopover, setShowPopover] = useState(false)
   const [tab, setTab] = useState<Tab>('components')
+  const activeDef = TAB_DEFS.find((t) => t.id === tab) ?? TAB_DEFS[1]
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -522,86 +598,132 @@ export function LayersPanel() {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
-      {/* Tab bar */}
-      <div className="flex border-b border-border-default shrink-0">
-        {([
-          { id: 'templates' as Tab, label: 'Templates' },
-          { id: 'components' as Tab, label: 'Blocks' },
-          { id: 'globals' as Tab, label: 'Globals' },
-          { id: 'layers' as Tab, label: 'Layers', count: blocks.length },
-        ]).map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex-1 py-2 text-[10px] font-medium transition-colors ${
-              tab === t.id
-                ? 'text-text-0 border-b border-green'
-                : 'text-text-3 hover:text-text-1'
-            }`}
-          >
-            {t.label}{t.count !== undefined ? ` (${t.count})` : ''}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'layers' ? (
-        <>
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2 pb-2">
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-                {blocks.map((block) => (
-                  <SortableLayer
-                    key={block.id}
-                    block={block}
-                    isSelected={selectedBlockId === block.id}
-                    onSelect={() => selectBlock(block.id)}
-                    onDuplicate={() => { duplicateBlock(block.id); toast('Block duplicated') }}
-                    onRemove={() => {
-                      if (selectedBlockId === block.id) selectBlock(null)
-                      removeBlock(block.id)
-                      toast('Block removed', {
-                        action: {
-                          label: 'Undo',
-                          onClick: () => {
-                            useConfigStore.getState().undo()
-                            toast('Block restored')
-                          },
-                        },
-                        duration: 3000,
-                      })
-                    }}
-                    onHide={() => {
-                      const key = `hideOn${viewportKey()}`
-                      updateBlockStyle(block.id, { [key]: !(block.style?.[key as keyof typeof block.style]) })
-                    }}
-                    isHidden={!!block.style?.hideOnDesktop || !!block.style?.hideOnTablet || !!block.style?.hideOnMobile}
-                  />
-                ))}
-              </SortableContext>
-            </DndContext>
-          </div>
-
-          <div className="p-2 border-t border-border-subtle relative">
+    <div className="flex flex-1 min-h-0 overflow-hidden relative">
+      {/* Icon nav rail */}
+      <nav className="w-[54px] shrink-0 h-full bg-bg-2 border-r border-border-default flex flex-col items-center py-2 gap-1" aria-label="Builder tools">
+        {TAB_DEFS.map(({ id, label, icon: Icon, color }) => {
+          const isActive = tab === id
+          return (
             <button
-              onClick={() => setShowPopover(!showPopover)}
-              className="w-full py-2 rounded-md border border-dashed border-border-default text-text-2 text-xs flex items-center justify-center gap-1.5 transition-all hover:border-green hover:text-green hover:bg-green-glow2"
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={`relative w-full flex flex-col items-center gap-1 py-2.5 rounded-lg group transition-all ${
+                isActive ? '' : 'text-text-3 hover:bg-bg-3'
+              }`}
+              title={label}
             >
-              <Plus size={13} />
-              Add Component
+              {isActive && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r" style={{ backgroundColor: color }} />
+              )}
+              <Icon
+                size={17}
+                strokeWidth={isActive ? 2.25 : 1.75}
+                style={{ color: isActive ? color : undefined }}
+                className={isActive ? 'drop-shadow-[0_0_5px_currentColor]' : 'group-hover:text-text-1'}
+              />
+              <span className={`text-[8.5px] font-semibold uppercase tracking-wide ${isActive ? '' : 'text-text-3'}`} style={isActive ? { color } : undefined}>
+                {label}
+              </span>
             </button>
-            {showPopover && (
-              <AddComponentPopover onAdd={handleAddBlock} onClose={() => setShowPopover(false)} />
+          )
+        })}
+
+        <div className="flex-1" />
+
+        <button
+          type="button"
+          onClick={toggleLeftSidebar}
+          className="w-full flex flex-col items-center gap-1 py-2.5 rounded-lg text-text-3 hover:text-text-1 hover:bg-bg-3 transition-colors"
+          title="Collapse panel"
+        >
+          <PanelLeftClose size={16} />
+          <span className="text-[8.5px] font-semibold uppercase tracking-wide">Hide</span>
+        </button>
+      </nav>
+
+      {/* Panel content */}
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="px-3.5 py-2.5 border-b border-border-default shrink-0">
+          <div className="flex items-center gap-2">
+            <activeDef.icon size={13} className="shrink-0" style={{ color: activeDef.color }} />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-text-0">{activeDef.label}</span>
+            <span className="flex-1" />
+            {tab === 'layers' && (
+              <span className="text-[9.5px] font-medium text-text-3 bg-bg-3 border border-border-default rounded-full px-2 py-0.5">
+                {blocks.length} section{blocks.length === 1 ? '' : 's'}
+              </span>
             )}
           </div>
-        </>
-      ) : tab === 'components' ? (
-        <ComponentsPanel />
-      ) : tab === 'templates' ? (
-        <SectionTemplatesPanel />
-      ) : (
-        <GlobalWidgetsPanel />
-      )}
+          <div className="text-[9.5px] text-text-3 mt-0.5">{activeDef.hint}</div>
+        </div>
+
+        {tab === 'layers' ? (
+          <>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-2">
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+                  {blocks.length === 0 ? (
+                    <div className="px-2 py-6 text-center">
+                      <Layers size={18} className="text-text-3 mx-auto mb-2" />
+                      <p className="text-[11px] text-text-2 font-medium">Canvas is empty</p>
+                      <p className="text-[10px] text-text-3 mt-0.5">Add a block or template to start</p>
+                    </div>
+                  ) : (
+                    blocks.map((block) => (
+                      <SortableLayer
+                        key={block.id}
+                        block={block}
+                        isSelected={selectedBlockId === block.id}
+                        onSelect={() => selectBlock(block.id)}
+                        onDuplicate={() => { duplicateBlock(block.id); toast('Block duplicated') }}
+                        onRemove={() => {
+                          if (selectedBlockId === block.id) selectBlock(null)
+                          removeBlock(block.id)
+                          toast('Block removed', {
+                            action: {
+                              label: 'Undo',
+                              onClick: () => {
+                                useConfigStore.getState().undo()
+                                toast('Block restored')
+                              },
+                            },
+                            duration: 3000,
+                          })
+                        }}
+                        onHide={() => {
+                          const key = `hideOn${viewportKey()}`
+                          updateBlockStyle(block.id, { [key]: !(block.style?.[key as keyof typeof block.style]) })
+                        }}
+                        isHidden={!!block.style?.hideOnDesktop || !!block.style?.hideOnTablet || !!block.style?.hideOnMobile}
+                      />
+                    ))
+                  )}
+                </SortableContext>
+              </DndContext>
+            </div>
+
+            <div className="p-2 border-t border-border-subtle relative">
+              <button
+                onClick={() => setShowPopover(!showPopover)}
+                className="w-full py-2 rounded-lg border border-dashed border-border-default text-text-2 text-xs flex items-center justify-center gap-1.5 transition-all hover:border-green hover:text-green hover:bg-green-glow2"
+              >
+                <Plus size={13} />
+                Add Component
+              </button>
+              {showPopover && (
+                <AddComponentPopover onAdd={handleAddBlock} onClose={() => setShowPopover(false)} />
+              )}
+            </div>
+          </>
+        ) : tab === 'components' ? (
+          <ComponentsPanel />
+        ) : tab === 'templates' ? (
+          <SectionTemplatesPanel />
+        ) : (
+          <GlobalWidgetsPanel />
+        )}
+      </div>
     </div>
   )
 }
@@ -660,12 +782,12 @@ function SectionTemplatesPanel() {
           Ready-to-use real estate sections. Edit content, images, forms and shortcodes in Properties.
         </p>
         <div className="relative">
-          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-3" />
+          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-3" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search templates…"
-            className="w-full pl-7 pr-2 py-1.5 rounded-md border border-border-default bg-bg-2 text-[11px] text-text-0 placeholder:text-text-3"
+            className={`${INPUT_CLS} pl-7`}
           />
         </div>
       </div>

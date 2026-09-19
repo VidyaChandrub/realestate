@@ -643,11 +643,24 @@ export async function uploadBuilderImage(
       size: file.size,
     }),
   });
-  const put = await fetch(uploadUrl, {
-    method: "PUT",
-    body: file,
-    headers: { "Content-Type": file.type },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  let put: Response;
+  try {
+    put = await fetch(uploadUrl, {
+      method: "PUT",
+      body: file,
+      headers: { "Content-Type": file.type },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error("Upload timed out. Try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!put.ok) {
     throw new Error(`Upload to storage failed (${put.status}).`);
   }

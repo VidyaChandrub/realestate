@@ -25,6 +25,8 @@ interface EditorState {
   previewMode: boolean
   activeProjectId: string | null
   rightSidebarTab: RightSidebarTab
+  leftSidebarOpen: boolean
+  rightSidebarOpen: boolean
   clipboardStyle: Partial<BlockStyle> | null
   clipboardProps: Record<string, unknown> | null
   clipboardBlock: BlockConfig | null
@@ -49,6 +51,10 @@ interface EditorState {
   togglePreview: () => void
   setActiveProject: (id: string | null) => void
   setRightSidebarTab: (tab: RightSidebarTab) => void
+  toggleLeftSidebar: () => void
+  toggleRightSidebar: () => void
+  openLeftSidebar: () => void
+  openRightSidebar: () => void
   setClipboardStyle: (style: Partial<BlockStyle> | null) => void
   setClipboardProps: (props: Record<string, unknown> | null) => void
   setClipboardBlock: (block: BlockConfig | null) => void
@@ -74,6 +80,8 @@ export const useEditorStore = create<EditorState>()((set) => ({
   previewMode: false,
   activeProjectId: null,
   rightSidebarTab: 'properties',
+  leftSidebarOpen: true,
+  rightSidebarOpen: true,
   clipboardStyle: null,
   clipboardProps: null,
   clipboardBlock: null,
@@ -103,6 +111,10 @@ export const useEditorStore = create<EditorState>()((set) => ({
   togglePreview: () => set((s) => ({ previewMode: !s.previewMode, ...(!s.previewMode ? { selectedBlockId: null, selectedBlockIds: [] } : {}) })),
   setActiveProject: (id) => set({ activeProjectId: id }),
   setRightSidebarTab: (tab) => set({ rightSidebarTab: tab }),
+  toggleLeftSidebar: () => set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
+  toggleRightSidebar: () => set((s) => ({ rightSidebarOpen: !s.rightSidebarOpen })),
+  openLeftSidebar: () => set({ leftSidebarOpen: true }),
+  openRightSidebar: () => set({ rightSidebarOpen: true }),
   setClipboardStyle: (style) => set({ clipboardStyle: style }),
   setClipboardProps: (props) => set({ clipboardProps: props }),
   setClipboardBlock: (block) => set({ clipboardBlock: block }),

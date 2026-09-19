@@ -131,6 +131,55 @@ export function applyBlockStyleForDevice(
   return css;
 }
 
+const BLOCK_TEXT_SELECTOR = "h1,h2,h3,h4,h5,h6,p,span,li,label,small,strong,em,figcaption,blockquote";
+
+/**
+ * Scoped `!important` stylesheet so user styles actually beat the block's own
+ * utility classes. Without this, `font-size`/`color` on the section wrapper are
+ * only inherited and get overridden by inner classes (e.g. `text-3xl`), and a
+ * `background-color` is hidden whenever the block root paints its own surface.
+ * Rules:
+ *   - `> *`  = the block's root element receives the user background.
+ *   - text element selector receives the user typography.
+ */
+export function blockStyleTag(blockId: string, style?: BlockStyle): string {
+  if (!style) return "";
+  const rootRules: string[] = [];
+  const textRules: string[] = [];
+
+  if (style.backgroundColor) rootRules.push(`background-color:${style.backgroundColor} !important`);
+  if (style.backgroundImage) {
+    rootRules.push(
+      `background-image:${style.backgroundImage.startsWith("url(") ? style.backgroundImage : `url(${style.backgroundImage})`} !important`,
+    );
+  }
+  if (style.backgroundSize) rootRules.push(`background-size:${style.backgroundSize} !important`);
+  if (style.backgroundPosition) rootRules.push(`background-position:${style.backgroundPosition} !important`);
+  if (style.backgroundRepeat) rootRules.push(`background-repeat:${style.backgroundRepeat} !important`);
+  if (style.borderColor) rootRules.push(`border-color:${style.borderColor} !important`);
+  if (style.borderWidth) rootRules.push(`border-width:${style.borderWidth} !important`);
+  if (style.borderStyle) rootRules.push(`border-style:${style.borderStyle} !important`);
+  if (style.borderRadius) rootRules.push(`border-radius:${style.borderRadius} !important`);
+  if (style.boxShadow) rootRules.push(`box-shadow:${style.boxShadow} !important`);
+  if (style.opacity) rootRules.push(`opacity:${style.opacity} !important`);
+
+  const t = style.typography;
+  if (t?.color) textRules.push(`color:${t.color} !important`);
+  if (t?.fontSize && t.fontSize.trim()) textRules.push(`font-size:${t.fontSize} !important`);
+  if (t?.fontFamily) textRules.push(`font-family:${t.fontFamily} !important`);
+  if (t?.fontWeight) textRules.push(`font-weight:${t.fontWeight} !important`);
+  if (t?.lineHeight) textRules.push(`line-height:${t.lineHeight} !important`);
+  if (t?.letterSpacing) textRules.push(`letter-spacing:${t.letterSpacing} !important`);
+  if (t?.textTransform) textRules.push(`text-transform:${t.textTransform} !important`);
+  if (t?.textDecoration) textRules.push(`text-decoration:${t.textDecoration} !important`);
+  if (t?.textAlign) textRules.push(`text-align:${t.textAlign} !important`);
+
+  const parts: string[] = [];
+  if (rootRules.length) parts.push(`[data-block-id="${blockId}"] > *{${rootRules.join(";")}}`);
+  if (textRules.length) parts.push(`[data-block-id="${blockId}"] :where(${BLOCK_TEXT_SELECTOR}){${textRules.join(";")}}`);
+  return parts.join("\n");
+}
+
 /** Deep-replace {{var}} tokens in any JSON-like value. */
 export function applyVarsDeep(value: unknown, vars: Record<string, string>): unknown {
   if (typeof value === "string") {

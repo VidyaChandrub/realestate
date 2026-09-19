@@ -1,26 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { MousePointer2 } from "lucide-react";
+import { useEffect } from "react";
+import { MousePointer2, SlidersHorizontal, PanelRightClose, AlignLeft, Palette, Type, Settings2 } from "lucide-react";
 import { useEditorStore, type RightSidebarTab } from "@/components/openpage/store/editorStore";
 import { useConfigStore } from "@/components/openpage/store/configStore";
+import { blockMetadata } from "@/lib/openpage/block-metadata";
 import { findBlock, findBlockLocation } from "@/lib/openpage/block-tree";
 import { PropertiesPanel } from './PropertiesPanel'
 import { StylePanel } from './StylePanel'
 import { TypographyPanel } from './TypographyPanel'
 import { AdvancedPanel } from './AdvancedPanel'
 
-const tabs: { id: RightSidebarTab; label: string }[] = [
-  { id: 'properties', label: 'Content' },
-  { id: 'style', label: 'Style' },
-  { id: 'typography', label: 'Typography' },
-  { id: 'advanced', label: 'Advanced' },
+const tabs: { id: RightSidebarTab; label: string; icon: typeof AlignLeft; color: string }[] = [
+  { id: 'properties', label: 'Content', icon: AlignLeft, color: "#38bdf8" },
+  { id: 'style', label: 'Style', icon: Palette, color: "#e879f9" },
+  { id: 'typography', label: 'Type', icon: Type, color: "#f59e0b" },
+  { id: 'advanced', label: 'More', icon: Settings2, color: "#a78bfa" },
 ]
+
+function blockLabel(type: string): string {
+  return blockMetadata.find((b) => b.type === type)?.label ?? type
+}
 
 export function RightSidebar() {
   const selectedBlockId = useEditorStore((s) => s.selectedBlockId)
   const rightSidebarTab = useEditorStore((s) => s.rightSidebarTab)
   const setRightSidebarTab = useEditorStore((s) => s.setRightSidebarTab)
+  const toggleRightSidebar = useEditorStore((s) => s.toggleRightSidebar)
   const blocks = useConfigStore((s) => {
     const pages = s.config.pages
     if (!pages || pages.length === 0) return s.config.blocks
@@ -35,34 +41,70 @@ export function RightSidebar() {
   }, [selectedBlock?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="hidden md:flex w-[280px] h-full min-h-0 bg-bg-1 border-l border-border-default flex-col shrink-0 overflow-hidden">
-      {/* Tabs */}
-      <div className="flex border-b border-border-default shrink-0 overflow-x-auto">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setRightSidebarTab(tab.id)}
-            className={`flex-1 py-2 text-[10px] font-medium transition-colors whitespace-nowrap ${
-              rightSidebarTab === tab.id
-                ? 'text-text-0 border-b border-green'
-                : 'text-text-3 hover:text-text-1'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+    <div className="hidden md:flex w-[300px] h-full min-h-0 bg-bg-1 border-l border-border-default flex-col shrink-0 overflow-hidden">
+      {/* Inspector header */}
+      <div className="h-11 px-3.5 border-b border-border-default flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[10.5px] font-bold uppercase tracking-wider text-text-2 flex items-center gap-1.5 shrink-0">
+            <SlidersHorizontal size={12} className="text-green" />
+            Inspector
+          </span>
+          {selectedBlock && (
+            <>
+              <span className="text-text-3">/</span>
+              <span className="text-[10.5px] font-semibold text-text-0 truncate">{blockLabel(selectedBlock.type)}</span>
+            </>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={toggleRightSidebar}
+          className="p-1.5 rounded text-text-3 hover:text-text-1 hover:bg-bg-3 transition-colors"
+          title="Collapse panel"
+        >
+          <PanelRightClose size={14} />
+        </button>
+      </div>
+
+      {/* Icon tabs */}
+      <div className="grid grid-cols-4 border-b border-border-default shrink-0">
+        {tabs.map(({ id, label, icon: Icon, color }) => {
+          const isActive = rightSidebarTab === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setRightSidebarTab(id)}
+              className={`relative flex flex-col items-center gap-1 py-2 transition-colors group ${
+                isActive ? '' : 'text-text-3 hover:bg-bg-3'
+              }`}
+              title={label}
+            >
+              {isActive && <span className="absolute top-0 left-1 right-1 h-[2.5px] rounded-b transition-colors" style={{ backgroundColor: color }} />}
+              <Icon
+                size={14}
+                strokeWidth={isActive ? 2.25 : 1.75}
+                style={{ color: isActive ? color : undefined }}
+                className={isActive ? 'drop-shadow-[0_0_5px_currentColor]' : 'group-hover:text-text-1'}
+              />
+              <span className={`text-[8.5px] font-semibold tracking-wide ${isActive ? '' : 'text-text-3'}`} style={isActive ? { color } : undefined}>
+                {label}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       {/* Content */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
         {!selectedBlock ? (
           <div className="flex flex-col items-center justify-center text-center px-6 py-16 gap-3">
-            <div className="w-10 h-10 rounded-lg bg-bg-3 border border-border-default flex items-center justify-center">
-              <MousePointer2 size={16} className="text-text-3" />
+            <div className="w-11 h-11 rounded-xl bg-bg-3 border border-border-default flex items-center justify-center">
+              <MousePointer2 size={18} className="text-text-3" />
             </div>
             <div>
               <p className="text-text-1 text-[12px] font-medium">Click a block to edit</p>
-              <p className="text-text-3 text-[11px] mt-1">Select any block on the canvas to edit its content here</p>
+              <p className="text-text-3 text-[11px] mt-1">Select any block on the canvas to edit its content, style and layout here</p>
             </div>
           </div>
         ) : rightSidebarTab === 'style' ? (

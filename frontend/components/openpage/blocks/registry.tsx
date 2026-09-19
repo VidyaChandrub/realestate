@@ -6,6 +6,8 @@ import {
   applyBlockStyleForDevice,
   blockAnimationClass,
   blockAnimationStyle,
+  blockStyleTag,
+  resolveBlockStyleForDevice,
 } from "@/lib/openpage/block-style";
 import { useDevice } from "@/components/openpage/runtime/device";
 
@@ -163,6 +165,8 @@ const blockRenderers: Record<string, React.ComponentType<{ block: BlockConfig }>
 export function RenderBlock({ block }: { block: BlockConfig }): ReactNode {
   const device = useDevice()
   const Renderer = blockRenderers[block.type] || PlaceholderBlock
+  const resolved = resolveBlockStyleForDevice(block.style, device)
+  const scopedCss = blockStyleTag(block.id, resolved)
   const style = {
     ...applyBlockStyleForDevice(block.style, device),
     ...blockAnimationStyle(block),
@@ -178,6 +182,7 @@ export function RenderBlock({ block }: { block: BlockConfig }): ReactNode {
         data-block-type={block.type}
         data-block-id={block.id}
       >
+        {scopedCss ? <style>{scopedCss}</style> : null}
         {block.style?.customCss ? (
           <style>{`[data-block-id="${block.id}"] { ${block.style.customCss} }`}</style>
         ) : null}

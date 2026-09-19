@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Link2, Sparkles, Trash2, Upload } from "lucide-react";
 import { isMediaSrc, readMediaFile } from "@/lib/media";
 import { useBuilderImageUpload } from "@/components/openpage/builder/upload-context";
@@ -20,12 +20,19 @@ export function MediaPicker({
   iconNames?: string[];
   compact?: boolean;
 }) {
+  const fileInputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const uploadImage = useBuilderImageUpload();
   const src = value.trim();
   const showImg = isMediaSrc(src);
+
+  /** Native label activation opens the file picker even if a parent handler
+   *  calls preventDefault on click events. Generating a synthetic click on a
+   *  display:none input is unreliable inside the builder, so the input is
+   *  kept visually hidden (but renderable) and triggered through its label. */
+  const stopProp = (e: React.MouseEvent) => e.stopPropagation();
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
@@ -69,11 +76,9 @@ export function MediaPicker({
           padding: compact ? 0 : "8px 0 4px",
         }}
       >
-        <button
-          type="button"
+        <label
+          onClick={stopProp}
           title={kind === "icon" ? "Upload icon" : "Upload image"}
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
           style={{
             width: compact ? 40 : 56,
             height: compact ? 40 : 56,
@@ -100,13 +105,11 @@ export function MediaPicker({
           ) : (
             <Upload size={compact ? 14 : 16} />
           )}
-        </button>
+        </label>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={uploading}
+            <label
+              onClick={stopProp}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -123,7 +126,7 @@ export function MediaPicker({
               }}
             >
               <Upload size={12} /> {uploading ? "Uploading…" : "Upload"}
-            </button>
+            </label>
             {src ? (
               <button
                 type="button"
@@ -186,13 +189,28 @@ export function MediaPicker({
       ) : null}
       {error ? <div style={{ fontSize: 11.5, color: "#e5484d", marginTop: 6 }}>{error}</div> : null}
       <input
+        id={fileInputId}
         ref={inputRef}
         type="file"
         accept="image/*,.svg"
-        hidden
+        tabIndex={-1}
+        aria-hidden
         onChange={(e) => {
           void onFile(e.target.files?.[0]);
           e.target.value = "";
+        }}
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: "hidden",
+          clip: "rect(0 0 0 0)",
+          clipPath: "inset(50%)",
+          whiteSpace: "nowrap",
+          borderWidth: 0,
+          pointerEvents: "none",
         }}
       />
     </div>

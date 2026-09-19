@@ -111,7 +111,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Header / Navigation',
     description: 'Logo, menu and enquire CTA',
     category: 'Core',
-    variants: ['default', 'centered'],
+    variants: ['default', 'centered', 'dual', 'pill', 'glass', 'minimal'],
     defaultProps: {
       logo: 'Project',
       logoImage: '',
@@ -346,7 +346,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Footer',
     description: 'Company info, links and legal',
     category: 'Core',
-    variants: ['multi-column', 'simple', 'minimal'],
+    variants: ['multi-column', 'simple', 'minimal', 'premium', 'contact'],
     defaultProps: { logo: 'Project', logoImage: '', copyright: 'All rights reserved.', links: ['Privacy Policy', 'Terms'] },
   },
 ]
