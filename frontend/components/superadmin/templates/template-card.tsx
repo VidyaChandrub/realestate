@@ -378,9 +378,9 @@ export function TemplateCard({
                     gap: 2,
                   }}
                 >
-                  {row.pageId ? (
+                  {row.pageId || isPreset ? (
                     <Link
-                      href={manageHref(row.pageId)}
+                      href={manageHref(row.pageId || row.key)}
                       className="btn btn-ghost btn-sm"
                       style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
                       onClick={() => setMenuOpen(false)}
