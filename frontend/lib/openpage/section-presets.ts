@@ -6,6 +6,8 @@
 import type { BlockConfig, BlockType } from "@/components/openpage/blocks/types";
 
 export type SectionPresetCategory =
+  | "Header"
+  | "Footer"
   | "Hero"
   | "Overview"
   | "Amenities"
@@ -46,6 +48,213 @@ const MAP =
   "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3888.079!2d77.7499!3d12.9698!2m3!1f0!2d0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae0e0!2sWhitefield%2C%20Bengaluru!5e0!3m2!1sen!2sin!4v1710000000000";
 
 export const SECTION_PRESETS: SectionPreset[] = [
+  // ─── Header ─────────────────────────────────────────────
+  {
+    id: "header-classic",
+    category: "Header",
+    name: "Classic Sticky Header",
+    description: "Logo left, nav center, enquiry CTA right",
+    type: "navbar",
+    variant: "default",
+    props: {
+      logo: "{{builder_name}}",
+      logoImage: "",
+      links: [
+        { label: "Overview", id: "overview" },
+        { label: "Amenities", id: "amenities" },
+        { label: "Plans", id: "plans" },
+        { label: "Gallery", id: "gallery" },
+        { label: "Pricing", id: "pricing" },
+        { label: "Contact", id: "enquire" },
+      ],
+      ctaText: "Book a Site Visit",
+      ctaId: "enquire",
+    },
+  },
+  {
+    id: "header-centered",
+    category: "Header",
+    name: "Centered Logo Header",
+    description: "Brand centered between split nav links",
+    type: "navbar",
+    variant: "centered",
+    props: {
+      logo: "{{builder_name}}",
+      logoImage: "",
+      links: [
+        { label: "Overview", id: "overview" },
+        { label: "Amenities", id: "amenities" },
+        { label: "Plans", id: "plans" },
+        { label: "Gallery", id: "gallery" },
+        { label: "Pricing", id: "pricing" },
+        { label: "Enquire", id: "enquire" },
+      ],
+      ctaText: "",
+      ctaId: "enquire",
+    },
+  },
+  {
+    id: "header-dual",
+    category: "Header",
+    name: "Dual Info Header",
+    description: "Contact bar above classic navigation",
+    type: "navbar",
+    variant: "dual",
+    props: {
+      logo: "{{builder_name}}",
+      logoImage: "",
+      links: [
+        { label: "Overview", id: "overview" },
+        { label: "Amenities", id: "amenities" },
+        { label: "Plans", id: "plans" },
+        { label: "Pricing", id: "pricing" },
+      ],
+      ctaText: "Enquire Now",
+      ctaId: "enquire",
+      phone: "+91 98765 43210",
+      email: "sales@{{builder_name}}.com",
+      badge: "RERA Registered",
+    },
+  },
+  {
+    id: "header-pill",
+    category: "Header",
+    name: "Floating Pill Header",
+    description: "Floating rounded nav over the hero",
+    type: "navbar",
+    variant: "pill",
+    props: {
+      logo: "{{builder_name}}",
+      logoImage: "",
+      links: [
+        { label: "Overview", id: "overview" },
+        { label: "Amenities", id: "amenities" },
+        { label: "Plans", id: "plans" },
+        { label: "Gallery", id: "gallery" },
+        { label: "Pricing", id: "pricing" },
+        { label: "Contact", id: "enquire" },
+      ],
+      ctaText: "Get Brochure",
+      ctaId: "brochure",
+    },
+  },
+  {
+    id: "header-glass",
+    category: "Header",
+    name: "Glass Overlay Header",
+    description: "Frosted translucent bar for hero images",
+    type: "navbar",
+    variant: "glass",
+    props: {
+      logo: "{{builder_name}}",
+      logoImage: "",
+      links: [
+        { label: "Overview", id: "overview" },
+        { label: "Amenities", id: "amenities" },
+        { label: "Plans", id: "plans" },
+        { label: "Pricing", id: "pricing" },
+      ],
+      ctaText: "Book a Visit",
+      ctaId: "enquire",
+    },
+  },
+
+  // ─── Footer ─────────────────────────────────────────────
+  {
+    id: "footer-compact",
+    category: "Footer",
+    name: "Compact Footer",
+    description: "Single-line minimal footer bar",
+    type: "footer",
+    variant: "minimal",
+    props: {
+      logo: "",
+      copyright: "© {{year}} {{builder_name}}. All rights reserved.",
+      links: ["Privacy", "Terms", "RERA"],
+    },
+  },
+  {
+    id: "footer-linkrow",
+    category: "Footer",
+    name: "Link Row Footer",
+    description: "Brand, anchor links and copyright in one row",
+    type: "footer",
+    variant: "simple",
+    props: {
+      logo: "{{builder_name}}",
+      copyright: "© {{year}} {{builder_name}}. All rights reserved.",
+      links: ["Overview", "Amenities", "Plans", "Pricing"],
+    },
+  },
+  {
+    id: "footer-classic",
+    category: "Footer",
+    name: "Classic Columns Footer",
+    description: "Multi-column sitemap with contact details",
+    type: "footer",
+    variant: "multi-column",
+    props: {
+      logo: "{{builder_name}}",
+      copyright: "© {{year}} {{builder_name}}. All rights reserved.",
+      tagline: "A thoughtfully planned address for contemporary living.",
+      address: "Site Office, Whitefield, Bengaluru",
+      phone: "+91 98765 43210",
+      email: "sales@{{builder_name}}.com",
+      socials: [],
+      links: ["Privacy", "Terms", "Sitemap"],
+      columns: [
+        { title: "Explore", links: ["Overview", "Amenities", "Floor Plans", "Gallery", "Pricing"] },
+        { title: "Company", links: ["About Us", "Projects", "Careers", "Press"] },
+        { title: "Support", links: ["Contact", "Brochure", "Site Visit", "FAQ"] },
+        { title: "Legal", links: ["Privacy", "Terms", "RERA", "Cookie Policy"] },
+      ],
+    },
+  },
+  {
+    id: "footer-premium",
+    category: "Footer",
+    name: "Premium Newsletter Footer",
+    description: "Brand, newsletter signup and link columns",
+    type: "footer",
+    variant: "premium",
+    props: {
+      logo: "{{builder_name}}",
+      copyright: "© {{year}} {{builder_name}}. All rights reserved.",
+      tagline: "The latest project updates, price alerts and offers in your inbox.",
+      phone: "+91 98765 43210",
+      email: "sales@{{builder_name}}.com",
+      socials: ["f", "X", "in", "yt"],
+      links: ["Privacy", "Terms"],
+      columns: [
+        { title: "Explore", links: ["Overview", "Amenities", "Floor Plans", "Pricing"] },
+        { title: "Company", links: ["About", "Projects", "Careers"] },
+        { title: "Support", links: ["Contact", "Brochure", "FAQ"] },
+      ],
+    },
+  },
+  {
+    id: "footer-contact",
+    category: "Footer",
+    name: "Contact Cards Footer",
+    description: "Contact info cards above link columns",
+    type: "footer",
+    variant: "contact",
+    props: {
+      logo: "{{builder_name}}",
+      copyright: "© {{year}} {{builder_name}}. All rights reserved.",
+      tagline: "Visit our sales office or drop us a line.",
+      address: "Site Office, Whitefield, Bengaluru",
+      phone: "+91 98765 43210",
+      email: "sales@{{builder_name}}.com",
+      links: ["Privacy", "Terms", "Sitemap"],
+      columns: [
+        { title: "Explore", links: ["Overview", "Amenities", "Floor Plans", "Gallery"] },
+        { title: "Company", links: ["About", "Projects", "Careers"] },
+        { title: "Support", links: ["Contact", "Brochure", "FAQ"] },
+      ],
+    },
+  },
+
   // ─── Hero ───────────────────────────────────────────────
   {
     id: "hero-split-form",
@@ -1001,6 +1210,8 @@ export const SECTION_PRESETS: SectionPreset[] = [
 ];
 
 export const SECTION_PRESET_CATEGORIES: SectionPresetCategory[] = [
+  "Header",
+  "Footer",
   "Lead Forms",
   "Hero",
   "Overview",

@@ -1118,7 +1118,15 @@ export default function SuperAdminTemplatesPage() {
               key={r.key}
               row={r}
               delay={i % 9}
-              onEdit={() => goToBuilder(r.pageId || r.designId)}
+              onEdit={() => {
+                if (r.pageId) {
+                  goToBuilder(r.pageId);
+                } else {
+                  setDesignId(r.designId);
+                  setNewName(r.name);
+                  setCreateOpen(true);
+                }
+              }}
               onPreview={() => window.open(templatePreviewPath(r.pageId || r.designId), "_blank")}
               onQuickPreview={() => setPreviewRow(r)}
               onDuplicate={() => duplicateRow(r)}

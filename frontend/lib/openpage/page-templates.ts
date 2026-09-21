@@ -1,4 +1,4 @@
-﻿import type { SectionInstance, SectionStyle, TemplateData } from "./types";
+import type { SectionInstance, SectionStyle, TemplateData } from "./types";
 
 function uid(prefix = "sec"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -89,6 +89,42 @@ export const PAGE_TEMPLATES: TemplateData[] = [
     description:
       "Builder-standard premium launch page — hero classic, overview, highlights, amenities, gallery, floor plans (card grid), pricing, location, testimonials, enquiry and brochure. Single premium template, fully editable in the new Builder with Layers navigator.",
   },
+  {
+    id: "tpl-standard",
+    name: "Standard Builder",
+    category: "Standard",
+    icon: "Layout",
+    pages: 1,
+    conversions: "—",
+    accent: "#3b82f6",
+    accent2: "#1e293b",
+    thumbnail: "hero",
+    description: "A standard page layout utilizing essential builder widgets for a complete presentation.",
+  },
+  {
+    id: "tpl-modern",
+    name: "Modern Builder",
+    category: "Premium",
+    icon: "Monitor",
+    pages: 1,
+    conversions: "—",
+    accent: "#10b981",
+    accent2: "#0f172a",
+    thumbnail: "hero",
+    description: "A sleek, contemporary layout showcasing projects with a focus on visuals and spacing.",
+  },
+  {
+    id: "tpl-luxury",
+    name: "Luxury Builder",
+    category: "Premium",
+    icon: "Gem",
+    pages: 1,
+    conversions: "—",
+    accent: "#8b5cf6",
+    accent2: "#18181b",
+    thumbnail: "hero",
+    description: "An elegant, high-end presentation suitable for luxury developments and prime real estate.",
+  },
 ];
 
 export const BLANK_TEMPLATE: TemplateData = {
@@ -120,6 +156,9 @@ export function inferDesignId(template: string): string {
     return "tpl-luxe";
   if (key.includes("meridian") || key === "tpl-meridian" || key.includes("premium"))
     return "tpl-meridian";
+  if (key.includes("standard") || key === "tpl-standard") return "tpl-standard";
+  if (key.includes("modern") || key === "tpl-modern") return "tpl-modern";
+  if (key.includes("luxury") || key === "tpl-luxury") return "tpl-luxury";
   return "tpl-estatepro";
 }
 
@@ -128,8 +167,10 @@ export function buildTemplateSections(idOrName: string): SectionInstance[] {
   if (key === "tpl-blank" || key.includes("scratch") || key === "blank")
     return [];
   if (key === "tpl-lead" || key.includes("lead")) return leadStandardSections();
-  if (key === "tpl-luxe" || key.includes("luxe") || key.includes("luxury"))
+  if (key === "tpl-luxe" || key.includes("luxe") || key.includes("luxury") || key === "tpl-luxury")
     return luxeStandardSections();
+  if (key === "tpl-standard" || key.includes("standard")) return estateProStandardSections();
+  if (key === "tpl-modern" || key.includes("modern")) return estateProStandardSections();
   return estateProStandardSections();
 }
 

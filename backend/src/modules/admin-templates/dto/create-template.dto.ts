@@ -9,8 +9,15 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { TemplateContentDto } from './template-content.dto';
-import { TEMPLATE_STATUS_VALUES } from './update-template.dto';
-import type { TemplateStatusValue } from './update-template.dto';
+
+export const TEMPLATE_STATUS_VALUES = [
+  'draft',
+  'published',
+  'scheduled',
+  'password',
+  'unpublished',
+] as const;
+export type TemplateStatusValue = (typeof TEMPLATE_STATUS_VALUES)[number];
 
 export const TEMPLATE_KIND_VALUES = ['preset', 'custom'] as const;
 export type TemplateKindValue = (typeof TEMPLATE_KIND_VALUES)[number];

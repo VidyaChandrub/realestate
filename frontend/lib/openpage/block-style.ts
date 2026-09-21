@@ -1,22 +1,47 @@
 import type { CSSProperties } from "react";
 import type { BlockConfig, BlockStyle } from "@/components/openpage/blocks/types";
+import type { Device } from "@/lib/openpage/types";
+
+/** Merge the device-specific value overrides over the desktop style. */
+export function resolveBlockStyleForDevice(
+  style: BlockStyle | undefined,
+  device: Device,
+): BlockStyle | undefined {
+  if (!style || device === "desktop") return style;
+  const overrides = style.responsive?.[device];
+  if (!overrides) return style;
+  const resolved: BlockStyle = { ...style };
+  delete resolved.responsive;
+  Object.assign(resolved, overrides);
+  resolved.responsive = style.responsive;
+  return resolved;
+}
+
+export function formatUnit(val: string | undefined): string | undefined {
+  if (!val) return undefined;
+  const trimmed = val.trim();
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+    return `${trimmed}px`;
+  }
+  return trimmed;
+}
 
 /** Convert persisted BlockStyle into CSS for editor canvas and live pages. */
 export function applyBlockStyle(style?: BlockStyle): CSSProperties {
   if (!style) return {};
   const s: CSSProperties = {};
 
-  if (style.marginTop) s.marginTop = style.marginTop;
-  if (style.marginBottom) s.marginBottom = style.marginBottom;
-  if (style.marginLeft) s.marginLeft = style.marginLeft;
-  if (style.marginRight) s.marginRight = style.marginRight;
-  if (style.paddingTop) s.paddingTop = style.paddingTop;
-  if (style.paddingBottom) s.paddingBottom = style.paddingBottom;
-  if (style.paddingLeft) s.paddingLeft = style.paddingLeft;
-  if (style.paddingRight) s.paddingRight = style.paddingRight;
-  if (style.width) s.width = style.width;
-  if (style.maxWidth) s.maxWidth = style.maxWidth;
-  if (style.minHeight) s.minHeight = style.minHeight;
+  if (style.marginTop) s.marginTop = formatUnit(style.marginTop);
+  if (style.marginBottom) s.marginBottom = formatUnit(style.marginBottom);
+  if (style.marginLeft) s.marginLeft = formatUnit(style.marginLeft);
+  if (style.marginRight) s.marginRight = formatUnit(style.marginRight);
+  if (style.paddingTop) s.paddingTop = formatUnit(style.paddingTop);
+  if (style.paddingBottom) s.paddingBottom = formatUnit(style.paddingBottom);
+  if (style.paddingLeft) s.paddingLeft = formatUnit(style.paddingLeft);
+  if (style.paddingRight) s.paddingRight = formatUnit(style.paddingRight);
+  if (style.width) s.width = formatUnit(style.width);
+  if (style.maxWidth) s.maxWidth = formatUnit(style.maxWidth);
+  if (style.minHeight) s.minHeight = formatUnit(style.minHeight);
   if (style.alignment) s.textAlign = style.alignment as CSSProperties["textAlign"];
   if (style.backgroundColor) s.backgroundColor = style.backgroundColor;
   if (style.backgroundImage) {
@@ -27,10 +52,10 @@ export function applyBlockStyle(style?: BlockStyle): CSSProperties {
   if (style.backgroundSize) s.backgroundSize = style.backgroundSize;
   if (style.backgroundPosition) s.backgroundPosition = style.backgroundPosition;
   if (style.backgroundRepeat) s.backgroundRepeat = style.backgroundRepeat as CSSProperties["backgroundRepeat"];
-  if (style.borderWidth) s.borderWidth = style.borderWidth;
+  if (style.borderWidth) s.borderWidth = formatUnit(style.borderWidth);
   if (style.borderStyle) s.borderStyle = style.borderStyle as CSSProperties["borderStyle"];
   if (style.borderColor) s.borderColor = style.borderColor;
-  if (style.borderRadius) s.borderRadius = style.borderRadius;
+  if (style.borderRadius) s.borderRadius = formatUnit(style.borderRadius);
   if (style.boxShadow) s.boxShadow = style.boxShadow;
   if (style.opacity) s.opacity = Number.parseFloat(style.opacity);
   if (style.overflow) s.overflow = style.overflow as CSSProperties["overflow"];
@@ -45,11 +70,11 @@ export function applyBlockStyle(style?: BlockStyle): CSSProperties {
   if (style.sectionBorderRadius) s.borderRadius = style.sectionBorderRadius;
 
   const typo = style.typography;
-  if (typo?.fontFamily) s.fontFamily = typo.fontFamily;
-  if (typo?.fontSize) s.fontSize = typo.fontSize;
+  if (typo?.fontFamily) s.fontFamily = `"${typo.fontFamily}", sans-serif`;
+  if (typo?.fontSize) s.fontSize = formatUnit(typo.fontSize);
   if (typo?.fontWeight) s.fontWeight = typo.fontWeight as CSSProperties["fontWeight"];
   if (typo?.lineHeight) s.lineHeight = typo.lineHeight;
-  if (typo?.letterSpacing) s.letterSpacing = typo.letterSpacing;
+  if (typo?.letterSpacing) s.letterSpacing = formatUnit(typo.letterSpacing);
   if (typo?.textTransform) s.textTransform = typo.textTransform as CSSProperties["textTransform"];
   if (typo?.textDecoration) s.textDecoration = typo.textDecoration as CSSProperties["textDecoration"];
   if (typo?.color) s.color = typo.color;
@@ -100,6 +125,111 @@ export function isHiddenOnViewport(
   if (viewport === "tablet" && style.hideOnTablet) return true;
   if (viewport === "mobile" && style.hideOnMobile) return true;
   return false;
+}
+
+/** Full device-aware render: resolved values + visibility for the active device. */
+export function applyBlockStyleForDevice(
+  style: BlockStyle | undefined,
+  device: Device,
+): CSSProperties {
+  const resolved = resolveBlockStyleForDevice(style, device);
+  const css = applyBlockStyle(resolved);
+  if (isHiddenOnViewport(resolved, device)) {
+    css.display = "none";
+  }
+  return css;
+}
+
+const BLOCK_TEXT_SELECTOR = "h1,h2,h3,h4,h5,h6,p,span,li,label,small,strong,em,figcaption,blockquote";
+
+/**
+ * Scoped `!important` stylesheet so user styles actually beat the block's own
+ * utility classes. Without this, `font-size`/`color` on the section wrapper are
+ * only inherited and get overridden by inner classes (e.g. `text-3xl`), and a
+ * `background-color` is hidden whenever the block root paints its own surface.
+ * Rules:
+ *   - `> *`  = the block's root element receives the user background.
+ *   - text element selector receives the user typography.
+ */
+export function blockStyleTag(blockId: string, style?: BlockStyle): string {
+  if (!style) return "";
+  const rootRules: string[] = [];
+  const textRules: string[] = [];
+
+  if (style.backgroundColor) {
+    rootRules.push(`background-color:${style.backgroundColor} !important`);
+    rootRules.push(`background:${style.backgroundColor} !important`);
+  }
+  if (style.backgroundImage) {
+    rootRules.push(
+      `background-image:${style.backgroundImage.startsWith("url(") ? style.backgroundImage : `url(${style.backgroundImage})`} !important`,
+    );
+  }
+  if (style.backgroundSize) rootRules.push(`background-size:${style.backgroundSize} !important`);
+  if (style.backgroundPosition) rootRules.push(`background-position:${style.backgroundPosition} !important`);
+  if (style.backgroundRepeat) rootRules.push(`background-repeat:${style.backgroundRepeat} !important`);
+  if (style.borderColor) rootRules.push(`border-color:${style.borderColor} !important`);
+  if (style.borderWidth) rootRules.push(`border-width:${formatUnit(style.borderWidth)} !important`);
+  if (style.borderStyle) rootRules.push(`border-style:${style.borderStyle} !important`);
+  if (style.borderRadius) rootRules.push(`border-radius:${formatUnit(style.borderRadius)} !important`);
+  if (style.boxShadow) rootRules.push(`box-shadow:${style.boxShadow} !important`);
+  if (style.opacity) rootRules.push(`opacity:${style.opacity} !important`);
+
+  const t = style.typography;
+  if (t?.color) {
+    textRules.push(`color:${t.color} !important`);
+    rootRules.push(`color:${t.color} !important`);
+  }
+  if (t?.fontSize && t.fontSize.trim()) {
+    const fs = formatUnit(t.fontSize);
+    textRules.push(`font-size:${fs} !important`);
+  }
+  if (t?.fontFamily) {
+    const ff = `"${t.fontFamily}", -apple-system, system-ui, sans-serif`;
+    textRules.push(`font-family:${ff} !important`);
+    rootRules.push(`font-family:${ff} !important`);
+  }
+  if (t?.fontWeight) {
+    textRules.push(`font-weight:${t.fontWeight} !important`);
+    rootRules.push(`font-weight:${t.fontWeight} !important`);
+  }
+  if (t?.lineHeight) textRules.push(`line-height:${t.lineHeight} !important`);
+  if (t?.letterSpacing) textRules.push(`letter-spacing:${formatUnit(t.letterSpacing)} !important`);
+  if (t?.textTransform) textRules.push(`text-transform:${t.textTransform} !important`);
+  if (t?.textDecoration) textRules.push(`text-decoration:${t.textDecoration} !important`);
+  if (t?.textAlign) {
+    textRules.push(`text-align:${t.textAlign} !important`);
+    rootRules.push(`text-align:${t.textAlign} !important`);
+  }
+
+  const parts: string[] = [];
+  if (rootRules.length) {
+    parts.push(
+      `[data-block-id="${blockId}"], [data-block-id="${blockId}"] > *, [data-block-id="${blockId}"] section { ${rootRules.join("; ")}; }`
+    );
+  }
+  if (textRules.length) {
+    const textSelectors = [
+      `[data-block-id="${blockId}"]`,
+      `[data-block-id="${blockId}"] h1`,
+      `[data-block-id="${blockId}"] h2`,
+      `[data-block-id="${blockId}"] h3`,
+      `[data-block-id="${blockId}"] h4`,
+      `[data-block-id="${blockId}"] h5`,
+      `[data-block-id="${blockId}"] h6`,
+      `[data-block-id="${blockId}"] p`,
+      `[data-block-id="${blockId}"] span`,
+      `[data-block-id="${blockId}"] li`,
+      `[data-block-id="${blockId}"] label`,
+      `[data-block-id="${blockId}"] a`,
+      `[data-block-id="${blockId}"] button`,
+      `[data-block-id="${blockId}"] strong`,
+      `[data-block-id="${blockId}"] em`,
+      `[data-block-id="${blockId}"] small`,
+    ].join(", ");
+    parts.push(`${textSelectors} { ${textRules.join("; ")}; }`);
+  }
+  return parts.join("\n");
 }
 
 /** Deep-replace {{var}} tokens in any JSON-like value. */

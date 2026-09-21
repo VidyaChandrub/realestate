@@ -325,6 +325,38 @@ export async function loadTemplates(
 
 export async function loadTemplate(id: string, resource: Resource = "template"): Promise<LandingPageData | null> {
   try {
+    if (resource === "template" && id.startsWith("tpl-")) {
+      const { TEMPLATES, BLANK_TEMPLATE, buildTemplateSections } = await import("./data");
+      const { seedConfigFor } = await import("./site-config");
+      const design = TEMPLATES.find((t) => t.id === id) || BLANK_TEMPLATE;
+      const config = seedConfigFor({
+        id,
+        name: design.name,
+        slug: design.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        status: "draft",
+        template: design.name,
+        domain: "",
+        designId: design.id,
+        kind: "preset",
+        sections: [],
+      });
+      return {
+        id,
+        name: design.name,
+        slug: design.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        status: "draft",
+        template: design.name,
+        domain: "",
+        designId: design.id,
+        kind: "preset",
+        tier: "free",
+        sections: buildTemplateSections(id),
+        config,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
     if (resource === "landing-page") {
       const raw = await apiFetch<ApiLandingPage>(`${LANDING_PAGES_PATH}/${encodeURIComponent(id)}`);
       const page = fromApiLandingPage(raw);
@@ -611,11 +643,24 @@ export async function uploadBuilderImage(
       size: file.size,
     }),
   });
-  const put = await fetch(uploadUrl, {
-    method: "PUT",
-    body: file,
-    headers: { "Content-Type": file.type },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  let put: Response;
+  try {
+    put = await fetch(uploadUrl, {
+      method: "PUT",
+      body: file,
+      headers: { "Content-Type": file.type },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error("Upload timed out. Try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!put.ok) {
     throw new Error(`Upload to storage failed (${put.status}).`);
   }

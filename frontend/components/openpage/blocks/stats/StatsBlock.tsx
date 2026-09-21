@@ -7,7 +7,7 @@ interface StatItem {
 
 interface StatsProps {
   title?: string
-  items?: StatItem[]
+  items?: any[]
 }
 
 const defaultStats: StatItem[] = [
@@ -17,8 +17,16 @@ const defaultStats: StatItem[] = [
   { value: '4.9/5', label: 'User rating' },
 ]
 
+function normalizeStats(rawItems?: any[]): StatItem[] {
+  if (!rawItems || !rawItems.length) return defaultStats
+  return rawItems.map((item) => ({
+    value: String(item?.value ?? item?.stat ?? item?.title ?? ''),
+    label: String(item?.label ?? item?.description ?? item?.subtitle ?? ''),
+  }))
+}
+
 function StatsGrid({ props }: { props: StatsProps }) {
-  const items = props.items || defaultStats
+  const items = normalizeStats(props.items)
 
   return (
     <section className="px-6 @md:px-10 py-12 @md:py-16">

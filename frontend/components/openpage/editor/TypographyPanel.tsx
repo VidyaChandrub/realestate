@@ -1,203 +1,409 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Clipboard } from "lucide-react";
+import {
+  Type,
+  Copy,
+  Clipboard,
+  Trash2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  Sliders,
+  CaseSensitive,
+  Underline,
+  Strikethrough,
+  Baseline,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { BlockConfig, BlockTypography } from "@/components/openpage/blocks/types";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { useEditorStore } from "@/components/openpage/store/editorStore";
 import { googleFontOptions } from "@/lib/openpage/theme-presets";
-import { Section } from "./shared-components";
+import { Section, ColorInput } from "./shared-components";
 
-function SelectField({ label, value, options, onChange }: { label: string; value?: string; options: { value: string; label: string }[]; onChange: (v: string) => void }) {
-  return (
-    <div className="mb-2">
-      <label className="block text-[10px] text-text-3 mb-1">{label}</label>
-      <select
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full px-2 py-1.5 rounded border border-border-default bg-bg-2 text-text-0 text-[11px] outline-none focus:border-green cursor-pointer"
-      >
-        <option value="">Inherit</option>
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-    </div>
-  )
-}
+const quickSizes = [
+  { label: "XS", value: "12px" },
+  { label: "SM", value: "14px" },
+  { label: "MD", value: "16px" },
+  { label: "LG", value: "18px" },
+  { label: "XL", value: "20px" },
+  { label: "2XL", value: "24px" },
+  { label: "3XL", value: "30px" },
+  { label: "4XL", value: "36px" },
+  { label: "5XL", value: "48px" },
+];
 
-function InputField({ label, value, onChange, placeholder, unit }: { label: string; value?: string; onChange: (v: string) => void; placeholder?: string; unit?: string }) {
-  return (
-    <div className="mb-2">
-      <label className="block text-[10px] text-text-3 mb-1">{label}</label>
-      <div className="relative">
-        <input
-          type="text"
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder || 'Inherit'}
-          className="w-full px-2 py-1.5 rounded border border-border-default bg-bg-2 text-text-0 text-[11px] outline-none focus:border-green font-mono"
-        />
-        {unit && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-text-3">{unit}</span>}
-      </div>
-    </div>
-  )
-}
-
-function ColorField({ label, value, onChange }: { label: string; value?: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex items-center gap-1.5 mb-2">
-      <label className="text-[10px] text-text-3 w-12 shrink-0">{label}</label>
-      <input
-        type="color"
-        value={value || '#000000'}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-6 h-6 rounded border border-border-default bg-bg-2 cursor-pointer p-0.5 shrink-0"
-      />
-      <input
-        type="text"
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="theme"
-        className="flex-1 px-1.5 py-1 rounded border border-border-default bg-bg-2 text-text-0 text-[10px] font-mono outline-none focus:border-green"
-      />
-    </div>
-  )
-}
-
-function AlignField({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
-  const options = ['left', 'center', 'right', 'justify']
-  return (
-    <div className="mb-2">
-      <label className="block text-[10px] text-text-3 mb-1">Text Align</label>
-      <div className="flex gap-0.5">
-        {options.map((opt) => (
-          <button
-            key={opt}
-            onClick={() => onChange(opt)}
-            className={`flex-1 py-1.5 rounded text-[10px] font-medium border transition-all ${
-              value === opt
-                ? 'bg-green-glow border-green text-green'
-                : 'border-border-default bg-bg-2 text-text-3 hover:text-text-1 hover:bg-bg-3'
-            }`}
-            title={opt}
-          >
-            {opt.charAt(0).toUpperCase()}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-const fontWeightOptions = [
-  { value: '100', label: 'Thin (100)' },
-  { value: '200', label: 'Extra Light (200)' },
-  { value: '300', label: 'Light (300)' },
-  { value: '400', label: 'Regular (400)' },
-  { value: '500', label: 'Medium (500)' },
-  { value: '600', label: 'Semi Bold (600)' },
-  { value: '700', label: 'Bold (700)' },
-  { value: '800', label: 'Extra Bold (800)' },
-  { value: '900', label: 'Black (900)' },
-]
-
-const textTransformOptions = [
-  { value: 'none', label: 'None' },
-  { value: 'uppercase', label: 'UPPERCASE' },
-  { value: 'lowercase', label: 'lowercase' },
-  { value: 'capitalize', label: 'Capitalize' },
-]
-
-const textDecorationOptions = [
-  { value: 'none', label: 'None' },
-  { value: 'underline', label: 'Underline' },
-  { value: 'line-through', label: 'Strikethrough' },
-  { value: 'overline', label: 'Overline' },
-]
+const fontWeightPills = [
+  { label: "300", name: "Light", value: "300" },
+  { label: "400", name: "Regular", value: "400" },
+  { label: "500", name: "Medium", value: "500" },
+  { label: "600", name: "Semi", value: "600" },
+  { label: "700", name: "Bold", value: "700" },
+  { label: "900", name: "Black", value: "900" },
+];
 
 export function TypographyPanel({ block }: { block: BlockConfig }) {
-  const updateBlockStyle = useConfigStore((s) => s.updateBlockStyle)
-  const typography = block.style?.typography || {}
+  const updateBlockStyle = useConfigStore((s) => s.updateBlockStyle);
+  const typography = block.style?.typography || {};
 
   const setTypo = (partial: Partial<BlockTypography>) => {
     updateBlockStyle(block.id, {
       typography: { ...typography, ...partial },
-    })
-  }
+    });
+  };
+
+  const rawSize = typography.fontSize ? Number.parseInt(typography.fontSize, 10) : 16;
+  const sliderSize = Number.isNaN(rawSize) ? 16 : Math.min(Math.max(rawSize, 8), 72);
+
+  const rawLineHeight = typography.lineHeight ? Number.parseFloat(typography.lineHeight) : 1.5;
+  const sliderLineHeight = Number.isNaN(rawLineHeight) ? 1.5 : Math.min(Math.max(rawLineHeight, 0.8), 3);
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-3.5 py-2.5 border-b border-border-default flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-text-2">Typography</span>
-        <div className="flex gap-1">
-          <button
-            onClick={() => {
-              const typography = useEditorStore.getState().clipboardStyle?.typography
-              if (typography) {
-                setTypo(typography)
-                toast('Typography pasted')
-              } else {
-                toast('No typography in clipboard')
-              }
-            }}
-            className="p-1 rounded hover:bg-bg-3 text-text-3 hover:text-text-1 transition-colors"
-            title="Paste typography"
-          >
-            <Clipboard size={12} />
-          </button>
-          <button
-            onClick={() => {
-              useEditorStore.getState().setClipboardStyle({ typography })
-              toast('Typography copied')
-            }}
-            className="p-1 rounded hover:bg-bg-3 text-text-3 hover:text-text-1 transition-colors"
-            title="Copy typography"
-          >
-            <Copy size={12} />
-          </button>
+    <div className="flex flex-col h-full select-none">
+      {/* Header bar */}
+      <div className="px-3 pt-3 pb-2.5 border-b border-border-default shrink-0 bg-bg-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-md bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <Type size={12} />
+            </div>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-text-0">Typography</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                useEditorStore.getState().setClipboardStyle({ typography });
+                toast.success("Typography copied");
+              }}
+              className="p-1.5 rounded-md border border-border-default bg-bg-2 text-text-3 hover:text-text-1 hover:border-border-hover transition-colors"
+              title="Copy typography"
+            >
+              <Copy size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const pasted = useEditorStore.getState().clipboardStyle?.typography;
+                if (pasted) {
+                  setTypo(pasted);
+                  toast.success("Typography applied");
+                } else {
+                  toast.error("No typography in clipboard");
+                }
+              }}
+              className="p-1.5 rounded-md border border-border-default bg-bg-2 text-text-3 hover:text-text-1 hover:border-border-hover transition-colors"
+              title="Paste typography"
+            >
+              <Clipboard size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                updateBlockStyle(block.id, { typography: undefined });
+                toast.success("Typography reset");
+              }}
+              className="p-1.5 rounded-md border border-border-default bg-bg-2 text-text-3 hover:text-status-red hover:border-status-red/40 transition-colors"
+              title="Reset typography"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <Section title="Font">
-          <div>
-            <label className="block text-[10px] text-text-3 mb-1">Font Family</label>
+      {/* Controls */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 overscroll-contain">
+        {/* Font Family */}
+        <Section title="Font Family" icon={<Type size={12} />}>
+          <div className="space-y-2.5">
             <select
-              value={typography.fontFamily || ''}
+              value={typography.fontFamily || ""}
               onChange={(e) => setTypo({ fontFamily: e.target.value })}
-              className="w-full px-2 py-1.5 rounded border border-border-default bg-bg-2 text-text-0 text-[11px] outline-none focus:border-green cursor-pointer"
+              className="w-full px-2.5 py-1.5 rounded-lg border border-border-default bg-bg-2 text-text-0 text-[11.5px] outline-none hover:border-border-hover focus:border-green cursor-pointer font-medium"
             >
               <option value="">Inherit from theme</option>
               {googleFontOptions.map((f) => (
-                <option key={f} value={f}>{f}</option>
+                <option key={f} value={f}>
+                  {f}
+                </option>
               ))}
             </select>
+
+            {/* Live preview banner */}
+            <div
+              className="p-2.5 rounded-lg border border-border-subtle bg-bg-2/50 text-center overflow-hidden"
+              style={{
+                fontFamily: typography.fontFamily ? `"${typography.fontFamily}", sans-serif` : undefined,
+                fontWeight: typography.fontWeight as React.CSSProperties["fontWeight"],
+                color: typography.color || "#ffffff",
+                letterSpacing: typography.letterSpacing,
+                textTransform: typography.textTransform as React.CSSProperties["textTransform"],
+              }}
+            >
+              <p className="text-[14px] leading-snug font-semibold truncate">
+                {typography.fontFamily || "Sample Heading"}
+              </p>
+              <p className="text-[11px] opacity-70 truncate mt-0.5">
+                Modern Real Estate Architecture & Design
+              </p>
+            </div>
           </div>
         </Section>
 
-        <Section title="Size & Weight">
-          <div className="grid grid-cols-2 gap-2">
-            <InputField label="Font Size" value={typography.fontSize} onChange={(v) => setTypo({ fontSize: v })} placeholder="16px" unit="px" />
-            <SelectField label="Font Weight" value={typography.fontWeight} options={fontWeightOptions} onChange={(v) => setTypo({ fontWeight: v })} />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <InputField label="Line Height" value={typography.lineHeight} onChange={(v) => setTypo({ lineHeight: v })} placeholder="1.5" />
-            <InputField label="Letter Spacing" value={typography.letterSpacing} onChange={(v) => setTypo({ letterSpacing: v })} placeholder="0px" unit="px" />
+        {/* Size & Weight */}
+        <Section title="Size & Weight" icon={<Sliders size={12} />}>
+          <div className="space-y-3">
+            {/* Font Size */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-text-3">Font Size</label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={typography.fontSize || ""}
+                    onChange={(e) => setTypo({ fontSize: e.target.value })}
+                    placeholder="16px"
+                    className="w-16 px-1.5 py-0.5 rounded border border-border-default bg-bg-2 text-right text-[11px] font-mono text-text-0 outline-none focus:border-green"
+                  />
+                </div>
+              </div>
+
+              {/* Slider */}
+              <input
+                type="range"
+                min="10"
+                max="64"
+                step="1"
+                value={sliderSize}
+                onChange={(e) => setTypo({ fontSize: `${e.target.value}px` })}
+                className="w-full accent-green cursor-pointer mb-2"
+              />
+
+              {/* Quick Pills */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+                {quickSizes.map((s) => {
+                  const active = typography.fontSize === s.value;
+                  return (
+                    <button
+                      key={s.value}
+                      type="button"
+                      onClick={() => setTypo({ fontSize: s.value })}
+                      className={`text-[9px] px-1.5 py-0.5 rounded border transition-all shrink-0 ${
+                        active
+                          ? "bg-green/15 border-green/40 text-green font-semibold shadow-sm"
+                          : "border-border-default text-text-3 hover:text-text-1 hover:bg-bg-3"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Font Weight */}
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-text-3 mb-1.5">
+                Font Weight
+              </label>
+              <div className="grid grid-cols-6 gap-1 p-0.5 rounded-lg border border-border-default bg-bg-2">
+                {fontWeightPills.map((w) => {
+                  const active = typography.fontWeight === w.value;
+                  return (
+                    <button
+                      key={w.value}
+                      type="button"
+                      onClick={() => setTypo({ fontWeight: w.value })}
+                      title={`${w.name} (${w.value})`}
+                      className={`py-1 text-center rounded text-[9.5px] transition-all font-semibold ${
+                        active
+                          ? "bg-green/15 text-green border border-green/30 shadow-sm"
+                          : "text-text-3 hover:text-text-1 hover:bg-bg-3 border border-transparent"
+                      }`}
+                    >
+                      {w.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </Section>
 
-        <Section title="Transform & Decoration">
-          <SelectField label="Text Transform" value={typography.textTransform} options={textTransformOptions} onChange={(v) => setTypo({ textTransform: v })} />
-          <SelectField label="Text Decoration" value={typography.textDecoration} options={textDecorationOptions} onChange={(v) => setTypo({ textDecoration: v })} />
+        {/* Color & Alignment */}
+        <Section title="Color & Alignment" icon={<Baseline size={12} />}>
+          <div className="space-y-3">
+            <ColorInput
+              label="Text Color"
+              value={typography.color}
+              onChange={(v) => setTypo({ color: v })}
+            />
+
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-text-3 mb-1.5">
+                Text Alignment
+              </label>
+              <div className="grid grid-cols-4 gap-1 p-0.5 rounded-lg border border-border-default bg-bg-2">
+                {[
+                  { id: "left", icon: AlignLeft, label: "Left" },
+                  { id: "center", icon: CenterIcon, label: "Center" },
+                  { id: "right", icon: AlignRight, label: "Right" },
+                  { id: "justify", icon: AlignJustify, label: "Justify" },
+                ].map(({ id, icon: Icon, label }) => {
+                  const active = typography.textAlign === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setTypo({ textAlign: id })}
+                      title={label}
+                      className={`flex items-center justify-center py-1.5 rounded-md text-[11px] transition-all ${
+                        active
+                          ? "bg-green/15 text-green font-semibold border border-green/30 shadow-sm"
+                          : "text-text-3 hover:text-text-1 hover:bg-bg-3 border border-transparent"
+                      }`}
+                    >
+                      <Icon size={14} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </Section>
 
-        <Section title="Color & Alignment">
-          <ColorField label="Color" value={typography.color} onChange={(v) => setTypo({ color: v })} />
-          <AlignField value={typography.textAlign} onChange={(v) => setTypo({ textAlign: v })} />
+        {/* Spacing & Line Height */}
+        <Section title="Spacing & Rhythm" defaultOpen={false} icon={<Sliders size={12} />}>
+          <div className="space-y-3">
+            {/* Line Height */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-text-3">Line Height</label>
+                <span className="text-[10px] font-mono text-text-2">
+                  {typography.lineHeight || "1.5"}
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0.9"
+                max="2.5"
+                step="0.05"
+                value={sliderLineHeight}
+                onChange={(e) => setTypo({ lineHeight: e.target.value })}
+                className="w-full accent-green cursor-pointer"
+              />
+            </div>
+
+            {/* Letter Spacing */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-text-3">Letter Spacing</label>
+                <input
+                  type="text"
+                  value={typography.letterSpacing || ""}
+                  onChange={(e) => setTypo({ letterSpacing: e.target.value })}
+                  placeholder="0px"
+                  className="w-16 px-1.5 py-0.5 rounded border border-border-default bg-bg-2 text-right text-[11px] font-mono text-text-0 outline-none focus:border-green"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                {[
+                  { label: "Tight", value: "-0.5px" },
+                  { label: "Normal", value: "0px" },
+                  { label: "Wide", value: "1px" },
+                  { label: "Wider", value: "2px" },
+                ].map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setTypo({ letterSpacing: s.value })}
+                    className={`text-[9px] px-2 py-1 rounded border transition-all flex-1 text-center ${
+                      typography.letterSpacing === s.value
+                        ? "bg-green/15 border-green/40 text-green font-semibold"
+                        : "border-border-default text-text-3 hover:text-text-1 hover:bg-bg-3"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        {/* Transform & Decoration */}
+        <Section title="Transform & Style" defaultOpen={false} icon={<CaseSensitive size={12} />}>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-text-3 mb-1.5">
+                Text Transform
+              </label>
+              <div className="grid grid-cols-4 gap-1 p-0.5 rounded-lg border border-border-default bg-bg-2">
+                {[
+                  { id: "none", label: "None" },
+                  { id: "uppercase", label: "UPPER" },
+                  { id: "lowercase", label: "lower" },
+                  { id: "capitalize", label: "Capital" },
+                ].map(({ id, label }) => {
+                  const active = (typography.textTransform || "none") === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setTypo({ textTransform: id })}
+                      className={`py-1 text-center rounded text-[10px] transition-all font-medium ${
+                        active
+                          ? "bg-green/15 text-green border border-green/30 font-semibold"
+                          : "text-text-3 hover:text-text-1 hover:bg-bg-3 border border-transparent"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-text-3 mb-1.5">
+                Text Decoration
+              </label>
+              <div className="grid grid-cols-3 gap-1 p-0.5 rounded-lg border border-border-default bg-bg-2">
+                {[
+                  { id: "none", label: "None", icon: null },
+                  { id: "underline", label: "Underline", icon: Underline },
+                  { id: "line-through", label: "Strike", icon: Strikethrough },
+                ].map(({ id, label, icon: Icon }) => {
+                  const active = (typography.textDecoration || "none") === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setTypo({ textDecoration: id })}
+                      className={`flex items-center justify-center gap-1 py-1 text-center rounded text-[10px] transition-all font-medium ${
+                        active
+                          ? "bg-green/15 text-green border border-green/30 font-semibold"
+                          : "text-text-3 hover:text-text-1 hover:bg-bg-3 border border-transparent"
+                      }`}
+                    >
+                      {Icon && <Icon size={11} />}
+                      <span>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </Section>
       </div>
     </div>
-  )
+  );
+}
+
+function CenterIcon(props: { size?: number }) {
+  return <AlignCenter size={props.size ?? 14} />;
 }

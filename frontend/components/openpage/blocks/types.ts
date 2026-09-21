@@ -112,6 +112,16 @@ export interface BlockStyle {
   sectionBorderColor?: string;
   sectionBorderRadius?: string;
   typography?: BlockTypography;
+  /**
+   * Per-device value overrides. `desktop` values live on the style root;
+   * tablet/mobile overrides are merged over them at render time, so changing
+   * a mobile value never touches desktop. Like Elementor, colors/borders
+   * shared effects can also be overridden per device if desired.
+   */
+  responsive?: {
+    tablet?: Partial<Omit<BlockStyle, "responsive">>;
+    mobile?: Partial<Omit<BlockStyle, "responsive">>;
+  };
 }
 
 export interface ColumnConfig {

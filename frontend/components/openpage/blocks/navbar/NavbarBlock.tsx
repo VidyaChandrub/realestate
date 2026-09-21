@@ -2,7 +2,7 @@
 
 import { useState, type MouseEvent } from "react";
 import type { BlockConfig } from "../types";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Phone, Mail } from "lucide-react";
 
 export type NavMenuItem = {
   label: string;
@@ -20,6 +20,9 @@ interface NavbarProps {
   ctaText: string;
   ctaId?: string;
   ctaHref?: string;
+  phone?: string;
+  email?: string;
+  badge?: string;
 }
 
 function slugify(label: string): string {
@@ -212,11 +215,234 @@ function NavbarCentered({ props }: { props: NavbarProps }) {
   );
 }
 
+function NavbarDual({ props }: { props: NavbarProps }) {
+  const { logo, logoImage, ctaText, phone, email, badge } = props;
+  const items = normalizeNavLinks(props.links, props.menuItems);
+  const ctaHref = resolveCtaHref(props);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <nav className="sticky top-0 z-40 bg-bg-1/95 backdrop-blur-md border-b border-border-subtle">
+      <div className="hidden @2xl:flex items-center justify-between gap-6 px-6 @md:px-10 py-2 border-b border-border-subtle text-[11px] text-text-3">
+        <div className="flex items-center gap-5 min-w-0">
+          {phone ? (
+            <span className="flex items-center gap-1.5 shrink-0">
+              <Phone size={11} className="text-green" />
+              {phone}
+            </span>
+          ) : null}
+          {email ? (
+            <span className="flex items-center gap-1.5 truncate">
+              <Mail size={11} className="text-green" />
+              {email}
+            </span>
+          ) : null}
+          {!phone && !email ? <span>Sales office open daily 10 AM – 7 PM</span> : null}
+        </div>
+        <span className="flex items-center gap-1.5 shrink-0">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
+          {badge || "RERA Registered Project"}
+        </span>
+      </div>
+      <div className="px-6 @md:px-10 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <Brand logo={logo} logoImage={logoImage} />
+          <div className="hidden @2xl:flex items-center gap-7">
+            <NavLinks items={items} />
+          </div>
+          <div className="flex items-center gap-3">
+            {ctaText ? <CtaButton text={ctaText} href={ctaHref} /> : null}
+            <button
+              type="button"
+              className="@2xl:hidden w-9 h-9 rounded-lg border border-border-default flex items-center justify-center text-text-2 hover:text-text-0 hover:bg-bg-3 transition-colors"
+              onClick={() => setOpen((v) => !v)}
+              aria-label="Menu"
+            >
+              {open ? <X size={16} /> : <Menu size={16} />}
+            </button>
+          </div>
+        </div>
+        {open ? (
+          <div className="@2xl:hidden flex flex-col gap-3 pt-4 pb-2">
+            <NavLinks items={items} onClick={() => setOpen(false)} />
+          </div>
+        ) : null}
+      </div>
+    </nav>
+  );
+}
+
+function NavbarPill({ props }: { props: NavbarProps }) {
+  const { logo, logoImage, ctaText } = props;
+  const items = normalizeNavLinks(props.links, props.menuItems);
+  const ctaHref = resolveCtaHref(props);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <nav className="sticky top-4 z-40 px-4 @md:px-8">
+      <div className="flex items-center justify-between gap-4 rounded-full border border-border-subtle bg-bg-2/85 backdrop-blur-md shadow-lg shadow-black/30 pl-5 pr-2 py-2 @md:px-6">
+        <Brand logo={logo} logoImage={logoImage} />
+        <div className="hidden @2xl:flex items-center gap-6">
+          <NavLinks items={items} />
+        </div>
+        <div className="flex items-center gap-2">
+          {ctaText ? <CtaButton text={ctaText} href={ctaHref} /> : null}
+          <button
+            type="button"
+            className="@2xl:hidden w-9 h-9 rounded-full border border-border-default flex items-center justify-center text-text-2 hover:text-text-0 hover:bg-bg-3 transition-colors"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Menu"
+          >
+            {open ? <X size={16} /> : <Menu size={16} />}
+          </button>
+        </div>
+      </div>
+      {open ? (
+        <div className="@2xl:hidden mt-2 rounded-2xl border border-border-subtle bg-bg-2/95 backdrop-blur-md p-4 flex flex-col gap-3">
+          <NavLinks items={items} onClick={() => setOpen(false)} />
+          {ctaText ? <CtaButton text={ctaText} href={ctaHref} onClick={() => setOpen(false)} /> : null}
+        </div>
+      ) : null}
+    </nav>
+  );
+}
+
+function NavbarGlass({ props }: { props: NavbarProps }) {
+  const { logo, logoImage, ctaText } = props;
+  const items = normalizeNavLinks(props.links, props.menuItems);
+  const ctaHref = resolveCtaHref(props);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <nav className="sticky top-0 z-40 px-4 @md:px-8 py-4">
+      <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl px-5 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            {logoImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoImage} alt={logo} className="h-8 w-auto object-contain" />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-green flex items-center justify-center">
+                <span className="text-[10px] font-bold text-black">H</span>
+              </div>
+            )}
+            <span className="font-semibold text-[15px] text-white tracking-tight font-display">{logo}</span>
+          </div>
+          <div className="hidden @2xl:flex items-center gap-7">
+            {items.map((item, i) => (
+              <a
+                key={`${item.href}-${i}`}
+                href={item.href}
+                onClick={(e) => handleNavClick(e, item.href, undefined)}
+                className="text-[13px] text-white/85 hover:text-white transition-colors"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            {ctaText ? (
+              <a
+                href={ctaHref}
+                onClick={(e) => handleNavClick(e, ctaHref, undefined)}
+                className="px-4 py-2 rounded-lg bg-green text-black text-[13px] font-semibold hover:bg-green-dim transition-all"
+              >
+                {ctaText}
+              </a>
+            ) : null}
+            <button
+              type="button"
+              className="@2xl:hidden w-9 h-9 rounded-lg border border-white/15 flex items-center justify-center text-white hover:bg-white/10 transition-colors"
+              onClick={() => setOpen((v) => !v)}
+              aria-label="Menu"
+            >
+              {open ? <X size={16} /> : <Menu size={16} />}
+            </button>
+          </div>
+        </div>
+        {open ? (
+          <div className="@2xl:hidden flex flex-col gap-3 pt-4 pb-1">
+            {items.map((item, i) => (
+              <a
+                key={`${item.href}-${i}`}
+                href={item.href}
+                onClick={(e) => handleNavClick(e, item.href, () => setOpen(false))}
+                className="text-[13px] text-white/85 hover:text-white transition-colors"
+              >
+                {item.label}
+              </a>
+            ))}
+            {ctaText ? (
+              <a
+                href={ctaHref}
+                onClick={(e) => handleNavClick(e, ctaHref, () => setOpen(false))}
+                className="px-4 py-2 rounded-lg bg-green text-black text-[13px] font-semibold mt-1 self-start"
+              >
+                {ctaText}
+              </a>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </nav>
+  );
+}
+
+function NavbarMinimal({ props }: { props: NavbarProps }) {
+  const { logo, logoImage, ctaText } = props;
+  const items = normalizeNavLinks(props.links, props.menuItems);
+  const ctaHref = resolveCtaHref(props);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <nav className="sticky top-0 z-40 px-6 @md:px-10 py-4">
+      <div className="flex items-center justify-between gap-4">
+        <Brand logo={logo} logoImage={logoImage} />
+        <div className="hidden @2xl:flex items-center gap-7">
+          <NavLinks items={items} />
+        </div>
+        <div className="flex items-center gap-3">
+          {ctaText ? (
+            <a
+              href={ctaHref}
+              onClick={(e) => handleNavClick(e, ctaHref, undefined)}
+              className="text-[13px] font-semibold text-green hover:text-green-dim transition-colors"
+            >
+              {ctaText}
+            </a>
+          ) : null}
+          <button
+            type="button"
+            className="@2xl:hidden w-9 h-9 rounded-lg border border-border-default flex items-center justify-center text-text-2 hover:text-text-0 hover:bg-bg-3 transition-colors"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Menu"
+          >
+            {open ? <X size={16} /> : <Menu size={16} />}
+          </button>
+        </div>
+      </div>
+      {open ? (
+        <div className="@2xl:hidden flex flex-col gap-3 pt-4 pb-2">
+          <NavLinks items={items} onClick={() => setOpen(false)} />
+        </div>
+      ) : null}
+    </nav>
+  );
+}
+
 export function NavbarBlock({ block }: { block: BlockConfig }) {
   const props = block.props as unknown as NavbarProps;
   switch (block.variant) {
     case "centered":
       return <NavbarCentered props={props} />;
+    case "dual":
+      return <NavbarDual props={props} />;
+    case "pill":
+      return <NavbarPill props={props} />;
+    case "glass":
+      return <NavbarGlass props={props} />;
+    case "minimal":
+      return <NavbarMinimal props={props} />;
     default:
       return <NavbarDefault props={props} sticky={block.variant !== "static"} />;
   }

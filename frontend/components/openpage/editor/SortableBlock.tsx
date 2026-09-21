@@ -9,7 +9,7 @@ import { useConfigStore } from "@/components/openpage/store/configStore";
 import { useEditorStore } from "@/components/openpage/store/editorStore";
 import type { BlockConfig } from "../blocks/types";
 import { blockMetadata } from "@/lib/openpage/block-metadata";
-import { isHiddenOnViewport } from "@/lib/openpage/block-style";
+import { isHiddenOnViewport, resolveBlockStyleForDevice } from "@/lib/openpage/block-style";
 
 const blockLabels: Record<string, string> = {
   navbar: 'Header',
@@ -108,7 +108,7 @@ export function SortableBlock({ block, isSelected, onSelect, children }: Props) 
   }, [isSelected])
 
   const isHidden = useMemo(
-    () => isHiddenOnViewport(block.style, viewport),
+    () => isHiddenOnViewport(resolveBlockStyleForDevice(block.style, viewport), viewport),
     [block.style, viewport],
   )
 
@@ -145,11 +145,13 @@ export function SortableBlock({ block, isSelected, onSelect, children }: Props) 
         e.stopPropagation()
         onSelect()
       }}
-      className={`relative cursor-pointer border-b border-border-subtle group transition-[opacity,transform] duration-300 ${
-        isSelected
+      className={`relative cursor-pointer border-b border-border-subtle group transition-[opacity,transform] duration-200 ${
+        isSortableDragging
+          ? "border-2 border-dashed border-[#5b9cff] bg-[#5b9cff]/10 z-50 rounded-lg"
+          : isSelected
           ? "outline outline-2 outline-dashed outline-[#5b9cff] -outline-offset-1"
           : "hover:outline hover:outline-1 hover:outline-dashed hover:outline-[#5b9cff]/50 hover:-outline-offset-1"
-      } ${isSortableDragging ? "z-50" : ""}`}
+      }`}
       role="button"
       aria-label={`${block.type} block${isSelected ? ', selected' : ''}`}
       aria-selected={isSelected}
@@ -161,14 +163,18 @@ export function SortableBlock({ block, isSelected, onSelect, children }: Props) 
         }
       }}
     >
-      {/* Section label + Elementor-style toolbar */}
-      <span
-        className={`absolute top-0 left-0 z-10 text-[9px] font-semibold uppercase tracking-wider text-white bg-[#5b9cff] px-1.5 py-0.5 ${
+      {/* Section label + Drag handle pill */}
+      <div
+        {...attributes}
+        {...listeners}
+        title="Drag to reorder section"
+        className={`absolute top-0 left-0 z-10 text-[10px] font-medium tracking-wide text-white bg-[#5b9cff] hover:bg-[#4a8beb] px-2 py-0.5 rounded-br flex items-center gap-1 cursor-grab active:cursor-grabbing select-none shadow-sm transition-opacity ${
           isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         }`}
       >
-        {blockLabels[block.type] || block.type}
-      </span>
+        <GripVertical size={11} className="shrink-0" />
+        <span>{blockLabels[block.type] || block.type}</span>
+      </div>
 
       <div
         className={`absolute -top-8 right-0 z-20 flex items-center rounded-md overflow-hidden shadow-lg bg-[#6d5dfc] ${
