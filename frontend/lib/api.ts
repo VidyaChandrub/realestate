@@ -1099,14 +1099,36 @@ export async function getProjectSalesAgents(
 }
 
 /**
- * Org members who may be assigned to a project as sales agents — the same
- * "who can hold a lead" rule the Lead Center assignee picker uses (permission
- * based, admins/managers excluded). Server-enforced on the PUT as well.
+ * Who a PROJECT's "Assign sales agents" picker offers: every active member
+ * except Admins and Managers (a manager is picked in the Project manager
+ * field instead). No CRM-permission requirement. Each row carries the
+ * projects the user is already on. The PUT enforces the same rule server-side.
  */
 export async function getProjectSalesAgentCandidates(): Promise<ProjectAssigneeCandidatesResponse> {
   return apiFetch<ProjectAssigneeCandidatesResponse>(
-    "/org/projects/project-assignee-candidates",
+    "/org/projects/project-assignee-candidates?type=sales_agent",
   );
+}
+
+/**
+ * Who the "Project manager" dropdown offers: every active user holding the
+ * manager role — the same set `GET /org/users?role=manager` returns — with the
+ * projects each is already on, so the picker can show who is already assigned.
+ */
+export async function getProjectManagerCandidates(): Promise<ProjectAssigneeCandidatesResponse> {
+  return apiFetch<ProjectAssigneeCandidatesResponse>(
+    "/org/projects/project-assignee-candidates?type=manager",
+  );
+}
+
+/**
+ * Who can be attached to a STANDALONE unit as a sales agent (and to a lead):
+ * the narrower "who can hold a lead" rule — CRM access required, admins and
+ * managers excluded. A project's own agents use the broader list above; keep
+ * the two apart, the server enforces each rule on its own write path.
+ */
+export async function getSalesAgentCandidates(): Promise<CrmAssignableResponse> {
+  return apiFetch<CrmAssignableResponse>("/org/projects/sales-agent-candidates");
 }
 
 /** Full-set replace — pass every assigned user id; re-submitting is idempotent. */

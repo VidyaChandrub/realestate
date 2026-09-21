@@ -19,7 +19,10 @@ import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { ListProjectsQueryDto } from './dto/list-projects-query.dto';
+import {
+  ListAssigneeCandidatesQueryDto,
+  ListProjectsQueryDto,
+} from './dto/list-projects-query.dto';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { SetSalesAgentsDto } from './dto/set-sales-agents.dto';
 import { CreateUnitTypeDto } from './dto/create-unit-type.dto';
@@ -72,10 +75,21 @@ export class ProjectsController {
     return this.service.listSalesAgentCandidates(user.orgId as string);
   }
 
+  /**
+   * Candidates for a project's assignment pickers, with role and existing
+   * project context. `?type=sales_agent` (default) excludes Admins/Managers;
+   * `?type=manager` lists the users holding the manager role.
+   */
   @Get('project-assignee-candidates')
   @RequirePermission('projects', 'view')
-  listProjectAssigneeCandidates(@CurrentUser() user: JwtPayload) {
-    return this.service.listProjectAssigneeCandidates(user.orgId as string);
+  listProjectAssigneeCandidates(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: ListAssigneeCandidatesQueryDto,
+  ) {
+    return this.service.listProjectAssigneeCandidates(
+      user.orgId as string,
+      query.type,
+    );
   }
 
   @Get(':id')

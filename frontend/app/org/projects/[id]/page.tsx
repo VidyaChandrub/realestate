@@ -265,11 +265,11 @@ export default function OrgProjectOverviewPage() {
 
   const specs: { k: string; v: string; mono?: boolean }[] = [
     { k: "Location", v: project.location || "—" },
-    { k: "Configuration", v: configuration },
+    { k: "Unit configurations", v: configuration },
     { k: "Price range", v: priceRange },
-    { k: "Total area", v: project.landArea != null ? `${project.landArea} acres` : "—" },
-    { k: "Towers", v: [project.towerCount != null ? `${project.towerCount} towers` : null, project.floorsDescription || null].filter(Boolean).join(" · ") || "—" },
-    { k: "Carpet range", v: project.carpetRange || "—" },
+    { k: "Total land area", v: project.landArea != null ? `${project.landArea} acres` : "—" },
+    { k: "Towers / floors", v: [project.towerCount != null ? `${project.towerCount} towers` : null, project.floorsDescription || null].filter(Boolean).join(" · ") || "—" },
+    { k: "Carpet area range", v: project.carpetRange || "—" },
     // Planned figure when a planned mix exists, otherwise the real created
     // count. "—" only when there's no inventory of either kind.
     {
@@ -284,8 +284,8 @@ export default function OrgProjectOverviewPage() {
       k: "Available",
       v: !hasInventory ? "—" : String(project.rollup.unitsAvailable),
     },
-    { k: "Possession", v: project.possession || "—" },
-    { k: "RERA", v: project.reraId || "—" },
+    { k: "Expected possession", v: project.possession || "—" },
+    { k: "RERA registration no.", v: project.reraId || "—" },
   ];
 
   return (
@@ -493,19 +493,19 @@ export default function OrgProjectOverviewPage() {
               <div className="card-b col gap-14">
                 <div className="spec-grid">
                   <div className="sp">
-                    <div className="k">Price Range</div>
+                    <div className="k">Price range</div>
                     <div className="v">{priceRange}</div>
                   </div>
                   <div className="sp">
-                    <div className="k">Base Rate</div>
+                    <div className="k">Price per sqft</div>
                     <div className="v">{project.baseRate ? `${formatMoney(project.baseRate, project.currency)}/sqft` : "—"}</div>
                   </div>
                   <div className="sp">
-                    <div className="k">Booking Token</div>
+                    <div className="k">Booking amount</div>
                     <div className="v">{project.bookingAmount ? formatMoney(project.bookingAmount, project.currency) : "—"}</div>
                   </div>
                   <div className="sp">
-                    <div className="k">Payment Plan</div>
+                    <div className="k">Payment plan</div>
                     <div className="v">{project.paymentPlan || "Standard Milestone"}</div>
                   </div>
                 </div>
@@ -513,7 +513,7 @@ export default function OrgProjectOverviewPage() {
                 {project.priceIncludes && project.priceIncludes.length > 0 ? (
                   <div style={{ borderTop: "1px solid var(--line)", paddingTop: 12 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 8 }}>
-                      Price Inclusions
+                      Price inclusions
                     </div>
                     <div className="row wrap gap-8">
                       {project.priceIncludes.map((inc) => (
@@ -526,7 +526,7 @@ export default function OrgProjectOverviewPage() {
                 ) : null}
 
                 {project.offers ? (
-                  noteBlock("Special Offers & Incentives", project.offers, true)
+                  noteBlock("Current offers / schemes", project.offers, true)
                 ) : null}
               </div>
             </div>
@@ -545,7 +545,7 @@ export default function OrgProjectOverviewPage() {
 
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 8 }}>
-                    Transit &amp; Highway Connectivity
+                    Nearby connectivity
                   </div>
                   <div className="row wrap gap-8">
                     {project.connectivity.length === 0 ? (
@@ -559,7 +559,7 @@ export default function OrgProjectOverviewPage() {
                 </div>
 
                 {project.landmarks
-                  ? noteBlock("Key landmarks nearby", project.landmarks, true)
+                  ? noteBlock("Key landmarks", project.landmarks, true)
                   : null}
               </div>
             </div>
@@ -598,7 +598,7 @@ export default function OrgProjectOverviewPage() {
                       </div>
                     ) : null}
                     {spec.notes
-                      ? noteBlock("Architectural & engineering notes", spec.notes, specRows.length > 0)
+                      ? noteBlock("Additional notes", spec.notes, specRows.length > 0)
                       : null}
                   </>
                 )}
@@ -641,7 +641,7 @@ export default function OrgProjectOverviewPage() {
                   <div className="spec-grid">
                     {/* Intentionally hidden: ad-source settings are not implemented yet and may return later. */}
                     {/* <div className="sp"><div className="k">Ad sources</div><div className="v">{mkt.adSources?.length ? mkt.adSources.join(", ") : "—"}</div></div> */}
-                    <div className="sp"><div className="k">Monthly budget</div><div className="v">{formatMoney(mkt.monthlyBudget ?? null, project.currency)}</div></div>
+                    <div className="sp"><div className="k">Monthly ad budget</div><div className="v">{formatMoney(mkt.monthlyBudget ?? null, project.currency)}</div></div>
                     <div className="sp"><div className="k">Target CPL</div><div className="v">{formatMoney(mkt.targetCpl ?? null, project.currency)}</div></div>
                     <div className="sp"><div className="k">Monthly lead goal</div><div className="v">{mkt.leadGoal ? `${mkt.leadGoal} leads` : "—"}</div></div>
                     <div className="sp"><div className="k">Landing page</div><div className="v">{mkt.landingPageChoice || "—"}</div></div>
@@ -945,7 +945,7 @@ export default function OrgProjectOverviewPage() {
                     <div>
                       <span className="nm" style={{ fontWeight: 600 }}>{project.manager.name}</span>
                       <br />
-                      <span className="sm" style={{ fontSize: 11.5, color: "var(--muted)" }}>Project Manager</span>
+                      <span className="sm" style={{ fontSize: 11.5, color: "var(--muted)" }}>Project manager</span>
                     </div>
                   </div>
                 ) : (
@@ -959,7 +959,7 @@ export default function OrgProjectOverviewPage() {
                     <div>
                       <span className="nm" style={{ fontWeight: 600 }}>{a.name}</span>
                       <br />
-                      <span className="sm" style={{ fontSize: 11.5, color: "var(--muted)" }}>Sales Agent</span>
+                      <span className="sm" style={{ fontSize: 11.5, color: "var(--muted)" }}>Sales agent</span>
                     </div>
                   </div>
                 ))}

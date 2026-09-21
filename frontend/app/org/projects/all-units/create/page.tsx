@@ -8,7 +8,7 @@ import {
   apiFetch,
   createStandaloneUnit,
   getOrgCatalogOptions,
-  getProjectSalesAgentCandidates,
+  getSalesAgentCandidates,
 } from "@/lib/api";
 import { parseAmount, parseCount, parseInteger } from "@/lib/parse";
 import { formatMoney } from "@/lib/money";
@@ -158,7 +158,7 @@ export default function UnitCreatePage() {
       .catch(() => {
         if (!cancelled) setManagers([]);
       });
-    getProjectSalesAgentCandidates()
+    getSalesAgentCandidates()
       .then((res) => {
         if (!cancelled) setSalesAgentCandidates(res.data);
       })

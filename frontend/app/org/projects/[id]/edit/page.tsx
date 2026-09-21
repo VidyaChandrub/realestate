@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectSalesAgentCandidates, setProjectSalesAgents } from "@/lib/api";
+import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectManagerCandidates, getProjectSalesAgentCandidates, getProjectSalesAgents, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { CURRENCY_OPTIONS } from "@/lib/countries";
 import {
+  alreadyAssignedLabel,
   CatalogOptions,
   ConfigSizePriceTable,
+  ManagerPicker,
   MoneyInput,
   SpecificationRows,
   type ConfigSizePriceRow,
@@ -33,19 +35,14 @@ import type {
   Amenity,
   LandingPageRow,
   OrgCatalogOption,
-  OrgUser,
-  OrgUsersListResponse,
   ProjectDetail,
   ProjectAssigneeCandidate,
+  ProjectSalesAgent,
   ProjectStatus,
   SafeOrganisation,
   UnitType,
   UpdateProjectInput,
 } from "@/lib/types";
-
-function userLabel(u: OrgUser): string {
-  return [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
-}
 
 function toField(value: number | null | undefined): string {
   return value == null ? "" : String(value);
@@ -136,7 +133,7 @@ export default function OrgProjectEditPage() {
   const [possession, setPossession] = useState("");
   const [managerId, setManagerId] = useState("");
   const [status, setStatus] = useState<ProjectStatus>("active");
-  const [managers, setManagers] = useState<OrgUser[]>([]);
+  const [managers, setManagers] = useState<ProjectAssigneeCandidate[]>([]);
   const [currentManager, setCurrentManager] = useState<{ id: string; name: string } | null>(null);
 
   // --- Pricing & payment ---
@@ -203,6 +200,11 @@ export default function OrgProjectEditPage() {
   const [salesUsers, setSalesUsers] = useState<ProjectAssigneeCandidate[]>([]);
   const [salesTeam, setSalesTeam] = useState("");
   const [agentAssign, setAgentAssign] = useState<string[]>([]);
+  // Who is assigned right now (with names), and whether the eligible list has
+  // loaded — together they surface an agent who was assigned while Admins and
+  // Managers were still allowed, so they aren't left invisible in the picker.
+  const [assignedAgents, setAssignedAgents] = useState<ProjectSalesAgent[]>([]);
+  const [salesUsersLoaded, setSalesUsersLoaded] = useState(false);
   const [requireBookingApproval, setRequireBookingApproval] = useState(false);
   const [visibleToTelecallers, setVisibleToTelecallers] = useState(true);
   const [publishedToWebsite, setPublishedToWebsite] = useState(false);
@@ -324,15 +326,24 @@ export default function OrgProjectEditPage() {
   }, [accessToken, id]);
 
   useEffect(() => {
+    if (!accessToken || !id) return;
+    getProjectSalesAgents(id)
+      .then(setAssignedAgents)
+      .catch(() => setAssignedAgents([]));
+  }, [accessToken, id]);
+
+  useEffect(() => {
     if (!accessToken) return;
     const auth = { headers: { Authorization: `Bearer ${accessToken}` } };
-    apiFetch<OrgUsersListResponse>("/org/users?role=manager&limit=100&status=active", auth)
+    // Everyone holding the manager role (same set the Users list gives for
+    // role=manager), each with the projects they're already on.
+    getProjectManagerCandidates()
       .then((res) => setManagers(res.data))
       .catch(() => setManagers([]));
-    // "Who can hold a lead" — resolved server-side (permission-based, admins
-    // and managers excluded), and the same rule the PUT enforces.
+    // Everyone except Admins and Managers, resolved server-side — the same
+    // rule the PUT enforces.
     getProjectSalesAgentCandidates()
-      .then((res) => setSalesUsers(res.data))
+      .then((res) => { setSalesUsers(res.data); setSalesUsersLoaded(true); })
       .catch(() => setSalesUsers([]));
     apiFetch<SafeOrganisation>("/org/settings", auth)
       .then((o) => setOrgName(o.name))
@@ -369,8 +380,11 @@ export default function OrgProjectEditPage() {
   const connectivityOptions = (catalog ?? []).filter((o) => o.category === "connectivity");
   const amenityOptions = (catalog ?? []).filter((o) => o.category === "amenity");
   // --- Required fields, from the shared rules (see STEP_SECTION) -----------
+  const ineligibleAssigned = salesUsersLoaded
+    ? assignedAgents.filter((a) => !salesUsers.some((u) => u.id === a.id))
+    : [];
   const requirements = projectRequirements({
-    name, projectType, reraId, currency, priceMin, address: addressLine, city, managerId,
+    name, projectType, currency, status, priceMin, address: addressLine, city, managerId,
   });
   const missingFields = allMissing(requirements);
   /** The inline message for a field, once Save has been attempted. */
@@ -858,13 +872,12 @@ export default function OrgProjectEditPage() {
                 <div className="hint">Shown on the public page and ad landing pages.</div>
               </div>
               <div className="row2">
-                <div className={fieldClass("reraId")}>
-                  <label>RERA ID <span className="req">*</span></label>
+                <div className="field">
+                  <label>RERA registration no.</label>
                   <input className="inp" value={reraId} onChange={(e) => setReraId(e.target.value)} />
-                  {fieldError("reraId") ? <div className="field-err">{fieldError("reraId")}</div> : null}
                 </div>
                 <div className="field">
-                  <label>Possession</label>
+                  <label>Expected possession</label>
                   <input className="inp" placeholder="e.g. Dec 2027" value={possession} onChange={(e) => setPossession(e.target.value)} />
                 </div>
               </div>
@@ -883,12 +896,13 @@ export default function OrgProjectEditPage() {
                   </select>
                 </div>
               </div>
-              <div className="field mb-0">
-                <label>Status</label>
+              <div className={fieldClass("status")}>
+                <label>Status <span className="req">*</span></label>
                 <select value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
+                {fieldError("status") ? <div className="field-err">{fieldError("status")}</div> : null}
               </div>
             </div>
           </div>
@@ -982,7 +996,7 @@ export default function OrgProjectEditPage() {
                 <div className="field"><label>Pincode</label><input className="inp" value={pincode} onChange={(e) => setPincode(e.target.value)} /></div>
               </div>
               <div className="field">
-                <label>Nearby (connectivity)</label>
+                <label>Nearby connectivity</label>
                 <CatalogOptions
                   category="connectivity"
                   options={connectivityOptions}
@@ -1090,7 +1104,7 @@ export default function OrgProjectEditPage() {
               <div className="row3">
                 <div className="field"><label>No. of towers / blocks</label><input className="inp" type="number" min={0} value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /></div>
                 <div className="field"><label>Floors / structure</label><input className="inp" placeholder="G+22" value={floorsDescription} onChange={(e) => setFloorsDescription(e.target.value)} /></div>
-                <div className="field"><label>Land area (acres)</label><input className="inp" type="number" min={0} step="0.01" value={landArea} onChange={(e) => setLandArea(e.target.value)} /></div>
+                <div className="field"><label>Total land area (acres)</label><input className="inp" type="number" min={0} step="0.01" value={landArea} onChange={(e) => setLandArea(e.target.value)} /></div>
               </div>
 
               <div className="field">
@@ -1188,18 +1202,10 @@ export default function OrgProjectEditPage() {
           <div className="card" id="sec-team" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Team &amp; access</span></div>
             <div className="card-b">
-              <div className="row2">
+              <div>
                 <div className={fieldClass("managerId")}>
                   <label>Project manager <span className="req">*</span></label>
-                  <select value={managerId} onChange={(e) => setManagerId(e.target.value)}>
-                    <option value="">Unassigned</option>
-                    {currentManager && !managers.some((u) => u.id === currentManager.id) ? (
-                      <option value={currentManager.id}>{currentManager.name} (current)</option>
-                    ) : null}
-                    {managers.map((u) => (
-                      <option key={u.id} value={u.id}>{userLabel(u)}</option>
-                    ))}
-                  </select>
+                  <ManagerPicker managers={managers} value={managerId} onChange={setManagerId} current={currentManager} />
                   {fieldError("managerId") ? <div className="field-err">{fieldError("managerId")}</div> : null}
                 </div>
                 {/* Intentionally hidden: this is a free-text regional label ("Ahmedabad — West"), not a
@@ -1220,7 +1226,7 @@ export default function OrgProjectEditPage() {
               </div>
               <div className="field">
                 <label>Assigned sales agents</label>
-                {salesUsers.length === 0 ? (
+                {salesUsers.length === 0 && ineligibleAssigned.length === 0 ? (
                   <div className="hint">No assignable users in your organisation yet — add them under Users.</div>
                 ) : (
                   <div className="opts project-assignee-options">
@@ -1232,9 +1238,22 @@ export default function OrgProjectEditPage() {
                           <span className="project-assignee-meta">
                             <b>{u.name}</b>
                             <small className="project-assignee-role">{u.role?.name ?? "No role"}</small>
-                            {u.projects.length > 0 ? (
-                              <small className="project-assignee-projects">Already assigned: {u.projects.map((p) => `${p.name} (${p.role})`).join(", ")}</small>
+                            {alreadyAssignedLabel(u.projects) ? (
+                              <small className="project-assignee-projects">{alreadyAssignedLabel(u.projects)}</small>
                             ) : null}
+                          </span>
+                        </span>
+                      );
+                    })}
+                    {ineligibleAssigned.map((a) => {
+                      const on = agentAssign.includes(a.id);
+                      return (
+                        <span key={a.id} className={`opt project-assignee-option ${on ? "on" : ""}`} onClick={() => setAgentAssign((prev) => (on ? prev.filter((x) => x !== a.id) : [...prev, a.id]))}>
+                          <span className="b">{on ? "✓" : ""}</span>
+                          <span className="project-assignee-meta">
+                            <b>{a.name}</b>
+                            <small className="project-assignee-role">Admin or Manager — no longer allowed as a sales agent</small>
+                            <small className="project-assignee-projects">Untick to remove; once removed they can&apos;t be added back here.</small>
                           </span>
                         </span>
                       );
