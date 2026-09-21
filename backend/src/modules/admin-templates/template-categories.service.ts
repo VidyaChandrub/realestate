@@ -28,9 +28,9 @@ export class TemplateCategoriesService {
       name: c.name,
       slug: c.slug,
       tier: c.tier,
-      templateCount: c._count.templates,
-      createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt.toISOString(),
+      templateCount: c._count?.templates ?? 0,
+      createdAt: c.createdAt ? c.createdAt.toISOString() : null,
+      updatedAt: c.updatedAt ? c.updatedAt.toISOString() : null,
     }));
   }
 
