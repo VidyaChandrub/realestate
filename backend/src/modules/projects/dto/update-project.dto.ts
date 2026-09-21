@@ -270,4 +270,25 @@ export class UpdateProjectDto {
   @IsString({ each: true })
   @MaxLength(2048, { each: true })
   floorPlanUrls?: string[];
+
+  // This project's own copy of its type's field templates (the wizard prefills
+  // them from the type; the user may add / remove / edit per project) and the
+  // typed values for the project template. Validated in depth server-side by
+  // normalizeFieldTemplate / validateCustomValues.
+  @IsOptional()
+  @IsArray()
+  projectFieldTemplate?: unknown[];
+
+  @IsOptional()
+  @IsArray()
+  unitFieldTemplate?: unknown[];
+
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  groupLabel?: string;
 }

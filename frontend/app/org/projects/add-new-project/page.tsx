@@ -7,6 +7,23 @@ import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectManagerCa
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { CURRENCY_OPTIONS } from "@/lib/countries";
+import { useProjectTypes } from "@/lib/use-project-types";
+import {
+  customFieldRequirements,
+  draftToPayload,
+  fieldsToRows,
+  groupNoun,
+  groupPlural,
+  LAYOUT_TRAITS,
+  rowsToTemplate,
+  validateFieldRows,
+  valuesToDraft,
+  type CustomValueDraft,
+  type FieldDef,
+  type FieldRow,
+  type ProjectLayout,
+} from "@/lib/field-template";
+import { CustomFieldInputs, ProjectTemplateCustomizer } from "@/components/org/project-type-fields";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import {
   alreadyAssignedLabel,
@@ -123,6 +140,8 @@ interface WizardDraft {
   status: ProjectStatus; launchDate: string; possession: string; constructionStage: string;
   selectedConfigs: string[]; towerCount: string; floorsDescription: string; landArea: string;
   carpetRange: string; highlights: string; unitTypes: UnitTypeDraft[];
+  // This project's copy of its type's templates + the typed values (Step 2).
+  projectFields?: FieldDef[]; unitFields?: FieldDef[]; groupLabel?: string; customValues?: CustomValueDraft;
   priceMin: string; priceMax: string; baseRate: string; bookingAmount: string; currency: string;
   priceIncludes: string[]; paymentPlan: string; offers: string;
   address: string; city: string; locality: string; pincode: string;
@@ -342,6 +361,21 @@ export default function AddNewProjectPage() {
   // refetched on entry to each catalog step so freshly-added options show up.
   const [catalog, setCatalog] = useState<OrgCatalogOption[] | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const projectTypes = useProjectTypes(!!accessToken && CATALOG_STEPS.has(step));
+  // The project's own editable copy of its type's field templates, the name of
+  // its grouping column, and the typed values for the project-level template.
+  const [projectFieldRows, setProjectFieldRows] = useState<FieldRow[]>([]);
+  const [unitFieldRows, setUnitFieldRows] = useState<FieldRow[]>([]);
+  const [groupLabel, setGroupLabel] = useState("");
+  const [customValues, setCustomValues] = useState<CustomValueDraft>({});
+  // No type picked (or not loaded yet) behaves as `tower` — today's experience.
+  const layout: ProjectLayout = projectTypes.types?.find((t) => t.name === projectType)?.layout ?? "tower";
+  const traits = LAYOUT_TRAITS[layout];
+  const groupName = groupNoun(layout, groupLabel);
+  const projectTemplate = useMemo(
+    () => rowsToTemplate(projectFieldRows.filter((r) => r.label.trim())),
+    [projectFieldRows],
+  );
 
   useEffect(() => {
     if (!accessToken) return;
@@ -421,8 +455,12 @@ export default function AddNewProjectPage() {
   // --- Required fields, per step. The rules live in lib/project-validation
   // so the edit page enforces exactly the same set. ---
   const requiredByStep = useMemo(
-    () => projectRequirements({ name, projectType, currency, status, priceMin, address, city, managerId }),
-    [name, projectType, currency, status, priceMin, address, city, managerId],
+    () =>
+      projectRequirements(
+        { name, projectType, currency, status, priceMin, address, city, managerId },
+        { 1: customFieldRequirements(projectTemplate, customValues) },
+      ),
+    [name, projectType, currency, status, priceMin, address, city, managerId, projectTemplate, customValues],
   );
 
   const missingOnStep = useCallback(
@@ -448,6 +486,24 @@ export default function AddNewProjectPage() {
   const markValidated = useCallback((i: number) => {
     setValidatedSteps((prev) => (prev.includes(i) ? prev : [...prev, i]));
   }, []);
+
+  // Picking a type prefills this project's templates and group name from it and
+  // resets what belonged to the previous type. Structure the new layout
+  // doesn't have (floors, configurations, group count) is cleared, so nothing
+  // stale is submitted.
+  function pickProjectType(label: string) {
+    const next = projectType === label ? "" : label;
+    const def = projectTypes.types?.find((t) => t.name === next) ?? null;
+    setProjectType(next);
+    setProjectFieldRows(fieldsToRows(def?.projectFields));
+    setUnitFieldRows(fieldsToRows(def?.unitFields));
+    setGroupLabel(def?.groupLabel ?? "");
+    setCustomValues({});
+    const t = LAYOUT_TRAITS[def?.layout ?? "tower"];
+    if (!t.floors) { setFloorsDescription(""); setCarpetRange(""); setLandArea(""); }
+    if (!t.configurations) { setSelectedConfigs([]); setUnitTypes([]); }
+    if (!t.grouped) setTowerCount("");
+  }
 
   // Continue: check this step's own required fields right here. Anything
   // missing blocks the move and surfaces inline + in the footer summary.
@@ -495,6 +551,9 @@ export default function AddNewProjectPage() {
       _savedAt: Date.now(),
       step, name, projectType, tagline, reraId, status, launchDate, possession, constructionStage,
       selectedConfigs, towerCount, floorsDescription, landArea, carpetRange, highlights, unitTypes,
+      projectFields: rowsToTemplate(projectFieldRows.filter((r) => r.label.trim())),
+      unitFields: rowsToTemplate(unitFieldRows.filter((r) => r.label.trim())),
+      groupLabel, customValues,
       priceMin, priceMax, baseRate, bookingAmount, currency, priceIncludes, paymentPlan, offers,
       address, city, locality, pincode, nearby, landmarks,
       amenities, specRows, specNotes,
@@ -514,6 +573,7 @@ export default function AddNewProjectPage() {
       managerId, salesTeam, agentAssign, requireApproval, visibleTele, publishWeb,
       coverImageUrl, galleryUrls, brochureUrl, reraCertificateUrl, floorPlanUrls,
       customLandingPageId, customLandingPageSlug, customLandingPageName, selectedTemplate,
+      projectFieldRows, unitFieldRows, groupLabel, customValues,
     ],
   );
 
@@ -591,6 +651,8 @@ export default function AddNewProjectPage() {
     setFloorsDescription(d.floorsDescription ?? "");
     setLandArea(d.landArea ?? ""); setCarpetRange(d.carpetRange ?? "");
     setHighlights(d.highlights ?? ""); setUnitTypes(d.unitTypes ?? []);
+    setProjectFieldRows(fieldsToRows(d.projectFields)); setUnitFieldRows(fieldsToRows(d.unitFields));
+    setGroupLabel(d.groupLabel ?? ""); setCustomValues(d.customValues ?? {});
     setPriceMin(d.priceMin ?? ""); setPriceMax(d.priceMax ?? ""); setBaseRate(d.baseRate ?? ""); setBookingAmount(d.bookingAmount ?? "");
     setCurrency(d.currency ?? "INR"); setPriceIncludes(d.priceIncludes ?? []);
     setPaymentPlan(d.paymentPlan ?? ""); setOffers(d.offers ?? "");
@@ -711,6 +773,14 @@ export default function AddNewProjectPage() {
       return;
     }
 
+    const templateProblem =
+      validateFieldRows(projectFieldRows, "Project fields") ?? validateFieldRows(unitFieldRows, "Unit fields");
+    if (templateProblem) {
+      setError(templateProblem);
+      setStep(1);
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
@@ -751,11 +821,17 @@ export default function AddNewProjectPage() {
         priceMin: parseAmount(priceMin),
         priceMax: parseAmount(priceMax),
         baseRate: parseAmount(baseRate),
-        landArea: parseDecimal(landArea),
-        towerCount: parseCount(towerCount),
-        floorsDescription: floorsDescription.trim() || undefined,
-        carpetRange: carpetRange.trim() || undefined,
+        landArea: traits.configurations ? parseDecimal(landArea) : undefined,
+        towerCount: traits.grouped ? parseCount(towerCount) : undefined,
+        floorsDescription: traits.floors ? floorsDescription.trim() || undefined : undefined,
+        carpetRange: traits.configurations ? carpetRange.trim() || undefined : undefined,
         projectType: projectType || undefined,
+        // This project's own copy of the type's templates, and the typed
+        // values — validated again server-side.
+        projectFieldTemplate: projectTemplate,
+        unitFieldTemplate: rowsToTemplate(unitFieldRows.filter((r) => r.label.trim())),
+        customFields: draftToPayload(projectTemplate, customValues),
+        groupLabel: traits.grouped ? groupLabel.trim() : undefined,
         tagline: tagline.trim() || undefined,
         launchDate: launchDate || undefined,
         constructionStage: constructionStage || undefined,
@@ -797,7 +873,7 @@ export default function AddNewProjectPage() {
       });
 
       const seededNames = new Set<string>();
-      for (const u of unitTypes) {
+      for (const u of traits.configurations ? unitTypes : []) {
         if (!u.name.trim()) continue;
         const utBody: CreateUnitTypeInput = {
           name: u.name.trim(),
@@ -817,7 +893,7 @@ export default function AddNewProjectPage() {
       // Seed the planned unit mix from the configurations picked in Step 2.
       // Counts start at 0 — the user fills them in later on the Units tab.
       // Without this the picked configs are shown in Review and then vanish.
-      for (const label of selectedConfigs) {
+      for (const label of traits.configurations ? selectedConfigs : []) {
         if (seededNames.has(label)) continue;
         const utBody: CreateUnitTypeInput = { name: label, totalUnits: 0 };
         await apiFetch(`/org/projects/${project.id}/unit-types`, {
@@ -1196,12 +1272,17 @@ export default function AddNewProjectPage() {
                   <div className={fieldClass("projectType")}><label>Project type <span className="req">*</span></label>
                     <CatalogOptions
                       category="project_type"
-                      options={catalogByCategory.project_type}
-                      loaded={catalog !== null}
-                      error={catalogError}
+                      options={projectTypes.options}
+                      loaded={projectTypes.loaded}
+                      error={projectTypes.error}
+                      emptyAction={
+                        <button type="button" className="btn btn-primary btn-sm" disabled={projectTypes.adding} onClick={() => void projectTypes.addCommon()}>
+                          {projectTypes.adding ? "Adding…" : "Add common project types"}
+                        </button>
+                      }
                       single
                       isSelected={(label) => projectType === label}
-                      onToggle={(label) => setProjectType((cur) => (cur === label ? "" : label))}
+                      onToggle={pickProjectType}
                     />
                     {invalid("projectType") && <div className="field-err">Pick a project type.</div>}
                   </div>
@@ -1235,36 +1316,67 @@ export default function AddNewProjectPage() {
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 2 of 9</div><h2>Inventory &amp; configuration</h2><div className="sub">Which unit types this project offers and the overall inventory picture.</div></div>
                 <div className="q-sec">
-                  <div className="lbl">🏠 Unit configurations (select all)</div>
-                  <div className="field">
-                    <CatalogOptions
-                      category="unit_type"
-                      options={catalogByCategory.unit_type}
-                      loaded={catalog !== null}
-                      error={catalogError}
-                      isSelected={(label) => selectedConfigs.includes(label)}
-                      onToggle={toggleConfig}
-                    />
-                  </div>
-                  <div className="grid g3">
-                    <div className="field"><label>No. of towers / blocks</label><input className="inp" type="number" placeholder="4" value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /></div>
-                    <div className="field"><label>Floors / structure</label><input className="inp" placeholder="G+22" value={floorsDescription} onChange={(e) => setFloorsDescription(e.target.value)} /></div>
-                    <div className="field"><label>Carpet area range (sqft)</label><input className="inp" placeholder="640 – 1,850" value={carpetRange} onChange={(e) => setCarpetRange(e.target.value)} /></div>
-                  </div>
-                  <ConfigSizePriceTable
-                    configurations={selectedConfigs}
-                    rows={unitTypes}
-                    onChange={updateUnitType}
-                    currency={currency}
-                    hint="Optional, and editable later from the project's Edit page or the Units page. Filling these in means adding a unit prefills its area and price from here instead of asking for them again."
-                  />
-                  <div className="field mb-0"><label>Total land area</label>
-                    <div style={{ position: "relative", maxWidth: 260 }}>
-                      <input className="inp" type="number" step="0.01" min={0} style={{ paddingRight: 52 }} placeholder="5.2" value={landArea} onChange={(e) => setLandArea(e.target.value)} />
-                      <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", fontSize: 13, pointerEvents: "none" }}>acres</span>
+                  <div className="lbl">{traits.configurations ? "🏠 Unit configurations (select all)" : "🏠 Inventory"}</div>
+                  {traits.configurations ? (
+                    <div className="field">
+                      <CatalogOptions
+                        category="unit_type"
+                        options={catalogByCategory.unit_type}
+                        loaded={catalog !== null}
+                        error={catalogError}
+                        isSelected={(label) => selectedConfigs.includes(label)}
+                        onToggle={toggleConfig}
+                      />
                     </div>
-                    <div className="hint">Unit counts (planned / available) come from the Units section after publishing.</div>
-                  </div>
+                  ) : null}
+                  {traits.configurations ? (
+                    <div className="grid g3">
+                      <div className="field"><label>{layout === "tower" && !groupLabel.trim() ? "No. of towers / blocks" : `No. of ${groupPlural(groupName ?? "group")}`}</label><input className="inp" type="number" placeholder="4" value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /></div>
+                      <div className="field"><label>Floors / structure</label><input className="inp" placeholder="G+22" value={floorsDescription} onChange={(e) => setFloorsDescription(e.target.value)} /></div>
+                      <div className="field"><label>Carpet area range (sqft)</label><input className="inp" placeholder="640 – 1,850" value={carpetRange} onChange={(e) => setCarpetRange(e.target.value)} /></div>
+                    </div>
+                  ) : traits.grouped ? (
+                    <div className="grid g3">
+                      <div className="field"><label>No. of {groupPlural(groupName ?? "group")}</label><input className="inp" type="number" min={0} placeholder="4" value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /><div className="hint">Units are grouped by {groupName?.toLowerCase()}; new names can only be added up to this number.</div></div>
+                    </div>
+                  ) : null}
+                  {traits.configurations ? (
+                    <ConfigSizePriceTable
+                      configurations={selectedConfigs}
+                      rows={unitTypes}
+                      onChange={updateUnitType}
+                      currency={currency}
+                      hint="Optional, and editable later from the project's Edit page or the Units page. Filling these in means adding a unit prefills its area and price from here instead of asking for them again."
+                    />
+                  ) : null}
+                  <CustomFieldInputs
+                    template={projectTemplate}
+                    values={customValues}
+                    onChange={(key, v) => setCustomValues((cur) => ({ ...cur, [key]: v }))}
+                    errorFor={(id) => (invalid(id) ? fieldError(id) : "")}
+                  />
+                  {traits.configurations ? (
+                    <div className="field mb-0"><label>Total land area</label>
+                      <div style={{ position: "relative", maxWidth: 260 }}>
+                        <input className="inp" type="number" step="0.01" min={0} style={{ paddingRight: 52 }} placeholder="5.2" value={landArea} onChange={(e) => setLandArea(e.target.value)} />
+                        <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", fontSize: 13, pointerEvents: "none" }}>acres</span>
+                      </div>
+                      <div className="hint">Unit counts (planned / available) come from the Units section after publishing.</div>
+                    </div>
+                  ) : (
+                    <div className="hint">Unit counts come from the Units section after publishing.</div>
+                  )}
+                  {projectType && (layout !== "tower" || projectFieldRows.length + unitFieldRows.length > 0) ? (
+                    <ProjectTemplateCustomizer
+                      layout={layout}
+                      projectRows={projectFieldRows}
+                      onProjectRows={setProjectFieldRows}
+                      unitRows={unitFieldRows}
+                      onUnitRows={setUnitFieldRows}
+                      groupLabel={groupLabel}
+                      onGroupLabel={setGroupLabel}
+                    />
+                  ) : null}
                 </div>
                 <div className="q-sec">
                   <div className="lbl">⭐ Unique selling points</div>
@@ -1586,10 +1698,21 @@ export default function AddNewProjectPage() {
                         <div className="sp"><span className="k">Status</span><span className="v"><span className={`badge ${status === "active" ? "b-green" : "b-gray"}`}>{status === "active" ? "Active" : "Inactive"}</span></span></div>
                       </div>
                       <div className="q-sec"><div className="lbl">🏠 Inventory</div>
-                        <div className="sp"><span className="k">Unit configurations</span><span className="v">{formatConfigs(selectedConfigs)}</span></div>
-                        <div className="sp"><span className="k">Towers / floors</span><span className="v">{[towerCount, floorsDescription].filter(Boolean).join(" · ") || "—"}</span></div>
-                        <div className="sp"><span className="k">Carpet area range</span><span className="v">{carpetRange || "—"}</span></div>
-                        <div className="sp"><span className="k">Total land area</span><span className="v">{landArea ? `${landArea} acres` : "—"}</span></div>
+                        {traits.configurations ? (
+                          <>
+                            <div className="sp"><span className="k">Unit configurations</span><span className="v">{formatConfigs(selectedConfigs)}</span></div>
+                            <div className="sp"><span className="k">Towers / floors</span><span className="v">{[towerCount, floorsDescription].filter(Boolean).join(" · ") || "—"}</span></div>
+                            <div className="sp"><span className="k">Carpet area range</span><span className="v">{carpetRange || "—"}</span></div>
+                            <div className="sp"><span className="k">Total land area</span><span className="v">{landArea ? `${landArea} acres` : "—"}</span></div>
+                          </>
+                        ) : traits.grouped ? (
+                          <div className="sp"><span className="k">No. of {groupPlural(groupName ?? "group")}</span><span className="v">{towerCount || "—"}</span></div>
+                        ) : null}
+                        {projectTemplate.map((f) => {
+                          const raw = customValues[f.key] ?? "";
+                          const shown = f.type === "yesno" ? (raw === "yes" ? "Yes" : raw === "no" ? "No" : "") : raw && f.unit ? `${raw} ${f.unit}` : raw;
+                          return <div className="sp" key={f.key}><span className="k">{f.label}</span><span className="v">{shown || "—"}</span></div>;
+                        })}
                         <div className="sp"><span className="k">Price range</span><span className="v">{priceRangeLabel(priceMin, priceMax, currency)}</span></div>
                       </div>
                       <div className="q-sec"><div className="lbl">📍 Location</div>

@@ -58,8 +58,14 @@ export const PROJECT_STEPS = [
  */
 export function projectRequirements(
   v: ProjectRequiredValues,
+  /**
+   * Fields the project's own type adds, by step — today the required project
+   * fields of its template, on Inventory & config. The base rules above hold
+   * for every layout, so a tower project is validated exactly as before.
+   */
+  extra: Record<number, RequiredField[]> = {},
 ): Record<number, RequiredField[]> {
-  return {
+  const base: Record<number, RequiredField[]> = {
     0: [
       { id: "name", label: "Project name", error: "Project name is required.", filled: !!v.name.trim() },
       { id: "projectType", label: "Project type", error: "Pick a project type.", filled: !!v.projectType },
@@ -85,6 +91,11 @@ export function projectRequirements(
       { id: "managerId", label: "Project manager", error: "Assign a project manager.", filled: !!v.managerId },
     ],
   };
+  for (const [step, fields] of Object.entries(extra)) {
+    if (fields.length === 0) continue;
+    base[Number(step)] = [...(base[Number(step)] ?? []), ...fields];
+  }
+  return base;
 }
 
 /** The unfilled required fields on one step. */

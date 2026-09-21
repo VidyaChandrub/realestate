@@ -1,9 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { currencyPrefix } from "@/lib/money";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import { makeSpecRow, type SpecRow } from "@/lib/specifications";
+import { RowListEditor } from "@/components/org/row-list-editor";
 import type {
   OrgCatalogCategory,
   OrgCatalogOption,
@@ -182,6 +184,32 @@ export function pricePerSqftLabel(
   currency = "INR",
 ): string {
   const area = basis === "builtup" ? builtupSqft : carpetSqft;
+  const text = perSqftText(price, area, currency);
+  return text ? `${text} (${PRICE_BASIS_LABEL[basis]})` : "";
+}
+
+/**
+ * ₹/sqft for a unit outside the `tower` layout: price ÷ its single `area`.
+ * There is no carpet / built-up basis to name, so the figure carries none.
+ */
+export function areaPricePerSqftLabel(
+  price: number | null | undefined,
+  area: number | null | undefined,
+  currency = "INR",
+): string {
+  return perSqftText(price, area, currency);
+}
+
+/** " (Carpet)" for a tower unit's basis; empty when the unit has no basis. */
+export function priceBasisSuffix(basis: UnitPriceBasis | null | undefined): string {
+  return basis ? ` (${PRICE_BASIS_LABEL[basis]})` : "";
+}
+
+function perSqftText(
+  price: number | null | undefined,
+  area: number | null | undefined,
+  currency: string,
+): string {
   if (!price || !area) return "";
   const sym = currencyPrefix(currency).trim() || "₹";
   // Two decimal places, not rounded to a whole unit: this is derived, never
@@ -192,7 +220,7 @@ export function pricePerSqftLabel(
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  return `${sym}${value} / sqft (${PRICE_BASIS_LABEL[basis]})`;
+  return `${sym}${value} / sqft`;
 }
 
 const CATALOG_NOUNS: Record<OrgCatalogCategory, string> = {
@@ -273,6 +301,7 @@ export function CatalogOptions({
   single = false,
   isSelected,
   onToggle,
+  emptyAction,
 }: {
   category: OrgCatalogCategory;
   options: OrgCatalogOption[];
@@ -281,6 +310,8 @@ export function CatalogOptions({
   single?: boolean;
   isSelected: (label: string) => boolean;
   onToggle: (label: string) => void;
+  /** Shown beside the "nothing configured" message, e.g. a one-click starter set. */
+  emptyAction?: ReactNode;
 }) {
   if (error) {
     return <div className="hint" style={{ color: "var(--rose)" }}>{error}</div>;
@@ -308,6 +339,7 @@ export function CatalogOptions({
         <a className="brand-link" href="/org/settings?section=catalogs" target="_blank" rel="noreferrer">
           Add them in Settings →
         </a>
+        {emptyAction}
       </div>
     );
   }
@@ -351,54 +383,36 @@ export function SpecificationRows({
   notes: string;
   onNotesChange: (notes: string) => void;
 }) {
-  const update = (key: number, patch: Partial<SpecRow>) =>
-    onChange(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-
   return (
     <>
-      <div className="spec-rows">
-        {rows.length === 0 ? (
-          <div className="hint" style={{ marginBottom: 10 }}>
-            No specifications yet — add the first row below.
-          </div>
-        ) : (
-          rows.map((row) => (
-            <div className="spec-row" key={row.key}>
-              <input
-                className="inp"
-                aria-label="Specification name"
-                placeholder="e.g. Flooring"
-                value={row.label}
-                maxLength={120}
-                onChange={(e) => update(row.key, { label: e.target.value })}
-              />
-              <input
-                className="inp"
-                aria-label={`Value for ${row.label || "this specification"}`}
-                placeholder="e.g. Vitrified tiles / marble in living"
-                value={row.value}
-                onChange={(e) => update(row.key, { value: e.target.value })}
-              />
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm spec-del"
-                aria-label={`Remove ${row.label || "this specification"}`}
-                title="Remove this row"
-                onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
-              >
-                ✕
-              </button>
-            </div>
-          ))
+      <RowListEditor<SpecRow>
+        rows={rows}
+        getKey={(r) => r.key}
+        onChange={onChange}
+        makeRow={makeSpecRow}
+        addLabel="+ Add specification"
+        emptyText="No specifications yet — add the first row below."
+        removeLabel={(r) => `Remove ${r.label || "this specification"}`}
+        renderCells={(row, update) => (
+          <>
+            <input
+              className="inp"
+              aria-label="Specification name"
+              placeholder="e.g. Flooring"
+              value={row.label}
+              maxLength={120}
+              onChange={(e) => update({ label: e.target.value })}
+            />
+            <input
+              className="inp"
+              aria-label={`Value for ${row.label || "this specification"}`}
+              placeholder="e.g. Vitrified tiles / marble in living"
+              value={row.value}
+              onChange={(e) => update({ value: e.target.value })}
+            />
+          </>
         )}
-      </div>
-      <button
-        type="button"
-        className="btn btn-ghost btn-sm mt-8"
-        onClick={() => onChange([...rows, makeSpecRow()])}
-      >
-        + Add specification
-      </button>
+      />
       <div className="field mb-0 mt-14">
         <label>Additional notes</label>
         <textarea
@@ -429,6 +443,7 @@ export function TowerCombobox({
   towerCount,
   disabled,
   listId = "tower-options",
+  noun = "Tower",
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -436,7 +451,10 @@ export function TowerCombobox({
   towerCount: number | null;
   disabled?: boolean;
   listId?: string;
+  /** What the project calls a group — "Tower" by default, or "Sector", "Phase"…. */
+  noun?: string;
 }) {
+  const word = noun.toLowerCase();
   const trimmed = value.trim();
   const known = otherTowers.includes(trimmed);
   const selectOnly =
@@ -444,10 +462,10 @@ export function TowerCombobox({
 
   const hint =
     towerCount == null
-      ? "No tower limit set on this project."
+      ? `No ${word} limit set on this project.`
       : selectOnly
-        ? `All ${towerCount} tower${towerCount === 1 ? "" : "s"} are in use — reuse one, or raise the project's tower count.`
-        : `${otherTowers.length} of ${towerCount} tower${towerCount === 1 ? "" : "s"} used.`;
+        ? `All ${towerCount} ${word}${towerCount === 1 ? "" : "s"} are in use — reuse one, or raise the project's ${word} count.`
+        : `${otherTowers.length} of ${towerCount} ${word}${towerCount === 1 ? "" : "s"} used.`;
 
   return (
     <>
@@ -458,7 +476,7 @@ export function TowerCombobox({
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
         >
-          <option value="">No tower</option>
+          <option value="">No {word}</option>
           {otherTowers.map((t) => (
             <option key={t} value={t}>
               {t}
@@ -473,7 +491,7 @@ export function TowerCombobox({
           <input
             className="inp"
             list={listId}
-            placeholder={otherTowers.length ? "e.g. Tower B" : "e.g. Tower A"}
+            placeholder={otherTowers.length ? `e.g. ${noun} B` : `e.g. ${noun} A`}
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
@@ -727,22 +745,28 @@ export function UnitMediaFields({
   onFloorPlanChange,
   onGalleryChange,
   ctx,
+  showFloorPlan = true,
+  floorPlanLabel = "Floor plan",
 }: {
   floorPlanUrl: string;
   galleryUrls: string[];
   onFloorPlanChange: (v: string) => void;
   onGalleryChange: (v: string[]) => void;
   ctx?: { projectId?: string; unitTypeId?: string };
+  showFloorPlan?: boolean;
+  floorPlanLabel?: string;
 }) {
   return (
-    <div className="grid g2">
-      <MediaUpload
-        field="floorPlan"
-        label="Floor plan"
-        value={floorPlanUrl || null}
-        onChange={(u) => onFloorPlanChange(u ?? "")}
-        ctx={ctx}
-      />
+    <div className={showFloorPlan ? "grid g2" : "grid g1"}>
+      {showFloorPlan ? (
+        <MediaUpload
+          field="floorPlan"
+          label={floorPlanLabel}
+          value={floorPlanUrl || null}
+          onChange={(u) => onFloorPlanChange(u ?? "")}
+          ctx={ctx}
+        />
+      ) : null}
       <div className="field">
         <label>Photos</label>
         <GalleryUpload

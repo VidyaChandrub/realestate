@@ -6,6 +6,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUrl,
@@ -25,12 +26,13 @@ export type UnitStatusValue = (typeof UNIT_STATUS_VALUES)[number];
 
 export class CreateUnitDto {
   // The unit's configuration — a `unit_type` catalog label ("2 BHK",
-  // "Villa"). Required. Validated server-side against the caller's org
-  // catalog (the UI restricting it is not trusted).
+  // "Villa"). Required for `tower`-layout project units and standalone units
+  // (enforced in the service), and rejected for other layouts. Validated
+  // server-side against the project's / org's configurations.
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(120)
-  configuration: string;
+  configuration?: string;
 
   // Optional free-text variant label ("Type A"). Not a catalog, not a
   // lookup — just a string stored on the unit.
@@ -59,7 +61,22 @@ export class CreateUnitDto {
   @Max(1000000)
   builtupSqft?: number;
 
-  // Optional — projects without towers (villas, plots) leave this blank.
+  // Primary area of a unit in a non-tower layout (plot / villa size), sqft.
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1000000)
+  area?: number;
+
+  // Typed values for the project's unit field template; validated in depth
+  // server-side (type, choice options, required).
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, unknown>;
+
+  // The group the unit belongs to (tower / phase / sector…); blank for
+  // individual layouts.
   @IsOptional()
   @IsString()
   @MaxLength(40)

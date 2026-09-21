@@ -6,6 +6,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUrl,
@@ -44,6 +45,17 @@ export class UpdateUnitDto {
   @Min(0)
   @Max(1000000)
   builtupSqft?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(1000000)
+  area?: number | null;
+
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, unknown>;
 
   @IsOptional()
   @IsString()

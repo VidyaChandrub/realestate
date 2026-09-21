@@ -46,6 +46,8 @@ import type {
   OrgCatalogCategory,
   LandingPageRow,
   OrgCatalogOption,
+  OrgProjectType,
+  OrgProjectTypeInput,
   OrgLeadStageDisplay,
   UpdateLeadStageDisplayInput,
   CrmLeadStatus,
@@ -1741,3 +1743,39 @@ export async function downloadAdminReportCsv(params?: ReportsFilterInput, type =
   await downloadCsvFile(`${API_BASE}/admin/reports/export/csv${fullQs}`, filename);
 }
 
+
+// ─── Org project types (layout + typed field templates) ────────────────────
+
+export async function getOrgProjectTypes(): Promise<OrgProjectType[]> {
+  return apiFetch<OrgProjectType[]>("/org/project-types");
+}
+
+export async function createOrgProjectType(
+  input: OrgProjectTypeInput & { name: string; layout: OrgProjectType["layout"] },
+): Promise<OrgProjectType> {
+  return apiFetch<OrgProjectType>("/org/project-types", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateOrgProjectType(
+  id: string,
+  input: OrgProjectTypeInput,
+): Promise<OrgProjectType> {
+  return apiFetch<OrgProjectType>(`/org/project-types/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteOrgProjectType(id: string): Promise<void> {
+  await apiFetch(`/org/project-types/${id}`, { method: "DELETE" });
+}
+
+/** Creates whichever of Apartments / Villas / Plots / Commercial the org lacks. */
+export async function addCommonProjectTypes(): Promise<{ created: number; types: OrgProjectType[] }> {
+  return apiFetch<{ created: number; types: OrgProjectType[] }>("/org/project-types/common", {
+    method: "POST",
+  });
+}

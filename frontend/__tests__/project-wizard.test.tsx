@@ -37,6 +37,10 @@ vi.mock("@/lib/api", () => ({
     return {};
   }),
   getOrgCatalogOptions: vi.fn(async () => CATALOG),
+  getOrgProjectTypes: vi.fn(async () => [
+    { id: "t1", orgId: "org-1", name: "Apartments", layout: "tower", groupLabel: null, projectFields: [], unitFields: [], sortOrder: 0, inUse: 0 },
+  ]),
+  addCommonProjectTypes: vi.fn(),
   getOrgLandingPages: vi.fn(async () => []),
   getProjectSalesAgentCandidates: vi.fn(async () => ({ data: [], total: 0 })),
   getProjectManagerCandidates: vi.fn(async () => ({ data: [], total: 0 })),

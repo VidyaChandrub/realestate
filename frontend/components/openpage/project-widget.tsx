@@ -77,6 +77,11 @@ export function ProjectEnquiryModal({
   units?: EnquiryUnit[];
 }) {
   if (!open || !project) return null;
+  const projectLayout = "layout" in project ? project.layout : "tower";
+  const groupLabel =
+    projectLayout === "cluster"
+      ? ("groupLabel" in project ? project.groupLabel : null) || "Phase"
+      : "Tower";
   const effectiveForm = form;
   const rawFields = effectiveForm?.fields?.length
     ? effectiveForm.fields
@@ -394,8 +399,13 @@ export function ProjectEnquiryModal({
                     {units.map((unit) => (
                       <option key={unit.id} value={unit.id}>
                         {unit.unitNo}
-                        {unit.tower ? ` · ${unit.tower}` : ""}
-                        {unit.floor ? ` · Floor ${unit.floor}` : ""}
+                        {unit.tower ? ` · ${groupLabel} ${unit.tower}` : ""}
+                        {projectLayout === "tower" && unit.floor != null
+                          ? ` · Floor ${unit.floor}`
+                          : ""}
+                        {projectLayout !== "tower" && unit.area != null
+                          ? ` · ${unit.area.toLocaleString("en-IN")} sqft`
+                          : ""}
                       </option>
                     ))}
                   </select>

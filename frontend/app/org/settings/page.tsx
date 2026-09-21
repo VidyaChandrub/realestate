@@ -2,12 +2,14 @@
 
 import { useEffect, useState, useCallback, type ChangeEvent } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, cancelPackageChangeRequest, changePlan, createOrgCatalogOption, deleteOrgCatalogOption, getInvoices, getOrgCatalogOptions, getOrgDomainInfo, getOrgLeadStageDisplays, getOrgPackageChangeRequest, getPlans, renewSubscription, requestCustomDomain, submitPackageChangeRequest, updateOrgLeadStageDisplay } from "@/lib/api";
-import type { BillingRenewResult, ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, PackageChangeRequestRow, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
+import { apiFetch, cancelPackageChangeRequest, changePlan, addCommonProjectTypes, createOrgCatalogOption, createOrgProjectType, deleteOrgCatalogOption, deleteOrgProjectType, getInvoices, getOrgCatalogOptions, getOrgProjectTypes, updateOrgProjectType, getOrgDomainInfo, getOrgLeadStageDisplays, getOrgPackageChangeRequest, getPlans, renewSubscription, requestCustomDomain, submitPackageChangeRequest, updateOrgLeadStageDisplay } from "@/lib/api";
+import type { BillingRenewResult, ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, OrgProjectType, PackageChangeRequestRow, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
 import { DEFAULT_LEAD_STAGES, LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead-stages";
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { OrgSmtpSettings } from "@/components/org/org-smtp-settings";
+import { TypedFieldEditor } from "@/components/org/typed-field-editor";
+import { fieldsToRows, LAYOUTS, layoutInfo, rowsToFields, validateFieldRows, type FieldRow, type ProjectLayout } from "@/lib/field-template";
 import { Modal } from "@/components/ui/modal";
 import { subdomainPreviewHost } from "@/lib/domain";
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
@@ -538,7 +540,6 @@ type CatalogGroup = {
 // kept generic for that reason (the enum values stay `unit_type` / `facing` /
 // `parking`).
 const CATALOG_GROUPS: CatalogGroup[] = [
-  { category: "project_type", title: "Project types", sub: "e.g. Apartments, Villas, Plots, Commercial, Mixed-use", placeholder: "Add a project type…" },
   { category: "unit_type", title: "Configurations", sub: "Configuration labels for units and lead requirements — e.g. 2 BHK, 3 BHK, Penthouse, Villa, Plot", placeholder: "Add a configuration…" },
   { category: "connectivity", title: "Connectivity & landmarks", sub: "Nearby categories — e.g. Metro / transit, Schools, Hospitals, Airport", placeholder: "Add a connectivity category…" },
   { category: "amenity", title: "Amenities", sub: "Lifestyle features — e.g. Clubhouse, Gymnasium, Swimming pool", placeholder: "Add an amenity…" },
@@ -746,6 +747,221 @@ function CatalogSection({
         );
       })}
     </>
+  );
+}
+
+/**
+ * Project types — each an org-owned entry with a fixed structure layout and
+ * two typed field templates (project summary fields, per-unit fields). Where
+ * an org defines what "Plots" or "Farmhouses" means, with no code change.
+ */
+function ProjectTypesSection() {
+  const [types, setTypes] = useState<OrgProjectType[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | "new" | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    getOrgProjectTypes()
+      .then(setTypes)
+      .catch((e) => setLoadError(e instanceof Error ? e.message : "Failed to load project types."));
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  async function addCommon() {
+    setBusy("common"); setError(null);
+    try {
+      const res = await addCommonProjectTypes();
+      setTypes(res.types);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not add the common project types.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function remove(t: OrgProjectType) {
+    const note = t.inUse > 0
+      ? ` The ${t.inUse} project(s) already using it keep their own copy and are not affected.`
+      : "";
+    if (!window.confirm(`Delete the project type "${t.name}"?${note}`)) return;
+    setBusy(t.id); setError(null);
+    try {
+      await deleteOrgProjectType(t.id);
+      setTypes((prev) => (prev ? prev.filter((x) => x.id !== t.id) : prev));
+      if (editing === t.id) setEditing(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete that project type.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function saved(t: OrgProjectType) {
+    setTypes((prev) => {
+      const list = prev ?? [];
+      return list.some((x) => x.id === t.id) ? list.map((x) => (x.id === t.id ? t : x)) : [...list, t];
+    });
+    setEditing(null);
+  }
+
+  return (
+    <Card
+      icon="properties"
+      title="Project types"
+      sub="Each type sets how a project's inventory is structured and which extra fields it captures — e.g. Apartments, Villas, Plots, Farmhouses"
+      action={
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn btn-ghost btn-sm" type="button" disabled={busy === "common"} onClick={() => void addCommon()}>
+            {busy === "common" ? "Adding…" : "Add common types"}
+          </button>
+          <button className="btn btn-primary btn-sm" type="button" onClick={() => setEditing("new")} disabled={editing === "new"}>
+            + New type
+          </button>
+        </div>
+      }
+    >
+      {loadError ? <div className="form-alert">{loadError}</div> : null}
+      {error ? <div className="form-alert">{error}</div> : null}
+      {types === null && !loadError ? <p className="muted" style={{ margin: 0 }}>Loading…</p> : null}
+      {types && types.length === 0 && editing !== "new" ? (
+        <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+          No project types yet. Add the common ones with one click (Apartments, Villas, Plots, Commercial), or create your own.
+        </div>
+      ) : null}
+      {editing === "new" ? (
+        <ProjectTypeEditor initial={null} onSaved={saved} onCancel={() => setEditing(null)} />
+      ) : null}
+      {(types ?? []).map((t) => {
+        const layout = layoutInfo(t.layout);
+        return (
+          <div key={t.id} style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <b style={{ fontSize: 14 }}>{t.name}</b>
+              <span className="badge b-blue">{layout.title}</span>
+              <span className="muted" style={{ fontSize: 12.5 }}>
+                {t.projectFields.length} project field{t.projectFields.length === 1 ? "" : "s"} · {t.unitFields.length} unit field{t.unitFields.length === 1 ? "" : "s"}
+                {t.inUse > 0 ? ` · used by ${t.inUse} project${t.inUse === 1 ? "" : "s"}` : ""}
+              </span>
+              <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => setEditing(editing === t.id ? null : t.id)}>
+                  {editing === t.id ? "Close" : "Edit"}
+                </button>
+                <button className="btn btn-ghost btn-sm" type="button" disabled={busy === t.id} onClick={() => void remove(t)}>Delete</button>
+              </span>
+            </div>
+            {editing === t.id ? (
+              <ProjectTypeEditor initial={t} onSaved={saved} onCancel={() => setEditing(null)} />
+            ) : null}
+          </div>
+        );
+      })}
+    </Card>
+  );
+}
+
+function ProjectTypeEditor({
+  initial, onSaved, onCancel,
+}: {
+  initial: OrgProjectType | null;
+  onSaved: (t: OrgProjectType) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [layout, setLayout] = useState<ProjectLayout>(initial?.layout ?? "cluster");
+  const [groupLabel, setGroupLabel] = useState(initial?.groupLabel ?? "");
+  const [projectRows, setProjectRows] = useState<FieldRow[]>(() => fieldsToRows(initial?.projectFields));
+  const [unitRows, setUnitRows] = useState<FieldRow[]>(() => fieldsToRows(initial?.unitFields));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const info = layoutInfo(layout);
+  const layoutLocked = (initial?.inUse ?? 0) > 0;
+  const nameLocked = layoutLocked;
+
+  async function save() {
+    setError(null);
+    if (!name.trim()) { setError("Give the project type a name."); return; }
+    const invalid = validateFieldRows(projectRows, "Project fields") ?? validateFieldRows(unitRows, "Unit fields");
+    if (invalid) { setError(invalid); return; }
+    const body = {
+      name: name.trim(),
+      layout,
+      groupLabel: info.defaultGroupLabel === null ? "" : groupLabel.trim(),
+      projectFields: rowsToFields(projectRows),
+      unitFields: rowsToFields(unitRows),
+    };
+    setSaving(true);
+    try {
+      const saved = initial
+        ? await updateOrgProjectType(initial.id, body)
+        : await createOrgProjectType(body);
+      onSaved(saved);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the project type.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: 12, padding: 16, margin: "12px 0" }}>
+      {error ? <div className="form-alert">{error}</div> : null}
+      <div className="field">
+        <label>Name</label>
+        <input className="inp" value={name} maxLength={120} disabled={nameLocked} placeholder="e.g. Farmhouses" onChange={(e) => setName(e.target.value)} />
+        {nameLocked ? <div className="hint">In use by {initial?.inUse} project(s), so it can&apos;t be renamed.</div> : null}
+      </div>
+
+      <div className="field">
+        <label>Structure</label>
+        <div className="opts" data-single>
+          {LAYOUTS.map((l) => (
+            <span
+              key={l.value}
+              className={`opt rad ${layout === l.value ? "on" : ""}`}
+              style={layoutLocked && layout !== l.value ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
+              onClick={() => { if (!layoutLocked) setLayout(l.value); }}
+            >
+              <span className="b">{layout === l.value ? "●" : ""}</span>{l.title}
+            </span>
+          ))}
+        </div>
+        <div className="hint">
+          {info.blurb}
+          {layoutLocked ? ` The layout is locked because ${initial?.inUse} project(s) already use this type — create a new type for a different layout.` : ""}
+        </div>
+      </div>
+
+      {info.defaultGroupLabel !== null ? (
+        <div className="field">
+          <label>What do you call a group?</label>
+          <input className="inp" style={{ maxWidth: 260 }} value={groupLabel} maxLength={40} placeholder={info.defaultGroupLabel} onChange={(e) => setGroupLabel(e.target.value)} />
+          <div className="hint">Shown wherever a unit&apos;s group is asked for — e.g. Tower, Phase, Sector, Block, Row. Leave blank for &ldquo;{info.defaultGroupLabel}&rdquo;.</div>
+        </div>
+      ) : null}
+
+      <div className="field">
+        <label>Project fields</label>
+        <div className="hint" style={{ marginBottom: 8 }}>Summary details captured once per project — e.g. Number of plots, Total land.</div>
+        <TypedFieldEditor rows={projectRows} onChange={setProjectRows} emptyText="No project fields — add one if this type needs any." />
+      </div>
+
+      <div className="field">
+        <label>Unit fields</label>
+        <div className="hint" style={{ marginBottom: 8 }}>Details captured on every unit — e.g. Dimensions, Corner plot. Editing this later never changes units that already exist.</div>
+        <TypedFieldEditor rows={unitRows} onChange={setUnitRows} emptyText="No unit fields — add one if units of this type need any." />
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+        <button className="btn btn-primary btn-sm" type="button" disabled={saving} onClick={() => void save()}>
+          {saving ? "Saving…" : initial ? "Save changes" : "Create type"}
+        </button>
+        <button className="btn btn-ghost btn-sm" type="button" disabled={saving} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
   );
 }
 
@@ -1411,6 +1627,7 @@ export default function OrgSettingsPage() {
           <div className={`os-section${section === "catalogs" ? " on" : ""}`}>
             <SectionHead section="catalogs" />
             <PricingBasisCard />
+            <ProjectTypesSection />
             <CatalogSection />
           </div>
 

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Prisma, UnitPriceBasis } from '@prisma/client';
+import type { Prisma, ProjectLayout, UnitPriceBasis } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
@@ -12,6 +12,12 @@ import {
   EXCLUDED_ROLE_KEYS,
   listLeadAssignableUsers,
 } from '../../common/utils/lead-assignee.util';
+import {
+  CustomValues,
+  FieldDef,
+  normalizeFieldTemplate,
+  validateCustomValues,
+} from '../../common/utils/field-template.util';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -80,7 +86,7 @@ const UNIT_ACTOR_SELECT = {
 } as const;
 
 const UNIT_INCLUDE = {
-  project: { select: { currency: true } },
+  project: { select: { currency: true, layout: true } },
   createdBy: UNIT_ACTOR_SELECT,
   updatedBy: UNIT_ACTOR_SELECT,
   manager: UNIT_ACTOR_SELECT,
@@ -163,10 +169,37 @@ export class ProjectsService {
       assertLimit(subscription.plan, 'projects', currentCount, 1);
     }
 
+    // Structure comes from the project's type (never from the client): the
+    // layout is fixed by the type, and the templates start as a copy of the
+    // type's that the caller may have edited for this project.
+    const def = dto.projectType
+      ? await this.resolveProjectType(orgId, dto.projectType)
+      : null;
+    const layout: ProjectLayout = def?.layout ?? 'tower';
+    this.assertFloorsAllowed(layout, dto.floorsDescription);
+    const projectFieldTemplate = normalizeFieldTemplate(
+      dto.projectFieldTemplate ?? def?.projectFields ?? [],
+    );
+    const unitFieldTemplate = normalizeFieldTemplate(
+      dto.unitFieldTemplate ?? def?.unitFields ?? [],
+    );
+    const customFields = validateCustomValues(
+      projectFieldTemplate,
+      dto.customFields,
+      {},
+      true,
+    );
+
     const project = await this.prisma.$transaction(async (tx) => {
       const created = await tx.project.create({
         data: {
           orgId,
+          layout,
+          projectTypeId: def?.id ?? null,
+          groupLabel: this.resolveGroupLabel(layout, dto.groupLabel, def?.groupLabel),
+          projectFieldTemplate: projectFieldTemplate as unknown as Prisma.InputJsonValue,
+          unitFieldTemplate: unitFieldTemplate as unknown as Prisma.InputJsonValue,
+          customFields: customFields as unknown as Prisma.InputJsonValue,
           name: dto.name,
           location: dto.location ?? null,
           reraId: dto.reraId ?? null,
@@ -426,6 +459,67 @@ export class ProjectsService {
       if (dto[key] !== undefined) {
         (data as Record<string, unknown>)[key] = dto[key];
       }
+    }
+
+    // Switching type re-derives layout + templates. A different LAYOUT is only
+    // allowed while the project has no units or unit types — inventory that
+    // exists was shaped by the old layout.
+    let layout: ProjectLayout = existingProject.layout;
+    let typeDef: Awaited<ReturnType<typeof this.resolveProjectType>> | null = null;
+    if (
+      dto.projectType != null &&
+      dto.projectType !== existingProject.projectType
+    ) {
+      typeDef = await this.resolveProjectType(orgId, dto.projectType);
+      if (typeDef.layout !== existingProject.layout) {
+        const [units, unitTypes] = await Promise.all([
+          this.prisma.unit.count({ where: { projectId: id } }),
+          this.prisma.unitType.count({ where: { projectId: id } }),
+        ]);
+        if (units + unitTypes > 0) {
+          throw new BadRequestException(
+            "This project already has units, so it can't switch to a project type with a different structure.",
+          );
+        }
+        layout = typeDef.layout;
+        data.layout = layout;
+        if (layout !== 'tower') data.floorsDescription = null;
+      }
+      data.projectTypeId = typeDef.id;
+      if (dto.groupLabel === undefined) {
+        data.groupLabel = this.resolveGroupLabel(layout, undefined, typeDef.groupLabel);
+      }
+    }
+    if (dto.floorsDescription) this.assertFloorsAllowed(layout, dto.floorsDescription);
+    if (dto.groupLabel !== undefined) {
+      data.groupLabel = this.resolveGroupLabel(layout, dto.groupLabel, null);
+    }
+
+    const readTemplate = (v: Prisma.JsonValue): FieldDef[] =>
+      (Array.isArray(v) ? v : []) as unknown as FieldDef[];
+    let projectFieldTemplate = readTemplate(existingProject.projectFieldTemplate);
+    if (dto.projectFieldTemplate !== undefined) {
+      projectFieldTemplate = normalizeFieldTemplate(dto.projectFieldTemplate);
+      data.projectFieldTemplate = projectFieldTemplate as unknown as Prisma.InputJsonValue;
+    } else if (typeDef) {
+      projectFieldTemplate = normalizeFieldTemplate(typeDef.projectFields);
+      data.projectFieldTemplate = projectFieldTemplate as unknown as Prisma.InputJsonValue;
+    }
+    if (dto.unitFieldTemplate !== undefined) {
+      data.unitFieldTemplate = normalizeFieldTemplate(
+        dto.unitFieldTemplate,
+      ) as unknown as Prisma.InputJsonValue;
+    } else if (typeDef) {
+      data.unitFieldTemplate = normalizeFieldTemplate(
+        typeDef.unitFields,
+      ) as unknown as Prisma.InputJsonValue;
+    }
+    if (dto.customFields !== undefined || dto.projectFieldTemplate !== undefined || typeDef) {
+      data.customFields = validateCustomValues(
+        projectFieldTemplate,
+        dto.customFields,
+        (existingProject.customFields ?? {}) as CustomValues,
+      ) as unknown as Prisma.InputJsonValue;
     }
     if (dto.landArea !== undefined) data.landArea = dto.landArea;
     if (dto.amenities !== undefined) {
@@ -705,7 +799,13 @@ export class ProjectsService {
     projectId: string,
     dto: CreateUnitTypeDto,
   ) {
-    await this.getOwnedProject(orgId, projectId);
+    const project = await this.getOwnedProject(orgId, projectId);
+    // A planned configuration mix (BHK types) belongs to the tower layout.
+    if (project.layout !== 'tower') {
+      throw new BadRequestException(
+        "Unit types (a planned configuration mix) only apply to projects with a towers-and-floors structure.",
+      );
+    }
 
     const created = await this.prisma.$transaction(async (tx) => {
       const row = await tx.unitType.create({
@@ -840,24 +940,45 @@ export class ProjectsService {
   ) {
     const project = await this.getOwnedProject(orgId, projectId);
 
-    // In a project, the configuration must be one the project itself has —
-    // not just anything in the org catalog. Never trusted from the body.
-    await this.assertConfigurationForProject(projectId, dto.configuration);
+    // Which fields a unit may carry depends on the project's layout.
+    this.assertUnitFitsLayout(project.layout, dto);
+    if (project.layout === 'tower') {
+      // In a project, the configuration must be one the project itself has —
+      // not just anything in the org catalog. Never trusted from the body.
+      if (!dto.configuration?.trim()) {
+        throw new BadRequestException('Configuration is required');
+      }
+      await this.assertConfigurationForProject(projectId, dto.configuration);
+    }
     await this.assertVariantInCatalog(orgId, dto.variantLabel);
 
     const tower = dto.tower?.trim() || null;
-    await this.assertTowerWithinLimit(projectId, project.towerCount, tower);
+    await this.assertTowerWithinLimit(
+      projectId,
+      project.towerCount,
+      tower,
+      undefined,
+      this.groupNounFor(project),
+    );
+    const customFields = validateCustomValues(
+      this.readTemplate(project.unitFieldTemplate),
+      dto.customFields,
+      {},
+      true,
+    );
 
     const created = await this.prisma.$transaction(async (tx) => {
       const row = await tx.unit.create({
         data: {
           orgId,
           projectId,
-          configuration: dto.configuration.trim(),
+          configuration: dto.configuration?.trim() || null,
           variantLabel: dto.variantLabel?.trim() || null,
           unitNo: dto.unitNo,
           carpetSqft: dto.carpetSqft ?? null,
           builtupSqft: dto.builtupSqft ?? null,
+          area: dto.area ?? null,
+          customFields: customFields as unknown as Prisma.InputJsonValue,
           tower,
           floor: dto.floor ?? null,
           facing: dto.facing ?? null,
@@ -933,7 +1054,8 @@ export class ProjectsService {
     const project = await this.getOwnedProject(orgId, projectId);
     const existing = await this.getOwnedUnit(orgId, projectId, id);
 
-    if (dto.configuration !== undefined) {
+    this.assertUnitFitsLayout(project.layout, dto);
+    if (dto.configuration !== undefined && project.layout === 'tower') {
       // The unit's own current value stays valid, so an edit never has to
       // rename a unit whose configuration has since been dropped.
       await this.assertConfigurationForProject(
@@ -956,6 +1078,7 @@ export class ProjectsService {
         project.towerCount,
         nextTower,
         id,
+        this.groupNounFor(project),
       );
     }
 
@@ -971,6 +1094,14 @@ export class ProjectsService {
     }
     if (dto.carpetSqft !== undefined) data.carpetSqft = dto.carpetSqft;
     if (dto.builtupSqft !== undefined) data.builtupSqft = dto.builtupSqft;
+    if (dto.area !== undefined) data.area = dto.area;
+    if (dto.customFields !== undefined) {
+      data.customFields = validateCustomValues(
+        this.readTemplate(project.unitFieldTemplate),
+        dto.customFields,
+        (existing.customFields ?? {}) as CustomValues,
+      ) as unknown as Prisma.InputJsonValue;
+    }
     if (dto.unitNo !== undefined) data.unitNo = dto.unitNo;
     if (dto.tower !== undefined) {
       data.tower =
@@ -1083,6 +1214,10 @@ export class ProjectsService {
     actorId?: string,
   ) {
     // Standalone units belong to no project, so the org catalog is the scope.
+    this.assertStandaloneHasNoLayoutFields(dto);
+    if (!dto.configuration?.trim()) {
+      throw new BadRequestException('Configuration is required');
+    }
     await this.assertConfigurationInCatalog(orgId, dto.configuration);
     await this.assertVariantInCatalog(orgId, dto.variantLabel);
     if (dto.managerId) await this.assertOrgUser(orgId, dto.managerId);
@@ -1094,7 +1229,7 @@ export class ProjectsService {
         data: {
           orgId,
           projectId: null,
-          configuration: dto.configuration.trim(),
+          configuration: (dto.configuration as string).trim(),
           variantLabel: dto.variantLabel?.trim() || null,
           unitNo: dto.unitNo,
           carpetSqft: dto.carpetSqft ?? null,
@@ -1152,6 +1287,7 @@ export class ProjectsService {
   ) {
     const existing = await this.getOwnedStandaloneUnit(orgId, id);
 
+    this.assertStandaloneHasNoLayoutFields(dto);
     if (dto.configuration !== undefined) {
       await this.assertConfigurationInCatalog(orgId, dto.configuration);
     }
@@ -1327,7 +1463,7 @@ export class ProjectsService {
         take: limit,
         include: {
           ...UNIT_INCLUDE,
-          project: { select: { id: true, name: true, currency: true } },
+          project: { select: { id: true, name: true, currency: true, layout: true } },
         },
       }),
       this.prisma.unit.count({ where }),
@@ -1356,8 +1492,11 @@ export class ProjectsService {
       facing: u.facing,
       parking: u.parking,
       price: u.price,
-      pricePerSqft: this.pricePerSqft(u, basis),
-      pricePerSqftBasis: basis,
+      area: u.area,
+      customFields: u.customFields,
+      pricePerSqft: this.pricePerSqft(u, basis, u.project?.layout),
+      // Only `tower` units are priced on a carpet / built-up basis.
+      pricePerSqftBasis: u.project && u.project.layout !== 'tower' ? null : basis,
       status: u.status,
       createdById: u.createdById,
       updatedById: u.updatedById,
@@ -1366,7 +1505,7 @@ export class ProjectsService {
       createdAt: u.createdAt,
       updatedAt: u.updatedAt,
       project: u.project
-        ? { id: u.project.id, name: u.project.name, currency: u.project.currency }
+        ? { id: u.project.id, name: u.project.name, currency: u.project.currency, layout: u.project.layout }
         : null,
     }));
 
@@ -1378,6 +1517,40 @@ export class ProjectsService {
   // never from a client-supplied id. A foreign org's row 404s exactly the
   // same as a non-existent id, so existence never leaks across tenants.
   // -------------------------------------------------------------------------
+
+  // The org's project type a project names. A name that matches no type is a
+  // 400 — structure is never guessed from a label.
+  private async resolveProjectType(orgId: string, name: string) {
+    const def = await this.prisma.projectTypeDef.findFirst({
+      where: { orgId, name },
+    });
+    if (!def) {
+      throw new BadRequestException(
+        `Unknown project type "${name}". Pick one from Settings → Project types.`,
+      );
+    }
+    return def;
+  }
+
+  // Floors exist only in the `tower` layout.
+  private assertFloorsAllowed(layout: ProjectLayout, floors?: string | null) {
+    if (layout !== 'tower' && floors && floors.trim()) {
+      throw new BadRequestException(
+        "Floors don't apply to this project's structure.",
+      );
+    }
+  }
+
+  // The grouping column's name: an explicit per-project value wins, then the
+  // type's; blank means "the layout default". `individual` has no grouping.
+  private resolveGroupLabel(
+    layout: ProjectLayout,
+    explicit: string | undefined,
+    fromType: string | null | undefined,
+  ): string | null {
+    if (layout === 'individual') return null;
+    return explicit?.trim() || (explicit === undefined ? fromType : null) || null;
+  }
 
   private async getOwnedProject(orgId: string, id: string, actor?: JwtPayload) {
     const project = await this.prisma.project.findFirst({
@@ -1454,6 +1627,79 @@ export class ProjectsService {
    *
    * The UI restricting the dropdown is not enough — this is the authority.
    */
+  private readTemplate(v: Prisma.JsonValue): FieldDef[] {
+    return (Array.isArray(v) ? v : []) as unknown as FieldDef[];
+  }
+
+  // The project's own word for its grouping column ("Tower", "Sector"…).
+  private groupNounFor(project: {
+    layout: ProjectLayout;
+    groupLabel: string | null;
+  }): string {
+    return (
+      project.groupLabel?.trim() ||
+      (project.layout === 'cluster' ? 'Phase' : 'Tower')
+    );
+  }
+
+  // What a project unit may carry, by layout. `tower`: carpet / built-up
+  // area, floor, configuration — never the primary `area`. Other layouts:
+  // the reverse (a plot has an area, not a floor or a BHK), and `individual`
+  // has no grouping at all. Rejected loudly rather than silently dropped so
+  // no stale structure accumulates.
+  private assertUnitFitsLayout(
+    layout: ProjectLayout,
+    d: {
+      configuration?: string | null;
+      carpetSqft?: number | null;
+      builtupSqft?: number | null;
+      floor?: number | null;
+      area?: number | null;
+      tower?: string | null;
+    },
+  ) {
+    if (layout === 'tower') {
+      if (d.area != null) {
+        throw new BadRequestException(
+          'Towers-and-floors units use carpet and built-up area, not a single area.',
+        );
+      }
+      return;
+    }
+    const banned: Array<[string, unknown]> = [
+      ['a configuration', typeof d.configuration === 'string' ? d.configuration.trim() : d.configuration],
+      ['a carpet area', d.carpetSqft],
+      ['a built-up area', d.builtupSqft],
+      ['a floor', d.floor],
+    ];
+    if (layout === 'individual') {
+      banned.push(['a group', typeof d.tower === 'string' ? d.tower.trim() : d.tower]);
+    }
+    for (const [what, value] of banned) {
+      if (value !== undefined && value !== null && value !== '') {
+        throw new BadRequestException(
+          `Units in this project don't have ${what}.`,
+        );
+      }
+    }
+  }
+
+  // Standalone units aren't in a project, so they have no layout or field
+  // template yet — the project-only fields are refused rather than dropped.
+  private assertStandaloneHasNoLayoutFields(d: {
+    area?: number | null;
+    customFields?: Record<string, unknown>;
+  }) {
+    if (
+      d.area != null ||
+      (d.customFields && Object.keys(d.customFields).length > 0)
+    ) {
+      throw new BadRequestException(
+        'Area and custom fields apply to units inside a project.',
+      );
+    }
+  }
+
   private async assertConfigurationForProject(
     projectId: string,
     configuration: string,
@@ -1538,8 +1784,10 @@ export class ProjectsService {
     towerCount: number | null,
     nextTower: string | null,
     excludeUnitId?: string,
+    noun = 'Tower',
   ) {
     if (!nextTower || towerCount == null) return;
+    const word = noun.toLowerCase();
 
     const rows = await this.prisma.unit.findMany({
       where: {
@@ -1557,9 +1805,9 @@ export class ProjectsService {
     if (existing.includes(nextTower)) return;
     if (existing.length + 1 > towerCount) {
       throw new BadRequestException(
-        `This project allows ${towerCount} tower(s) and already uses ${existing.length}` +
+        `This project allows ${towerCount} ${word}(s) and already uses ${existing.length}` +
           (existing.length ? ` (${existing.join(', ')})` : '') +
-          `. Reuse an existing tower name, or raise the tower count on the project before adding "${nextTower}".`,
+          `. Reuse an existing ${word} name, or raise the ${word} count on the project before adding "${nextTower}".`,
       );
     }
   }
@@ -1652,6 +1900,12 @@ export class ProjectsService {
       floorsDescription: project.floorsDescription,
       carpetRange: project.carpetRange,
       projectType: project.projectType,
+      layout: project.layout,
+      projectTypeId: project.projectTypeId,
+      groupLabel: project.groupLabel,
+      projectFieldTemplate: project.projectFieldTemplate,
+      unitFieldTemplate: project.unitFieldTemplate,
+      customFields: project.customFields,
       tagline: project.tagline,
       launchDate: project.launchDate,
       constructionStage: project.constructionStage,
@@ -1736,10 +1990,23 @@ export class ProjectsService {
    * commercial error.
    */
   private pricePerSqft(
-    unit: { price: number | null; carpetSqft: number | null; builtupSqft: number | null },
+    unit: {
+      price: number | null;
+      carpetSqft: number | null;
+      builtupSqft: number | null;
+      area: number | null;
+    },
     basis: UnitPriceBasis,
+    layout: ProjectLayout = 'tower',
   ): number | null {
-    const area = basis === 'builtup' ? unit.builtupSqft : unit.carpetSqft;
+    // `tower` units price by the org's carpet / built-up basis; every other
+    // layout has one primary area, so price/sqft is simply price over that.
+    const area =
+      layout !== 'tower'
+        ? unit.area
+        : basis === 'builtup'
+          ? unit.builtupSqft
+          : unit.carpetSqft;
     if (!unit.price || !area) return null;
     // Never stored — derived fresh on every read — so unlike the price
     // itself (a real Int column) there's no reason to round it to a whole
@@ -1765,8 +2032,11 @@ export class ProjectsService {
       facing: unit.facing,
       parking: unit.parking,
       price: unit.price,
-      pricePerSqft: this.pricePerSqft(unit, basis),
-      pricePerSqftBasis: basis,
+      layout: unit.project?.layout ?? null,
+      area: unit.area,
+      customFields: unit.customFields,
+      pricePerSqft: this.pricePerSqft(unit, basis, unit.project?.layout),
+      pricePerSqftBasis: unit.project && unit.project.layout !== 'tower' ? null : basis,
       addressLine: unit.addressLine,
       ownerName: unit.ownerName,
       notes: unit.notes,

@@ -131,6 +131,7 @@ export class PublicSiteService {
             variantLabel: true,
             carpetSqft: true,
             builtupSqft: true,
+            area: true,
             tower: true,
             floor: true,
             facing: true,
@@ -141,10 +142,30 @@ export class PublicSiteService {
       },
     });
 
-    return projects.map((project) => ({
-      ...project,
-      landArea: project.landArea === null ? null : Number(project.landArea),
-    }));
+    return projects.map((project) => {
+      const layout = project.layout ?? 'tower';
+      const towerLayout = layout === 'tower';
+      const groupedLayout = layout === 'tower' || layout === 'cluster';
+
+      return {
+        ...project,
+        // Tower-only concepts are not part of the public contract for the
+        // other layouts. `tower` remains the stored group value for clusters.
+        towerCount: towerLayout ? project.towerCount : null,
+        floorsDescription: towerLayout ? project.floorsDescription : null,
+        carpetRange: towerLayout ? project.carpetRange : null,
+        floorPlanUrls: towerLayout ? project.floorPlanUrls : [],
+        landArea: project.landArea === null ? null : Number(project.landArea),
+        units: project.units.map((unit) => ({
+          ...unit,
+          configuration: towerLayout ? unit.configuration : null,
+          carpetSqft: towerLayout ? unit.carpetSqft : null,
+          builtupSqft: towerLayout ? unit.builtupSqft : null,
+          tower: groupedLayout ? unit.tower : null,
+          floor: towerLayout ? unit.floor : null,
+        })),
+      };
+    });
   }
 
   async resolveByDomain(domain: string) {
