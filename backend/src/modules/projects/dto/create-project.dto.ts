@@ -49,9 +49,13 @@ export class CreateProjectDto {
   @IsUUID()
   managerId?: string;
 
-  @IsOptional()
+  // Mandatory (Step 1 of the wizard). Not defaulted server-side: a project's
+  // lifecycle state should be an explicit choice, and lib/project-validation.ts
+  // requires it on the same step so the two agree. (UpdateProjectDto keeps it
+  // optional — a PATCH only sends what changed.)
+  @IsNotEmpty()
   @IsIn(PROJECT_STATUS_VALUES)
-  status?: (typeof PROJECT_STATUS_VALUES)[number];
+  status!: (typeof PROJECT_STATUS_VALUES)[number];
 
   @IsOptional()
   @Type(() => Number)

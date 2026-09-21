@@ -31,8 +31,8 @@ export interface MissingField extends RequiredField {
 export interface ProjectRequiredValues {
   name: string;
   projectType: string;
-  reraId: string;
   currency: string;
+  status: string;
   priceMin: string;
   address: string;
   city: string;
@@ -63,7 +63,12 @@ export function projectRequirements(
     0: [
       { id: "name", label: "Project name", error: "Project name is required.", filled: !!v.name.trim() },
       { id: "projectType", label: "Project type", error: "Pick a project type.", filled: !!v.projectType },
-      { id: "reraId", label: "RERA registration no.", error: "RERA registration number is required.", filled: !!v.reraId.trim() },
+      // RERA registration no. is deliberately NOT required (small developers
+      // often have none yet) — it stays a plain optional field on both forms
+      // and is optional in CreateProjectDto too.
+      // Status is required: a project's lifecycle state is an explicit choice,
+      // and CreateProjectDto requires it as well.
+      { id: "status", label: "Status", error: "Pick a status.", filled: !!v.status },
       // Lives here, not on the Pricing step, so it's locked in before Step 2
       // (Inventory & config) asks for the first unit-type price — every
       // price entered anywhere in the wizard is denominated in this.

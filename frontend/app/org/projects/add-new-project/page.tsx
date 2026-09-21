@@ -3,15 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectSalesAgentCandidates, setProjectSalesAgents } from "@/lib/api";
+import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectManagerCandidates, getProjectSalesAgentCandidates, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { CURRENCY_OPTIONS } from "@/lib/countries";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import {
+  alreadyAssignedLabel,
   CatalogOptions,
   ConfigSizePriceTable,
+  ManagerPicker,
   MoneyInput,
+  personLabel,
   SpecificationRows,
   type ConfigSizePriceRow,
 } from "@/components/org/project-form-fields";
@@ -38,8 +41,6 @@ import type {
   OrgCatalogCategory,
   OrgCatalogOption,
   LandingPageRow,
-  OrgUser,
-  OrgUsersListResponse,
   OrgTemplateSummary,
   OrgTemplatesListResponse,
   OrgBillingSummary,
@@ -49,10 +50,6 @@ import type {
   SafeOrganisation,
 } from "@/lib/types";
 import Link from "next/link";
-
-function userLabel(u: OrgUser): string {
-  return [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
-}
 
 // The wizard's draft rows are the shared table's rows — one shape, so the
 // component and the localStorage draft can't drift apart.
@@ -260,7 +257,7 @@ export default function AddNewProjectPage() {
 
   // Step 7 — team
   const [managerId, setManagerId] = useState("");
-  const [managers, setManagers] = useState<OrgUser[]>([]);
+  const [managers, setManagers] = useState<ProjectAssigneeCandidate[]>([]);
   const [salesAgents, setSalesAgents] = useState<ProjectAssigneeCandidate[]>([]);
   const [salesTeam, setSalesTeam] = useState("Ahmedabad — West");
   // User ids of the agents ticked in Step 7.
@@ -349,11 +346,13 @@ export default function AddNewProjectPage() {
   useEffect(() => {
     if (!accessToken) return;
     const auth = { headers: { Authorization: `Bearer ${accessToken}` } };
-    apiFetch<OrgUsersListResponse>("/org/users?role=manager&limit=100&status=active", auth)
+    // Everyone holding the manager role (same set the Users list gives for
+    // role=manager), each with the projects they're already on.
+    getProjectManagerCandidates()
       .then((res) => setManagers(res.data))
       .catch(() => setManagers([]));
-    // "Who can hold a lead" — resolved server-side (permission-based, admins
-    // and managers excluded), and the same rule the PUT enforces.
+    // Everyone except Admins and Managers, resolved server-side — the same
+    // rule the PUT enforces.
     getProjectSalesAgentCandidates()
       .then((res) => setSalesAgents(res.data))
       .catch(() => setSalesAgents([]));
@@ -422,8 +421,8 @@ export default function AddNewProjectPage() {
   // --- Required fields, per step. The rules live in lib/project-validation
   // so the edit page enforces exactly the same set. ---
   const requiredByStep = useMemo(
-    () => projectRequirements({ name, projectType, reraId, currency, priceMin, address, city, managerId }),
-    [name, projectType, reraId, currency, priceMin, address, city, managerId],
+    () => projectRequirements({ name, projectType, currency, status, priceMin, address, city, managerId }),
+    [name, projectType, currency, status, priceMin, address, city, managerId],
   );
 
   const missingOnStep = useCallback(
@@ -1219,8 +1218,8 @@ export default function AddNewProjectPage() {
                 <div className="q-sec">
                   <div className="lbl">🏛️ Approvals &amp; timeline</div>
                   <div className="grid g2">
-                    <div className={fieldClass("reraId")}><label>RERA registration no. <span className="req">*</span></label><input className="inp" placeholder="PR/GJ/AHM/2026/00842" value={reraId} onChange={(e) => setReraId(e.target.value)} />{invalid("reraId") && <div className="field-err">RERA registration number is required.</div>}</div>
-                    <div className="field"><label>Status</label><select className="inp" value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+                    <div className="field"><label>RERA registration no.</label><input className="inp" placeholder="PR/GJ/AHM/2026/00842" value={reraId} onChange={(e) => setReraId(e.target.value)} /></div>
+                    <div className={fieldClass("status")}><label>Status <span className="req">*</span></label><select className="inp" value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}><option value="active">Active</option><option value="inactive">Inactive</option></select>{invalid("status") && <div className="field-err">Pick a status.</div>}</div>
                   </div>
                   <div className="grid g3">
                     <div className="field"><label>Launch date</label><input className="inp" type="date" value={launchDate} onChange={(e) => setLaunchDate(e.target.value)} /></div>
@@ -1302,7 +1301,7 @@ export default function AddNewProjectPage() {
                 </div>
                 <div className="q-sec">
                   <div className="lbl">📄 Payment plan</div>
-                  <div className="field"><label>Plan type</label>
+                  <div className="field"><label>Payment plan</label>
                     <CatalogOptions
                       category="payment_plan"
                       options={catalogByCategory.payment_plan}
@@ -1333,7 +1332,7 @@ export default function AddNewProjectPage() {
                 </div>
                 <div className="q-sec">
                   <div className="lbl">🛣️ Connectivity &amp; landmarks</div>
-                  <div className="field"><label>Nearby (select all that apply)</label>
+                  <div className="field"><label>Nearby connectivity (select all that apply)</label>
                     <CatalogOptions
                       category="connectivity"
                       options={catalogByCategory.connectivity}
@@ -1434,7 +1433,7 @@ export default function AddNewProjectPage() {
                       <>
                         <div className="grid g2 mt-12">
                           <div className="field mb-0">
-                            <label style={{ fontSize: 12 }}>Landing Page Title</label>
+                            <label style={{ fontSize: 12 }}>Landing page title</label>
                             <input
                               className="inp"
                               value={landingPageTitle}
@@ -1443,7 +1442,7 @@ export default function AddNewProjectPage() {
                             />
                           </div>
                           <div className="field mb-0">
-                            <label style={{ fontSize: 12 }}>Live Web URL Preview</label>
+                            <label style={{ fontSize: 12 }}>Live web URL preview</label>
                             <div style={{ height: 38, background: "#fff", border: "1px solid var(--line)", borderRadius: 6, display: "flex", alignItems: "center", padding: "0 10px", fontSize: 12, color: "var(--muted)" }}>
                               /p/{name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "project-slug"}
                             </div>
@@ -1493,15 +1492,15 @@ export default function AddNewProjectPage() {
                 <div className="q-h"><div className="st">Step 7 of 9</div><h2>Team &amp; access</h2><div className="sub">Who owns this project and which agents can work its leads.</div></div>
                 <div className="q-sec">
                   <div className="lbl">👤 Ownership</div>
-                  <div className="grid g2">
-                    <div className={fieldClass("managerId")}><label>Project manager <span className="req">*</span></label><select className="inp" value={managerId} onChange={(e) => setManagerId(e.target.value)}><option value="">Unassigned</option>{managers.map((u) => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}</select>{invalid("managerId") && <div className="field-err">Assign a project manager.</div>}</div>
+                  <div>
+                    <div className={fieldClass("managerId")}><label>Project manager <span className="req">*</span></label><ManagerPicker managers={managers} value={managerId} onChange={setManagerId} />{invalid("managerId") && <div className="field-err">Assign a project manager.</div>}</div>
                     {/* Intentionally hidden: this is a free-text regional label ("Ahmedabad — West"), not a
                         reference to the real Team model (org-teams module) — Project.salesTeam is stored
                         and echoed back but never read anywhere in the backend. May return once it's wired
                         to real teams. */}
                     {/* <div className="field"><label>Sales team</label><select className="inp" value={salesTeam} onChange={(e) => setSalesTeam(e.target.value)}><option>Ahmedabad — West</option><option>Ahmedabad — Core</option><option>NRI Desk</option></select></div> */}
                   </div>
-                  <div className="field"><label>Assign sales agents</label>
+                  <div className="field"><label>Assigned sales agents</label>
                     {salesAgents.length === 0 ? (
                       <div className="hint">No assignable users in your organisation yet — add them under Users.</div>
                     ) : (
@@ -1518,8 +1517,8 @@ export default function AddNewProjectPage() {
                               <span className="project-assignee-meta">
                                 <b>{u.name}</b>
                                 <small className="project-assignee-role">{u.role?.name ?? "No role"}</small>
-                                {u.projects.length > 0 ? (
-                                  <small className="project-assignee-projects">Already assigned: {u.projects.map((p) => `${p.name} (${p.role})`).join(", ")}</small>
+                                {alreadyAssignedLabel(u.projects) ? (
+                                  <small className="project-assignee-projects">{alreadyAssignedLabel(u.projects)}</small>
                                 ) : null}
                               </span>
                             </span>
@@ -1581,16 +1580,16 @@ export default function AddNewProjectPage() {
                   <div className="rev-grid">
                     <div>
                       <div className="q-sec"><div className="lbl">📋 Basics</div>
-                        <div className="sp"><span className="k">Project</span><span className="v">{name || "—"}</span></div>
-                        <div className="sp"><span className="k">Type</span><span className="v">{projectType || "—"}</span></div>
-                        <div className="sp"><span className="k">RERA</span><span className="v">{reraId || "—"}</span></div>
+                        <div className="sp"><span className="k">Project name</span><span className="v">{name || "—"}</span></div>
+                        <div className="sp"><span className="k">Project type</span><span className="v">{projectType || "—"}</span></div>
+                        <div className="sp"><span className="k">RERA registration no.</span><span className="v">{reraId || "—"}</span></div>
                         <div className="sp"><span className="k">Status</span><span className="v"><span className={`badge ${status === "active" ? "b-green" : "b-gray"}`}>{status === "active" ? "Active" : "Inactive"}</span></span></div>
                       </div>
                       <div className="q-sec"><div className="lbl">🏠 Inventory</div>
-                        <div className="sp"><span className="k">Configs</span><span className="v">{formatConfigs(selectedConfigs)}</span></div>
+                        <div className="sp"><span className="k">Unit configurations</span><span className="v">{formatConfigs(selectedConfigs)}</span></div>
                         <div className="sp"><span className="k">Towers / floors</span><span className="v">{[towerCount, floorsDescription].filter(Boolean).join(" · ") || "—"}</span></div>
-                        <div className="sp"><span className="k">Carpet range</span><span className="v">{carpetRange || "—"}</span></div>
-                        <div className="sp"><span className="k">Land area</span><span className="v">{landArea ? `${landArea} acres` : "—"}</span></div>
+                        <div className="sp"><span className="k">Carpet area range</span><span className="v">{carpetRange || "—"}</span></div>
+                        <div className="sp"><span className="k">Total land area</span><span className="v">{landArea ? `${landArea} acres` : "—"}</span></div>
                         <div className="sp"><span className="k">Price range</span><span className="v">{priceRangeLabel(priceMin, priceMax, currency)}</span></div>
                       </div>
                       <div className="q-sec"><div className="lbl">📍 Location</div>
@@ -1612,14 +1611,14 @@ export default function AddNewProjectPage() {
                       <div className="q-sec"><div className="lbl">📣 Marketing</div>
                         {/* Intentionally hidden: ad-source settings are not implemented yet and may return later. */}
                         {/* <div className="sp"><span className="k">Sources</span><span className="v">{[metaAds && "Meta", googleAds && "Google", linkedinAds && "LinkedIn", portalAds && "Portals"].filter(Boolean).join(", ") || "—"}</span></div> */}
-                        <div className="sp"><span className="k">Monthly budget</span><span className="v">{monthlyBudget ? formatProjectMoney(monthlyBudget, currency) : "—"}</span></div>
+                        <div className="sp"><span className="k">Monthly ad budget</span><span className="v">{monthlyBudget ? formatProjectMoney(monthlyBudget, currency) : "—"}</span></div>
                         <div className="sp"><span className="k">Target CPL</span><span className="v">{targetCpl ? formatProjectMoney(targetCpl, currency) : "—"}</span></div>
-                        <div className="sp"><span className="k">Lead goal</span><span className="v">{leadGoal || "—"}</span></div>
+                        <div className="sp"><span className="k">Monthly lead goal</span><span className="v">{leadGoal || "—"}</span></div>
                         {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
                         {/* <div className="sp"><span className="k">AI calling</span><span className="v"><span className={`badge ${aiCalling ? "b-green" : "b-gray"}`}>{aiCalling ? "On" : "Off"}</span></span></div> */}
                         {/* Intentionally hidden: the backing WhatsApp auto-welcome feature is not implemented yet and may return later. */}
                         {/* <div className="sp"><span className="k">WhatsApp welcome</span><span className="v"><span className={`badge ${whatsappAuto ? "b-green" : "b-gray"}`}>{whatsappAuto ? "On" : "Off"}</span></span></div> */}
-                        <div className="sp"><span className="k">Round-robin</span><span className="v"><span className={`badge ${roundRobin ? "b-green" : "b-gray"}`}>{roundRobin ? "On" : "Off"}</span></span></div>
+                        <div className="sp"><span className="k">Round-robin assignment</span><span className="v"><span className={`badge ${roundRobin ? "b-green" : "b-gray"}`}>{roundRobin ? "On" : "Off"}</span></span></div>
                       </div>
                       <div className="q-sec"><div className="lbl">🌐 Project Template &amp; Website</div>
                         <div className="sp"><span className="k">Template</span><span className="v">{selectedTemplate?.name || "Standard Template"}</span></div>
@@ -1660,8 +1659,8 @@ export default function AddNewProjectPage() {
                         </div>
                       </div>
                       <div className="q-sec"><div className="lbl">👤 Team &amp; access</div>
-                        <div className="sp"><span className="k">Manager</span><span className="v">{selectedManager ? userLabel(selectedManager) : "Unassigned"}</span></div>
-                        <div className="sp"><span className="k">Agents</span><span className="v">{agentAssign.length} assigned</span></div>
+                        <div className="sp"><span className="k">Project manager</span><span className="v">{selectedManager ? personLabel(selectedManager) : "Unassigned"}</span></div>
+                        <div className="sp"><span className="k">Assigned sales agents</span><span className="v">{agentAssign.length} assigned</span></div>
                         {/* Intentionally hidden: booking approval, telecaller visibility, and public website publishing are not implemented yet and may return later. */}
                         {/*
                         <div className="sp"><span className="k">Booking approval</span><span className="v">{requireApproval ? "Required" : "Not required"}</span></div>
@@ -1670,8 +1669,8 @@ export default function AddNewProjectPage() {
                         */}
                       </div>
                       <div className="q-sec"><div className="lbl">📄 Media</div>
-                        <div className="sp"><span className="k">Cover image</span><span className="v">{coverImageUrl ? "✓ Uploaded" : "—"}</span></div>
-                        <div className="sp"><span className="k">Gallery</span><span className="v">{galleryUrls.length ? `${galleryUrls.length} photo${galleryUrls.length > 1 ? "s" : ""}` : "—"}</span></div>
+                        <div className="sp"><span className="k">Cover / elevation image</span><span className="v">{coverImageUrl ? "✓ Uploaded" : "—"}</span></div>
+                        <div className="sp"><span className="k">Gallery images</span><span className="v">{galleryUrls.length ? `${galleryUrls.length} photo${galleryUrls.length > 1 ? "s" : ""}` : "—"}</span></div>
                         <div className="sp"><span className="k">Brochure</span><span className="v">{brochureUrl ? "✓ Uploaded" : "—"}</span></div>
                         <div className="sp"><span className="k">RERA certificate</span><span className="v">{reraCertificateUrl ? "✓ Uploaded" : "—"}</span></div>
                         <div className="sp"><span className="k">Project floor / site plan</span><span className="v">{floorPlanUrls.length ? `${floorPlanUrls.length} plan${floorPlanUrls.length > 1 ? "s" : ""}` : "—"}</span></div>

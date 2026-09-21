@@ -9,6 +9,55 @@ import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { DynamicRole } from "@/lib/types";
 
+type PermissionColumn = "canView" | "canAdd" | "canEdit" | "canDelete" | "canApprove";
+type PermissionPill = { key: string; permission: PermissionColumn; label: string };
+
+const DEFAULT_PERMISSION_PILLS: PermissionPill[] = [
+  { key: "canView", permission: "canView", label: "View" },
+  { key: "canAdd", permission: "canAdd", label: "Add" },
+  { key: "canEdit", permission: "canEdit", label: "Edit" },
+  { key: "canDelete", permission: "canDelete", label: "Delete" },
+  { key: "canApprove", permission: "canApprove", label: "Approve" },
+];
+
+// Per-module pill overrides — the backend still stores the same 5 boolean
+// columns for every module, but a handful of console pages don't map 1:1
+// onto generic View/Add/Edit/Delete/Approve actions. Relabelling (and
+// dropping) pills here keeps the matrix truthful to what each page can
+// actually do, without touching the shared column schema.
+const MODULE_PERMISSION_PILLS: Record<string, PermissionPill[]> = {
+  // Organisations has no "Approve" action; canAdd/canApprove are repurposed
+  // as the Activate/Deactivate toggle instead.
+  admin_organisations: [
+    { key: "canView", permission: "canView", label: "View" },
+    { key: "activate", permission: "canAdd", label: "Activate" },
+    { key: "deactivate", permission: "canApprove", label: "Deactivate" },
+    { key: "canEdit", permission: "canEdit", label: "Edit" },
+    { key: "canDelete", permission: "canDelete", label: "Delete" },
+  ],
+  // The console dashboard is a read-only overview — there's nothing to add,
+  // edit, delete or approve.
+  admin_dashboard: [
+    { key: "canView", permission: "canView", label: "View" },
+  ],
+  // Covers both the Members and Roles tabs (there's no separate "Platform
+  // roles" module). Members: viewed, invited (Add), edited, disabled and
+  // removed. Roles: viewed, created (Add), edited/permissions-managed and
+  // deleted. Neither tab has an "Approve" step, so canApprove is repurposed
+  // as the member Disable/Enable toggle.
+  admin_platform_team: [
+    { key: "canView", permission: "canView", label: "View" },
+    { key: "canAdd", permission: "canAdd", label: "Add" },
+    { key: "canEdit", permission: "canEdit", label: "Edit" },
+    { key: "canDelete", permission: "canDelete", label: "Delete" },
+    { key: "disable", permission: "canApprove", label: "Disable" },
+  ],
+};
+
+function permissionPillsFor(moduleKey: string): PermissionPill[] {
+  return MODULE_PERMISSION_PILLS[moduleKey] ?? DEFAULT_PERMISSION_PILLS;
+}
+
 const PRESETS = [
   { name: "Platform Operator", key: "platform_operator", desc: "Day-to-day Super Admin console: organisations, domains, support" },
   { name: "Platform Support", key: "platform_support", desc: "Helps organisations with onboarding, billing, and access issues" },
@@ -40,11 +89,18 @@ export function PlatformRolesPanel({
   onCreateOpenChange,
   onRolesChanged,
   onPermissionEditing,
+  canEdit: canEditRoles,
+  canDelete: canDeleteRoles,
 }: {
   createOpen: boolean;
   onCreateOpenChange: (open: boolean) => void;
   onRolesChanged?: () => void;
   onPermissionEditing?: (active: boolean) => void;
+  // Roles is a tab of the Platform Team module, not its own permission
+  // module — the caller passes down the single admin_platform_team grant
+  // that governs both the Members and Roles tabs identically.
+  canEdit: boolean;
+  canDelete: boolean;
 }) {
   const { accessToken } = useAuth();
   const [roles, setRoles] = useState<DynamicRole[]>([]);
@@ -206,11 +262,16 @@ export function PlatformRolesPanel({
     if (!permRole || permRole.key === "super_admin") return;
     const item = permRows.find((row) => row.moduleKey === moduleKey);
     if (!item) return;
-    const nextRows = permRows.map((row) =>
-      row.moduleKey === moduleKey
-        ? { ...row, canView: enabled, canAdd: enabled, canEdit: enabled, canDelete: enabled, canApprove: enabled }
-        : row,
-    );
+    // Only the columns this module actually exposes a pill for — never write
+    // a hidden/unused action column (e.g. the unused canApprove on modules
+    // with no approve-like action) just because "All"/"None" was clicked.
+    const visibleColumns = permissionPillsFor(moduleKey).map((p) => p.permission);
+    const nextRows = permRows.map((row) => {
+      if (row.moduleKey !== moduleKey) return row;
+      const patch: Partial<typeof row> = {};
+      for (const col of visibleColumns) patch[col] = enabled;
+      return { ...row, ...patch };
+    });
     await savePermissionRows(
       nextRows,
       `${moduleKey}:all`,
@@ -308,22 +369,7 @@ export function PlatformRolesPanel({
                       <div className="muted" style={{ fontSize: 12 }}>{item.description}</div>
                     </div>
                     <div className="platform-permission-actions">
-                      {(item.moduleKey === "admin_organisations"
-                        ? [
-                            { key: "canView", permission: "canView", label: "View" },
-                            { key: "activate", permission: "canAdd", label: "Activate" },
-                            { key: "deactivate", permission: "canApprove", label: "Deactivate" },
-                            { key: "canEdit", permission: "canEdit", label: "Edit" },
-                            { key: "canDelete", permission: "canDelete", label: "Delete" },
-                          ]
-                        : [
-                            { key: "canView", permission: "canView", label: "View" },
-                            { key: "canAdd", permission: "canAdd", label: "Add" },
-                            { key: "canEdit", permission: "canEdit", label: "Edit" },
-                            { key: "canDelete", permission: "canDelete", label: "Delete" },
-                            { key: "canApprove", permission: "canApprove", label: "Approve" },
-                          ]
-                      ).map(({ key, permission, label }) => {
+                      {permissionPillsFor(item.moduleKey).map(({ key, permission, label }) => {
                         const enabled = locked || item[permission as keyof typeof item];
                         return (
                           <button
@@ -415,26 +461,30 @@ export function PlatformRolesPanel({
                     <td>{r._count?.userRoles ?? 0}</td>
                     <td>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button className="btn btn-ghost btn-sm" type="button" onClick={() => void openPerms(r)}>
-                          Permissions
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          type="button"
-                          onClick={() => {
-                            setEditing(r);
-                            setEditForm({
-                              name: r.name,
-                              key: r.key,
-                              description: r.description ?? "",
-                              status: r.status,
-                            });
-                            setEditError(null);
-                          }}
-                        >
-                          Edit
-                        </button>
-                        {r.key !== "super_admin" ? (
+                        {canEditRoles ? (
+                          <button className="btn btn-ghost btn-sm" type="button" onClick={() => void openPerms(r)}>
+                            Permissions
+                          </button>
+                        ) : null}
+                        {canEditRoles ? (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            type="button"
+                            onClick={() => {
+                              setEditing(r);
+                              setEditForm({
+                                name: r.name,
+                                key: r.key,
+                                description: r.description ?? "",
+                                status: r.status,
+                              });
+                              setEditError(null);
+                            }}
+                          >
+                            Edit
+                          </button>
+                        ) : null}
+                        {canDeleteRoles && r.key !== "super_admin" ? (
                           <button className="btn btn-ghost btn-sm" type="button" onClick={() => setConfirmDelete(r)}>
                             Delete
                           </button>

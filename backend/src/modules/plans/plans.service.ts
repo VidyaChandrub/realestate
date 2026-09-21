@@ -77,9 +77,18 @@ export class PlansService {
     if (query.isActive !== undefined) where.isActive = query.isActive;
     if (query.isPopular !== undefined) where.isPopular = query.isPopular;
 
+    // The platform's default plan (isSystem — the ₹0 Basic every new org lands
+    // on) always leads, ahead of "popular" and price ordering: it is the one
+    // plan that must never be buried or overshadowed. This single endpoint
+    // feeds every plan list in the app (Super Admin, org settings, org detail).
     const plans = await this.prisma.plan.findMany({
       where,
-      orderBy: [{ isPopular: 'desc' }, { priceMonthly: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [
+        { isSystem: 'desc' },
+        { isPopular: 'desc' },
+        { priceMonthly: 'asc' },
+        { createdAt: 'asc' },
+      ],
     });
     return plans.map(toPlanResponse);
   }
@@ -122,8 +131,19 @@ export class PlansService {
     const plan = await this.prisma.plan.findUnique({ where: { id } });
     if (!plan) throw new NotFoundException('Plan not found');
 
+    // The default plan is looked up by its slug at onboarding
+    // (assignBasicPlanIfMissing → 'basic') and must stay active, otherwise new
+    // signups silently get no plan. Editing it is fine — renaming or
+    // re-slugging it, or switching it off, is not: delete is already refused
+    // for the same reason (see remove()).
+    if (plan.isSystem && dto.isActive === false) {
+      throw new ConflictException(
+        `"${plan.name}" is the platform's default onboarding plan and cannot be deactivated.`,
+      );
+    }
     let slug = dto.slug ? slugify(dto.slug) : undefined;
     if (dto.name && !dto.slug) slug = slugify(dto.name);
+    if (plan.isSystem) slug = undefined;
     if (slug && slug !== plan.slug) {
       const clash = await this.prisma.plan.findUnique({ where: { slug } });
       if (clash) throw new ConflictException(`Plan slug "${slug}" already exists`);

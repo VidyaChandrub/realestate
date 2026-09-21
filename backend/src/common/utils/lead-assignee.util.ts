@@ -14,7 +14,15 @@ import { SYSTEM_ORG_ID, roleDefaults } from './permissions.util';
 //   - at least one of their roles grants `crm` view — via an explicit
 //     RoleModulePermission row, or the baked-in default for a system role —
 //     unless a per-user override for `crm` explicitly sets it.
-const EXCLUDED_ROLE_KEYS = new Set(['super_admin', 'admin', 'manager']);
+// Exported so the project sales-agent rule (ProjectsService — "everyone except
+// Admin and Manager", no CRM-permission requirement) uses this same set rather
+// than re-declaring it. The lead / standalone-unit rule above additionally
+// requires crm:view; the project rule deliberately does not.
+export const EXCLUDED_ROLE_KEYS: ReadonlySet<string> = new Set([
+  'super_admin',
+  'admin',
+  'manager',
+]);
 
 export interface LeadAssignableUser {
   id: string;

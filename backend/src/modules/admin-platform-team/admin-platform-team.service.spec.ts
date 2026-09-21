@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { AdminPlatformTeamService } from './admin-platform-team.service';
 
 jest.mock('bcrypt', () => ({
@@ -148,5 +149,59 @@ describe('AdminPlatformTeamService.update — disable / re-enable', () => {
     await service.update('m1', 'actor-1', { status: 'active' } as any);
 
     expect(email.sendUserAccountStatusEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('AdminPlatformTeamService — Super Admin accounts are protected', () => {
+  it('update: rejects a non-Super-Admin actor editing a Super Admin target', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.findFirst.mockResolvedValue(memberRow()); // default row has the super_admin role
+    prisma.userRole.findFirst.mockResolvedValue({ id: 'ur1' }); // hasRole('super_admin') -> true
+
+    await expect(
+      service.update('m1', 'actor-1', { firstName: 'Hacked' } as any, ['platform_operator']),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('update: allows a Super Admin actor to edit a Super Admin target', async () => {
+    const { service, prisma, txn } = makeService();
+    prisma.user.findFirst.mockResolvedValue(memberRow());
+    prisma.userRole.findFirst.mockResolvedValue({ id: 'ur1' });
+
+    await service.update('m1', 'actor-1', { firstName: 'Renamed' } as any, ['super_admin']);
+
+    expect(txn.user.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('update: does not gate editing a non-Super-Admin target on the actor\'s roles', async () => {
+    const { service, prisma, txn } = makeService();
+    prisma.user.findFirst.mockResolvedValue(
+      memberRow({ userRoles: [{ role: { key: 'ops', name: 'Ops', scope: 'platform' } }] }),
+    );
+    prisma.userRole.findFirst.mockResolvedValue(null); // hasRole('super_admin') -> false
+
+    await service.update('m1', 'actor-1', { firstName: 'Renamed' } as any, ['platform_operator']);
+
+    expect(txn.user.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('remove: rejects deleting a Super Admin account outright, even by another Super Admin', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.findFirst.mockResolvedValue(memberRow());
+    prisma.userRole.findFirst.mockResolvedValue({ id: 'ur1' });
+
+    await expect(service.remove('m1', 'actor-1')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.delete).not.toHaveBeenCalled();
+  });
+
+  it('remove: allows deleting a non-Super-Admin member', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.findFirst.mockResolvedValue(
+      memberRow({ userRoles: [{ role: { key: 'ops', name: 'Ops', scope: 'platform' } }] }),
+    );
+    prisma.userRole.findFirst.mockResolvedValue(null);
+
+    await expect(service.remove('m1', 'actor-1')).resolves.toEqual({ ok: true });
+    expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'm1' } });
   });
 });

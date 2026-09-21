@@ -39,6 +39,7 @@ vi.mock("@/lib/api", () => ({
   getOrgCatalogOptions: vi.fn(async () => CATALOG),
   getOrgLandingPages: vi.fn(async () => []),
   getProjectSalesAgentCandidates: vi.fn(async () => ({ data: [], total: 0 })),
+  getProjectManagerCandidates: vi.fn(async () => ({ data: [], total: 0 })),
   setProjectSalesAgents: vi.fn(async () => ({})),
 }));
 
@@ -91,13 +92,14 @@ describe("project wizard — per-step required-field validation", () => {
     // Every missing field is named inline...
     expect(screen.getByText("Project name is required.")).toBeInTheDocument();
     expect(screen.getByText("Pick a project type.")).toBeInTheDocument();
-    expect(screen.getByText("RERA registration number is required.")).toBeInTheDocument();
+    // RERA registration no. is optional — it must NOT be demanded.
+    expect(screen.queryByText("RERA registration number is required.")).not.toBeInTheDocument();
 
     // ...and summarised next to the button that refused.
     const summary = screen.getByText(/Fill in these fields to continue/).closest("div")!;
     expect(within(summary).getByText("Project name")).toBeInTheDocument();
     expect(within(summary).getByText("Project type")).toBeInTheDocument();
-    expect(within(summary).getByText("RERA registration no.")).toBeInTheDocument();
+    expect(within(summary).queryByText("RERA registration no.")).not.toBeInTheDocument();
   });
 
   it("advances once the step's required fields are filled", async () => {
@@ -106,7 +108,7 @@ describe("project wizard — per-step required-field validation", () => {
 
     await fill(user, "e.g. Palm Residency", "Palm Residency");
     await user.click(await screen.findByText("Apartments"));
-    await fill(user, "PR/GJ/AHM/2026/00842", "PR/GJ/AHM/2026/00842");
+    // No RERA number entered — it's optional, so Step 1 still advances.
     await user.click(screen.getByRole("button", { name: /Continue/ }));
 
     expect(screen.getByRole("heading", { name: /Inventory & configuration/ })).toBeInTheDocument();
@@ -182,7 +184,9 @@ describe("project wizard — per-step required-field validation", () => {
 
     await jumpTo(user, "Review & launch");
 
-    expect(screen.getByText(/7 required fields still empty/)).toBeInTheDocument();
+    // name, type, price-from, address, city, manager. RERA is optional, and
+    // Status / Currency start pre-selected, so none of those three count.
+    expect(screen.getByText(/6 required fields still empty/)).toBeInTheDocument();
   });
 
   it("has no Skip button on any step, including Marketing and Team & access", async () => {

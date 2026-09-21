@@ -464,7 +464,12 @@ export default function SuperAdminSubscriptionsPage() {
     }
   };
 
-  const deletePlan = (id: string) => setDeletePlanId(id);
+  // The default onboarding plan (isSystem) can never be deleted — the API
+  // refuses too; the button is disabled so this is only a backstop.
+  const deletePlan = (id: string) => {
+    if (plans.find((pl) => pl.id === id)?.isSystem) return;
+    setDeletePlanId(id);
+  };
 
   const confirmDeletePlan = async () => {
     if (!deletePlanId) return;
@@ -1106,6 +1111,14 @@ export default function SuperAdminSubscriptionsPage() {
                             {p.name}
                           </span>
                           <span style={{ fontSize: 11, color: "#94a3b8" }}>{p.slug}</span>
+                          {p.isSystem ? (
+                            <span
+                              title="The platform's default plan — every new organisation starts on it. It can be edited but never deleted or deactivated."
+                              style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", padding: "2px 7px", borderRadius: 6, background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0" }}
+                            >
+                              Default
+                            </span>
+                          ) : null}
                         </div>
 
                         <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
@@ -1154,6 +1167,8 @@ export default function SuperAdminSubscriptionsPage() {
                         <button
                           type="button"
                           onClick={() => deletePlan(p.id)}
+                          disabled={p.isSystem}
+                          title={p.isSystem ? "The default plan can't be deleted — edit it instead." : undefined}
                           style={{
                             padding: "8px 12px",
                             borderRadius: 8,
@@ -1162,7 +1177,8 @@ export default function SuperAdminSubscriptionsPage() {
                             fontSize: 12.5,
                             fontWeight: 600,
                             color: "#ef4444",
-                            cursor: "pointer",
+                            cursor: p.isSystem ? "not-allowed" : "pointer",
+                            opacity: p.isSystem ? 0.45 : 1,
                           }}
                         >
                           Delete

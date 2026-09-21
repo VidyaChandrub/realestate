@@ -2419,6 +2419,9 @@
 .project-assignee-meta small{display:block;font-size:11.5px;font-weight:500;line-height:1.35;overflow-wrap:anywhere}
 .project-assignee-role{color:var(--brand);font-weight:700!important}
 .project-assignee-projects{color:var(--muted);font-weight:500!important}
+.project-assignee-free{color:var(--green,#059669);font-weight:600!important}
+.project-assignee-option[role="radio"]{cursor:pointer}
+.project-assignee-option[role="radio"]:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 @media (max-width:720px){.project-assignee-options{grid-template-columns:1fr}}
 .sw-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:13px 0;border-bottom:1px solid var(--line)}
 .sw-row:last-child{border-bottom:0}
@@ -3035,15 +3038,26 @@
 }
 .org .spec-row .inp { margin: 0; }
 .org .spec-row .spec-del {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   width: 32px;
   height: 32px;
+  min-width: 32px;
   border-radius: 9px;
-  color: var(--muted);
-  font-size: 13px;
+  color: #5f6d82;
+  background: #f8fafc;
+  border: 1px solid transparent;
+  font-size: 16px;
   line-height: 1;
+  font-weight: 700;
 }
-.org .spec-row .spec-del:hover { color: var(--rose); border-color: var(--rose); }
+.org .spec-row .spec-del:hover {
+  color: var(--rose);
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
 @media (max-width: 700px) {
   .org .spec-row { grid-template-columns: 1fr 32px; }
   .org .spec-row .inp:first-child { grid-column: 1 / -1; }
