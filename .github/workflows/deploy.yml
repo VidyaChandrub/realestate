@@ -97,7 +97,11 @@ jobs:
 
       - name: Deploy
         run: |
-          ssh -i ~/.ssh/deploy_key "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+          ssh \
+            -i ~/.ssh/deploy_key \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=10 \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
             'bash -s' << 'ENDSSH'
           set -euo pipefail
 
