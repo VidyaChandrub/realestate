@@ -1,11 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectManagerCandidates, getProjectSalesAgentCandidates, getProjectSalesAgents, setProjectSalesAgents } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
+import { useProjectTypes } from "@/lib/use-project-types";
+import {
+  customFieldRequirements,
+  draftToPayload,
+  fieldsToRows,
+  groupNoun,
+  groupPlural,
+  LAYOUT_TRAITS,
+  rowsToTemplate,
+  validateFieldRows,
+  valuesToDraft,
+  type CustomValueDraft,
+  type FieldRow,
+  type ProjectLayout,
+} from "@/lib/field-template";
+import { CustomFieldInputs, ProjectTemplateCustomizer } from "@/components/org/project-type-fields";
 import { CURRENCY_OPTIONS } from "@/lib/countries";
 import {
   alreadyAssignedLabel,
@@ -218,6 +234,25 @@ export default function OrgProjectEditPage() {
 
   // --- Catalogs (option pickers) ---
   const [catalog, setCatalog] = useState<OrgCatalogOption[] | null>(null);
+  const projectTypes = useProjectTypes(!!accessToken);
+  // Structure + this project's own field templates and values. `layout` is the
+  // server's until the user picks a different type.
+  const [layout, setLayout] = useState<ProjectLayout>("tower");
+  const [hasInventory, setHasInventory] = useState(false);
+  const [projectFieldRows, setProjectFieldRows] = useState<FieldRow[]>([]);
+  const [unitFieldRows, setUnitFieldRows] = useState<FieldRow[]>([]);
+  const [groupLabel, setGroupLabel] = useState("");
+  const [customValues, setCustomValues] = useState<CustomValueDraft>({});
+  // Keys that already held a value when the page loaded: only those are
+  // enforced as required here (see the server rule — old records are never
+  // retroactively blocked by a required field added later).
+  const [filledKeys, setFilledKeys] = useState<Set<string>>(new Set());
+  const traits = LAYOUT_TRAITS[layout];
+  const groupName = groupNoun(layout, groupLabel);
+  const projectTemplate = useMemo(
+    () => rowsToTemplate(projectFieldRows.filter((r) => r.label.trim())),
+    [projectFieldRows],
+  );
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [orgLandingPages, setOrgLandingPages] = useState<LandingPageRow[]>([]);
   const [activeSection, setActiveSection] = useState<string>(NAV[0][0]);
@@ -243,6 +278,13 @@ export default function OrgProjectEditPage() {
         setProjectName(p.name);
         setName(p.name);
         setProjectType(p.projectType ?? "");
+        setLayout(p.layout ?? "tower");
+        setHasInventory((p.rollup?.unitsCreated ?? 0) + (p.unitTypes?.length ?? 0) > 0);
+        setProjectFieldRows(fieldsToRows(p.projectFieldTemplate));
+        setUnitFieldRows(fieldsToRows(p.unitFieldTemplate));
+        setGroupLabel(p.groupLabel ?? "");
+        setCustomValues(valuesToDraft(p.projectFieldTemplate ?? [], p.customFields));
+        setFilledKeys(new Set(Object.entries(p.customFields ?? {}).filter(([, v]) => v !== null && v !== "").map(([k]) => k)));
         setTagline(p.tagline ?? "");
         setLaunchDate(p.launchDate ?? "");
         setConstructionStage(p.constructionStage ?? "");
@@ -383,9 +425,10 @@ export default function OrgProjectEditPage() {
   const ineligibleAssigned = salesUsersLoaded
     ? assignedAgents.filter((a) => !salesUsers.some((u) => u.id === a.id))
     : [];
-  const requirements = projectRequirements({
-    name, projectType, currency, status, priceMin, address: addressLine, city, managerId,
-  });
+  const requirements = projectRequirements(
+    { name, projectType, currency, status, priceMin, address: addressLine, city, managerId },
+    { 1: customFieldRequirements(projectTemplate.filter((f) => filledKeys.has(f.key)), customValues) },
+  );
   const missingFields = allMissing(requirements);
   /** The inline message for a field, once Save has been attempted. */
   const fieldError = (id: string) =>
@@ -395,6 +438,30 @@ export default function OrgProjectEditPage() {
   /** How many required fields are still empty in one section of this page. */
   const sectionMissingCount = (anchor: string) =>
     missingFields.filter((f) => STEP_SECTION[f.step] === anchor).length;
+
+  // Picking a different type re-prefills this project's templates from it. A
+  // different LAYOUT is refused once the project has units or unit types —
+  // the inventory that exists was shaped by the old layout (the server
+  // enforces the same rule).
+  function pickProjectType(label: string) {
+    const next = projectType === label ? "" : label;
+    const def = projectTypes.types?.find((t) => t.name === next) ?? null;
+    if (def && def.layout !== layout && hasInventory) {
+      setError("This project already has units, so it can't switch to a project type with a different structure.");
+      return;
+    }
+    setError(null);
+    setProjectType(next);
+    if (!def) return;
+    setLayout(def.layout);
+    setProjectFieldRows(fieldsToRows(def.projectFields));
+    setUnitFieldRows(fieldsToRows(def.unitFields));
+    setGroupLabel(def.groupLabel ?? "");
+    setCustomValues({});
+    const t = LAYOUT_TRAITS[def.layout];
+    if (!t.floors) { setFloorsDescription(""); setCarpetRange(""); setLandArea(""); }
+    if (!t.grouped) setTowerCount("");
+  }
 
   function jumpToSection(anchor: string, label: string) {
     const currentIndex = NAV.findIndex(([current]) => current === activeSection);
@@ -421,7 +488,6 @@ export default function OrgProjectEditPage() {
     document.getElementById(to)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  const projectTypeOptions = (catalog ?? []).filter((o) => o.category === "project_type");
   const unitTypeOptions = (catalog ?? []).filter((o) => o.category === "unit_type");
   const duplicateConfigs = findDuplicateConfigurations(unitTypeRows);
   const priceIncludeOptions = (catalog ?? []).filter((o) => o.category === "price_includes");
@@ -557,6 +623,13 @@ export default function OrgProjectEditPage() {
       document.getElementById(firstSection)?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
+    const templateProblem =
+      validateFieldRows(projectFieldRows, "Project fields") ?? validateFieldRows(unitFieldRows, "Unit fields");
+    if (templateProblem) {
+      setNotice(null);
+      setError(templateProblem);
+      return;
+    }
     setSaving(true);
     setError(null);
     setNotice(null);
@@ -609,10 +682,14 @@ export default function OrgProjectEditPage() {
         connectivity,
         landmarks: landmarks.trim() || null,
 
-        towerCount: parseCount(towerCount) ?? null,
-        floorsDescription: floorsDescription.trim() || null,
-        carpetRange: carpetRange.trim() || null,
-        landArea: parseDecimal(landArea) ?? null,
+        towerCount: traits.grouped ? parseCount(towerCount) ?? null : null,
+        floorsDescription: traits.floors ? floorsDescription.trim() || null : null,
+        carpetRange: traits.configurations ? carpetRange.trim() || null : null,
+        landArea: traits.configurations ? parseDecimal(landArea) ?? null : null,
+        projectFieldTemplate: projectTemplate,
+        unitFieldTemplate: rowsToTemplate(unitFieldRows.filter((r) => r.label.trim())),
+        customFields: draftToPayload(projectTemplate, customValues),
+        groupLabel: traits.grouped ? groupLabel.trim() : undefined,
         amenities: amenityPayload,
         specifications,
         marketing,
@@ -839,14 +916,19 @@ export default function OrgProjectEditPage() {
                 <label>Project type <span className="req">*</span></label>
                 <CatalogOptions
                   category="project_type"
-                  options={projectTypeOptions}
-                  loaded={catalog !== null}
-                  error={catalogError}
+                  options={projectTypes.options}
+                  loaded={projectTypes.loaded}
+                  error={projectTypes.error}
+                  emptyAction={
+                    <button type="button" className="btn btn-primary btn-sm" disabled={projectTypes.adding} onClick={() => void projectTypes.addCommon()}>
+                      {projectTypes.adding ? "Adding…" : "Add common project types"}
+                    </button>
+                  }
                   single
                   isSelected={(label) => projectType === label}
-                  onToggle={(label) => setProjectType((cur) => (cur === label ? "" : label))}
+                  onToggle={pickProjectType}
                 />
-                {projectType && !projectTypeOptions.some((o) => o.label === projectType) ? (
+                {projectType && projectTypes.loaded && !projectTypes.options.some((o) => o.label === projectType) ? (
                   <div className="row gap-8 wrap mt-8">
                     <span className="chip">
                       {projectType}
@@ -1027,6 +1109,7 @@ export default function OrgProjectEditPage() {
           <div className="card" id="sec-inventory" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Inventory &amp; specifications</span></div>
             <div className="card-b">
+              {traits.configurations ? (<>
               <div className="field">
                 <label>Unit configurations</label>
                 <CatalogOptions
@@ -1102,7 +1185,7 @@ export default function OrgProjectEditPage() {
                 hint="Optional. Filling these in means adding a unit prefills its area and price from here instead of asking for them again. Changing them later never alters units that already exist."
               />
               <div className="row3">
-                <div className="field"><label>No. of towers / blocks</label><input className="inp" type="number" min={0} value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /></div>
+                <div className="field"><label>{layout === "tower" && !groupLabel.trim() ? "No. of towers / blocks" : `No. of ${groupPlural(groupName ?? "group")}`}</label><input className="inp" type="number" min={0} value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /></div>
                 <div className="field"><label>Floors / structure</label><input className="inp" placeholder="G+22" value={floorsDescription} onChange={(e) => setFloorsDescription(e.target.value)} /></div>
                 <div className="field"><label>Total land area (acres)</label><input className="inp" type="number" min={0} step="0.01" value={landArea} onChange={(e) => setLandArea(e.target.value)} /></div>
               </div>
@@ -1112,6 +1195,29 @@ export default function OrgProjectEditPage() {
                 <input className="inp" placeholder="640 – 1,850" value={carpetRange} onChange={(e) => setCarpetRange(e.target.value)} />
                 <div className="hint">Whole-project summary. Per-unit-type carpet area is set on each unit type.</div>
               </div>
+              </>) : traits.grouped ? (
+                <div className="row3">
+                  <div className="field"><label>No. of {groupPlural(groupName ?? "group")}</label><input className="inp" type="number" min={0} value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /><div className="hint">Units are grouped by {groupName?.toLowerCase()}; new names can only be added up to this number.</div></div>
+                </div>
+              ) : null}
+
+              <CustomFieldInputs
+                template={projectTemplate}
+                values={customValues}
+                onChange={(key, v) => setCustomValues((cur) => ({ ...cur, [key]: v }))}
+                errorFor={(id) => fieldError(id)}
+              />
+              {projectType && (layout !== "tower" || projectFieldRows.length + unitFieldRows.length > 0) ? (
+                <ProjectTemplateCustomizer
+                  layout={layout}
+                  projectRows={projectFieldRows}
+                  onProjectRows={setProjectFieldRows}
+                  unitRows={unitFieldRows}
+                  onUnitRows={setUnitFieldRows}
+                  groupLabel={groupLabel}
+                  onGroupLabel={setGroupLabel}
+                />
+              ) : null}
 
               <div className="field">
                 <label>Highlights (one per line)</label>

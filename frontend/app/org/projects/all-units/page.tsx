@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgUnits } from "@/lib/api";
 import { formatMoney } from "@/lib/money";
-import { formatUpdatedAt, PRICE_BASIS_LABEL } from "@/components/org/project-form-fields";
+import { formatUpdatedAt, priceBasisSuffix } from "@/components/org/project-form-fields";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
@@ -239,7 +239,7 @@ export default function AllUnitsPage() {
                   <th>Unit</th>
                   <th>Project</th>
                   <th>Configuration</th>
-                  <th>Carpet</th>
+                  <th>Area</th>
                   <th>Tower</th>
                   <th>Floor</th>
                   <th>Facing</th>
@@ -292,8 +292,8 @@ export default function AllUnitsPage() {
                         </td>
                         <td>{u.configuration ?? "—"}</td>
                         <td>
-                          {u.carpetSqft != null
-                            ? `${u.carpetSqft.toLocaleString("en-IN")} sqft`
+                          {(u.carpetSqft ?? u.area) != null
+                            ? `${(u.carpetSqft ?? u.area)!.toLocaleString("en-IN")} sqft`
                             : "—"}
                         </td>
                         <td>{u.tower ?? "—"}</td>
@@ -304,11 +304,11 @@ export default function AllUnitsPage() {
                           {u.price != null
                             ? formatMoney(u.price, ccy)
                             : psf != null
-                              ? `${formatMoney(psf, ccy, 2)}/sqft (${PRICE_BASIS_LABEL[u.pricePerSqftBasis]})`
+                              ? `${formatMoney(psf, ccy, 2)}/sqft${priceBasisSuffix(u.pricePerSqftBasis)}`
                               : "—"}
                           {u.price != null && psf != null ? (
                             <div className="hint">
-                              {formatMoney(psf, ccy, 2)}/sqft ({PRICE_BASIS_LABEL[u.pricePerSqftBasis]})
+                              {formatMoney(psf, ccy, 2)}/sqft{priceBasisSuffix(u.pricePerSqftBasis)}
                             </div>
                           ) : null}
                         </td>

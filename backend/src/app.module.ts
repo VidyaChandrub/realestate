@@ -28,6 +28,7 @@ import { PublicSiteModule } from './modules/public-site/public-site.module';
 import { EmailModule } from './modules/email/email.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { OrgProjectCatalogModule } from './modules/org-project-catalog/org-project-catalog.module';
+import { OrgProjectTypesModule } from './modules/org-project-types/org-project-types.module';
 import { OrgLeadStageDisplayModule } from './modules/org-lead-stage-display/org-lead-stage-display.module';
 import { OrgTeamsModule } from './modules/org-teams/org-teams.module';
 import { OrgPermissionsModule } from './modules/org-permissions/org-permissions.module';
@@ -70,6 +71,7 @@ import { OrgReportsModule } from './modules/org-reports/org-reports.module';
     SalesAgentsModule,
     ProjectsModule,
     OrgProjectCatalogModule,
+    OrgProjectTypesModule,
     OrgLeadStageDisplayModule,
     OrgTeamsModule,
     OrgPermissionsModule,

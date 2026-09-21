@@ -246,7 +246,7 @@ export default function StandaloneUnitPage() {
 
   // The unit response carries the org's basis, so the live edit figure and the
   // stored one can't disagree.
-  const basis = unit.pricePerSqftBasis;
+  const basis = unit.pricePerSqftBasis ?? "carpet"; // standalone units always have one
   const currency = unit.currency ?? "INR";
   const psqft = pricePerSqftLabel(
     parseAmount(form.price),

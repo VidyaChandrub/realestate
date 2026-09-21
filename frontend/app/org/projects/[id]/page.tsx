@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch, createCrmLead, getCrmLeads, getProjectSalesAgents } from "@/lib/api";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { normalizeSpecifications, specificationRows } from "@/lib/specifications";
+import { groupNoun, groupPlural, LAYOUT_TRAITS } from "@/lib/field-template";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { ProjectPageHead } from "@/components/org/project-tabs";
@@ -263,13 +264,36 @@ export default function OrgProjectOverviewPage() {
 
   const totalLeads = leadCount;
 
+  // The structure the project was created with decides which rows exist:
+  // configurations, land area, towers/floors and carpet range are the `tower`
+  // layout's; other layouts show their group count and their own typed fields.
+  const traits = LAYOUT_TRAITS[project.layout ?? "tower"];
+  const groupName = groupNoun(project.layout ?? "tower", project.groupLabel);
+  const customRows = (project.projectFieldTemplate ?? []).map((f) => {
+    const v = project.customFields?.[f.key];
+    const shown =
+      v === undefined || v === null || v === ""
+        ? "—"
+        : typeof v === "boolean"
+          ? v ? "Yes" : "No"
+          : f.unit ? `${v} ${f.unit}` : String(v);
+    return { k: f.label, v: shown };
+  });
+
   const specs: { k: string; v: string; mono?: boolean }[] = [
     { k: "Location", v: project.location || "—" },
-    { k: "Unit configurations", v: configuration },
+    ...(traits.configurations ? [{ k: "Unit configurations", v: configuration }] : []),
     { k: "Price range", v: priceRange },
-    { k: "Total land area", v: project.landArea != null ? `${project.landArea} acres` : "—" },
-    { k: "Towers / floors", v: [project.towerCount != null ? `${project.towerCount} towers` : null, project.floorsDescription || null].filter(Boolean).join(" · ") || "—" },
-    { k: "Carpet area range", v: project.carpetRange || "—" },
+    ...(traits.configurations
+      ? [
+          { k: "Total land area", v: project.landArea != null ? `${project.landArea} acres` : "—" },
+          { k: "Towers / floors", v: [project.towerCount != null ? `${project.towerCount} towers` : null, project.floorsDescription || null].filter(Boolean).join(" · ") || "—" },
+          { k: "Carpet area range", v: project.carpetRange || "—" },
+        ]
+      : traits.grouped
+        ? [{ k: `No. of ${groupPlural(groupName ?? "group")}`, v: project.towerCount != null ? String(project.towerCount) : "—" }]
+        : []),
+    ...customRows,
     // Planned figure when a planned mix exists, otherwise the real created
     // count. "—" only when there's no inventory of either kind.
     {
@@ -444,7 +468,8 @@ export default function OrgProjectOverviewPage() {
             </div>
           </Reveal>
 
-          {/* Configurations & Floor Plan Breakdown Widget */}
+          {/* Configurations & Floor Plan Breakdown Widget — the `tower` layout's */}
+          {traits.configurations ? (
           <Reveal delay={3}>
             <div className="card">
               <div className="card-h">
@@ -483,6 +508,7 @@ export default function OrgProjectOverviewPage() {
               </div>
             </div>
           </Reveal>
+          ) : null}
 
           {/* Pricing, Commercials & Inclusions Widget */}
           <Reveal delay={3}>

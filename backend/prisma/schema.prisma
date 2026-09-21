@@ -201,6 +201,7 @@ model Organisation {
   trackingEvents        TrackingEvent[]
   projects              Project[]
   catalogOptions        OrgCatalogOption[]
+  projectTypeDefs       ProjectTypeDef[]
   leadStageDisplays     OrgLeadStageDisplay[]
   units                 Unit[]
   emailConfig           EmailConfig?
@@ -1462,6 +1463,20 @@ model Project {
   // reference" rule as amenities/connectivity: no FK back to the catalog, so
   // renaming or deleting an option never rewrites an existing project.
   projectType       String?       @map("project_type")
+  // Structure + templates COPIED from the project type at creation (see
+  // ProjectTypeDef): editing or deleting the type never changes this project.
+  // `layout` decides which inventory controls exist; the two templates are
+  // this project's own editable copy; `customFields` are the typed values for
+  // `projectFieldTemplate`, keyed by field key (values of fields later removed
+  // from the template are kept, just hidden).
+  layout               ProjectLayout @default(tower)
+  // Soft pointer to the type it was created from — no FK, so deleting the
+  // type is always safe. Used only to count a type's usage.
+  projectTypeId        String?       @map("project_type_id")
+  groupLabel           String?       @map("group_label")
+  projectFieldTemplate Json          @default("[]") @map("project_field_template")
+  unitFieldTemplate    Json          @default("[]") @map("unit_field_template")
+  customFields         Json          @default("{}") @map("custom_fields")
   tagline           String?
   // ISO "YYYY-MM-DD" exactly as an <input type="date"> produces it. Kept as
   // text on purpose: it's a plain calendar date with no time or zone, and a
@@ -1523,6 +1538,7 @@ model Project {
 
   @@index([orgId])
   @@index([managerId])
+  @@index([projectTypeId])
   @@map("projects")
   @@schema("projects")
 }
@@ -1608,6 +1624,13 @@ model Unit {
   // names are bounded server-side by Project.towerCount.
   tower   String?
   floor   Int?
+  // The primary area of a unit in a non-`tower` layout (plot / villa size), in
+  // sqft. Named neutrally so a later area unit doesn't rename it. Not used by
+  // `tower` units, which keep carpet / built-up above.
+  area    Int?
+  // Typed values for the project's `unitFieldTemplate`, by field key. Values
+  // of fields later removed from the template are kept, just hidden.
+  customFields Json @default("{}") @map("custom_fields")
   facing  String? // e.g. "North-East"
   // Free text as entered on the form ("1 covered", "2 covered", "Open").
   parking String?
@@ -1681,6 +1704,50 @@ model UnitSalesAgent {
 // the project's own columns — there is NO foreign key from a project back
 // to a catalog option, so editing/deleting an option never affects an
 // already-created project.
+// How a project's inventory is structured. A small FIXED set — code, not org
+// data: the wizard, unit forms and availability grid each render per layout.
+//   tower      — groups (towers/blocks) with floors; apartments, commercial
+//   cluster    — groups (phases/sectors/rows), no floors; villas, plots
+//   individual — a flat list, no grouping; farmhouses, one-offs
+enum ProjectLayout {
+  tower
+  cluster
+  individual
+
+  @@schema("projects")
+}
+
+// An org's own project-type catalog entry: a name plus the layout it uses and
+// two typed field templates (JSON arrays of field definitions — see
+// common/utils/field-template.util.ts). Projects COPY the name, layout and
+// templates at creation, so editing or deleting a type never touches an
+// existing project. Deliberately not an OrgCatalogOption: those are flat
+// labels and cannot carry structure.
+model ProjectTypeDef {
+  id            String        @id @default(uuid())
+  orgId         String        @map("org_id")
+  name          String
+  layout        ProjectLayout @default(tower)
+  // What the grouping column is called for this type ("Tower", "Phase",
+  // "Sector"…). Null = the layout's default label. Meaningless for
+  // `individual` (no grouping).
+  groupLabel    String?       @map("group_label")
+  // Summary fields on the project ("Number of plots", "Total land").
+  projectFields Json          @default("[]") @map("project_fields")
+  // Per-unit fields ("Dimensions", "Corner plot").
+  unitFields    Json          @default("[]") @map("unit_fields")
+  sortOrder     Int           @default(0) @map("sort_order")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, name])
+  @@index([orgId])
+  @@map("project_type_defs")
+  @@schema("projects")
+}
+
 model OrgCatalogOption {
   id        String             @id @default(uuid())
   orgId     String             @map("org_id")

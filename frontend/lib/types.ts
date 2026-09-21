@@ -1,3 +1,5 @@
+import type { FieldDef, ProjectLayout } from "./field-template";
+
 export type OnboardingStep =
   | "account"
   | "organisation"
@@ -957,8 +959,18 @@ export interface Project {
   towerCount: number | null;
   floorsDescription: string | null;
   carpetRange: string | null;
-  /** A `project_type` catalog label, copied at write time (no FK). */
+  /** The project type's name, copied at write time (no FK). */
   projectType: string | null;
+  /** Structure copied from the type at creation; decides which inventory controls exist. */
+  layout: ProjectLayout;
+  projectTypeId: string | null;
+  /** Name of the grouping column; null = the layout's default. */
+  groupLabel: string | null;
+  /** This project's own copy of its type's field templates. */
+  projectFieldTemplate: FieldDef[];
+  unitFieldTemplate: FieldDef[];
+  /** Typed values for `projectFieldTemplate`, by field key. */
+  customFields: Record<string, string | number | boolean | null>;
   tagline: string | null;
   /** ISO "YYYY-MM-DD", as an `<input type="date">` produces it. */
   launchDate: string | null;
@@ -1011,6 +1023,7 @@ export interface EnquiryUnit {
   variantLabel: string | null;
   carpetSqft: number | null;
   builtupSqft: number | null;
+  area: number | null;
   tower: string | null;
   floor: number | null;
   facing: string | null;
@@ -1084,7 +1097,14 @@ export interface Unit {
   price: number | null;
   /** Derived server-side on the org's basis. Null when price or that area is missing. */
   pricePerSqft: number | null;
-  pricePerSqftBasis: UnitPriceBasis;
+  /** Null for units outside the `tower` layout, which price on their single `area`. */
+  pricePerSqftBasis: UnitPriceBasis | null;
+  /** The project's structure layout; null for a standalone unit. */
+  layout?: ProjectLayout | null;
+  /** Primary area (sqft) of a non-`tower` unit. */
+  area: number | null;
+  /** Typed values for the project's unit field template, by field key. */
+  customFields: Record<string, string | number | boolean | null>;
   /** Standalone-listing-only (null for project units). */
   addressLine: string | null;
   ownerName: string | null;
@@ -1162,6 +1182,10 @@ export interface CreateProjectInput {
   floorsDescription?: string;
   carpetRange?: string;
   projectType?: string;
+  projectFieldTemplate?: unknown[];
+  unitFieldTemplate?: unknown[];
+  customFields?: Record<string, unknown>;
+  groupLabel?: string;
   tagline?: string;
   launchDate?: string;
   constructionStage?: string;
@@ -1214,6 +1238,10 @@ export interface UpdateProjectInput {
   floorsDescription?: string | null;
   carpetRange?: string | null;
   projectType?: string | null;
+  projectFieldTemplate?: unknown[];
+  unitFieldTemplate?: unknown[];
+  customFields?: Record<string, unknown>;
+  groupLabel?: string;
   tagline?: string | null;
   launchDate?: string | null;
   constructionStage?: string | null;
@@ -1310,8 +1338,12 @@ export interface CreateUnitTypeInput {
 export type UpdateUnitTypeInput = Partial<CreateUnitTypeInput>;
 
 export interface CreateUnitInput {
-  /** A `unit_type` catalog label — required, validated server-side. */
-  configuration: string;
+  /** A `unit_type` catalog label — required for `tower` and standalone units, refused for other layouts. */
+  configuration?: string;
+  /** Primary area (sqft) — non-`tower` layouts only. */
+  area?: number;
+  /** Typed values for the project's unit field template. */
+  customFields?: Record<string, unknown>;
   /** Optional free-text variant label. */
   variantLabel?: string;
   unitNo: string;
@@ -1344,6 +1376,8 @@ export type UpdateUnitInput = Partial<
     | "variantLabel"
     | "carpetSqft"
     | "builtupSqft"
+    | "floor"
+    | "area"
     | "facing"
     | "price"
     | "addressLine"
@@ -1359,6 +1393,8 @@ export type UpdateUnitInput = Partial<
   variantLabel?: string | null;
   carpetSqft?: number | null;
   builtupSqft?: number | null;
+  floor?: number | null;
+  area?: number | null;
   facing?: string | null;
   price?: number | null;
   addressLine?: string | null;
@@ -1386,7 +1422,9 @@ export interface OrgUnitRow {
   parking: string | null;
   price: number | null;
   pricePerSqft: number | null;
-  pricePerSqftBasis: UnitPriceBasis;
+  pricePerSqftBasis: UnitPriceBasis | null;
+  area: number | null;
+  customFields: Record<string, string | number | boolean | null>;
   status: UnitStatus;
   createdById: string | null;
   updatedById: string | null;
@@ -1395,7 +1433,7 @@ export interface OrgUnitRow {
   createdAt: string;
   updatedAt: string;
   /** Null for a standalone unit. */
-  project: { id: string; name: string; currency: string } | null;
+  project: { id: string; name: string; currency: string; layout: ProjectLayout } | null;
 }
 
 export interface OrgUnitsListResponse {
@@ -2709,3 +2747,27 @@ export interface ProjectAnalyticsStat {
 }
 
 
+
+/** An org's project type: a name, a fixed layout and two typed field templates. */
+export interface OrgProjectType {
+  id: string;
+  orgId: string;
+  name: string;
+  layout: ProjectLayout;
+  /** Name of the grouping column; null = the layout's default label. */
+  groupLabel: string | null;
+  projectFields: FieldDef[];
+  unitFields: FieldDef[];
+  sortOrder: number;
+  /** Projects already using this type — the layout is locked when > 0. */
+  inUse: number;
+}
+
+export interface OrgProjectTypeInput {
+  name?: string;
+  layout?: ProjectLayout;
+  groupLabel?: string;
+  projectFields?: unknown[];
+  unitFields?: unknown[];
+  sortOrder?: number;
+}

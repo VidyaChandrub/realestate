@@ -40,6 +40,7 @@ import type {
   UnitType,
 } from "@/lib/types";
 import { prefillFromUnitType, type PrefillField } from "@/lib/unit-prefill";
+import { layoutInfo } from "@/lib/field-template";
 
 const STATUSES: { value: UnitStatus; label: string }[] = [
   { value: "available", label: "Available" },
@@ -276,8 +277,14 @@ export default function UnitCreatePage() {
 
   const fieldsDisabled = !standalone && projectId === "";
 
+  // This form is the towers-and-floors one (configuration, floor, carpet /
+  // built-up). A project with another structure has its own unit form on its
+  // Units page — sent there rather than duplicated here.
+  const otherLayout = !standalone && !!selectedProject && selectedProject.layout !== "tower";
+
   const canSave =
     !saving &&
+    !otherLayout &&
     (standalone || projectId !== "") &&
     configuration !== "" &&
     unitNo.trim() !== "";
@@ -391,6 +398,15 @@ export default function UnitCreatePage() {
                 </div>
               </div>
             </div>
+
+            {otherLayout && selectedProject ? (
+              <div className="form-alert mb-12">
+                <b>&ldquo;{selectedProject.name}&rdquo; uses the {layoutInfo(selectedProject.layout).title.toLowerCase()} structure</b>, so its units don&apos;t have a configuration, floor or carpet / built-up area.{" "}
+                <Link className="brand-link" href={`/org/projects/${selectedProject.id}/units?new=1`}>
+                  Add the unit from the project&apos;s Units page →
+                </Link>
+              </div>
+            ) : null}
 
             {!standalone ? (
               <div className="sec">

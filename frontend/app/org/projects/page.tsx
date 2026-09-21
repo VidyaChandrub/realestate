@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
+import { useProjectTypes } from "@/lib/use-project-types";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
@@ -46,6 +47,7 @@ function getCoverGradient(id: string) {
 
 export default function OrgProjectsPage() {
   const { accessToken } = useAuth();
+  const projectTypes = useProjectTypes(!!accessToken);
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -247,7 +249,16 @@ export default function OrgProjectsPage() {
             ) : loading ? (
               <div className="card"><div className="card-b"><p className="muted">Loading projects…</p></div></div>
             ) : rows.length === 0 ? (
-              <div className="card"><div className="card-b"><p className="muted">{isFiltered ? "No projects match this filter." : "No projects yet — create one to get started."}</p></div></div>
+              <div className="card"><div className="card-b"><p className="muted">{isFiltered ? "No projects match this filter." : "No projects yet — create one to get started."}</p>
+              {projectTypes.loaded && projectTypes.types?.length === 0 ? (
+                <div className="hint" style={{ marginTop: 10 }}>
+                  Projects need a project type first.{" "}
+                  <button type="button" className="btn btn-primary btn-sm" disabled={projectTypes.adding} onClick={() => void projectTypes.addCommon()}>
+                    {projectTypes.adding ? "Adding…" : "Add common project types"}
+                  </button>{" "}
+                  (Apartments, Villas, Plots, Commercial) — or build your own in Settings.
+                </div>
+              ) : null}</div></div>
             ) : (
               rows.map((p) => (
                 <Link key={p.id} href={`/org/projects/${p.id}`} className="pcard">

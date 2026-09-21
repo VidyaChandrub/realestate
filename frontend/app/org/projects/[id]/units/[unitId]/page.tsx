@@ -6,9 +6,11 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { currencyPrefix, formatMoney } from "@/lib/money";
+import { customValueText, groupNoun, LAYOUT_TRAITS } from "@/lib/field-template";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectTabs } from "@/components/org/project-tabs";
 import {
+  areaPricePerSqftLabel,
   formatPossession,
   PRICE_BASIS_LABEL,
   pricePerSqftLabel,
@@ -149,36 +151,68 @@ export default function OrgProjectUnitDetailPage() {
   const carpet = unit?.carpetSqft ?? plannedType?.carpetSqft ?? null;
   const builtup = unit?.builtupSqft ?? plannedType?.builtupSqft ?? null;
 
-  const subParts = [
-    unit?.configuration ?? null,
-    unit?.variantLabel ?? null,
-    unit?.tower ?? null,
-    unit?.floor != null ? `Floor ${unit.floor}` : null,
-    carpet != null ? `${carpet.toLocaleString("en-IN")} sqft carpet` : null,
-    unit?.facing != null ? `${unit.facing} facing` : null,
-  ].filter(Boolean) as string[];
+  // The project's structure decides which facts a unit has. `tower` shows
+  // exactly what it always did; other layouts show their single area, their
+  // group (in the project's own word) and the project's unit field template.
+  const traits = LAYOUT_TRAITS[project?.layout ?? "tower"];
+  const groupWord = groupNoun(project?.layout ?? "tower", project?.groupLabel) ?? "Group";
+  const customRows = (project?.unitFieldTemplate ?? []).map((f) => ({
+    k: f.label,
+    v: customValueText(f, unit?.customFields?.[f.key]),
+  }));
+  const perSqft = traits.configurations
+    ? pricePerSqftLabel(effectivePrice, carpet, builtup, priceBasis, project?.currency ?? "INR")
+    : areaPricePerSqftLabel(effectivePrice, unit?.area, project?.currency ?? "INR");
+  const areaText = unit?.area != null ? `${unit.area.toLocaleString("en-IN")} sqft` : "—";
+
+  const subParts = (traits.configurations
+    ? [
+        unit?.configuration ?? null,
+        unit?.variantLabel ?? null,
+        unit?.tower ?? null,
+        unit?.floor != null ? `Floor ${unit.floor}` : null,
+        carpet != null ? `${carpet.toLocaleString("en-IN")} sqft carpet` : null,
+        unit?.facing != null ? `${unit.facing} facing` : null,
+      ]
+    : [
+        project?.projectType ?? null,
+        unit?.variantLabel ?? null,
+        unit?.tower ? `${groupWord} ${unit.tower}` : null,
+        unit?.area != null ? `${unit.area.toLocaleString("en-IN")} sqft` : null,
+        unit?.facing != null ? `${unit.facing} facing` : null,
+      ]
+  ).filter(Boolean) as string[];
 
   const specs: { k: string; v: string }[] = [
-    { k: "Configuration", v: unit?.configuration ?? "—" },
+    ...(traits.configurations ? [{ k: "Configuration", v: unit?.configuration ?? "—" }] : []),
     { k: "Unit type", v: unit?.variantLabel ?? "—" },
-    { k: "Carpet area", v: carpet != null ? `${carpet.toLocaleString("en-IN")} sqft` : "—" },
-    { k: "Built-up", v: builtup != null ? `${builtup.toLocaleString("en-IN")} sqft` : "—" },
-    {
-      k: "Floor",
-      v:
-        unit?.floor != null
-          ? [project?.towerCount != null ? `Floor ${unit.floor} of ${project.towerCount}` : null, project?.floorsDescription ?? null]
-              .filter(Boolean)
-              .join(" · ") || `Floor ${unit.floor}`
-          : "—",
-    },
+    ...(traits.configurations
+      ? [
+          { k: "Carpet area", v: carpet != null ? `${carpet.toLocaleString("en-IN")} sqft` : "—" },
+          { k: "Built-up", v: builtup != null ? `${builtup.toLocaleString("en-IN")} sqft` : "—" },
+        ]
+      : [{ k: "Area", v: areaText }]),
+    ...(traits.floors
+      ? [
+          {
+            k: "Floor",
+            v:
+              unit?.floor != null
+                ? [project?.towerCount != null ? `Floor ${unit.floor} of ${project.towerCount}` : null, project?.floorsDescription ?? null]
+                    .filter(Boolean)
+                    .join(" · ") || `Floor ${unit.floor}`
+                : "—",
+          },
+        ]
+      : []),
+    ...customRows,
     { k: "Facing", v: unit?.facing ?? "—" },
     { k: "Parking", v: unit?.parking ?? "—" },
     {
-      k: `${currencyPrefix(project?.currency ?? "INR").trim()}/sqft (${PRICE_BASIS_LABEL[priceBasis]})`,
-      v: pricePerSqftLabel(effectivePrice, carpet, builtup, priceBasis, project?.currency ?? "INR") || "—",
+      k: `${currencyPrefix(project?.currency ?? "INR").trim()}/sqft${traits.configurations ? ` (${PRICE_BASIS_LABEL[priceBasis]})` : ""}`,
+      v: perSqft || "—",
     },
-    { k: "Tower", v: unit?.tower ?? "—" },
+    ...(traits.grouped ? [{ k: traits.configurations ? "Tower" : groupWord, v: unit?.tower ?? "—" }] : []),
     // Units have no possession date of their own — this is the project's,
     // labelled so nobody reads it as unit-specific.
     { k: "Possession (project)", v: formatPossession(project?.possession) },
@@ -187,8 +221,8 @@ export default function OrgProjectUnitDetailPage() {
   const kvRows: { k: string; v: string }[] = [
     { k: "Base price", v: effectivePrice != null ? formatMoney(effectivePrice, project?.currency ?? "INR") : "—" },
     { k: "Status", v: unit ? STATUS_LABEL[unit.status] : "—" },
-    { k: "Tower", v: unit?.tower ?? "—" },
-    { k: "Floor", v: unit?.floor != null ? String(unit.floor) : "—" },
+    ...(traits.grouped ? [{ k: traits.configurations ? "Tower" : groupWord, v: unit?.tower ?? "—" }] : []),
+    ...(traits.floors ? [{ k: "Floor", v: unit?.floor != null ? String(unit.floor) : "—" }] : []),
     { k: "Possession (project)", v: formatPossession(project?.possession) },
     { k: "RERA", v: project?.reraId ?? "—" },
     // Who touched this unit — the client asked to see both, particularly for
@@ -352,7 +386,7 @@ export default function OrgProjectUnitDetailPage() {
                       {effectivePrice != null ? formatMoney(effectivePrice, project?.currency ?? "INR") : "—"}
                     </div>
                     <div className="muted fs-12-5">
-                      {pricePerSqftLabel(effectivePrice, carpet, builtup, priceBasis, project?.currency ?? "INR") || "Price per sqft"} · all-inclusive
+                      {perSqft || "Price per sqft"} · all-inclusive
                     </div>
                   </div>
                   <div className="kv mt-16">
