@@ -8,7 +8,7 @@ import {
   apiFetch,
   deleteStandaloneUnit,
   getOrgCatalogOptions,
-  getProjectSalesAgentCandidates,
+  getSalesAgentCandidates,
   getStandaloneUnit,
   updateStandaloneUnit,
 } from "@/lib/api";
@@ -156,7 +156,7 @@ export default function StandaloneUnitPage() {
     )
       .then((res) => setManagers(res.data))
       .catch(() => setManagers([]));
-    getProjectSalesAgentCandidates()
+    getSalesAgentCandidates()
       .then((res) => setSalesAgentCandidates(res.data))
       .catch(() => setSalesAgentCandidates([]));
   }, [accessToken]);

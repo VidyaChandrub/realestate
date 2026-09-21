@@ -40,3 +40,15 @@ export class ListProjectsQueryDto {
   @IsIn(PROJECT_STATUS_VALUES)
   status?: ProjectStatusValue;
 }
+
+// Which project-assignment picker a candidate list is for. `sales_agent` is
+// everyone except Admins/Managers; `manager` is the users holding the manager
+// role. See ProjectsService.listProjectAssigneeCandidates.
+export const ASSIGNEE_KIND_VALUES = ['sales_agent', 'manager'] as const;
+export type AssigneeKind = (typeof ASSIGNEE_KIND_VALUES)[number];
+
+export class ListAssigneeCandidatesQueryDto {
+  @IsOptional()
+  @IsIn(ASSIGNEE_KIND_VALUES)
+  type?: AssigneeKind;
+}

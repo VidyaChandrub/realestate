@@ -8,7 +8,10 @@ import type { Prisma, UnitPriceBasis } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
-import { listLeadAssignableUsers } from '../../common/utils/lead-assignee.util';
+import {
+  EXCLUDED_ROLE_KEYS,
+  listLeadAssignableUsers,
+} from '../../common/utils/lead-assignee.util';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -169,7 +172,8 @@ export class ProjectsService {
           reraId: dto.reraId ?? null,
           possession: dto.possession ?? null,
           managerId: dto.managerId ?? null,
-          status: dto.status ?? 'active',
+          // Required on the DTO now (@IsNotEmpty) — no silent 'active' default.
+          status: dto.status,
           priceMin: dto.priceMin ?? null,
           priceMax: dto.priceMax ?? null,
           baseRate: dto.baseRate ?? null,
@@ -483,15 +487,42 @@ export class ProjectsService {
   // re-submitting is idempotent (delete-all + recreate in one transaction).
   // -------------------------------------------------------------------------
 
-  /** Existing CRM-eligible candidates used by lead and standalone-unit flows. */
+  /**
+   * CRM-eligible candidates for LEAD assignment and STANDALONE-unit agents.
+   * Narrower than a project's sales-agent rule below: it also requires crm:view.
+   */
   async listSalesAgentCandidates(orgId: string) {
     const data = await listLeadAssignableUsers(this.prisma, orgId);
     return { data, total: data.length };
   }
 
-  /** Active org members available to assign to projects, with role and
-   * existing project membership context for the assignment picker. */
-  async listProjectAssigneeCandidates(orgId: string) {
+  /**
+   * A user is barred from being a project SALES AGENT when any of their roles
+   * is Admin, Manager or Super Admin. Status-agnostic on purpose: a disabled
+   * role's existing memberships keep working (see Role.status), so a user who
+   * still holds `admin` is still an admin. The one predicate behind both the
+   * picker list and the server-side check in `setSalesAgents`.
+   */
+  private hasExcludedAgentRole(roleKeys: string[]): boolean {
+    return roleKeys.some((key) => EXCLUDED_ROLE_KEYS.has(key));
+  }
+
+  /**
+   * Active org members for a project's assignment pickers, each with their
+   * role and the projects they are already on.
+   *
+   *  - `sales_agent` (default): everyone EXCEPT Admins and Managers. There is
+   *    no CRM-permission requirement — telecallers and custom roles are valid
+   *    project agents. Active members only. `setSalesAgents` enforces this
+   *    same predicate.
+   *  - `manager`: every active user holding the `manager` role — the same set
+   *    `GET /org/users?role=manager` returns, so the Project manager dropdown
+   *    keeps listing exactly the managers it always did, now with context.
+   */
+  async listProjectAssigneeCandidates(
+    orgId: string,
+    kind: 'sales_agent' | 'manager' = 'sales_agent',
+  ) {
     const users = await this.prisma.user.findMany({
       where: { orgId, status: 'active' },
       orderBy: { createdAt: 'asc' },
@@ -501,8 +532,7 @@ export class ProjectsService {
         lastName: true,
         email: true,
         userRoles: {
-          where: { role: { status: 'active' } },
-          select: { role: { select: { key: true, name: true } } },
+          select: { role: { select: { key: true, name: true, status: true } } },
         },
         managedProjects: { select: { id: true, name: true } },
         salesProjects: {
@@ -511,30 +541,45 @@ export class ProjectsService {
       },
     });
 
-    const data = users.map((user) => {
-      const projects = new Map<string, { id: string; name: string; role: string }>();
-      for (const project of user.managedProjects) {
-        projects.set(project.id, { ...project, role: 'Manager' });
-      }
-      for (const assignment of user.salesProjects) {
-        if (!projects.has(assignment.project.id)) {
-          projects.set(assignment.project.id, {
-            ...assignment.project,
-            role: 'Sales agent',
-          });
+    const data = users
+      .filter((user) => {
+        const keys = user.userRoles.map((ur) => ur.role.key);
+        return kind === 'manager'
+          ? keys.includes('manager')
+          : !this.hasExcludedAgentRole(keys);
+      })
+      .map((user) => {
+        const projects = new Map<string, { id: string; name: string; role: string }>();
+        for (const project of user.managedProjects) {
+          projects.set(project.id, { ...project, role: 'Manager' });
         }
-      }
+        for (const assignment of user.salesProjects) {
+          if (!projects.has(assignment.project.id)) {
+            projects.set(assignment.project.id, {
+              ...assignment.project,
+              role: 'Sales agent',
+            });
+          }
+        }
 
-      return {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
-        role: user.userRoles[0]?.role ?? null,
-        projects: [...projects.values()],
-      };
-    });
+        const activeRoles = user.userRoles
+          .filter((ur) => ur.role.status === 'active')
+          .map((ur) => ur.role);
+        const role =
+          (kind === 'manager'
+            ? activeRoles.find((r) => r.key === 'manager')
+            : undefined) ?? activeRoles[0];
+
+        return {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+          role: role ? { key: role.key, name: role.name } : null,
+          projects: [...projects.values()],
+        };
+      });
     return { data, total: data.length };
   }
 
@@ -562,9 +607,11 @@ export class ProjectsService {
   }
 
   /**
-  * Every id must be an active member of the caller's org. Project assignment
-  * intentionally supports every org role; the separate standalone-unit and
-  * lead assignment paths retain their narrower CRM eligibility rule.
+   * STANDALONE-unit agents only (a project's own agents use the broader rule
+   * in `setSalesAgents`): every id must be someone the shared "who can hold a
+   * lead" rule allows — never trusted from the body. Same list
+   * `listSalesAgentCandidates` shows, so a direct API call can't attach anyone
+   * the picker wouldn't offer.
    *
    * Callers must pass only the ids being newly added to the set, not the
    * whole resubmitted list — an id that's already assigned may have since
@@ -603,17 +650,27 @@ export class ProjectsService {
     );
     const newIds = unique.filter((id) => !currentIds.has(id));
     if (newIds.length > 0) {
-      const eligible = new Set(
-        (
-          await this.prisma.user.findMany({
-            where: { orgId, status: 'active', id: { in: newIds } },
-            select: { id: true },
-          })
-        ).map((user) => user.id),
-      );
-      if (eligible.size !== newIds.length) {
+      const candidates = await this.prisma.user.findMany({
+        where: { orgId, status: 'active', id: { in: newIds } },
+        select: {
+          id: true,
+          userRoles: { select: { role: { select: { key: true } } } },
+        },
+      });
+      if (candidates.length !== newIds.length) {
         throw new BadRequestException(
           'Assigned users must be active members of this organisation',
+        );
+      }
+      // Same predicate as the sales-agent picker (see hasExcludedAgentRole) —
+      // a direct API call can't attach anyone the picker wouldn't offer.
+      if (
+        candidates.some((user) =>
+          this.hasExcludedAgentRole(user.userRoles.map((ur) => ur.role.key)),
+        )
+      ) {
+        throw new BadRequestException(
+          'Admins and Managers cannot be assigned as project sales agents',
         );
       }
     }

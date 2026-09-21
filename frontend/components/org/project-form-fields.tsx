@@ -7,6 +7,7 @@ import { makeSpecRow, type SpecRow } from "@/lib/specifications";
 import type {
   OrgCatalogCategory,
   OrgCatalogOption,
+  ProjectAssigneeCandidate,
   UnitPriceBasis,
 } from "@/lib/types";
 
@@ -52,6 +53,107 @@ export function formatPossession(value: string | null | undefined): string {
   if (!m) return text;
   const [, year, month] = m;
   return `${SHORT_MONTHS[Number(month) - 1]} ${year}`;
+}
+
+/**
+ * "Already assigned: Skyline Heights (Manager), Palm Residency (Sales agent)",
+ * or `null` when the person isn't on any project yet. The one wording every
+ * project-assignment picker uses, so the Project manager dropdown and the
+ * sales-agent cards describe existing assignments identically.
+ */
+export function alreadyAssignedLabel(
+  projects: ProjectAssigneeCandidate["projects"],
+  max = 2,
+): string | null {
+  if (projects.length === 0) return null;
+  const shown = projects.slice(0, max).map((p) => `${p.name} (${p.role})`);
+  const more = projects.length - shown.length;
+  return `Already assigned: ${shown.join(", ")}${more > 0 ? ` +${more} more` : ""}`;
+}
+
+
+/** A person's display name — first + last, falling back to their email. */
+export function personLabel(u: {
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+}): string {
+  return [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
+}
+
+/**
+ * The Project manager picker — single-select cards in the same style as the
+ * sales-agent cards, each showing who the person is and whether they already
+ * manage or work on a project. (A native `<select>` can't lay that out: the
+ * assignment text ran into one unreadable line.) Click the chosen card again
+ * to clear it.
+ */
+export function ManagerPicker({
+  managers,
+  value,
+  onChange,
+  current,
+}: {
+  managers: ProjectAssigneeCandidate[];
+  value: string;
+  onChange: (id: string) => void;
+  /** The project's existing manager — kept selectable even if the list no longer includes them. */
+  current?: { id: string; name: string } | null;
+}) {
+  const extra = current && !managers.some((m) => m.id === current.id) ? current : null;
+  if (managers.length === 0 && !extra) {
+    return (
+      <div className="hint">
+        No managers in your organisation yet — add one under Users.
+      </div>
+    );
+  }
+  const pick = (id: string) => onChange(value === id ? "" : id);
+  const cards: { id: string; name: string; role: string; assigned: string | null; title?: string }[] = [
+    ...managers.map((u) => ({
+      id: u.id,
+      name: personLabel(u),
+      role: u.role?.name ?? "Manager",
+      assigned: alreadyAssignedLabel(u.projects),
+      title: alreadyAssignedLabel(u.projects, Infinity) ?? undefined,
+    })),
+    ...(extra ? [{ id: extra.id, name: extra.name, role: "Current manager", assigned: null }] : []),
+  ];
+  return (
+    <div className="opts project-assignee-options" role="radiogroup" aria-label="Project manager">
+      {cards.map((c) => {
+        const on = value === c.id;
+        return (
+          <span
+            key={c.id}
+            role="radio"
+            aria-checked={on}
+            tabIndex={0}
+            title={c.title}
+            className={`opt rad project-assignee-option ${on ? "on" : ""}`}
+            onClick={() => pick(c.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                pick(c.id);
+              }
+            }}
+          >
+            <span className="b">{on ? "●" : ""}</span>
+            <span className="project-assignee-meta">
+              <b>{c.name}</b>
+              <small className="project-assignee-role">{c.role}</small>
+              {c.assigned ? (
+                <small className="project-assignee-projects">{c.assigned}</small>
+              ) : c.id !== extra?.id ? (
+                <small className="project-assignee-free">Not assigned to a project yet</small>
+              ) : null}
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 /** Human name for a price basis, as shown in the label. */
