@@ -100,9 +100,7 @@ export class AdminTemplatesService {
   }
 
   async create(dto: CreateTemplateDto) {
-    const slug = dto.slug
-      ? dto.slug
-      : await generateUniqueTemplateSlug(this.prisma, dto.name);
+    const slug = await generateUniqueTemplateSlug(this.prisma, dto.slug || dto.name);
 
     let tier = dto.tier;
     if (!tier && dto.categoryId) {
@@ -139,15 +137,21 @@ export class AdminTemplatesService {
   }
 
   async update(id: string, dto: UpdateTemplateDto) {
-    await this.findOrThrow(id);
+    const template = await this.findOrThrow(id);
 
     const data: Prisma.TemplateUpdateInput = {
       name: dto.name,
-      slug: dto.slug,
       status: dto.status,
       domain: dto.domain,
       thumbnail: dto.thumbnail,
     };
+    if (dto.slug !== undefined) {
+      if (dto.slug && dto.slug !== template.slug) {
+        data.slug = await generateUniqueTemplateSlug(this.prisma, dto.slug);
+      } else if (dto.slug === template.slug) {
+        data.slug = template.slug;
+      }
+    }
     if (dto.tier !== undefined) {
       data.tier = dto.tier as any;
     } else if (dto.isPaid !== undefined) {
