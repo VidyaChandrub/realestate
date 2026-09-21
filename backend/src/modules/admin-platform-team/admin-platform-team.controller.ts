@@ -42,7 +42,7 @@ export class AdminPlatformTeamController {
     @Param('id') id: string,
     @Body() dto: UpdatePlatformMemberDto,
   ) {
-    return this.platformTeam.update(id, actor.sub, dto);
+    return this.platformTeam.update(id, actor.sub, dto, actor.roles);
   }
 
   @Delete(':id')

@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Seg } from "@/components/superadmin/seg";
 import { Icon } from "@/components/icons";
 import { useAuth } from "@/lib/auth-context";
 import { getAdminDashboard } from "@/lib/api";
+import { firstAccessibleAdminHref } from "@/components/superadmin/shell";
 import type { AdminDashboardResponse } from "@/lib/types";
 
 const PERIOD_OPTIONS = [
@@ -55,16 +57,29 @@ const SPARK_PATHS = [
 ];
 
 export default function SuperAdminDashboardPage() {
-  const { user, accessToken, isLoading: authLoading } = useAuth();
+  const { user, accessToken, isLoading: authLoading, hasPermission } = useAuth();
+  const router = useRouter();
   const [data, setData] = useState<AdminDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [revenueMetric, setRevenueMetric] = useState<"MRR" | "Total">("Total");
   const [periodIndex, setPeriodIndex] = useState(2); // 30d
   const [periodDropdownOpen, setPeriodDropdownOpen] = useState(false);
 
+  // Platform users without Dashboard view access must never see this page —
+  // it's the console's default post-login landing route, so it can't rely on
+  // the sidebar alone to keep restricted users out. Send them to the first
+  // module they're actually allowed to view instead.
+  const canViewDashboard = !authLoading && !!user && hasPermission("admin_dashboard", "view");
+  useEffect(() => {
+    if (authLoading || !user) return;
+    if (canViewDashboard) return;
+    const fallback = firstAccessibleAdminHref(user, hasPermission);
+    router.replace(fallback ?? "/admin-login");
+  }, [authLoading, user, canViewDashboard, hasPermission, router]);
+
   const loadDashboard = useCallback(async () => {
     if (authLoading) return;
-    if (!accessToken || user?.role !== "super_admin") {
+    if (!accessToken || user?.role !== "super_admin" || !canViewDashboard) {
       setLoading(false);
       return;
     }
@@ -77,11 +92,13 @@ export default function SuperAdminDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [authLoading, accessToken, user]);
+  }, [authLoading, accessToken, user, canViewDashboard]);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  if (!canViewDashboard) return null;
 
   const firstName = user?.first_name || (user?.email ? user.email.split("@")[0] : "Admin");
 

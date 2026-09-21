@@ -138,8 +138,23 @@ export class AdminPlatformTeamService {
     return this.getById(user.id);
   }
 
-  async update(id: string, actorUserId: string, dto: UpdatePlatformMemberDto) {
+  async update(
+    id: string,
+    actorUserId: string,
+    dto: UpdatePlatformMemberDto,
+    actorRoles: string[] = [],
+  ) {
     const member = await this.requireMember(id);
+
+    // A Super Admin account (profile fields or status) can only be touched by
+    // another Super Admin — never by a lesser platform team member, even one
+    // holding the `edit` permission on this module. Checked here rather than
+    // only in the UI so a direct API call can't bypass it.
+    if (await this.hasRole(id, 'super_admin')) {
+      if (!actorRoles.includes('super_admin')) {
+        throw new ForbiddenException('Only a Super Admin can edit a Super Admin account');
+      }
+    }
 
     if (dto.status === 'disabled' && id === actorUserId) {
       throw new ForbiddenException('You cannot disable your own account');
@@ -249,7 +264,13 @@ export class AdminPlatformTeamService {
       throw new ForbiddenException('You cannot remove your own account');
     }
     await this.requireMember(id);
-    await this.assertNotLastSuperAdmin(id);
+    // Super Admin accounts can never be deleted from the console, by anyone —
+    // there is no "last one" carve-out here (that check still applies to
+    // disabling, below). This mirrors the UI, which never renders a Delete
+    // button for a Super Admin row.
+    if (await this.hasRole(id, 'super_admin')) {
+      throw new ForbiddenException('Super Admin accounts cannot be deleted');
+    }
     await this.prisma.user.delete({ where: { id } });
     return { ok: true };
   }
@@ -297,11 +318,15 @@ export class AdminPlatformTeamService {
     return ids;
   }
 
-  private async assertNotLastSuperAdmin(userId: string) {
-    const isSuperAdmin = await this.prisma.userRole.findFirst({
-      where: { userId, role: { key: 'super_admin' } },
+  private async hasRole(userId: string, roleKey: string): Promise<boolean> {
+    const row = await this.prisma.userRole.findFirst({
+      where: { userId, role: { key: roleKey } },
     });
-    if (!isSuperAdmin) return;
+    return !!row;
+  }
+
+  private async assertNotLastSuperAdmin(userId: string) {
+    if (!(await this.hasRole(userId, 'super_admin'))) return;
 
     const remaining = await this.prisma.user.count({
       where: {

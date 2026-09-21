@@ -56,8 +56,12 @@ export const PLATFORM_PERMISSION_MODULES: ModuleDefinition[] = [
   { key: 'admin_notifications', label: 'Notifications', description: 'Platform notification inbox' },
   { key: 'admin_organisations', label: 'Organisations', description: 'Onboard, approve and manage organisations' },
   { key: 'admin_org_roles', label: 'Organisation roles', description: 'Default roles and permissions for organisations' },
-  { key: 'admin_platform_team', label: 'Platform team', description: 'Invite and manage Super Admin console users' },
-  { key: 'admin_platform_roles', label: 'Platform roles', description: 'Create platform roles and their console permissions' },
+  // Covers both the Members and Roles tabs of the Platform Team page — there
+  // is no separate "Platform roles" console module. A dedicated module here
+  // would just be a second set of pills governing screens on the same page,
+  // which is confusing to configure; View/Edit/Delete/Add apply identically
+  // to both tabs (see PLATFORM_ROUTE_MODULES below).
+  { key: 'admin_platform_team', label: 'Platform team', description: 'Invite and manage Super Admin console users, and the platform roles assigned to them' },
   { key: 'admin_templates', label: 'Templates', description: 'Site templates, typography and landing pages' },
   { key: 'admin_forms', label: 'Forms', description: 'Platform lead forms builder and library' },
   { key: 'admin_leads', label: 'Leads', description: 'View leads captured across all organisations' },
@@ -74,7 +78,9 @@ export const PLATFORM_PERMISSION_MODULE_KEYS = PLATFORM_PERMISSION_MODULES.map(
 );
 
 export const PLATFORM_ROUTE_MODULES: Array<{ prefix: string; module: string }> = [
-  { prefix: '/admin/platform-roles', module: 'admin_platform_roles' },
+  // Platform roles (the "Roles" tab) share the Platform Team module — see
+  // the note on PLATFORM_PERMISSION_MODULES above.
+  { prefix: '/admin/platform-roles', module: 'admin_platform_team' },
   { prefix: '/admin/platform-team', module: 'admin_platform_team' },
   { prefix: '/admin/platform-config', module: 'admin_settings' },
   { prefix: '/admin/organisations', module: 'admin_organisations' },
