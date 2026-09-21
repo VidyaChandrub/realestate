@@ -109,9 +109,23 @@ export class SuperAdminGuard implements CanActivate {
       return true;
     }
 
+    // Platform Team members are disabled/re-enabled via the same PATCH route
+    // used to edit their profile, distinguished only by the request body
+    // containing solely `status` — the console UI never sends it alongside a
+    // profile edit. Route that case to `approve` (the module's "Disable" pill)
+    // instead of `edit`, so the two console actions can be granted separately.
+    const isPlatformTeamStatusOnlyUpdate =
+      request.method === 'PATCH' &&
+      /^\/admin\/platform-team\/[^/]+$/.test(path) &&
+      !!request.body &&
+      Object.keys(request.body).length > 0 &&
+      Object.keys(request.body).every((key) => key === 'status');
+
     const action =
       request.method === 'PATCH' && /\/admin\/organisations\/[^/]+\/status$/.test(path)
         ? request.body?.status === 'disabled' ? 'approve' : 'add'
+        : isPlatformTeamStatusOnlyUpdate
+        ? 'approve'
         : actionFromHttpMethod(request.method);
     const rows = await this.prisma.roleModulePermission.findMany({
       where: {

@@ -79,7 +79,20 @@ function formatDate(iso: string): string {
 }
 
 export default function SuperAdminAdminsPage() {
-  const { accessToken, user } = useAuth();
+  const { accessToken, user, hasPermission } = useAuth();
+  // Members and Roles are two tabs of one console module — Platform Team —
+  // not two separately permissioned modules, so a single set of pills
+  // (View/Add/Edit/Delete/Disable) governs both tabs identically.
+  const canView = hasPermission("admin_platform_team", "view");
+  const canAdd = hasPermission("admin_platform_team", "add");
+  const canEdit = hasPermission("admin_platform_team", "edit");
+  const canDelete = hasPermission("admin_platform_team", "delete");
+  const canDisable = hasPermission("admin_platform_team", "approve");
+  // A Super Admin account can only be edited by another Super Admin, and can
+  // never be deleted by anyone — mirrors the backend guard in
+  // AdminPlatformTeamService (edit/remove), which rejects this even if
+  // called directly, not just when the button is hidden.
+  const viewerIsSuperAdmin = !!(user?.platformUnrestricted || user?.roleKeys?.includes("super_admin"));
   const [tab, setTab] = useState<"members" | "roles">("members");
   const [createRoleOpen, setCreateRoleOpen] = useState(false);
   const [permEditing, setPermEditing] = useState(false);
@@ -224,11 +237,11 @@ export default function SuperAdminAdminsPage() {
     setDeleteBusy(true);
     try {
       await deletePlatformTeamMember(confirmDelete.id);
-      notify("Member removed");
+      notify("Member deleted");
       setConfirmDelete(null);
       await load();
     } catch (err) {
-      notify(err instanceof Error ? err.message : "Remove failed");
+      notify(err instanceof Error ? err.message : "Delete failed");
     } finally {
       setDeleteBusy(false);
     }
@@ -250,12 +263,16 @@ export default function SuperAdminAdminsPage() {
             <Icon name="refresh" size={16} />
             <span style={{ marginLeft: 6 }}>Refresh</span>
           </button>
-          <button className="btn btn-ghost" type="button" onClick={() => { setTab("roles"); setCreateRoleOpen(true); }}>
-            + Create role
-          </button>
-          <button className="btn btn-primary" type="button" onClick={() => { setTab("members"); openCreate(); }}>
-            + Create admin
-          </button>
+          {canAdd ? (
+            <button className="btn btn-ghost" type="button" onClick={() => { setTab("roles"); setCreateRoleOpen(true); }}>
+              + Create role
+            </button>
+          ) : null}
+          {canAdd ? (
+            <button className="btn btn-primary" type="button" onClick={() => { setTab("members"); openCreate(); }}>
+              + Create admin
+            </button>
+          ) : null}
         </div>
       </div>
       )}
@@ -267,6 +284,7 @@ export default function SuperAdminAdminsPage() {
         Organisation CRM/project permissions stay under <b>Organisation roles</b>.
       </div>
 
+      {canView ? (
       <div
         style={{
           display: "flex",
@@ -294,21 +312,24 @@ export default function SuperAdminAdminsPage() {
           Roles
         </button>
       </div>
+      ) : null}
       </>
       )}
 
       {error && tab === "members" ? <div className="form-alert" style={{ marginBottom: 16 }}>{error}</div> : null}
 
-      {tab === "roles" || permEditing ? (
+      {(tab === "roles" || permEditing) && canView ? (
         <PlatformRolesPanel
           createOpen={createRoleOpen}
           onCreateOpenChange={setCreateRoleOpen}
           onRolesChanged={() => void load()}
           onPermissionEditing={setPermEditing}
+          canEdit={canEdit}
+          canDelete={canDelete}
         />
       ) : null}
 
-      {tab === "members" && !permEditing ? (
+      {tab === "members" && !permEditing && canView ? (
       <div className="card reveal">
         <div className="card-h">
           <span className="t">Internal team members</span>
@@ -340,7 +361,9 @@ export default function SuperAdminAdminsPage() {
                   </td>
                 </tr>
               ) : (
-                members.map((m) => (
+                members.map((m) => {
+                  const isSuperAdminRow = m.roles.some((r) => r.key === "super_admin");
+                  return (
                   <tr key={m.id}>
                     <td>
                       <div className="u">
@@ -375,29 +398,36 @@ export default function SuperAdminAdminsPage() {
                     <td>{formatDate(m.createdAt)}</td>
                     <td>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button className="btn btn-ghost btn-sm" type="button" onClick={() => openEdit(m)}>
-                          Edit
-                        </button>
+                        {/* A Super Admin row can only be edited by another
+                            Super Admin — a created platform team member,
+                            even with Edit permission, cannot touch it. */}
+                        {canEdit && (!isSuperAdminRow || viewerIsSuperAdmin) ? (
+                          <button className="btn btn-ghost btn-sm" type="button" onClick={() => openEdit(m)}>
+                            Edit
+                          </button>
+                        ) : null}
                         {/* Super Admin members cannot be enabled/disabled from
                             here — the action is only for other platform roles. */}
-                        {!m.roles.some((r) => r.key === "super_admin") ? (
+                        {canDisable && !isSuperAdminRow ? (
                           <button className="btn btn-ghost btn-sm" type="button" onClick={() => void toggleStatus(m)}>
                             {m.status === "active" ? "Disable" : "Enable"}
                           </button>
                         ) : null}
-                        {user?.id !== m.id ? (
+                        {/* Super Admin accounts can never be deleted, by anyone. */}
+                        {canDelete && !isSuperAdminRow && user?.id !== m.id ? (
                           <button
                             className="btn btn-ghost btn-sm"
                             type="button"
                             onClick={() => setConfirmDelete(m)}
                           >
-                            Remove
+                            Delete
                           </button>
                         ) : null}
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -666,13 +696,13 @@ export default function SuperAdminAdminsPage() {
 
       <ConfirmModal
         open={confirmDelete !== null}
-        title="Remove platform team member?"
+        title="Delete platform team member?"
         message={
           confirmDelete
             ? `${fullName(confirmDelete.firstName, confirmDelete.lastName, confirmDelete.email)} will lose Super Admin console access.`
             : ""
         }
-        confirmLabel="Remove"
+        confirmLabel="Delete"
         destructive
         busy={deleteBusy}
         onClose={() => setConfirmDelete(null)}

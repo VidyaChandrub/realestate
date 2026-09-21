@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import type { PermissionAction, SessionUser } from "@/lib/types";
 import { apiFetch } from "@/lib/api";
 import { Icon } from "@/components/icons";
 import { NotificationsBell } from "./notifications-bell";
@@ -22,7 +23,9 @@ type NavGroup = {
   items: NavItem[];
 };
 
-const NAV_MODULE: Record<string, string> = {
+type AdminNavUser = SessionUser | null | undefined;
+
+export const NAV_MODULE: Record<string, string> = {
   "/admin-console": "admin_dashboard",
   "/admin-console/organisations": "admin_organisations",
   "/admin-console/roles": "admin_org_roles",
@@ -40,7 +43,7 @@ const NAV_MODULE: Record<string, string> = {
   "/admin-console/reports": "admin_dashboard",
 };
 
-const NAV_GROUPS: NavGroup[] = [
+export const NAV_GROUPS: NavGroup[] = [
   {
     grp: "Overview",
     items: [
@@ -118,6 +121,50 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
 ];
+
+/**
+ * Single source of truth for "can this platform console user see this nav
+ * item" — shared by the sidebar filter and by pages that must redirect away
+ * when the signed-in user lacks view access (e.g. the dashboard landing page).
+ */
+export function canAccessAdminNavItem(
+  item: NavItem,
+  user: AdminNavUser,
+  hasPermission: (module: string, action: PermissionAction) => boolean,
+): boolean {
+  // Full Super Admin / unrestricted platform users see every item.
+  if (
+    user &&
+    !user.org_id &&
+    (user.platformUnrestricted ||
+      user.roleKeys?.includes("super_admin") ||
+      // Stale session before refreshPermissions: treat console Super Admin as full access.
+      (user.role === "super_admin" &&
+        (!user.permissions || Object.keys(user.permissions).length === 0)))
+  ) {
+    return true;
+  }
+  // Form Builder shares Templates access — never hide it when Templates is visible.
+  if (item.href === "/admin-console/forms") {
+    return hasPermission("admin_templates", "view");
+  }
+  const moduleKey = NAV_MODULE[item.href];
+  if (!moduleKey) return true;
+  return hasPermission(moduleKey, "view");
+}
+
+/** First nav route (in display order) the signed-in user is allowed to see. */
+export function firstAccessibleAdminHref(
+  user: AdminNavUser,
+  hasPermission: (module: string, action: PermissionAction) => boolean,
+): string | null {
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (canAccessAdminNavItem(item, user, hasPermission)) return item.href;
+    }
+  }
+  return null;
+}
 
 const CRUMB_MAP: Record<string, string> = {
   "/admin-console": "Dashboard",
@@ -232,33 +279,9 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
         <nav>
           <ul className="nav">
             {NAV_GROUPS.map((group) => {
-              const items = group.items.filter((item) => {
-                // Full Super Admin / unrestricted platform users see every item.
-                if (
-                  user &&
-                  !user.org_id &&
-                  (user.platformUnrestricted ||
-                    user.roleKeys?.includes("super_admin") ||
-                    // Stale session before refreshPermissions: treat console Super Admin as full access.
-                    (user.role === "super_admin" &&
-                      (!user.permissions || Object.keys(user.permissions).length === 0)))
-                ) {
-                  return true;
-                }
-                const moduleKey = NAV_MODULE[item.href];
-                if (item.href === "/admin-console/admins") {
-                  return (
-                    hasPermission("admin_platform_team", "view") ||
-                    hasPermission("admin_platform_roles", "view")
-                  );
-                }
-                // Form Builder shares Templates access — never hide it when Templates is visible.
-                if (item.href === "/admin-console/forms") {
-                  return hasPermission("admin_templates", "view");
-                }
-                if (!moduleKey) return true;
-                return hasPermission(moduleKey, "view");
-              });
+              const items = group.items.filter((item) =>
+                canAccessAdminNavItem(item, user, hasPermission),
+              );
               if (items.length === 0) return null;
               return (
               <ul className="nav-group" key={group.grp}>
