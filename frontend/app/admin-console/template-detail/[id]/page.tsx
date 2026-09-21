@@ -10,6 +10,7 @@ import {
   loadTemplate,
   duplicateTemplate,
   saveTemplate,
+  createTemplate,
   loadTemplateCategories,
   type TemplateCategory,
 } from "@/lib/openpage/persist";
@@ -109,7 +110,8 @@ export default function SuperAdminTemplateDetailPage() {
     if (!template) return;
     const cleanSlug =
       slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || template.slug;
-    const updated = await saveTemplate({
+      
+    const payload = {
       ...template,
       name: name.trim() || template.name,
       slug: cleanSlug,
@@ -118,7 +120,16 @@ export default function SuperAdminTemplateDetailPage() {
       tier,
       categoryId: categoryId || null,
       isPaid: tier !== "free",
-    });
+    };
+    
+    let updated;
+    if (template.id.startsWith("tpl-")) {
+      updated = await createTemplate(payload);
+      router.replace(manageHref(updated.id));
+    } else {
+      updated = await saveTemplate(payload);
+    }
+    
     setTemplate(updated);
     setSlug(cleanSlug);
     notify("Template settings saved");
