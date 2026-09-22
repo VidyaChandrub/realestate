@@ -89,10 +89,14 @@ export function DynamicLeadForm({
   const [submitting, setSubmitting] = useState(false);
   const [download, setDownload] = useState<ResolvedDownload | null>(null);
   const [step, setStep] = useState(0);
-  const [captcha, setCaptcha] = useState(makeCaptcha);
+  const [captcha, setCaptcha] = useState({ q: "3 + 4", a: "7" });
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const started = useRef(false);
   const submitted = useRef(false);
+
+  useEffect(() => {
+    setCaptcha(makeCaptcha());
+  }, []);
 
   useEffect(() => {
     return () => {

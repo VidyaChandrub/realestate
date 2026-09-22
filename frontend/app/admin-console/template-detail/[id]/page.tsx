@@ -286,18 +286,13 @@ export default function SuperAdminTemplateDetailPage() {
                       className="inp"
                       value={categoryId}
                       onChange={(e) => {
-                        const nextCatId = e.target.value;
-                        setCategoryId(nextCatId);
-                        const selected = categories.find((c) => c.id === nextCatId);
-                        if (selected && selected.tier) {
-                          setTier(selected.tier);
-                        }
+                        setCategoryId(e.target.value);
                       }}
                     >
                       <option value="">Unassigned</option>
                       {categories.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.name} ({c.tier})
+                          {c.name}
                         </option>
                       ))}
                     </select>

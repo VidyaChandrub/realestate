@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useId } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -47,7 +47,8 @@ function formatDate(iso: string): string {
 }
 
 function Sparkline({ color, d }: { color: string; d: string }) {
-  const gradientId = `spark-grad-${color.replace(/[^a-zA-Z0-9]/g, "")}-${Math.random().toString(36).substring(2, 7)}`;
+  const reactId = useId();
+  const gradientId = `spark-grad-${color.replace(/[^a-zA-Z0-9]/g, "")}-${reactId.replace(/:/g, "")}`;
   return (
     <svg width="84" height="32" viewBox="0 0 84 32" fill="none" style={{ overflow: "visible" }}>
       <defs>
