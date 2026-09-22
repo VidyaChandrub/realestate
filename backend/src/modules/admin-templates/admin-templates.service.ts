@@ -176,10 +176,22 @@ export class AdminTemplatesService {
 
   async remove(id: string) {
     const template = await this.findOrThrow(id);
-    if (template.kind === 'preset') {
+    const isLegacyBuilder =
+      template.slug === 'skyline-heights-builder' ||
+      template.designId === 'tpl-estatepro' ||
+      /^project launch\s*\(builder\)$/i.test(template.name);
+    if (template.kind === 'preset' && !isLegacyBuilder) {
       throw new ConflictException(
         'Predefined templates cannot be deleted — use the reset endpoint instead',
       );
+    }
+    // Detach org pages before deleting a legacy preset that may still be linked.
+    if (isLegacyBuilder) {
+      await this.prisma.organisationTemplate.deleteMany({ where: { templateId: id } });
+      await this.prisma.landingPage.updateMany({
+        where: { sourceTemplateId: id },
+        data: { sourceTemplateId: null },
+      });
     }
     await this.prisma.template.delete({ where: { id } });
   }

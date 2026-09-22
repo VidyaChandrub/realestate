@@ -45,11 +45,12 @@ import {
   manageHref,
 } from "@/components/superadmin/templates/shared";
 import { TemplateCard } from "@/components/superadmin/templates/template-card";
-import { BLANK_TEMPLATE, TEMPLATES, buildTemplateSections } from "@/lib/openpage/data";
+import { TEMPLATES, buildTemplateSections } from "@/lib/openpage/data";
 import {
   createTemplate,
   deleteTemplate,
   duplicateTemplate,
+  ensurePresetTemplates,
   loadTemplates,
   resetTemplate,
   saveTemplate,
@@ -62,11 +63,81 @@ import {
 import { builderPath, templatePreviewPath } from "@/lib/openpage/paths";
 import { defaultSiteConfig, seedConfigFor } from "@/lib/openpage/site-config";
 import { inferDesignId } from "@/lib/openpage/page-templates";
-import { buildRealEstateTemplate, openPageTemplateIdForDesign } from "@/lib/openpage/re-templates";
+import {
+  buildRealEstateTemplate,
+  openPageTemplateIdForDesign,
+  realEstateTemplateMeta,
+} from "@/lib/openpage/re-templates";
 import type { LandingPageData, TemplateData } from "@/lib/openpage/types";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { SceneImage } from "@/components/openpage/art";
+
+function thumbnailFor(id: string): string {
+  switch (id) {
+    case "premium":
+      return "hero";
+    case "aurelia-reserve":
+      return "/templates/aurelia-reserve.jpg";
+    case "vista-framed":
+      return "/templates/vista-framed.jpg";
+    case "future-home":
+      return "/templates/future-home.jpg";
+    case "modern-living":
+      return "/templates/modern-living.jpg";
+    case "investment-hub":
+      return "/templates/investment-hub.jpg";
+    case "vista-curve":
+      return "/templates/vista-curve.jpg";
+    case "residential":
+      return "tower";
+    case "commercial":
+      return "commercial";
+    case "luxury":
+      return "interior";
+    case "villa":
+      return "villa";
+    case "plot":
+      return "plots";
+    case "launch":
+      return "overview";
+    case "enquiry":
+      return "lobby";
+    case "site-visit":
+      return "tour";
+    case "brochure":
+      return "pool";
+    case "lead":
+      return "garden";
+    default:
+      return "tower";
+  }
+}
+
+function TemplateThumb({
+  thumbnail,
+  accent,
+}: {
+  thumbnail: string;
+  accent?: string;
+}) {
+  const real = thumbnail.startsWith("/") || thumbnail.startsWith("http");
+  if (real) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={thumbnail}
+        alt=""
+        style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
+      />
+    );
+  }
+  return (
+    <div style={{ width: "100%", height: "100%", background: accent || "#1e293b", position: "relative" }}>
+      <SceneImage art={thumbnail || "hero"} />
+    </div>
+  );
+}
 
 function goToBuilder(pageId: string) {
   window.location.assign(builderPath(pageId));
@@ -91,15 +162,16 @@ export default function SuperAdminTemplatesPage() {
   const [categories, setCategories] = useState<TemplateCategory[]>([]);
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [catName, setCatName] = useState("");
-  const [catTier, setCatTier] = useState<"free" | "paid" | "premium">("free");
   const [catBusy, setCatBusy] = useState(false);
   const [catError, setCatError] = useState<string | null>(null);
   const [editingCat, setEditingCat] = useState<TemplateCategory | null>(null);
 
   // Create Template Modal
   const [createOpen, setCreateOpen] = useState(false);
-  const [designId, setDesignId] = useState("tpl-blank");
+  const [designId, setDesignId] = useState("premium");
   const [newName, setNewName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createBusy, setCreateBusy] = useState(false);
   const [createTier, setCreateTier] = useState<"free" | "paid" | "premium">("free");
   const [createCategoryId, setCreateCategoryId] = useState<string>("");
 
@@ -116,9 +188,13 @@ export default function SuperAdminTemplatesPage() {
 
   const reloadTemplates = useCallback(() => {
     setLoading(true);
-    loadTemplates()
+    ensurePresetTemplates()
       .then(setPages)
-      .catch(() => setPages([]))
+      .catch(() =>
+        loadTemplates()
+          .then(setPages)
+          .catch(() => setPages([])),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -149,18 +225,15 @@ export default function SuperAdminTemplatesPage() {
       if (editingCat) {
         await updateTemplateCategory(editingCat.id, {
           name: catName.trim(),
-          tier: catTier,
         });
         notify("Category updated");
       } else {
         await createTemplateCategory({
           name: catName.trim(),
-          tier: catTier,
         });
         notify("Category created");
       }
       setCatName("");
-      setCatTier("free");
       setEditingCat(null);
       reloadCategories();
     } catch (e) {
@@ -187,11 +260,14 @@ export default function SuperAdminTemplatesPage() {
   const createFromDesign = useCallback(
     async (
       template: TemplateData,
-      name?: string,
+      name: string,
       tier: "free" | "paid" | "premium" = "free",
       categoryId?: string,
     ) => {
-      const label = name?.trim() || (template.id === "tpl-blank" ? "Untitled template" : `${template.name} — New`);
+      const label = name?.trim();
+      if (!label) {
+        throw new Error("Template name is required");
+      }
       const slug =
         label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "new-template";
       const config = seedConfigFor({
@@ -219,7 +295,7 @@ export default function SuperAdminTemplatesPage() {
         categoryId: categoryId || undefined,
         sections: buildTemplateSections(template.id),
         config,
-        openPageSite: buildRealEstateTemplate(openPageTemplateIdForDesign(template.id), template.name),
+        openPageSite: buildRealEstateTemplate(openPageTemplateIdForDesign(template.id), label),
       });
       setPages((prev) => [created, ...prev]);
       notify(`Created "${label}"`);
@@ -284,6 +360,7 @@ export default function SuperAdminTemplatesPage() {
           designId: design,
           kind: "preset",
         }),
+        openPageSite: buildRealEstateTemplate(openPageTemplateIdForDesign(design), row.name),
       });
       setPages((prev) => prev.map((p) => (p.id === pageId ? updated : p)));
       notify("Predefined template reset");
@@ -337,16 +414,51 @@ export default function SuperAdminTemplatesPage() {
     return map;
   }, [rows]);
 
-  const bases: TemplateData[] = [BLANK_TEMPLATE, ...TEMPLATES];
-  const selectedBase = bases.find((t) => t.id === designId) ?? BLANK_TEMPLATE;
+  const bases: TemplateData[] = useMemo(() => {
+    const reDesigns: TemplateData[] = realEstateTemplateMeta
+      .filter((t) => t.id !== "blank")
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        category: "Real Estate",
+        icon: "LayoutTemplate",
+        pages: 1,
+        conversions: "High",
+        accent: "#6D5DFC",
+        accent2: "#1e293b",
+        thumbnail: thumbnailFor(t.id),
+        description: t.description,
+      }));
+    const reIds = new Set(reDesigns.map((t) => t.id));
+    return [...reDesigns, ...TEMPLATES.filter((t) => t.id !== "tpl-blank" && !reIds.has(t.id))];
+  }, []);
 
-  const submitCreate = () => {
-    createFromDesign(selectedBase, newName.trim(), createTier, createCategoryId);
-    setCreateOpen(false);
-    setNewName("");
-    setDesignId("tpl-blank");
-    setCreateTier("free");
-    setCreateCategoryId("");
+  const selectedBase = bases.find((t) => t.id === designId) ?? bases[0];
+
+  const submitCreate = async () => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      setCreateError("Template name is required");
+      return;
+    }
+    if (!selectedBase) {
+      setCreateError("Please select a design template");
+      return;
+    }
+    setCreateBusy(true);
+    setCreateError(null);
+    try {
+      await createFromDesign(selectedBase, trimmed, createTier, createCategoryId);
+      setCreateOpen(false);
+      setNewName("");
+      setDesignId(bases[0]?.id ?? "premium");
+      setCreateTier("free");
+      setCreateCategoryId("");
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : "Failed to create template");
+    } finally {
+      setCreateBusy(false);
+    }
   };
 
   return (
@@ -415,7 +527,6 @@ export default function SuperAdminTemplatesPage() {
             onClick={() => {
               setEditingCat(null);
               setCatName("");
-              setCatTier("free");
               setCatError(null);
               setCatModalOpen(true);
             }}
@@ -426,26 +537,18 @@ export default function SuperAdminTemplatesPage() {
 
           <button
             type="button"
-            className="btn btn-soft"
+            className="btn btn-primary"
             onClick={() => {
               setNewName("");
-              setDesignId("tpl-blank");
+              setCreateError(null);
+              setDesignId(bases[0]?.id ?? "premium");
               setCreateTier("free");
               setCreateCategoryId("");
               setCreateOpen(true);
             }}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 10 }}
-          >
-            <Sparkles size={14} /> Start from design…
-          </button>
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => createFromDesign(BLANK_TEMPLATE, undefined, "free", "")}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 10, fontWeight: 700 }}
           >
-            <Plus size={16} /> Blank template
+            <Plus size={16} /> Create Template
           </button>
         </div>
       </div>
@@ -934,7 +1037,6 @@ export default function SuperAdminTemplatesPage() {
             onClick={() => {
               setEditingCat(null);
               setCatName("");
-              setCatTier("free");
               setCatError(null);
               setCatModalOpen(true);
             }}
@@ -1033,7 +1135,7 @@ export default function SuperAdminTemplatesPage() {
                           position: "relative",
                         }}
                       >
-                        <SceneImage art={r.thumbnail || "hero"} />
+                        <TemplateThumb thumbnail={r.thumbnail || "hero"} accent={r.accent} />
                       </div>
                     </td>
                     <td>
@@ -1303,7 +1405,7 @@ export default function SuperAdminTemplatesPage() {
                 {catError}
               </div>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 160px auto", gap: 10, alignItems: "flex-end" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "flex-end" }}>
               <div className="field" style={{ marginBottom: 0 }}>
                 <label style={{ fontSize: 12 }}>Category Name</label>
                 <input
@@ -1314,19 +1416,6 @@ export default function SuperAdminTemplatesPage() {
                   placeholder="e.g. Commercial, Luxury Villas…"
                   style={{ height: 38 }}
                 />
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 12 }}>Default Tier</label>
-                <select
-                  className="inp"
-                  value={catTier}
-                  onChange={(e) => setCatTier(e.target.value as any)}
-                  style={{ height: 38 }}
-                >
-                  <option value="free">Free</option>
-                  <option value="paid">Paid</option>
-                  <option value="premium">Premium</option>
-                </select>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 <button
@@ -1345,7 +1434,6 @@ export default function SuperAdminTemplatesPage() {
                     onClick={() => {
                       setEditingCat(null);
                       setCatName("");
-                      setCatTier("free");
                     }}
                     style={{ height: 38 }}
                   >
@@ -1362,7 +1450,6 @@ export default function SuperAdminTemplatesPage() {
               <thead>
                 <tr>
                   <th>Category</th>
-                  <th>Tier</th>
                   <th>Templates Count</th>
                   <th style={{ textAlign: "right" }}>Actions</th>
                 </tr>
@@ -1370,7 +1457,7 @@ export default function SuperAdminTemplatesPage() {
               <tbody>
                 {categories.length === 0 ? (
                   <tr>
-                    <td colSpan={4} style={{ textAlign: "center", color: "var(--muted)", padding: 24 }}>
+                    <td colSpan={3} style={{ textAlign: "center", color: "var(--muted)", padding: 24 }}>
                       No categories created yet.
                     </td>
                   </tr>
@@ -1378,9 +1465,6 @@ export default function SuperAdminTemplatesPage() {
                   categories.map((c) => (
                     <tr key={c.id}>
                       <td style={{ fontWeight: 600 }}>{c.name}</td>
-                      <td>
-                        <TierBadge tier={c.tier} />
-                      </td>
                       <td>
                         <span style={{ fontSize: 12.5, fontWeight: 700 }}>
                           {categoryCounts[c.name] ?? 0} templates
@@ -1394,7 +1478,6 @@ export default function SuperAdminTemplatesPage() {
                             onClick={() => {
                               setEditingCat(c);
                               setCatName(c.name);
-                              setCatTier(c.tier);
                             }}
                           >
                             <Edit2 size={12} /> Edit
@@ -1425,26 +1508,53 @@ export default function SuperAdminTemplatesPage() {
         title="Create New Landing Page Template"
         footer={
           <>
-            <button type="button" className="btn btn-ghost" onClick={() => setCreateOpen(false)}>
+            <button type="button" className="btn btn-ghost" onClick={() => setCreateOpen(false)} disabled={createBusy}>
               Cancel
             </button>
-            <button type="button" className="btn btn-primary" onClick={submitCreate}>
-              Create &amp; Open Builder
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={submitCreate}
+              disabled={createBusy || !newName.trim()}
+            >
+              {createBusy ? "Creating…" : "Create & Open Builder"}
             </button>
           </>
         }
       >
+        {createError && (
+          <div
+            style={{
+              color: "var(--rose)",
+              background: "rgba(244,63,94,0.08)",
+              border: "1px solid rgba(244,63,94,0.2)",
+              padding: "8px 12px",
+              borderRadius: 8,
+              fontSize: 12.5,
+              marginBottom: 14,
+            }}
+          >
+            {createError}
+          </div>
+        )}
+
         <div className="field">
-          <label>Template name <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional)</span></label>
+          <label>
+            Template name <span style={{ color: "var(--rose)", fontWeight: 700 }}>*</span>
+          </label>
           <input
             autoFocus
             className="inp"
             value={newName}
-            onChange={(e) => setNewName(e.target.value)}
+            onChange={(e) => {
+              setNewName(e.target.value);
+              if (createError) setCreateError(null);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") submitCreate();
             }}
-            placeholder="Untitled template"
+            placeholder="e.g. Luxury Penthouse Showcase"
+            required
           />
         </div>
 
@@ -1455,16 +1565,13 @@ export default function SuperAdminTemplatesPage() {
               className="inp"
               value={createCategoryId}
               onChange={(e) => {
-                const id = e.target.value;
-                setCreateCategoryId(id);
-                const cat = categories.find((c) => c.id === id);
-                if (cat?.tier) setCreateTier(cat.tier);
+                setCreateCategoryId(e.target.value);
               }}
             >
               <option value="">Unassigned</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} ({c.tier})
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -1484,7 +1591,9 @@ export default function SuperAdminTemplatesPage() {
         </div>
 
         <div className="field" style={{ marginBottom: 0 }}>
-          <label>Start from design <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional — blank by default)</span></label>
+          <label>
+            Start from design <span style={{ color: "var(--rose)", fontWeight: 700 }}>*</span>
+          </label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10, maxHeight: 300, overflowY: "auto", padding: 2 }}>
             {bases.map((t) => {
               const active = designId === t.id;
@@ -1519,7 +1628,7 @@ export default function SuperAdminTemplatesPage() {
                       color: "#fff",
                     }}
                   >
-                    {t.id === "tpl-blank" ? <Plus size={16} /> : <SceneImage art={t.thumbnail} />}
+                    <TemplateThumb thumbnail={t.thumbnail} accent={t.accent2} />
                   </span>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{t.name}</span>

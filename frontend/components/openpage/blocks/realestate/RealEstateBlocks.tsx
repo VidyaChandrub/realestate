@@ -216,6 +216,290 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
     );
   }
 
+  /* PDF 8 — Aurelia editorial: left copy + pill CTAs + floating label/value bar */
+  if (block.variant === "editorial") {
+    return (
+      <section className="relative min-h-[88vh] flex flex-col overflow-hidden bg-bg-0">
+        {str(p.image) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={str(p.image)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-bg-3 to-bg-2" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/15" />
+        <div className="relative z-10 flex-1 flex flex-col justify-center px-6 @md:px-12 @lg:px-16 pt-28 pb-36 max-w-3xl">
+          {str(p.badge) ? (
+            <p className="text-[11px] uppercase tracking-[0.28em] text-white/75 font-medium mb-5">{str(p.badge)}</p>
+          ) : null}
+          <h1 className="font-display text-4xl @md:text-6xl @lg:text-[4.25rem] font-medium text-white leading-[1.08] tracking-tight mb-5">
+            {str(p.headline, "Architecture Crafted For Generations.")}
+          </h1>
+          {str(p.description) ? (
+            <p className="text-white/80 text-base @md:text-lg leading-relaxed max-w-xl mb-8">{str(p.description)}</p>
+          ) : null}
+          <div className="flex flex-wrap gap-3">
+            {str(p.primaryCta) ? (
+              <button
+                type="button"
+                onClick={onPrimary}
+                className="px-7 py-3 rounded-full bg-white text-text-0 text-[12px] font-semibold uppercase tracking-[0.12em] hover:bg-white/90 transition-colors"
+              >
+                {str(p.primaryCta)}
+              </button>
+            ) : null}
+            {str(p.secondaryCta) ? (
+              <button
+                type="button"
+                onClick={onSecondary}
+                className="px-7 py-3 rounded-full border border-white/55 text-white text-[12px] font-semibold uppercase tracking-[0.12em] hover:bg-white/10 transition-colors"
+              >
+                {str(p.secondaryCta)}
+              </button>
+            ) : null}
+          </div>
+        </div>
+        {stats.length ? (
+          <div className="absolute bottom-6 left-6 right-6 @md:left-12 @md:right-12 @lg:left-16 @lg:right-16 z-20">
+            <div className="rounded-2xl bg-[#2a2a2a]/72 backdrop-blur-md border border-white/10 grid grid-cols-2 @md:grid-cols-4 divide-x divide-white/10 overflow-hidden">
+              {stats.map((s, i) => (
+                <div key={i} className="px-5 @md:px-7 py-5 text-white">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-white/55 mb-2">{s.label}</div>
+                  <div className="font-display text-xl @md:text-2xl font-medium">{s.value || "—"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
+  /* PDF 3 — Framed rounded hero with glass 2×2 stats */
+  if (block.variant === "framed") {
+    return (
+      <section className="bg-bg-0 px-3 @md:px-5 pt-3 @md:pt-4 pb-10">
+        <div className="relative min-h-[560px] @md:min-h-[640px] rounded-[28px] @md:rounded-[36px] overflow-hidden">
+          {str(p.image) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={str(p.image)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-bg-3 to-bg-2" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/35 to-transparent" />
+          <div className="relative z-10 flex flex-col justify-end h-full min-h-[560px] @md:min-h-[640px] px-6 @md:px-12 py-12 @md:py-16 max-w-3xl">
+            <h1 className="font-display text-3xl @md:text-5xl @lg:text-[3.4rem] font-medium text-white leading-[1.12] mb-6">
+              {str(p.headline, "Luxury residences")}
+            </h1>
+            {stats.length ? (
+              <div className="mb-7 grid grid-cols-2 gap-px rounded-2xl overflow-hidden bg-white/15 backdrop-blur-md border border-white/25 max-w-md">
+                {stats.slice(0, 4).map((s, i) => (
+                  <div key={i} className="bg-white/10 px-4 py-3.5">
+                    <div className="font-display text-xl @md:text-2xl font-semibold text-white leading-none mb-1">
+                      {s.value || "—"}
+                    </div>
+                    <div className="text-[11px] text-white/75 leading-snug">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {str(p.primaryCta) ? (
+              <button
+                type="button"
+                onClick={onPrimary}
+                className="inline-flex items-center gap-2 self-start px-6 py-3 rounded-full bg-green text-white text-sm font-semibold hover:bg-green-dim transition-colors"
+              >
+                {str(p.primaryCta)}
+                <ArrowRight size={14} />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  /* PDF 5 — Asymmetric: headline + floating stats card over photo */
+  if (block.variant === "asymmetric") {
+    return (
+      <section className="bg-bg-0 px-6 @md:px-10 @lg:px-14 pt-10 @md:pt-14 pb-16">
+        <div className="max-w-6xl mx-auto grid @lg:grid-cols-[1.15fr_0.85fr] gap-8 @lg:gap-10 items-start">
+          <div className="relative order-2 @lg:order-1">
+            <div className="relative rounded-[28px] overflow-hidden aspect-[4/3] @lg:aspect-[5/4] bg-bg-2">
+              {str(p.image) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={str(p.image)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-bg-3 to-bg-2" />
+              )}
+            </div>
+            {str(p.rera) || str(p.badge) ? (
+              <div className="absolute bottom-4 right-4 @md:bottom-6 @md:right-6 rounded-full bg-white/90 backdrop-blur px-4 py-2 text-[10px] @md:text-[11px] font-semibold tracking-wide text-text-0 shadow-sm max-w-[min(100%,280px)] truncate">
+                {str(p.rera) || str(p.badge)}
+              </div>
+            ) : null}
+          </div>
+          <div className="order-1 @lg:order-2 @lg:pt-4">
+            <h1 className="font-display text-4xl @md:text-5xl @lg:text-[3.5rem] font-medium text-text-0 leading-[1.1] tracking-tight mb-4">
+              {str(p.headline, "Your Future Home Starts Here")}
+            </h1>
+            {str(p.description) ? (
+              <p className="text-text-1 text-sm @md:text-base leading-relaxed mb-8 max-w-md">{str(p.description)}</p>
+            ) : null}
+            {stats.length ? (
+              <div className="rounded-2xl border border-border-default bg-bg-1/90 backdrop-blur shadow-[0_12px_40px_rgba(0,0,0,0.06)] grid grid-cols-2 divide-x divide-y divide-border-subtle overflow-hidden max-w-sm">
+                {stats.slice(0, 4).map((s, i) => (
+                  <div key={i} className="px-5 py-5 text-center">
+                    <div className="font-display text-2xl @md:text-3xl font-semibold text-text-0 leading-none mb-1.5">
+                      {s.value || "—"}
+                    </div>
+                    <div className="text-[11px] uppercase tracking-wider text-text-2">{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {(str(p.primaryCta) || str(p.secondaryCta)) && (
+              <div className="flex flex-wrap gap-3 mt-7">
+                {str(p.primaryCta) ? (
+                  <button
+                    type="button"
+                    onClick={onPrimary}
+                    className="px-5 py-2.5 rounded-lg bg-green text-white text-sm font-semibold hover:bg-green-dim transition-colors"
+                  >
+                    {str(p.primaryCta)}
+                  </button>
+                ) : null}
+                {str(p.secondaryCta) ? (
+                  <button
+                    type="button"
+                    onClick={onSecondary}
+                    className="px-5 py-2.5 rounded-lg border border-border-default text-sm font-medium hover:bg-bg-2 transition-colors"
+                  >
+                    {str(p.secondaryCta)}
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  /* PDF 6 — Centered over image + overlapping info bar */
+  if (block.variant === "info-bar") {
+    return (
+      <section className="relative pb-24 @md:pb-28 bg-bg-0">
+        <div className="relative min-h-[520px] @md:min-h-[600px] overflow-hidden">
+          {str(p.image) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={str(p.image)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-bg-3 to-bg-2" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/55 via-white/35 to-white/70" />
+          <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 py-24 @md:py-32 max-w-3xl mx-auto">
+            <h1 className="font-display text-3xl @md:text-5xl @lg:text-[3.25rem] font-medium text-text-0 leading-[1.15] tracking-tight mb-4">
+              {str(p.headline, "Discover Modern Living")}
+            </h1>
+            {str(p.description) ? (
+              <p className="text-text-1 text-sm @md:text-base leading-relaxed max-w-xl">{str(p.description)}</p>
+            ) : null}
+          </div>
+        </div>
+        {stats.length ? (
+          <div className="absolute left-4 right-4 @md:left-10 @md:right-10 @lg:left-16 @lg:right-16 bottom-6 z-20">
+            <div className="rounded-2xl @md:rounded-3xl bg-bg-1 border border-border-default shadow-[0_20px_60px_rgba(0,0,0,0.1)] grid grid-cols-2 @md:grid-cols-4 divide-x divide-border-subtle overflow-hidden">
+              {stats.slice(0, 4).map((s, i) => (
+                <div key={i} className="px-4 @md:px-6 py-5 @md:py-6 text-center @md:text-left">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-green font-semibold mb-2">{s.label}</div>
+                  <div className="font-semibold text-sm @md:text-base text-text-0 leading-snug">{s.value || "—"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
+  /* PDF 1 — Centered copy inside large rounded framed hero */
+  if (block.variant === "framed-center") {
+    return (
+      <section className="bg-bg-0 px-4 @md:px-8 pt-3 @md:pt-5 pb-10">
+        <div className="relative min-h-[520px] @md:min-h-[620px] rounded-[28px] @md:rounded-[36px] overflow-hidden flex items-center justify-center text-center">
+          {str(p.image) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={str(p.image)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-bg-3 to-bg-2" />
+          )}
+          <div className="absolute inset-0 bg-black/45" />
+          <div className="relative z-10 px-6 @md:px-12 py-20 max-w-3xl mx-auto flex flex-col items-center">
+            <h1 className="font-display text-4xl @md:text-5xl @lg:text-[3.5rem] font-medium text-white leading-[1.12] mb-4">
+              {str(p.headline, "Find your perfect investment properties")}
+            </h1>
+            {str(p.description) ? (
+              <p className="text-white/85 text-sm @md:text-base leading-relaxed mb-8 max-w-xl">{str(p.description)}</p>
+            ) : null}
+            {str(p.primaryCta) ? (
+              <button
+                type="button"
+                onClick={onPrimary}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-black/55 backdrop-blur border border-white/20 text-white text-sm font-semibold hover:bg-black/70 transition-colors"
+              >
+                {str(p.primaryCta)}
+                <ArrowRight size={14} className="-rotate-45" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  /* PDF 2 — Split curve: photo left with large bottom-right radius, cream stats panel */
+  if (block.variant === "split-curve") {
+    return (
+      <section className="bg-bg-0 grid @lg:grid-cols-2 min-h-[560px] @lg:min-h-[640px]">
+        <div className="relative min-h-[360px] @lg:min-h-full overflow-hidden rounded-br-[120px] @lg:rounded-br-[180px]">
+          {str(p.image) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={str(p.image)} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-bg-3 to-bg-2" />
+          )}
+        </div>
+        <div className="flex flex-col justify-center px-8 @md:px-12 @lg:px-14 py-12 @lg:py-16 bg-bg-0">
+          <h1 className="font-display text-3xl @md:text-4xl @lg:text-[2.75rem] font-medium text-text-0 leading-[1.15] mb-8">
+            {str(p.headline, "4 BHK Luxury Flat")}
+          </h1>
+          {stats.length ? (
+            <div className="grid grid-cols-2 gap-x-6 gap-y-6 mb-8 max-w-md">
+              {stats.slice(0, 4).map((s, i) => (
+                <div key={i} className={`pr-4 ${i % 2 === 0 ? "border-r border-border-default" : ""}`}>
+                  <div className="font-display text-2xl @md:text-3xl font-semibold text-text-0 leading-none mb-2">
+                    {s.value || "—"}
+                  </div>
+                  <div className="text-[12px] text-green leading-snug">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {str(p.primaryCta) ? (
+            <button
+              type="button"
+              onClick={onPrimary}
+              className="inline-flex items-center gap-2 self-start px-6 py-3 rounded-full bg-green text-white text-sm font-semibold hover:bg-green-dim transition-colors"
+            >
+              {str(p.primaryCta)}
+              <ArrowRight size={14} className="-rotate-45" />
+            </button>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="relative min-h-[560px] @md:min-h-[680px] flex items-center overflow-hidden">
       {str(p.image) ? (
@@ -278,10 +562,18 @@ export function ProjectOverviewBlock({ block }: { block: BlockConfig }) {
   }
 
   if (variant === "split") {
+    const rawStats = items<Record<string, unknown>>(p.stats);
+    const overviewStats = rawStats
+      .map((s) => ({
+        value: str(s.value ?? s.stat ?? s.title ?? ""),
+        label: str(s.label ?? s.description ?? s.subtitle ?? ""),
+      }))
+      .filter((s) => s.value || s.label);
+    const imageFirst = str(p.imagePosition) !== "right";
     return (
       <SectionShell id={str(p.anchor, "overview")}>
         <div className="grid @lg:grid-cols-2 gap-10 @lg:gap-16 items-center max-w-6xl mx-auto">
-          <div className="rounded-2xl overflow-hidden border border-border-default aspect-[4/3] bg-bg-2">
+          <div className={`rounded-[24px] overflow-hidden border border-border-default aspect-[3/4] @lg:aspect-[4/5] bg-bg-2 ${imageFirst ? "order-1" : "order-2"}`}>
             {str(p.image) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={str(p.image)} alt={str(p.title)} className="w-full h-full object-cover hover:scale-[1.03] transition-transform duration-700" />
@@ -289,10 +581,10 @@ export function ProjectOverviewBlock({ block }: { block: BlockConfig }) {
               <div className="w-full h-full min-h-[280px] bg-bg-3" />
             )}
           </div>
-          <div>
+          <div className={imageFirst ? "order-2" : "order-1"}>
             {str(p.subtitle) ? <p className="text-[11px] uppercase tracking-[0.2em] text-green font-semibold mb-3">{str(p.subtitle)}</p> : null}
             <h2 className="font-display text-3xl @md:text-4xl font-semibold mb-4">{str(p.title, "About the Project")}</h2>
-            <p className="text-text-1 leading-relaxed mb-6">{str(p.body)}</p>
+            <p className="text-text-1 leading-relaxed mb-6 whitespace-pre-line">{str(p.body)}</p>
             {highlights.length ? (
               <ul className="space-y-3 mb-7">
                 {highlights.map((h, i) => (
@@ -302,6 +594,16 @@ export function ProjectOverviewBlock({ block }: { block: BlockConfig }) {
                   </li>
                 ))}
               </ul>
+            ) : null}
+            {overviewStats.length ? (
+              <div className="grid grid-cols-2 border-t border-l border-border-default mb-6">
+                {overviewStats.map((s, i) => (
+                  <div key={i} className="border-r border-b border-border-default px-5 py-5">
+                    <div className="font-display text-3xl font-medium text-text-0 mb-1">{s.value}</div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-text-3">{s.label}</div>
+                  </div>
+                ))}
+              </div>
             ) : null}
             {cta ? (
               <a href={`#${str(p.ctaAnchor, "enquire")}`} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-green text-black text-sm font-semibold hover:bg-green-dim transition-all">
@@ -317,7 +619,13 @@ export function ProjectOverviewBlock({ block }: { block: BlockConfig }) {
   return (
     <SectionShell id={str(p.anchor, "overview")}>
       <Title title={str(p.title, "Project Overview")} subtitle={str(p.subtitle)} />
-      <p className="max-w-3xl mx-auto text-text-1 leading-relaxed text-center">{str(p.body)}</p>
+      <p className="max-w-3xl mx-auto text-text-1 leading-relaxed text-center whitespace-pre-line">{str(p.body)}</p>
+      {str(p.image) ? (
+        <div className="mt-10 max-w-5xl mx-auto rounded-[28px] overflow-hidden aspect-[16/9] bg-bg-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={str(p.image)} alt={str(p.title)} className="w-full h-full object-cover" />
+        </div>
+      ) : null}
     </SectionShell>
   );
 }
@@ -404,10 +712,138 @@ export function PropertyDetailsBlock({ block }: { block: BlockConfig }) {
 }
 
 export function ProjectHighlightsBlock({ block }: { block: BlockConfig }) {
-  const itemsList = items<{ title: string; description: string }>(block.props.items);
+  const itemsList = items<{ title: string; description: string; icon?: string }>(block.props.items);
+  const p = block.props;
+
+  if (block.variant === "split-impact") {
+    return (
+      <SectionShell id={str(p.anchor, "impact")} className="bg-[#e8efe8]">
+        <div className="max-w-6xl mx-auto grid @lg:grid-cols-2 gap-8 @lg:gap-12 items-center">
+          <div className="rounded-[28px] overflow-hidden aspect-[4/3] @lg:aspect-auto @lg:min-h-[360px] bg-bg-3">
+            {str(p.image) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={str(p.image)} alt="" className="w-full h-full object-cover" />
+            ) : null}
+          </div>
+          <div>
+            <p className="font-display text-4xl @md:text-5xl text-text-0 leading-tight mb-1">{str(p.title, "Do good.")}</p>
+            {str(p.accentLine) ? (
+              <p className="font-display text-4xl @md:text-5xl italic text-green leading-tight mb-6">{str(p.accentLine)}</p>
+            ) : null}
+            {str(p.body) ? <p className="text-text-1 text-sm @md:text-base leading-relaxed mb-8 max-w-md">{str(p.body)}</p> : null}
+            <div className="flex flex-wrap gap-3">
+              {str(p.author) ? (
+                <a
+                  href={`#${str(p.ctaAnchor, "about")}`}
+                  className="px-5 py-2.5 rounded-full border border-text-0 text-sm font-semibold hover:bg-text-0 hover:text-bg-1 transition-colors"
+                >
+                  {str(p.author)}
+                </a>
+              ) : null}
+              {str(p.authorRole) ? (
+                <a
+                  href={`#${str(p.secondaryAnchor, "impact")}`}
+                  className="px-5 py-2.5 rounded-full bg-text-0 text-bg-1 text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  {str(p.authorRole)}
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </SectionShell>
+    );
+  }
+
+  if (block.variant === "quote") {
+    return (
+      <SectionShell id={str(p.anchor, "philosophy")} className="bg-bg-2">
+        <div className="max-w-3xl mx-auto text-center py-6 @md:py-10">
+          {str(p.subtitle) ? (
+            <p className="text-[11px] uppercase tracking-[0.28em] text-text-2 font-medium mb-8">{str(p.subtitle)}</p>
+          ) : null}
+          <p className="font-display text-3xl @md:text-5xl text-text-0 leading-tight mb-3">{str(p.title)}</p>
+          {str(p.accentLine) ? (
+            <p className="font-display text-3xl @md:text-5xl italic text-green leading-tight mb-8">{str(p.accentLine)}</p>
+          ) : null}
+          {str(p.body) ? <p className="text-text-1 text-sm mt-2">{str(p.body)}</p> : null}
+          {str(p.author) ? (
+            <div className="mt-8">
+              <div className="text-sm font-semibold text-text-0">{str(p.author)}</div>
+              {str(p.authorRole) ? (
+                <div className="text-[11px] uppercase tracking-[0.18em] text-text-3 mt-1">{str(p.authorRole)}</div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </SectionShell>
+    );
+  }
+
+  if (block.variant === "signature") {
+    return (
+      <SectionShell id={str(p.anchor, "highlights")}>
+        <div className="flex flex-col @lg:flex-row @lg:items-end @lg:justify-between gap-4 mb-8 max-w-6xl mx-auto">
+          <h2 className="font-display text-3xl @md:text-4xl font-medium tracking-tight">
+            {str(p.title, "Signature Highlights")}
+          </h2>
+          {str(p.subtitle) ? <p className="text-text-2 text-sm max-w-sm @lg:text-right">{str(p.subtitle)}</p> : null}
+        </div>
+        <div className="max-w-6xl mx-auto rounded-2xl border border-border-default overflow-hidden">
+          <div className="grid grid-cols-1 @sm:grid-cols-2 @xl:grid-cols-5 divide-y @sm:divide-y-0 @sm:divide-x divide-border-default">
+            {itemsList.map((it, i) => (
+              <div key={i} className="p-6 @xl:p-7">
+                <div className="w-9 h-9 rounded-lg bg-green/10 text-green flex items-center justify-center mb-5">
+                  <Check size={14} />
+                </div>
+                <h3 className="font-display text-lg font-medium mb-3 leading-snug">{it.title}</h3>
+                <p className="text-text-2 text-sm leading-relaxed">{it.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </SectionShell>
+    );
+  }
+
+  if (block.variant === "radial") {
+    const mid = Math.ceil(itemsList.length / 2);
+    const left = itemsList.slice(0, mid);
+    const right = itemsList.slice(mid);
+    return (
+      <SectionShell id={str(p.anchor, "highlights")} className="bg-bg-2">
+        <Title title={str(p.title, "Project Highlights")} />
+        <div className="max-w-5xl mx-auto grid @lg:grid-cols-[1fr_auto_1fr] gap-8 @lg:gap-10 items-center">
+          <ul className="space-y-5 @lg:text-right">
+            {left.map((it, i) => (
+              <li key={i} className="flex @lg:flex-row-reverse gap-3 items-start text-sm text-text-1">
+                <span className="mt-1.5 w-2.5 h-2.5 rounded-full bg-green shrink-0" />
+                <span>{it.title}{it.description ? ` ${it.description}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="w-56 h-56 @md:w-72 @md:h-72 rounded-full overflow-hidden border-4 border-bg-1 shadow-lg mx-auto bg-bg-3">
+            {str(p.image) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={str(p.image)} alt="" className="w-full h-full object-cover" />
+            ) : null}
+          </div>
+          <ul className="space-y-5">
+            {right.map((it, i) => (
+              <li key={i} className="flex gap-3 items-start text-sm text-text-1">
+                <span className="mt-1.5 w-2.5 h-2.5 rounded-full bg-green shrink-0" />
+                <span>{it.title}{it.description ? ` ${it.description}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </SectionShell>
+    );
+  }
+
   return (
-    <SectionShell>
-      <Title title={str(block.props.title, "Highlights")} subtitle={str(block.props.subtitle)} />
+    <SectionShell id={str(p.anchor, "highlights")}>
+      <Title title={str(p.title, "Highlights")} subtitle={str(p.subtitle)} />
       <div className="grid @md:grid-cols-3 gap-4">
         {itemsList.map((it, i) => (
           <div key={i} className="rounded-xl border border-border-default bg-bg-2 p-5">
@@ -500,6 +936,77 @@ export function AmenitiesBlock({ block }: { block: BlockConfig }) {
             ))}
           </div>
         </div>
+      </SectionShell>
+    );
+  }
+
+  if (block.variant === "mosaic") {
+    const [featured, ...rest] = amen;
+    return (
+      <SectionShell id={str(block.props.anchor, "amenities")}>
+        <div className="mb-8 text-center max-w-2xl mx-auto">
+          {str(block.props.subtitle) ? (
+            <p className="text-text-2 text-sm mb-1">{str(block.props.subtitle)}</p>
+          ) : null}
+          <h2 className="font-display text-3xl @md:text-4xl font-semibold tracking-tight">
+            {str(block.props.title, "Property Type")}
+          </h2>
+        </div>
+        <div className="max-w-6xl mx-auto grid @lg:grid-cols-2 gap-3 @md:gap-4">
+          {featured ? (
+            <div className="relative rounded-[22px] overflow-hidden min-h-[320px] @lg:min-h-[420px] @lg:row-span-2 group">
+              {featured.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={featured.image} alt={featured.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700" />
+              ) : (
+                <div className="absolute inset-0 bg-bg-3" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-5 flex items-end justify-between gap-3">
+                <div>
+                  <h3 className="text-white font-semibold text-xl mb-0.5">{featured.title}</h3>
+                  {featured.description ? <p className="text-white/80 text-sm">{featured.description}</p> : null}
+                </div>
+                <span className="w-9 h-9 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white shrink-0">
+                  <ArrowRight size={14} />
+                </span>
+              </div>
+            </div>
+          ) : null}
+          <div className="grid grid-cols-2 gap-3 @md:gap-4">
+            {rest.slice(0, 4).map((a) => (
+              <div key={a.title} className="relative rounded-[22px] overflow-hidden aspect-square group">
+                {a.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.image} alt={a.title} className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700" />
+                ) : (
+                  <div className="absolute inset-0 bg-bg-3" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-4 flex items-end justify-between gap-2">
+                  <div>
+                    <h3 className="text-white font-semibold text-sm">{a.title}</h3>
+                    {a.description ? <p className="text-white/75 text-xs">{a.description}</p> : null}
+                  </div>
+                  <span className="w-8 h-8 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white shrink-0">
+                    <ArrowRight size={12} />
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {str(block.props.ctaText) ? (
+          <div className="mt-8 flex justify-center">
+            <a
+              href={`#${str(block.props.ctaAnchor, "listings")}`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-text-0 text-sm font-semibold hover:bg-bg-2 transition-colors"
+            >
+              {str(block.props.ctaText)}
+              <ArrowRight size={14} className="-rotate-45" />
+            </a>
+          </div>
+        ) : null}
       </SectionShell>
     );
   }
@@ -707,7 +1214,56 @@ export function FloorPlansBlock({ block }: { block: BlockConfig }) {
 }
 
 export function UnitConfigBlock({ block }: { block: BlockConfig }) {
-  const rows = items<{ config: string; type?: string; area: string; price: string; image?: string; cta?: string }>(block.props.items);
+  const rows = items<{
+    config: string;
+    type?: string;
+    area: string;
+    price: string;
+    image?: string;
+    cta?: string;
+    description?: string;
+    meta?: string;
+  }>(block.props.items);
+
+  if (block.variant === "listings") {
+    return (
+      <SectionShell id={str(block.props.anchor, "listings")}>
+        <div className="max-w-6xl mx-auto mb-8">
+          <h2 className="font-display text-3xl @md:text-4xl font-medium tracking-tight">{str(block.props.title, "New Properties")}</h2>
+          {str(block.props.subtitle) ? <p className="text-text-2 text-sm mt-2">{str(block.props.subtitle)}</p> : null}
+        </div>
+        <div className="grid @md:grid-cols-2 gap-5 @md:gap-6 max-w-6xl mx-auto">
+          {rows.map((r, i) => (
+            <article
+              key={i}
+              className="rounded-[22px] border border-border-default bg-bg-1 overflow-hidden hover:border-border-hover transition-colors group"
+            >
+              <div className="aspect-[16/10] bg-bg-3 relative overflow-hidden">
+                {r.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={r.image} alt={r.config} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" />
+                ) : null}
+                {r.type ? (
+                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-bg-1/95 text-[11px] font-semibold uppercase tracking-wide text-text-0">
+                    {r.type}
+                  </span>
+                ) : null}
+              </div>
+              <div className="p-5 @md:p-6">
+                <h3 className="font-display text-xl @md:text-2xl font-medium leading-snug mb-2">{r.config}</h3>
+                {r.description ? <p className="text-text-2 text-sm leading-relaxed line-clamp-3 mb-4">{r.description}</p> : null}
+                <div className="flex flex-wrap gap-2 text-[12px] text-text-2">
+                  {r.area ? <span className="px-2.5 py-1 rounded-full bg-bg-2">{r.area}</span> : null}
+                  {r.meta ? <span className="px-2.5 py-1 rounded-full bg-bg-2">{r.meta}</span> : null}
+                  {r.price && !r.meta ? <span className="px-2.5 py-1 rounded-full bg-bg-2">{r.price}</span> : null}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </SectionShell>
+    );
+  }
 
   if (block.variant === "table") {
     return (
@@ -923,6 +1479,42 @@ export function LocationBlock({ block }: { block: BlockConfig }) {
     );
   }
 
+  if (variant === "editorial") {
+    const image = str(block.props.image);
+    return (
+      <SectionShell id={str(block.props.anchor, "location")} className="bg-bg-0">
+        <div className="max-w-6xl mx-auto mb-10">
+          {str(block.props.subtitle) ? (
+            <p className="text-[11px] uppercase tracking-[0.28em] text-green font-medium mb-3">{str(block.props.subtitle)}</p>
+          ) : null}
+          <h2 className="font-display text-3xl @md:text-5xl font-medium tracking-tight max-w-2xl">
+            {str(block.props.title, "Quietly Central.")}
+          </h2>
+        </div>
+        <div className="max-w-6xl mx-auto grid @lg:grid-cols-[0.95fr_1.05fr] gap-8 @lg:gap-12 items-start">
+          <div className="rounded-[24px] overflow-hidden aspect-[3/4] bg-bg-2">
+            {image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={image} alt="" className="w-full h-full object-cover" />
+            ) : embed ? (
+              <iframe title="Map" src={embed} className="w-full h-full border-0 min-h-[420px]" loading="lazy" />
+            ) : (
+              <div className="w-full h-full min-h-[360px] bg-bg-3" />
+            )}
+          </div>
+          <div className="grid grid-cols-1 @sm:grid-cols-2 border-t border-l border-border-default">
+            {nearby.map((n, i) => (
+              <div key={i} className="border-r border-b border-border-default px-5 py-6">
+                <div className="font-medium text-text-0 mb-2">{n.title}</div>
+                <div className="font-display text-sm text-text-2 tracking-wide">{n.meta}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </SectionShell>
+    );
+  }
+
   return (
     <SectionShell id={str(block.props.anchor, "location")}>
       <Title title={str(block.props.title, "Location & Connectivity")} subtitle={str(block.props.address)} />
@@ -974,15 +1566,47 @@ export function GoogleMapsBlock({ block }: { block: BlockConfig }) {
 }
 
 export function ConstructionStatusBlock({ block }: { block: BlockConfig }) {
-  const stages = items<{ label: string; percent: string }>(block.props.items);
+  const stages = items<{ label: string; percent?: string; year?: string; description?: string; title?: string }>(
+    block.props.items,
+  );
+  const p = block.props;
+
+  if (block.variant === "timeline") {
+    return (
+      <SectionShell id={str(p.anchor, "progress")} className="bg-bg-2">
+        <div className="max-w-5xl mx-auto">
+          {str(p.subtitle) ? (
+            <p className="text-[11px] uppercase tracking-[0.28em] text-text-2 font-medium mb-3 text-center">
+              {str(p.subtitle)}
+            </p>
+          ) : null}
+          <h2 className="font-display text-3xl @md:text-4xl font-medium text-center mb-12">
+            {str(p.title, "Built Slowly. On Purpose.")}
+          </h2>
+          <div className="relative grid grid-cols-2 @md:grid-cols-4 gap-8">
+            <div className="hidden @md:block absolute top-3 left-[12%] right-[12%] h-px bg-border-default" />
+            {stages.map((s, i) => (
+              <div key={i} className="relative text-center">
+                <div className="mx-auto w-3 h-3 rounded-full bg-green border-4 border-bg-1 shadow mb-5 relative z-10" />
+                <div className="font-display text-2xl text-text-0 mb-2">{s.year || s.percent || ""}</div>
+                <div className="text-sm font-semibold mb-1">{s.title || s.label}</div>
+                {s.description ? <p className="text-text-2 text-xs leading-relaxed">{s.description}</p> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      </SectionShell>
+    );
+  }
+
   return (
-    <SectionShell>
-      <Title title={str(block.props.title, "Construction Status")} />
+    <SectionShell id={str(p.anchor, "progress")}>
+      <Title title={str(p.title, "Construction Status")} />
       <div className="max-w-xl mx-auto space-y-4">
         {stages.map((s, i) => (
           <div key={i}>
             <div className="flex justify-between text-sm mb-1">
-              <span>{s.label}</span>
+              <span>{s.label || s.title}</span>
               <span className="text-text-3">{s.percent}%</span>
             </div>
             <div className="h-2 rounded-full bg-bg-3 overflow-hidden">

@@ -417,6 +417,119 @@ export async function createTemplate(input: CreateTemplateInput): Promise<Landin
   return fromApiTemplate(raw);
 }
 
+/**
+ * Ensure every catalog design exists as a real preset Template row so the
+ * gallery can open / rename / edit them immediately (no "create from design" step).
+ */
+export async function ensurePresetTemplates(): Promise<LandingPageData[]> {
+  const { TEMPLATES } = await import("./data");
+  const { seedConfigFor } = await import("./site-config");
+  const { buildTemplateSections } = await import("./page-templates");
+  const { buildRealEstateTemplate, openPageTemplateIdForDesign } = await import("./re-templates");
+
+  const existing = await loadTemplates({ includeContent: false });
+
+  // Drop the legacy seeded "Project launch (builder)" preset if present.
+  for (const row of existing) {
+    const legacy =
+      row.slug === "skyline-heights-builder" ||
+      row.designId === "tpl-estatepro" ||
+      /project launch\s*\(builder\)/i.test(row.name);
+    if (!legacy) continue;
+    try {
+      await deleteTemplate(row.id);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const refreshed = await loadTemplates({ includeContent: false });
+  const byDesign = new Map(
+    refreshed
+      .filter((p) => (p.kind ?? "custom") === "preset")
+      .map((p) => [p.designId ?? "", p] as const),
+  );
+
+  for (const design of TEMPLATES) {
+    if (design.id === "tpl-blank") continue;
+    const existingRow = byDesign.get(design.id);
+    if (existingRow) {
+      // Keep catalog preview images in sync (e.g. art-key → real JPG).
+      if (design.thumbnail && existingRow.thumbnail !== design.thumbnail) {
+        try {
+          const updated = await apiFetch<ApiTemplate>(
+            `${TEMPLATES_PATH}/${encodeURIComponent(existingRow.id)}`,
+            {
+              method: "PATCH",
+              body: JSON.stringify({ thumbnail: design.thumbnail }),
+            },
+          );
+          byDesign.set(design.id, fromApiTemplate(updated));
+        } catch {
+          /* ignore */
+        }
+      }
+
+      const presetPageId = openPageTemplateIdForDesign(design.id);
+      const freshSite = buildRealEstateTemplate(presetPageId, design.name);
+      const targetRev = freshSite?.vars?.presetRevision;
+      if (targetRev && existingRow.id) {
+        try {
+          const full = await loadTemplate(existingRow.id);
+          const currentRev = full?.openPageSite?.vars?.presetRevision;
+          if (full && currentRev !== targetRev && freshSite) {
+            const synced = await patchTemplate(full.id, { ...full, openPageSite: freshSite });
+            byDesign.set(design.id, synced);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      continue;
+    }
+
+    const slug =
+      design.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) ||
+      design.id;
+    const stub: LandingPageData = {
+      id: "",
+      name: design.name,
+      slug,
+      status: "published",
+      template: design.name,
+      domain: "",
+      views: "—",
+      conversions: "—",
+      updated: "",
+      thumbnail: design.thumbnail,
+      sections: [],
+      designId: design.id,
+      kind: "preset",
+    };
+
+    try {
+      const created = await createTemplate({
+        name: design.name,
+        slug,
+        designId: design.id,
+        template: design.name,
+        status: "published",
+        kind: "preset",
+        tier: "free",
+        thumbnail: design.thumbnail,
+        sections: buildTemplateSections(design.id),
+        config: seedConfigFor(stub),
+        openPageSite: buildRealEstateTemplate(openPageTemplateIdForDesign(design.id), design.name),
+      });
+      byDesign.set(design.id, created);
+    } catch {
+      // Race / duplicate slug — ignore; next load will pick up the existing row.
+    }
+  }
+
+  return loadTemplates({ includeContent: true });
+}
+
 async function patchTemplate(id: string, record: LandingPageData): Promise<LandingPageData> {
   const raw = await apiFetch<ApiTemplate>(`${TEMPLATES_PATH}/${encodeURIComponent(id)}`, {
     method: "PATCH",
@@ -580,11 +693,17 @@ export async function duplicateTemplate(id: string): Promise<LandingPageData> {
 
 export async function resetTemplate(
   id: string,
-  content: { sections: SectionInstance[]; config: SiteConfig },
+  content: { sections: SectionInstance[]; config: SiteConfig; openPageSite?: LandingPageData["openPageSite"] },
 ): Promise<LandingPageData> {
   const raw = await apiFetch<ApiTemplate>(`${TEMPLATES_PATH}/${encodeURIComponent(id)}/reset`, {
     method: "POST",
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({
+      content: toContentBody({
+        sections: content.sections,
+        config: content.config,
+        openPageSite: content.openPageSite,
+      }),
+    }),
   });
   return fromApiTemplate(raw);
 }

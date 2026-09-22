@@ -4,7 +4,7 @@ import {
   bindLandingPageContent,
   snapshotFromProject,
 } from '../src/common/utils/landing-page-property.util';
-import { asTemplateJson, builderTemplateContent } from './seed-builder-page';
+import { builderTemplateContent } from './seed-builder-page';
 
 // Place this at: prisma/seed.ts
 // Run with: npx prisma db seed
@@ -281,7 +281,7 @@ async function seedDemoOrg() {
     }
   }
 
-  // --- Builder template + org page bound to the project --------------------
+  // --- Demo org landing page (no platform "Project launch" template) --------
   const templateSource = builderTemplateContent();
   const configChoices = unitTypes.map((u) => u.name);
   const applyChoices = (form: { fields?: Array<{ id?: string; label?: string; options?: string[] }> } | undefined) => {
@@ -296,7 +296,7 @@ async function seedDemoOrg() {
     applyChoices(form);
   }
 
-  const realEstateCat = await prisma.templateCategory.upsert({
+  await prisma.templateCategory.upsert({
     where: { slug: 'real-estate' },
     update: {},
     create: {
@@ -306,37 +306,20 @@ async function seedDemoOrg() {
     },
   });
 
-  const template = await prisma.template.upsert({
+  // Remove legacy seeded preset if it still exists.
+  const legacyBuilder = await prisma.template.findUnique({
     where: { slug: 'skyline-heights-builder' },
-    update: {
-      name: 'Project launch (builder)',
-      status: 'published',
-      kind: 'preset',
-      pageType: 'landing',
-      designId: 'tpl-estatepro',
-      baseDesignName: 'Builder',
-      tier: 'free',
-      categoryId: realEstateCat.id,
-      content: asTemplateJson(templateSource),
-    },
-    create: {
-      name: 'Project launch (builder)',
-      slug: 'skyline-heights-builder',
-      status: 'published',
-      kind: 'preset',
-      pageType: 'landing',
-      designId: 'tpl-estatepro',
-      baseDesignName: 'Builder',
-      tier: 'free',
-      categoryId: realEstateCat.id,
-      content: asTemplateJson(templateSource),
-    },
+    select: { id: true },
   });
-  await prisma.organisationTemplate.upsert({
-    where: { orgId_templateId: { orgId: org.id, templateId: template.id } },
-    update: {},
-    create: { orgId: org.id, templateId: template.id },
-  });
+  if (legacyBuilder) {
+    await prisma.organisationTemplate.deleteMany({ where: { templateId: legacyBuilder.id } });
+    await prisma.landingPage.updateMany({
+      where: { sourceTemplateId: legacyBuilder.id },
+      data: { sourceTemplateId: null },
+    });
+    await prisma.template.delete({ where: { id: legacyBuilder.id } });
+    console.log('Removed legacy preset template: Project launch (builder)');
+  }
 
   const unitCount = await prisma.unit.count({ where: { projectId: project.id } });
   const bound = bindLandingPageContent(
@@ -354,7 +337,7 @@ async function seedDemoOrg() {
     update: {
       name: 'Skyline Heights',
       status: 'published',
-      sourceTemplateId: template.id,
+      sourceTemplateId: null,
       content: bound as Prisma.InputJsonValue,
       publishedAt: new Date(),
     },
@@ -363,15 +346,13 @@ async function seedDemoOrg() {
       name: 'Skyline Heights',
       slug: 'skyline-heights',
       status: 'published',
-      sourceTemplateId: template.id,
+      sourceTemplateId: null,
       content: bound as Prisma.InputJsonValue,
       pageType: 'landing',
       publishedAt: new Date(),
     },
   });
-  console.log(
-    `Builder template seeded (${template.slug}) and org page bound to ${project.name}.`,
-  );
+  console.log(`Org landing page seeded for ${project.name} (no platform builder template).`);
 
   // --- Landing pages --------------------------------------------------------
   const landingPages: { name: string; slug: string }[] = [

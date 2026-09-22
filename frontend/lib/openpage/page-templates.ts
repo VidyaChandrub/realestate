@@ -49,7 +49,81 @@ const sec = (
 // stats cards, amenities grid, gallery masonry, floorplans cards, etc.).
 // ---------------------------------------------------------------------------
 
-export const PAGE_TEMPLATES: TemplateData[] = [];
+export const PAGE_TEMPLATES: TemplateData[] = [
+  {
+    id: "aurelia-reserve",
+    name: "Aurelia Reserve",
+    category: "Luxury",
+    icon: "LayoutTemplate",
+    pages: 1,
+    conversions: "High",
+    accent: "#c5a075",
+    accent2: "#1a1612",
+    thumbnail: "/templates/aurelia-reserve.jpg",
+    description:
+      "Luxury editorial home — hero info bar, philosophy, signature highlights, lifestyle gallery, timeline",
+  },
+  {
+    id: "vista-framed",
+    name: "Vista Framed",
+    category: "Residential",
+    icon: "LayoutTemplate",
+    pages: 1,
+    conversions: "High",
+    accent: "#e11d2e",
+    accent2: "#12101c",
+    thumbnail: "/templates/vista-framed.jpg",
+    description: "Rounded framed hero with glass stats, centered overview, amenity grid and gallery",
+  },
+  {
+    id: "future-home",
+    name: "Future Home",
+    category: "Residential",
+    icon: "LayoutTemplate",
+    pages: 1,
+    conversions: "High",
+    accent: "#ff4b4b",
+    accent2: "#1c1917",
+    thumbnail: "/templates/future-home.jpg",
+    description: "Cream asymmetric hero with floating stats card, highlights split and contact form",
+  },
+  {
+    id: "modern-living",
+    name: "Modern Living",
+    category: "Residential",
+    icon: "LayoutTemplate",
+    pages: 1,
+    conversions: "High",
+    accent: "#ff5252",
+    accent2: "#0e121a",
+    thumbnail: "/templates/modern-living.jpg",
+    description: "Centered aerial hero with overlapping info bar, featured amenities and location cards",
+  },
+  {
+    id: "investment-hub",
+    name: "Investment Hub",
+    category: "Marketplace",
+    icon: "LayoutTemplate",
+    pages: 1,
+    conversions: "High",
+    accent: "#171717",
+    accent2: "#171717",
+    thumbnail: "/templates/investment-hub.jpg",
+    description: "Marketplace home — framed night hero, property-type mosaic, listings and testimonials",
+  },
+  {
+    id: "vista-curve",
+    name: "Vista Curve",
+    category: "Residential",
+    icon: "LayoutTemplate",
+    pages: 1,
+    conversions: "High",
+    accent: "#ef4444",
+    accent2: "#1c1917",
+    thumbnail: "/templates/vista-curve.jpg",
+    description: "Split curve hero with stats panel, radial highlights, configs and neighbourhood",
+  },
+];
 
 export const BLANK_TEMPLATE: TemplateData = {
   id: "tpl-blank",
@@ -80,6 +154,12 @@ export function inferDesignId(template: string): string {
     return "tpl-luxe";
   if (key.includes("meridian") || key === "tpl-meridian" || key.includes("premium"))
     return "tpl-meridian";
+  if (key.includes("aurelia")) return "aurelia-reserve";
+  if (key.includes("vista") || key.includes("framed")) return "vista-framed";
+  if (key.includes("future-home") || key.includes("future home")) return "future-home";
+  if (key.includes("modern-living") || key.includes("modern living")) return "modern-living";
+  if (key.includes("investment") || key.includes("aevum")) return "investment-hub";
+  if (key.includes("vista-curve") || key.includes("curve")) return "vista-curve";
   if (key.includes("standard") || key === "tpl-standard") return "tpl-standard";
   if (key.includes("modern") || key === "tpl-modern") return "tpl-modern";
   if (key.includes("luxury") || key === "tpl-luxury") return "tpl-luxury";

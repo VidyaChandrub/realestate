@@ -16,6 +16,8 @@ interface TestimonialsProps {
   title?: string
   subtitle?: string
   items?: Testimonial[]
+  viewAllText?: string
+  viewAllUrl?: string
 }
 
 const defaultTestimonials: Testimonial[] = [
@@ -79,6 +81,16 @@ function TestimonialsCards({ props }: { props: TestimonialsProps }) {
           </div>
         ))}
       </div>
+      {props.viewAllText ? (
+        <div className="mt-10 flex justify-center">
+          <a
+            href={props.viewAllUrl || "#listings"}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-text-0 text-sm font-semibold hover:bg-bg-2 transition-colors"
+          >
+            {props.viewAllText}
+          </a>
+        </div>
+      ) : null}
     </section>
   )
 }

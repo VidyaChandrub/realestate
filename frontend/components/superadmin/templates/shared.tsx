@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { SceneImage } from "@/components/openpage/art";
 import { TEMPLATES } from "@/lib/openpage/data";
+import { isMediaSrc } from "@/lib/media";
 import { localPreviewPath } from "@/lib/openpage/paths";
 import { ensureConfig } from "@/lib/openpage/site-config";
 import type { LandingPageData } from "@/lib/openpage/types";
@@ -46,14 +47,18 @@ export function findPreset(pages: LandingPageData[], designId: string) {
 
 /** Build the unified, filterable list of template rows from the store. */
 export function buildTemplateRows(pages: LandingPageData[]): TemplateRow[] {
+  const catalogIds = new Set(TEMPLATES.map((d) => d.id));
+
   const presets: TemplateRow[] = TEMPLATES.map((design) => {
     const page = findPreset(pages, design.id);
+    const thumb =
+      page?.thumbnail && isMediaSrc(page.thumbnail) ? page.thumbnail : design.thumbnail;
     return {
       key: design.id,
       pageId: page?.id,
       name: page?.name ?? design.name,
       description: design.description,
-      thumbnail: page?.thumbnail || design.thumbnail,
+      thumbnail: thumb,
       accent: design.accent2,
       kind: "preset",
       source: design.name,
@@ -65,6 +70,38 @@ export function buildTemplateRows(pages: LandingPageData[]): TemplateRow[] {
       categoryId: page?.categoryId ?? null,
     };
   });
+
+  // API presets that aren't in the static catalog still show up.
+  const orphanPresets: TemplateRow[] = pages
+    .filter(
+      (p) =>
+        (p.kind ?? "custom") === "preset" &&
+        p.pageType !== "thank-you" &&
+        !catalogIds.has(p.designId ?? "") &&
+        // Legacy seeded demo — hide from Template Studio.
+        p.slug !== "skyline-heights-builder" &&
+        p.designId !== "tpl-estatepro" &&
+        !/project launch\s*\(builder\)/i.test(p.name),
+    )
+    .map((p) => {
+      const cfg = ensureConfig(p);
+      return {
+        key: p.id,
+        pageId: p.id,
+        name: p.name,
+        description: p.template || "Predefined template",
+        thumbnail: p.thumbnail || "tower",
+        accent: cfg.brand.primary,
+        kind: "preset" as const,
+        source: p.template || p.name,
+        status: p.status,
+        domain: p.domain || localPreviewPath(p),
+        designId: p.designId ?? p.id,
+        tier: p.tier ?? "free",
+        category: p.category ?? null,
+        categoryId: p.categoryId ?? null,
+      };
+    });
 
   const customs: TemplateRow[] = pages
     .filter((p) => (p.kind ?? "custom") === "custom")
@@ -88,7 +125,7 @@ export function buildTemplateRows(pages: LandingPageData[]): TemplateRow[] {
       };
     });
 
-  return [...presets, ...customs];
+  return [...presets, ...orphanPresets, ...customs];
 }
 
 export function tierStyle(tier?: "free" | "paid" | "premium"): { cls: string; label: string } {
@@ -186,6 +223,7 @@ export function TemplateCover({
   radius?: string;
   children?: ReactNode;
 }) {
+  const realPreview = isMediaSrc(thumbnail);
   return (
     <div
       style={{
@@ -197,7 +235,23 @@ export function TemplateCover({
         flexShrink: 0,
       }}
     >
-      <SceneImage art={thumbnail || "hero"} />
+      {realPreview ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={thumbnail}
+          alt=""
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "top center",
+          }}
+        />
+      ) : (
+        <SceneImage art={thumbnail || "hero"} />
+      )}
       {children}
     </div>
   );
