@@ -50,7 +50,7 @@ function seedForm(name: string) {
   return form;
 }
 
-function page(name: string, themeId: string, blocks: BlockConfig[]): SiteConfig {
+function page(name: string, themeId: string, blocks: BlockConfig[], presetRevision?: string): SiteConfig {
   const form = seedForm(name);
   const popupId = "popup-brochure";
   const withForm = blocks.map((b) => {
@@ -81,6 +81,7 @@ function page(name: string, themeId: string, blocks: BlockConfig[]): SiteConfig 
     ],
     pages: [{ id: "page-home", name: "Home", path: "/", blocks: withForm }],
     blocks: withForm,
+    vars: presetRevision ? { presetRevision } : undefined,
   };
 }
 
@@ -774,18 +775,18 @@ export function buildInvestmentHubTemplate(name = "Investment Hub"): SiteConfig 
     {
       id: bid("nav"),
       type: "navbar",
-      variant: "default",
+      variant: "marketing",
       props: {
-        logo: name,
+        logo: "Logoipsum",
         ctaText: "Contact Us",
-        ctaId: "enquire",
+        ctaId: "booking",
         menuItems: [
           { label: "About us", id: "about" },
           { label: "Upcoming Projects", id: "listings" },
-          { label: "Cities", id: "location" },
-          { label: "New Launch", id: "listings" },
-          { label: "Luxury Homes", id: "amenities" },
-          { label: "All Properties", id: "listings" },
+          { label: "Cities", id: "location", dropdown: true },
+          { label: "New Launch", id: "listings", dropdown: true },
+          { label: "Luxury Homes", id: "amenities", dropdown: true },
+          { label: "All Properties", id: "listings", dropdown: true },
         ],
       },
     },
@@ -798,7 +799,7 @@ export function buildInvestmentHubTemplate(name = "Investment Hub"): SiteConfig 
         description:
           "Explore a selection of high-value real estate opportunities designed for financial growth and stability",
         primaryCta: "Know More",
-        primaryAnchor: "amenities",
+        primaryAnchor: "types",
         image: IMG.heroNight,
         anchor: "hero",
       },
@@ -808,7 +809,8 @@ export function buildInvestmentHubTemplate(name = "Investment Hub"): SiteConfig 
       type: "amenities",
       variant: "mosaic",
       props: {
-        title: "Explore by Property Type",
+        subtitle: "Explore by",
+        title: "Property Type",
         ctaText: "View All",
         ctaAnchor: "listings",
         items: [
@@ -818,22 +820,89 @@ export function buildInvestmentHubTemplate(name = "Investment Hub"): SiteConfig 
           { title: "Commercial", description: "380+ listings", image: IMG.lobby },
           { title: "Penthouse", description: "60+ listings", image: IMG.terrace },
         ],
-        anchor: "amenities",
+        anchor: "types",
+      },
+    },
+    {
+      id: bid("filters"),
+      type: "property-filters",
+      variant: "tabs",
+      props: {
+        activeIndex: 0,
+        items: [
+          { label: "New Launch" },
+          { label: "Apartments" },
+          { label: "Plots" },
+          { label: "Villas" },
+          { label: "Luxury Homes" },
+        ],
       },
     },
     {
       id: bid("list"),
       type: "unit-config",
-      variant: "cards",
+      variant: "listings",
       props: {
         title: "New Properties",
         items: [
-          { type: "Apartment", config: "Poulomi Florique", area: "Thanisandra", price: "New Launch", image: IMG.facade },
-          { type: "Apartment", config: "Abhee Codename", area: "Sarjapur", price: "Ultra-premium", image: IMG.towers },
-          { type: "Apartment", config: "Sattva Songbird Phase 2", area: "Budigere Main Road", price: "New Launch", image: IMG.heroCity },
-          { type: "Apartment", config: "Purva Codename Hennur", area: "Hennur Road", price: "Luxury", image: IMG.facade },
-          { type: "Apartment", config: "Brigade Lumina", area: "Tumkur Road", price: "New Launch", image: IMG.towers },
-          { type: "Apartment", config: "Ramky Fortuna", area: "Whitefield", price: "Premium", image: IMG.lobby },
+          {
+            type: "New Launch",
+            config: "Poulomi Florique in Thanisandra, North Bangalore",
+            description:
+              "Poulomi Florique is a new luxury residential Apartment project launched just off Thanisandra Road near Bhartiya City, North Bangalore",
+            area: "Thanisandra",
+            image: IMG.facade,
+          },
+          {
+            type: "New Launch",
+            config: "Abhee Codename New Dimension in Varthur Sarjapur Road, Bangalore",
+            description:
+              "Abhee Codename New Dimension is the new ultra-premium residential apartment project near Gunjur Road, Varthur…",
+            area: "Sarjapur, East Bangalore",
+            meta: "Varthur Sarjapur Road",
+            image: IMG.towers,
+          },
+          {
+            type: "New Launch",
+            config: "Sattva Songbird Phase 2 in Budigere Main Road, Bangalore",
+            description:
+              "Sattva Songbird Phase 2 is the brand new ultra-premium residential Apartment project launched near Budigere…",
+            area: "Main Road, Old Madras Road, East Bangalore",
+            meta: "Budigere Main Road",
+            image: IMG.heroCity,
+          },
+          {
+            type: "New Launch",
+            config: "Purva Codename Hennur in Hennur Road, Bangalore",
+            description:
+              "Purva Codename Hennur is the new luxury residential Apartment project launching bang on Hennur Main Road…",
+            area: "Hennur Road",
+            image: IMG.facade,
+          },
+          {
+            type: "New Launch",
+            config: "Brigade Lumina Apartments in Tumkur Road, Bangalore",
+            description:
+              "Brigade Lumina is the new luxury residential Apartment project being launched right on Tumkur Road, West…",
+            area: "Tumkur Road",
+            image: IMG.towers,
+          },
+          {
+            type: "New Launch",
+            config: "Ramky Fortuna in Whitefield, Bangalore",
+            description:
+              "Ramky Fortuna is the new premium residential apartment project launched in Seegehalli, Whitefield, near KR Puram…",
+            area: "Whitefield",
+            image: IMG.lobby,
+          },
+          {
+            type: "New Launch",
+            config: "Eaton Park at Prestige City in Sarjapur, Bangalore",
+            description:
+              "Prestige Eaton Park at Prestige City is the new Phase premium residential Apartment project launched on Sarjapur…",
+            area: "Sarjapur",
+            image: IMG.terrace,
+          },
         ],
         anchor: "listings",
       },
@@ -846,7 +915,7 @@ export function buildInvestmentHubTemplate(name = "Investment Hub"): SiteConfig 
         title: "Engineering Nature into Every Home",
         body: "We don't just build near nature; we weave it into your living spaces. Our precision-led designs ensure every home is a green sanctuary, blending sustainable innovation with lush, life-elevating landscapes.",
         image: IMG.master,
-        imagePosition: "right",
+        imagePosition: "left",
         stats: [
           { value: "26+", label: "Years of Excellence" },
           { value: "38 MN+", label: "Sq. ft. of Developments" },
@@ -859,14 +928,15 @@ export function buildInvestmentHubTemplate(name = "Investment Hub"): SiteConfig 
     {
       id: bid("impact"),
       type: "project-highlights",
-      variant: "quote",
+      variant: "split-impact",
       props: {
-        subtitle: "Our Impact",
         title: "Do good.",
         accentLine: "Do well.",
-        body: "Committed to elevating the living experience while emphasising a positive impact on the environment and society.",
+        body: "Logoipsum is committed to elevating the living experience while emphasising the importance of creating a positive impact on the environment and society.",
         author: "Our Story",
         authorRole: "Our Impact",
+        image: IMG.towers,
+        ctaAnchor: "about",
         anchor: "impact",
       },
     },
@@ -877,22 +947,46 @@ export function buildInvestmentHubTemplate(name = "Investment Hub"): SiteConfig 
       props: {
         title: "What Our Customers Say",
         subtitle: "Trusted by thousands of families across India.",
+        viewAllText: "View All",
+        viewAllUrl: "#listings",
         items: [
-          { name: "Rahul Sharma", role: "Bangalore · Bought 3 BHK", quote: "Helped us find our dream home in Whitefield within budget. Completely transparent.", rating: 5 },
-          { name: "Priya Anand", role: "Pune · Bought 2 BHK", quote: "From shortlisting to registration — absolutely seamless experience.", rating: 5 },
-          { name: "Manish Kumar", role: "Hyderabad · Investor", quote: "Locality insights and price trend data before deciding — a game changer.", rating: 5 },
+          {
+            name: "Rahul Sharma",
+            role: "Bangalore · Bought 3 BHK",
+            quote:
+              "Aevum helped us find our dream home in Whitefield within budget. The advisor was incredibly knowledgeable and the process was completely transparent.",
+            rating: 5,
+          },
+          {
+            name: "Priya Anand",
+            role: "Pune · Bought 2 BHK Apartment",
+            quote:
+              "From shortlisting to loan approval to registration — they handled everything. I didn't visit a single government office myself. Absolutely seamless experience.",
+            rating: 5,
+          },
+          {
+            name: "Manish Kumar",
+            role: "Hyderabad · Investment Buyer",
+            quote:
+              "The locality insights are a game changer. I compared neighbourhoods with real price trend data before deciding. No other platform offers this level of detail.",
+            rating: 5,
+          },
         ],
       },
     },
     {
-      id: bid("cta"),
+      id: bid("booking"),
       type: "cta",
-      variant: "simple",
+      variant: "booking",
       props: {
         headline: "Want to Book a Call?",
         subheadline: "Ready to make your step in real estate? Book Now",
-        buttonText: "View Properties",
-        buttonUrl: "#listings",
+        buttonText: "Book Now",
+        buttonUrl: "#enquire",
+        secondaryButtonText: "View Properties",
+        secondaryButtonUrl: "#listings",
+        image: IMG.heroCity,
+        anchor: "booking",
       },
     },
     {
@@ -901,7 +995,7 @@ export function buildInvestmentHubTemplate(name = "Investment Hub"): SiteConfig 
       variant: "card",
       props: {
         title: "Contact Us",
-        subtitle: "India's most transparent real estate platform since 2021.",
+        subtitle: "India's most transparent real estate platform, connecting home buyers with verified properties and expert advisors since 2021.",
         formId: "",
         anchor: "enquire",
       },
@@ -911,12 +1005,18 @@ export function buildInvestmentHubTemplate(name = "Investment Hub"): SiteConfig 
       type: "footer",
       variant: "multi-column",
       props: {
-        logo: name,
-        copyright: "© 2026 Aevum Realty Pvt. Ltd. All rights reserved. RERA Registered.",
-        links: ["About Us", "Careers", "Privacy Policy", "Terms of Service"],
+        logo: "Logoipsum",
+        tagline: "India's most transparent real estate platform, connecting home buyers with verified properties and expert advisors since 2021.",
+        copyright: "© 2025 Aevum Realty Pvt. Ltd. All rights reserved. RERA Registered.",
+        links: ["Privacy Policy", "Terms of Service"],
+        columns: [
+          { title: "Company", links: ["About Us", "Careers", "Press", "Blog", "Contact"] },
+          { title: "Explore", links: ["Bangalore", "Mumbai", "Hyderabad", "Pune", "New Launches"] },
+          { title: "Services", links: ["Buy Property", "Home Loans", "Legal Help", "Investment", "List Property"] },
+        ],
       },
     },
-  ]);
+  ], "2");
 }
 
 /** PDF 2 — Vista curve split hero with radial highlights */

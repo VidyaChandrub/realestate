@@ -2,13 +2,15 @@
 
 import { useState, type MouseEvent } from "react";
 import type { BlockConfig } from "../types";
-import { Menu, X, Phone, Mail } from "lucide-react";
+import { Menu, X, Phone, Mail, ChevronDown } from "lucide-react";
 
 export type NavMenuItem = {
   label: string;
   /** Section id without # — e.g. "amenities", "plans", "enquire" */
   id?: string;
   href?: string;
+  /** PDF marketplace nav — show caret (visual only in builder preview). */
+  dropdown?: boolean;
 };
 
 interface NavbarProps {
@@ -81,9 +83,13 @@ function handleNavClick(e: MouseEvent<HTMLAnchorElement>, href: string, onClick?
 function NavLinks({
   items,
   onClick,
+  className = "text-[13px] text-text-2 hover:text-text-0 transition-colors",
+  dropdownKeys,
 }: {
   items: Array<{ label: string; href: string }>;
   onClick?: () => void;
+  className?: string;
+  dropdownKeys?: Set<string>;
 }) {
   return (
     <>
@@ -92,13 +98,27 @@ function NavLinks({
           key={`${item.href}-${i}`}
           href={item.href}
           onClick={(e) => handleNavClick(e, item.href, onClick)}
-          className="text-[13px] text-text-2 hover:text-text-0 transition-colors"
+          className={`inline-flex items-center gap-1 ${className}`}
         >
           {item.label}
+          {dropdownKeys?.has(item.label) ? <ChevronDown size={14} className="opacity-60 shrink-0" /> : null}
         </a>
       ))}
     </>
   );
+}
+
+function marketingDropdownLabels(
+  links?: Array<string | NavMenuItem>,
+  menuItems?: NavMenuItem[],
+): Set<string> {
+  const source = (menuItems && menuItems.length ? menuItems : links) ?? [];
+  const out = new Set<string>();
+  for (const item of source) {
+    if (typeof item === "string") continue;
+    if (item.dropdown && item.label) out.add(String(item.label).trim());
+  }
+  return out;
 }
 
 function Brand({ logo, logoImage }: { logo: string; logoImage?: string }) {
@@ -388,6 +408,54 @@ function NavbarGlass({ props }: { props: NavbarProps }) {
   );
 }
 
+/** PDF 1 — Marketplace pill header on light canvas, dark Contact CTA */
+function NavbarMarketing({ props }: { props: NavbarProps }) {
+  const { logo, logoImage, ctaText } = props;
+  const items = normalizeNavLinks(props.links, props.menuItems);
+  const dropdownKeys = marketingDropdownLabels(props.links, props.menuItems);
+  const ctaHref = resolveCtaHref(props);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <nav className="sticky top-0 z-40 px-4 @md:px-8 py-3 @md:py-4 bg-bg-0">
+      <div className="flex items-center justify-between gap-3 rounded-full border border-black/[0.06] bg-bg-1 shadow-[0_8px_30px_rgba(0,0,0,0.06)] pl-4 @md:pl-6 pr-2 @md:pr-3 py-2 @md:py-2.5 max-w-6xl mx-auto">
+        <Brand logo={logo} logoImage={logoImage} />
+        <div className="hidden @2xl:flex items-center gap-5 @3xl:gap-6 flex-1 justify-center">
+          <NavLinks
+            items={items}
+            dropdownKeys={dropdownKeys}
+            className="text-[13px] text-text-1 hover:text-text-0 transition-colors whitespace-nowrap"
+          />
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {ctaText ? (
+            <a
+              href={ctaHref}
+              onClick={(e) => handleNavClick(e, ctaHref, undefined)}
+              className="px-4 @md:px-5 py-2 rounded-full bg-text-0 text-bg-1 text-[13px] font-semibold hover:opacity-90 transition-opacity"
+            >
+              {ctaText}
+            </a>
+          ) : null}
+          <button
+            type="button"
+            className="@2xl:hidden w-9 h-9 rounded-full border border-border-default flex items-center justify-center text-text-2 hover:text-text-0 hover:bg-bg-2 transition-colors"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Menu"
+          >
+            {open ? <X size={16} /> : <Menu size={16} />}
+          </button>
+        </div>
+      </div>
+      {open ? (
+        <div className="@2xl:hidden mt-2 max-w-6xl mx-auto rounded-2xl border border-border-default bg-bg-1 p-4 flex flex-col gap-3 shadow-lg">
+          <NavLinks items={items} dropdownKeys={dropdownKeys} onClick={() => setOpen(false)} />
+        </div>
+      ) : null}
+    </nav>
+  );
+}
+
 function NavbarMinimal({ props }: { props: NavbarProps }) {
   const { logo, logoImage, ctaText } = props;
   const items = normalizeNavLinks(props.links, props.menuItems);
@@ -443,6 +511,8 @@ export function NavbarBlock({ block }: { block: BlockConfig }) {
       return <NavbarGlass props={props} />;
     case "minimal":
       return <NavbarMinimal props={props} />;
+    case "marketing":
+      return <NavbarMarketing props={props} />;
     default:
       return <NavbarDefault props={props} sticky={block.variant !== "static"} />;
   }

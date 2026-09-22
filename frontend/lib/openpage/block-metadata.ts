@@ -111,7 +111,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Header / Navigation',
     description: 'Logo, menu and enquire CTA',
     category: 'Core',
-    variants: ['default', 'centered', 'dual', 'pill', 'glass', 'minimal'],
+    variants: ['default', 'centered', 'dual', 'pill', 'glass', 'minimal', 'marketing'],
     defaultProps: {
       logo: 'Project',
       logoImage: '',
@@ -148,7 +148,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Property Listing / Cards',
     description: 'Unit cards with type, area, price and enquire',
     category: 'Real Estate',
-    variants: ['cards', 'table'],
+    variants: ['cards', 'table', 'listings'],
     defaultProps: { title: 'Residences', items: [{ type: 'Apartment', config: '2 BHK', area: '1,145 sq.ft', price: 'From ₹ 1.42 Cr*', image: '' }] },
   },
   {
@@ -164,7 +164,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Property Filters',
     description: 'Filter chips for configuration and status',
     category: 'Real Estate',
-    variants: ['default'],
+    variants: ['default', 'tabs'],
     defaultProps: { title: 'Filters', items: [{ label: '2 BHK' }, { label: '3 BHK' }, { label: 'Ready' }] },
   },
   {
@@ -218,7 +218,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Location Advantages',
     description: 'Nearby highlights with icons',
     category: 'Real Estate',
-    variants: ['grid', 'signature', 'quote', 'radial'],
+    variants: ['grid', 'signature', 'quote', 'radial', 'split-impact'],
     defaultProps: { title: 'Location advantages', items: [{ title: 'ITPL', description: '8 minutes', icon: '' }] },
   },
   {
@@ -290,7 +290,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'CTA / Enquiry Section',
     description: 'Closing headline and button',
     category: 'Real Estate',
-    variants: ['simple', 'split'],
+    variants: ['simple', 'split', 'booking'],
     defaultProps: { headline: 'Book a site visit', subheadline: '', buttonText: 'Enquire Now', buttonUrl: '#enquire' },
   },
   {

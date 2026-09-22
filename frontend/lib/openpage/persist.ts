@@ -469,6 +469,22 @@ export async function ensurePresetTemplates(): Promise<LandingPageData[]> {
           /* ignore */
         }
       }
+
+      const presetPageId = openPageTemplateIdForDesign(design.id);
+      const freshSite = buildRealEstateTemplate(presetPageId, design.name);
+      const targetRev = freshSite?.vars?.presetRevision;
+      if (targetRev && existingRow.id) {
+        try {
+          const full = await loadTemplate(existingRow.id);
+          const currentRev = full?.openPageSite?.vars?.presetRevision;
+          if (full && currentRev !== targetRev && freshSite) {
+            const synced = await patchTemplate(full.id, { ...full, openPageSite: freshSite });
+            byDesign.set(design.id, synced);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
       continue;
     }
 

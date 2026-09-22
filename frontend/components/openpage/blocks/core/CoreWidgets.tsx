@@ -1,6 +1,6 @@
 "use client";
 
-import type { BlockConfig } from "./types";
+import type { BlockConfig } from "../types";
 import { isMediaSrc } from "@/lib/media";
 import { ArrowRight, Calculator, Filter, Search } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -107,6 +107,30 @@ export function PropertySearchBlock({ block }: { block: BlockConfig }) {
 
 export function PropertyFiltersBlock({ block }: { block: BlockConfig }) {
   const items = Array.isArray(block.props.items) ? (block.props.items as { label: string }[]) : [{ label: "2 BHK" }, { label: "3 BHK" }, { label: "Ready" }, { label: "Under construction" }];
+  const activeIndex = Number(block.props.activeIndex) || 0;
+
+  if (block.variant === "tabs") {
+    return (
+      <section className="px-6 @md:px-10 pb-2 -mt-2">
+        <div className="max-w-6xl mx-auto flex flex-wrap gap-2">
+          {items.map((it, i) => (
+            <button
+              key={i}
+              type="button"
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                i === activeIndex
+                  ? "bg-text-0 text-bg-1"
+                  : "border border-border-default text-text-2 hover:border-text-0 hover:text-text-0"
+              }`}
+            >
+              {it.label || String(it)}
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="px-6 @md:px-10 py-6">
       <div className="flex flex-wrap justify-center gap-2">

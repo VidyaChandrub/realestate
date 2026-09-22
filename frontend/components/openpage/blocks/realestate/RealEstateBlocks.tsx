@@ -715,6 +715,46 @@ export function ProjectHighlightsBlock({ block }: { block: BlockConfig }) {
   const itemsList = items<{ title: string; description: string; icon?: string }>(block.props.items);
   const p = block.props;
 
+  if (block.variant === "split-impact") {
+    return (
+      <SectionShell id={str(p.anchor, "impact")} className="bg-[#e8efe8]">
+        <div className="max-w-6xl mx-auto grid @lg:grid-cols-2 gap-8 @lg:gap-12 items-center">
+          <div className="rounded-[28px] overflow-hidden aspect-[4/3] @lg:aspect-auto @lg:min-h-[360px] bg-bg-3">
+            {str(p.image) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={str(p.image)} alt="" className="w-full h-full object-cover" />
+            ) : null}
+          </div>
+          <div>
+            <p className="font-display text-4xl @md:text-5xl text-text-0 leading-tight mb-1">{str(p.title, "Do good.")}</p>
+            {str(p.accentLine) ? (
+              <p className="font-display text-4xl @md:text-5xl italic text-green leading-tight mb-6">{str(p.accentLine)}</p>
+            ) : null}
+            {str(p.body) ? <p className="text-text-1 text-sm @md:text-base leading-relaxed mb-8 max-w-md">{str(p.body)}</p> : null}
+            <div className="flex flex-wrap gap-3">
+              {str(p.author) ? (
+                <a
+                  href={`#${str(p.ctaAnchor, "about")}`}
+                  className="px-5 py-2.5 rounded-full border border-text-0 text-sm font-semibold hover:bg-text-0 hover:text-bg-1 transition-colors"
+                >
+                  {str(p.author)}
+                </a>
+              ) : null}
+              {str(p.authorRole) ? (
+                <a
+                  href={`#${str(p.secondaryAnchor, "impact")}`}
+                  className="px-5 py-2.5 rounded-full bg-text-0 text-bg-1 text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  {str(p.authorRole)}
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </SectionShell>
+    );
+  }
+
   if (block.variant === "quote") {
     return (
       <SectionShell id={str(p.anchor, "philosophy")} className="bg-bg-2">
@@ -904,7 +944,14 @@ export function AmenitiesBlock({ block }: { block: BlockConfig }) {
     const [featured, ...rest] = amen;
     return (
       <SectionShell id={str(block.props.anchor, "amenities")}>
-        <Title title={str(block.props.title, "Explore by Property Type")} subtitle={str(block.props.subtitle)} />
+        <div className="mb-8 text-center max-w-2xl mx-auto">
+          {str(block.props.subtitle) ? (
+            <p className="text-text-2 text-sm mb-1">{str(block.props.subtitle)}</p>
+          ) : null}
+          <h2 className="font-display text-3xl @md:text-4xl font-semibold tracking-tight">
+            {str(block.props.title, "Property Type")}
+          </h2>
+        </div>
         <div className="max-w-6xl mx-auto grid @lg:grid-cols-2 gap-3 @md:gap-4">
           {featured ? (
             <div className="relative rounded-[22px] overflow-hidden min-h-[320px] @lg:min-h-[420px] @lg:row-span-2 group">
@@ -1167,7 +1214,56 @@ export function FloorPlansBlock({ block }: { block: BlockConfig }) {
 }
 
 export function UnitConfigBlock({ block }: { block: BlockConfig }) {
-  const rows = items<{ config: string; type?: string; area: string; price: string; image?: string; cta?: string }>(block.props.items);
+  const rows = items<{
+    config: string;
+    type?: string;
+    area: string;
+    price: string;
+    image?: string;
+    cta?: string;
+    description?: string;
+    meta?: string;
+  }>(block.props.items);
+
+  if (block.variant === "listings") {
+    return (
+      <SectionShell id={str(block.props.anchor, "listings")}>
+        <div className="max-w-6xl mx-auto mb-8">
+          <h2 className="font-display text-3xl @md:text-4xl font-medium tracking-tight">{str(block.props.title, "New Properties")}</h2>
+          {str(block.props.subtitle) ? <p className="text-text-2 text-sm mt-2">{str(block.props.subtitle)}</p> : null}
+        </div>
+        <div className="grid @md:grid-cols-2 gap-5 @md:gap-6 max-w-6xl mx-auto">
+          {rows.map((r, i) => (
+            <article
+              key={i}
+              className="rounded-[22px] border border-border-default bg-bg-1 overflow-hidden hover:border-border-hover transition-colors group"
+            >
+              <div className="aspect-[16/10] bg-bg-3 relative overflow-hidden">
+                {r.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={r.image} alt={r.config} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" />
+                ) : null}
+                {r.type ? (
+                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-bg-1/95 text-[11px] font-semibold uppercase tracking-wide text-text-0">
+                    {r.type}
+                  </span>
+                ) : null}
+              </div>
+              <div className="p-5 @md:p-6">
+                <h3 className="font-display text-xl @md:text-2xl font-medium leading-snug mb-2">{r.config}</h3>
+                {r.description ? <p className="text-text-2 text-sm leading-relaxed line-clamp-3 mb-4">{r.description}</p> : null}
+                <div className="flex flex-wrap gap-2 text-[12px] text-text-2">
+                  {r.area ? <span className="px-2.5 py-1 rounded-full bg-bg-2">{r.area}</span> : null}
+                  {r.meta ? <span className="px-2.5 py-1 rounded-full bg-bg-2">{r.meta}</span> : null}
+                  {r.price && !r.meta ? <span className="px-2.5 py-1 rounded-full bg-bg-2">{r.price}</span> : null}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </SectionShell>
+    );
+  }
 
   if (block.variant === "table") {
     return (

@@ -5,6 +5,8 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class PrismaService
@@ -24,20 +26,67 @@ export class PrismaService
 
   // Prod often deploys Prisma client ahead of migrations. Login and
   // /org/permissions/me then 500 because a selected column/table is missing.
+  // ensure-all-tables.sql is idempotent (IF NOT EXISTS) and covers every
+  // schema/table/index from schema.prisma so a drifted prod DB can boot.
   private async ensureProductionSchema() {
     const statements = [
-      `CREATE SCHEMA IF NOT EXISTS "identity"`,
-      `CREATE SCHEMA IF NOT EXISTS "access"`,
+      ...this.loadEnsureSqlStatements(),
+      // Column-level backfills that CREATE TABLE IF NOT EXISTS cannot add
+      // once a table already exists with an older shape.
       `ALTER TABLE "identity"."users" ADD COLUMN IF NOT EXISTS "email_verified_at" TIMESTAMP(3)`,
       `ALTER TABLE "identity"."users" ADD COLUMN IF NOT EXISTS "onboarding_step" TEXT`,
       `ALTER TABLE "identity"."users" ADD COLUMN IF NOT EXISTS "must_change_password" BOOLEAN NOT NULL DEFAULT false`,
-      `DO $$ BEGIN CREATE TYPE "identity"."RoleStatus" AS ENUM ('active', 'inactive'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+      `ALTER TABLE "identity"."users" ADD COLUMN IF NOT EXISTS "country" TEXT`,
+      `ALTER TABLE "identity"."users" ADD COLUMN IF NOT EXISTS "terms_accepted_at" TIMESTAMP(3)`,
       `ALTER TABLE "identity"."roles" ADD COLUMN IF NOT EXISTS "org_id" TEXT`,
-      `ALTER TABLE "identity"."roles" ADD COLUMN IF NOT EXISTS "status" "identity"."RoleStatus" NOT NULL DEFAULT 'active'`,
       `ALTER TABLE "identity"."roles" ADD COLUMN IF NOT EXISTS "description" TEXT NOT NULL DEFAULT ''`,
       `ALTER TABLE "identity"."organisations" ADD COLUMN IF NOT EXISTS "custom_domain_landing_page_id" TEXT`,
       `ALTER TABLE "access"."role_module_permissions" ADD COLUMN IF NOT EXISTS "org_id" TEXT NOT NULL DEFAULT 'system'`,
       `ALTER TABLE "access"."role_module_permissions" ADD COLUMN IF NOT EXISTS "can_approve" BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE "identity"."media_files" ADD COLUMN IF NOT EXISTS "alt" TEXT`,
+      `ALTER TABLE "billing"."plans" ADD COLUMN IF NOT EXISTS "capabilities" JSONB`,
+      `ALTER TABLE "billing"."plans" ADD COLUMN IF NOT EXISTS "is_system" BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE "access"."teams" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'active'`,
+      `ALTER TABLE "audit"."support_tickets" ADD COLUMN IF NOT EXISTS "hold_reason" TEXT`,
+      `ALTER TABLE "audit"."support_tickets" ADD COLUMN IF NOT EXISTS "assigned_to_id" TEXT`,
+    ];
+
+    for (const sql of statements) {
+      try {
+        await this.$executeRawUnsafe(sql);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Schema backfill skipped: ${message}`);
+      }
+    }
+  }
+
+  private loadEnsureSqlStatements(): string[] {
+    const candidates = [
+      join(process.cwd(), 'prisma', 'ensure-all-tables.sql'),
+      join(__dirname, '..', '..', 'prisma', 'ensure-all-tables.sql'),
+      join(__dirname, '..', '..', '..', 'prisma', 'ensure-all-tables.sql'),
+    ];
+    const path = candidates.find((p) => existsSync(p));
+    if (!path) {
+      this.logger.warn(
+        'ensure-all-tables.sql not found — falling back to inline schema ensures',
+      );
+      return this.inlineFallbackStatements();
+    }
+
+    const raw = readFileSync(path, 'utf8');
+    return splitSqlStatements(raw);
+  }
+
+  private inlineFallbackStatements(): string[] {
+    return [
+      `CREATE SCHEMA IF NOT EXISTS "identity"`,
+      `CREATE SCHEMA IF NOT EXISTS "access"`,
+      `CREATE SCHEMA IF NOT EXISTS "audit"`,
+      `CREATE SCHEMA IF NOT EXISTS "billing"`,
+      `CREATE SCHEMA IF NOT EXISTS "templates"`,
+      `CREATE SCHEMA IF NOT EXISTS "projects"`,
       `CREATE TABLE IF NOT EXISTS "access"."user_module_permissions" (
           "org_id" TEXT NOT NULL,
           "user_id" TEXT NOT NULL,
@@ -68,15 +117,44 @@ export class PrismaService
           "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "media_files_pkey" PRIMARY KEY ("id")
         )`,
-      `ALTER TABLE "identity"."media_files" ADD COLUMN IF NOT EXISTS "alt" TEXT`,
     ];
-    for (const sql of statements) {
-      try {
-        await this.$executeRawUnsafe(sql);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Schema backfill skipped: ${message}`);
+  }
+}
+
+/** Split SQL file into executable statements; keep DO $$ ... $$ blocks intact. */
+function splitSqlStatements(raw: string): string[] {
+  const lines = raw.split(/\r?\n/);
+  const statements: string[] = [];
+  let buf: string[] = [];
+  let inDo = false;
+
+  const flush = () => {
+    const text = buf.join('\n').trim();
+    buf = [];
+    if (!text || text.startsWith('--')) return;
+    statements.push(text.replace(/;+\s*$/, ''));
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!inDo && (trimmed.startsWith('--') || trimmed.length === 0) && buf.length === 0) {
+      continue;
+    }
+    if (!inDo && /^DO\s+\$\$/i.test(trimmed)) {
+      inDo = true;
+    }
+    buf.push(line);
+    if (inDo) {
+      if (/END\s+\$\$\s*;?\s*$/i.test(trimmed)) {
+        inDo = false;
+        flush();
       }
+      continue;
+    }
+    if (trimmed.endsWith(';')) {
+      flush();
     }
   }
+  if (buf.length) flush();
+  return statements;
 }
