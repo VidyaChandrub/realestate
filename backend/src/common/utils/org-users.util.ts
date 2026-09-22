@@ -156,8 +156,8 @@ export async function provisionInvitedUser(
   // through (POST /org/users, POST /team/invite, the onboarding invite step,
   // and Super Admin POST /admin/organisations/:id/users). Enforced only when
   // the org has a subscription. The founding admin is created elsewhere, at
-  // org creation, before any subscription — it is not gated here but does
-  // count: active + pending users consume a seat, a disabled user does not.
+  // org creation, before any subscription — it is not gated here and does
+  // not consume a seat; active + pending non-admin users consume seats.
   const subscription = await prisma.subscription.findFirst({
     where: { orgId, status: { not: 'cancelled' } },
     include: { plan: true },

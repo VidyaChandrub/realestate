@@ -35,7 +35,12 @@ import { siteFromLandingPage } from "@/lib/openpage/content";
 import { buildRealEstateTemplate } from "@/lib/openpage/re-templates";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import type { LandingPageRow, LandingPageStatus, OrgLandingPagesListResponse } from "@/lib/types";
+import type {
+  LandingPageRow,
+  LandingPageStatus,
+  OrgBillingSummary,
+  OrgLandingPagesListResponse,
+} from "@/lib/types";
 import type { SectionInstance, SiteConfig } from "@/lib/openpage/types";
 import {
   InventoryBindFields,
@@ -125,6 +130,12 @@ export default function OrgLandingPagesPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  const [landingPageQuota, setLandingPageQuota] = useState<{
+    used: number;
+    limit: number | null;
+    planName: string | null;
+  } | null>(null);
+
   // Deletion
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -166,6 +177,21 @@ export default function OrgLandingPagesPage() {
   useEffect(() => {
     fetchList();
   }, [fetchList]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    apiFetch<OrgBillingSummary>("/org/billing", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((billing) =>
+        setLandingPageQuota({
+          used: billing.usage.landingPagesCreateUsed ?? 0,
+          limit: billing.usage.landingPagesCreateLimit ?? null,
+          planName: billing.plan?.name ?? null,
+        }),
+      )
+      .catch(() => setLandingPageQuota(null));
+  }, [accessToken]);
 
   async function publishPage(id: string) {
     if (!accessToken) return;
@@ -301,6 +327,10 @@ export default function OrgLandingPagesPage() {
 
   const total = result?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+  const atLandingPageCreateLimit =
+    landingPageQuota != null &&
+    landingPageQuota.limit != null &&
+    landingPageQuota.used >= landingPageQuota.limit;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 60 }}>
@@ -342,43 +372,72 @@ export default function OrgLandingPagesPage() {
 
         {/* Global Header Actions */}
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <button
-            className="btn btn-soft"
-            type="button"
-            onClick={() => {
-              setScratchName("");
-              setScratchBind({ kind: "none" });
-              setScratchError(null);
-              setScratchOpen(true);
-            }}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              borderRadius: 11,
-              fontWeight: 600,
-              padding: "9px 16px",
-            }}
-          >
-            <Sparkles size={15} /> Create from scratch
-          </button>
+          {!atLandingPageCreateLimit && (
+            <>
+              <button
+                className="btn btn-soft"
+                type="button"
+                onClick={() => {
+                  setScratchName("");
+                  setScratchBind({ kind: "none" });
+                  setScratchError(null);
+                  setScratchOpen(true);
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: 11,
+                  fontWeight: 600,
+                  padding: "9px 16px",
+                }}
+              >
+                <Sparkles size={15} /> Create from scratch
+              </button>
 
-          <Link
-            className="btn btn-primary"
-            href="/org/templates"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              borderRadius: 11,
-              fontWeight: 700,
-              padding: "9px 18px",
-            }}
-          >
-            <Plus size={16} /> New from template
-          </Link>
+              <Link
+                className="btn btn-primary"
+                href="/org/templates"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: 11,
+                  fontWeight: 700,
+                  padding: "9px 18px",
+                }}
+              >
+                <Plus size={16} /> New from template
+              </Link>
+            </>
+          )}
         </div>
       </div>
+
+      {atLandingPageCreateLimit ? (
+        <div
+          className="card reveal in"
+          style={{
+            marginBottom: 16,
+            borderColor: "var(--amber, #f59e0b)",
+            padding: "12px 16px",
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ fontSize: 20 }}>⚠️</span>
+          <div style={{ flex: 1, minWidth: 220, fontSize: 13.5 }}>
+            Your{landingPageQuota?.planName ? ` ${landingPageQuota.planName}` : ""} plan allows creating up to{" "}
+            <b>{landingPageQuota?.limit}</b> landing page{landingPageQuota?.limit === 1 ? "" : "s"} and you have{" "}
+            <b>{landingPageQuota?.used}</b>. Upgrade your plan to create more.
+          </div>
+          <Link href="/org/settings?section=billing" className="btn btn-soft btn-sm">
+            Upgrade plan
+          </Link>
+        </div>
+      ) : null}
 
       {/* Floating & Sticky Control Toolbar */}
       <div
@@ -603,7 +662,8 @@ export default function OrgLandingPagesPage() {
                 Clear Search
               </button>
             ) : (
-              <>
+              !atLandingPageCreateLimit && (
+                <>
                 <Link
                   href="/org/templates"
                   className="btn btn-primary"
@@ -630,7 +690,8 @@ export default function OrgLandingPagesPage() {
                 >
                   <Sparkles size={15} /> Start from Scratch
                 </button>
-              </>
+                </>
+              )
             )}
           </div>
         </div>

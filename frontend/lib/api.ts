@@ -490,10 +490,13 @@ export async function submitPackageChangeRequest(input: {
   targetPlanId: string;
   billingCycle?: "monthly" | "yearly";
 }): Promise<PackageChangeRequestRow> {
-  return apiFetch<PackageChangeRequestRow>("/org/billing/package-change-request", {
+  const response = await apiFetch<
+    { request: PackageChangeRequestRow } | PackageChangeRequestRow
+  >("/org/billing/package-change-request", {
     method: "POST",
     body: JSON.stringify(input),
   });
+  return "request" in response ? response.request : response;
 }
 
 export async function cancelPackageChangeRequest(

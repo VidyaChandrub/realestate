@@ -148,6 +148,9 @@ export function canAccessAdminNavItem(
   if (item.href === "/admin-console/forms") {
     return hasPermission("admin_templates", "view");
   }
+  if (item.href === "/admin-console/subscriptions") {
+    return hasPermission("admin_subscriptions", "view");
+  }
   const moduleKey = NAV_MODULE[item.href];
   if (!moduleKey) return true;
   return hasPermission(moduleKey, "view");

@@ -52,6 +52,17 @@ const MODULE_PERMISSION_PILLS: Record<string, PermissionPill[]> = {
     { key: "canDelete", permission: "canDelete", label: "Delete" },
     { key: "disable", permission: "canApprove", label: "Disable" },
   ],
+  admin_subscriptions: [
+    { key: "canView", permission: "canView", label: "View" },
+    { key: "createPlan", permission: "canAdd", label: "Create plan" },
+    { key: "canEdit", permission: "canEdit", label: "Edit" },
+    { key: "canDelete", permission: "canDelete", label: "Delete" },
+    { key: "assignPlan", permission: "canAdd", label: "Assign plan" },
+    { key: "changePlan", permission: "canEdit", label: "Change" },
+    { key: "cancelPlan", permission: "canDelete", label: "Cancel plan" },
+    { key: "approve", permission: "canApprove", label: "Approve" },
+    { key: "reject", permission: "canDelete", label: "Reject" },
+  ],
 };
 
 function permissionPillsFor(moduleKey: string): PermissionPill[] {
@@ -363,7 +374,10 @@ export function PlatformRolesPanel({
                   <span>Permissions</span>
                 </div>
                 {permRows.map((item) => (
-                  <div className="platform-permission-row" key={item.moduleKey}>
+                  <div
+                    className={`platform-permission-row${item.moduleKey === "admin_subscriptions" ? " platform-permission-row--subscriptions" : ""}`}
+                    key={item.moduleKey}
+                  >
                     <div className="platform-permission-module">
                       <div style={{ fontWeight: 700 }}>{item.label}</div>
                       <div className="muted" style={{ fontSize: 12 }}>{item.description}</div>
