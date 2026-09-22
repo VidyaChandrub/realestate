@@ -4,6 +4,7 @@ import {
   IsArray,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUrl,
@@ -21,24 +22,8 @@ export class UpdateUnitTypeDto {
   name?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000000)
-  carpetSqft?: number | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000000)
-  builtupSqft?: number | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  price?: number | null;
+  @IsObject()
+  fieldDefaults?: Record<string, unknown>;
 
   @IsOptional()
   @Type(() => Number)

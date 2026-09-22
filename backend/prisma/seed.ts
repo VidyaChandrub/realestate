@@ -1,10 +1,5 @@
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-import {
-  bindLandingPageContent,
-  snapshotFromProject,
-} from '../src/common/utils/landing-page-property.util';
-import { builderTemplateContent } from './seed-builder-page';
 
 // Place this at: prisma/seed.ts
 // Run with: npx prisma db seed
@@ -13,9 +8,12 @@ import { builderTemplateContent } from './seed-builder-page';
 //   1. Roles catalogue (super_admin / admin / manager / sales)
 //   2. Super Admin account (from env, optional)
 //   3. A demo organisation + org admin (no extra sales/users roster)
-//   4. A demo project assigned to the seeded manager and sales users
-//   5. Demo landing pages (empty until published content is added)
-//   6. Two demo CRM leads for Lead Center (Skyline Heights)
+//   4. Demo landing pages (empty until published content is added)
+//   5. Two demo CRM leads for Lead Center
+//
+// No demo Project is seeded — project types are fully dynamic now (see
+// ProjectTypeDef), so a hardcoded project has no template to match. Create
+// one through the product instead (Settings → Project types → add a project).
 //
 const prisma = new PrismaClient();
 
@@ -187,114 +185,12 @@ async function seedDemoOrg() {
     `Org admin seeded: rohan@skylinedev.in — password: ${SEED_USER_PASSWORD}`,
   );
 
-  // --- Demo project -----------------------------------------------------------
+  // Demo project seeding was removed — it predated fully dynamic project
+  // types and had no ProjectTypeDef/template to match, so it was never a
+  // useful demonstration of the current feature. Recreate one manually
+  // through the product (Settings → Project types → add a project) if a
+  // demo project is needed again.
   const managerId = userIds['rohan@skylinedev.in'];
-  const existingProject = await prisma.project.findFirst({
-    where: { orgId: org.id, name: 'Skyline Heights' },
-    select: { id: true },
-  });
-  const project = existingProject
-    ? await prisma.project.update({
-        where: { id: existingProject.id },
-        data: {
-          location: 'Bandra East, Mumbai',
-          reraId: 'P51800012345',
-          possession: 'Dec 2027',
-          managerId,
-          status: 'active',
-          priceMin: 12500000,
-          priceMax: 28500000,
-          baseRate: 18500,
-          landArea: 4.5,
-          towerCount: 3,
-          floorsDescription: 'G+22',
-          amenities: [
-            { name: 'Swimming Pool', iconUrl: null },
-            { name: 'Clubhouse', iconUrl: null },
-            { name: 'Gymnasium', iconUrl: null },
-          ],
-          city: 'Mumbai',
-          locality: 'Bandra East',
-          pincode: '400051',
-          connectivity: ['Metro', 'School', 'Hospital', 'Airport'],
-          publishedToWebsite: true,
-          projectType: 'Apartment',
-          constructionStage: 'Under construction',
-          tagline: 'Residences in Bandra East',
-          highlights: 'RERA registered\nMetro connected\nClubhouse and pool',
-          carpetRange: '1,250 – 2,450 sq.ft',
-        },
-      })
-    : await prisma.project.create({
-        data: {
-          orgId: org.id,
-          name: 'Skyline Heights',
-          location: 'Bandra East, Mumbai',
-          reraId: 'P51800012345',
-          possession: 'Dec 2027',
-          managerId,
-          status: 'active',
-          priceMin: 12500000,
-          priceMax: 28500000,
-          baseRate: 18500,
-          landArea: 4.5,
-          towerCount: 3,
-          floorsDescription: 'G+22',
-          amenities: [
-            { name: 'Swimming Pool', iconUrl: null },
-            { name: 'Clubhouse', iconUrl: null },
-            { name: 'Gymnasium', iconUrl: null },
-          ],
-          city: 'Mumbai',
-          locality: 'Bandra East',
-          pincode: '400051',
-          connectivity: ['Metro', 'School', 'Hospital', 'Airport'],
-          publishedToWebsite: true,
-          projectType: 'Apartment',
-          constructionStage: 'Under construction',
-          tagline: 'Residences in Bandra East',
-          highlights: 'RERA registered\nMetro connected\nClubhouse and pool',
-          carpetRange: '1,250 – 2,450 sq.ft',
-        },
-      });
-
-  await prisma.projectSalesAgent.deleteMany({
-    where: { projectId: project.id },
-  });
-  console.log(
-    `Demo project seeded: ${project.name} — manager: rohan@skylinedev.in.`,
-  );
-
-  const unitTypes = [
-    { name: '3 BHK', carpetSqft: 1450, builtupSqft: 1850, price: 12500000, totalUnits: 80 },
-    { name: '4 BHK', carpetSqft: 2100, builtupSqft: 2650, price: 19800000, totalUnits: 40 },
-  ];
-  for (const ut of unitTypes) {
-    const existing = await prisma.unitType.findFirst({
-      where: { projectId: project.id, name: ut.name },
-      select: { id: true },
-    });
-    if (existing) {
-      await prisma.unitType.update({ where: { id: existing.id }, data: ut });
-    } else {
-      await prisma.unitType.create({ data: { projectId: project.id, ...ut } });
-    }
-  }
-
-  // --- Demo org landing page (no platform "Project launch" template) --------
-  const templateSource = builderTemplateContent();
-  const configChoices = unitTypes.map((u) => u.name);
-  const applyChoices = (form: { fields?: Array<{ id?: string; label?: string; options?: string[] }> } | undefined) => {
-    for (const field of form?.fields ?? []) {
-      if (field.id === 'sv-interest' || field.label === 'Interested in') {
-        field.options = configChoices;
-      }
-    }
-  };
-  applyChoices(templateSource.config.form as { fields?: Array<{ id?: string; label?: string; options?: string[] }> });
-  for (const form of (templateSource.config.forms as Array<{ fields?: Array<{ id?: string; label?: string; options?: string[] }> }> | undefined) ?? []) {
-    applyChoices(form);
-  }
 
   await prisma.templateCategory.upsert({
     where: { slug: 'real-estate' },
@@ -320,39 +216,6 @@ async function seedDemoOrg() {
     await prisma.template.delete({ where: { id: legacyBuilder.id } });
     console.log('Removed legacy preset template: Project launch (builder)');
   }
-
-  const unitCount = await prisma.unit.count({ where: { projectId: project.id } });
-  const bound = bindLandingPageContent(
-    templateSource,
-    { kind: 'project', projectId: project.id },
-    snapshotFromProject({
-      orgName: org.name,
-      project,
-      unitCount,
-    }),
-  );
-
-  await prisma.landingPage.upsert({
-    where: { orgId_slug: { orgId: org.id, slug: 'skyline-heights' } },
-    update: {
-      name: 'Skyline Heights',
-      status: 'published',
-      sourceTemplateId: null,
-      content: bound as Prisma.InputJsonValue,
-      publishedAt: new Date(),
-    },
-    create: {
-      orgId: org.id,
-      name: 'Skyline Heights',
-      slug: 'skyline-heights',
-      status: 'published',
-      sourceTemplateId: null,
-      content: bound as Prisma.InputJsonValue,
-      pageType: 'landing',
-      publishedAt: new Date(),
-    },
-  });
-  console.log(`Org landing page seeded for ${project.name} (no platform builder template).`);
 
   // --- Landing pages --------------------------------------------------------
   const landingPages: { name: string; slug: string }[] = [
@@ -389,7 +252,6 @@ async function seedDemoOrg() {
         phone: '+91 98765 43101',
         phoneNumber: '+91 98765 43101',
         email: 'ananya.mehta@example.com',
-        project: 'Skyline Heights',
         'Interested in': '3 BHK',
       },
     },
@@ -405,7 +267,6 @@ async function seedDemoOrg() {
         phone: '+91 98765 43102',
         phoneNumber: '+91 98765 43102',
         email: 'vikram.rao@example.com',
-        project: 'Skyline Heights',
         'Interested in': '4 BHK',
       },
     },
@@ -425,7 +286,6 @@ async function seedDemoOrg() {
     const lead = await prisma.lead.create({
       data: {
         orgId: org.id,
-        projectId: project.id,
         landingPageId: demo.landingPageId,
         formName: demo.formName,
         source: demo.source,

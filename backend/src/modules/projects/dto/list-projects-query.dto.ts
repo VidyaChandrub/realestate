@@ -18,6 +18,13 @@ export const PROJECT_CURRENCY_VALUES = [
 ] as const;
 export type ProjectCurrencyValue = (typeof PROJECT_CURRENCY_VALUES)[number];
 
+// The area unit a project's `area`-role figures and price-per-area display
+// are in. "sq ft" and "acre" for now; named as a plain string set (not an
+// enum) so more units (sq yard, sq m) can be added later without a schema
+// change — just extend this list.
+export const PROJECT_AREA_UNITS = ['sqft', 'acre'] as const;
+export type ProjectAreaUnit = (typeof PROJECT_AREA_UNITS)[number];
+
 export class ListProjectsQueryDto {
   @IsOptional()
   @Type(() => Number)

@@ -6,6 +6,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -34,21 +35,7 @@ export class UpdateUnitDto {
 
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000000)
-  carpetSqft?: number | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000000)
-  builtupSqft?: number | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(1000000)
   area?: number | null;

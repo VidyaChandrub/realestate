@@ -6,11 +6,11 @@ import { currencyPrefix } from "@/lib/money";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import { makeSpecRow, type SpecRow } from "@/lib/specifications";
 import { RowListEditor } from "@/components/org/row-list-editor";
+import type { FieldDef } from "@/lib/field-template";
 import type {
   OrgCatalogCategory,
   OrgCatalogOption,
   ProjectAssigneeCandidate,
-  UnitPriceBasis,
 } from "@/lib/types";
 
 // Shared field controls for the project create wizard, the project edit page,
@@ -158,69 +158,31 @@ export function ManagerPicker({
   );
 }
 
-/** Human name for a price basis, as shown in the label. */
-export const PRICE_BASIS_LABEL: Record<UnitPriceBasis, string> = {
-  carpet: "carpet",
-  builtup: "built-up",
-};
-
 /**
- * Derived ₹/sqft for a unit — price ÷ the area the *organisation* prices on
- * (Settings → Project Catalogs → Pricing basis). Never stored; the server
- * derives the same figure from the same setting.
+ * Derived price per unit area — price ÷ the project's `area`-role figure, in
+ * the project's area unit ("sqft" | "acre"). Never stored; the server derives
+ * the same figure the same way (ProjectsService.pricePerArea).
  *
- * Returns "" (not "0", not an error) when the price or the relevant area is
- * missing, so the field degrades to blank rather than lying.
- *
- * The basis is always named in the output. A per-sqft price on the wrong
- * denominator is a real commercial error, so there is deliberately no way to
- * render this figure unlabelled.
+ * Returns "" (not "0", not an error) when the price or the area is missing,
+ * so the field degrades to blank rather than lying.
  */
-export function pricePerSqftLabel(
-  price: number | null | undefined,
-  carpetSqft: number | null | undefined,
-  builtupSqft: number | null | undefined,
-  basis: UnitPriceBasis,
-  currency = "INR",
-): string {
-  const area = basis === "builtup" ? builtupSqft : carpetSqft;
-  const text = perSqftText(price, area, currency);
-  return text ? `${text} (${PRICE_BASIS_LABEL[basis]})` : "";
-}
-
-/**
- * ₹/sqft for a unit outside the `tower` layout: price ÷ its single `area`.
- * There is no carpet / built-up basis to name, so the figure carries none.
- */
-export function areaPricePerSqftLabel(
+export function areaPricePerAreaLabel(
   price: number | null | undefined,
   area: number | null | undefined,
+  areaUnit: string | null | undefined,
   currency = "INR",
-): string {
-  return perSqftText(price, area, currency);
-}
-
-/** " (Carpet)" for a tower unit's basis; empty when the unit has no basis. */
-export function priceBasisSuffix(basis: UnitPriceBasis | null | undefined): string {
-  return basis ? ` (${PRICE_BASIS_LABEL[basis]})` : "";
-}
-
-function perSqftText(
-  price: number | null | undefined,
-  area: number | null | undefined,
-  currency: string,
 ): string {
   if (!price || !area) return "";
   const sym = currencyPrefix(currency).trim() || "₹";
   // Two decimal places, not rounded to a whole unit: this is derived, never
   // stored, so nothing forces it to be an integer the way the price itself
-  // is — and in real estate 2.50 vs. 2.72 per sqft is a real difference at
-  // project scale, not noise to round away.
+  // is — and in real estate 2.50 vs. 2.72 per unit area is a real difference
+  // at project scale, not noise to round away.
   const value = (Math.round((price / area) * 100) / 100).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  return `${sym}${value} / sqft`;
+  return `${sym}${value} / ${areaUnit || "sqft"}`;
 }
 
 const CATALOG_NOUNS: Record<OrgCatalogCategory, string> = {
@@ -578,20 +540,23 @@ export function ConfigurationSelect({
  * One editable row of the "Size & price per configuration" table. Strings
  * throughout because it is bound straight to number inputs; the caller parses
  * on save. `key` is a stable client-side identity — for the create wizard a
- * counter, for the edit page the `UnitType` id.
+ * counter, for the edit page the `UnitType` id. `area`/`price` are staged
+ * under those fixed keys and mapped onto the template's actual area-/
+ * price-role field keys by the caller when saving (see UnitType.fieldDefaults).
  */
 export interface ConfigSizePriceRow {
   key: string | number;
   name: string;
-  carpetSqft: string;
-  builtupSqft: string;
+  area: string;
   price: string;
   totalUnits: string;
 }
 
 /**
- * Carpet / built-up / price / planned units, one row per configuration the
- * project offers.
+ * Area / price / planned units, one row per configuration the project
+ * offers. Column headers use the project's own area-/price-role field
+ * labels (and the area field's display unit), so an org that calls it
+ * "Built-up Area" sees that, not a hardcoded "Carpet".
  *
  * Shared verbatim by the create wizard's Step 2 and the project edit form so
  * the same information is captured the same way in both places — divergent
@@ -600,7 +565,8 @@ export interface ConfigSizePriceRow {
  * Every field is optional: an empty row just means that configuration won't
  * prefill anything when a unit is added. The component is presentational —
  * it owns no state and does no saving; the caller supplies the rows and
- * receives patches.
+ * receives patches. Renders nothing if the template has neither an area- nor
+ * a price-role field — there's nothing to default in that case.
  */
 export function ConfigSizePriceTable({
   configurations,
@@ -608,6 +574,8 @@ export function ConfigSizePriceTable({
   onChange,
   hint,
   currency = "INR",
+  areaField,
+  priceField,
 }: {
   /** Labels currently selected, in display order. */
   configurations: string[];
@@ -615,18 +583,21 @@ export function ConfigSizePriceTable({
   onChange: (key: string | number, patch: Partial<ConfigSizePriceRow>) => void;
   hint?: React.ReactNode;
   currency?: string;
+  /** The template's `area`-role field, if any — supplies the column label/unit. */
+  areaField?: FieldDef | null;
+  /** The template's `price`-role field, if any — supplies the column label. */
+  priceField?: FieldDef | null;
 }) {
-  if (configurations.length === 0) return null;
+  if (configurations.length === 0 || (!areaField && !priceField)) return null;
   return (
     <div className="field">
-      <label>Size &amp; price per configuration</label>
+      <label>Defaults per configuration</label>
       {hint ? <div className="hint" style={{ marginBottom: 10 }}>{hint}</div> : null}
       <div className="ut-rows">
         <div className="ut-row ut-head">
           <span>Configuration</span>
-          <span>Carpet (sqft)</span>
-          <span>Built-up (sqft)</span>
-          <span>Price ({currencyPrefix(currency).trim() || "₹"})</span>
+          {areaField ? <span>{areaField.label}{areaField.unit ? ` (${areaField.unit})` : ""}</span> : null}
+          {priceField ? <span>{priceField.label} ({currencyPrefix(currency).trim() || "₹"})</span> : null}
           <span>Planned units</span>
         </div>
         {configurations.map((label) => {
@@ -635,18 +606,18 @@ export function ConfigSizePriceTable({
           return (
             <div className="ut-row" key={row.key}>
               <span className="ut-name">{label}</span>
-              <input className="inp" type="number" min={0} placeholder="1,000"
-                aria-label={`Carpet area for ${label}`}
-                value={row.carpetSqft}
-                onChange={(e) => onChange(row.key, { carpetSqft: e.target.value })} />
-              <input className="inp" type="number" min={0} placeholder="1,250"
-                aria-label={`Built-up area for ${label}`}
-                value={row.builtupSqft}
-                onChange={(e) => onChange(row.key, { builtupSqft: e.target.value })} />
-              <input className="inp" type="number" min={0} placeholder={currency === "INR" ? "64,00,000" : "640,000"}
-                aria-label={`Price for ${label}`}
-                value={row.price}
-                onChange={(e) => onChange(row.key, { price: e.target.value })} />
+              {areaField ? (
+                <input className="inp" type="number" min={0} placeholder="1,000"
+                  aria-label={`${areaField.label} for ${label}`}
+                  value={row.area}
+                  onChange={(e) => onChange(row.key, { area: e.target.value })} />
+              ) : null}
+              {priceField ? (
+                <input className="inp" type="number" min={0} placeholder={currency === "INR" ? "64,00,000" : "640,000"}
+                  aria-label={`${priceField.label} for ${label}`}
+                  value={row.price}
+                  onChange={(e) => onChange(row.key, { price: e.target.value })} />
+              ) : null}
               <input className="inp" type="number" min={0} placeholder="0"
                 aria-label={`Planned units for ${label}`}
                 value={row.totalUnits}

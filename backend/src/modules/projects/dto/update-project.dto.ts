@@ -19,6 +19,7 @@ import {
 } from 'class-validator';
 import { AmenityDto } from './amenity.dto';
 import {
+  PROJECT_AREA_UNITS,
   PROJECT_CURRENCY_VALUES,
   PROJECT_STATUS_VALUES,
 } from './list-projects-query.dto';
@@ -288,7 +289,6 @@ export class UpdateProjectDto {
   customFields?: Record<string, unknown>;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  groupLabel?: string;
+  @IsIn(PROJECT_AREA_UNITS)
+  areaUnit?: (typeof PROJECT_AREA_UNITS)[number];
 }

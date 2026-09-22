@@ -18,6 +18,7 @@ import {
 } from 'class-validator';
 import { AmenityDto } from './amenity.dto';
 import {
+  PROJECT_AREA_UNITS,
   PROJECT_CURRENCY_VALUES,
   PROJECT_STATUS_VALUES,
 } from './list-projects-query.dto';
@@ -302,8 +303,10 @@ export class CreateProjectDto {
   @IsObject()
   customFields?: Record<string, unknown>;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  groupLabel?: string;
+  // Unit every `area`-role figure and "₹ x / <unit>" price-per-area display
+  // uses for this project. A plain string, not an enum, so more units can be
+  // added later without a schema change.
+  @IsNotEmpty()
+  @IsIn(PROJECT_AREA_UNITS)
+  areaUnit!: (typeof PROJECT_AREA_UNITS)[number];
 }

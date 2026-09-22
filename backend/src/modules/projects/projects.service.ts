@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { Prisma, ProjectLayout, UnitPriceBasis } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { StorageService } from '../../common/storage/storage.service';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
@@ -15,7 +15,11 @@ import {
 import {
   CustomValues,
   FieldDef,
+  FieldRole,
+  groupNoun,
+  nonRoleFields,
   normalizeFieldTemplate,
+  roleField,
   validateCustomValues,
 } from '../../common/utils/field-template.util';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
@@ -50,6 +54,7 @@ const PROJECT_SCALARS = [
   'towerCount',
   'floorsDescription',
   'carpetRange',
+  'areaUnit',
   // Wizard Steps 1-2 identity & timeline.
   'projectType',
   'tagline',
@@ -86,7 +91,7 @@ const UNIT_ACTOR_SELECT = {
 } as const;
 
 const UNIT_INCLUDE = {
-  project: { select: { currency: true, layout: true } },
+  project: { select: { currency: true, areaUnit: true, unitFieldTemplate: true } },
   createdBy: UNIT_ACTOR_SELECT,
   updatedBy: UNIT_ACTOR_SELECT,
   manager: UNIT_ACTOR_SELECT,
@@ -169,14 +174,13 @@ export class ProjectsService {
       assertLimit(subscription.plan, 'projects', currentCount, 1);
     }
 
-    // Structure comes from the project's type (never from the client): the
-    // layout is fixed by the type, and the templates start as a copy of the
-    // type's that the caller may have edited for this project.
+    // The templates start as a copy of the project's type's — which the
+    // caller may have edited for this project — never from the client
+    // otherwise. There is no fixed layout: which inventory controls exist is
+    // derived at read time from which role fields the unit template has.
     const def = dto.projectType
       ? await this.resolveProjectType(orgId, dto.projectType)
       : null;
-    const layout: ProjectLayout = def?.layout ?? 'tower';
-    this.assertFloorsAllowed(layout, dto.floorsDescription);
     const projectFieldTemplate = normalizeFieldTemplate(
       dto.projectFieldTemplate ?? def?.projectFields ?? [],
     );
@@ -194,9 +198,8 @@ export class ProjectsService {
       const created = await tx.project.create({
         data: {
           orgId,
-          layout,
           projectTypeId: def?.id ?? null,
-          groupLabel: this.resolveGroupLabel(layout, dto.groupLabel, def?.groupLabel),
+          areaUnit: dto.areaUnit,
           projectFieldTemplate: projectFieldTemplate as unknown as Prisma.InputJsonValue,
           unitFieldTemplate: unitFieldTemplate as unknown as Prisma.InputJsonValue,
           customFields: customFields as unknown as Prisma.InputJsonValue,
@@ -405,15 +408,31 @@ export class ProjectsService {
     // currency is already looking at them — unlike a unit's price, which
     // lives on a different page and is easy to forget about.
     if (dto.currency !== undefined && dto.currency !== existingProject.currency) {
+      const priceField = roleField(
+        this.readTemplate(existingProject.unitFieldTemplate),
+        'price',
+      );
       const [pricedUnit, pricedUnitType] = await Promise.all([
         this.prisma.unit.findFirst({
           where: { projectId: id, price: { not: null } },
           select: { id: true },
         }),
-        this.prisma.unitType.findFirst({
-          where: { projectId: id, price: { not: null } },
-          select: { id: true },
-        }),
+        this.prisma.unitType.findMany({
+          where: { projectId: id },
+          select: { id: true, fieldDefaults: true },
+        }).then((rows) =>
+          priceField
+            ? rows.find((row) => {
+                const defaults = row.fieldDefaults;
+                return typeof defaults === 'object' && defaults !== null &&
+                  !Array.isArray(defaults) &&
+                  Object.prototype.hasOwnProperty.call(defaults, priceField.key) &&
+                  defaults[priceField.key] !== null &&
+                  defaults[priceField.key] !== undefined &&
+                  defaults[priceField.key] !== '';
+              }) ?? null
+            : null,
+        ),
       ]);
 
       if (pricedUnit || pricedUnitType) {
@@ -461,38 +480,17 @@ export class ProjectsService {
       }
     }
 
-    // Switching type re-derives layout + templates. A different LAYOUT is only
-    // allowed while the project has no units or unit types — inventory that
-    // exists was shaped by the old layout.
-    let layout: ProjectLayout = existingProject.layout;
+    // Switching type re-copies its templates onto the project (the caller may
+    // then edit them further). Existing units keep whatever values they
+    // already have — a field the new template doesn't define is simply kept,
+    // just hidden, same as any other template edit.
     let typeDef: Awaited<ReturnType<typeof this.resolveProjectType>> | null = null;
     if (
       dto.projectType != null &&
       dto.projectType !== existingProject.projectType
     ) {
       typeDef = await this.resolveProjectType(orgId, dto.projectType);
-      if (typeDef.layout !== existingProject.layout) {
-        const [units, unitTypes] = await Promise.all([
-          this.prisma.unit.count({ where: { projectId: id } }),
-          this.prisma.unitType.count({ where: { projectId: id } }),
-        ]);
-        if (units + unitTypes > 0) {
-          throw new BadRequestException(
-            "This project already has units, so it can't switch to a project type with a different structure.",
-          );
-        }
-        layout = typeDef.layout;
-        data.layout = layout;
-        if (layout !== 'tower') data.floorsDescription = null;
-      }
       data.projectTypeId = typeDef.id;
-      if (dto.groupLabel === undefined) {
-        data.groupLabel = this.resolveGroupLabel(layout, undefined, typeDef.groupLabel);
-      }
-    }
-    if (dto.floorsDescription) this.assertFloorsAllowed(layout, dto.floorsDescription);
-    if (dto.groupLabel !== undefined) {
-      data.groupLabel = this.resolveGroupLabel(layout, dto.groupLabel, null);
     }
 
     const readTemplate = (v: Prisma.JsonValue): FieldDef[] =>
@@ -800,21 +798,22 @@ export class ProjectsService {
     dto: CreateUnitTypeDto,
   ) {
     const project = await this.getOwnedProject(orgId, projectId);
-    // A planned configuration mix (BHK types) belongs to the tower layout.
-    if (project.layout !== 'tower') {
+    // A planned configuration mix only makes sense once the project's unit
+    // template actually has a `configuration`-role field.
+    const template = this.readTemplate(project.unitFieldTemplate);
+    if (!roleField(template, 'configuration')) {
       throw new BadRequestException(
-        "Unit types (a planned configuration mix) only apply to projects with a towers-and-floors structure.",
+        "Unit types (a planned configuration mix) need a configuration field in this project's unit template first.",
       );
     }
+    const fieldDefaults = validateCustomValues(template, dto.fieldDefaults);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const row = await tx.unitType.create({
         data: {
           projectId,
           name: dto.name,
-          carpetSqft: dto.carpetSqft ?? null,
-          builtupSqft: dto.builtupSqft ?? null,
-          price: dto.price ?? null,
+          fieldDefaults: fieldDefaults as unknown as Prisma.InputJsonValue,
           totalUnits: dto.totalUnits ?? 0,
           floorPlanUrl: dto.floorPlanUrl ?? null,
           brochureUrl: dto.brochureUrl ?? null,
@@ -860,13 +859,20 @@ export class ProjectsService {
     id: string,
     dto: UpdateUnitTypeDto,
   ) {
-    await this.getOwnedUnitType(orgId, projectId, id);
+    const [project, existing] = await Promise.all([
+      this.getOwnedProject(orgId, projectId),
+      this.getOwnedUnitType(orgId, projectId, id),
+    ]);
 
     const data: Prisma.UnitTypeUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
-    if (dto.carpetSqft !== undefined) data.carpetSqft = dto.carpetSqft;
-    if (dto.builtupSqft !== undefined) data.builtupSqft = dto.builtupSqft;
-    if (dto.price !== undefined) data.price = dto.price;
+    if (dto.fieldDefaults !== undefined) {
+      data.fieldDefaults = validateCustomValues(
+        this.readTemplate(project.unitFieldTemplate),
+        dto.fieldDefaults,
+        (existing.fieldDefaults ?? {}) as CustomValues,
+      ) as unknown as Prisma.InputJsonValue;
+    }
     if (dto.totalUnits !== undefined) data.totalUnits = dto.totalUnits;
     if (dto.floorPlanUrl !== undefined) data.floorPlanUrl = dto.floorPlanUrl;
     if (dto.brochureUrl !== undefined) data.brochureUrl = dto.brochureUrl;
@@ -939,10 +945,12 @@ export class ProjectsService {
     actorId?: string,
   ) {
     const project = await this.getOwnedProject(orgId, projectId);
+    const template = this.readTemplate(project.unitFieldTemplate);
 
-    // Which fields a unit may carry depends on the project's layout.
-    this.assertUnitFitsLayout(project.layout, dto);
-    if (project.layout === 'tower') {
+    // Which fields a unit may carry depends on which role fields the
+    // project's unit template has.
+    this.assertUnitFitsTemplate(template, dto);
+    if (roleField(template, 'configuration')) {
       // In a project, the configuration must be one the project itself has —
       // not just anything in the org catalog. Never trusted from the body.
       if (!dto.configuration?.trim()) {
@@ -958,10 +966,10 @@ export class ProjectsService {
       project.towerCount,
       tower,
       undefined,
-      this.groupNounFor(project),
+      this.groupNounFor(template),
     );
     const customFields = validateCustomValues(
-      this.readTemplate(project.unitFieldTemplate),
+      nonRoleFields(template),
       dto.customFields,
       {},
       true,
@@ -975,8 +983,6 @@ export class ProjectsService {
           configuration: dto.configuration?.trim() || null,
           variantLabel: dto.variantLabel?.trim() || null,
           unitNo: dto.unitNo,
-          carpetSqft: dto.carpetSqft ?? null,
-          builtupSqft: dto.builtupSqft ?? null,
           area: dto.area ?? null,
           customFields: customFields as unknown as Prisma.InputJsonValue,
           tower,
@@ -1024,24 +1030,18 @@ export class ProjectsService {
       where.unitNo = { contains: query.search, mode: 'insensitive' };
     }
 
-    const [rows, basis] = await Promise.all([
-      this.prisma.unit.findMany({
-        where,
-        orderBy: [{ unitNo: 'asc' }],
-        include: UNIT_INCLUDE,
-      }),
-      this.orgPriceBasis(orgId),
-    ]);
+    const rows = await this.prisma.unit.findMany({
+      where,
+      orderBy: [{ unitNo: 'asc' }],
+      include: UNIT_INCLUDE,
+    });
 
-    return rows.map((row) => this.serializeUnit(row, basis));
+    return rows.map((row) => this.serializeUnit(row));
   }
 
   async getUnit(orgId: string, projectId: string, id: string) {
-    const [row, basis] = await Promise.all([
-      this.getOwnedUnit(orgId, projectId, id),
-      this.orgPriceBasis(orgId),
-    ]);
-    return this.serializeUnit(row, basis);
+    const row = await this.getOwnedUnit(orgId, projectId, id);
+    return this.serializeUnit(row);
   }
 
   async updateUnit(
@@ -1053,9 +1053,10 @@ export class ProjectsService {
   ) {
     const project = await this.getOwnedProject(orgId, projectId);
     const existing = await this.getOwnedUnit(orgId, projectId, id);
+    const template = this.readTemplate(project.unitFieldTemplate);
 
-    this.assertUnitFitsLayout(project.layout, dto);
-    if (dto.configuration !== undefined && project.layout === 'tower') {
+    this.assertUnitFitsTemplate(template, dto);
+    if (dto.configuration !== undefined && roleField(template, 'configuration')) {
       // The unit's own current value stays valid, so an edit never has to
       // rename a unit whose configuration has since been dropped.
       await this.assertConfigurationForProject(
@@ -1078,7 +1079,7 @@ export class ProjectsService {
         project.towerCount,
         nextTower,
         id,
-        this.groupNounFor(project),
+        this.groupNounFor(template),
       );
     }
 
@@ -1092,12 +1093,10 @@ export class ProjectsService {
           ? dto.variantLabel.trim() || null
           : null;
     }
-    if (dto.carpetSqft !== undefined) data.carpetSqft = dto.carpetSqft;
-    if (dto.builtupSqft !== undefined) data.builtupSqft = dto.builtupSqft;
     if (dto.area !== undefined) data.area = dto.area;
     if (dto.customFields !== undefined) {
       data.customFields = validateCustomValues(
-        this.readTemplate(project.unitFieldTemplate),
+        nonRoleFields(template),
         dto.customFields,
         (existing.customFields ?? {}) as CustomValues,
       ) as unknown as Prisma.InputJsonValue;
@@ -1160,7 +1159,7 @@ export class ProjectsService {
   ) {
     const current = await this.getOwnedUnit(orgId, projectId, id);
     if (current.status === dto.status) {
-      return this.serializeUnit(current, await this.orgPriceBasis(orgId));
+      return this.serializeUnit(current);
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -1214,7 +1213,7 @@ export class ProjectsService {
     actorId?: string,
   ) {
     // Standalone units belong to no project, so the org catalog is the scope.
-    this.assertStandaloneHasNoLayoutFields(dto);
+    this.assertStandaloneHasNoTemplateFields(dto);
     if (!dto.configuration?.trim()) {
       throw new BadRequestException('Configuration is required');
     }
@@ -1232,8 +1231,7 @@ export class ProjectsService {
           configuration: (dto.configuration as string).trim(),
           variantLabel: dto.variantLabel?.trim() || null,
           unitNo: dto.unitNo,
-          carpetSqft: dto.carpetSqft ?? null,
-          builtupSqft: dto.builtupSqft ?? null,
+          area: dto.area ?? null,
           tower: null,
           floor: null,
           facing: dto.facing ?? null,
@@ -1272,11 +1270,8 @@ export class ProjectsService {
   }
 
   async getStandaloneUnit(orgId: string, id: string) {
-    const [row, basis] = await Promise.all([
-      this.getOwnedStandaloneUnit(orgId, id),
-      this.orgPriceBasis(orgId),
-    ]);
-    return this.serializeUnit(row, basis);
+    const row = await this.getOwnedStandaloneUnit(orgId, id);
+    return this.serializeUnit(row);
   }
 
   async updateStandaloneUnit(
@@ -1287,7 +1282,7 @@ export class ProjectsService {
   ) {
     const existing = await this.getOwnedStandaloneUnit(orgId, id);
 
-    this.assertStandaloneHasNoLayoutFields(dto);
+    this.assertStandaloneHasNoTemplateFields(dto);
     if (dto.configuration !== undefined) {
       await this.assertConfigurationInCatalog(orgId, dto.configuration);
     }
@@ -1328,9 +1323,8 @@ export class ProjectsService {
           ? dto.variantLabel.trim() || null
           : null;
     }
-    if (dto.carpetSqft !== undefined) data.carpetSqft = dto.carpetSqft;
-    if (dto.builtupSqft !== undefined) data.builtupSqft = dto.builtupSqft;
     if (dto.unitNo !== undefined) data.unitNo = dto.unitNo;
+    if (dto.area !== undefined) data.area = dto.area;
     if (dto.facing !== undefined) data.facing = dto.facing;
     if (dto.parking !== undefined) {
       data.parking =
@@ -1455,7 +1449,7 @@ export class ProjectsService {
       ];
     }
 
-    const [rows, total, grouped, basis] = await Promise.all([
+    const [rows, total, grouped] = await Promise.all([
       this.prisma.unit.findMany({
         where,
         orderBy: [{ createdAt: 'desc' }],
@@ -1463,7 +1457,15 @@ export class ProjectsService {
         take: limit,
         include: {
           ...UNIT_INCLUDE,
-          project: { select: { id: true, name: true, currency: true, layout: true } },
+          project: {
+            select: {
+              id: true,
+              name: true,
+              currency: true,
+              areaUnit: true,
+              unitFieldTemplate: true,
+            },
+          },
         },
       }),
       this.prisma.unit.count({ where }),
@@ -1472,7 +1474,6 @@ export class ProjectsService {
         where,
         _count: { _all: true },
       }),
-      this.orgPriceBasis(orgId),
     ]);
 
     const counts = { available: 0, booked: 0, held: 0, sold: 0 };
@@ -1480,34 +1481,38 @@ export class ProjectsService {
       counts[g.status] = g._count._all;
     }
 
-    const data = rows.map((u) => ({
-      id: u.id,
-      unitNo: u.unitNo,
-      configuration: u.configuration,
-      variantLabel: u.variantLabel,
-      carpetSqft: u.carpetSqft,
-      builtupSqft: u.builtupSqft,
-      tower: u.tower,
-      floor: u.floor,
-      facing: u.facing,
-      parking: u.parking,
-      price: u.price,
-      area: u.area,
-      customFields: u.customFields,
-      pricePerSqft: this.pricePerSqft(u, basis, u.project?.layout),
-      // Only `tower` units are priced on a carpet / built-up basis.
-      pricePerSqftBasis: u.project && u.project.layout !== 'tower' ? null : basis,
-      status: u.status,
-      createdById: u.createdById,
-      updatedById: u.updatedById,
-      createdBy: this.serializeActor(u.createdBy),
-      updatedBy: this.serializeActor(u.updatedBy),
-      createdAt: u.createdAt,
-      updatedAt: u.updatedAt,
-      project: u.project
-        ? { id: u.project.id, name: u.project.name, currency: u.project.currency, layout: u.project.layout }
-        : null,
-    }));
+    const data = rows.map((u) => {
+      const template = this.readTemplate(u.project?.unitFieldTemplate ?? []);
+      return {
+        id: u.id,
+        unitNo: u.unitNo,
+        configuration: u.configuration,
+        variantLabel: u.variantLabel,
+        tower: u.tower,
+        floor: u.floor,
+        facing: u.facing,
+        parking: u.parking,
+        price: u.price,
+        area: u.area,
+        customFields: u.customFields,
+        pricePerArea: this.pricePerArea(u, template),
+        status: u.status,
+        createdById: u.createdById,
+        updatedById: u.updatedById,
+        createdBy: this.serializeActor(u.createdBy),
+        updatedBy: this.serializeActor(u.updatedBy),
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
+        project: u.project
+          ? {
+              id: u.project.id,
+              name: u.project.name,
+              currency: u.project.currency,
+              areaUnit: u.project.areaUnit,
+            }
+          : null,
+      };
+    });
 
     return { data, total, page, limit, counts };
   }
@@ -1530,26 +1535,6 @@ export class ProjectsService {
       );
     }
     return def;
-  }
-
-  // Floors exist only in the `tower` layout.
-  private assertFloorsAllowed(layout: ProjectLayout, floors?: string | null) {
-    if (layout !== 'tower' && floors && floors.trim()) {
-      throw new BadRequestException(
-        "Floors don't apply to this project's structure.",
-      );
-    }
-  }
-
-  // The grouping column's name: an explicit per-project value wins, then the
-  // type's; blank means "the layout default". `individual` has no grouping.
-  private resolveGroupLabel(
-    layout: ProjectLayout,
-    explicit: string | undefined,
-    fromType: string | null | undefined,
-  ): string | null {
-    if (layout === 'individual') return null;
-    return explicit?.trim() || (explicit === undefined ? fromType : null) || null;
   }
 
   private async getOwnedProject(orgId: string, id: string, actor?: JwtPayload) {
@@ -1596,15 +1581,6 @@ export class ProjectsService {
     return unitType;
   }
 
-  /** The org's price-per-sqft denominator. Defaults to carpet. */
-  private async orgPriceBasis(orgId: string): Promise<UnitPriceBasis> {
-    const org = await this.prisma.organisation.findUnique({
-      where: { id: orgId },
-      select: { unitPriceBasis: true },
-    });
-    return org?.unitPriceBasis ?? 'carpet';
-  }
-
   private async getOwnedUnit(orgId: string, projectId: string, id: string) {
     await this.getOwnedProject(orgId, projectId);
     const unit = await this.prisma.unit.findFirst({
@@ -1631,71 +1607,52 @@ export class ProjectsService {
     return (Array.isArray(v) ? v : []) as unknown as FieldDef[];
   }
 
-  // The project's own word for its grouping column ("Tower", "Sector"…).
-  private groupNounFor(project: {
-    layout: ProjectLayout;
-    groupLabel: string | null;
-  }): string {
-    return (
-      project.groupLabel?.trim() ||
-      (project.layout === 'cluster' ? 'Phase' : 'Tower')
-    );
+  // The project's own word for its grouping column ("Tower", "Sector"…) —
+  // the `group`-role field's own editable label, or a generic fallback for a
+  // template that doesn't have one yet.
+  private groupNounFor(template: FieldDef[]): string {
+    return groupNoun(template) ?? 'Group';
   }
 
-  // What a project unit may carry, by layout. `tower`: carpet / built-up
-  // area, floor, configuration — never the primary `area`. Other layouts:
-  // the reverse (a plot has an area, not a floor or a BHK), and `individual`
-  // has no grouping at all. Rejected loudly rather than silently dropped so
-  // no stale structure accumulates.
-  private assertUnitFitsLayout(
-    layout: ProjectLayout,
+  // What a unit may carry is derived from which role fields the project's
+  // CURRENT unit template has — never a fixed layout. A value sent for a
+  // role the template doesn't have is rejected loudly rather than silently
+  // dropped, so no stale structure accumulates; a role the template simply
+  // never had (or no longer has) just means that input isn't offered.
+  private assertUnitFitsTemplate(
+    template: FieldDef[],
     d: {
       configuration?: string | null;
-      carpetSqft?: number | null;
-      builtupSqft?: number | null;
-      floor?: number | null;
       area?: number | null;
+      floor?: number | null;
       tower?: string | null;
+      price?: number | null;
     },
   ) {
-    if (layout === 'tower') {
-      if (d.area != null) {
-        throw new BadRequestException(
-          'Towers-and-floors units use carpet and built-up area, not a single area.',
-        );
-      }
-      return;
-    }
-    const banned: Array<[string, unknown]> = [
-      ['a configuration', typeof d.configuration === 'string' ? d.configuration.trim() : d.configuration],
-      ['a carpet area', d.carpetSqft],
-      ['a built-up area', d.builtupSqft],
-      ['a floor', d.floor],
+    const checks: Array<[FieldRole, string, unknown]> = [
+      ['configuration', 'a configuration', typeof d.configuration === 'string' ? d.configuration.trim() : d.configuration],
+      ['area', 'an area', d.area],
+      ['floor', 'a floor', d.floor],
+      ['group', 'a group', typeof d.tower === 'string' ? d.tower.trim() : d.tower],
+      ['price', 'a price', d.price],
     ];
-    if (layout === 'individual') {
-      banned.push(['a group', typeof d.tower === 'string' ? d.tower.trim() : d.tower]);
-    }
-    for (const [what, value] of banned) {
-      if (value !== undefined && value !== null && value !== '') {
-        throw new BadRequestException(
-          `Units in this project don't have ${what}.`,
-        );
+    for (const [role, what, value] of checks) {
+      if (value !== undefined && value !== null && value !== '' && !roleField(template, role)) {
+        throw new BadRequestException(`Units in this project don't have ${what}.`);
       }
     }
   }
 
-  // Standalone units aren't in a project, so they have no layout or field
-  // template yet — the project-only fields are refused rather than dropped.
-  private assertStandaloneHasNoLayoutFields(d: {
-    area?: number | null;
+  // Standalone units aren't in a project, so they have no field template —
+  // custom fields (which a template would validate) are refused rather than
+  // silently dropped. Area is still allowed (single generic figure, no unit
+  // template needed) so a resale/broker listing can still show a price/area.
+  private assertStandaloneHasNoTemplateFields(d: {
     customFields?: Record<string, unknown>;
   }) {
-    if (
-      d.area != null ||
-      (d.customFields && Object.keys(d.customFields).length > 0)
-    ) {
+    if (d.customFields && Object.keys(d.customFields).length > 0) {
       throw new BadRequestException(
-        'Area and custom fields apply to units inside a project.',
+        'Custom fields apply to units inside a project.',
       );
     }
   }
@@ -1900,9 +1857,8 @@ export class ProjectsService {
       floorsDescription: project.floorsDescription,
       carpetRange: project.carpetRange,
       projectType: project.projectType,
-      layout: project.layout,
       projectTypeId: project.projectTypeId,
-      groupLabel: project.groupLabel,
+      areaUnit: project.areaUnit,
       projectFieldTemplate: project.projectFieldTemplate,
       unitFieldTemplate: project.unitFieldTemplate,
       customFields: project.customFields,
@@ -1949,9 +1905,7 @@ export class ProjectsService {
       id: ut.id,
       projectId: ut.projectId,
       name: ut.name,
-      carpetSqft: ut.carpetSqft,
-      builtupSqft: ut.builtupSqft,
-      price: ut.price,
+      fieldDefaults: ut.fieldDefaults,
       totalUnits: ut.totalUnits,
       // Media — always null / empty for now (upload is out of scope).
       floorPlanUrl: ut.floorPlanUrl,
@@ -1983,60 +1937,50 @@ export class ProjectsService {
   }
 
   /**
-   * Price per sqft on the org's chosen denominator. Null (not zero) whenever
-   * the price or the relevant area is missing — a blank cell is honest, a
-   * zero is not. The basis travels with the number so no caller can render an
-   * unlabelled figure: a per-sqft price on the wrong denominator is a real
-   * commercial error.
+   * Price per unit area, in the project's Project.areaUnit. Null (not zero)
+   * whenever the price or area is missing — a blank cell is honest, a zero is
+   * not — and also null whenever the project's CURRENT unit template no
+   * longer has both a `price`- and an `area`-role field (deleting either
+   * role turns this figure off rather than showing a stale one). `template`
+   * is null for a standalone unit (no project, no template to gate on).
    */
-  private pricePerSqft(
-    unit: {
-      price: number | null;
-      carpetSqft: number | null;
-      builtupSqft: number | null;
-      area: number | null;
-    },
-    basis: UnitPriceBasis,
-    layout: ProjectLayout = 'tower',
+  private pricePerArea(
+    unit: { price: number | null; area: number | null },
+    template: FieldDef[] | null,
   ): number | null {
-    // `tower` units price by the org's carpet / built-up basis; every other
-    // layout has one primary area, so price/sqft is simply price over that.
-    const area =
-      layout !== 'tower'
-        ? unit.area
-        : basis === 'builtup'
-          ? unit.builtupSqft
-          : unit.carpetSqft;
-    if (!unit.price || !area) return null;
+    if (template && (!roleField(template, 'price') || !roleField(template, 'area'))) {
+      return null;
+    }
+    if (!unit.price || !unit.area) return null;
     // Never stored — derived fresh on every read — so unlike the price
     // itself (a real Int column) there's no reason to round it to a whole
-    // unit. In real estate the difference between 2.50 and 2.72 per sqft is
-    // real money at project scale, so keep two decimal places rather than
+    // unit. In real estate the difference between 2.50 and 2.72 per unit area
+    // is real money at project scale, so keep two decimal places rather than
     // rounding both down to a misleadingly identical "3".
-    return Math.round((unit.price / area) * 100) / 100;
+    return Math.round((unit.price / unit.area) * 100) / 100;
   }
 
-  private serializeUnit(unit: UnitRow, basis: UnitPriceBasis) {
+  private serializeUnit(unit: UnitRow) {
+    const template = unit.project
+      ? this.readTemplate(unit.project.unitFieldTemplate)
+      : null;
     return {
       id: unit.id,
       orgId: unit.orgId,
       projectId: unit.projectId,
       currency: unit.project?.currency ?? null,
+      areaUnit: unit.project?.areaUnit ?? null,
       configuration: unit.configuration,
       variantLabel: unit.variantLabel,
       unitNo: unit.unitNo,
-      carpetSqft: unit.carpetSqft,
-      builtupSqft: unit.builtupSqft,
       tower: unit.tower,
       floor: unit.floor,
       facing: unit.facing,
       parking: unit.parking,
       price: unit.price,
-      layout: unit.project?.layout ?? null,
       area: unit.area,
       customFields: unit.customFields,
-      pricePerSqft: this.pricePerSqft(unit, basis, unit.project?.layout),
-      pricePerSqftBasis: unit.project && unit.project.layout !== 'tower' ? null : basis,
+      pricePerArea: this.pricePerArea(unit, template),
       addressLine: unit.addressLine,
       ownerName: unit.ownerName,
       notes: unit.notes,

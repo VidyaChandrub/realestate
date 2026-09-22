@@ -6,6 +6,7 @@ import {
   IsIn,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -25,10 +26,11 @@ export const UNIT_STATUS_VALUES = [
 export type UnitStatusValue = (typeof UNIT_STATUS_VALUES)[number];
 
 export class CreateUnitDto {
-  // The unit's configuration — a `unit_type` catalog label ("2 BHK",
-  // "Villa"). Required for `tower`-layout project units and standalone units
-  // (enforced in the service), and rejected for other layouts. Validated
-  // server-side against the project's / org's configurations.
+  // The unit's configuration. Required when the project's unit template has
+  // a `configuration`-role field (enforced in the service), and rejected
+  // otherwise. For a project unit, validated against the project's own
+  // configurations; for a standalone unit (no project), against the org's
+  // `unit_type` catalog.
   @IsOptional()
   @IsString()
   @MaxLength(120)
@@ -46,25 +48,12 @@ export class CreateUnitDto {
   @MaxLength(60)
   unitNo: string;
 
-  // The unit carries its own areas.
+  // The unit's single area figure (whichever field carries the project's
+  // `area` role), in the project's Project.areaUnit. Decimal so a fractional
+  // acre value is representable.
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000000)
-  carpetSqft?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000000)
-  builtupSqft?: number;
-
-  // Primary area of a unit in a non-tower layout (plot / villa size), sqft.
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(1000000)
   area?: number;
@@ -75,8 +64,8 @@ export class CreateUnitDto {
   @IsObject()
   customFields?: Record<string, unknown>;
 
-  // The group the unit belongs to (tower / phase / sector…); blank for
-  // individual layouts.
+  // The group the unit belongs to (tower / block / sector…, whatever the
+  // `group`-role field is called); required only when that role field exists.
   @IsOptional()
   @IsString()
   @MaxLength(40)

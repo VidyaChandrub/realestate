@@ -22,18 +22,23 @@ function hasMedia(t: UnitType): boolean {
   );
 }
 
+/** How many of this row's defaults are actually filled in. */
+function filledDefaultsCount(t: UnitType): number {
+  return Object.values(t.fieldDefaults ?? {}).filter(
+    (v) => v !== null && v !== undefined && v !== "",
+  ).length;
+}
+
 /**
- * How much real content a row carries, 0-5. One point each for a carpet area,
- * a built-up area, a price, a non-zero planned count, and any media.
+ * How much real content a row carries. One point per filled default value,
+ * one for a non-zero planned count, and one for any media.
  *
  * Deliberately flat: the point is to prefer a row someone actually filled in
  * over an empty placeholder, not to rank two populated rows by importance.
  */
 export function unitTypeScore(t: UnitType): number {
   return (
-    (t.carpetSqft != null ? 1 : 0) +
-    (t.builtupSqft != null ? 1 : 0) +
-    (t.price != null ? 1 : 0) +
+    filledDefaultsCount(t) +
     (t.totalUnits > 0 ? 1 : 0) +
     (hasMedia(t) ? 1 : 0)
   );
@@ -88,10 +93,10 @@ export interface DuplicateConfiguration {
 /**
  * What removing a configuration from the planned mix should do.
  *
- * Only *actual units* can block removal. Whether someone typed a carpet area
- * or a price into the row says nothing about whether the configuration is in
+ * Only *actual units* can block removal. Whether someone typed a default
+ * value into the row says nothing about whether the configuration is in
  * use — treating that as a blocker forced an absurd workaround (edit the row
- * to zero, save, then delete) to drop a configuration that was never used.
+ * to blank, save, then delete) to drop a configuration that was never used.
  * Those values are worth confirming before they're discarded, not refusing
  * over.
  */
@@ -103,20 +108,18 @@ export type PlannedMixRemoval =
   /** No units, nothing recorded — just remove it. */
   | { kind: "allowed" };
 
-/** The values a row holds, named for the confirmation copy. */
-function recordedValues(rows: UnitType[]): string[] {
-  const names: string[] = [];
-  if (rows.some((r) => r.carpetSqft != null)) names.push("carpet area");
-  if (rows.some((r) => r.builtupSqft != null)) names.push("built-up area");
-  if (rows.some((r) => r.price != null)) names.push("price");
-  if (rows.some((r) => r.totalUnits > 0)) names.push("planned unit count");
-  return names;
-}
-
 /** "a, b and c" */
 function joinList(parts: string[]): string {
   if (parts.length <= 1) return parts[0] ?? "";
   return parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1];
+}
+
+/** The values a row holds, named for the confirmation copy. */
+function recordedValues(rows: UnitType[]): string[] {
+  const names: string[] = [];
+  if (rows.some((r) => filledDefaultsCount(r) > 0)) names.push("default values");
+  if (rows.some((r) => r.totalUnits > 0)) names.push("planned unit count");
+  return names;
 }
 
 /**
@@ -125,10 +128,10 @@ function joinList(parts: string[]): string {
  * untick — the same row reached two ways, so one rule and one wording.
  *
  * Removing the row can never delete units (there is no FK from Unit to
- * UnitType); it drops the planned mix and whatever sizes and pricing it
- * carried, and leaves any units showing as "derived from units — not in the
- * planned mix" with nothing left to prefill from. That is why units block it
- * and recorded values only warrant a confirmation.
+ * UnitType); it drops the planned mix and whatever defaults it carried,
+ * leaving any units showing as "derived from units — not in the planned mix"
+ * with nothing left to prefill from. That is why units block it and
+ * recorded values only warrant a confirmation.
  */
 export function plannedMixRemoval(
   label: string,
@@ -154,7 +157,7 @@ export function plannedMixRemoval(
   return { kind: "allowed" };
 }
 
-/** A row carrying nothing at all: no sizes, price, planned count or media. */
+/** A row carrying nothing at all: no defaults, planned count or media. */
 export function isEmptyRow(t: UnitType): boolean {
   return unitTypeScore(t) === 0;
 }

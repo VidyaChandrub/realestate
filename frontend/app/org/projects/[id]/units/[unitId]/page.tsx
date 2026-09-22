@@ -6,15 +6,10 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { currencyPrefix, formatMoney } from "@/lib/money";
-import { customValueText, groupNoun, LAYOUT_TRAITS } from "@/lib/field-template";
+import { customValueText, nonRoleFields, roleField, templateTraits } from "@/lib/field-template";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectTabs } from "@/components/org/project-tabs";
-import {
-  areaPricePerSqftLabel,
-  formatPossession,
-  PRICE_BASIS_LABEL,
-  pricePerSqftLabel,
-} from "@/components/org/project-form-fields";
+import { formatPossession } from "@/components/org/project-form-fields";
 import "@/app/org/org.css";
 import type { ProjectDetail, Unit, UnitStatus } from "@/lib/types";
 
@@ -139,31 +134,27 @@ export default function OrgProjectUnitDetailPage() {
     );
   }
 
-  // The org's price-per-sqft denominator travels on the unit response, so the
-  // figure shown here and the one the server derived can't disagree.
-  const priceBasis = unit?.pricePerSqftBasis ?? "carpet";
-
-  // Planned mix for this configuration — used only as a fallback for
-  // display when the unit itself has no carpet/built-up/price set.
+  // Planned mix defaults are only a display fallback when the unit itself is blank.
   const plannedType =
     project?.unitTypes.find((ut) => ut.name === unit?.configuration) ?? null;
-  const effectivePrice = unit?.price ?? plannedType?.price ?? null;
-  const carpet = unit?.carpetSqft ?? plannedType?.carpetSqft ?? null;
-  const builtup = unit?.builtupSqft ?? plannedType?.builtupSqft ?? null;
 
   // The project's structure decides which facts a unit has. `tower` shows
   // exactly what it always did; other layouts show their single area, their
   // group (in the project's own word) and the project's unit field template.
-  const traits = LAYOUT_TRAITS[project?.layout ?? "tower"];
-  const groupWord = groupNoun(project?.layout ?? "tower", project?.groupLabel) ?? "Group";
-  const customRows = (project?.unitFieldTemplate ?? []).map((f) => ({
+  const traits = templateTraits(project?.unitFieldTemplate ?? []);
+  const groupWord = roleField(project?.unitFieldTemplate ?? [], "group")?.label ?? "Group";
+  const areaField = roleField(project?.unitFieldTemplate ?? [], "area");
+  const priceField = roleField(project?.unitFieldTemplate ?? [], "price");
+  const effectivePrice = unit?.price ?? (priceField && plannedType?.fieldDefaults?.[priceField.key] != null ? Number(plannedType.fieldDefaults[priceField.key]) : null);
+  const effectiveArea = unit?.area ?? (areaField && plannedType?.fieldDefaults?.[areaField.key] != null ? Number(plannedType.fieldDefaults[areaField.key]) : null);
+  const customRows = nonRoleFields(project?.unitFieldTemplate ?? []).map((f) => ({
     k: f.label,
     v: customValueText(f, unit?.customFields?.[f.key]),
   }));
-  const perSqft = traits.configurations
-    ? pricePerSqftLabel(effectivePrice, carpet, builtup, priceBasis, project?.currency ?? "INR")
-    : areaPricePerSqftLabel(effectivePrice, unit?.area, project?.currency ?? "INR");
-  const areaText = unit?.area != null ? `${unit.area.toLocaleString("en-IN")} sqft` : "—";
+  const perArea = effectivePrice && effectiveArea
+    ? `${currencyPrefix(project?.currency ?? "INR").trim()}${(effectivePrice / effectiveArea).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${project?.areaUnit ?? "sqft"}`
+    : "";
+  const areaText = effectiveArea != null ? `${effectiveArea.toLocaleString("en-IN")} ${project?.areaUnit ?? "sqft"}` : "—";
 
   const subParts = (traits.configurations
     ? [
@@ -171,7 +162,7 @@ export default function OrgProjectUnitDetailPage() {
         unit?.variantLabel ?? null,
         unit?.tower ?? null,
         unit?.floor != null ? `Floor ${unit.floor}` : null,
-        carpet != null ? `${carpet.toLocaleString("en-IN")} sqft carpet` : null,
+        effectiveArea != null ? `${effectiveArea.toLocaleString("en-IN")} ${project?.areaUnit ?? "sqft"}` : null,
         unit?.facing != null ? `${unit.facing} facing` : null,
       ]
     : [
@@ -188,8 +179,7 @@ export default function OrgProjectUnitDetailPage() {
     { k: "Unit type", v: unit?.variantLabel ?? "—" },
     ...(traits.configurations
       ? [
-          { k: "Carpet area", v: carpet != null ? `${carpet.toLocaleString("en-IN")} sqft` : "—" },
-          { k: "Built-up", v: builtup != null ? `${builtup.toLocaleString("en-IN")} sqft` : "—" },
+          { k: areaField?.label ?? "Area", v: areaText },
         ]
       : [{ k: "Area", v: areaText }]),
     ...(traits.floors
@@ -209,8 +199,8 @@ export default function OrgProjectUnitDetailPage() {
     { k: "Facing", v: unit?.facing ?? "—" },
     { k: "Parking", v: unit?.parking ?? "—" },
     {
-      k: `${currencyPrefix(project?.currency ?? "INR").trim()}/sqft${traits.configurations ? ` (${PRICE_BASIS_LABEL[priceBasis]})` : ""}`,
-      v: perSqft || "—",
+      k: `${currencyPrefix(project?.currency ?? "INR").trim()} / ${project?.areaUnit ?? "sqft"}`,
+      v: perArea || "—",
     },
     ...(traits.grouped ? [{ k: traits.configurations ? "Tower" : groupWord, v: unit?.tower ?? "—" }] : []),
     // Units have no possession date of their own — this is the project's,

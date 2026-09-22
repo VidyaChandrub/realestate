@@ -12,16 +12,15 @@ import {
   getStandaloneUnit,
   updateStandaloneUnit,
 } from "@/lib/api";
-import { parseAmount, parseCount } from "@/lib/parse";
-import { currencyPrefix, formatMoney } from "@/lib/money";
+import { parseAmount, parseDecimal } from "@/lib/parse";
+import { formatMoney } from "@/lib/money";
 import { Reveal } from "@/components/superadmin/reveal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import {
   ConfigurationSelect,
   UnitMediaFields,
   formatUpdatedAt,
-  pricePerSqftLabel,
-  PRICE_BASIS_LABEL,
+  areaPricePerAreaLabel,
   UnitAttributeSelect,
 } from "@/components/org/project-form-fields";
 import "@/app/org/org.css";
@@ -51,8 +50,7 @@ interface Form {
   configuration: string;
   variantLabel: string;
   unitNo: string;
-  carpetSqft: string;
-  builtupSqft: string;
+  area: string;
   facing: string;
   parking: string;
   price: string;
@@ -70,8 +68,7 @@ const toForm = (u: Unit): Form => ({
   configuration: u.configuration ?? "",
   variantLabel: u.variantLabel ?? "",
   unitNo: u.unitNo,
-  carpetSqft: u.carpetSqft == null ? "" : String(u.carpetSqft),
-  builtupSqft: u.builtupSqft == null ? "" : String(u.builtupSqft),
+  area: u.area == null ? "" : String(u.area),
   facing: u.facing ?? "",
   parking: u.parking ?? "",
   price: u.price == null ? "" : String(u.price),
@@ -186,8 +183,7 @@ export default function StandaloneUnitPage() {
         configuration: form.configuration,
         variantLabel: form.variantLabel.trim() || null,
         unitNo: form.unitNo.trim(),
-        carpetSqft: parseCount(form.carpetSqft) ?? null,
-        builtupSqft: parseCount(form.builtupSqft) ?? null,
+        area: parseDecimal(form.area) ?? null,
         facing: form.facing.trim() || null,
         parking: form.parking.trim() || null,
         price: parseAmount(form.price) ?? null,
@@ -244,34 +240,26 @@ export default function StandaloneUnitPage() {
     );
   }
 
-  // The unit response carries the org's basis, so the live edit figure and the
-  // stored one can't disagree.
-  const basis = unit.pricePerSqftBasis ?? "carpet"; // standalone units always have one
   const currency = unit.currency ?? "INR";
-  const psqft = pricePerSqftLabel(
+  const pricePerArea = areaPricePerAreaLabel(
     parseAmount(form.price),
-    parseCount(form.carpetSqft),
-    parseCount(form.builtupSqft),
-    basis,
+    parseDecimal(form.area),
+    unit.areaUnit,
   );
 
   const specs: { k: string; v: string }[] = [
     { k: "Configuration", v: unit.configuration ?? "—" },
     { k: "Unit variant", v: unit.variantLabel ?? "—" },
     {
-      k: "Carpet area",
-      v: unit.carpetSqft != null ? `${unit.carpetSqft.toLocaleString("en-IN")} sqft` : "—",
-    },
-    {
-      k: "Built-up",
-      v: unit.builtupSqft != null ? `${unit.builtupSqft.toLocaleString("en-IN")} sqft` : "—",
+      k: "Area",
+      v: unit.area != null ? `${unit.area.toLocaleString("en-IN")} ${unit.areaUnit || "sqft"}` : "—",
     },
     { k: "Facing", v: unit.facing ?? "—" },
     { k: "Parking", v: unit.parking ?? "—" },
     { k: "Price", v: unit.price != null ? formatMoney(unit.price, currency) : "—" },
     {
-      k: `${currencyPrefix(currency).trim() || "₹"}/sqft (${PRICE_BASIS_LABEL[basis]})`,
-      v: pricePerSqftLabel(unit.price, unit.carpetSqft, unit.builtupSqft, basis, currency) || "—",
+      k: `Price / ${unit.areaUnit || "sqft"}`,
+      v: areaPricePerAreaLabel(unit.price, unit.area, unit.areaUnit, currency) || "—",
     },
     { k: "Location / address", v: unit.addressLine ?? "—" },
     { k: "Owner / seller", v: unit.ownerName ?? "—" },
@@ -409,23 +397,13 @@ export default function StandaloneUnitPage() {
               </div>
               <div className="grid g3">
                 <div className="field">
-                  <label>Carpet area (sqft)</label>
+                  <label>Area (sqft)</label>
                   <input
                     className="inp"
                     type="number"
                     min={0}
-                    value={form.carpetSqft}
-                    onChange={(e) => patch({ carpetSqft: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label>Built-up area (sqft)</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    min={0}
-                    value={form.builtupSqft}
-                    onChange={(e) => patch({ builtupSqft: e.target.value })}
+                    value={form.area}
+                    onChange={(e) => patch({ area: e.target.value })}
                   />
                 </div>
                 <div className="field">
@@ -468,8 +446,8 @@ export default function StandaloneUnitPage() {
                   />
                 </div>
                 <div className="field">
-                  <label>Price / sqft</label>
-                  <input className="inp" disabled placeholder="—" value={psqft} />
+                  <label>Price / {unit.areaUnit || "sqft"}</label>
+                  <input className="inp" disabled placeholder="—" value={pricePerArea} />
                 </div>
                 <div className="field">
                   <label>Status</label>

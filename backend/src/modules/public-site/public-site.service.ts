@@ -1,6 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { extractSubdomainFromHost, subdomainHost } from '../../common/utils/domain.util';
+import { FieldDef, roleField } from '../../common/utils/field-template.util';
+
+function readTemplate(v: Prisma.JsonValue): FieldDef[] {
+  return (Array.isArray(v) ? v : []) as unknown as FieldDef[];
+}
 
 @Injectable()
 export class PublicSiteService {
@@ -129,8 +135,6 @@ export class PublicSiteService {
             unitNo: true,
             configuration: true,
             variantLabel: true,
-            carpetSqft: true,
-            builtupSqft: true,
             area: true,
             tower: true,
             floor: true,
@@ -143,26 +147,24 @@ export class PublicSiteService {
     });
 
     return projects.map((project) => {
-      const layout = project.layout ?? 'tower';
-      const towerLayout = layout === 'tower';
-      const groupedLayout = layout === 'tower' || layout === 'cluster';
+      const template = readTemplate(project.unitFieldTemplate);
+      const hasConfiguration = !!roleField(template, 'configuration');
+      const hasFloor = !!roleField(template, 'floor');
+      const hasGroup = !!roleField(template, 'group');
 
       return {
         ...project,
-        // Tower-only concepts are not part of the public contract for the
-        // other layouts. `tower` remains the stored group value for clusters.
-        towerCount: towerLayout ? project.towerCount : null,
-        floorsDescription: towerLayout ? project.floorsDescription : null,
-        carpetRange: towerLayout ? project.carpetRange : null,
-        floorPlanUrls: towerLayout ? project.floorPlanUrls : [],
+        // Structure fields are only part of the public contract when the
+        // project's unit template actually has the matching role field —
+        // degrades to hidden rather than a stale/wrong value.
+        floorsDescription: hasFloor ? project.floorsDescription : null,
+        carpetRange: hasConfiguration ? project.carpetRange : null,
         landArea: project.landArea === null ? null : Number(project.landArea),
         units: project.units.map((unit) => ({
           ...unit,
-          configuration: towerLayout ? unit.configuration : null,
-          carpetSqft: towerLayout ? unit.carpetSqft : null,
-          builtupSqft: towerLayout ? unit.builtupSqft : null,
-          tower: groupedLayout ? unit.tower : null,
-          floor: towerLayout ? unit.floor : null,
+          configuration: hasConfiguration ? unit.configuration : null,
+          tower: hasGroup ? unit.tower : null,
+          floor: hasFloor ? unit.floor : null,
         })),
       };
     });

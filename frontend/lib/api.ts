@@ -1747,14 +1747,14 @@ export async function downloadAdminReportCsv(params?: ReportsFilterInput, type =
 }
 
 
-// ─── Org project types (layout + typed field templates) ────────────────────
+// ─── Org project types (typed field templates, some fields carrying a role) ─
 
 export async function getOrgProjectTypes(): Promise<OrgProjectType[]> {
   return apiFetch<OrgProjectType[]>("/org/project-types");
 }
 
 export async function createOrgProjectType(
-  input: OrgProjectTypeInput & { name: string; layout: OrgProjectType["layout"] },
+  input: OrgProjectTypeInput & { name: string },
 ): Promise<OrgProjectType> {
   return apiFetch<OrgProjectType>("/org/project-types", {
     method: "POST",
@@ -1776,7 +1776,7 @@ export async function deleteOrgProjectType(id: string): Promise<void> {
   await apiFetch(`/org/project-types/${id}`, { method: "DELETE" });
 }
 
-/** Creates whichever of Apartments / Villas / Plots / Commercial the org lacks. */
+/** Creates whichever of Apartment / Plot / Villa the org lacks. */
 export async function addCommonProjectTypes(): Promise<{ created: number; types: OrgProjectType[] }> {
   return apiFetch<{ created: number; types: OrgProjectType[] }>("/org/project-types/common", {
     method: "POST",

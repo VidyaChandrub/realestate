@@ -1,4 +1,4 @@
-import type { FieldDef, ProjectLayout } from "./field-template";
+import type { FieldDef } from "./field-template";
 
 export type OnboardingStep =
   | "account"
@@ -52,8 +52,6 @@ export interface SafeOrganisation {
   team_size: string | null;
   legal_name: string | null;
   industry: OrgIndustry | null;
-  /** Denominator for every "₹ x / sqft" figure shown for this org's units. */
-  unit_price_basis: UnitPriceBasis;
   support_email: string | null;
   support_phone: string | null;
   enabled_modules: string[];
@@ -82,7 +80,6 @@ export interface UpdateOrganisationSettingsInput {
   gstin?: string;
   legalName?: string;
   industry?: OrgIndustry;
-  unitPriceBasis?: UnitPriceBasis;
   supportEmail?: string;
   supportPhone?: string;
 }
@@ -963,12 +960,12 @@ export interface Project {
   carpetRange: string | null;
   /** The project type's name, copied at write time (no FK). */
   projectType: string | null;
-  /** Structure copied from the type at creation; decides which inventory controls exist. */
-  layout: ProjectLayout;
   projectTypeId: string | null;
-  /** Name of the grouping column; null = the layout's default. */
-  groupLabel: string | null;
-  /** This project's own copy of its type's field templates. */
+  /** Unit every `area`-role figure and price-per-unit-area display uses ("sqft" | "acre"). */
+  areaUnit: string;
+  /** This project's own copy of its type's field templates. Which inventory
+   *  controls exist (grouping, floors, configurations, price) is derived
+   *  from which role fields `unitFieldTemplate` carries — see field-template.ts. */
   projectFieldTemplate: FieldDef[];
   unitFieldTemplate: FieldDef[];
   /** Typed values for `projectFieldTemplate`, by field key. */
@@ -1023,8 +1020,6 @@ export interface EnquiryUnit {
   unitNo: string;
   configuration: string | null;
   variantLabel: string | null;
-  carpetSqft: number | null;
-  builtupSqft: number | null;
   area: number | null;
   tower: string | null;
   floor: number | null;
@@ -1058,9 +1053,10 @@ export interface UnitType {
   id: string;
   projectId: string;
   name: string;
-  carpetSqft: number | null;
-  builtupSqft: number | null;
-  price: number | null;
+  /** Default values to prefill onto a new unit of this configuration, keyed
+   *  by the project's current unit-template field keys — typically at least
+   *  the `area`- and `price`-role fields. */
+  fieldDefaults: Record<string, string | number | boolean | null>;
   totalUnits: number;
   floorPlanUrl: string | null;
   brochureUrl: string | null;
@@ -1088,22 +1084,20 @@ export interface Unit {
   /** A `unit_variant` catalog label ("Type A"). Optional — blank is valid. */
   variantLabel: string | null;
   unitNo: string;
-  carpetSqft: number | null;
-  builtupSqft: number | null;
-  /** Optional — null for projects with no tower concept (villas, plots). */
+  /** Optional — set only when the project's unit template has a `group`-role field. */
   tower: string | null;
+  /** Optional — set only when the unit template has a `floor`-role field. */
   floor: number | null;
   facing: string | null;
   /** Free text as entered on the form ("1 covered", "2 covered", "Open"). */
   parking: string | null;
   price: number | null;
-  /** Derived server-side on the org's basis. Null when price or that area is missing. */
-  pricePerSqft: number | null;
-  /** Null for units outside the `tower` layout, which price on their single `area`. */
-  pricePerSqftBasis: UnitPriceBasis | null;
-  /** The project's structure layout; null for a standalone unit. */
-  layout?: ProjectLayout | null;
-  /** Primary area (sqft) of a non-`tower` unit. */
+  /** Derived server-side. Null unless the project's CURRENT unit template has
+   *  both a `price`- and an `area`-role field, and this unit has both values. */
+  pricePerArea: number | null;
+  /** The project's area unit ("sqft" | "acre"); null for a standalone unit. */
+  areaUnit?: string | null;
+  /** The unit's single area figure (whichever field carries the `area` role), in `areaUnit`. */
   area: number | null;
   /** Typed values for the project's unit field template, by field key. */
   customFields: Record<string, string | number | boolean | null>;
@@ -1187,7 +1181,6 @@ export interface CreateProjectInput {
   projectFieldTemplate?: unknown[];
   unitFieldTemplate?: unknown[];
   customFields?: Record<string, unknown>;
-  groupLabel?: string;
   tagline?: string;
   launchDate?: string;
   constructionStage?: string;
@@ -1199,6 +1192,8 @@ export interface CreateProjectInput {
   bookingAmount?: number;
   /** Any code from lib/countries.ts's CURRENCY_OPTIONS, not just INR/AED/USD. */
   currency?: string;
+  /** Required on create. "sqft" | "acre" for now. */
+  areaUnit?: string;
   priceIncludes?: string[];
   paymentPlan?: string;
   offers?: string;
@@ -1243,7 +1238,7 @@ export interface UpdateProjectInput {
   projectFieldTemplate?: unknown[];
   unitFieldTemplate?: unknown[];
   customFields?: Record<string, unknown>;
-  groupLabel?: string;
+  areaUnit?: string;
   tagline?: string | null;
   launchDate?: string | null;
   constructionStage?: string | null;
@@ -1281,9 +1276,6 @@ export interface UpdateProjectInput {
 // generic row shape keyed by `category`. Picked values are copied onto a
 // project's own fields at creation time; nothing references these rows, so
 // editing or deleting one never affects an existing project.
-/** Which area a "₹ x / sqft" figure is divided by. Carpet is the default. */
-export type UnitPriceBasis = "carpet" | "builtup";
-
 export type OrgCatalogCategory =
   | "project_type"
   | "unit_type"
@@ -1327,9 +1319,9 @@ export interface UpdateOrgCatalogOptionInput {
 
 export interface CreateUnitTypeInput {
   name: string;
-  carpetSqft?: number;
-  builtupSqft?: number;
-  price?: number;
+  /** Default values to prefill onto a new unit of this configuration, keyed
+   *  by the project's current unit-template field keys. */
+  fieldDefaults?: Record<string, unknown>;
   totalUnits?: number;
   floorPlanUrl?: string | null;
   brochureUrl?: string | null;
@@ -1340,17 +1332,17 @@ export interface CreateUnitTypeInput {
 export type UpdateUnitTypeInput = Partial<CreateUnitTypeInput>;
 
 export interface CreateUnitInput {
-  /** A `unit_type` catalog label — required for `tower` and standalone units, refused for other layouts. */
+  /** Required when the project's unit template has a `configuration`-role
+   *  field; for a standalone unit, an org `unit_type` catalog label. */
   configuration?: string;
-  /** Primary area (sqft) — non-`tower` layouts only. */
+  /** The unit's single area figure — set when the unit template has an
+   *  `area`-role field (or for a standalone unit). */
   area?: number;
   /** Typed values for the project's unit field template. */
   customFields?: Record<string, unknown>;
   /** Optional free-text variant label. */
   variantLabel?: string;
   unitNo: string;
-  carpetSqft?: number;
-  builtupSqft?: number;
   tower?: string;
   floor?: number;
   facing?: string;
@@ -1376,8 +1368,6 @@ export type UpdateUnitInput = Partial<
     | "tower"
     | "parking"
     | "variantLabel"
-    | "carpetSqft"
-    | "builtupSqft"
     | "floor"
     | "area"
     | "facing"
@@ -1393,8 +1383,6 @@ export type UpdateUnitInput = Partial<
   tower?: string | null;
   parking?: string | null;
   variantLabel?: string | null;
-  carpetSqft?: number | null;
-  builtupSqft?: number | null;
   floor?: number | null;
   area?: number | null;
   facing?: string | null;
@@ -1416,15 +1404,12 @@ export interface OrgUnitRow {
   unitNo: string;
   configuration: string | null;
   variantLabel: string | null;
-  carpetSqft: number | null;
-  builtupSqft: number | null;
   tower: string | null;
   floor: number | null;
   facing: string | null;
   parking: string | null;
   price: number | null;
-  pricePerSqft: number | null;
-  pricePerSqftBasis: UnitPriceBasis | null;
+  pricePerArea: number | null;
   area: number | null;
   customFields: Record<string, string | number | boolean | null>;
   status: UnitStatus;
@@ -1435,7 +1420,7 @@ export interface OrgUnitRow {
   createdAt: string;
   updatedAt: string;
   /** Null for a standalone unit. */
-  project: { id: string; name: string; currency: string; layout: ProjectLayout } | null;
+  project: { id: string; name: string; currency: string; areaUnit: string } | null;
 }
 
 export interface OrgUnitsListResponse {
@@ -2750,25 +2735,24 @@ export interface ProjectAnalyticsStat {
 
 
 
-/** An org's project type: a name, a fixed layout and two typed field templates. */
+/**
+ * An org's project type: a name and two typed field templates. There is no
+ * fixed layout — which inventory controls a project has is derived from
+ * which role fields `unitFields` carries.
+ */
 export interface OrgProjectType {
   id: string;
   orgId: string;
   name: string;
-  layout: ProjectLayout;
-  /** Name of the grouping column; null = the layout's default label. */
-  groupLabel: string | null;
   projectFields: FieldDef[];
   unitFields: FieldDef[];
   sortOrder: number;
-  /** Projects already using this type — the layout is locked when > 0. */
+  /** Projects already using this type. */
   inUse: number;
 }
 
 export interface OrgProjectTypeInput {
   name?: string;
-  layout?: ProjectLayout;
-  groupLabel?: string;
   projectFields?: unknown[];
   unitFields?: unknown[];
   sortOrder?: number;

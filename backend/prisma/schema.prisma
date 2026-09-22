@@ -69,17 +69,6 @@ enum RoleScope {
 // signup wizard (previously collected in the UI but discarded, never
 // persisted) and editable later from Org Settings → General. Fixed,
 // app-controlled list, hence an enum rather than free text.
-// Which area a unit's price-per-sqft is divided by. Carpet is the default and
-// the RERA-standard basis in India; some orgs quote on built-up instead. Set
-// per organisation — a figure on the wrong denominator is a real commercial
-// error, so every surface that shows it also names the basis.
-enum UnitPriceBasis {
-  carpet
-  builtup
-
-  @@schema("identity")
-}
-
 enum OrgIndustry {
   developer
   broker
@@ -152,8 +141,6 @@ model Organisation {
   // have these on day one, and existing rows backfill to null.
   legalName    String?      @map("legal_name")
   industry     OrgIndustry?
-  // Denominator for every "₹ x / sqft" figure shown for this org's units.
-  unitPriceBasis UnitPriceBasis @default(carpet) @map("unit_price_basis")
   supportEmail String?      @map("support_email")
   supportPhone String?      @map("support_phone")
 
@@ -1445,11 +1432,18 @@ model Project {
   priceMax          Int?          @map("price_max") // rupees
   baseRate          Int?          @map("base_rate") // rupees per sqft
   landArea          Decimal?      @map("land_area") @db.Decimal(8, 2) // acres
+  // Caps how many distinct values the unit template's `group`-role field may
+  // introduce across this project's units (whatever the org calls it —
+  // Tower, Block, Sector). Null = no limit. Meaningless when the template has
+  // no `group`-role field.
   towerCount        Int?          @map("tower_count")
-  floorsDescription String?       @map("floors_description") // e.g. "G+22"
-  // Free-text carpet-area range for the project as a whole, e.g. "640 – 1,850
-  // sqft". Per-unit-type carpet area lives on UnitType.carpetSqft; this is the
-  // headline summary shown before unit types are entered.
+  // Free-text structure summary ("G+22"), shown only when the unit template
+  // has a `floor`-role field.
+  floorsDescription String?       @map("floors_description")
+  // Free-text area range for the project as a whole, e.g. "640 – 1,850
+  // sqft". Per-configuration area lives on UnitType.fieldDefaults; this is the
+  // headline summary shown before unit types are entered. Shown only when the
+  // unit template has a `configuration`-role field.
   carpetRange       String?       @map("carpet_range")
   // Array of { name: string, iconUrl: string | null }. iconUrl is always
   // null for now — amenity-icon upload is out of scope (blocked on S3).
@@ -1463,17 +1457,21 @@ model Project {
   // reference" rule as amenities/connectivity: no FK back to the catalog, so
   // renaming or deleting an option never rewrites an existing project.
   projectType       String?       @map("project_type")
-  // Structure + templates COPIED from the project type at creation (see
-  // ProjectTypeDef): editing or deleting the type never changes this project.
-  // `layout` decides which inventory controls exist; the two templates are
-  // this project's own editable copy; `customFields` are the typed values for
-  // `projectFieldTemplate`, keyed by field key (values of fields later removed
-  // from the template are kept, just hidden).
-  layout               ProjectLayout @default(tower)
+  // Templates COPIED from the project type at creation (see ProjectTypeDef):
+  // editing or deleting the type never changes this project. Which inventory
+  // controls exist (grouping, floors, configurations, price) is derived at
+  // read time from which ROLE fields (see common/utils/field-template.util.ts)
+  // are present in `unitFieldTemplate` — there is no fixed layout. This
+  // project's own editable copy of the templates; `customFields` are the
+  // typed values for `projectFieldTemplate`, keyed by field key (values of
+  // fields later removed from the template are kept, just hidden).
   // Soft pointer to the type it was created from — no FK, so deleting the
   // type is always safe. Used only to count a type's usage.
   projectTypeId        String?       @map("project_type_id")
-  groupLabel           String?       @map("group_label")
+  // Area unit every `area`-role figure and "₹ x / <unit>" price-per-area
+  // display uses for this project. A plain string (not an enum) so more
+  // units (sq yard, sq m) can be added later without a schema change.
+  areaUnit             String        @default("sqft") @map("area_unit")
   projectFieldTemplate Json          @default("[]") @map("project_field_template")
   unitFieldTemplate    Json          @default("[]") @map("unit_field_template")
   customFields         Json          @default("{}") @map("custom_fields")
@@ -1571,9 +1569,14 @@ model UnitType {
   id          String @id @default(uuid())
   projectId   String @map("project_id")
   name        String
-  carpetSqft  Int?   @map("carpet_sqft")
-  builtupSqft Int?   @map("builtup_sqft")
-  price       Int? // rupees — the type's base price
+  // Default values to prefill onto a new unit when this configuration is
+  // picked, keyed by the project's CURRENT unit-template field keys (see
+  // common/utils/field-template.util.ts) — typically at least the `area`- and
+  // `price`-role fields. Validated the same way as Unit.customFields
+  // (validateCustomValues); a key whose field is later removed from the
+  // template is kept, just no longer offered for editing. A snapshot copied
+  // onto the unit at pick time, never a live binding.
+  fieldDefaults Json  @default("{}") @map("field_defaults")
   // Planned/marketed unit count for this configuration, entered on the form.
   // The *available* count is NOT stored here — it's derived at read time from
   // the actual Unit rows' status so the two can never drift apart.
@@ -1615,19 +1618,16 @@ model Unit {
   // NOT the unit_types table — just a string.
   variantLabel  String? @map("variant_label")
 
-  // The unit carries its own areas now (was on UnitType).
-  carpetSqft  Int? @map("carpet_sqft")
-  builtupSqft Int? @map("builtup_sqft")
-
-  // Optional — villas / plots / single-building projects have no tower.
-  // Drives the availability-grid grouping (no unitNo parsing). New tower
-  // names are bounded server-side by Project.towerCount.
+  // Optional — a project whose unit template has no `group`-role field has no
+  // grouping. Drives the availability-grid grouping (no unitNo parsing). New
+  // group names are bounded server-side by Project.towerCount.
   tower   String?
+  // Set only when the unit template has a `floor`-role field.
   floor   Int?
-  // The primary area of a unit in a non-`tower` layout (plot / villa size), in
-  // sqft. Named neutrally so a later area unit doesn't rename it. Not used by
-  // `tower` units, which keep carpet / built-up above.
-  area    Int?
+  // The unit's single area figure — whichever field carries the `area` role
+  // (carpet, built-up, plot area, …). In the project's `Project.areaUnit`.
+  // Named neutrally so it works for every project type.
+  area    Float?
   // Typed values for the project's `unitFieldTemplate`, by field key. Values
   // of fields later removed from the template are kept, just hidden.
   customFields Json @default("{}") @map("custom_fields")
@@ -1704,37 +1704,26 @@ model UnitSalesAgent {
 // the project's own columns — there is NO foreign key from a project back
 // to a catalog option, so editing/deleting an option never affects an
 // already-created project.
-// How a project's inventory is structured. A small FIXED set — code, not org
-// data: the wizard, unit forms and availability grid each render per layout.
-//   tower      — groups (towers/blocks) with floors; apartments, commercial
-//   cluster    — groups (phases/sectors/rows), no floors; villas, plots
-//   individual — a flat list, no grouping; farmhouses, one-offs
-enum ProjectLayout {
-  tower
-  cluster
-  individual
-
-  @@schema("projects")
-}
-
-// An org's own project-type catalog entry: a name plus the layout it uses and
-// two typed field templates (JSON arrays of field definitions — see
-// common/utils/field-template.util.ts). Projects COPY the name, layout and
-// templates at creation, so editing or deleting a type never touches an
-// existing project. Deliberately not an OrgCatalogOption: those are flat
-// labels and cannot carry structure.
+// An org's own project-type catalog entry: a name plus two typed field
+// templates (JSON arrays of field definitions — see
+// common/utils/field-template.util.ts). There is no fixed layout — every
+// type is just a list of fields; some carry a `role` (price / area / group /
+// floor / configuration) that maps onto a real Unit column and powers a
+// feature (availability grid grouping, price per area, …). Which inventory
+// controls exist is derived at read time from which roles are present, so
+// deleting a role field degrades gracefully instead of erroring. Projects
+// COPY the name and templates at creation, so editing or deleting a type
+// never touches an existing project. Deliberately not an OrgCatalogOption:
+// those are flat labels and cannot carry structure.
 model ProjectTypeDef {
   id            String        @id @default(uuid())
   orgId         String        @map("org_id")
   name          String
-  layout        ProjectLayout @default(tower)
-  // What the grouping column is called for this type ("Tower", "Phase",
-  // "Sector"…). Null = the layout's default label. Meaningless for
-  // `individual` (no grouping).
-  groupLabel    String?       @map("group_label")
-  // Summary fields on the project ("Number of plots", "Total land").
+  // Summary fields on the project ("Number of plots", "Total land"). Never
+  // carry a role — roles are a per-UNIT concept.
   projectFields Json          @default("[]") @map("project_fields")
-  // Per-unit fields ("Dimensions", "Corner plot").
+  // Per-unit fields — the template a project's unit form and availability
+  // grid render from.
   unitFields    Json          @default("[]") @map("unit_fields")
   sortOrder     Int           @default(0) @map("sort_order")
   createdAt     DateTime      @default(now()) @map("created_at")

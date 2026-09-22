@@ -181,7 +181,6 @@ export class OrgLandingPagesService {
           unitTypes: {
             select: {
               name: true,
-              carpetSqft: true,
               floorPlanUrl: true,
             },
           },
