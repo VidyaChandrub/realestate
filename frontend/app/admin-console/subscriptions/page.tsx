@@ -17,6 +17,7 @@ import {
 import { Icon } from "@/components/icons";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { useAuth } from "@/lib/auth-context";
 import type {
   Plan,
   PlanCapability,
@@ -86,6 +87,16 @@ function perFor(cycle: "Monthly" | "Yearly") {
 }
 
 export default function SuperAdminSubscriptionsPage() {
+  const { hasPermission, isLoading: authLoading } = useAuth();
+  const canViewSubscriptions = hasPermission("admin_subscriptions", "view");
+  const canCreatePlan = hasPermission("admin_subscriptions", "add");
+  const canEditPlan = hasPermission("admin_subscriptions", "edit");
+  const canDeletePlan = hasPermission("admin_subscriptions", "delete");
+  const canAssignPlan = hasPermission("admin_subscriptions", "add");
+  const canChangeSubscription = hasPermission("admin_subscriptions", "edit");
+  const canCancelSubscription = hasPermission("admin_subscriptions", "delete");
+  const canApproveRequest = hasPermission("admin_subscriptions", "approve");
+  const canRejectRequest = hasPermission("admin_subscriptions", "delete");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [subs, setSubs] = useState<Subscription[]>([]);
@@ -130,6 +141,8 @@ export default function SuperAdminSubscriptionsPage() {
   const [upgradeTarget, setUpgradeTarget] = useState<Subscription | null>(null);
   const [upgradePlanId, setUpgradePlanId] = useState<string>("");
   const [upgradeCycle, setUpgradeCycle] = useState<"monthly" | "yearly">("monthly");
+  const [cancelTarget, setCancelTarget] = useState<Subscription | null>(null);
+  const [cancellingSubscription, setCancellingSubscription] = useState(false);
 
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignOrgId, setAssignOrgId] = useState("");
@@ -261,14 +274,41 @@ export default function SuperAdminSubscriptionsPage() {
   }
 
   useEffect(() => {
+    if (!canViewSubscriptions) return;
     fetchPlans();
-    fetchSubs(1, "", 0);
-    fetchOverview();
-    fetchOrgs();
-    fetchPackageChangeRequests("pending", 1);
     fetchCapabilities();
+    fetchSubs(1, "", 0);
+    fetchOrgs();
+    fetchOverview();
+    fetchPackageChangeRequests("pending", 1);
     loadExpiryPolicy();
-  }, []);
+  }, [canViewSubscriptions]);
+
+  const visibleTabs = [
+    { index: 0, label: "Overview & Analytics" },
+    { index: 1, label: "Plans & Pricing Matrices" },
+    { index: 2, label: `Organisation Subscriptions (${subsTotal})` },
+    { index: 3, label: `Package Requests (${requestsTotal})` },
+    { index: 4, label: "Payments & Invoicing" },
+    { index: 5, label: "Expiry & Grace Policy" },
+  ];
+
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.some((item) => item.index === tab)) {
+      setTab(visibleTabs[0].index);
+    }
+  }, [tab]);
+
+  if (!authLoading && !canViewSubscriptions) {
+    return (
+      <div className="card" style={{ padding: 32, textAlign: "center" }}>
+        <h1 style={{ margin: "0 0 8px", fontSize: 22 }}>Access restricted</h1>
+        <p className="muted" style={{ margin: 0 }}>
+          You do not have permission to view subscription management.
+        </p>
+      </div>
+    );
+  }
 
   const renewRow = async (subId: string) => {
     try {
@@ -531,6 +571,22 @@ export default function SuperAdminSubscriptionsPage() {
     }
   };
 
+  const confirmCancelSubscription = async () => {
+    if (!cancelTarget) return;
+    setCancellingSubscription(true);
+    try {
+      await apiFetch(`/admin/subscriptions/${cancelTarget.id}`, { method: "DELETE" });
+      notify(`Subscription cancelled for ${cancelTarget.organisation?.name || "organisation"}`);
+      setCancelTarget(null);
+      void fetchSubs(subsPage);
+      void fetchOverview();
+    } catch (e: any) {
+      notify(e.message || "Cancel failed");
+    } finally {
+      setCancellingSubscription(false);
+    }
+  };
+
   const mrrDisplay = overview ? overview.mrr : 0;
   const arrDisplay = overview ? overview.arr : 0;
   const activePlansCount = overview ? overview.activePlans : plans.length;
@@ -572,6 +628,7 @@ export default function SuperAdminSubscriptionsPage() {
               fetchPlans();
               fetchSubs();
               fetchOverview();
+              fetchPackageChangeRequests(requestFilterStatus, requestsPage);
             }}
             style={{
               display: "inline-flex",
@@ -590,7 +647,7 @@ export default function SuperAdminSubscriptionsPage() {
             <Icon name="refresh" size={14} /> Refresh
           </button>
 
-          {tab !== 2 ? (
+          {canCreatePlan ? (
             <button
               type="button"
               onClick={openCreate}
@@ -778,14 +835,7 @@ export default function SuperAdminSubscriptionsPage() {
           }}
         >
           <div style={{ display: "flex", gap: 6, overflowX: "auto" }}>
-            {[
-              "Overview & Analytics",
-              "Plans & Pricing Matrices",
-              `Organisation Subscriptions (${subsTotal})`,
-              `Package Requests (${requestsTotal})`,
-              "Payments & Invoicing",
-              "Expiry & Grace Policy",
-            ].map((label, i) => (
+            {visibleTabs.map(({ label, index: i }) => (
               <button
                 key={label}
                 type="button"
@@ -1062,7 +1112,7 @@ export default function SuperAdminSubscriptionsPage() {
                       </div>
 
                       <div style={{ display: "flex", gap: 8, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
-                        <button
+                        {canEditPlan ? <button
                           type="button"
                           onClick={() => openEdit(p)}
                           style={{
@@ -1078,8 +1128,8 @@ export default function SuperAdminSubscriptionsPage() {
                           }}
                         >
                           Edit Plan
-                        </button>
-                        <button
+                        </button> : null}
+                        {canDeletePlan ? <button
                           type="button"
                           onClick={() => deletePlan(p.id)}
                           disabled={p.isSystem}
@@ -1097,7 +1147,7 @@ export default function SuperAdminSubscriptionsPage() {
                           }}
                         >
                           Delete
-                        </button>
+                        </button> : null}
                       </div>
                     </div>
                   );
@@ -1181,7 +1231,7 @@ export default function SuperAdminSubscriptionsPage() {
                     }}
                   />
                 </div>
-                <button
+                {canAssignPlan ? <button
                   type="button"
                   onClick={() => setAssignOpen(true)}
                   style={{
@@ -1199,7 +1249,7 @@ export default function SuperAdminSubscriptionsPage() {
                   }}
                 >
                   <Icon name="plus" size={14} /> Assign Plan
-                </button>
+                </button> : null}
               </div>
             </div>
 
@@ -1228,9 +1278,9 @@ export default function SuperAdminSubscriptionsPage() {
                       filteredSubs.map((s) => (
                         <tr key={s.id} style={{ borderBottom: "1px solid #f8fafc" }}>
                           <td style={{ padding: "12px 16px" }}>
-                            <Link href={`/admin-console/organisation-detail/${s.orgId}`} style={{ textDecoration: "none", color: "#0f172a", fontWeight: 700 }}>
+                            <div style={{ color: "#0f172a", fontWeight: 700 }}>
                               {s.organisation?.name ?? s.orgId}
-                            </Link>
+                            </div>
                             <div style={{ fontSize: 11, color: "#64748b" }}>{s.organisation?.city || "Active Tenant"}</div>
                           </td>
                           <td style={{ padding: "12px 16px", textAlign: "center" }}>
@@ -1270,7 +1320,7 @@ export default function SuperAdminSubscriptionsPage() {
                           </td>
                           <td style={{ padding: "12px 16px", textAlign: "right" }}>
                             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                              <button
+                              {canChangeSubscription ? <button
                                 type="button"
                                 onClick={() => {
                                   setUpgradeTarget(s);
@@ -1288,24 +1338,44 @@ export default function SuperAdminSubscriptionsPage() {
                                 }}
                               >
                                 Change
-                              </button>
-                              {(s.status === "expired" || s.status === "cancelled" || s.status === "past_due") && (
+                              </button> : null}
+                              {canCancelSubscription && s.status !== "cancelled" ? (
                                 <button
                                   type="button"
-                                  onClick={() => void renewRow(s.id)}
+                                  onClick={() => setCancelTarget(s)}
                                   style={{
                                     padding: "5px 10px",
                                     borderRadius: 6,
-                                    border: "1px solid #bbf7d0",
-                                    background: "#f0fdf4",
-                                    color: "#16a34a",
+                                    border: "1px solid #fecaca",
+                                    background: "#fef2f2",
+                                    color: "#ef4444",
                                     fontSize: 12,
-                                    fontWeight: 700,
+                                    fontWeight: 600,
                                     cursor: "pointer",
                                   }}
                                 >
-                                  Renew
+                                  Cancel
                                 </button>
+                              ) : null}
+                              {(s.status === "expired" || s.status === "cancelled" || s.status === "past_due") && (
+                                canChangeSubscription ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => void renewRow(s.id)}
+                                    style={{
+                                      padding: "5px 10px",
+                                      borderRadius: 6,
+                                      border: "1px solid #bbf7d0",
+                                      background: "#f0fdf4",
+                                      color: "#16a34a",
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Renew
+                                  </button>
+                                ) : null
                               )}
                             </div>
                           </td>
@@ -1439,7 +1509,7 @@ export default function SuperAdminSubscriptionsPage() {
                           <td style={{ padding: "12px 16px", textAlign: "right" }}>
                             {r.status === "pending" ? (
                               <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                                <button
+                                {canApproveRequest ? <button
                                   type="button"
                                   onClick={() => void handleApproveRequest(r.id)}
                                   disabled={actionLoadingId === r.id}
@@ -1455,8 +1525,8 @@ export default function SuperAdminSubscriptionsPage() {
                                   }}
                                 >
                                   Approve
-                                </button>
-                                <button
+                                </button> : null}
+                                {canRejectRequest ? <button
                                   type="button"
                                   onClick={() => {
                                     setRejectModalReq(r);
@@ -1475,7 +1545,7 @@ export default function SuperAdminSubscriptionsPage() {
                                   }}
                                 >
                                   Reject
-                                </button>
+                                </button> : null}
                               </div>
                             ) : (
                               <span style={{ fontSize: 12, color: "#94a3b8" }}>Completed</span>
@@ -2052,6 +2122,21 @@ export default function SuperAdminSubscriptionsPage() {
         busy={deletingPlan}
         onConfirm={() => void confirmDeletePlan()}
         onClose={() => setDeletePlanId(null)}
+      />
+
+      <ConfirmModal
+        open={cancelTarget !== null}
+        title="Cancel this subscription?"
+        message={
+          cancelTarget
+            ? `This will cancel the subscription for ${cancelTarget.organisation?.name || "this organisation"}.`
+            : ""
+        }
+        confirmLabel="Cancel subscription"
+        destructive
+        busy={cancellingSubscription}
+        onConfirm={() => void confirmCancelSubscription()}
+        onClose={() => setCancelTarget(null)}
       />
     </div>
   );

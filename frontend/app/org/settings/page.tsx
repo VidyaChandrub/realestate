@@ -1163,6 +1163,7 @@ export default function OrgSettingsPage() {
   const [requestModalPlan, setRequestModalPlan] = useState<Plan | null>(null);
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [cancelingRequest, setCancelingRequest] = useState(false);
+  const PLAN_CHANGE_ERROR = "We couldn't switch plans right now. Please review your current usage and try again with a suitable plan.";
 
   const loadPendingRequest = useCallback(async () => {
     if (!accessToken) return;
@@ -1192,7 +1193,14 @@ export default function OrgSettingsPage() {
       setRequestModalPlan(null);
       setChangeOk(`Package change request to "${requestModalPlan.name}" submitted successfully. Awaiting Super Admin approval.`);
     } catch (err) {
-      setChangeError(err instanceof Error ? err.message : "Failed to submit package change request.");
+      const current = await getOrgPackageChangeRequest().catch(() => null);
+      if (current?.pendingRequest) {
+        setPendingChangeRequest(current.pendingRequest);
+        setRequestModalPlan(null);
+        setChangeOk("A package change request is already pending Super Admin approval.");
+        return;
+      }
+      setChangeError(PLAN_CHANGE_ERROR);
     } finally {
       setSubmittingRequest(false);
     }
@@ -1332,7 +1340,7 @@ export default function OrgSettingsPage() {
       setChangeOk(`Switched to the ${res.planName} plan (${cycle === "yearly" ? "billed yearly" : "billed monthly"}).`);
       const b = await apiFetch<OrgBillingSummary>("/org/billing", { headers: { Authorization: `Bearer ${accessToken}` } });
       setBilling(b); if (b.subscription) setPlansCycle(b.subscription.billingCycle);
-    } catch (err) { setChangeError(err instanceof Error ? err.message : "Failed to change plan."); }
+    } catch { setChangeError(PLAN_CHANGE_ERROR); }
     finally { setChangeLoading(false); }
   }
 

@@ -1396,33 +1396,6 @@ export default function SuperAdminOrganisationDetailPage() {
               </div>
             </div>
           </Reveal>
-          <Reveal delay={3}>
-            <div className="card">
-              <div className="card-h">
-                <span className="t">Danger zone</span>
-              </div>
-              <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {(org.status === "active" ? canDeactivateOrganisation : canActivateOrganisation) ? (
-                  <button
-                    className="btn btn-ghost btn-block"
-                    onClick={() => setStatusModalOpen(true)}
-                    disabled={statusSubmitting}
-                  >
-                    {org.status === "active" ? <><Icon name="close" size={14} /> Deactivate organisation</> : <><Icon name="chevron-right" size={14} /> Activate organisation</>}
-                  </button>
-                ) : null}
-                {canDeleteOrganisation ? (
-                  <button
-                    className="btn btn-ghost btn-block"
-                    style={{ color: "var(--rose)", borderColor: "var(--rose-050)" }}
-                    onClick={() => setDeleteModalOpen(true)}
-                  >
-                    <Icon name="trash" size={14} /> Delete organisation
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          </Reveal>
         </div>
       </div>
 
