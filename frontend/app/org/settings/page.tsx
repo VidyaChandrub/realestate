@@ -41,11 +41,12 @@ const SUBSCRIPTION_STATUS_LABEL: Record<string, string> = {
 const INVOICE_STATUS_BADGE: Record<string, string> = { paid: "b-green", pending: "b-amber" };
 const INVOICE_STATUS_LABEL: Record<string, string> = { paid: "Paid", pending: "Pending" };
 
-const PLAN_LIMIT_ROWS: { key: "templates" | "projects" | "users" | "landingPages"; label: string }[] = [
+const PLAN_LIMIT_ROWS: { key: "templates" | "projects" | "users" | "landingPages" | "landingPagesCreate"; label: string }[] = [
   { key: "templates", label: "Templates" },
   { key: "projects", label: "Projects" },
   { key: "users", label: "Users" },
   { key: "landingPages", label: "Landing pages" },
+  { key: "landingPagesCreate", label: "Created landing pages" },
 ];
 
 const NAV_GROUPS = [
@@ -283,7 +284,7 @@ function SubscriptionHealthBanner({
   );
 }
 
-function PlanLimitsList({ limits, features }: { limits: { templates: number | null; projects: number | null; users: number | null; landingPages: number | null } | null; features?: string[] | null }) {
+function PlanLimitsList({ limits, features }: { limits: { templates: number | null; projects: number | null; users: number | null; landingPages: number | null; landingPagesCreate?: number | null } | null; features?: string[] | null }) {
   const rows = PLAN_LIMIT_ROWS.map((r) => ({
     ...r,
     count: limits?.[r.key] == null ? "Unlimited" : String(limits[r.key]),
@@ -1873,6 +1874,10 @@ export default function OrgSettingsPage() {
                         {renewLoading ? "Renewing…" : "Manage Subscription"}
                       </button>
                     </div>
+                    <div style={{ width: "100%", display: "flex", flexWrap: "wrap", gap: 8, paddingTop: 10, borderTop: "1px solid var(--line)" }}>
+                      <span className="chip">{billing.plan.limits?.landingPagesCreate ?? "Unlimited"} Created landing pages</span>
+                      <span className="chip">{billing.plan.limits?.landingPages ?? "Unlimited"} Published landing pages</span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1962,6 +1967,25 @@ export default function OrgSettingsPage() {
                       ∞
                     </div>
                   </div>
+
+                  {/* Created Landing Pages */}
+                  <div style={{ padding: 16, border: "1px solid var(--line-2)", borderRadius: 12, background: "var(--surface)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--brand-050)", color: "var(--brand)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon name="landing" size={16} />
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>Created Landing Pages</div>
+                        <div className="muted" style={{ fontSize: 12 }}>{billing.usage.landingPagesCreateUsed ?? 0} of {billing.usage.landingPagesCreateLimit ?? "unlimited"} created</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden", marginTop: 12 }}>
+                      <div style={{ height: "100%", width: `${billing.usage.landingPagesCreateLimit ? Math.min(100, ((billing.usage.landingPagesCreateUsed ?? 0) / billing.usage.landingPagesCreateLimit) * 100) : 0}%`, background: "var(--brand)", borderRadius: 999 }} />
+                    </div>
+                    <div style={{ textAlign: "right", fontSize: 11, fontWeight: 700, color: "var(--muted)", marginTop: 4 }}>
+                      {billing.usage.landingPagesCreateLimit ? `${Math.round(((billing.usage.landingPagesCreateUsed ?? 0) / billing.usage.landingPagesCreateLimit) * 100)}%` : "0%"}
+                    </div>
+                  </div>
                 </div>
               ) : <p className="muted">Loading usage statistics…</p>}
             </Card>
@@ -2021,21 +2045,20 @@ export default function OrgSettingsPage() {
                           <span style={{ fontSize: 26, fontWeight: 800, fontFamily: "var(--display)" }}>{formatMoney(price, billing?.subscription?.currency ?? "INR")}</span>
                           <span className="muted" style={{ fontSize: 12.5 }}> / {plansCycle === "yearly" ? "month" : "month"}</span>
                         </div>
-                        <p className="muted" style={{ fontSize: 12.5, marginBottom: 18, minHeight: 36 }}>{p.description || "Perfect for teams getting started"}</p>
+                        {p.description ? <p className="muted" style={{ fontSize: 12.5, marginBottom: 18, minHeight: 36 }}>{p.description}</p> : <div style={{ minHeight: 18, marginBottom: 18 }} />}
 
                         <div style={{ borderTop: "1px solid var(--line)", paddingTop: 16, flex: 1, marginBottom: 20 }}>
                           <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 10 }}>
-                            {(p.features && p.features.length > 0 ? p.features : [
-                              `${p.limits?.templates ?? "Unlimited"} Templates`,
-                              `${p.limits?.projects ?? "Unlimited"} Projects`,
-                              `${p.limits?.users ?? "Unlimited"} Users`,
-                              `${p.limits?.landingPages ?? "Unlimited"} Landing pages`,
-                              "Email & Chat support",
-                              "Custom branding",
-                            ]).map((feat, idx) => (
-                              <li key={idx} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--ink-2)" }}>
+                            {[
+                              { key: "templates", label: "Templates" },
+                              { key: "projects", label: "Projects" },
+                              { key: "users", label: "Users" },
+                              { key: "landingPagesCreate", label: "Created landing pages" },
+                              { key: "landingPages", label: "Published landing pages" },
+                            ].map((limit) => (
+                              <li key={limit.key} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--ink-2)" }}>
                                 <span style={{ color: "var(--green)", fontWeight: 700 }}>✓</span>
-                                <span>{feat}</span>
+                                <span><b>{p.limits?.[limit.key as keyof typeof p.limits] ?? "Unlimited"}</b> {limit.label}</span>
                               </li>
                             ))}
                           </ul>
@@ -2119,7 +2142,8 @@ export default function OrgSettingsPage() {
                           <li>Projects: {billing?.plan?.limits?.projects ?? "Unlimited"}</li>
                           <li>Users: {billing?.plan?.limits?.users ?? "Unlimited"}</li>
                           <li>Templates: {billing?.plan?.limits?.templates ?? "Unlimited"}</li>
-                          <li>Landing Pages: {billing?.plan?.limits?.landingPages ?? "Unlimited"}</li>
+                          <li>Published Landing Pages: {billing?.plan?.limits?.landingPages ?? "Unlimited"}</li>
+                          <li>Created Landing Pages: {billing?.plan?.limits?.landingPagesCreate ?? "Unlimited"}</li>
                         </ul>
                       </div>
                       <div>
@@ -2128,7 +2152,8 @@ export default function OrgSettingsPage() {
                           <li>Projects: {requestModalPlan.limits?.projects ?? "Unlimited"}</li>
                           <li>Users: {requestModalPlan.limits?.users ?? "Unlimited"}</li>
                           <li>Templates: {requestModalPlan.limits?.templates ?? "Unlimited"}</li>
-                          <li>Landing Pages: {requestModalPlan.limits?.landingPages ?? "Unlimited"}</li>
+                          <li>Published Landing Pages: {requestModalPlan.limits?.landingPages ?? "Unlimited"}</li>
+                          <li>Created Landing Pages: {requestModalPlan.limits?.landingPagesCreate ?? "Unlimited"}</li>
                         </ul>
                       </div>
                     </div>

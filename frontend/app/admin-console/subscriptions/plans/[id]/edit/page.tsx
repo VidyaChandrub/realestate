@@ -288,7 +288,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
                 />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
                 <label
                   style={{
                     display: "flex",
@@ -314,30 +314,6 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
                   </div>
                 </label>
 
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "12px 14px",
-                    border: "1px solid rgba(16, 185, 129, 0.2)",
-                    background: "rgba(16, 185, 129, 0.05)",
-                    borderRadius: 12,
-                    cursor: "pointer",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={(form as any).isActive !== false}
-                    onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked } as any))}
-                    style={{ width: 18, height: 18, accentColor: "#10b981" }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: "#059669" }}>
-                      ✓ Set as Default Active Plan
-                    </div>
-                  </div>
-                </label>
               </div>
             </div>
 
