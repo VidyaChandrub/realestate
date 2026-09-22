@@ -807,6 +807,8 @@ export interface OrgBillingSummary {
     usersLimit: number | null;
     landingPagesUsed: number;
     landingPagesLimit: number | null;
+    landingPagesCreateUsed?: number;
+    landingPagesCreateLimit?: number | null;
   };
 }
 

@@ -590,26 +590,28 @@ export default function SuperAdminSubscriptionsPage() {
             <Icon name="refresh" size={14} /> Refresh
           </button>
 
-          <button
-            type="button"
-            onClick={openCreate}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 16px",
-              borderRadius: 10,
-              background: "#4f46e5",
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              border: "none",
-              cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)",
-            }}
-          >
-            <Icon name="plus" size={14} /> Create Plan
-          </button>
+          {tab !== 2 ? (
+            <button
+              type="button"
+              onClick={openCreate}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 16px",
+                borderRadius: 10,
+                background: "#4f46e5",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 600,
+                border: "none",
+                cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)",
+              }}
+            >
+              <Icon name="plus" size={14} /> Create Plan
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -837,7 +839,7 @@ export default function SuperAdminSubscriptionsPage() {
         {/* Tab 0: Overview */}
         {tab === 0 && (
           <div style={{ padding: 24, display: "grid", gap: 20 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.7fr", gap: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
               {/* Left Overview Info */}
               <div
                 style={{
@@ -881,81 +883,6 @@ export default function SuperAdminSubscriptionsPage() {
                 </div>
               </div>
 
-              {/* Right Quick Shortcuts */}
-              <div
-                style={{
-                  padding: 20,
-                  borderRadius: 14,
-                  border: "1px solid #f1f5f9",
-                  background: "#fff",
-                }}
-              >
-                <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 12 }}>
-                  Quick Actions
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={openCreate}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      padding: "10px 14px",
-                      borderRadius: 10,
-                      background: "#4f46e5",
-                      color: "#fff",
-                      fontSize: 13,
-                      fontWeight: 700,
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Icon name="plus" size={14} /> Create New Plan
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAssignOpen(true)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      padding: "10px 14px",
-                      borderRadius: 10,
-                      background: "#f8fafc",
-                      border: "1px solid #e2e8f0",
-                      color: "#334155",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Assign Subscription →
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTab(1)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      padding: "10px 14px",
-                      borderRadius: 10,
-                      background: "#f8fafc",
-                      border: "1px solid #e2e8f0",
-                      color: "#334155",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    View Pricing Matrices →
-                  </button>
-                </div>
-              </div>
             </div>
 
             {/* Revenue Trend & Distribution Row */}
@@ -1041,25 +968,6 @@ export default function SuperAdminSubscriptionsPage() {
                   {plans.length} plans configured for {billingCycle} billing cycle
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={openCreate}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "8px 14px",
-                  borderRadius: 10,
-                  background: "#4f46e5",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                <Icon name="plus" size={14} /> Create Plan
-              </button>
             </div>
 
             {plansLoading ? (
@@ -1142,6 +1050,12 @@ export default function SuperAdminSubscriptionsPage() {
                           </span>
                           <span style={{ fontSize: 11, fontWeight: 600, background: "#f8fafc", border: "1px solid #e2e8f0", padding: "3px 8px", borderRadius: 6, color: "#475569" }}>
                             {fmtLimit(p.limits?.templates)} Templates
+                          </span>
+                          <span style={{ fontSize: 11, fontWeight: 600, background: "#f8fafc", border: "1px solid #e2e8f0", padding: "3px 8px", borderRadius: 6, color: "#475569" }}>
+                            {fmtLimit(p.limits?.landingPagesCreate)} Created Pages
+                          </span>
+                          <span style={{ fontSize: 11, fontWeight: 600, background: "#f8fafc", border: "1px solid #e2e8f0", padding: "3px 8px", borderRadius: 6, color: "#475569" }}>
+                            {fmtLimit(p.limits?.landingPages)} Published Pages
                           </span>
                         </div>
 
@@ -1717,7 +1631,7 @@ export default function SuperAdminSubscriptionsPage() {
               </div>
               <div>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 4 }}>
-                  URL Slug <span style={{ color: "#ef4444" }}>*</span>
+                  URL Slug
                 </label>
                 <input
                   value={String((planForm as any).slug || "")}
@@ -1725,6 +1639,11 @@ export default function SuperAdminSubscriptionsPage() {
                   placeholder="professional"
                   style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
                 />
+                {!editingPlan ? (
+                  <div style={{ marginTop: 5, fontSize: 11, color: "#64748b", lineHeight: 1.4 }}>
+                    Slug will be generated automatically if you leave this blank. You can also enter your own slug.
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -1778,16 +1697,12 @@ export default function SuperAdminSubscriptionsPage() {
               />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, fontWeight: 600, color: "#d97706", cursor: "pointer", background: "rgba(245, 158, 11, 0.08)", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(245, 158, 11, 0.2)" }}>
                 <input type="checkbox" checked={!!(planForm as any).isPopular} onChange={(e) => setPlanForm((p) => ({ ...p, isPopular: e.target.checked } as any))} style={{ width: 16, height: 16, accentColor: "#4f46e5" }} />
                 ★ Highlight as Popular Plan
               </label>
 
-              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, fontWeight: 600, color: "#10b981", cursor: "pointer", background: "rgba(16, 185, 129, 0.08)", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(16, 185, 129, 0.2)" }}>
-                <input type="checkbox" checked={(planForm as any).isActive !== false} onChange={(e) => setPlanForm((p) => ({ ...p, isActive: e.target.checked } as any))} style={{ width: 16, height: 16, accentColor: "#10b981" }} />
-                ✓ Set as Default Active Plan
-              </label>
             </div>
           </div>
 

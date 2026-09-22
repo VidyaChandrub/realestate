@@ -23,6 +23,7 @@ export interface PlanLimits {
   users: number | null;
   templates: number | null;
   landingPages: number | null;
+  landingPagesCreate: number | null;
 }
 
 /** All unlimited — the shape written when no limits are supplied. */
@@ -31,6 +32,7 @@ const UNLIMITED_LIMITS: PlanLimits = {
   users: null,
   templates: null,
   landingPages: null,
+  landingPagesCreate: null,
 };
 
 /**
@@ -59,6 +61,7 @@ export function normalizeLimits(raw: unknown): PlanLimits {
     users: one(src.users),
     templates: one(src.templates),
     landingPages: one(src.landingPages),
+    landingPagesCreate: one(src.landingPagesCreate),
   };
 }
 

@@ -959,6 +959,8 @@ export default function SuperAdminOrganisationDetailPage() {
                         <div><span className="muted" style={{ fontSize:11 }}>Plan value</span><br/><b>₹{((org as any).planValue ?? (org.subscription as any).amount ?? 0).toLocaleString("en-IN")}</b></div>
                         <div><span className="muted" style={{ fontSize:11 }}>Renews</span><br/><b>{(org as any).subscriptionRenewsAt || (org.subscription as any).renewsAt ? new Date((org as any).subscriptionRenewsAt || (org.subscription as any).renewsAt).toLocaleDateString("en-GB") : "—"}</b></div>
                         <div><span className="muted" style={{ fontSize:11 }}>Templates</span><br/><b>{assignedTemplates.length} assigned</b></div>
+                        <div><span className="muted" style={{ fontSize:11 }}>Created landing pages</span><br/><b>{(org as any).plan?.limits?.landingPagesCreate ?? "Unlimited"}</b></div>
+                        <div><span className="muted" style={{ fontSize:11 }}>Published landing pages</span><br/><b>{(org as any).plan?.limits?.landingPages ?? "Unlimited"}</b></div>
                         <div><span className="muted" style={{ fontSize:11 }}>Status</span><br/><b>{(org.subscription as any).status}</b></div>
                       </div>
                     </div>
@@ -984,6 +986,7 @@ export default function SuperAdminOrganisationDetailPage() {
                             <div className={`badge ${p.badge}`}>{p.name}</div>
                             <div style={{ fontWeight:800, marginTop:6 }}>₹{price.toLocaleString("en-IN")}<span style={{ fontSize:11, color:"var(--muted)"}}>{upgradeBillingCycle==="monthly"?"/mo":"/yr"}</span></div>
                             <div style={{ fontSize:11, color:"var(--muted)"}}>{(p.limits as any)?.templates} templates · {p.limits?.projects} projects</div>
+                            <div style={{ fontSize:11, color:"var(--muted)", marginTop:3 }}>{p.limits?.landingPagesCreate ?? "Unlimited"} created · {p.limits?.landingPages ?? "Unlimited"} published pages</div>
                             <div style={{ fontSize:11, fontWeight:700, color: isCurrent? "var(--green)": isSelected? "var(--brand)":"var(--muted)", marginTop:6 }}>{isCurrent?"Current": isSelected?"Selected":"Select"}</div>
                           </div>
                         );

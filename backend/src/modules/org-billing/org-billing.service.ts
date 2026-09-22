@@ -5,6 +5,7 @@ import {
   assertPlanFitsCurrentUsage,
   countBillableOrgUsers,
   countOrgLandingPages,
+  countOrgTotalLandingPages,
   countOrgProjects,
   resolveLimit,
 } from '../../common/utils/plan-quota.util';
@@ -53,7 +54,7 @@ export class OrgBillingService {
     // At most one non-cancelled subscription per org — enforced by
     // SubscriptionsService.create(), not a DB constraint. Mirrors that
     // same lookup rather than assuming a unique index exists.
-    const [subscription, templatesUsed, projectsUsed, usersUsed, landingPagesUsed] =
+    const [subscription, templatesUsed, projectsUsed, usersUsed, landingPagesUsed, landingPagesCreateUsed] =
       await Promise.all([
         this.prisma.subscription.findFirst({
           where: { orgId, status: { not: 'cancelled' } },
@@ -63,6 +64,7 @@ export class OrgBillingService {
         countOrgProjects(this.prisma, orgId),
         countBillableOrgUsers(this.prisma, orgId),
         countOrgLandingPages(this.prisma, orgId),
+        countOrgTotalLandingPages(this.prisma, orgId),
       ]);
 
     if (!subscription) {
@@ -78,12 +80,14 @@ export class OrgBillingService {
           usersLimit: null,
           landingPagesUsed,
           landingPagesLimit: null,
+          landingPagesCreateUsed,
+          landingPagesCreateLimit: null,
         },
       };
     }
 
     // Infinity -> null so the UI renders "unlimited" without a magic number.
-    const asLimit = (key: 'projects' | 'users' | 'templates' | 'landingPages') => {
+    const asLimit = (key: 'projects' | 'users' | 'templates' | 'landingPages' | 'landingPagesCreate') => {
       const n = resolveLimit(subscription.plan, key);
       return n === Infinity ? null : n;
     };
@@ -122,6 +126,8 @@ export class OrgBillingService {
         usersLimit: asLimit('users'),
         landingPagesUsed,
         landingPagesLimit: asLimit('landingPages'),
+        landingPagesCreateUsed,
+        landingPagesCreateLimit: asLimit('landingPagesCreate'),
       },
     };
   }

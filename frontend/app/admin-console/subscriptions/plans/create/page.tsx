@@ -197,15 +197,17 @@ export default function CreatePlanPage() {
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                    URL Slug <span style={{ color: "#ef4444" }}>*</span>
+                    URL Slug
                   </label>
                   <input
                     value={form.slug}
                     onChange={(e) => setForm((p) => ({ ...p, slug: e.target.value }))}
                     placeholder="professional"
-                    required
                     style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13.5 }}
                   />
+                  <div style={{ marginTop: 6, fontSize: 11.5, color: "#64748b", lineHeight: 1.4 }}>
+                    Slug will be generated automatically if you leave this blank. You can also enter your own slug.
+                  </div>
                 </div>
               </div>
 
@@ -262,7 +264,7 @@ export default function CreatePlanPage() {
                 />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
                 <label
                   style={{
                     display: "flex",
@@ -288,30 +290,6 @@ export default function CreatePlanPage() {
                   </div>
                 </label>
 
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "12px 14px",
-                    border: "1px solid rgba(16, 185, 129, 0.2)",
-                    background: "rgba(16, 185, 129, 0.05)",
-                    borderRadius: 12,
-                    cursor: "pointer",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={(form as any).isActive !== false}
-                    onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked } as any))}
-                    style={{ width: 18, height: 18, accentColor: "#10b981" }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: "#059669" }}>
-                      ✓ Set as Default Active Plan
-                    </div>
-                  </div>
-                </label>
               </div>
             </div>
 
