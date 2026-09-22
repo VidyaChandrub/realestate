@@ -144,9 +144,9 @@ function FeaturesAlternating({ props }: { props: FeaturesProps }) {
               {/* Image / placeholder */}
               <div className="flex-1 w-full">
                 {imageUrl ? (
-                  <img src={imageUrl} alt={item.title} className="w-full h-48 @lg:h-56 object-cover rounded-xl" />
+                  <img src={imageUrl} alt={item.title} className="w-full h-56 @lg:h-72 object-cover rounded-[24px]" />
                 ) : (
-                  <div className="w-full h-48 @lg:h-56 rounded-xl bg-bg-3 border border-border-default flex items-center justify-center text-green">
+                  <div className="w-full h-56 @lg:h-72 rounded-[24px] bg-bg-3 border border-border-default flex items-center justify-center text-green">
                     <FeatureGlyph icon={item.icon} />
                   </div>
                 )}
@@ -156,8 +156,22 @@ function FeaturesAlternating({ props }: { props: FeaturesProps }) {
                 <div className="w-10 h-10 rounded-lg bg-green/10 border border-green/20 flex items-center justify-center text-green mb-3">
                   <FeatureGlyph icon={item.icon} />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-                <p className="text-text-2 text-[13px] leading-relaxed">{item.description}</p>
+                {(item as unknown as Record<string, unknown>).label ? (
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-text-2 font-medium mb-2">
+                    {String((item as unknown as Record<string, unknown>).label)}
+                  </div>
+                ) : null}
+                <h3 className="font-display text-2xl font-medium mb-2">{item.title}</h3>
+                <p className="text-text-2 text-[13px] leading-relaxed mb-4">{item.description}</p>
+                {Array.isArray((item as unknown as Record<string, unknown>).tags) ? (
+                  <div className="flex flex-wrap gap-2">
+                    {((item as unknown as Record<string, unknown>).tags as string[]).map((tag) => (
+                      <span key={tag} className="px-3 py-1 rounded-full border border-border-default text-[10px] uppercase tracking-[0.14em] text-text-2">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
           )

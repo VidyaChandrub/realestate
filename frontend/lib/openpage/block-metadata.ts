@@ -132,7 +132,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Hero / Banner',
     description: 'Cover image, title, CTAs and optional form',
     category: 'Real Estate',
-    variants: ['split-form', 'overlay', 'centered', 'stats'],
+    variants: ['split-form', 'overlay', 'centered', 'stats', 'editorial', 'framed', 'asymmetric', 'info-bar', 'framed-center', 'split-curve'],
     defaultProps: { badge: 'New Launch', headline: 'Project name', location: '', description: '', price: '', image: '', primaryCta: 'Book a Site Visit', secondaryCta: 'Download Brochure', stats: [], formId: '', anchor: 'hero' },
   },
   {
@@ -141,7 +141,7 @@ export const blockMetadata: BlockMeta[] = [
     description: 'About the project with highlights',
     category: 'Real Estate',
     variants: ['split', 'centered', 'cards', 'timeline'],
-    defaultProps: { title: 'About the Project', subtitle: '', body: '', image: '', highlights: [], ctaText: '', anchor: 'overview' },
+    defaultProps: { title: 'About the Project', subtitle: '', body: '', image: '', highlights: [], stats: [], ctaText: '', anchor: 'overview' },
   },
   {
     type: 'unit-config',
@@ -180,15 +180,15 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Property Gallery',
     description: 'Gallery with lightbox and filters',
     category: 'Real Estate',
-    variants: ['grid', 'masonry', 'strip'],
-    defaultProps: { title: 'Gallery', images: [{ src: '', alt: '', caption: '', category: '' }], anchor: 'gallery' },
+    variants: ['grid', 'masonry', 'strip', 'lifestyle'],
+    defaultProps: { title: 'Gallery', images: [{ src: '', alt: '', caption: '', meta: '', category: '' }], anchor: 'gallery' },
   },
   {
     type: 'amenities',
     label: 'Property Amenities',
     description: 'Amenity cards with icon or image',
     category: 'Real Estate',
-    variants: ['grid', 'chips', 'icon-grid', 'featured'],
+    variants: ['grid', 'chips', 'icon-grid', 'featured', 'mosaic'],
     defaultProps: { title: 'Amenities', items: [{ title: 'Clubhouse', description: 'Lounge and banquet.', image: '', icon: '' }], anchor: 'amenities' },
   },
   {
@@ -210,7 +210,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Location / Map',
     description: 'Map embed, address and nearby',
     category: 'Real Estate',
-    variants: ['split-map', 'list', 'map-only', 'cards'],
+    variants: ['split-map', 'list', 'map-only', 'cards', 'editorial'],
     defaultProps: { title: 'Location & Connectivity', address: '', embedUrl: '', items: [{ title: 'Metro', meta: '12 min' }], anchor: 'location' },
   },
   {
@@ -218,7 +218,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Location Advantages',
     description: 'Nearby highlights with icons',
     category: 'Real Estate',
-    variants: ['grid'],
+    variants: ['grid', 'signature', 'quote', 'radial'],
     defaultProps: { title: 'Location advantages', items: [{ title: 'ITPL', description: '8 minutes', icon: '' }] },
   },
   {
@@ -226,7 +226,7 @@ export const blockMetadata: BlockMeta[] = [
     label: 'Project Highlights',
     description: 'Why choose us / selling points',
     category: 'Real Estate',
-    variants: ['grid', 'list'],
+    variants: ['grid', 'list', 'alternating'],
     defaultProps: { label: 'Highlights', title: 'Project highlights', items: [{ icon: '', title: 'RERA registered', description: 'Fully compliant development.' }] },
   },
   {
@@ -307,6 +307,19 @@ export const blockMetadata: BlockMeta[] = [
       formId: '',
       popupId: '',
       anchor: 'brochure',
+    },
+  },
+  {
+    type: 'construction-status',
+    label: 'Construction Status',
+    description: 'Progress bars or delivery timeline',
+    category: 'Real Estate',
+    variants: ['default', 'timeline'],
+    defaultProps: {
+      title: 'Construction Status',
+      subtitle: '',
+      items: [{ label: 'Foundation', percent: '100', year: '2026', title: 'Foundation', description: '' }],
+      anchor: 'progress',
     },
   },
   {

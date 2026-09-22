@@ -50,6 +50,7 @@ import {
   createTemplate,
   deleteTemplate,
   duplicateTemplate,
+  ensurePresetTemplates,
   loadTemplates,
   resetTemplate,
   saveTemplate,
@@ -76,6 +77,18 @@ function thumbnailFor(id: string): string {
   switch (id) {
     case "premium":
       return "hero";
+    case "aurelia-reserve":
+      return "/templates/aurelia-reserve.jpg";
+    case "vista-framed":
+      return "/templates/vista-framed.jpg";
+    case "future-home":
+      return "/templates/future-home.jpg";
+    case "modern-living":
+      return "/templates/modern-living.jpg";
+    case "investment-hub":
+      return "/templates/investment-hub.jpg";
+    case "vista-curve":
+      return "/templates/vista-curve.jpg";
     case "residential":
       return "tower";
     case "commercial":
@@ -99,6 +112,31 @@ function thumbnailFor(id: string): string {
     default:
       return "tower";
   }
+}
+
+function TemplateThumb({
+  thumbnail,
+  accent,
+}: {
+  thumbnail: string;
+  accent?: string;
+}) {
+  const real = thumbnail.startsWith("/") || thumbnail.startsWith("http");
+  if (real) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={thumbnail}
+        alt=""
+        style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
+      />
+    );
+  }
+  return (
+    <div style={{ width: "100%", height: "100%", background: accent || "#1e293b", position: "relative" }}>
+      <SceneImage art={thumbnail || "hero"} />
+    </div>
+  );
 }
 
 function goToBuilder(pageId: string) {
@@ -150,9 +188,13 @@ export default function SuperAdminTemplatesPage() {
 
   const reloadTemplates = useCallback(() => {
     setLoading(true);
-    loadTemplates()
+    ensurePresetTemplates()
       .then(setPages)
-      .catch(() => setPages([]))
+      .catch(() =>
+        loadTemplates()
+          .then(setPages)
+          .catch(() => setPages([])),
+      )
       .finally(() => setLoading(false));
   }, []);
 
@@ -318,6 +360,7 @@ export default function SuperAdminTemplatesPage() {
           designId: design,
           kind: "preset",
         }),
+        openPageSite: buildRealEstateTemplate(openPageTemplateIdForDesign(design), row.name),
       });
       setPages((prev) => prev.map((p) => (p.id === pageId ? updated : p)));
       notify("Predefined template reset");
@@ -386,7 +429,8 @@ export default function SuperAdminTemplatesPage() {
         thumbnail: thumbnailFor(t.id),
         description: t.description,
       }));
-    return [...reDesigns, ...TEMPLATES.filter((t) => t.id !== "tpl-blank")];
+    const reIds = new Set(reDesigns.map((t) => t.id));
+    return [...reDesigns, ...TEMPLATES.filter((t) => t.id !== "tpl-blank" && !reIds.has(t.id))];
   }, []);
 
   const selectedBase = bases.find((t) => t.id === designId) ?? bases[0];
@@ -1091,7 +1135,7 @@ export default function SuperAdminTemplatesPage() {
                           position: "relative",
                         }}
                       >
-                        <SceneImage art={r.thumbnail || "hero"} />
+                        <TemplateThumb thumbnail={r.thumbnail || "hero"} accent={r.accent} />
                       </div>
                     </td>
                     <td>
@@ -1584,7 +1628,7 @@ export default function SuperAdminTemplatesPage() {
                       color: "#fff",
                     }}
                   >
-                    <SceneImage art={t.thumbnail} />
+                    <TemplateThumb thumbnail={t.thumbnail} accent={t.accent2} />
                   </span>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{t.name}</span>

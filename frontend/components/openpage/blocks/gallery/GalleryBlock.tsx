@@ -8,6 +8,7 @@ interface GalleryImage {
   src?: string;
   alt?: string;
   caption?: string;
+  meta?: string;
   category?: string;
 }
 
@@ -55,7 +56,16 @@ export function GalleryBlock({ block }: { block: BlockConfig }) {
 
   return (
     <section id={(typeof props.anchor === "string" && props.anchor) || "gallery"} className="px-6 py-16 @lg:px-16 @lg:py-20">
-      {title ? <h2 className="font-display text-3xl @md:text-4xl font-semibold mb-6 text-center">{title}</h2> : null}
+      {typeof props.label === "string" && props.label ? (
+        <p className="text-[11px] uppercase tracking-[0.28em] text-text-2 font-medium mb-3 text-center @lg:text-left max-w-6xl mx-auto">
+          {props.label}
+        </p>
+      ) : null}
+      {title ? (
+        <h2 className={`font-display text-3xl @md:text-4xl font-semibold mb-6 ${variant === "lifestyle" ? "text-left max-w-xl" : "text-center"}`}>
+          {title}
+        </h2>
+      ) : null}
       {categories.length ? (
         <div className="flex flex-wrap justify-center gap-2 mb-8">
           {["All", ...categories].map((c) => (
@@ -72,6 +82,35 @@ export function GalleryBlock({ block }: { block: BlockConfig }) {
           ))}
         </div>
       ) : null}
+      {variant === "lifestyle" ? (
+        <div className="grid grid-cols-1 @md:grid-cols-2 gap-6 @md:gap-8 max-w-6xl mx-auto">
+          {visible.map((img, i) => (
+            <button
+              key={`${img.src}-${i}`}
+              type="button"
+              onClick={() => setOpen(i)}
+              className={`text-left group ${i % 3 === 0 ? "@md:row-span-2" : ""}`}
+            >
+              <div className={`rounded-[24px] overflow-hidden bg-bg-2 ${i % 3 === 0 ? "aspect-[3/4]" : "aspect-[16/11]"}`}>
+                {img.src ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={img.src} alt={img.alt || ""} className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700" />
+                ) : (
+                  <div className="w-full h-full min-h-[200px] bg-bg-3 flex items-center justify-center">
+                    <ImageIcon size={24} className="text-text-3" />
+                  </div>
+                )}
+              </div>
+              <div className="flex items-baseline justify-between gap-3 mt-3 px-1">
+                <span className="font-display text-lg text-text-0">{img.caption || img.alt || "Space"}</span>
+                {img.meta ? (
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-text-3 shrink-0">{img.meta}</span>
+                ) : null}
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
       <div
         className={
           variant === "strip"
@@ -104,6 +143,7 @@ export function GalleryBlock({ block }: { block: BlockConfig }) {
           )
         )}
       </div>
+      )}
       {openImage?.src ? (
         <div className="fixed inset-0 z-[90] bg-black/80 flex items-center justify-center p-4" onClick={() => setOpen(null)}>
           <button type="button" className="absolute top-4 right-4 text-white" aria-label="Close" onClick={() => setOpen(null)}>

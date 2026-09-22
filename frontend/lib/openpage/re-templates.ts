@@ -2,6 +2,7 @@ import type { BlockConfig, SiteConfig } from "@/components/openpage/blocks/types
 import { themePresets } from "@/lib/openpage/theme-presets";
 import { newFormDefinition } from "@/lib/openpage/forms-store";
 import { buildPremiumRealEstateTemplate } from "@/lib/openpage/premium-template";
+import { buildPdfHomeTemplate } from "@/lib/openpage/pdf-home-templates";
 
 function theme(id: string) {
   return themePresets.find((t) => t.id === id)?.theme;
@@ -112,6 +113,12 @@ const footer = (name: string): BlockConfig => ({
 export const realEstateTemplateMeta = [
   { id: "blank", name: "Blank canvas", description: "Empty page — add sections from the Templates library" },
   { id: "premium", name: "Meridian Residences", description: "Premium launch page with hero form, gallery, brochure popup and full lead capture" },
+  { id: "aurelia-reserve", name: "Aurelia Reserve", description: "Luxury editorial home — hero info bar, philosophy, signature highlights, lifestyle gallery, timeline" },
+  { id: "vista-framed", name: "Vista Framed", description: "Rounded framed hero with glass stats, centered overview, amenity grid and gallery" },
+  { id: "future-home", name: "Future Home", description: "Cream asymmetric hero with floating stats card, highlights split and contact form" },
+  { id: "modern-living", name: "Modern Living", description: "Centered aerial hero with overlapping info bar, featured amenities and location cards" },
+  { id: "investment-hub", name: "Investment Hub", description: "Marketplace home — framed night hero, property-type mosaic, listings and testimonials" },
+  { id: "vista-curve", name: "Vista Curve", description: "Split curve hero with stats panel, radial highlights, configs and neighbourhood" },
   { id: "residential", name: "Residential Project", description: "Apartments with amenities, plans and enquiry" },
   { id: "commercial", name: "Commercial Project", description: "Office / retail project landing page" },
   { id: "luxury", name: "Luxury Apartment", description: "Premium presentation with gallery and offers" },
@@ -141,6 +148,12 @@ export function openPageTemplateIdForDesign(designId: string): RealEstateTemplat
   }
   if (key === "tpl-lead" || key.includes("lead")) return "lead";
   if (key === "tpl-meridian" || key.includes("premium") || key.includes("meridian")) return "premium";
+  if (key.includes("aurelia")) return "aurelia-reserve";
+  if (key.includes("vista-curve") || (key.includes("curve") && key.includes("vista"))) return "vista-curve";
+  if (key.includes("vista") || key.includes("framed")) return "vista-framed";
+  if (key.includes("future-home") || key.includes("future home")) return "future-home";
+  if (key.includes("modern-living") || key.includes("modern living")) return "modern-living";
+  if (key.includes("investment") || key.includes("aevum")) return "investment-hub";
   if (key.includes("enquiry")) return "enquiry";
   if (key.includes("site-visit") || key.includes("sitevisit")) return "site-visit";
   if (key.includes("brochure")) return "brochure";
@@ -328,6 +341,9 @@ function leadCaptureBlocks(name: string): BlockConfig[] {
 }
 
 export function buildRealEstateTemplate(id: RealEstateTemplateId | string, name: string): SiteConfig {
+  const fromPdf = buildPdfHomeTemplate(id, name);
+  if (fromPdf) return fromPdf;
+
   switch (id) {
     case "blank":
       return {

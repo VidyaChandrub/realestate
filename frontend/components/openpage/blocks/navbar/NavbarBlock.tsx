@@ -130,7 +130,7 @@ function CtaButton({
     <a
       href={href}
       onClick={(e) => handleNavClick(e, href, onClick)}
-      className="px-4 py-2 rounded-lg bg-green text-black text-[13px] font-semibold hover:bg-green-dim transition-all hover:accent-glow-md"
+      className="px-4 py-2 rounded-full bg-green text-white text-[13px] font-semibold hover:bg-green-dim transition-all hover:accent-glow-md"
     >
       {text}
     </a>
