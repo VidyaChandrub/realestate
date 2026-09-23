@@ -1083,11 +1083,23 @@ export default function SuperAdminOrganisationDetailPage() {
                           <div style={{ padding:10}}>
                             <div style={{ fontWeight:700, fontSize:12}}>{at.template.name}</div>
                             <div style={{ fontSize:11, color:"var(--muted)"}}>{at.template.slug}</div>
-                            {canRemoveOrgTemplates ? (
-                              <button className="btn btn-ghost btn-sm" style={{ marginTop:6, color:"var(--rose)" }} onClick={()=>requestRemoveTemplate(at)} disabled={templateSaving}>Remove</button>
-                            ) : null}
-                            <div style={{ fontSize:11, color:"var(--muted)", marginTop:6 }}>
-                              Built pages: <strong style={{ color:"var(--ink)" }}>{at.landingPageCount ?? 0}</strong>
+                            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, marginTop:8 }}>
+                              <div style={{ fontSize:11, color:"var(--muted)" }}>
+                                Built pages: <strong style={{ color:"var(--ink)" }}>{at.landingPageCount ?? 0}</strong>
+                              </div>
+                              {canRemoveOrgTemplates ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  style={{ padding:"6px 8px", color:"var(--rose)" }}
+                                  onClick={()=>requestRemoveTemplate(at)}
+                                  disabled={templateSaving}
+                                  title="Remove template"
+                                  aria-label={`Remove ${at.template.name}`}
+                                >
+                                  <Icon name="trash" size={13} />
+                                </button>
+                              ) : null}
                             </div>
                           </div>
                         </div>
