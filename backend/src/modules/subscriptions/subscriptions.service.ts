@@ -158,6 +158,10 @@ export class SubscriptionsService {
     });
     if (existing) throw new ConflictException('Organisation already has an active subscription — use PATCH to upgrade/downgrade');
 
+    // Same downgrade guard as update() — assigning a brand-new subscription
+    // must not silently exceed what the org is already using.
+    await assertPlanFitsCurrentUsage(this.prisma, dto.orgId, plan);
+
     const billingCycle = dto.billingCycle ?? 'monthly';
     const { amount, mrr } = computeAmountAndMrr(plan, billingCycle);
 

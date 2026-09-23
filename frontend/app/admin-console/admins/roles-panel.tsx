@@ -10,7 +10,11 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { DynamicRole } from "@/lib/types";
 
 type PermissionColumn = "canView" | "canAdd" | "canEdit" | "canDelete" | "canApprove";
-type PermissionPill = { key: string; permission: PermissionColumn; label: string };
+// `moduleKey` lets a pill shown under one row read/write a *different*
+// module's column — used to nest "Upgrade subscription" under Organisations
+// while keeping it stored independently of Organisations' own Edit bit (see
+// admin_org_upgrade_subscription below).
+type PermissionPill = { key: string; moduleKey?: string; permission: PermissionColumn; label: string };
 
 const DEFAULT_PERMISSION_PILLS: PermissionPill[] = [
   { key: "canView", permission: "canView", label: "View" },
@@ -27,12 +31,22 @@ const DEFAULT_PERMISSION_PILLS: PermissionPill[] = [
 // actually do, without touching the shared column schema.
 const MODULE_PERMISSION_PILLS: Record<string, PermissionPill[]> = {
   // Organisations has no "Approve" action; canAdd/canApprove are repurposed
-  // as the Activate/Deactivate toggle instead.
+  // as the Activate/Deactivate toggle instead. "Upgrade subscription" is
+  // shown here (where a Super Admin looks for it, and where "All"/"None"
+  // sweep it up) but is actually stored on its own module,
+  // admin_org_upgrade_subscription (hidden from the module list below) — so
+  // granting/revoking it never touches "Edit" or any other Organisations bit.
   admin_organisations: [
     { key: "canView", permission: "canView", label: "View" },
     { key: "activate", permission: "canAdd", label: "Activate" },
     { key: "deactivate", permission: "canApprove", label: "Deactivate" },
     { key: "canEdit", permission: "canEdit", label: "Edit" },
+    {
+      key: "upgradeSubscription",
+      moduleKey: "admin_org_upgrade_subscription",
+      permission: "canEdit",
+      label: "Upgrade subscription",
+    },
     { key: "canDelete", permission: "canDelete", label: "Delete" },
   ],
   // The console dashboard is a read-only overview — there's nothing to add,
@@ -59,7 +73,6 @@ const MODULE_PERMISSION_PILLS: Record<string, PermissionPill[]> = {
     { key: "canDelete", permission: "canDelete", label: "Delete" },
     { key: "assignPlan", permission: "canAdd", label: "Assign plan" },
     { key: "changePlan", permission: "canEdit", label: "Change" },
-    { key: "cancelPlan", permission: "canDelete", label: "Cancel plan" },
     { key: "approve", permission: "canApprove", label: "Approve" },
     { key: "reject", permission: "canDelete", label: "Reject" },
   ],
@@ -68,6 +81,11 @@ const MODULE_PERMISSION_PILLS: Record<string, PermissionPill[]> = {
 function permissionPillsFor(moduleKey: string): PermissionPill[] {
   return MODULE_PERMISSION_PILLS[moduleKey] ?? DEFAULT_PERMISSION_PILLS;
 }
+
+// Modules that exist purely as backing storage for a pill nested under a
+// different row (see the `moduleKey` override on that pill) — never rendered
+// as a console-module row of their own.
+const HIDDEN_MODULE_KEYS = new Set<string>(["admin_org_upgrade_subscription"]);
 
 const PRESETS = [
   { name: "Platform Operator", key: "platform_operator", desc: "Day-to-day Super Admin console: organisations, domains, support" },
@@ -273,14 +291,25 @@ export function PlatformRolesPanel({
     if (!permRole || permRole.key === "super_admin") return;
     const item = permRows.find((row) => row.moduleKey === moduleKey);
     if (!item) return;
-    // Only the columns this module actually exposes a pill for — never write
-    // a hidden/unused action column (e.g. the unused canApprove on modules
-    // with no approve-like action) just because "All"/"None" was clicked.
-    const visibleColumns = permissionPillsFor(moduleKey).map((p) => p.permission);
+    // Only the columns this module's pills actually expose — never write a
+    // hidden/unused action column (e.g. the unused canApprove on modules with
+    // no approve-like action) just because "All"/"None" was clicked. A pill
+    // can target a different module than the one it's displayed under (e.g.
+    // "Upgrade subscription" nested under Organisations but stored on its own
+    // module), so group columns by their real target module first — this is
+    // what keeps "All"/"None" on Organisations from missing it.
+    const columnsByModule = new Map<string, PermissionColumn[]>();
+    for (const pill of permissionPillsFor(moduleKey)) {
+      const target = pill.moduleKey ?? moduleKey;
+      const cols = columnsByModule.get(target) ?? [];
+      cols.push(pill.permission);
+      columnsByModule.set(target, cols);
+    }
     const nextRows = permRows.map((row) => {
-      if (row.moduleKey !== moduleKey) return row;
+      const cols = columnsByModule.get(row.moduleKey);
+      if (!cols) return row;
       const patch: Partial<typeof row> = {};
-      for (const col of visibleColumns) patch[col] = enabled;
+      for (const col of cols) patch[col] = enabled;
       return { ...row, ...patch };
     });
     await savePermissionRows(
@@ -373,7 +402,7 @@ export function PlatformRolesPanel({
                   <span>Console module</span>
                   <span>Permissions</span>
                 </div>
-                {permRows.map((item) => (
+                {permRows.filter((item) => !HIDDEN_MODULE_KEYS.has(item.moduleKey)).map((item) => (
                   <div
                     className={`platform-permission-row${item.moduleKey === "admin_subscriptions" ? " platform-permission-row--subscriptions" : ""}`}
                     key={item.moduleKey}
@@ -383,15 +412,19 @@ export function PlatformRolesPanel({
                       <div className="muted" style={{ fontSize: 12 }}>{item.description}</div>
                     </div>
                     <div className="platform-permission-actions">
-                      {permissionPillsFor(item.moduleKey).map(({ key, permission, label }) => {
-                        const enabled = locked || item[permission as keyof typeof item];
+                      {permissionPillsFor(item.moduleKey).map(({ key, moduleKey: pillModuleKey, permission, label }) => {
+                        // A pill can be stored on a different module than the
+                        // row it's displayed under (see "Upgrade subscription"
+                        // on Organisations) — resolve its own row for state.
+                        const sourceItem = pillModuleKey ? permRows.find((r) => r.moduleKey === pillModuleKey) : item;
+                        const enabled = locked || (sourceItem ? sourceItem[permission as keyof typeof sourceItem] : false);
                         return (
                           <button
                             className={`platform-permission-pill${enabled ? " is-enabled" : ""}`}
                             key={key}
                             type="button"
                             disabled={locked || savingPermission !== null}
-                            onClick={() => void togglePerm(item.moduleKey, permission as "canView" | "canAdd" | "canEdit" | "canDelete" | "canApprove")}
+                            onClick={() => void togglePerm(pillModuleKey ?? item.moduleKey, permission as "canView" | "canAdd" | "canEdit" | "canDelete" | "canApprove")}
                             aria-pressed={enabled}
                             aria-label={`${label} permission for ${item.label}`}
                           >
