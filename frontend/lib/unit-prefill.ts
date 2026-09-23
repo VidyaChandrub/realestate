@@ -1,10 +1,12 @@
 /**
- * Prefilling a unit's areas and price from its project's unit type.
+ * Prefilling a unit's fields from its project's unit type.
  *
- * A project's `UnitType` rows are its planned mix — "a 2 BHK here is 1,000 sqft
- * carpet at ₹64L". The unit form used to ask for all of that again, which is
- * what made "add a unit type, then add a unit" feel like doing the same work
- * twice. Picking a configuration now copies those values in.
+ * A project's `UnitType` rows are its planned mix — "a 2 BHK here is 1,000
+ * sq ft at ₹64L". Picking a configuration copies those values into the unit
+ * form, for whichever fields the org actually filled in on that row —
+ * typically at least the `area`- and `price`-role fields, but any field in
+ * the unit template can carry a default. This works for any project type
+ * with a `configuration`-role field, not just apartments.
  *
  * Three rules this deliberately keeps:
  *
@@ -23,38 +25,35 @@
  * the same way.
  */
 
+import type { FieldDef } from "./field-template";
 import type { UnitType } from "./types";
 import { pickUnitTypeForConfiguration } from "./unit-types";
 
-/** The three fields a unit type can prefill. */
-export type PrefillField = "carpetSqft" | "builtupSqft" | "price";
-
-export const PREFILL_FIELDS: PrefillField[] = [
-  "carpetSqft",
-  "builtupSqft",
-  "price",
-];
-
 export interface PrefillResult {
-  /** Form values to apply, as strings. Only includes fields the type has. */
-  values: Partial<Record<PrefillField, string>>;
-  /** Which fields were actually filled — drives the "from X" note. */
-  filled: PrefillField[];
+  /** Form values to apply, as strings, keyed by template field key. */
+  values: Record<string, string>;
+  /** Which keys were actually filled — drives the "from X" note. */
+  filled: string[];
 }
 
-const toField = (v: number | null | undefined): string =>
-  v == null ? "" : String(v);
+const toField = (v: string | number | boolean | null | undefined): string => {
+  if (v === null || v === undefined || v === "") return "";
+  return typeof v === "boolean" ? (v ? "yes" : "no") : String(v);
+};
 
 /**
  * Values to copy in when `configuration` is picked in a project context.
  *
- * `unitTypes` is the project's planned mix. Returns empty when there's no
- * project, no matching type, or the type carries none of the three values —
- * all of which mean "leave the form alone", not "error".
+ * `unitTypes` is the project's planned mix; `template` is the project's
+ * current unit template (defaults for a key no longer in the template are
+ * ignored — nothing left to render them into). Returns empty when there's no
+ * project, no matching type, or the type carries no defaults — all of which
+ * mean "leave the form alone", not "error".
  */
 export function prefillFromUnitType(
   configuration: string,
   unitTypes: UnitType[] | null | undefined,
+  template: FieldDef[],
 ): PrefillResult {
   const empty: PrefillResult = { values: {}, filled: [] };
   const label = configuration.trim();
@@ -66,13 +65,15 @@ export function prefillFromUnitType(
   const match = pickUnitTypeForConfiguration(label, unitTypes);
   if (!match) return empty;
 
-  const values: Partial<Record<PrefillField, string>> = {};
-  const filled: PrefillField[] = [];
-  for (const field of PREFILL_FIELDS) {
-    const next = toField(match[field]);
+  const templateKeys = new Set(template.map((f) => f.key));
+  const values: Record<string, string> = {};
+  const filled: string[] = [];
+  for (const [key, raw] of Object.entries(match.fieldDefaults ?? {})) {
+    if (!templateKeys.has(key)) continue;
+    const next = toField(raw);
     if (next === "") continue;
-    values[field] = next;
-    filled.push(field);
+    values[key] = next;
+    filled.push(key);
   }
   return { values, filled };
 }

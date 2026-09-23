@@ -8,19 +8,97 @@ import { BadRequestException } from '@nestjs/common';
 export const FIELD_TYPES = ['number', 'text', 'yesno', 'choice'] as const;
 export type FieldType = (typeof FIELD_TYPES)[number];
 
+// A role wires a field onto a real Unit column and the feature that column
+// powers. At most one field per template may carry a given role. A role is
+// fixed once set (never re-assigned by an edit) — only a field's label is
+// always editable. Deleting the field that carries a role simply turns that
+// feature off (no price shown, flat list, …) — it never errors.
+export const FIELD_ROLES = [
+  'price',
+  'area',
+  'group',
+  'floor',
+  'configuration',
+] as const;
+export type FieldRole = (typeof FIELD_ROLES)[number];
+
+// The Unit type each role must be storable as, so a role can only land on a
+// field whose input type actually fits its column (Unit.floor is an Int,
+// Unit.tower/configuration are free text/choice, price/area are numbers).
+const ROLE_REQUIRED_TYPES: Record<FieldRole, FieldType[]> = {
+  price: ['number'],
+  area: ['number'],
+  floor: ['number'],
+  group: ['text', 'choice'],
+  configuration: ['text', 'choice'],
+};
+
 export interface FieldDef {
   key: string;
   label: string;
   type: FieldType;
   required: boolean;
+  // Groups fields under a heading in the rendered form. Optional — an
+  // unsectioned field renders under no heading.
+  section?: string;
+  // Wires this field onto a real Unit column and the feature it powers. At
+  // most one field per template may carry a given role.
+  role?: FieldRole;
   // choice only
   options?: string[];
   // number only — display suffix such as "acres"
   unit?: string;
+  // text only — render hint for a textarea instead of a single-line input.
+  multiline?: boolean;
 }
 
 export const MAX_TEMPLATE_FIELDS = 40;
 const KEY_RE = /^[a-z][a-z0-9_]{0,39}$/;
+
+/** The field currently carrying `role` in a template, or null. */
+export function roleField(template: FieldDef[], role: FieldRole): FieldDef | null {
+  return template.find((f) => f.role === role) ?? null;
+}
+
+/**
+ * The fields whose values belong in `customFields` — a role field's value
+ * lives on its own dedicated Unit column instead, so it's never valid inside
+ * `customFields` (an incoming key for one is rejected as unknown, same as
+ * any other key not in the template).
+ */
+export function nonRoleFields(template: FieldDef[]): FieldDef[] {
+  return template.filter((f) => !f.role);
+}
+
+/** What a template's role fields give a project. Derived, never stored. */
+export interface TemplateTraits {
+  /** A price-role field exists. */
+  priced: boolean;
+  /** An area-role field exists (powers price per unit area). */
+  hasArea: boolean;
+  /** Floors are captured (a floor-role field exists). */
+  floors: boolean;
+  /** The unit-configuration mix (planned counts, size/price defaults). */
+  configurations: boolean;
+  /** Units are organised into named groups. */
+  grouped: boolean;
+}
+
+export function templateTraits(template: FieldDef[]): TemplateTraits {
+  return {
+    priced: !!roleField(template, 'price'),
+    hasArea: !!roleField(template, 'area'),
+    floors: !!roleField(template, 'floor'),
+    configurations: !!roleField(template, 'configuration'),
+    grouped: !!roleField(template, 'group'),
+  };
+}
+
+/** The grouping column's name for a project — the `group`-role field's own
+ *  editable label; null when the template has no `group`-role field. */
+export function groupNoun(template: FieldDef[]): string | null {
+  return roleField(template, 'group')?.label ?? null;
+}
 
 export function slugifyFieldKey(label: string): string {
   const slug = label
@@ -48,6 +126,7 @@ export function normalizeFieldTemplate(input: unknown): FieldDef[] {
   }
   const seenKeys = new Set<string>();
   const seenLabels = new Set<string>();
+  const seenRoles = new Set<FieldRole>();
   return input.map((raw: unknown, i) => {
     const n = i + 1;
     if (typeof raw !== 'object' || raw === null) {
@@ -87,6 +166,31 @@ export function normalizeFieldTemplate(input: unknown): FieldDef[] {
 
     const def: FieldDef = { key, label, type, required: f.required === true };
 
+    if (typeof f.section === 'string' && f.section.trim()) {
+      const section = f.section.trim();
+      if (section.length > 60) {
+        throw new BadRequestException(`"${label}" section name is too long (max 60)`);
+      }
+      def.section = section;
+    }
+
+    if (f.role !== undefined && f.role !== null) {
+      if (!FIELD_ROLES.includes(f.role as FieldRole)) {
+        throw new BadRequestException(`"${label}" has an unknown role`);
+      }
+      const role = f.role as FieldRole;
+      if (seenRoles.has(role)) {
+        throw new BadRequestException(`Two fields can't both be the "${role}" field`);
+      }
+      if (!ROLE_REQUIRED_TYPES[role].includes(type)) {
+        throw new BadRequestException(
+          `"${label}" can't be the "${role}" field — it must be ${ROLE_REQUIRED_TYPES[role].join(' or ')}`,
+        );
+      }
+      seenRoles.add(role);
+      def.role = role;
+    }
+
     if (type === 'choice') {
       const opts = Array.isArray(f.options)
         ? f.options
@@ -110,6 +214,9 @@ export function normalizeFieldTemplate(input: unknown): FieldDef[] {
         throw new BadRequestException(`"${label}" unit is too long (max 20)`);
       }
       def.unit = unit;
+    }
+    if (type === 'text' && f.multiline === true) {
+      def.multiline = true;
     }
     return def;
   });
@@ -183,12 +290,14 @@ export function validateCustomValues(
         }
         result[f.key] = raw;
         break;
-      case 'text':
-        if (typeof raw !== 'string' || raw.length > 500) {
-          throw new BadRequestException(`"${f.label}" must be text of at most 500 characters`);
+      case 'text': {
+        const max = f.multiline ? 2000 : 500;
+        if (typeof raw !== 'string' || raw.length > max) {
+          throw new BadRequestException(`"${f.label}" must be text of at most ${max} characters`);
         }
         result[f.key] = raw.trim();
         break;
+      }
       case 'yesno':
         if (typeof raw !== 'boolean') {
           throw new BadRequestException(`"${f.label}" must be yes or no`);

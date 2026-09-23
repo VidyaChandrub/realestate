@@ -3,13 +3,13 @@
 import { useEffect, useState, useCallback, type ChangeEvent } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, cancelPackageChangeRequest, changePlan, addCommonProjectTypes, createOrgCatalogOption, createOrgProjectType, deleteOrgCatalogOption, deleteOrgProjectType, getInvoices, getOrgCatalogOptions, getOrgProjectTypes, updateOrgProjectType, getOrgDomainInfo, getOrgLeadStageDisplays, getOrgPackageChangeRequest, getPlans, renewSubscription, requestCustomDomain, submitPackageChangeRequest, updateOrgLeadStageDisplay } from "@/lib/api";
-import type { BillingRenewResult, ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, OrgProjectType, PackageChangeRequestRow, Plan, SafeOrganisation, UnitPriceBasis, UpdateOrganisationSettingsInput } from "@/lib/types";
+import type { BillingRenewResult, ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, OrgProjectType, PackageChangeRequestRow, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
 import { DEFAULT_LEAD_STAGES, LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead-stages";
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { OrgSmtpSettings } from "@/components/org/org-smtp-settings";
 import { TypedFieldEditor } from "@/components/org/typed-field-editor";
-import { fieldsToRows, LAYOUTS, layoutInfo, rowsToFields, validateFieldRows, type FieldRow, type ProjectLayout } from "@/lib/field-template";
+import { fieldsToRows, groupNoun, rowsToFields, templateTraits, validateFieldRows, type FieldRow } from "@/lib/field-template";
 import { Modal } from "@/components/ui/modal";
 import { subdomainPreviewHost } from "@/lib/domain";
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
@@ -564,82 +564,6 @@ const LEAD_CATALOG_GROUPS: CatalogGroup[] = [
   { category: "lead_preferred_floor", title: "Preferred floor", sub: "Floor preference — e.g. Any, Low, Mid, High (10th+)", placeholder: "Add a floor preference…" },
 ];
 
-/**
- * Org-level price-per-sqft basis. Lives here rather than under Localization
- * because carpet-vs-built-up is a commercial (RERA) convention about the
- * inventory, not a locale format — and this is the page that already owns the
- * unit configuration list it applies to.
- */
-function PricingBasisCard() {
-  const [basis, setBasis] = useState<UnitPriceBasis | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState(false);
-
-  useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect */
-    apiFetch<SafeOrganisation>("/org/settings")
-      .then((o) => setBasis(o.unit_price_basis ?? "carpet"))
-      .catch((e) => setErr(e instanceof Error ? e.message : "Failed to load the pricing basis."));
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, []);
-
-  async function choose(next: UnitPriceBasis) {
-    if (next === basis || saving) return;
-    const previous = basis;
-    setBasis(next);
-    setSaving(true);
-    setErr(null);
-    setSavedAt(false);
-    try {
-      await apiFetch("/org/settings", {
-        method: "PATCH",
-        body: JSON.stringify({ unitPriceBasis: next }),
-      });
-      setSavedAt(true);
-    } catch (e) {
-      setBasis(previous);
-      setErr(e instanceof Error ? e.message : "Couldn't change the pricing basis.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Card
-      icon="properties"
-      title="Pricing basis"
-      sub="Which area a unit's price per sqft is divided by"
-    >
-      {err ? <div className="form-alert">{err}</div> : null}
-      {basis === null ? (
-        <p className="muted" style={{ margin: 0 }}>Loading…</p>
-      ) : (
-        <>
-          <div className="opts" data-single>
-            {(["carpet", "builtup"] as const).map((option) => (
-              <span
-                key={option}
-                className={`opt rad ${basis === option ? "on" : ""}`}
-                onClick={() => void choose(option)}
-                style={{ cursor: saving ? "wait" : "pointer" }}
-              >
-                <span className="b">{basis === option ? "●" : ""}</span>
-                {option === "carpet" ? "Carpet area" : "Built-up area"}
-              </span>
-            ))}
-          </div>
-          <div className="hint" style={{ marginTop: 10 }}>
-            Applies everywhere a per-sqft price is shown, and the figure is always
-            labelled with the basis. Carpet area is the RERA-standard default.
-            {savedAt ? <b> Saved.</b> : null}
-          </div>
-        </>
-      )}
-    </Card>
-  );
-}
-
 function CatalogSection({
   groups = CATALOG_GROUPS,
   heading,
@@ -752,9 +676,11 @@ function CatalogSection({
 }
 
 /**
- * Project types — each an org-owned entry with a fixed structure layout and
- * two typed field templates (project summary fields, per-unit fields). Where
- * an org defines what "Plots" or "Farmhouses" means, with no code change.
+ * Project types — each an org-owned entry with two typed field templates
+ * (project summary fields, per-unit fields). There is no fixed layout: which
+ * inventory controls a project has (grouping, floors, configurations, price)
+ * is derived from which role fields the unit template carries. Where an org
+ * defines what "Plots" or "Farmhouses" means, with no code change.
  */
 function ProjectTypesSection() {
   const [types, setTypes] = useState<OrgProjectType[] | null>(null);
@@ -829,19 +755,25 @@ function ProjectTypesSection() {
       {types === null && !loadError ? <p className="muted" style={{ margin: 0 }}>Loading…</p> : null}
       {types && types.length === 0 && editing !== "new" ? (
         <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
-          No project types yet. Add the common ones with one click (Apartments, Villas, Plots, Commercial), or create your own.
+          No project types yet. Add the common ones with one click (Apartment, Plot, Villa), or create your own.
         </div>
       ) : null}
       {editing === "new" ? (
         <ProjectTypeEditor initial={null} onSaved={saved} onCancel={() => setEditing(null)} />
       ) : null}
       {(types ?? []).map((t) => {
-        const layout = layoutInfo(t.layout);
+        const traits = templateTraits(t.unitFields);
+        const badges = [
+          traits.grouped ? groupNoun(t.unitFields) ?? "Grouped" : null,
+          traits.floors ? "Floors" : null,
+          traits.configurations ? "Configurations" : null,
+          traits.priced ? "Priced" : null,
+        ].filter((b): b is string => !!b);
         return (
           <div key={t.id} style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <b style={{ fontSize: 14 }}>{t.name}</b>
-              <span className="badge b-blue">{layout.title}</span>
+              {badges.length ? badges.map((b) => <span key={b} className="badge b-blue">{b}</span>) : <span className="badge">Flat list</span>}
               <span className="muted" style={{ fontSize: 12.5 }}>
                 {t.projectFields.length} project field{t.projectFields.length === 1 ? "" : "s"} · {t.unitFields.length} unit field{t.unitFields.length === 1 ? "" : "s"}
                 {t.inUse > 0 ? ` · used by ${t.inUse} project${t.inUse === 1 ? "" : "s"}` : ""}
@@ -871,16 +803,12 @@ function ProjectTypeEditor({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [layout, setLayout] = useState<ProjectLayout>(initial?.layout ?? "cluster");
-  const [groupLabel, setGroupLabel] = useState(initial?.groupLabel ?? "");
   const [projectRows, setProjectRows] = useState<FieldRow[]>(() => fieldsToRows(initial?.projectFields));
   const [unitRows, setUnitRows] = useState<FieldRow[]>(() => fieldsToRows(initial?.unitFields));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const info = layoutInfo(layout);
-  const layoutLocked = (initial?.inUse ?? 0) > 0;
-  const nameLocked = layoutLocked;
+  const nameLocked = (initial?.inUse ?? 0) > 0;
 
   async function save() {
     setError(null);
@@ -889,8 +817,6 @@ function ProjectTypeEditor({
     if (invalid) { setError(invalid); return; }
     const body = {
       name: name.trim(),
-      layout,
-      groupLabel: info.defaultGroupLabel === null ? "" : groupLabel.trim(),
       projectFields: rowsToFields(projectRows),
       unitFields: rowsToFields(unitRows),
     };
@@ -917,42 +843,17 @@ function ProjectTypeEditor({
       </div>
 
       <div className="field">
-        <label>Structure</label>
-        <div className="opts" data-single>
-          {LAYOUTS.map((l) => (
-            <span
-              key={l.value}
-              className={`opt rad ${layout === l.value ? "on" : ""}`}
-              style={layoutLocked && layout !== l.value ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
-              onClick={() => { if (!layoutLocked) setLayout(l.value); }}
-            >
-              <span className="b">{layout === l.value ? "●" : ""}</span>{l.title}
-            </span>
-          ))}
-        </div>
-        <div className="hint">
-          {info.blurb}
-          {layoutLocked ? ` The layout is locked because ${initial?.inUse} project(s) already use this type — create a new type for a different layout.` : ""}
-        </div>
-      </div>
-
-      {info.defaultGroupLabel !== null ? (
-        <div className="field">
-          <label>What do you call a group?</label>
-          <input className="inp" style={{ maxWidth: 260 }} value={groupLabel} maxLength={40} placeholder={info.defaultGroupLabel} onChange={(e) => setGroupLabel(e.target.value)} />
-          <div className="hint">Shown wherever a unit&apos;s group is asked for — e.g. Tower, Phase, Sector, Block, Row. Leave blank for &ldquo;{info.defaultGroupLabel}&rdquo;.</div>
-        </div>
-      ) : null}
-
-      <div className="field">
         <label>Project fields</label>
         <div className="hint" style={{ marginBottom: 8 }}>Summary details captured once per project — e.g. Number of plots, Total land.</div>
-        <TypedFieldEditor rows={projectRows} onChange={setProjectRows} emptyText="No project fields — add one if this type needs any." />
+        <TypedFieldEditor rows={projectRows} onChange={setProjectRows} emptyText="No project fields — add one if this type needs any." roles={false} />
       </div>
 
       <div className="field">
         <label>Unit fields</label>
-        <div className="hint" style={{ marginBottom: 8 }}>Details captured on every unit — e.g. Dimensions, Corner plot. Editing this later never changes units that already exist.</div>
+        <div className="hint" style={{ marginBottom: 8 }}>
+          Details captured on every unit — e.g. Bedrooms, Floor, Configuration, Price. Editing this later never
+          changes units that already exist.
+        </div>
         <TypedFieldEditor rows={unitRows} onChange={setUnitRows} emptyText="No unit fields — add one if units of this type need any." />
       </div>
 
@@ -1635,7 +1536,6 @@ export default function OrgSettingsPage() {
           {/* CATALOGS */}
           <div className={`os-section${section === "catalogs" ? " on" : ""}`}>
             <SectionHead section="catalogs" />
-            <PricingBasisCard />
             <ProjectTypesSection />
             <CatalogSection />
           </div>

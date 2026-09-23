@@ -2,7 +2,6 @@ import {
   Organisation,
   OrgIndustry,
   Prisma,
-  UnitPriceBasis,
   User,
 } from '@prisma/client';
 
@@ -71,7 +70,6 @@ export function toSafeOrganisation(organisation: Organisation) {
     team_size: organisation.teamSize,
     legal_name: organisation.legalName,
     industry: organisation.industry,
-    unit_price_basis: organisation.unitPriceBasis,
     support_email: organisation.supportEmail,
     support_phone: organisation.supportPhone,
     enabled_modules: organisation.enabledModules,
@@ -110,14 +108,13 @@ const ORGANISATION_EDITABLE_FIELDS = [
 // Only copies fields the caller actually sent, so a partial PATCH body
 // doesn't clobber the rest with undefined.
 //
-// `industry` and `unitPriceBasis` are handled separately from the loop below
-// — they're the enums among these fields (Prisma.OrganisationUpdateInput
-// expects OrgIndustry / UnitPriceBasis, not an arbitrary string), so they
-// can't share the generic plain-string assignment the rest of these use.
+// `industry` is handled separately from the loop below — it's the one enum
+// among these fields (Prisma.OrganisationUpdateInput expects OrgIndustry, not
+// an arbitrary string), so it can't share the generic plain-string assignment
+// the rest of these use.
 export function buildOrganisationUpdateData(
   dto: Partial<Record<(typeof ORGANISATION_EDITABLE_FIELDS)[number], string>> & {
     industry?: OrgIndustry;
-    unitPriceBasis?: UnitPriceBasis;
   },
 ): Prisma.OrganisationUpdateInput {
   const data: Prisma.OrganisationUpdateInput = {};
@@ -128,9 +125,6 @@ export function buildOrganisationUpdateData(
   }
   if (dto.industry !== undefined) {
     data.industry = dto.industry;
-  }
-  if (dto.unitPriceBasis !== undefined) {
-    data.unitPriceBasis = dto.unitPriceBasis;
   }
   return data;
 }

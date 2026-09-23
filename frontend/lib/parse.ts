@@ -40,16 +40,16 @@ export function parseInteger(value: string): number | undefined {
  *
  * Deliberately whole-number, deliberately not revisited lightly: real-estate
  * list prices are whole amounts in practice, and every backing column is
- * `Int` (`Project.priceMin/priceMax/baseRate/bookingAmount`,
- * `Unit.price`, `UnitType.price`) — changing that to a `Decimal` column is a
- * real schema migration, not a parsing tweak. If fractional currency (cents/
- * paise) is ever genuinely needed, store it as an integer in the currency's
- * minor unit (e.g. cents) and convert only at the display edge, the way
- * Stripe and most payment systems do — don't reach for a `Decimal`/`Float`
- * column, which reintroduces the exact floating-point rounding problems
- * integer-cents storage exists to avoid. A *derived*, never-stored figure
- * like $/sqft (`pricePerSqftLabel` in `components/org/project-form-fields.tsx`,
- * and `ProjectsService.pricePerSqft` on the backend) is a different case —
+ * `Int` (`Project.priceMin/priceMax/baseRate/bookingAmount`, `Unit.price`) —
+ * changing that to a `Decimal` column is a real schema migration, not a
+ * parsing tweak. If fractional currency (cents/paise) is ever genuinely
+ * needed, store it as an integer in the currency's minor unit (e.g. cents)
+ * and convert only at the display edge, the way Stripe and most payment
+ * systems do — don't reach for a `Decimal`/`Float` column, which reintroduces
+ * the exact floating-point rounding problems integer-cents storage exists to
+ * avoid. A *derived*, never-stored figure like price-per-unit-area
+ * (`areaPricePerAreaLabel` in `components/org/project-form-fields.tsx`, and
+ * `ProjectsService.pricePerArea` on the backend) is a different case —
  * nothing forces that to be a whole number, which is why it keeps two
  * decimal places instead of rounding through this function.
  */

@@ -323,13 +323,10 @@ export function snapshotFromProject(input: {
     reraId: string | null;
     possession: string | null;
     priceMin: number | null;
-    carpetRange: string | null;
     tagline: string | null;
     highlights: string | null;
     projectType: string | null;
     constructionStage: string | null;
-    landArea: unknown;
-    towerCount: number | null;
     addressLine: string | null;
     city: string | null;
     locality: string | null;
@@ -343,7 +340,6 @@ export function snapshotFromProject(input: {
   unitTypes?: Array<{
     name?: string | null;
     configuration?: string | null;
-    carpetSqft?: number | null;
     floorPlanUrl?: string | null;
   }>;
 }): PropertySnapshot {
@@ -359,10 +355,6 @@ export function snapshotFromProject(input: {
         )
         .filter(Boolean)
     : [];
-  const land =
-    p.landArea != null && p.landArea !== ''
-      ? `${String(p.landArea)} Ac`
-      : '';
   const location = joinLocation([p.location, p.locality, p.city, p.addressLine]);
   const description = (p.tagline || p.highlights || '').trim();
 
@@ -371,7 +363,7 @@ export function snapshotFromProject(input: {
     .map((ut) => ({
       name: ut.name || ut.configuration || 'Floor plan',
       beds: ut.configuration || ut.name || '',
-      area: ut.carpetSqft != null ? `${ut.carpetSqft.toLocaleString('en-IN')} sq.ft` : '',
+      area: '',
       image: ut.floorPlanUrl as string,
       downloadUrl: ut.floorPlanUrl as string,
     }));
@@ -390,15 +382,15 @@ export function snapshotFromProject(input: {
     status: p.constructionStage ?? '',
     description,
     startingPrice: formatInr(p.priceMin),
-    carpetArea: p.carpetRange ?? '',
+    carpetArea: '',
     reraNumber: p.reraId ?? '',
     location,
     possession: p.possession ?? '',
     amenities: amenityNames,
     features: p.connectivity ?? [],
     gallery: p.galleryUrls ?? [],
-    landArea: land,
-    towers: p.towerCount != null ? String(p.towerCount) : '',
+    landArea: '',
+    towers: '',
     units: input.unitCount != null ? String(input.unitCount) : '',
     brochureUrl: p.brochureUrl ?? '',
     floorPlans: fromTypes.length ? fromTypes : fromProject,
@@ -411,8 +403,7 @@ export function snapshotFromStandaloneUnit(input: {
     unitNo: string;
     configuration: string | null;
     variantLabel: string | null;
-    carpetSqft: number | null;
-    builtupSqft: number | null;
+    area: number | null;
     price: number | null;
     addressLine: string | null;
     notes: string | null;
@@ -425,12 +416,7 @@ export function snapshotFromStandaloneUnit(input: {
 }): PropertySnapshot {
   const u = input.unit;
   const name = [u.configuration, u.variantLabel, u.unitNo].filter(Boolean).join(' · ') || u.unitNo;
-  const carpet =
-    u.carpetSqft != null
-      ? `${u.carpetSqft.toLocaleString('en-IN')} sq.ft`
-      : u.builtupSqft != null
-        ? `${u.builtupSqft.toLocaleString('en-IN')} sq.ft`
-        : '';
+  const carpet = u.area != null ? `${u.area.toLocaleString('en-IN')} sq.ft` : '';
   return {
     name,
     builder: input.orgName,

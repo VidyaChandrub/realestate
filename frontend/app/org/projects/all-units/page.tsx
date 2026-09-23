@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgUnits } from "@/lib/api";
 import { formatMoney } from "@/lib/money";
-import { formatUpdatedAt, priceBasisSuffix } from "@/components/org/project-form-fields";
+import { formatUpdatedAt } from "@/components/org/project-form-fields";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
@@ -267,7 +267,8 @@ export default function AllUnitsPage() {
                 ) : (
                   rows.map((u) => {
                     const ccy = u.project?.currency ?? "INR";
-                    const psf = u.pricePerSqft;
+                    const areaUnit = u.project?.areaUnit || "sqft";
+                    const psf = u.pricePerArea;
                     const detailHref = u.project
                       ? `/org/projects/${u.project.id}/units/${u.id}`
                       : `/org/units/${u.id}`;
@@ -292,8 +293,8 @@ export default function AllUnitsPage() {
                         </td>
                         <td>{u.configuration ?? "—"}</td>
                         <td>
-                          {(u.carpetSqft ?? u.area) != null
-                            ? `${(u.carpetSqft ?? u.area)!.toLocaleString("en-IN")} sqft`
+                          {u.area != null
+                            ? `${u.area.toLocaleString("en-IN")} ${areaUnit}`
                             : "—"}
                         </td>
                         <td>{u.tower ?? "—"}</td>
@@ -304,11 +305,11 @@ export default function AllUnitsPage() {
                           {u.price != null
                             ? formatMoney(u.price, ccy)
                             : psf != null
-                              ? `${formatMoney(psf, ccy, 2)}/sqft${priceBasisSuffix(u.pricePerSqftBasis)}`
+                              ? `${formatMoney(psf, ccy, 2)}/${areaUnit}`
                               : "—"}
                           {u.price != null && psf != null ? (
                             <div className="hint">
-                              {formatMoney(psf, ccy, 2)}/sqft{priceBasisSuffix(u.pricePerSqftBasis)}
+                              {formatMoney(psf, ccy, 2)}/{areaUnit}
                             </div>
                           ) : null}
                         </td>

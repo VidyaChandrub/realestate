@@ -2,9 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Step 2 of the create wizard renders per the picked project type's layout.
-// A `tower` type must look exactly as before; a `cluster` type has no floors,
-// no BHK configurations and its own typed fields.
+// Step 2 of the create wizard renders from the picked project's templates.
 class NoopIntersectionObserver {
   observe() {}
   unobserve() {}
@@ -21,8 +19,8 @@ vi.mock("@/lib/auth-context", () => ({
   useAuth: () => ({ accessToken: "test-token", user: { org_id: "org-1" } }),
 }));
 
-const type = (id: string, name: string, layout: string, extra = {}) => ({
-  id, orgId: "org-1", name, layout, groupLabel: null, projectFields: [], unitFields: [], sortOrder: 0, inUse: 0, ...extra,
+const type = (id: string, name: string, extra = {}) => ({
+  id, orgId: "org-1", name, projectFields: [], unitFields: [], sortOrder: 0, inUse: 0, ...extra,
 });
 
 vi.mock("@/lib/api", () => ({
@@ -30,22 +28,127 @@ vi.mock("@/lib/api", () => ({
     if (path.startsWith("/org/users")) return { data: [] };
     if (path === "/org/settings") return { name: "Skyline Developers" };
     if (path.startsWith("/org/templates")) return { data: [] };
+    if (path === "/org/project-types") {
+      return [
+        type("t1", "Apartments", {
+          projectFields: [
+            { key: "tower_count", label: "No. of Towers / Blocks", type: "number", required: false },
+            { key: "floors", label: "Floors / Structure", type: "text", required: false },
+            { key: "area_range", label: "Area Range", type: "text", required: false },
+            { key: "total_land", label: "Total Land Area", type: "number", required: false, unit: "acres" },
+          ],
+          unitFields: [
+            { key: "tower", label: "Tower / Building", type: "text", required: false, role: "group" },
+            { key: "configuration", label: "Apartment Type", type: "choice", required: false, role: "configuration", options: ["2 BHK"] },
+            { key: "floor", label: "Floor Number", type: "number", required: false, role: "floor" },
+            { key: "area", label: "Carpet Area", type: "number", required: false, role: "area" },
+            { key: "price", label: "Price", type: "number", required: false, role: "price" },
+          ],
+        }),
+        type("t2", "Plots", {
+          projectFields: [
+            { key: "number_of_plots", label: "Number of plots", type: "number", required: true },
+            { key: "total_land", label: "Total land", type: "number", required: false, unit: "acres" },
+          ],
+          unitFields: [
+            { key: "configuration", label: "Plot Type", type: "choice", required: false, role: "configuration", options: ["Residential"] },
+            { key: "plot_area", label: "Plot Area", type: "number", required: false, role: "area", unit: "sq ft" },
+            { key: "price", label: "Price", type: "number", required: false, role: "price" },
+          ],
+        }),
+        type("t3", "Villas", {
+          projectFields: [],
+          unitFields: [
+            { key: "configuration", label: "Configuration", type: "choice", required: false, role: "configuration", options: ["2 BHK"] },
+            { key: "built_up_area", label: "Built-up Area", type: "number", required: false, role: "area", unit: "sq ft" },
+            { key: "plot_area", label: "Plot Area", type: "number", required: false, unit: "sq ft" },
+            { key: "price", label: "Price", type: "number", required: false, role: "price" },
+          ],
+        }),
+        type("t4", "Farmhouses"),
+      ];
+    }
     return {};
   }),
   getOrgCatalogOptions: vi.fn(async () => []),
   getOrgProjectTypes: vi.fn(async () => [
-    type("t1", "Apartments", "tower"),
-    type("t2", "Plots", "cluster", {
-      groupLabel: "Sector",
+    type("t1", "Apartments", {
+      projectFields: [
+        { key: "tower_count", label: "No. of Towers / Blocks", type: "number", required: false },
+        { key: "floors", label: "Floors / Structure", type: "text", required: false },
+        { key: "area_range", label: "Area Range", type: "text", required: false },
+        { key: "total_land", label: "Total Land Area", type: "number", required: false, unit: "acres" },
+      ],
+      unitFields: [
+        { key: "tower", label: "Tower / Building", type: "text", required: false, role: "group" },
+        { key: "configuration", label: "Apartment Type", type: "choice", required: false, role: "configuration", options: ["2 BHK"] },
+        { key: "floor", label: "Floor Number", type: "number", required: false, role: "floor" },
+        { key: "area", label: "Carpet Area", type: "number", required: false, role: "area" },
+        { key: "price", label: "Price", type: "number", required: false, role: "price" },
+      ],
+    }),
+    type("t2", "Plots", {
       projectFields: [
         { key: "number_of_plots", label: "Number of plots", type: "number", required: true },
         { key: "total_land", label: "Total land", type: "number", required: false, unit: "acres" },
       ],
-      unitFields: [{ key: "corner", label: "Corner plot", type: "yesno", required: false }],
+      unitFields: [
+        { key: "configuration", label: "Plot Type", type: "choice", required: false, role: "configuration", options: ["Residential"] },
+        { key: "plot_area", label: "Plot Area", type: "number", required: false, role: "area", unit: "sq ft" },
+        { key: "price", label: "Price", type: "number", required: false, role: "price" },
+      ],
     }),
-    type("t3", "Farmhouses", "individual"),
+    type("t3", "Villas", {
+      projectFields: [],
+      unitFields: [
+        { key: "configuration", label: "Configuration", type: "choice", required: false, role: "configuration", options: ["2 BHK"] },
+        { key: "built_up_area", label: "Built-up Area", type: "number", required: false, role: "area", unit: "sq ft" },
+        { key: "plot_area", label: "Plot Area", type: "number", required: false, unit: "sq ft" },
+        { key: "price", label: "Price", type: "number", required: false, role: "price" },
+      ],
+    }),
+    type("t4", "Farmhouses"),
   ]),
-  addCommonProjectTypes: vi.fn(),
+  addCommonProjectTypes: vi.fn(async () => ({
+    types: [
+      type("t1", "Apartments", {
+        projectFields: [
+          { key: "tower_count", label: "No. of Towers / Blocks", type: "number", required: false },
+          { key: "floors", label: "Floors / Structure", type: "text", required: false },
+          { key: "area_range", label: "Area Range", type: "text", required: false },
+          { key: "total_land", label: "Total Land Area", type: "number", required: false, unit: "acres" },
+        ],
+        unitFields: [
+          { key: "tower", label: "Tower / Building", type: "text", required: false, role: "group" },
+          { key: "configuration", label: "Apartment Type", type: "choice", required: false, role: "configuration", options: ["2 BHK"] },
+          { key: "floor", label: "Floor Number", type: "number", required: false, role: "floor" },
+          { key: "area", label: "Carpet Area", type: "number", required: false, role: "area" },
+          { key: "price", label: "Price", type: "number", required: false, role: "price" },
+        ],
+      }),
+      type("t2", "Plots", {
+        projectFields: [
+          { key: "number_of_plots", label: "Number of plots", type: "number", required: true },
+          { key: "total_land", label: "Total land", type: "number", required: false, unit: "acres" },
+        ],
+        unitFields: [
+          { key: "configuration", label: "Plot Type", type: "choice", required: false, role: "configuration", options: ["Residential"] },
+          { key: "plot_area", label: "Plot Area", type: "number", required: false, role: "area", unit: "sq ft" },
+          { key: "price", label: "Price", type: "number", required: false, role: "price" },
+        ],
+      }),
+      type("t3", "Villas", {
+        projectFields: [],
+        unitFields: [
+          { key: "configuration", label: "Configuration", type: "choice", required: false, role: "configuration", options: ["2 BHK"] },
+          { key: "built_up_area", label: "Built-up Area", type: "number", required: false, role: "area", unit: "sq ft" },
+          { key: "plot_area", label: "Plot Area", type: "number", required: false, unit: "sq ft" },
+          { key: "price", label: "Price", type: "number", required: false, role: "price" },
+        ],
+      }),
+      type("t4", "Farmhouses"),
+    ],
+  })),
   getOrgLandingPages: vi.fn(async () => []),
   getProjectSalesAgentCandidates: vi.fn(async () => ({ data: [], total: 0 })),
   getProjectManagerCandidates: vi.fn(async () => ({ data: [], total: 0 })),
@@ -67,36 +170,35 @@ beforeEach(() => window.localStorage.clear());
 afterEach(() => window.localStorage.clear());
 
 describe("project wizard — Step 2 follows the project type's layout", () => {
-  it("tower: shows exactly the apartment inventory controls", async () => {
+  it("apartment: shows role-driven configuration controls and project fields", async () => {
     const user = userEvent.setup();
     render(<AddNewProjectPage />);
     await toStep2(user, "Apartments");
 
     expect(screen.getByText(/Unit configurations \(select all\)/)).toBeInTheDocument();
-    expect(screen.getByText("No. of towers / blocks")).toBeInTheDocument();
-    expect(screen.getByText("Floors / structure")).toBeInTheDocument();
-    expect(screen.getByText("Carpet area range (sqft)")).toBeInTheDocument();
-    expect(screen.getByText("Total land area")).toBeInTheDocument();
-    // No template fields → no per-project field customiser to clutter it.
-    expect(screen.queryByText(/Customise this project/)).not.toBeInTheDocument();
+    expect(screen.getByText("No. of Towers / Blocks")).toBeInTheDocument();
+    expect(screen.getByText("Floors / Structure")).toBeInTheDocument();
+    expect(screen.getByText("Area Range")).toBeInTheDocument();
+    expect(screen.getByText("Total Land Area")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ Add project field" })).toBeInTheDocument();
+    expect(screen.getByText("Unit fields")).toBeInTheDocument();
   });
 
-  it("cluster: no floors / BHK, group count in the type's own word, typed fields", async () => {
+  it("plot: no grouping or floors, but keeps its own plot area defaults", async () => {
     const user = userEvent.setup();
     render(<AddNewProjectPage />);
     await toStep2(user, "Plots");
 
-    expect(screen.queryByText(/Unit configurations/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Floors / structure")).not.toBeInTheDocument();
-    expect(screen.queryByText("Carpet area range (sqft)")).not.toBeInTheDocument();
-    expect(screen.queryByText("No. of towers / blocks")).not.toBeInTheDocument();
-    expect(screen.getByText("No. of sectors")).toBeInTheDocument();
+    expect(screen.queryByText("No. of Towers / Blocks")).not.toBeInTheDocument();
+    expect(screen.queryByText("Floors / Structure")).not.toBeInTheDocument();
     expect(screen.getByText("Number of plots")).toBeInTheDocument();
     expect(screen.getByText("Total land")).toBeInTheDocument();
-    expect(screen.getByText(/Customise this project/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Plot Area for Residential")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ Add project field" })).toBeInTheDocument();
+    expect(screen.getByText("Unit fields")).toBeInTheDocument();
   });
 
-  it("cluster: a required type field blocks Continue until it is filled", async () => {
+  it("plot: a required type field blocks Continue until it is filled", async () => {
     const user = userEvent.setup();
     render(<AddNewProjectPage />);
     await toStep2(user, "Plots");
@@ -106,7 +208,18 @@ describe("project wizard — Step 2 follows the project type's layout", () => {
     expect(screen.getByRole("heading", { name: /Inventory & configuration/ })).toBeInTheDocument();
   });
 
-  it("individual: no grouping at all", async () => {
+  it("plot and villa: show the project-specific default area fields for each configuration", async () => {
+    const user = userEvent.setup();
+    render(<AddNewProjectPage />);
+    await toStep2(user, "Plots");
+    expect(screen.getByLabelText("Plot Area for 2 BHK")).toBeInTheDocument();
+
+    await toStep2(user, "Villas");
+    expect(screen.getByLabelText("Built-up Area for 2 BHK")).toBeInTheDocument();
+    expect(screen.getByLabelText("Plot Area for 2 BHK")).toBeInTheDocument();
+  });
+
+  it("custom flat type: no grouping at all", async () => {
     const user = userEvent.setup();
     render(<AddNewProjectPage />);
     await toStep2(user, "Farmhouses");

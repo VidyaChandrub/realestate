@@ -6,11 +6,11 @@ import { currencyPrefix } from "@/lib/money";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import { makeSpecRow, type SpecRow } from "@/lib/specifications";
 import { RowListEditor } from "@/components/org/row-list-editor";
+import type { FieldDef } from "@/lib/field-template";
 import type {
   OrgCatalogCategory,
   OrgCatalogOption,
   ProjectAssigneeCandidate,
-  UnitPriceBasis,
 } from "@/lib/types";
 
 // Shared field controls for the project create wizard, the project edit page,
@@ -158,69 +158,31 @@ export function ManagerPicker({
   );
 }
 
-/** Human name for a price basis, as shown in the label. */
-export const PRICE_BASIS_LABEL: Record<UnitPriceBasis, string> = {
-  carpet: "carpet",
-  builtup: "built-up",
-};
-
 /**
- * Derived ₹/sqft for a unit — price ÷ the area the *organisation* prices on
- * (Settings → Project Catalogs → Pricing basis). Never stored; the server
- * derives the same figure from the same setting.
+ * Derived price per unit area — price ÷ the project's `area`-role figure, in
+ * the project's area unit ("sqft" | "acre"). Never stored; the server derives
+ * the same figure the same way (ProjectsService.pricePerArea).
  *
- * Returns "" (not "0", not an error) when the price or the relevant area is
- * missing, so the field degrades to blank rather than lying.
- *
- * The basis is always named in the output. A per-sqft price on the wrong
- * denominator is a real commercial error, so there is deliberately no way to
- * render this figure unlabelled.
+ * Returns "" (not "0", not an error) when the price or the area is missing,
+ * so the field degrades to blank rather than lying.
  */
-export function pricePerSqftLabel(
-  price: number | null | undefined,
-  carpetSqft: number | null | undefined,
-  builtupSqft: number | null | undefined,
-  basis: UnitPriceBasis,
-  currency = "INR",
-): string {
-  const area = basis === "builtup" ? builtupSqft : carpetSqft;
-  const text = perSqftText(price, area, currency);
-  return text ? `${text} (${PRICE_BASIS_LABEL[basis]})` : "";
-}
-
-/**
- * ₹/sqft for a unit outside the `tower` layout: price ÷ its single `area`.
- * There is no carpet / built-up basis to name, so the figure carries none.
- */
-export function areaPricePerSqftLabel(
+export function areaPricePerAreaLabel(
   price: number | null | undefined,
   area: number | null | undefined,
+  areaUnit: string | null | undefined,
   currency = "INR",
-): string {
-  return perSqftText(price, area, currency);
-}
-
-/** " (Carpet)" for a tower unit's basis; empty when the unit has no basis. */
-export function priceBasisSuffix(basis: UnitPriceBasis | null | undefined): string {
-  return basis ? ` (${PRICE_BASIS_LABEL[basis]})` : "";
-}
-
-function perSqftText(
-  price: number | null | undefined,
-  area: number | null | undefined,
-  currency: string,
 ): string {
   if (!price || !area) return "";
   const sym = currencyPrefix(currency).trim() || "₹";
   // Two decimal places, not rounded to a whole unit: this is derived, never
   // stored, so nothing forces it to be an integer the way the price itself
-  // is — and in real estate 2.50 vs. 2.72 per sqft is a real difference at
-  // project scale, not noise to round away.
+  // is — and in real estate 2.50 vs. 2.72 per unit area is a real difference
+  // at project scale, not noise to round away.
   const value = (Math.round((price / area) * 100) / 100).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  return `${sym}${value} / sqft`;
+  return `${sym}${value} / ${areaUnit || "sqft"}`;
 }
 
 const CATALOG_NOUNS: Record<OrgCatalogCategory, string> = {
@@ -428,19 +390,15 @@ export function SpecificationRows({
 }
 
 /**
- * Tower / block field. A combobox over the tower names already used by the
- * project's other units, plus free entry — but a *new* name is only allowed
- * while the project's distinct tower count is below `towerCount`. Once every
- * slot is used it becomes select-only. Mirrors the server-side rule in
- * ProjectsService.assertTowerWithinLimit (which is authoritative — this is
- * just fast feedback). `otherTowers` must exclude the unit being edited, so
- * renaming the sole holder of a name stays possible.
+ * Group (tower / block / sector…) field. A combobox over the group names
+ * already used by the project's other units, plus free entry — no cap.
+ * `otherTowers` must exclude the unit being edited, so renaming the sole
+ * holder of a name stays possible.
  */
 export function TowerCombobox({
   value,
   onChange,
   otherTowers,
-  towerCount,
   disabled,
   listId = "tower-options",
   noun = "Tower",
@@ -448,62 +406,33 @@ export function TowerCombobox({
   value: string;
   onChange: (v: string) => void;
   otherTowers: string[];
-  towerCount: number | null;
   disabled?: boolean;
   listId?: string;
   /** What the project calls a group — "Tower" by default, or "Sector", "Phase"…. */
   noun?: string;
 }) {
   const word = noun.toLowerCase();
-  const trimmed = value.trim();
-  const known = otherTowers.includes(trimmed);
-  const selectOnly =
-    towerCount != null && otherTowers.length >= towerCount && !known;
-
-  const hint =
-    towerCount == null
-      ? `No ${word} limit set on this project.`
-      : selectOnly
-        ? `All ${towerCount} ${word}${towerCount === 1 ? "" : "s"} are in use — reuse one, or raise the project's ${word} count.`
-        : `${otherTowers.length} of ${towerCount} ${word}${towerCount === 1 ? "" : "s"} used.`;
 
   return (
     <>
-      {selectOnly ? (
-        <select
-          className="inp"
-          value={trimmed}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">No {word}</option>
-          {otherTowers.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-          {trimmed && !known ? (
-            <option value={trimmed}>{trimmed} (current)</option>
-          ) : null}
-        </select>
-      ) : (
-        <>
-          <input
-            className="inp"
-            list={listId}
-            placeholder={otherTowers.length ? `e.g. ${noun} B` : `e.g. ${noun} A`}
-            value={value}
-            disabled={disabled}
-            onChange={(e) => onChange(e.target.value)}
-          />
-          <datalist id={listId}>
-            {otherTowers.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-        </>
-      )}
-      <div className="hint">{hint}</div>
+      <input
+        className="inp"
+        list={listId}
+        placeholder={otherTowers.length ? `e.g. ${noun} B` : `e.g. ${noun} A`}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <datalist id={listId}>
+        {otherTowers.map((t) => (
+          <option key={t} value={t} />
+        ))}
+      </datalist>
+      <div className="hint">
+        {otherTowers.length > 0
+          ? `${otherTowers.length} distinct ${word}${otherTowers.length === 1 ? "" : "s"} in use — type a new one or pick an existing.`
+          : `e.g. ${noun} A. Free text — no ${word} limit.`}
+      </div>
     </>
   );
 }
@@ -578,20 +507,27 @@ export function ConfigurationSelect({
  * One editable row of the "Size & price per configuration" table. Strings
  * throughout because it is bound straight to number inputs; the caller parses
  * on save. `key` is a stable client-side identity — for the create wizard a
- * counter, for the edit page the `UnitType` id.
+ * counter, for the edit page the `UnitType` id. `area`/`price` are staged
+ * under those fixed keys and mapped onto the template's actual area-/
+ * price-role field keys by the caller when saving; `extra` holds any other
+ * defaultable field (e.g. Built-up Area), keyed by that field's own template
+ * key (see UnitType.fieldDefaults).
  */
 export interface ConfigSizePriceRow {
   key: string | number;
   name: string;
-  carpetSqft: string;
-  builtupSqft: string;
+  area: string;
   price: string;
+  extra: Record<string, string>;
   totalUnits: string;
 }
 
 /**
- * Carpet / built-up / price / planned units, one row per configuration the
- * project offers.
+ * Area / price / planned units — plus any other fields the caller wants
+ * defaulted per configuration (e.g. Built-up Area for apartments) — one row
+ * per configuration the project offers. Column headers use the project's own
+ * field labels (and the area field's display unit), so an org that renames a
+ * field sees that name here too, not a hardcoded term.
  *
  * Shared verbatim by the create wizard's Step 2 and the project edit form so
  * the same information is captured the same way in both places — divergent
@@ -600,7 +536,8 @@ export interface ConfigSizePriceRow {
  * Every field is optional: an empty row just means that configuration won't
  * prefill anything when a unit is added. The component is presentational —
  * it owns no state and does no saving; the caller supplies the rows and
- * receives patches.
+ * receives patches. Renders nothing if the template has neither an area- nor
+ * a price-role field, and no extra fields — there's nothing to default then.
  */
 export function ConfigSizePriceTable({
   configurations,
@@ -608,6 +545,9 @@ export function ConfigSizePriceTable({
   onChange,
   hint,
   currency = "INR",
+  areaField,
+  priceField,
+  extraFields = [],
 }: {
   /** Labels currently selected, in display order. */
   configurations: string[];
@@ -615,18 +555,26 @@ export function ConfigSizePriceTable({
   onChange: (key: string | number, patch: Partial<ConfigSizePriceRow>) => void;
   hint?: React.ReactNode;
   currency?: string;
+  /** The template's `area`-role field, if any — supplies the column label/unit. */
+  areaField?: FieldDef | null;
+  /** The template's `price`-role field, if any — supplies the column label. */
+  priceField?: FieldDef | null;
+  /** Other defaultable fields (e.g. Built-up Area) — one column each, by their own template key. */
+  extraFields?: FieldDef[];
 }) {
-  if (configurations.length === 0) return null;
+  if (configurations.length === 0 || (!areaField && !priceField && extraFields.length === 0)) return null;
   return (
     <div className="field">
-      <label>Size &amp; price per configuration</label>
+      <label>Defaults per configuration</label>
       {hint ? <div className="hint" style={{ marginBottom: 10 }}>{hint}</div> : null}
       <div className="ut-rows">
         <div className="ut-row ut-head">
           <span>Configuration</span>
-          <span>Carpet (sqft)</span>
-          <span>Built-up (sqft)</span>
-          <span>Price ({currencyPrefix(currency).trim() || "₹"})</span>
+          {areaField ? <span>{areaField.label}{areaField.unit ? ` (${areaField.unit})` : ""}</span> : null}
+          {extraFields.map((f) => (
+            <span key={f.key}>{f.label}{f.unit ? ` (${f.unit})` : ""}</span>
+          ))}
+          {priceField ? <span>{priceField.label} ({currencyPrefix(currency).trim() || "₹"})</span> : null}
           <span>Planned units</span>
         </div>
         {configurations.map((label) => {
@@ -635,18 +583,24 @@ export function ConfigSizePriceTable({
           return (
             <div className="ut-row" key={row.key}>
               <span className="ut-name">{label}</span>
-              <input className="inp" type="number" min={0} placeholder="1,000"
-                aria-label={`Carpet area for ${label}`}
-                value={row.carpetSqft}
-                onChange={(e) => onChange(row.key, { carpetSqft: e.target.value })} />
-              <input className="inp" type="number" min={0} placeholder="1,250"
-                aria-label={`Built-up area for ${label}`}
-                value={row.builtupSqft}
-                onChange={(e) => onChange(row.key, { builtupSqft: e.target.value })} />
-              <input className="inp" type="number" min={0} placeholder={currency === "INR" ? "64,00,000" : "640,000"}
-                aria-label={`Price for ${label}`}
-                value={row.price}
-                onChange={(e) => onChange(row.key, { price: e.target.value })} />
+              {areaField ? (
+                <input className="inp" type="number" min={0} placeholder="1,000"
+                  aria-label={`${areaField.label} for ${label}`}
+                  value={row.area}
+                  onChange={(e) => onChange(row.key, { area: e.target.value })} />
+              ) : null}
+              {extraFields.map((f) => (
+                <input className="inp" key={f.key} type="number" min={0} placeholder="1,200"
+                  aria-label={`${f.label} for ${label}`}
+                  value={row.extra[f.key] ?? ""}
+                  onChange={(e) => onChange(row.key, { extra: { ...row.extra, [f.key]: e.target.value } })} />
+              ))}
+              {priceField ? (
+                <input className="inp" type="number" min={0} placeholder={currency === "INR" ? "64,00,000" : "640,000"}
+                  aria-label={`${priceField.label} for ${label}`}
+                  value={row.price}
+                  onChange={(e) => onChange(row.key, { price: e.target.value })} />
+              ) : null}
               <input className="inp" type="number" min={0} placeholder="0"
                 aria-label={`Planned units for ${label}`}
                 value={row.totalUnits}

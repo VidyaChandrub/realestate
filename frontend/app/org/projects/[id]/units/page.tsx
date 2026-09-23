@@ -5,21 +5,22 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions } from "@/lib/api";
-import { parseAmount, parseCount, parseInteger } from "@/lib/parse";
+import { parseAmount, parseCount, parseDecimal, parseInteger } from "@/lib/parse";
 import { currencyPrefix, formatMoney } from "@/lib/money";
-import { prefillFromUnitType, type PrefillField } from "@/lib/unit-prefill";
+import { prefillFromUnitType } from "@/lib/unit-prefill";
 import { plannedMixRemoval } from "@/lib/unit-types";
 import {
   customValueText,
+  defaultableExtraFields,
   draftToPayload,
-  groupNoun,
-  LAYOUT_TRAITS,
+  nonRoleFields,
+  roleField,
+  templateTraits,
   valuesToDraft,
   type CustomValueDraft,
   type FieldDef,
-  type ProjectLayout,
 } from "@/lib/field-template";
-import { CustomFieldInputs } from "@/components/org/project-type-fields";
+import { SectionedFieldInputs } from "@/components/org/project-type-fields";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
 import { Modal } from "@/components/ui/modal";
@@ -32,10 +33,7 @@ import {
   TowerCombobox,
   UnitMediaFields,
   formatUpdatedAt,
-  pricePerSqftLabel,
-  areaPricePerSqftLabel,
-  priceBasisSuffix,
-  PRICE_BASIS_LABEL,
+  areaPricePerAreaLabel,
   PrefillNote,
   UnitAttributeSelect,
 } from "@/components/org/project-form-fields";
@@ -46,9 +44,7 @@ import type {
   CreateUnitTypeInput,
   OrgCatalogOption,
   ProjectDetail,
-  SafeOrganisation,
   Unit,
-  UnitPriceBasis,
   UnitStatus,
   UnitType,
 } from "@/lib/types";
@@ -84,16 +80,17 @@ const NO_TOWER = "__NO_TOWER__";
 
 interface UnitTypeForm {
   name: string;
-  carpetSqft: string;
-  builtupSqft: string;
+  area: string;
   price: string;
+  /** Other defaultable fields (e.g. Built-up Area), keyed by template field key. */
+  extra: Record<string, string>;
   totalUnits: string;
 }
 const EMPTY_UT_FORM: UnitTypeForm = {
   name: "",
-  carpetSqft: "",
-  builtupSqft: "",
+  area: "",
   price: "",
+  extra: {},
   totalUnits: "",
 };
 
@@ -101,8 +98,6 @@ interface UnitForm {
   configuration: string;
   variantLabel: string;
   unitNo: string;
-  carpetSqft: string;
-  builtupSqft: string;
   tower: string;
   floor: string;
   /** Primary area — non-tower layouts. */
@@ -120,8 +115,6 @@ const emptyUnitForm = (): UnitForm => ({
   configuration: "",
   variantLabel: "",
   unitNo: "",
-  carpetSqft: "",
-  builtupSqft: "",
   tower: "",
   floor: "",
   area: "",
@@ -167,24 +160,17 @@ export default function OrgProjectUnitsPage() {
   const [utError, setUtError] = useState<string | null>(null);
   const [utBusy, setUtBusy] = useState(false);
 
-  // Org-managed "Unit types" catalog (Settings → Project Catalogs). Same
-  // source the wizard's Step 2 chip-selector reads — the unit-type name is
-  // picked from here, never free-typed, so labels stay consistent. `null`
-  // = not loaded yet. "Copy, don't reference": the chosen label is just
-  // written to UnitType.name; there's no FK to the catalog.
-  const [unitTypeCatalog, setUnitTypeCatalog] = useState<
-    OrgCatalogOption[] | null
-  >(null);
+  // Shared load-error for the org's facing/parking/unit-variant catalogs
+  // (see the fetch effect below) — a configuration's own choices now come
+  // from the project's configuration-role field, not an org-wide catalog.
   const [unitTypeCatalogError, setUnitTypeCatalogError] = useState<
     string | null
   >(null);
   const [unitAttributeCatalog, setUnitAttributeCatalog] = useState<OrgCatalogOption[]>([]);
   const [unitAttributeCatalogLoaded, setUnitAttributeCatalogLoaded] = useState(false);
-  // The org's price-per-sqft denominator (Settings → Project Catalogs).
-  const [priceBasis, setPriceBasis] = useState<UnitPriceBasis>("carpet");
   // Which fields the unit type filled in, so the "from X" note can be shown
   // and then dropped the moment the user edits that field.
-  const [prefilled, setPrefilled] = useState<PrefillField[]>([]);
+  const [prefilled, setPrefilled] = useState<string[]>([]);
 
   const [unitMode, setUnitMode] = useState<"create" | "edit" | null>(null);
   const [unitEditingId, setUnitEditingId] = useState<string | null>(null);
@@ -255,19 +241,6 @@ export default function OrgProjectUnitsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantsNew, project, id, router]);
 
-  // The org's price-per-sqft basis, so the live figure and its label match
-  // what the server derives.
-  useEffect(() => {
-    if (!accessToken) return;
-    let cancelled = false;
-    apiFetch<SafeOrganisation>("/org/settings", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then((org) => { if (!cancelled) setPriceBasis(org.unit_price_basis ?? "carpet"); })
-      .catch(() => { /* keep the carpet default */ });
-    return () => { cancelled = true; };
-  }, [accessToken]);
-
   useEffect(() => {
     if (!accessToken) return;
     let cancelled = false;
@@ -276,12 +249,6 @@ export default function OrgProjectUnitsPage() {
         if (cancelled) return;
         setUnitAttributeCatalog(rows);
         setUnitAttributeCatalogLoaded(true);
-        setUnitTypeCatalog(
-          rows.filter((row) => row.category === "unit_type").sort(
-            (a, b) =>
-              a.sortOrder - b.sortOrder || a.label.localeCompare(b.label),
-          ),
-        );
         setUnitTypeCatalogError(null);
       })
       .catch((e) => {
@@ -309,9 +276,22 @@ export default function OrgProjectUnitsPage() {
     const { values, filled } = prefillFromUnitType(
       configuration,
       project?.unitTypes,
+      project?.unitFieldTemplate ?? [],
     );
     setPrefilled(filled);
-    setUnitForm((f) => ({ ...f, configuration, ...values }));
+    const groupField = roleField(project?.unitFieldTemplate ?? [], "group");
+    const floorField = roleField(project?.unitFieldTemplate ?? [], "floor");
+    setUnitForm((f) => ({
+      ...f,
+      configuration,
+      area: areaField ? values[areaField.key] ?? f.area : f.area,
+      price: priceField ? values[priceField.key] ?? f.price : f.price,
+      tower: groupField ? values[groupField.key] ?? f.tower : f.tower,
+      floor: floorField ? values[floorField.key] ?? f.floor : f.floor,
+      customValues: Object.fromEntries(
+        Object.entries(values).filter(([key]) => ![areaField?.key, priceField?.key, groupField?.key, floorField?.key, roleField(project?.unitFieldTemplate ?? [], "configuration")?.key].includes(key)),
+      ),
+    }));
   }
 
   /**
@@ -328,20 +308,43 @@ export default function OrgProjectUnitsPage() {
   }
 
   /** The note is only true until the user edits that field. */
-  function clearPrefill(field: PrefillField) {
+  function clearPrefill(field: string) {
     setPrefilled((prev) => (prev.includes(field) ? prev.filter((f) => f !== field) : prev));
   }
 
-  // A project unit may only use configurations assigned to this project.
-  // UnitType rows are the planned mix; the rollup and existing units preserve
-  // configurations already present on older projects.
-  const projectConfigurationOptions: OrgCatalogOption[] = project
+  // A project unit may only use configurations assigned to THIS project —
+  // its planned mix (UnitType rows, from the wizard / "+ Add configuration")
+  // plus anything already on its units (imports, or a value since dropped
+  // from the field's options). Only when the project has planned/used
+  // nothing yet do we fall back to the configuration field's full option
+  // list, so a brand-new project isn't stuck with an empty dropdown.
+  const plannedOrUsedConfigurations = project
     ? [...new Set([
         ...project.unitTypes.map((unitType) => unitType.name),
         ...project.configurations.map((configuration) => configuration.label),
         ...units.map((unit) => unit.configuration).filter((value): value is string => !!value),
-      ])].map((label, index) => ({
+      ])]
+    : [];
+  const projectConfigurationOptions: OrgCatalogOption[] = project
+    ? (plannedOrUsedConfigurations.length > 0
+        ? plannedOrUsedConfigurations
+        : roleField(project.unitFieldTemplate ?? [], "configuration")?.options ?? []
+      ).map((label, index) => ({
         id: `${project.id}-configuration-${index}`,
+        orgId: project.orgId,
+        category: "unit_type",
+        label,
+        sortOrder: index,
+        createdAt: "",
+        updatedAt: "",
+      }))
+    : [];
+  // The type's full configuration option list — used by "+ Add
+  // configuration" (planning a new one), unlike the Add Unit form above
+  // which is scoped to what's already planned/used.
+  const configFieldOptions: OrgCatalogOption[] = project
+    ? (roleField(project.unitFieldTemplate ?? [], "configuration")?.options ?? []).map((label, index) => ({
+        id: `${project.id}-configfield-${index}`,
         orgId: project.orgId,
         category: "unit_type",
         label,
@@ -363,9 +366,11 @@ export default function OrgProjectUnitsPage() {
     setUtEditingId(ut.id);
     setUtForm({
       name: ut.name,
-      carpetSqft: ut.carpetSqft == null ? "" : String(ut.carpetSqft),
-      builtupSqft: ut.builtupSqft == null ? "" : String(ut.builtupSqft),
-      price: ut.price == null ? "" : String(ut.price),
+      area: unitTypeDefault(ut, areaField)?.toString() ?? "",
+      price: unitTypeDefault(ut, priceField)?.toString() ?? "",
+      extra: Object.fromEntries(
+        extraFields.map((f) => [f.key, unitTypeDefault(ut, f)?.toString() ?? ""]),
+      ),
       totalUnits: String(ut.totalUnits),
     });
     setUtError(null);
@@ -381,9 +386,13 @@ export default function OrgProjectUnitsPage() {
     try {
       const body: CreateUnitTypeInput = {
         name: utForm.name.trim(),
-        carpetSqft: parseCount(utForm.carpetSqft),
-        builtupSqft: parseCount(utForm.builtupSqft),
-        price: parseAmount(utForm.price),
+        fieldDefaults: {
+          ...(areaField ? { [areaField.key]: parseDecimal(utForm.area) } : {}),
+          ...(priceField ? { [priceField.key]: parseAmount(utForm.price) } : {}),
+          ...Object.fromEntries(
+            extraFields.map((f) => [f.key, parseDecimal(utForm.extra[f.key] ?? "")]),
+          ),
+        },
         totalUnits: parseCount(utForm.totalUnits),
       };
       if (utMode === "create") {
@@ -436,8 +445,6 @@ export default function OrgProjectUnitsPage() {
       configuration: unit.configuration ?? "",
       variantLabel: unit.variantLabel ?? "",
       unitNo: unit.unitNo,
-      carpetSqft: unit.carpetSqft == null ? "" : String(unit.carpetSqft),
-      builtupSqft: unit.builtupSqft == null ? "" : String(unit.builtupSqft),
       tower: unit.tower ?? "",
       floor: unit.floor == null ? "" : String(unit.floor),
       area: unit.area == null ? "" : String(unit.area),
@@ -467,7 +474,7 @@ export default function OrgProjectUnitsPage() {
     // one only if it already held a value (the server enforces the same —
     // fields added to the template later never block old units).
     const stored = unitMode === "edit" ? units.find((u) => u.id === unitEditingId)?.customFields ?? {} : null;
-    const unfilled = unitTemplate.filter(
+    const unfilled = nonRoleFields(unitTemplate).filter(
       (f) =>
         f.required &&
         !(unitForm.customValues[f.key] ?? "").trim() &&
@@ -486,15 +493,13 @@ export default function OrgProjectUnitsPage() {
           configuration: traits.configurations ? unitForm.configuration : undefined,
           variantLabel: unitForm.variantLabel.trim() || undefined,
           unitNo: unitForm.unitNo.trim(),
-          carpetSqft: traits.configurations ? parseCount(unitForm.carpetSqft) : undefined,
-          builtupSqft: traits.configurations ? parseCount(unitForm.builtupSqft) : undefined,
-          area: traits.configurations ? undefined : parseCount(unitForm.area),
-          customFields: unitTemplate.length ? draftToPayload(unitTemplate, unitForm.customValues) : undefined,
+          area: areaField ? parseDecimal(unitForm.area) : undefined,
+          customFields: nonRoleFields(unitTemplate).length ? draftToPayload(nonRoleFields(unitTemplate), unitForm.customValues) : undefined,
           tower: traits.grouped ? unitForm.tower.trim() || undefined : undefined,
           floor: traits.floors ? parseInteger(unitForm.floor) : undefined,
           facing: unitForm.facing.trim() || undefined,
           parking: unitForm.parking.trim() || undefined,
-          price: parseAmount(unitForm.price),
+          price: priceField ? parseAmount(unitForm.price) : undefined,
           status: unitForm.status,
           floorPlanUrl: unitForm.floorPlanUrl || undefined,
           galleryUrls: unitForm.galleryUrls.length
@@ -512,18 +517,13 @@ export default function OrgProjectUnitsPage() {
           ...(traits.configurations ? { configuration: unitForm.configuration } : {}),
           variantLabel: unitForm.variantLabel.trim() || null,
           unitNo: unitForm.unitNo.trim(),
-          ...(traits.configurations
-            ? {
-                carpetSqft: parseCount(unitForm.carpetSqft) ?? null,
-                builtupSqft: parseCount(unitForm.builtupSqft) ?? null,
-              }
-            : { area: parseCount(unitForm.area) ?? null }),
-          ...(unitTemplate.length ? { customFields: draftToPayload(unitTemplate, unitForm.customValues) } : {}),
+          ...(areaField ? { area: parseDecimal(unitForm.area) ?? null } : {}),
+          ...(nonRoleFields(unitTemplate).length ? { customFields: draftToPayload(nonRoleFields(unitTemplate), unitForm.customValues) } : {}),
           ...(traits.grouped ? { tower: unitForm.tower.trim() || null } : {}),
           ...(traits.floors ? { floor: parseInteger(unitForm.floor) ?? null } : {}),
           facing: unitForm.facing.trim() || null,
           parking: unitForm.parking.trim() || null,
-          price: parseAmount(unitForm.price) ?? null,
+          ...(priceField ? { price: parseAmount(unitForm.price) ?? null } : {}),
           status: unitForm.status,
           floorPlanUrl: unitForm.floorPlanUrl || null,
           galleryUrls: unitForm.galleryUrls,
@@ -627,17 +627,28 @@ export default function OrgProjectUnitsPage() {
   }
 
   const unitTypes = project?.unitTypes ?? [];
-  // The project's structure decides which controls exist. Until it loads (or
-  // for a project made before layouts) everything behaves as `tower`.
-  const layout: ProjectLayout = project?.layout ?? "tower";
-  const traits = LAYOUT_TRAITS[layout];
-  const groupWord = groupNoun(layout, project?.groupLabel) ?? "Group";
+  // Which controls exist is derived from the project's own unit template —
+  // no fixed layout. Until the project loads, nothing is grouped/floored/
+  // configured/priced.
   const unitTemplate: FieldDef[] = project?.unitFieldTemplate ?? [];
+  const traits = templateTraits(unitTemplate);
+  const groupWord = roleField(unitTemplate, "group")?.label ?? "Group";
+  const areaField = roleField(unitTemplate, "area");
+  const priceField = roleField(unitTemplate, "price");
+  // Other defaultable fields (e.g. Built-up Area) — one extra column in the
+  // per-configuration defaults table and summary cards, driven by the
+  // template rather than hardcoded.
+  const extraFields = defaultableExtraFields(unitTemplate);
+  const unitTypeDefault = (ut: UnitType | undefined, field: FieldDef | null) => {
+    if (!ut || !field) return null;
+    const value = ut.fieldDefaults?.[field.key];
+    return value === null || value === undefined || value === "" ? null : Number(value);
+  };
 
-  // The configuration catalog only gates `tower` units — other layouts have
-  // no configuration to pick.
-  const catalogEmpty =
-    traits.configurations && unitTypeCatalog !== null && unitTypeCatalog.length === 0;
+  // Only meaningful when the template has a configuration-role field: if so,
+  // a unit can't be added until there's at least one configuration to pick
+  // (the field's own choices, or one already planned/in use).
+  const catalogEmpty = traits.configurations && projectConfigurationOptions.length === 0;
 
   // One card per configuration = the union of the planned mix (UnitType rows,
   // from the wizard / "Add unit type") and the configurations actually
@@ -659,7 +670,7 @@ export default function OrgProjectUnitsPage() {
       : units.filter((u) => u.status === filter.toLowerCase());
 
   // Distinct tower names in use by units OTHER than the one being edited —
-  // feeds the tower combobox + its towerCount limit (server is authoritative).
+  // feeds the tower combobox's suggestions (free text, no cap).
   const otherTowers = (() => {
     const set = new Set<string>();
     for (const u of units) {
@@ -674,15 +685,12 @@ export default function OrgProjectUnitsPage() {
   // Live ₹/sqft for the modal, on the org's chosen basis — never stored,
   // blank when the price or that area is missing. Always labelled with the
   // basis (the helper has no unlabelled form).
-  const modalPricePerSqft = traits.configurations
-    ? pricePerSqftLabel(
-        parseAmount(unitForm.price),
-        parseCount(unitForm.carpetSqft),
-        parseCount(unitForm.builtupSqft),
-        priceBasis,
-        project?.currency,
-      )
-    : areaPricePerSqftLabel(parseAmount(unitForm.price), parseCount(unitForm.area), project?.currency);
+  const modalPricePerArea = areaPricePerAreaLabel(
+    parseAmount(unitForm.price),
+    parseDecimal(unitForm.area),
+    project?.areaUnit,
+    project?.currency,
+  );
 
   // Can a unit be created at all? Only when the org has ≥1 unit_type catalog
   // option (or the form already carries a legacy configuration value).
@@ -726,13 +734,8 @@ export default function OrgProjectUnitsPage() {
 
   function floorBadge(min: number | null, max: number | null): string {
     if (!traits.floors) return "";
-    const range =
-      min != null && max != null
-        ? min === max
-          ? `Floor ${min}`
-          : `Floors ${min}–${max}`
-        : null;
-    return [range, project?.floorsDescription].filter(Boolean).join(" · ");
+    if (min == null || max == null) return "";
+    return min === max ? `Floor ${min}` : `Floors ${min}–${max}`;
   }
 
   return (
@@ -768,7 +771,7 @@ export default function OrgProjectUnitsPage() {
               disabled={catalogEmpty}
               title={
                 catalogEmpty
-                  ? "Add unit configurations in Settings → Project Catalogs first"
+                  ? "Add choices to this type's configuration field, or a planned configuration, first"
                   : undefined
               }
             >
@@ -817,31 +820,35 @@ export default function OrgProjectUnitsPage() {
                     </div>
                     <div className="uspec">
                       <div>
-                        <div className="k">Carpet</div>
+                        <div className="k">{areaField?.label ?? "Area"}</div>
                         <div className="v">
-                          {ut?.carpetSqft != null
-                            ? `${ut.carpetSqft} sqft`
+                          {unitTypeDefault(ut, areaField) != null
+                            ? `${unitTypeDefault(ut, areaField)} ${project?.areaUnit ?? "sqft"}`
                             : "—"}
                         </div>
                       </div>
-                      <div>
-                        <div className="k">Built-up</div>
-                        <div className="v">
-                          {ut?.builtupSqft != null
-                            ? `${ut.builtupSqft} sqft`
-                            : "—"}
+                      {extraFields.map((f) => (
+                        <div key={f.key}>
+                          <div className="k">{f.label}</div>
+                          <div className="v">
+                            {unitTypeDefault(ut, f) != null ? `${unitTypeDefault(ut, f)} ${f.unit ?? project?.areaUnit ?? "sqft"}` : "—"}
+                          </div>
                         </div>
+                      ))}
+                      <div>
+                        <div className="k">Planned units</div>
+                        <div className="v">{ut?.totalUnits ?? 0}</div>
                       </div>
                       <div>
                         <div className="k">Price</div>
                         <div className="v">
-                          {ut?.price != null ? formatMoney(ut.price, project?.currency ?? "INR") : "—"}
+                          {unitTypeDefault(ut, priceField) != null ? formatMoney(unitTypeDefault(ut, priceField)!, project?.currency ?? "INR") : "—"}
                         </div>
                       </div>
                       <div>
-                        <div className="k">{currencyPrefix(project?.currency ?? "INR").trim()}/sqft ({PRICE_BASIS_LABEL[priceBasis]})</div>
+                        <div className="k">{currencyPrefix(project?.currency ?? "INR").trim()} / {project?.areaUnit ?? "sqft"}</div>
                         <div className="v">
-                          {pricePerSqftLabel(ut?.price ?? null, ut?.carpetSqft ?? null, ut?.builtupSqft ?? null, priceBasis, project?.currency ?? "INR") || "—"}
+                          {areaPricePerAreaLabel(unitTypeDefault(ut, priceField), unitTypeDefault(ut, areaField), project?.areaUnit, project?.currency) || "—"}
                         </div>
                       </div>
                     </div>
@@ -988,11 +995,11 @@ export default function OrgProjectUnitsPage() {
               <thead>
                 <tr>
                   <th>Unit No</th>
-                  {traits.grouped ? <th>{traits.configurations ? "Tower" : groupWord}</th> : null}
-                  {traits.configurations ? <th>Config</th> : null}
-                  <th>{traits.configurations ? "Carpet" : "Area (sqft)"}</th>
-                  {traits.floors ? <th>Floor</th> : null}
-                  {unitTemplate.map((f) => <th key={f.key}>{f.label}</th>)}
+                  {traits.grouped ? <th>{groupWord}</th> : null}
+                  {traits.configurations ? <th>{roleField(unitTemplate, "configuration")?.label ?? "Config"}</th> : null}
+                  {areaField ? <th>{areaField.label} ({project?.areaUnit ?? "sqft"})</th> : null}
+                  {traits.floors ? <th>{roleField(unitTemplate, "floor")?.label ?? "Floor"}</th> : null}
+                  {nonRoleFields(unitTemplate).map((f) => <th key={f.key}>{f.label}</th>)}
                   <th>Facing</th>
                   <th>Parking</th>
                   <th>Price {currencyPrefix(project?.currency ?? "INR").trim()}</th>
@@ -1005,7 +1012,7 @@ export default function OrgProjectUnitsPage() {
               <tbody>
                 {visibleUnits.length === 0 ? (
                   <tr>
-                    <td colSpan={12 - (traits.grouped ? 0 : 1) - (traits.configurations ? 0 : 1) - (traits.floors ? 0 : 1) + unitTemplate.length} className="muted">
+                    <td colSpan={11 - (traits.grouped ? 0 : 1) - (traits.configurations ? 0 : 1) - (areaField ? 0 : 1) - (traits.floors ? 0 : 1) + nonRoleFields(unitTemplate).length} className="muted">
                       {units.length === 0
                         ? "No units yet — add one with “＋ Add unit”."
                         : "No units match this filter."}
@@ -1017,13 +1024,9 @@ export default function OrgProjectUnitsPage() {
                       <td className="">{row.unitNo}</td>
                       {traits.grouped ? <td>{row.tower ?? "—"}</td> : null}
                       {traits.configurations ? <td>{row.configuration ?? "—"}</td> : null}
-                      <td>
-                        {(traits.configurations ? row.carpetSqft : row.area) != null
-                          ? `${(traits.configurations ? row.carpetSqft : row.area)!.toLocaleString("en-IN")}`
-                          : "—"}
-                      </td>
+                      {areaField ? <td>{row.area != null ? `${row.area.toLocaleString("en-IN")} ${project?.areaUnit ?? "sqft"}` : "—"}</td> : null}
                       {traits.floors ? <td>{row.floor ?? "—"}</td> : null}
-                      {unitTemplate.map((f) => (
+                      {nonRoleFields(unitTemplate).map((f) => (
                         <td key={f.key}>{customValueText(f, row.customFields?.[f.key])}</td>
                       ))}
                       <td>{row.facing ?? "—"}</td>
@@ -1032,9 +1035,9 @@ export default function OrgProjectUnitsPage() {
                         {row.price != null
                           ? formatMoney(row.price, project?.currency ?? "INR")
                           : "—"}
-                        {row.pricePerSqft != null ? (
+                        {row.pricePerArea != null ? (
                           <div className="hint" style={{ marginTop: 2 }}>
-                            {formatMoney(row.pricePerSqft, project?.currency ?? "INR", 2)} / sqft{priceBasisSuffix(row.pricePerSqftBasis)}
+                            {formatMoney(row.pricePerArea, project?.currency ?? "INR", 2)} / {project?.areaUnit ?? "sqft"}
                           </div>
                         ) : null}
                       </td>
@@ -1142,18 +1145,14 @@ export default function OrgProjectUnitsPage() {
           <div className="row2">
             <div className="field">
               <label>Configuration <span className="req">*</span></label>
-              {unitTypeCatalogError ? (
-                <div className="hint text-rose">{unitTypeCatalogError}</div>
-              ) : unitTypeCatalog === null ? (
-                <div className="hint">Loading unit types…</div>
-              ) : unitTypeCatalog.length === 0 ? (
+              {configFieldOptions.length === 0 ? (
                 <div className="hint">
-                  No unit types configured yet.{" "}
+                  This type&apos;s configuration field has no choices yet.{" "}
                   <Link
                     className="brand-link"
                     href="/org/settings?section=catalogs"
                   >
-                    Add them in Settings →
+                    Edit it in Settings →
                   </Link>
                 </div>
               ) : (
@@ -1164,18 +1163,19 @@ export default function OrgProjectUnitsPage() {
                     setUtForm((f) => ({ ...f, name: e.target.value }))
                   }
                 >
-                  <option value="">Select a unit type…</option>
-                  {unitTypeCatalog.map((o) => (
+                  <option value="">Select a configuration…</option>
+                  {configFieldOptions.map((o) => (
                     <option key={o.id} value={o.label}>
                       {o.label}
                     </option>
                   ))}
-                  {/* Existing row whose name predates the current catalog:
-                      keep it selectable so edit doesn't silently rename it. */}
+                  {/* Existing row whose name predates the field's current
+                      options: keep it selectable so edit doesn't silently
+                      rename it. */}
                   {utForm.name &&
-                  !unitTypeCatalog.some((o) => o.label === utForm.name) ? (
+                  !configFieldOptions.some((o) => o.label === utForm.name) ? (
                     <option value={utForm.name}>
-                      {utForm.name} (not in catalog)
+                      {utForm.name} (not in the field&apos;s options)
                     </option>
                   ) : null}
                 </select>
@@ -1194,34 +1194,16 @@ export default function OrgProjectUnitsPage() {
               />
             </div>
           </div>
-          <div className="row2">
-            <div className="field">
-              <label>Carpet (sqft)</label>
-              <input
-                className="inp"
-                type="number"
-                min={0}
-                value={utForm.carpetSqft}
-                onChange={(e) =>
-                  setUtForm((f) => ({ ...f, carpetSqft: e.target.value }))
-                }
-              />
+          {areaField ? <div className="field"><label>{areaField.label} ({project?.areaUnit ?? "sqft"})</label><input className="inp" type="number" min={0} value={utForm.area} onChange={(e) => setUtForm((f) => ({ ...f, area: e.target.value }))} /></div> : null}
+          {extraFields.map((f) => (
+            <div className="field" key={f.key}>
+              <label>{f.label}{f.unit ? ` (${f.unit})` : ""}</label>
+              <input className="inp" type="number" min={0} value={utForm.extra[f.key] ?? ""} onChange={(e) => setUtForm((prev) => ({ ...prev, extra: { ...prev.extra, [f.key]: e.target.value } }))} />
             </div>
-            <div className="field">
-              <label>Built-up (sqft)</label>
-              <input
-                className="inp"
-                type="number"
-                min={0}
-                value={utForm.builtupSqft}
-                onChange={(e) =>
-                  setUtForm((f) => ({ ...f, builtupSqft: e.target.value }))
-                }
-              />
-            </div>
-          </div>
+          ))}
+          {priceField ? (
           <div className="field">
-            <label>Base price ({currencyPrefix(project?.currency ?? "INR").trim()})</label>
+            <label>{priceField.label} ({currencyPrefix(project?.currency ?? "INR").trim()})</label>
             <input
               className="inp"
               type="number"
@@ -1232,14 +1214,14 @@ export default function OrgProjectUnitsPage() {
               }
             />
           </div>
+          ) : null}
           <div className="row gap-10">
             <button
               className="btn btn-primary"
               type="button"
               disabled={
                 utBusy ||
-                (utMode === "create" &&
-                  (unitTypeCatalog?.length ?? 0) === 0)
+                (utMode === "create" && configFieldOptions.length === 0)
               }
               onClick={() => void submitUt()}
             >
@@ -1277,13 +1259,13 @@ export default function OrgProjectUnitsPage() {
               </div>
             ) : null}
 
-            {traits.grouped ? (
+            {traits.grouped || traits.floors || traits.configurations ? (
             <div className="sec">
               <div className="lbl"><Icon name="map" size={15} /> Placement</div>
               <div className="grid g3">
                 {traits.configurations ? (
                 <div className="field">
-                  <label>Configuration <span className="req">*</span></label>
+                  <label>{roleField(unitTemplate, "configuration")?.label ?? "Configuration"} <span className="req">*</span></label>
                   <ConfigurationSelect
                     catalog={project ? projectConfigurationOptions : null}
                     error={project ? null : unitTypeCatalogError}
@@ -1294,18 +1276,17 @@ export default function OrgProjectUnitsPage() {
                 </div>
                 ) : null}
                 <div className="field">
-                  <label>{traits.configurations ? "Tower / block" : groupWord}</label>
+                  <label>{groupWord}</label>
                   <TowerCombobox
                     value={unitForm.tower}
                     onChange={(v) => setUnitForm((f) => ({ ...f, tower: v }))}
                     otherTowers={otherTowers}
-                    towerCount={project?.towerCount ?? null}
                     noun={groupWord}
                   />
                 </div>
                 {traits.floors ? (
                 <div className="field">
-                  <label>Floor</label>
+                  <label>{roleField(unitTemplate, "floor")?.label ?? "Floor"}</label>
                   <input
                     className="inp"
                     type="number"
@@ -1363,51 +1344,21 @@ export default function OrgProjectUnitsPage() {
                 </div>
               </div>
               <div className="grid g3">
-                {!traits.configurations ? (
+                {areaField ? (
                 <div className="field">
-                  <label>Area (sqft)</label>
+                  <label>{areaField.label} ({project?.areaUnit ?? "sqft"})</label>
                   <input
                     className="inp"
                     type="number"
                     min={0}
                     placeholder="2400"
                     value={unitForm.area}
-                    onChange={(e) => setUnitForm((f) => ({ ...f, area: e.target.value }))}
-                  />
-                </div>
-                ) : null}
-                {traits.configurations ? (
-                <div className="field">
-                  <label>Carpet area (sqft)</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    min={0}
-                    placeholder="1450"
-                    value={unitForm.carpetSqft}
                     onChange={(e) => {
-                      clearPrefill("carpetSqft");
-                      setUnitForm((f) => ({ ...f, carpetSqft: e.target.value }));
+                      clearPrefill(areaField.key);
+                      setUnitForm((f) => ({ ...f, area: e.target.value }));
                     }}
                   />
-                  {prefilled.includes("carpetSqft") ? <PrefillNote configuration={unitForm.configuration} /> : null}
-                </div>
-                ) : null}
-                {traits.configurations ? (
-                <div className="field">
-                  <label>Built-up area (sqft)</label>
-                  <input
-                    className="inp"
-                    type="number"
-                    min={0}
-                    placeholder="1720"
-                    value={unitForm.builtupSqft}
-                    onChange={(e) => {
-                      clearPrefill("builtupSqft");
-                      setUnitForm((f) => ({ ...f, builtupSqft: e.target.value }));
-                    }}
-                  />
-                  {prefilled.includes("builtupSqft") ? <PrefillNote configuration={unitForm.configuration} /> : null}
+                  {prefilled.includes(areaField.key) ? <PrefillNote configuration={unitForm.configuration} /> : null}
                 </div>
                 ) : null}
                 <div className="field">
@@ -1427,7 +1378,7 @@ export default function OrgProjectUnitsPage() {
             {unitTemplate.length > 0 ? (
               <div className="sec">
                 <div className="lbl"><Icon name="properties" size={15} /> {project?.projectType ?? "Type"} details</div>
-                <CustomFieldInputs
+                <SectionedFieldInputs
                   template={unitTemplate}
                   values={unitForm.customValues}
                   onChange={(key, v) => setUnitForm((f) => ({ ...f, customValues: { ...f.customValues, [key]: v } }))}
@@ -1438,8 +1389,9 @@ export default function OrgProjectUnitsPage() {
             <div className="sec">
               <div className="lbl"><Icon name="billing" size={15} /> Pricing &amp; status</div>
               <div className="grid g3">
+                {priceField ? (
                 <div className="field">
-                  <label>Price ({currencyPrefix(project?.currency ?? "INR").trim()})</label>
+                  <label>{priceField.label} ({currencyPrefix(project?.currency ?? "INR").trim()})</label>
                   <input
                     className="inp"
                     type="number"
@@ -1447,17 +1399,20 @@ export default function OrgProjectUnitsPage() {
                     placeholder="16500000"
                     value={unitForm.price}
                     onChange={(e) => {
-                      clearPrefill("price");
+                      clearPrefill(priceField.key);
                       setUnitForm((f) => ({ ...f, price: e.target.value }));
                     }}
                   />
-                  {prefilled.includes("price") ? <PrefillNote configuration={unitForm.configuration} /> : null}
+                  {prefilled.includes(priceField.key) ? <PrefillNote configuration={unitForm.configuration} /> : null}
                 </div>
+                ) : null}
+                {priceField && areaField ? (
                 <div className="field">
-                  <label>Price / sqft{traits.configurations ? ` (${PRICE_BASIS_LABEL[priceBasis]})` : ""}</label>
-                  <input className="inp" placeholder="Enter price and area" disabled value={modalPricePerSqft} />
-                  {!modalPricePerSqft ? <div className="hint">Calculated from price ÷ area.</div> : null}
+                  <label>{priceField.label} / {project?.areaUnit ?? "sqft"}</label>
+                  <input className="inp" placeholder="Enter price and area" disabled value={modalPricePerArea} />
+                  {!modalPricePerArea ? <div className="hint">Calculated from price ÷ area.</div> : null}
                 </div>
+                ) : null}
                 <div className="field">
                   <label>Status</label>
                   <select
@@ -1515,14 +1470,10 @@ export default function OrgProjectUnitsPage() {
                   <br />
                   {[
                     unitForm.facing || null,
-                    traits.configurations
-                      ? unitForm.carpetSqft
-                        ? `${Number(unitForm.carpetSqft).toLocaleString("en-IN")} sqft carpet`
-                        : null
-                      : unitForm.area
-                        ? `${Number(unitForm.area).toLocaleString("en-IN")} sqft`
-                        : null,
-                    modalPricePerSqft || null,
+                    areaField && unitForm.area
+                      ? `${Number(unitForm.area).toLocaleString("en-IN")} ${project?.areaUnit ?? "sqft"}`
+                      : null,
+                    modalPricePerArea || null,
                   ]
                     .filter(Boolean)
                     .join(" · ") || "Fill the form to preview."}

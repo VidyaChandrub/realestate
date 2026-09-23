@@ -13,7 +13,6 @@ import {
   CreateProjectTypeDto,
   UpdateProjectTypeDto,
 } from './dto/project-type.dto';
-import { LAYOUT_DEFAULT_GROUP_LABEL, ProjectLayoutValue } from './layouts';
 
 type FieldSeed = Omit<FieldDef, 'key'>;
 
@@ -23,31 +22,131 @@ const field = (
   extra: Partial<FieldDef> = {},
 ): FieldSeed => ({ label, type, required: false, ...extra });
 
+// Facing and Parking are deliberately NOT template fields — Unit.facing and
+// Unit.parking are already fixed, org-catalog-driven inputs on every unit
+// form (Settings → Project Catalogs → Facing / Parking), the same way
+// amenities already are at the project level. Re-adding them as template
+// fields would just duplicate that existing, already-configurable mechanism.
+
+// Default PROJECT-level fields — informational summary fields, same
+// mechanism (and same editability) as Specifications. No special behaviour
+// reads these; an org can rename, edit, reorder or delete any of them. Each
+// common type gets its own set rather than one shared list, so a Plot isn't
+// asked for a tower count and a Villa isn't asked for floors.
+// "Total Land Area" deliberately carries no fixed unit — a project's area
+// unit (sq ft / acre, chosen in Step 1) applies to `area`-role fields and
+// price-per-area, not to arbitrary plain fields like this one. An org that
+// wants a unit shown can put it in the label itself (e.g. "Total Land Area
+// (acres)"), since labels are always editable.
+const APARTMENT_PROJECT_FIELDS: FieldSeed[] = [
+  field('No. of Towers / Blocks', 'number'),
+  field('Floors / Structure', 'text'),
+  field('Total Land Area', 'number'),
+];
+const PLOT_PROJECT_FIELDS: FieldSeed[] = [
+  field('Total Land Area', 'number'),
+  field('Plot Area Range', 'text'),
+];
+const VILLA_PROJECT_FIELDS: FieldSeed[] = [
+  field('No. of Villas', 'number'),
+  field('Total Land Area', 'number'),
+  field('Villa Area Range', 'text'),
+];
+
 // The "add common project types" starter set. Plain data: once created a
-// type is just a row — nothing ever looks a type up by these names.
-const COMMON_TYPES: Array<{
-  name: string;
-  layout: ProjectLayoutValue;
-  projectFields: FieldSeed[];
-  unitFields: FieldSeed[];
-}> = [
-  { name: 'Apartments', layout: 'tower', projectFields: [], unitFields: [] },
+// type is just a row — nothing ever looks a type up by these names. No field
+// is required (the org can add that back per-field in Settings if it wants
+// to); a `*`-required-by-default set was tried and the client didn't want it.
+const COMMON_TYPES: Array<{ name: string; projectFields: FieldSeed[]; unitFields: FieldSeed[] }> = [
   {
-    name: 'Villas',
-    layout: 'cluster',
-    projectFields: [field('Number of villas', 'number')],
-    unitFields: [field('Plot area', 'number', { unit: 'sq ft' })],
-  },
-  {
-    name: 'Plots',
-    layout: 'cluster',
-    projectFields: [
-      field('Number of plots', 'number'),
-      field('Total land', 'number', { unit: 'acres' }),
+    name: 'Apartment',
+    projectFields: APARTMENT_PROJECT_FIELDS,
+    // Lean on purpose — mirrors what the old (pre-dynamic) apartment form
+    // actually asked for: tower, configuration, floor, carpet + built-up
+    // area, price. An org that wants Bedrooms, Bathrooms, Super Built-up
+    // Area etc. adds them from here — they're not forced on everyone.
+    unitFields: [
+      field('Tower / Building', 'text', { section: 'Basic Details', role: 'group' }),
+      field('Apartment Type', 'choice', {
+        section: 'Basic Details',
+        role: 'configuration',
+        options: ['1 BHK', '2 BHK', '3 BHK', '4 BHK', 'Penthouse'],
+      }),
+      field('Floor Number', 'number', { section: 'Basic Details', role: 'floor' }),
+      field('Carpet Area', 'number', { section: 'Area & Pricing', role: 'area', unit: 'sq ft' }),
+      field('Built-up Area', 'number', { section: 'Area & Pricing', unit: 'sq ft' }),
+      field('Price', 'number', { section: 'Area & Pricing', role: 'price' }),
     ],
-    unitFields: [field('Dimensions', 'text'), field('Corner plot', 'yesno')],
   },
-  { name: 'Commercial', layout: 'tower', projectFields: [], unitFields: [] },
+  {
+    name: 'Plot',
+    projectFields: PLOT_PROJECT_FIELDS,
+    unitFields: [
+      field('Plot Type', 'choice', {
+        section: 'Basic Details',
+        options: ['Residential', 'Commercial', 'Industrial'],
+      }),
+      field('Corner Plot', 'yesno', { section: 'Basic Details' }),
+      field('Gated Community', 'yesno', { section: 'Basic Details' }),
+      field('Plot Area', 'number', { section: 'Location & Size', role: 'area', unit: 'sq ft' }),
+      field('Length', 'number', { section: 'Location & Size', unit: 'ft' }),
+      field('Width', 'number', { section: 'Location & Size', unit: 'ft' }),
+      field('Road Width', 'number', { section: 'Location & Size', unit: 'ft' }),
+      field('Floors Allowed', 'number', { section: 'Location & Size' }),
+      field('Boundary / Location', 'text', { section: 'Location & Size' }),
+      field('Water Connection', 'yesno', { section: 'Additional' }),
+      field('Electricity Connection', 'yesno', { section: 'Additional' }),
+      field('Approved By', 'text', { section: 'Additional' }),
+      field('Property Description', 'text', { section: 'Additional', multiline: true }),
+      field('Price', 'number', { section: 'Pricing', role: 'price' }),
+    ],
+  },
+  {
+    name: 'Villa',
+    projectFields: VILLA_PROJECT_FIELDS,
+    unitFields: [
+      field('Villa Type', 'choice', {
+        section: 'Basic Details',
+        options: ['Independent', 'Row', 'Twin', 'Luxury'],
+      }),
+      // Price per unit area uses Built-up Area for villas (see Area section)
+      // rather than Carpet Area — the conventional quoting basis for
+      // independent/villa listings, where carpet area is often undefined.
+      field('Configuration', 'choice', {
+        section: 'Basic Details',
+        role: 'configuration',
+        options: ['1 BHK', '2 BHK', '3 BHK', '4 BHK', '5 BHK+'],
+      }),
+      field('Total Floors', 'number', { section: 'Basic Details' }),
+      field('Construction Status', 'choice', {
+        section: 'Basic Details',
+        options: ['Under Construction', 'Ready to Move'],
+      }),
+      field('Furnishing Status', 'choice', {
+        section: 'Basic Details',
+        options: ['Unfurnished', 'Semi-Furnished', 'Fully Furnished'],
+      }),
+      field('Built-up Area', 'number', { section: 'Area', role: 'area', unit: 'sq ft' }),
+      field('Plot Area', 'number', { section: 'Area', unit: 'sq ft' }),
+      field('Carpet Area', 'number', { section: 'Area', unit: 'sq ft' }),
+      field('Super Built-up Area', 'number', { section: 'Area', unit: 'sq ft' }),
+      field('Bedrooms', 'number', { section: 'Highlights' }),
+      field('Bathrooms', 'number', { section: 'Highlights' }),
+      field('Balcony', 'number', { section: 'Highlights' }),
+      field('Private Garden', 'yesno', { section: 'Highlights' }),
+      field('Servant Room', 'yesno', { section: 'Highlights' }),
+      field('Swimming Pool', 'yesno', { section: 'Highlights' }),
+      field('View Type', 'choice', {
+        section: 'Highlights',
+        options: ['Garden', 'Pool', 'City', 'Street', 'Other'],
+      }),
+      field('Property Description', 'text', { section: 'Additional', multiline: true }),
+      field('Price', 'number', { section: 'Pricing', role: 'price' }),
+      // No group-role field by default — an independent villa community has
+      // no towers/blocks, so it renders as a flat list. An org whose villas
+      // sit in blocks can add one from Settings.
+    ],
+  },
 ];
 
 @Injectable()
@@ -59,18 +158,33 @@ export class OrgProjectTypesService {
       where: { orgId },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
-    // `inUse` = how many projects already use the type; the UI locks the
-    // layout on those, matching the rule enforced in `update`.
+    // `inUse` = how many projects already use the type — surfaced so the UI
+    // can warn before an edit that would affect live projects.
     const counts = await Promise.all(
       rows.map((r) => this.countProjects(orgId, r.id, r.name)),
     );
-    return rows.map((r, i) => ({ ...r, inUse: counts[i] }));
+    return rows.map((r, i) => {
+      const common = COMMON_TYPES.find((type) => type.name.toLowerCase() === r.name.toLowerCase());
+      const projectFields = common && (!Array.isArray(r.projectFields) || r.projectFields.length === 0)
+        ? normalizeFieldTemplate(common.projectFields)
+        : r.projectFields;
+      const unitFields = common && Array.isArray(r.unitFields)
+        ? r.unitFields.filter((raw) => {
+            if (typeof raw !== 'object' || raw === null) return true;
+            const label = typeof (raw as { label?: unknown }).label === 'string'
+              ? (raw as { label: string }).label.toLowerCase()
+              : '';
+            return !['facing', 'parking', 'parking type', 'plot facing'].includes(label);
+          })
+        : r.unitFields;
+      return { ...r, projectFields, unitFields, inUse: counts[i] };
+    });
   }
 
   async create(orgId: string, dto: CreateProjectTypeDto) {
     try {
       const created = await this.prisma.projectTypeDef.create({
-        data: { orgId, ...this.buildData(dto, dto.layout) } as Prisma.ProjectTypeDefUncheckedCreateInput,
+        data: { orgId, ...this.buildData(dto) } as Prisma.ProjectTypeDefUncheckedCreateInput,
       });
       return { ...created, inUse: 0 };
     } catch (err) {
@@ -82,13 +196,23 @@ export class OrgProjectTypesService {
     const existing = await this.getOwned(orgId, id);
     const inUse = await this.countProjects(orgId, existing.id, existing.name);
 
-    if (dto.layout !== undefined && dto.layout !== existing.layout && inUse > 0) {
-      throw new BadRequestException(
-        `${inUse} project(s) already use this type, so its layout can't change. Create a new type with the layout you want instead.`,
+    if (dto.projectFields !== undefined) {
+      this.assertRolesImmutable(
+        normalizeFieldTemplate(existing.projectFields),
+        normalizeFieldTemplate(dto.projectFields),
+        'project',
       );
     }
+    if (dto.unitFields !== undefined) {
+      this.assertRolesImmutable(
+        normalizeFieldTemplate(existing.unitFields),
+        normalizeFieldTemplate(dto.unitFields),
+        'unit',
+      );
+    }
+
     // Projects copy the type's name, so renaming an in-use type would orphan
-    // the link the layout lock above relies on.
+    // the link `countProjects`'s name-fallback relies on.
     if (dto.name !== undefined && dto.name.trim() !== existing.name && inUse > 0) {
       throw new BadRequestException(
         `${inUse} project(s) already use this type, so it can't be renamed.`,
@@ -98,7 +222,7 @@ export class OrgProjectTypesService {
     try {
       const updated = await this.prisma.projectTypeDef.update({
         where: { id },
-        data: this.buildData(dto, dto.layout ?? existing.layout),
+        data: this.buildData(dto),
       });
       return { ...updated, inUse };
     } catch (err) {
@@ -108,8 +232,8 @@ export class OrgProjectTypesService {
 
   async remove(orgId: string, id: string) {
     await this.getOwned(orgId, id);
-    // Safe: projects copy name, layout and templates and never reference this
-    // row (same guarantee as OrgCatalogOption).
+    // Safe: projects copy name and templates and never reference this row
+    // (same guarantee as OrgCatalogOption).
     await this.prisma.projectTypeDef.delete({ where: { id } });
     return { success: true };
   }
@@ -119,8 +243,9 @@ export class OrgProjectTypesService {
   async addCommon(orgId: string) {
     const existing = await this.prisma.projectTypeDef.findMany({
       where: { orgId },
-      select: { name: true, sortOrder: true },
+      select: { id: true, name: true, sortOrder: true, projectFields: true, unitFields: true },
     });
+    const commonByName = new Map(COMMON_TYPES.map((type) => [type.name.toLowerCase(), type]));
     const have = new Set(existing.map((e) => e.name.toLowerCase()));
     let order = existing.reduce((m, e) => Math.max(m, e.sortOrder), -1) + 1;
     const missing = COMMON_TYPES.filter((t) => !have.has(t.name.toLowerCase()));
@@ -128,32 +253,48 @@ export class OrgProjectTypesService {
       await this.prisma.projectTypeDef.create({
         data: {
           orgId,
-          ...this.buildData(
-            {
-              name: t.name,
-              layout: t.layout,
-              projectFields: t.projectFields,
-              unitFields: t.unitFields,
-              sortOrder: order++,
-            },
-            t.layout,
-          ),
+          ...this.buildData({
+            name: t.name,
+            projectFields: t.projectFields,
+            unitFields: t.unitFields,
+            sortOrder: order++,
+          }),
         } as Prisma.ProjectTypeDefUncheckedCreateInput,
       });
+    }
+    for (const row of existing) {
+      const common = commonByName.get(row.name.toLowerCase());
+      if (!common) continue;
+      const projectFields = Array.isArray(row.projectFields) && row.projectFields.length > 0
+        ? row.projectFields
+        : normalizeFieldTemplate(common.projectFields);
+      const currentUnitFields = Array.isArray(row.unitFields) ? row.unitFields : [];
+      const cleanedUnitFields = currentUnitFields.filter((raw) => {
+        if (typeof raw !== 'object' || raw === null) return true;
+        const label = typeof (raw as { label?: unknown }).label === 'string'
+          ? (raw as { label: string }).label.toLowerCase()
+          : '';
+        return !['facing', 'parking', 'parking type', 'plot facing'].includes(label);
+      });
+      if (projectFields !== row.projectFields || cleanedUnitFields.length !== currentUnitFields.length) {
+        await this.prisma.projectTypeDef.update({
+          where: { id: row.id },
+          data: {
+            projectFields: projectFields as Prisma.InputJsonValue,
+            unitFields: cleanedUnitFields as Prisma.InputJsonValue,
+          },
+        });
+      }
     }
     return { created: missing.length, types: await this.list(orgId) };
   }
 
   // Shared by create and update: only the fields the caller sent are
-  // included, templates are validated in depth, and grouping is forced off
-  // for `individual`.
-  private buildData(
-    dto: Partial<CreateProjectTypeDto> & { layout?: ProjectLayoutValue },
-    layout: ProjectLayoutValue,
-  ) {
+  // included; templates are validated in depth (type, role, choice options,
+  // unique keys/labels/roles).
+  private buildData(dto: Partial<CreateProjectTypeDto>) {
     const data: Record<string, unknown> = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
-    if (dto.layout !== undefined) data.layout = dto.layout;
     if (dto.projectFields !== undefined) {
       data.projectFields = normalizeFieldTemplate(dto.projectFields);
     }
@@ -161,15 +302,6 @@ export class OrgProjectTypesService {
       data.unitFields = normalizeFieldTemplate(dto.unitFields);
     }
     if (dto.sortOrder !== undefined) data.sortOrder = dto.sortOrder;
-    if (layout === 'individual') {
-      data.groupLabel = null;
-    } else if (dto.groupLabel !== undefined || dto.layout !== undefined) {
-      // A blank label, or one equal to the layout default, is stored as null
-      // ("use the layout default").
-      const label = dto.groupLabel?.trim();
-      data.groupLabel =
-        label && label !== LAYOUT_DEFAULT_GROUP_LABEL[layout] ? label : null;
-    }
     return data;
   }
 
@@ -179,6 +311,23 @@ export class OrgProjectTypesService {
     });
     if (!row) throw new NotFoundException('Project type not found');
     return row;
+  }
+
+  private assertRolesImmutable(
+    existing: FieldDef[],
+    next: FieldDef[],
+    scope: string,
+  ) {
+    const nextByKey = new Map(next.map((field) => [field.key, field]));
+    for (const field of existing) {
+      const replacement = nextByKey.get(field.key);
+      if (!replacement) continue;
+      if ((field.role ?? null) !== (replacement.role ?? null)) {
+        throw new BadRequestException(
+          `The role of an existing ${scope} field cannot be changed. Delete the field and add a new one instead.`,
+        );
+      }
+    }
   }
 
   // Projects made from a type point at it by id; the name match also catches

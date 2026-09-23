@@ -19,6 +19,7 @@ import {
 } from 'class-validator';
 import { AmenityDto } from './amenity.dto';
 import {
+  PROJECT_AREA_UNITS,
   PROJECT_CURRENCY_VALUES,
   PROJECT_STATUS_VALUES,
 } from './list-projects-query.dto';
@@ -75,30 +76,6 @@ export class UpdateProjectDto {
   @IsInt()
   @Min(0)
   baseRate?: number | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @Max(100000)
-  landArea?: number | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(10000)
-  towerCount?: number | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  floorsDescription?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  carpetRange?: string | null;
 
   @IsOptional()
   @IsArray()
@@ -288,7 +265,6 @@ export class UpdateProjectDto {
   customFields?: Record<string, unknown>;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  groupLabel?: string;
+  @IsIn(PROJECT_AREA_UNITS)
+  areaUnit?: (typeof PROJECT_AREA_UNITS)[number];
 }

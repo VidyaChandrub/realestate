@@ -1,13 +1,13 @@
 "use client";
 
 import { TypedFieldEditor } from "@/components/org/typed-field-editor";
+import { RowListEditor } from "@/components/org/row-list-editor";
 import {
-  groupNoun,
-  layoutInfo,
+  groupBySection,
+  nonRoleFields,
   type CustomValueDraft,
   type FieldDef,
   type FieldRow,
-  type ProjectLayout,
 } from "@/lib/field-template";
 
 /**
@@ -30,107 +30,170 @@ export function CustomFieldInputs({
   if (template.length === 0) return null;
   return (
     <div className="grid g3">
-      {template.map((f) => {
-        const value = values[f.key] ?? "";
-        const err = errorFor?.(`cf_${f.key}`) ?? "";
-        return (
-          <div className={`field${err ? " field-invalid" : ""}`} key={f.key}>
-            <label>
-              {f.label}
-              {f.required ? <span className="req"> *</span> : null}
-            </label>
-            {f.type === "number" ? (
-              <div style={{ position: "relative" }}>
-                <input
-                  className="inp"
-                  type="number"
-                  step="any"
-                  style={f.unit ? { paddingRight: 12 + f.unit.length * 8 } : undefined}
-                  value={value}
-                  onChange={(e) => onChange(f.key, e.target.value)}
-                />
-                {f.unit ? (
-                  <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", fontSize: 13, pointerEvents: "none" }}>
-                    {f.unit}
-                  </span>
-                ) : null}
-              </div>
-            ) : f.type === "yesno" ? (
-              <select className="inp" value={value} onChange={(e) => onChange(f.key, e.target.value)}>
-                <option value="">—</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-              </select>
-            ) : f.type === "choice" ? (
-              <select className="inp" value={value} onChange={(e) => onChange(f.key, e.target.value)}>
-                <option value="">—</option>
-                {/* A stored value no longer among the options stays visible. */}
-                {value && !(f.options ?? []).includes(value) ? <option value={value}>{value}</option> : null}
-                {(f.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            ) : (
-              <input className="inp" value={value} maxLength={500} onChange={(e) => onChange(f.key, e.target.value)} />
-            )}
-            {err ? <div className="field-err">{err}</div> : null}
-          </div>
-        );
-      })}
+      {template.map((f) => (
+        <FieldInput key={f.key} field={f} value={values[f.key] ?? ""} onChange={(v) => onChange(f.key, v)} error={errorFor?.(`cf_${f.key}`) ?? ""} />
+      ))}
+    </div>
+  );
+}
+
+/** One field's input, by type — number (with unit), long/short text, yes/no, choice. */
+export function FieldInput({
+  field: f,
+  value,
+  onChange,
+  error,
+  showLabel = true,
+  className,
+}: {
+  field: FieldDef;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  showLabel?: boolean;
+  className?: string;
+}) {
+  const wrapperClassName = ["field", error ? "field-invalid" : "", className].filter(Boolean).join(" ");
+
+  return (
+    <div className={wrapperClassName}>
+      {showLabel ? (
+        <label>
+          {f.label}
+          {f.required ? <span className="req"> *</span> : null}
+        </label>
+      ) : null}
+      {f.type === "number" ? (
+        <div style={{ position: "relative" }}>
+          <input
+            className="inp"
+            type="number"
+            step="any"
+            style={f.unit ? { paddingRight: 12 + f.unit.length * 8 } : undefined}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          {f.unit ? (
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", fontSize: 13, pointerEvents: "none" }}>
+              {f.unit}
+            </span>
+          ) : null}
+        </div>
+      ) : f.type === "yesno" ? (
+        <select className="inp" value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">—</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      ) : f.type === "choice" ? (
+        <select className="inp" value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">—</option>
+          {/* A stored value no longer among the options stays visible. */}
+          {value && !(f.options ?? []).includes(value) ? <option value={value}>{value}</option> : null}
+          {(f.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      ) : f.multiline ? (
+        <textarea className="inp" rows={3} maxLength={2000} value={value} onChange={(e) => onChange(e.target.value)} />
+      ) : (
+        <input className="inp" value={value} maxLength={500} onChange={(e) => onChange(e.target.value)} />
+      )}
+      {error ? <div className="field-err">{error}</div> : null}
+    </div>
+  );
+}
+
+/** Project summary fields use the same compact label/value/delete pattern as Specifications. */
+export function ProjectFieldRows({
+  template,
+  values,
+  onTemplateChange,
+  onValueChange,
+}: {
+  template: FieldDef[];
+  values: CustomValueDraft;
+  onTemplateChange: (template: FieldDef[]) => void;
+  onValueChange: (key: string, value: string) => void;
+}) {
+  return (
+    <RowListEditor<FieldDef>
+      rows={template}
+      getKey={(field) => field.key}
+      onChange={onTemplateChange}
+      makeRow={() => ({ key: `project_field_${Date.now()}`, label: "New project field", type: "text", required: false })}
+      addLabel="+ Add project field"
+      emptyText="No project fields — add the first one below."
+      removeLabel={(field) => `Remove ${field.label || "this project field"}`}
+      renderCells={(field, update) => (
+        <>
+          <input
+            className="inp"
+            aria-label="Project field label"
+            placeholder="e.g. Number of towers"
+            value={field.label}
+            onChange={(event) => update({ label: event.target.value })}
+          />
+          <FieldInput
+            field={field}
+            value={values[field.key] ?? ""}
+            onChange={(value) => onValueChange(field.key, value)}
+            showLabel={false}
+            className="field-compact"
+          />
+        </>
+      )}
+    />
+  );
+}
+
+export function UnitFieldRows({
+  rows,
+  onChange,
+}: {
+  rows: FieldRow[];
+  onChange: (rows: FieldRow[]) => void;
+}) {
+  return (
+    <div className="field unit-field-editor">
+      <label className="unit-fields-title">Unit fields</label>
+      <div className="hint unit-fields-hint">Fields captured for each unit — e.g. Bedrooms, Floor, Price.</div>
+      <TypedFieldEditor rows={rows} onChange={onChange} emptyText="No unit fields — add a field." />
     </div>
   );
 }
 
 /**
- * Per-project editing of what the type prefilled: this project's own copy of
- * the project-level and unit-level field templates, and the name of its
- * grouping column. Changes here never touch the org's project type.
+ * A unit template's NON-role fields, grouped under section headings. Role
+ * fields (price / area / group / floor / configuration) are never rendered
+ * here — they power dedicated inputs the caller renders itself, since each
+ * backs real behaviour (tower limits, configuration validation, …) beyond a
+ * plain typed value.
  */
-export function ProjectTemplateCustomizer({
-  layout,
-  projectRows,
-  onProjectRows,
-  unitRows,
-  onUnitRows,
-  groupLabel,
-  onGroupLabel,
+export function SectionedFieldInputs({
+  template,
+  values,
+  onChange,
+  errorFor,
 }: {
-  layout: ProjectLayout;
-  projectRows: FieldRow[];
-  onProjectRows: (rows: FieldRow[]) => void;
-  unitRows: FieldRow[];
-  onUnitRows: (rows: FieldRow[]) => void;
-  groupLabel: string;
-  onGroupLabel: (v: string) => void;
+  template: FieldDef[];
+  values: CustomValueDraft;
+  onChange: (key: string, value: string) => void;
+  errorFor?: (id: string) => string;
 }) {
-  const info = layoutInfo(layout);
-  const noun = groupNoun(layout, groupLabel);
+  const fields = nonRoleFields(template);
+  if (fields.length === 0) return null;
+  const sections = groupBySection(fields);
   return (
-    <details className="tpl-custom" style={{ margin: "14px 0" }}>
-      <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 13.5 }}>
-        Customise this project&apos;s fields
-        <span className="muted" style={{ fontWeight: 400 }}>
-          {" "}— {projectRows.length} project field{projectRows.length === 1 ? "" : "s"}, {unitRows.length} unit field{unitRows.length === 1 ? "" : "s"}
-        </span>
-      </summary>
-      <div style={{ paddingTop: 12 }}>
-        <div className="hint" style={{ marginBottom: 12 }}>
-          Prefilled from the project type. Add, remove or edit fields for this project only — the type itself is not changed. Removing a field never deletes values already saved.
-        </div>
-        {info.defaultGroupLabel !== null ? (
-          <div className="field">
-            <label>What do you call a group?</label>
-            <input className="inp" style={{ maxWidth: 260 }} value={groupLabel} maxLength={40} placeholder={info.defaultGroupLabel} onChange={(e) => onGroupLabel(e.target.value)} />
-            <div className="hint">Currently &ldquo;{noun}&rdquo;.</div>
+    <>
+      {sections.map((s, i) => (
+        <div className="q-sec" key={s.section ?? `_${i}`}>
+          {s.section ? <div className="lbl">{s.section}</div> : null}
+          <div className="grid g3">
+            {s.fields.map((f) => (
+              <FieldInput key={f.key} field={f} value={values[f.key] ?? ""} onChange={(v) => onChange(f.key, v)} error={errorFor?.(`cf_${f.key}`) ?? ""} />
+            ))}
           </div>
-        ) : null}
-        <div className="field">
-          <label>Project fields</label>
-          <TypedFieldEditor rows={projectRows} onChange={onProjectRows} emptyText="No project fields." />
         </div>
-        <div className="field mb-0">
-          <label>Unit fields</label>
-          <TypedFieldEditor rows={unitRows} onChange={onUnitRows} emptyText="No unit fields." />
-        </div>
-      </div>
-    </details>
+      ))}
+    </>
   );
 }

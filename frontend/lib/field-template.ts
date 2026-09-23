@@ -1,10 +1,15 @@
 /**
- * Typed field templates and project layouts.
+ * Typed field templates — fully dynamic project types.
  *
- * A project type carries a fixed structure *layout* (code) plus two
- * org-configured field templates (data): summary fields on the project, and
- * per-unit fields. Mirrors backend `common/utils/field-template.util.ts`,
- * which is the authority — the server re-validates everything.
+ * A project type is just a list of fields; there is no fixed layout. Some
+ * fields carry a `role` that wires them onto a real Unit column and the
+ * feature that column powers (availability grid grouping, floor view,
+ * price per unit area, configuration prefill). Which inventory controls a
+ * project has is derived from which roles its unit template's fields carry —
+ * deleting a role field just turns that feature off, it never errors.
+ *
+ * Mirrors backend `common/utils/field-template.util.ts`, which is the
+ * authority — the server re-validates everything.
  */
 
 export type FieldType = "number" | "text" | "yesno" | "choice";
@@ -16,52 +21,107 @@ export const FIELD_TYPE_LABEL: Record<FieldType, string> = {
   choice: "Choice",
 };
 
+export const FIELD_ROLES = ["price", "area", "group", "floor", "configuration"] as const;
+export type FieldRole = (typeof FIELD_ROLES)[number];
+
+export const FIELD_ROLE_LABEL: Record<FieldRole, string> = {
+  price: "Price",
+  area: "Area",
+  group: "Tower / Block / Sector",
+  floor: "Floor",
+  configuration: "Configuration",
+};
+
+/** The input type(s) a role may land on — must fit the Unit column it maps to. */
+export const ROLE_ALLOWED_TYPES: Record<FieldRole, FieldType[]> = {
+  price: ["number"],
+  area: ["number"],
+  floor: ["number"],
+  group: ["text", "choice"],
+  configuration: ["text", "choice"],
+};
+
 export interface FieldDef {
   /** Stable identity — values are stored against it, never against the label. */
   key: string;
   label: string;
   type: FieldType;
   required: boolean;
+  /** Groups fields under a heading when the form renders. */
+  section?: string;
+  /** Wires this field onto a real Unit column. Fixed once set; only the label stays editable. */
+  role?: FieldRole;
   /** choice only */
   options?: string[];
   /** number only — display suffix such as "acres" */
   unit?: string;
+  /** text only — render as a textarea instead of a single-line input. */
+  multiline?: boolean;
 }
 
-/** The fixed structure layouts. Which inventory controls exist is decided by these. */
-export type ProjectLayout = "tower" | "cluster" | "individual";
-
-export interface LayoutInfo {
-  value: ProjectLayout;
-  title: string;
-  blurb: string;
-  /** Default name of the grouping column; null = no grouping. */
-  defaultGroupLabel: string | null;
+/** The field currently carrying `role` in a template, or null. */
+export function roleField(template: FieldDef[], role: FieldRole): FieldDef | null {
+  return template.find((f) => f.role === role) ?? null;
 }
 
-export const LAYOUTS: LayoutInfo[] = [
-  {
-    value: "tower",
-    title: "Towers & floors",
-    blurb: "Towers or blocks with floors — apartments, commercial complexes.",
-    defaultGroupLabel: "Tower",
-  },
-  {
-    value: "cluster",
-    title: "Phases / clusters",
-    blurb: "Groups such as phases, sectors or rows, with no floors — villas, plots.",
-    defaultGroupLabel: "Phase",
-  },
-  {
-    value: "individual",
-    title: "Individual units",
-    blurb: "A flat list with no grouping — farmhouses, one-off properties.",
-    defaultGroupLabel: null,
-  },
-];
+/** The fields whose values belong in customFields — a role field's value has its own Unit column. */
+export function nonRoleFields(template: FieldDef[]): FieldDef[] {
+  return template.filter((f) => !f.role);
+}
 
-export function layoutInfo(layout: ProjectLayout): LayoutInfo {
-  return LAYOUTS.find((l) => l.value === layout) ?? LAYOUTS[0];
+/**
+ * Area-like defaults that should be copied into each configuration row when a
+ * project offers multiple unit types. These are not role fields (they do not
+ * map to dedicated Unit columns), but they are still meaningful defaults to
+ * persist per configuration — e.g. Built-up Area for apartments, Plot Area for
+ * plots, and both for villas.
+ */
+export function defaultableExtraFields(template: FieldDef[]): FieldDef[] {
+  return nonRoleFields(template).filter((f) => (
+    f.type === "number" && /(?:area|built|plot|carpet|super)/i.test(f.label)
+  ));
+}
+
+/** What a template's role fields give a project. Derived, never stored. */
+export interface TemplateTraits {
+  priced: boolean;
+  hasArea: boolean;
+  floors: boolean;
+  configurations: boolean;
+  grouped: boolean;
+}
+
+export function templateTraits(template: FieldDef[]): TemplateTraits {
+  return {
+    priced: !!roleField(template, "price"),
+    hasArea: !!roleField(template, "area"),
+    floors: !!roleField(template, "floor"),
+    configurations: !!roleField(template, "configuration"),
+    grouped: !!roleField(template, "group"),
+  };
+}
+
+/** The grouping column's name for a project — the `group`-role field's own editable label. */
+export function groupNoun(template: FieldDef[]): string | null {
+  return roleField(template, "group")?.label ?? null;
+}
+
+/** Pluralise a group noun for a form label ("Tower" → "towers"). */
+export function groupPlural(noun: string): string {
+  const n = noun.toLowerCase();
+  return /(s|x|ch|sh)$/.test(n) ? `${n}es` : `${n}s`;
+}
+
+/** Fields grouped by their `section`, in template order; unsectioned fields form a final, unlabeled group. */
+export function groupBySection(template: FieldDef[]): Array<{ section: string | null; fields: FieldDef[] }> {
+  const groups: Array<{ section: string | null; fields: FieldDef[] }> = [];
+  for (const f of template) {
+    const section = f.section ?? null;
+    const last = groups[groups.length - 1];
+    if (last && last.section === section) last.fields.push(f);
+    else groups.push({ section, fields: [f] });
+  }
+  return groups;
 }
 
 /** An editable template row. `rowId` is a client-only React key. */
@@ -72,10 +132,24 @@ export interface FieldRow {
   label: string;
   type: FieldType;
   required: boolean;
+  section: string;
+  /** Fixed once the row represents a saved field — see `role`. */
+  role: FieldRole | "";
   /** choice: comma-separated choices as typed */
   optionsText: string;
   /** number: display unit as typed */
   unit: string;
+  multiline: boolean;
+  /**
+   * True only for a row loaded from an already-saved template (via
+   * `fieldsToRows`) — never set true client-side just because `key` got
+   * auto-assigned. This, not `key`, is what "fixed once saved" (role, and
+   * anything else that shouldn't move after a save) should check: `key` is
+   * filled in as soon as you type a label into a brand-new row (see
+   * TypedFieldEditor's name-field onBlur), long before that row is actually
+   * persisted, so gating on `key` locked new rows immediately — a real bug.
+   */
+  existing: boolean;
 }
 
 let nextRowId = 1;
@@ -87,8 +161,12 @@ export function makeFieldRow(patch: Partial<FieldRow> = {}): FieldRow {
     label: "",
     type: "text",
     required: false,
+    section: "",
+    role: "",
     optionsText: "",
     unit: "",
+    multiline: false,
+    existing: false,
     ...patch,
   };
 }
@@ -100,10 +178,26 @@ export function fieldsToRows(fields: FieldDef[] | null | undefined): FieldRow[] 
       label: f.label,
       type: f.type,
       required: f.required,
+      section: f.section ?? "",
+      role: f.role ?? "",
       optionsText: (f.options ?? []).join(", "),
       unit: f.unit ?? "",
+      multiline: f.multiline ?? false,
+      existing: true,
     }),
   );
+}
+
+/**
+ * Same as `fieldsToRows`, but every row comes back with `existing: false`.
+ * Use this wherever the fields being loaded aren't actually saved against a
+ * live project yet — e.g. the new-project wizard, where picking a project
+ * type or resuming a draft only seeds a starting point; nothing is
+ * persisted (and no Unit can reference a role field) until publish, so a
+ * role should stay editable until then.
+ */
+export function fieldsToDraftRows(fields: FieldDef[] | null | undefined): FieldRow[] {
+  return fieldsToRows(fields).map((r) => ({ ...r, existing: false }));
 }
 
 /** Mirror of the server's slugifyFieldKey. */
@@ -139,16 +233,20 @@ export function rowsToFields(rows: FieldRow[]): Array<FieldDef> {
       label: r.label.trim(),
       type: r.type,
       required: r.required,
+      ...(r.section.trim() ? { section: r.section.trim() } : {}),
+      ...(r.role ? { role: r.role } : {}),
       ...(r.type === "choice"
         ? { options: r.optionsText.split(",").map((o) => o.trim()).filter(Boolean) }
         : {}),
       ...(r.type === "number" && r.unit.trim() ? { unit: r.unit.trim() } : {}),
+      ...(r.type === "text" && r.multiline ? { multiline: true } : {}),
     }));
 }
 
 /** Client-side mirror of the server's template rules, for fast feedback. */
 export function validateFieldRows(rows: FieldRow[], where: string): string | null {
   const seen = new Set<string>();
+  const seenRoles = new Set<FieldRole>();
   for (const r of rows) {
     const label = r.label.trim();
     if (!label) return `${where}: every field needs a label.`;
@@ -157,37 +255,17 @@ export function validateFieldRows(rows: FieldRow[], where: string): string | nul
     if (r.type === "choice" && !r.optionsText.split(",").some((o) => o.trim())) {
       return `${where}: "${label}" needs at least one choice.`;
     }
+    if (r.role) {
+      if (seenRoles.has(r.role)) {
+        return `${where}: two fields can't both be the "${FIELD_ROLE_LABEL[r.role]}" field.`;
+      }
+      seenRoles.add(r.role);
+      if (!ROLE_ALLOWED_TYPES[r.role].includes(r.type)) {
+        return `${where}: "${label}" can't be the "${FIELD_ROLE_LABEL[r.role]}" field — change its type first.`;
+      }
+    }
   }
   return null;
-}
-
-/** What each layout gives a project. Code, not org data. */
-export interface LayoutTraits {
-  /** Floors are captured (tower only). */
-  floors: boolean;
-  /** The unit-configuration mix (BHK types, planned counts, size/price table). */
-  configurations: boolean;
-  /** Units are organised into named groups. */
-  grouped: boolean;
-}
-
-export const LAYOUT_TRAITS: Record<ProjectLayout, LayoutTraits> = {
-  tower: { floors: true, configurations: true, grouped: true },
-  cluster: { floors: false, configurations: false, grouped: true },
-  individual: { floors: false, configurations: false, grouped: false },
-};
-
-/** The grouping column's name for a project ("Tower", "Sector"…); null = no grouping. */
-export function groupNoun(layout: ProjectLayout, groupLabel: string | null | undefined): string | null {
-  const info = layoutInfo(layout);
-  if (info.defaultGroupLabel === null) return null;
-  return groupLabel?.trim() || info.defaultGroupLabel;
-}
-
-/** Pluralise a group noun for a form label ("Tower" → "towers"). */
-export function groupPlural(noun: string): string {
-  const n = noun.toLowerCase();
-  return /(s|x|ch|sh)$/.test(n) ? `${n}es` : `${n}s`;
 }
 
 /**

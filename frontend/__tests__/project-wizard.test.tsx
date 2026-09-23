@@ -264,10 +264,8 @@ describe("project wizard — project-level floor plan", () => {
     await jumpTo(user, "Documents & media");
 
     expect(screen.getByText("Project floor / site plan")).toBeInTheDocument();
-    // The separate per-unit-type concept is untouched.
-    expect(screen.getByText("Per-unit-type floor plans")).toBeInTheDocument();
-    expect(
-      screen.getByText("Added per unit type from the Units section after publishing"),
-    ).toBeInTheDocument();
+    // The separate per-unit-type concept is still explained without adding a
+    // second upload control to the wizard.
+    expect(screen.getByText(/Per-unit-type floor plans are added per configuration/)).toBeInTheDocument();
   });
 });

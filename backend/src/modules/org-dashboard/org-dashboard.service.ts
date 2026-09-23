@@ -7,6 +7,11 @@ import {
   actorLeadOrClauses,
   canSeeAllLeads,
 } from '../../common/utils/lead-scope.util';
+import { FieldDef, roleField } from '../../common/utils/field-template.util';
+
+function readTemplate(v: Prisma.JsonValue): FieldDef[] {
+  return (Array.isArray(v) ? v : []) as unknown as FieldDef[];
+}
 
 function parseBudgetValue(data: unknown): number {
   if (!data || typeof data !== 'object') return 0;
@@ -158,21 +163,17 @@ export class OrgDashboardService {
           priceMin: true,
           priceMax: true,
           currency: true,
-          towerCount: true,
-          floorsDescription: true,
-          landArea: true,
           possession: true,
           reraId: true,
           coverImageUrl: true,
           marketing: true,
+          unitFieldTemplate: true,
           unitTypes: {
             select: {
               id: true,
               name: true,
               totalUnits: true,
-              price: true,
-              carpetSqft: true,
-              builtupSqft: true,
+              fieldDefaults: true,
             },
           },
           units: {
@@ -372,10 +373,15 @@ export class OrgDashboardService {
         pTotalPlanned += ut.totalUnits ?? 0;
       }
 
+      const priceKey = roleField(readTemplate(p.unitFieldTemplate), 'price')?.key;
       for (const u of p.units) {
         pUnitsCreated += 1;
         const plannedType = p.unitTypes.find((ut) => ut.name === u.configuration);
-        const uPrice = u.price ?? plannedType?.price ?? 0;
+        const plannedPrice =
+          priceKey && plannedType
+            ? (plannedType.fieldDefaults as Record<string, unknown>)?.[priceKey]
+            : undefined;
+        const uPrice = u.price ?? (typeof plannedPrice === 'number' ? plannedPrice : 0);
         if (u.status === 'available') {
           pAvailable += 1;
           pAvailValue += uPrice;
@@ -405,9 +411,6 @@ export class OrgDashboardService {
         priceMin: p.priceMin,
         priceMax: p.priceMax,
         currency: p.currency ?? 'INR',
-        towerCount: p.towerCount,
-        floorsDescription: p.floorsDescription,
-        landArea: p.landArea,
         possession: p.possession,
         reraId: p.reraId,
         coverImageUrl: p.coverImageUrl,

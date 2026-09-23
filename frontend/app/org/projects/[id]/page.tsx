@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { apiFetch, createCrmLead, getCrmLeads, getProjectSalesAgents } from "@/lib/api";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { normalizeSpecifications, specificationRows } from "@/lib/specifications";
-import { groupNoun, groupPlural, LAYOUT_TRAITS } from "@/lib/field-template";
+import { roleField, templateTraits } from "@/lib/field-template";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { ProjectPageHead } from "@/components/org/project-tabs";
@@ -264,11 +264,11 @@ export default function OrgProjectOverviewPage() {
 
   const totalLeads = leadCount;
 
-  // The structure the project was created with decides which rows exist:
-  // configurations, land area, towers/floors and carpet range are the `tower`
-  // layout's; other layouts show their group count and their own typed fields.
-  const traits = LAYOUT_TRAITS[project.layout ?? "tower"];
-  const groupName = groupNoun(project.layout ?? "tower", project.groupLabel);
+  // Which structural rows exist is derived from the unit template's role
+  // fields. No. of towers/blocks, floors/structure, area range and total
+  // land area are ordinary default project fields now — rendered generically
+  // via customRows below, not hardcoded here.
+  const traits = templateTraits(project.unitFieldTemplate ?? []);
   const customRows = (project.projectFieldTemplate ?? []).map((f) => {
     const v = project.customFields?.[f.key];
     const shown =
@@ -284,15 +284,6 @@ export default function OrgProjectOverviewPage() {
     { k: "Location", v: project.location || "—" },
     ...(traits.configurations ? [{ k: "Unit configurations", v: configuration }] : []),
     { k: "Price range", v: priceRange },
-    ...(traits.configurations
-      ? [
-          { k: "Total land area", v: project.landArea != null ? `${project.landArea} acres` : "—" },
-          { k: "Towers / floors", v: [project.towerCount != null ? `${project.towerCount} towers` : null, project.floorsDescription || null].filter(Boolean).join(" · ") || "—" },
-          { k: "Carpet area range", v: project.carpetRange || "—" },
-        ]
-      : traits.grouped
-        ? [{ k: `No. of ${groupPlural(groupName ?? "group")}`, v: project.towerCount != null ? String(project.towerCount) : "—" }]
-        : []),
     ...customRows,
     // Planned figure when a planned mix exists, otherwise the real created
     // count. "—" only when there's no inventory of either kind.
@@ -494,7 +485,13 @@ export default function OrgProjectOverviewPage() {
                           <div className="info">
                             <b>{label}</b>
                             <div className="muted fs-12-5">
-                              {[ut?.builtupSqft ? `${ut.builtupSqft} sqft` : null, ut?.price != null ? formatMoney(ut.price, project.currency) : null].filter(Boolean).join(" · ") || (ut ? "—" : "Derived from units")}
+                              {(() => {
+                                const areaField = roleField(project.unitFieldTemplate ?? [], "area");
+                                const priceField = roleField(project.unitFieldTemplate ?? [], "price");
+                                const area = areaField ? ut?.fieldDefaults?.[areaField.key] : null;
+                                const price = priceField ? ut?.fieldDefaults?.[priceField.key] : null;
+                                return [area != null ? `${area} ${project.areaUnit}` : null, price != null ? formatMoney(Number(price), project.currency) : null].filter(Boolean).join(" · ") || (ut ? "—" : "Derived from units");
+                              })()}
                             </div>
                             <span className={`badge ${available > 0 ? "b-green" : "b-amber"} mt-8`}>
                               {available} available

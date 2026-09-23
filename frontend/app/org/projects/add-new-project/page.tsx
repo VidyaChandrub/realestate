@@ -10,20 +10,19 @@ import { CURRENCY_OPTIONS } from "@/lib/countries";
 import { useProjectTypes } from "@/lib/use-project-types";
 import {
   customFieldRequirements,
+  defaultableExtraFields,
   draftToPayload,
-  fieldsToRows,
-  groupNoun,
-  groupPlural,
-  LAYOUT_TRAITS,
+  fieldsToDraftRows,
+  roleField,
   rowsToTemplate,
+  templateTraits,
   validateFieldRows,
   valuesToDraft,
   type CustomValueDraft,
   type FieldDef,
   type FieldRow,
-  type ProjectLayout,
 } from "@/lib/field-template";
-import { CustomFieldInputs, ProjectTemplateCustomizer } from "@/components/org/project-type-fields";
+import { ProjectFieldRows, UnitFieldRows } from "@/components/org/project-type-fields";
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import {
   alreadyAssignedLabel,
@@ -75,9 +74,9 @@ type UnitTypeDraft = ConfigSizePriceRow;
 const makeUnitType = (): UnitTypeDraft => ({
   key: Date.now() + Math.random(),
   name: "",
-  carpetSqft: "",
-  builtupSqft: "",
+  area: "",
   price: "",
+  extra: {},
   totalUnits: "",
 });
 
@@ -138,11 +137,10 @@ interface WizardDraft {
   step: number;
   name: string; projectType: string; tagline: string; reraId: string;
   status: ProjectStatus; launchDate: string; possession: string; constructionStage: string;
-  selectedConfigs: string[]; towerCount: string; floorsDescription: string; landArea: string;
-  carpetRange: string; highlights: string; unitTypes: UnitTypeDraft[];
+  selectedConfigs: string[]; highlights: string; unitTypes: UnitTypeDraft[];
   // This project's copy of its type's templates + the typed values (Step 2).
-  projectFields?: FieldDef[]; unitFields?: FieldDef[]; groupLabel?: string; customValues?: CustomValueDraft;
-  priceMin: string; priceMax: string; baseRate: string; bookingAmount: string; currency: string;
+  projectFields?: FieldDef[]; unitFields?: FieldDef[]; customValues?: CustomValueDraft;
+  priceMin: string; priceMax: string; baseRate: string; bookingAmount: string; currency: string; areaUnit?: string;
   priceIncludes: string[]; paymentPlan: string; offers: string;
   address: string; city: string; locality: string; pincode: string;
   nearby: string[]; landmarks: string;
@@ -218,10 +216,6 @@ export default function AddNewProjectPage() {
 
   // Step 2 — inventory
   const [selectedConfigs, setSelectedConfigs] = useState<string[]>([]);
-  const [towerCount, setTowerCount] = useState("");
-  const [floorsDescription, setFloorsDescription] = useState("");
-  const [landArea, setLandArea] = useState("");
-  const [carpetRange, setCarpetRange] = useState("");
   const [highlights, setHighlights] = useState("");
   const [unitTypes, setUnitTypes] = useState<UnitTypeDraft[]>([]);
 
@@ -231,6 +225,7 @@ export default function AddNewProjectPage() {
   const [baseRate, setBaseRate] = useState("");
   const [bookingAmount, setBookingAmount] = useState("");
   const [currency, setCurrency] = useState("INR");
+  const [areaUnit, setAreaUnit] = useState("sqft");
   // Both now come from the org's catalogs, so neither can be pre-seeded with
   // a label this org may not have configured.
   const [priceIncludes, setPriceIncludes] = useState<string[]>([]);
@@ -366,12 +361,18 @@ export default function AddNewProjectPage() {
   // its grouping column, and the typed values for the project-level template.
   const [projectFieldRows, setProjectFieldRows] = useState<FieldRow[]>([]);
   const [unitFieldRows, setUnitFieldRows] = useState<FieldRow[]>([]);
-  const [groupLabel, setGroupLabel] = useState("");
   const [customValues, setCustomValues] = useState<CustomValueDraft>({});
-  // No type picked (or not loaded yet) behaves as `tower` — today's experience.
-  const layout: ProjectLayout = projectTypes.types?.find((t) => t.name === projectType)?.layout ?? "tower";
-  const traits = LAYOUT_TRAITS[layout];
-  const groupName = groupNoun(layout, groupLabel);
+  const dynamicUnitTemplate = rowsToTemplate(unitFieldRows.filter((r) => r.label.trim()));
+  const dynamicExtraFields = defaultableExtraFields(dynamicUnitTemplate);
+  const traits = templateTraits(dynamicUnitTemplate);
+  // The type's configuration-role field IS the source of "which configs can
+  // this project offer" — not an unrelated org-wide catalog.
+  const configFieldOptions: OrgCatalogOption[] = (
+    roleField(dynamicUnitTemplate, "configuration")?.options ?? []
+  ).map((label, i) => ({
+    id: `cfg-${i}`, orgId: "", category: "unit_type" as const, label,
+    sortOrder: i, createdAt: "", updatedAt: "",
+  }));
   const projectTemplate = useMemo(
     () => rowsToTemplate(projectFieldRows.filter((r) => r.label.trim())),
     [projectFieldRows],
@@ -495,14 +496,11 @@ export default function AddNewProjectPage() {
     const next = projectType === label ? "" : label;
     const def = projectTypes.types?.find((t) => t.name === next) ?? null;
     setProjectType(next);
-    setProjectFieldRows(fieldsToRows(def?.projectFields));
-    setUnitFieldRows(fieldsToRows(def?.unitFields));
-    setGroupLabel(def?.groupLabel ?? "");
+    setProjectFieldRows(fieldsToDraftRows(def?.projectFields));
+    setUnitFieldRows(fieldsToDraftRows(def?.unitFields));
     setCustomValues({});
-    const t = LAYOUT_TRAITS[def?.layout ?? "tower"];
-    if (!t.floors) { setFloorsDescription(""); setCarpetRange(""); setLandArea(""); }
+    const t = templateTraits(def?.unitFields ?? []);
     if (!t.configurations) { setSelectedConfigs([]); setUnitTypes([]); }
-    if (!t.grouped) setTowerCount("");
   }
 
   // Continue: check this step's own required fields right here. Anything
@@ -550,11 +548,11 @@ export default function AddNewProjectPage() {
     (): WizardDraft => ({
       _savedAt: Date.now(),
       step, name, projectType, tagline, reraId, status, launchDate, possession, constructionStage,
-      selectedConfigs, towerCount, floorsDescription, landArea, carpetRange, highlights, unitTypes,
+      selectedConfigs, highlights, unitTypes,
       projectFields: rowsToTemplate(projectFieldRows.filter((r) => r.label.trim())),
       unitFields: rowsToTemplate(unitFieldRows.filter((r) => r.label.trim())),
-      groupLabel, customValues,
-      priceMin, priceMax, baseRate, bookingAmount, currency, priceIncludes, paymentPlan, offers,
+      customValues,
+      priceMin, priceMax, baseRate, bookingAmount, currency, areaUnit, priceIncludes, paymentPlan, offers,
       address, city, locality, pincode, nearby, landmarks,
       amenities, specRows, specNotes,
       metaAds, googleAds, linkedinAds, portalAds, monthlyBudget, targetCpl, leadGoal, landingPage, aiCalling, whatsappAuto, roundRobin, aiKnowledgeBase,
@@ -565,15 +563,15 @@ export default function AddNewProjectPage() {
     }),
     [
       step, name, projectType, tagline, reraId, status, launchDate, possession, constructionStage,
-      selectedConfigs, towerCount, floorsDescription, landArea, carpetRange, highlights, unitTypes,
-      priceMin, priceMax, baseRate, bookingAmount, currency, priceIncludes, paymentPlan, offers,
+      selectedConfigs, highlights, unitTypes,
+      priceMin, priceMax, baseRate, bookingAmount, currency, areaUnit, priceIncludes, paymentPlan, offers,
       address, city, locality, pincode, nearby, landmarks,
       amenities, specRows, specNotes,
       metaAds, googleAds, linkedinAds, portalAds, monthlyBudget, targetCpl, leadGoal, landingPage, aiCalling, whatsappAuto, roundRobin, aiKnowledgeBase,
       managerId, salesTeam, agentAssign, requireApproval, visibleTele, publishWeb,
       coverImageUrl, galleryUrls, brochureUrl, reraCertificateUrl, floorPlanUrls,
       customLandingPageId, customLandingPageSlug, customLandingPageName, selectedTemplate,
-      projectFieldRows, unitFieldRows, groupLabel, customValues,
+      projectFieldRows, unitFieldRows, customValues,
     ],
   );
 
@@ -647,14 +645,15 @@ export default function AddNewProjectPage() {
     setName(d.name ?? ""); setProjectType(d.projectType ?? ""); setTagline(d.tagline ?? "");
     setReraId(d.reraId ?? ""); setStatus(d.status ?? "active"); setLaunchDate(d.launchDate ?? "");
     setPossession(d.possession ?? ""); setConstructionStage(d.constructionStage ?? "Under construction");
-    setSelectedConfigs(d.selectedConfigs ?? []); setTowerCount(d.towerCount ?? "");
-    setFloorsDescription(d.floorsDescription ?? "");
-    setLandArea(d.landArea ?? ""); setCarpetRange(d.carpetRange ?? "");
-    setHighlights(d.highlights ?? ""); setUnitTypes(d.unitTypes ?? []);
-    setProjectFieldRows(fieldsToRows(d.projectFields)); setUnitFieldRows(fieldsToRows(d.unitFields));
-    setGroupLabel(d.groupLabel ?? ""); setCustomValues(d.customValues ?? {});
+    setSelectedConfigs(d.selectedConfigs ?? []);
+    setHighlights(d.highlights ?? "");
+    // Older drafts predate the `extra` bag — default it so a resumed draft
+    // never crashes the defaults table.
+    setUnitTypes((d.unitTypes ?? []).map((u) => ({ ...u, extra: u.extra ?? {} })));
+    setProjectFieldRows(fieldsToDraftRows(d.projectFields)); setUnitFieldRows(fieldsToDraftRows(d.unitFields));
+    setCustomValues(d.customValues ?? {});
     setPriceMin(d.priceMin ?? ""); setPriceMax(d.priceMax ?? ""); setBaseRate(d.baseRate ?? ""); setBookingAmount(d.bookingAmount ?? "");
-    setCurrency(d.currency ?? "INR"); setPriceIncludes(d.priceIncludes ?? []);
+    setCurrency(d.currency ?? "INR"); setAreaUnit(d.areaUnit ?? "sqft"); setPriceIncludes(d.priceIncludes ?? []);
     setPaymentPlan(d.paymentPlan ?? ""); setOffers(d.offers ?? "");
     setAddress(d.address ?? ""); setCity(d.city ?? ""); setLocality(d.locality ?? ""); setPincode(d.pincode ?? "");
     setNearby(d.nearby ?? []); setLandmarks(d.landmarks ?? "");
@@ -821,17 +820,13 @@ export default function AddNewProjectPage() {
         priceMin: parseAmount(priceMin),
         priceMax: parseAmount(priceMax),
         baseRate: parseAmount(baseRate),
-        landArea: traits.configurations ? parseDecimal(landArea) : undefined,
-        towerCount: traits.grouped ? parseCount(towerCount) : undefined,
-        floorsDescription: traits.floors ? floorsDescription.trim() || undefined : undefined,
-        carpetRange: traits.configurations ? carpetRange.trim() || undefined : undefined,
         projectType: projectType || undefined,
         // This project's own copy of the type's templates, and the typed
         // values — validated again server-side.
         projectFieldTemplate: projectTemplate,
         unitFieldTemplate: rowsToTemplate(unitFieldRows.filter((r) => r.label.trim())),
         customFields: draftToPayload(projectTemplate, customValues),
-        groupLabel: traits.grouped ? groupLabel.trim() : undefined,
+        areaUnit,
         tagline: tagline.trim() || undefined,
         launchDate: launchDate || undefined,
         constructionStage: constructionStage || undefined,
@@ -875,11 +870,17 @@ export default function AddNewProjectPage() {
       const seededNames = new Set<string>();
       for (const u of traits.configurations ? unitTypes : []) {
         if (!u.name.trim()) continue;
+        const areaKey = roleField(dynamicUnitTemplate, "area")?.key;
+        const priceKey = roleField(dynamicUnitTemplate, "price")?.key;
         const utBody: CreateUnitTypeInput = {
           name: u.name.trim(),
-          carpetSqft: parseCount(u.carpetSqft),
-          builtupSqft: parseCount(u.builtupSqft),
-          price: parseAmount(u.price),
+          fieldDefaults: {
+            ...(areaKey ? { [areaKey]: parseDecimal(u.area) } : {}),
+            ...(priceKey ? { [priceKey]: parseAmount(u.price) } : {}),
+            ...Object.fromEntries(
+              Object.entries(u.extra).map(([key, v]) => [key, parseDecimal(v)]),
+            ),
+          },
           totalUnits: parseCount(u.totalUnits),
         };
         await apiFetch(`/org/projects/${project.id}/unit-types`, {
@@ -1294,6 +1295,7 @@ export default function AddNewProjectPage() {
                     <div className="hint">Every price on this project — unit types, units, price range — is in this currency. Locked in here, before Step 2 asks for the first one.</div>
                     {invalid("currency") && <div className="field-err">Pick a currency before entering any prices.</div>}
                   </div>
+                  <div className="field"><label>Area unit <span className="req">*</span></label><select className="inp" value={areaUnit} onChange={(e) => setAreaUnit(e.target.value)}><option value="sqft">sq ft</option><option value="acre">acre</option></select><div className="hint">Used for every area-role value and price per unit area on this project.</div></div>
                   <div className="field"><label>Short tagline</label><input className="inp" placeholder="e.g. 2 &amp; 3 BHK homes on SG Highway" value={tagline} onChange={(e) => setTagline(e.target.value)} /><div className="hint">Shown on the public page and ad landing pages.</div></div>
                 </div>
                 <div className="q-sec">
@@ -1315,29 +1317,25 @@ export default function AddNewProjectPage() {
             {step === 1 && (
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 2 of 9</div><h2>Inventory &amp; configuration</h2><div className="sub">Which unit types this project offers and the overall inventory picture.</div></div>
+                <div className="help mb-14">Project type: <b>{projectType || "Not selected"}</b></div>
                 <div className="q-sec">
                   <div className="lbl">{traits.configurations ? "🏠 Unit configurations (select all)" : "🏠 Inventory"}</div>
                   {traits.configurations ? (
                     <div className="field">
                       <CatalogOptions
                         category="unit_type"
-                        options={catalogByCategory.unit_type}
-                        loaded={catalog !== null}
-                        error={catalogError}
+                        options={configFieldOptions}
+                        loaded={true}
+                        error={null}
                         isSelected={(label) => selectedConfigs.includes(label)}
                         onToggle={toggleConfig}
                       />
-                    </div>
-                  ) : null}
-                  {traits.configurations ? (
-                    <div className="grid g3">
-                      <div className="field"><label>{layout === "tower" && !groupLabel.trim() ? "No. of towers / blocks" : `No. of ${groupPlural(groupName ?? "group")}`}</label><input className="inp" type="number" placeholder="4" value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /></div>
-                      <div className="field"><label>Floors / structure</label><input className="inp" placeholder="G+22" value={floorsDescription} onChange={(e) => setFloorsDescription(e.target.value)} /></div>
-                      <div className="field"><label>Carpet area range (sqft)</label><input className="inp" placeholder="640 – 1,850" value={carpetRange} onChange={(e) => setCarpetRange(e.target.value)} /></div>
-                    </div>
-                  ) : traits.grouped ? (
-                    <div className="grid g3">
-                      <div className="field"><label>No. of {groupPlural(groupName ?? "group")}</label><input className="inp" type="number" min={0} placeholder="4" value={towerCount} onChange={(e) => setTowerCount(e.target.value)} /><div className="hint">Units are grouped by {groupName?.toLowerCase()}; new names can only be added up to this number.</div></div>
+                      <div className="hint">
+                        Choices come from this type&apos;s configuration field.{" "}
+                        <Link className="brand-link" href="/org/settings?section=catalogs" target="_blank" rel="noreferrer">
+                          Edit them in Settings →
+                        </Link>
+                      </div>
                     </div>
                   ) : null}
                   {traits.configurations ? (
@@ -1346,37 +1344,25 @@ export default function AddNewProjectPage() {
                       rows={unitTypes}
                       onChange={updateUnitType}
                       currency={currency}
+                      areaField={roleField(dynamicUnitTemplate, "area")}
+                      priceField={roleField(dynamicUnitTemplate, "price")}
+                      extraFields={dynamicExtraFields}
                       hint="Optional, and editable later from the project's Edit page or the Units page. Filling these in means adding a unit prefills its area and price from here instead of asking for them again."
                     />
                   ) : null}
-                  <CustomFieldInputs
+                  {/* No. of towers/blocks, Floors/structure, Area range and
+                      Total land area are ordinary default project fields now
+                      (see the type's Project fields, rendered below) — not
+                      hardcoded inputs, so an org can rename, edit or remove
+                      any of them. */}
+                  <ProjectFieldRows
                     template={projectTemplate}
                     values={customValues}
-                    onChange={(key, v) => setCustomValues((cur) => ({ ...cur, [key]: v }))}
-                    errorFor={(id) => (invalid(id) ? fieldError(id) : "")}
+                    onTemplateChange={(template) => setProjectFieldRows(fieldsToDraftRows(template))}
+                    onValueChange={(key, value) => setCustomValues((cur) => ({ ...cur, [key]: value }))}
                   />
-                  {traits.configurations ? (
-                    <div className="field mb-0"><label>Total land area</label>
-                      <div style={{ position: "relative", maxWidth: 260 }}>
-                        <input className="inp" type="number" step="0.01" min={0} style={{ paddingRight: 52 }} placeholder="5.2" value={landArea} onChange={(e) => setLandArea(e.target.value)} />
-                        <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", fontSize: 13, pointerEvents: "none" }}>acres</span>
-                      </div>
-                      <div className="hint">Unit counts (planned / available) come from the Units section after publishing.</div>
-                    </div>
-                  ) : (
-                    <div className="hint">Unit counts come from the Units section after publishing.</div>
-                  )}
-                  {projectType && (layout !== "tower" || projectFieldRows.length + unitFieldRows.length > 0) ? (
-                    <ProjectTemplateCustomizer
-                      layout={layout}
-                      projectRows={projectFieldRows}
-                      onProjectRows={setProjectFieldRows}
-                      unitRows={unitFieldRows}
-                      onUnitRows={setUnitFieldRows}
-                      groupLabel={groupLabel}
-                      onGroupLabel={setGroupLabel}
-                    />
-                  ) : null}
+                  <UnitFieldRows rows={unitFieldRows} onChange={setUnitFieldRows} />
+                  <div className="hint">Unit counts come from the Units section after publishing.</div>
                 </div>
                 <div className="q-sec">
                   <div className="lbl">⭐ Unique selling points</div>
@@ -1671,6 +1657,7 @@ export default function AddNewProjectPage() {
                   <div className="hint" style={{ marginTop: -4 }}>
                     The overall plan for the development — master site layout, tower plans, podium levels. Add as many as you need.
                   </div>
+                  <div className="hint">Per-unit-type floor plans are added per configuration from the Units section after publishing.</div>
                 </div>
                 <div className="q-sec">
                   <div className="lbl">📄 Documents</div>
@@ -1699,14 +1686,7 @@ export default function AddNewProjectPage() {
                       </div>
                       <div className="q-sec"><div className="lbl">🏠 Inventory</div>
                         {traits.configurations ? (
-                          <>
-                            <div className="sp"><span className="k">Unit configurations</span><span className="v">{formatConfigs(selectedConfigs)}</span></div>
-                            <div className="sp"><span className="k">Towers / floors</span><span className="v">{[towerCount, floorsDescription].filter(Boolean).join(" · ") || "—"}</span></div>
-                            <div className="sp"><span className="k">Carpet area range</span><span className="v">{carpetRange || "—"}</span></div>
-                            <div className="sp"><span className="k">Total land area</span><span className="v">{landArea ? `${landArea} acres` : "—"}</span></div>
-                          </>
-                        ) : traits.grouped ? (
-                          <div className="sp"><span className="k">No. of {groupPlural(groupName ?? "group")}</span><span className="v">{towerCount || "—"}</span></div>
+                          <div className="sp"><span className="k">Unit configurations</span><span className="v">{formatConfigs(selectedConfigs)}</span></div>
                         ) : null}
                         {projectTemplate.map((f) => {
                           const raw = customValues[f.key] ?? "";

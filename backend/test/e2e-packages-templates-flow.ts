@@ -309,8 +309,8 @@ async function runTests() {
         amenities: [{ name: 'Infinity Pool' }, { name: 'Panoramic Sky Lounge' }],
         unitTypes: {
           create: [
-            { name: '3 BHK Grande', carpetSqft: 1850, totalUnits: 24 },
-            { name: '4 BHK Sky Suite', carpetSqft: 2900, totalUnits: 12 },
+            { name: '3 BHK Grande', fieldDefaults: { area: 1850 }, totalUnits: 24 },
+            { name: '4 BHK Sky Suite', fieldDefaults: { area: 2900 }, totalUnits: 12 },
           ],
         },
       },

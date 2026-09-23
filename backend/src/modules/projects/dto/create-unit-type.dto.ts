@@ -4,6 +4,7 @@ import {
   IsArray,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   IsUrl,
@@ -21,25 +22,13 @@ export class CreateUnitTypeDto {
   @MaxLength(160)
   name: string;
 
+  // Default values to prefill onto a new unit of this configuration, keyed by
+  // the project's current unit-template field keys — typically at least the
+  // `area`- and `price`-role fields. Validated in depth server-side against
+  // the template (same rules as Unit.customFields).
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000000)
-  carpetSqft?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1000000)
-  builtupSqft?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  price?: number;
+  @IsObject()
+  fieldDefaults?: Record<string, unknown>;
 
   @IsOptional()
   @Type(() => Number)
