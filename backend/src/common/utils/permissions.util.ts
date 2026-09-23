@@ -63,6 +63,8 @@ export const PLATFORM_PERMISSION_MODULES: ModuleDefinition[] = [
   // organisation's detail page; the plan cards it lives next to stay visible
   // regardless.
   { key: 'admin_org_upgrade_subscription', label: 'Organisation — Upgrade Subscription', description: "Shows the 'Upgrade subscription' button on an organisation's detail page" },
+  { key: 'admin_org_templates_add', label: 'Organisation — Add Templates', description: "Shows the 'Add template' action on an organisation's detail page" },
+  { key: 'admin_org_templates_remove', label: 'Organisation — Remove Templates', description: "Shows the 'Remove' template action on an organisation's detail page" },
   { key: 'admin_org_roles', label: 'Organisation roles', description: 'Default roles and permissions for organisations' },
   // Covers both the Members and Roles tabs of the Platform Team page — there
   // is no separate "Platform roles" console module. A dedicated module here

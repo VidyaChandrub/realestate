@@ -109,6 +109,55 @@ export class SuperAdminGuard implements CanActivate {
       return true;
     }
 
+    // Organisation template assignment is one endpoint for both adding and
+    // removing templates. Check the dedicated nested permissions separately
+    // so Add template and Remove remain independently configurable under the
+    // Organisations row in the platform role matrix.
+    const templateAssignmentMatch = path.match(/^\/admin\/organisations\/([^/]+)\/templates$/);
+    if (templateAssignmentMatch && request.method === 'PUT') {
+      const requestedIds = new Set<string>(
+        Array.isArray(request.body?.templateIds) ? request.body.templateIds : [],
+      );
+      const currentRows = await this.prisma.organisationTemplate.findMany({
+        where: { orgId: templateAssignmentMatch[1] },
+        select: { templateId: true },
+      });
+      const currentIds = new Set(currentRows.map((row) => row.templateId));
+      const hasAdditions = [...requestedIds].some((id) => !currentIds.has(id));
+      const hasRemovals = [...currentIds].some((id) => !requestedIds.has(id));
+      const requiredPermissions: Array<{ moduleKey: string; action: 'add' | 'delete' }> = [];
+      if (hasAdditions) requiredPermissions.push({ moduleKey: 'admin_org_templates_add', action: 'add' });
+      if (hasRemovals) requiredPermissions.push({ moduleKey: 'admin_org_templates_remove', action: 'delete' });
+
+      if (requiredPermissions.length > 0) {
+        const permissionRows = await this.prisma.roleModulePermission.findMany({
+          where: {
+            orgId: SYSTEM_ORG_ID,
+            roleId: { in: platformRoles.map((role) => role.id) },
+            moduleKey: { in: requiredPermissions.map((permission) => permission.moduleKey) },
+          },
+        });
+        const allowed = requiredPermissions.every((required) =>
+          permissionRows.some((row) =>
+            row.moduleKey === required.moduleKey &&
+            (required.action === 'add' ? row.canAdd : row.canDelete),
+          ),
+        );
+        if (!allowed) {
+          const missing = requiredPermissions.find((required) =>
+            !permissionRows.some((row) =>
+              row.moduleKey === required.moduleKey &&
+              (required.action === 'add' ? row.canAdd : row.canDelete),
+            ),
+          );
+          throw new ForbiddenException(
+            `Missing platform permission: ${missing?.moduleKey}:${missing?.action}`,
+          );
+        }
+        return true;
+      }
+    }
+
     // Platform Team members are disabled/re-enabled via the same PATCH route
     // used to edit their profile, distinguished only by the request body
     // containing solely `status` — the console UI never sends it alongside a
