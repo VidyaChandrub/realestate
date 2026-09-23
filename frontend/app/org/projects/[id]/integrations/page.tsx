@@ -7,10 +7,11 @@
 
 import { Reveal } from "@/components/superadmin/reveal";
 import { ProjectPageHead } from "@/components/org/project-tabs";
+import { Icon, type IconName } from "@/components/icons";
 import "@/app/org/org.css";
 
 type SourceCard = {
-  icon: string;
+  icon: IconName;
   name: React.ReactNode;
   desc: string;
   connected: boolean;
@@ -18,37 +19,37 @@ type SourceCard = {
 
 const SOURCES: SourceCard[] = [
   {
-    icon: "📣",
+    icon: "bell",
     name: "Facebook & Instagram Lead Ads",
     desc: "Instant-form leads sync in real time from Meta campaigns.",
     connected: true,
   },
   {
-    icon: "🔍",
+    icon: "search",
     name: "Google Ads Lead Forms",
     desc: "Lead-form extensions from Search & Discovery campaigns.",
     connected: true,
   },
   {
-    icon: "📝",
+    icon: "document",
     name: "Google Forms",
     desc: "Pull responses from a shared Google Form into the CRM.",
     connected: false,
   },
   {
-    icon: "🌐",
+    icon: "globe",
     name: "Website / landing form",
     desc: "Enquiry form on the project's landing page.",
     connected: true,
   },
   {
-    icon: "🔗",
+    icon: "link",
     name: "Webhook",
     desc: "POST JSON payloads from any external portal (99acres, Housing).",
     connected: true,
   },
   {
-    icon: "🎪",
+    icon: "flag",
     name: <>Property Expo <span className="badge b-gray">Custom</span></>,
     desc: "Walk-in leads captured at the Ahmedabad Property Expo 2026 stall.",
     connected: true,
@@ -110,7 +111,7 @@ export default function OrgProjectIntegrationsPage() {
             <div className="card hover">
               <div className="card-b col gap-10">
                 <div className="row between top">
-                  <span className="fs-26">{s.icon}</span>
+                  <span className="fs-26"><Icon name={s.icon} size={24} /></span>
                   {s.connected ? (
                     <span className="badge b-green">Connected</span>
                   ) : (

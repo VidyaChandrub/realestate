@@ -439,7 +439,7 @@ export default function UnitCreatePage() {
                                 )
                               }
                             >
-                              <span className="b">{on ? "✓" : ""}</span>{u.name}
+                              <span className="b">{on ? <Icon name="check" size={11} /> : ""}</span>{u.name}
                             </span>
                           );
                         })}
