@@ -13,6 +13,7 @@ import {
   Layers,
   LayoutTemplate,
   List,
+  Monitor,
   MoreVertical,
   PauseCircle,
   Pencil,
@@ -21,13 +22,15 @@ import {
   Rocket,
   Search,
   Sparkles,
+  Smartphone,
+  Tablet,
   Trash2,
   X,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
-import { TemplateCover, StatusBadge } from "@/components/superadmin/templates/shared";
+import { TemplateCover, StatusBadge, TierBadge } from "@/components/superadmin/templates/shared";
 import { orgBuilderPath } from "@/lib/openpage/paths";
 import { defaultSiteConfig } from "@/lib/openpage/site-config";
 import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
@@ -40,8 +43,11 @@ import type {
   LandingPageStatus,
   OrgBillingSummary,
   OrgLandingPagesListResponse,
+  OrgTemplateSummary,
+  OrgTemplatesListResponse,
+  AvailableTemplatesResponse,
 } from "@/lib/types";
-import type { SectionInstance, SiteConfig } from "@/lib/openpage/types";
+import type { LandingPageData, SectionInstance, SiteConfig } from "@/lib/openpage/types";
 import {
   InventoryBindFields,
   inventoryBindPayload,
@@ -112,6 +118,26 @@ export default function OrgLandingPagesPage() {
   const [scratchHasInventory, setScratchHasInventory] = useState(false);
   const [scratchSubmitting, setScratchSubmitting] = useState(false);
   const [scratchError, setScratchError] = useState<string | null>(null);
+
+  // Assigned template picker state
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [assignedTemplates, setAssignedTemplates] = useState<OrgTemplateSummary[]>([]);
+  const [templateQuota, setTemplateQuota] = useState<AvailableTemplatesResponse | null>(null);
+  const [templatePickerLoading, setTemplatePickerLoading] = useState(false);
+  const [templatePickerError, setTemplatePickerError] = useState<string | null>(null);
+  const [useTemplate, setUseTemplate] = useState<{ id: string; name: string } | null>(null);
+  const [useName, setUseName] = useState("");
+  const [useBind, setUseBind] = useState<InventoryBindValue>({ kind: "none" });
+  const [useHasInventory, setUseHasInventory] = useState(false);
+  const [useSubmitting, setUseSubmitting] = useState(false);
+  const [useError, setUseError] = useState<string | null>(null);
+
+  // Template preview state
+  const [templatePreviewId, setTemplatePreviewId] = useState<string | null>(null);
+  const [templatePreviewData, setTemplatePreviewData] = useState<LandingPageData | null>(null);
+  const [templatePreviewLoading, setTemplatePreviewLoading] = useState(false);
+  const [templatePreviewError, setTemplatePreviewError] = useState<string | null>(null);
+  const [templatePreviewDevice, setTemplatePreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
 
   // View modal
   const [viewId, setViewId] = useState<string | null>(null);
@@ -192,6 +218,86 @@ export default function OrgLandingPagesPage() {
       )
       .catch(() => setLandingPageQuota(null));
   }, [accessToken]);
+
+  async function openTemplatePicker() {
+    setTemplatePickerOpen(true);
+    setTemplatePickerLoading(true);
+    setTemplatePickerError(null);
+    try {
+      const [assigned, quota] = await Promise.all([
+        apiFetch<OrgTemplatesListResponse>("/org/templates?page=1&limit=100", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+        apiFetch<AvailableTemplatesResponse>("/org/templates/available", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }),
+      ]);
+      setAssignedTemplates(assigned.data);
+      setTemplateQuota(quota);
+    } catch (err) {
+      setTemplatePickerError(err instanceof Error ? err.message : "Failed to load workspace templates.");
+    } finally {
+      setTemplatePickerLoading(false);
+    }
+  }
+
+  function openTemplateUse(id: string, name: string) {
+    setUseTemplate({ id, name });
+    setUseName(name);
+    setUseBind({ kind: "none" });
+    setUseError(null);
+    setTemplatePickerOpen(false);
+  }
+
+  async function confirmUseTemplate() {
+    if (!useTemplate || !accessToken) return;
+    if (!useName.trim()) {
+      setUseError("Give the page a name");
+      return;
+    }
+    const missing = needsInventorySelection(useBind, useHasInventory);
+    if (missing) {
+      setUseError(missing);
+      return;
+    }
+    setUseSubmitting(true);
+    setUseError(null);
+    try {
+      const created = await apiFetch<LandingPageRow>("/org/landing-pages", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          templateId: useTemplate.id,
+          name: useName.trim(),
+          ...inventoryBindPayload(useBind),
+        }),
+      });
+      router.push(orgBuilderPath(created.id));
+    } catch (err) {
+      setUseError(err instanceof Error ? err.message : "Failed to create page from this template.");
+      setUseSubmitting(false);
+    }
+  }
+
+  function openTemplatePreview(id: string) {
+    if (!accessToken) return;
+    setTemplatePreviewId(id);
+    setTemplatePreviewData(null);
+    setTemplatePreviewError(null);
+    setTemplatePreviewLoading(true);
+    apiFetch<LandingPageData>(`/org/templates/${id}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then(setTemplatePreviewData)
+      .catch((err) => setTemplatePreviewError(err instanceof Error ? err.message : "Failed to load preview."))
+      .finally(() => setTemplatePreviewLoading(false));
+  }
+
+  function closeTemplatePreview() {
+    setTemplatePreviewId(null);
+    setTemplatePreviewData(null);
+    setTemplatePreviewError(null);
+  }
 
   async function publishPage(id: string) {
     if (!accessToken) return;
@@ -395,9 +501,10 @@ export default function OrgLandingPagesPage() {
                 <Sparkles size={15} /> Create from scratch
               </button>
 
-              <Link
+              <button
                 className="btn btn-primary"
-                href="/org/templates"
+                type="button"
+                onClick={openTemplatePicker}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -408,7 +515,7 @@ export default function OrgLandingPagesPage() {
                 }}
               >
                 <Plus size={16} /> New from template
-              </Link>
+              </button>
             </>
           )}
         </div>
@@ -664,8 +771,9 @@ export default function OrgLandingPagesPage() {
             ) : (
               !atLandingPageCreateLimit && (
                 <>
-                <Link
-                  href="/org/templates"
+                <button
+                  type="button"
+                  onClick={openTemplatePicker}
                   className="btn btn-primary"
                   style={{
                     padding: "10px 22px",
@@ -676,7 +784,7 @@ export default function OrgLandingPagesPage() {
                   }}
                 >
                   <Plus size={16} /> Choose from Templates
-                </Link>
+                </button>
                 <button
                   type="button"
                   className="btn btn-soft"
@@ -844,6 +952,254 @@ export default function OrgLandingPagesPage() {
           </button>
         </div>
       )}
+
+      {/* Assigned Templates Modal */}
+      <Modal
+        open={templatePickerOpen}
+        onClose={() => setTemplatePickerOpen(false)}
+        title="Choose a Landing Page Template"
+        description="Use a template already added to your workspace, or preview it before you start."
+        size="xl"
+      >
+        {templatePickerLoading ? (
+          <div style={{ padding: 44, textAlign: "center", color: "var(--muted)" }}>
+            <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
+            <div>Loading workspace templates…</div>
+          </div>
+        ) : templatePickerError ? (
+          <div style={{ padding: "16px 0", color: "var(--rose)", fontSize: 13 }}>{templatePickerError}</div>
+        ) : (
+          <div>
+            {templateQuota && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "12px 16px",
+                  background: "var(--surface-2, #f8fafc)",
+                  borderRadius: 12,
+                  border: "1px solid var(--line)",
+                  marginBottom: 16,
+                  flexWrap: "wrap",
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>
+                    {templateQuota.planName} Package
+                  </span>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                    Template Allowance: {templateQuota.assignedCount} of{" "}
+                    {templateQuota.maxAllowed == null ? "Unlimited" : templateQuota.maxAllowed} Selected
+                  </div>
+                </div>
+                <span
+                  className={`badge ${
+                    templateQuota.remainingQuota === 0
+                      ? "b-amber"
+                      : templateQuota.remainingQuota != null
+                      ? "b-indigo"
+                      : "b-green"
+                  }`}
+                  style={{ fontWeight: 700 }}
+                >
+                  {templateQuota.remainingQuota === 0
+                    ? "Quota Reached"
+                    : templateQuota.remainingQuota != null
+                    ? `${templateQuota.remainingQuota} remaining slots`
+                    : "Unlimited access"}
+                </span>
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                {assignedTemplates.length} workspace template{assignedTemplates.length === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            {assignedTemplates.length === 0 ? (
+              <div
+                style={{
+                  padding: "34px 20px",
+                  textAlign: "center",
+                  border: "1px dashed var(--line-2)",
+                  borderRadius: 12,
+                  color: "var(--muted)",
+                  fontSize: 13,
+                }}
+              >
+                No templates have been added to this workspace yet. Add one from Templates Studio first.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+                  gap: 14,
+                  maxHeight: 500,
+                  overflowY: "auto",
+                  padding: "2px 4px 4px 2px",
+                }}
+              >
+                {assignedTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    style={{
+                      border: "1px solid var(--line-2)",
+                      borderRadius: 14,
+                      overflow: "hidden",
+                      background: "var(--surface)",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <TemplateCover thumbnail={template.thumbnail ?? "hero"} accent="#4f46e5" height={150}>
+                      <div style={{ position: "absolute", top: 8, left: 8 }}>
+                        <TierBadge tier={template.tier} />
+                      </div>
+                      {template.category && (
+                        <div style={{ position: "absolute", top: 8, right: 8 }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              background: "rgba(15,20,36,0.7)",
+                              color: "#fff",
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              backdropFilter: "blur(4px)",
+                            }}
+                          >
+                            {template.category}
+                          </span>
+                        </div>
+                      )}
+                    </TemplateCover>
+                    <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{template.name}</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => openTemplateUse(template.id, template.name)}
+                          style={{ flex: 1, justifyContent: "center", fontWeight: 700 }}
+                        >
+                          <Sparkles size={13} /> Use
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => openTemplatePreview(template.id)}
+                          style={{ flex: 1, justifyContent: "center", fontWeight: 600 }}
+                        >
+                          <Eye size={13} /> Preview
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Template Preview Modal */}
+      {templatePreviewId && (
+        <Modal
+          open={!!templatePreviewId}
+          onClose={closeTemplatePreview}
+          title={templatePreviewData?.name ?? "Template Preview"}
+          size="xl"
+          footer={
+            <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", justifyContent: "space-between" }}>
+              <div style={{ display: "inline-flex", background: "var(--surface-2, #f8fafc)", borderRadius: 8, padding: 2, border: "1px solid var(--line-2)" }}>
+                {(["desktop", "tablet", "mobile"] as const).map((device) => {
+                  const DeviceIcon = device === "desktop" ? Monitor : device === "tablet" ? Tablet : Smartphone;
+                  return (
+                    <button
+                      key={device}
+                      type="button"
+                      onClick={() => setTemplatePreviewDevice(device)}
+                      title={`${device} view`}
+                      style={{
+                        border: "none",
+                        background: templatePreviewDevice === device ? "var(--surface)" : "transparent",
+                        color: templatePreviewDevice === device ? "var(--brand)" : "var(--muted)",
+                        padding: "5px 9px",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <DeviceIcon size={15} />
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  const template = assignedTemplates.find((item) => item.id === templatePreviewId);
+                  if (template) {
+                    closeTemplatePreview();
+                    openTemplateUse(template.id, template.name);
+                  }
+                }}
+                style={{ fontWeight: 700 }}
+              >
+                <Sparkles size={14} /> Use template
+              </button>
+            </div>
+          }
+        >
+          <div style={{ background: "#0f172a", borderRadius: 14, padding: templatePreviewDevice === "desktop" ? 8 : "24px 12px", display: "flex", justifyContent: "center", alignItems: "center", minHeight: 520, maxHeight: "75vh", overflow: "hidden" }}>
+            {templatePreviewLoading ? (
+              <div style={{ color: "#ffffff", padding: 40, textAlign: "center" }}>
+                <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
+                <div>Loading preview canvas…</div>
+              </div>
+            ) : templatePreviewError ? (
+              <div style={{ color: "var(--rose)", padding: 20 }}>{templatePreviewError}</div>
+            ) : templatePreviewData ? (
+              <div style={{ width: templatePreviewDevice === "desktop" ? "100%" : templatePreviewDevice === "tablet" ? 768 : 375, height: 520, background: "#ffffff", borderRadius: templatePreviewDevice === "desktop" ? 8 : 16, overflowY: "auto", boxShadow: "0 20px 50px rgba(0, 0, 0, 0.5)", border: templatePreviewDevice !== "desktop" ? "8px solid #334155" : "none" }}>
+                <SiteRenderer site={siteFromLandingPage(templatePreviewData)} live />
+              </div>
+            ) : null}
+          </div>
+        </Modal>
+      )}
+
+      {/* Use Template Modal */}
+      <Modal
+        open={!!useTemplate}
+        onClose={() => {
+          if (!useSubmitting) setUseTemplate(null);
+        }}
+        title="Create Landing Page"
+        description={useTemplate ? `Start a new landing page based on "${useTemplate.name}".` : undefined}
+        footer={
+          <>
+            <button className="btn btn-ghost" type="button" onClick={() => setUseTemplate(null)} disabled={useSubmitting}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" type="button" disabled={useSubmitting} onClick={confirmUseTemplate} style={{ fontWeight: 700 }}>
+              {useSubmitting ? "Creating…" : "Create & Launch Builder"}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {useError && <div style={{ padding: "8px 12px", background: "var(--rose-050)", color: "var(--rose)", borderRadius: 8, fontSize: 13 }}>{useError}</div>}
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label>Landing Page Name</label>
+            <input className="inp" placeholder="e.g. Skyline Residence Launch" value={useName} onChange={(e) => setUseName(e.target.value)} autoFocus />
+          </div>
+          <InventoryBindFields accessToken={accessToken} value={useBind} onChange={setUseBind} onAvailabilityChange={setUseHasInventory} />
+        </div>
+      </Modal>
 
       {/* Scratch Modal */}
       <Modal
