@@ -113,7 +113,7 @@ export default function OrgProjectAiCallingPage() {
               </p>
             </div>
             <div className="col gap-8 flex-none">
-              <button className="btn btn-ghost">✏️ Edit</button>
+              <button className="btn btn-ghost"><Icon name="edit" size={13} /> Edit</button>
               <button className="btn btn-primary">▶ Test call</button>
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function OrgProjectAiCallingPage() {
 
       <Reveal delay={2}>
         <div className="help mt-18">
-          💡 Aarohi&apos;s call scripts, pricing lines and FAQ answers are pulled live from the{" "}
+          <Icon name="info" size={13} /> Aarohi&apos;s call scripts, pricing lines and FAQ answers are pulled live from the{" "}
           <Link
             href={`/org/projects/${id}/knowledge`}
             className="brand-link"

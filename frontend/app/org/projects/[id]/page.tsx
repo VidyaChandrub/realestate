@@ -10,6 +10,7 @@ import { normalizeSpecifications, specificationRows } from "@/lib/specifications
 import { roleField, templateTraits } from "@/lib/field-template";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
+import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
 import { Modal } from "@/components/ui/modal";
 import "@/app/org/org.css";
@@ -317,7 +318,7 @@ export default function OrgProjectOverviewPage() {
         actions={
           <>
             <Link href={`/org/projects/${id}/edit`} className="btn btn-ghost">
-              ✏️ Edit
+              <Icon name="edit" size={13} /> Edit
             </Link>
             <button className="btn btn-primary" type="button">＋ Add lead</button>
           </>
@@ -337,7 +338,7 @@ export default function OrgProjectOverviewPage() {
                 />
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", background: "linear-gradient(135deg, #1e293b, #0f172a)", color: "#fff" }}>
-                  <span style={{ fontSize: 42 }}>🏙️</span>
+                  <Icon name="camera" size={40} />
                   <span className="cap" style={{ marginTop: 8, fontSize: 16, fontWeight: 700 }}>{project.name}</span>
                 </div>
               )}
@@ -370,7 +371,7 @@ export default function OrgProjectOverviewPage() {
             <div className="card">
               <div className="card-h">
                 <span className="t" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  📊 Inventory &amp; Availability Metrics
+                  <Icon name="reports" size={15} /> Inventory &amp; Availability Metrics
                 </span>
                 <Link className="x brand-link" href={`/org/projects/${id}/units`}>Manage Unit Inventory →</Link>
               </div>
@@ -479,7 +480,7 @@ export default function OrgProjectOverviewPage() {
                       return (
                         <Link key={label} href={`/org/projects/${id}/units`} className="utype-card">
                           <div className="cover media plan">
-                            <span>📐</span>
+                            <Icon name="camera" size={18} />
                             <span className="cap">{label}</span>
                           </div>
                           <div className="info">
@@ -541,7 +542,7 @@ export default function OrgProjectOverviewPage() {
                     <div className="row wrap gap-8">
                       {project.priceIncludes.map((inc) => (
                         <span className="chip" key={inc} style={{ background: "rgba(99, 102, 241, 0.08)", borderColor: "rgba(99, 102, 241, 0.2)", color: "var(--indigo, #4f46e5)" }}>
-                          ✓ {inc}
+                          <Icon name="check" size={11} /> {inc}
                         </span>
                       ))}
                     </div>
@@ -597,7 +598,7 @@ export default function OrgProjectOverviewPage() {
                   <span className="muted">None added.</span>
                 ) : (
                   project.amenities.map((a) => (
-                    <span className="chip" key={a.name}>✨ {a.name}</span>
+                    <span className="chip" key={a.name}><Icon name="sparkles" size={11} /> {a.name}</span>
                   ))
                 )}
               </div>
@@ -689,7 +690,7 @@ export default function OrgProjectOverviewPage() {
             <div className="card" style={{ border: "1.5px solid var(--brand, #4f46e5)" }}>
               <div className="card-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="t" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span>🌐</span> Website &amp; Landing Page
+                  <Icon name="globe" size={14} /> Website &amp; Landing Page
                 </span>
                 {project.publishedToWebsite || pagePublishSuccess ? (
                   <span className="badge b-green">● Published</span>
@@ -737,7 +738,7 @@ export default function OrgProjectOverviewPage() {
                           className="btn btn-secondary btn-sm"
                           style={{ flex: 1, textDecoration: "none", textAlign: "center" }}
                         >
-                          ✏️ Edit in Builder
+                          <Icon name="edit" size={13} /> Edit in Builder
                         </Link>
                       ) : (
                         <Link
@@ -745,12 +746,12 @@ export default function OrgProjectOverviewPage() {
                           className="btn btn-secondary btn-sm"
                           style={{ flex: 1, textDecoration: "none", textAlign: "center" }}
                         >
-                          📑 Pages
+                          <Icon name="document" size={13} /> Pages
                         </Link>
                       )}
                     </div>
                     <div className="muted fs-11" style={{ lineHeight: 1.4 }}>
-                      💡 You can add, edit, or customize sections in the visual builder anytime without affecting original templates.
+                      <Icon name="info" size={13} /> You can add, edit, or customize sections in the visual builder anytime without affecting original templates.
                     </div>
                   </>
                 ) : (
@@ -793,7 +794,7 @@ export default function OrgProjectOverviewPage() {
                           }
                         }}
                       >
-                        {publishingPage ? "Preparing Builder…" : "✏️ Customize in Visual Builder"}
+                        {publishingPage ? "Preparing Builder…" : <><Icon name="edit" size={13} /> Customize in Visual Builder</>}
                       </button>
 
                       <button
@@ -850,7 +851,7 @@ export default function OrgProjectOverviewPage() {
                           }
                         }}
                       >
-                        {publishingPage ? "Publishing…" : "🚀 Publish Live Landing Page"}
+                        {publishingPage ? "Publishing…" : <><Icon name="flag" size={13} /> Publish Live Landing Page</>}
                       </button>
                     </div>
                   </>
@@ -929,11 +930,11 @@ export default function OrgProjectOverviewPage() {
                   </select>
                 </div>
                 {leadError ? (
-                  <div className="help err mb-8" role="alert">⚠️ {leadError}</div>
+                  <div className="help err mb-8" role="alert"><Icon name="alert" size={13} /> {leadError}</div>
                 ) : null}
                 {leadToast ? (
                   <div className="help mb-8" role="status">
-                    ✅ {leadToast}{" "}
+                    <Icon name="check" size={13} /> {leadToast}{" "}
                     <Link className="brand-link" href={`/org/projects/${id}/leads`}>View leads →</Link>
                   </div>
                 ) : null}
@@ -946,10 +947,10 @@ export default function OrgProjectOverviewPage() {
                   {leadSaving ? "Creating lead…" : "Submit & Create Lead →"}
                 </button>
                 {project.brochureUrl ? (
-                  <a href={project.brochureUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-block mt-8">⬇ Download Brochure</a>
+                  <a href={project.brochureUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-block mt-8"><Icon name="download" size={13} /> Download Brochure</a>
                 ) : null}
                 {project.reraCertificateUrl ? (
-                  <a href={project.reraCertificateUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-block mt-8">🏛️ RERA Certificate</a>
+                  <a href={project.reraCertificateUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-block mt-8"><Icon name="shield" size={13} /> RERA Certificate</a>
                 ) : null}
               </div>
             </div>

@@ -164,7 +164,7 @@ export default function OrgProjectsPage() {
           className="card reveal in"
           style={{ marginBottom: 16, borderColor: "var(--amber, #f59e0b)", padding: "12px 16px", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}
         >
-          <span style={{ fontSize: 20 }}>⚠️</span>
+          <Icon name="alert" size={20} />
           <div style={{ flex: 1, minWidth: 220, fontSize: 13.5 }}>
             Your{projectQuota?.planName ? ` ${projectQuota.planName}` : ""} plan allows{" "}
             <b>{projectQuota?.limit}</b> project{projectQuota?.limit === 1 ? "" : "s"} and you have{" "}
@@ -235,8 +235,8 @@ export default function OrgProjectsPage() {
           </div>
           <div className="spacer" />
           <div className="view-toggle">
-            <span className={view === "grid" ? "on" : ""} onClick={() => setView("grid")}>▦ Grid</span>
-            <span className={view === "list" ? "on" : ""} onClick={() => setView("list")}>☰ List</span>
+            <span className={view === "grid" ? "on" : ""} onClick={() => setView("grid")}><Icon name="modules" size={13} /> Grid</span>
+            <span className={view === "list" ? "on" : ""} onClick={() => setView("list")}><Icon name="menu" size={13} /> List</span>
           </div>
         </div>
       </Reveal>
@@ -263,7 +263,7 @@ export default function OrgProjectsPage() {
               rows.map((p) => (
                 <Link key={p.id} href={`/org/projects/${p.id}`} className="pcard">
                   <div className="cover" style={{ background: getCoverGradient(p.id) }}>
-                    <span>🏗️</span>
+                    <Icon name="building" size={22} />
                     <span className="tag">{[p.location, p.reraId].filter(Boolean).join(" · ") || "Project"}</span>
                     <span className="st">
                       <span className={`badge ${p.status === "active" ? "b-green" : "b-gray"}`}>{p.status === "active" ? "Active" : "Inactive"}</span>
@@ -272,7 +272,7 @@ export default function OrgProjectsPage() {
                   <div className="pb">
                     <div>
                       <h3>{p.name}</h3>
-                      <div className="loc">📍 {[p.location, p.reraId].filter(Boolean).join(" · ") || "—"}</div>
+                      <div className="loc"><Icon name="pin" size={12} /> {[p.location, p.reraId].filter(Boolean).join(" · ") || "—"}</div>
                     </div>
                     <div className="pmeta">
                       <div><span className="k">Starting</span><b>{formatMoney(p.priceMin, p.currency)}</b></div>

@@ -257,6 +257,23 @@ export default function OrgProjectEditPage() {
     () => rowsToTemplate(projectFieldRows.filter((r) => r.label.trim())),
     [projectFieldRows],
   );
+  // Same rows, but for feeding ProjectFieldRows' own label inputs while the
+  // user is actively typing: `projectTemplate` trims each label, so on every
+  // keystroke a trailing space (exactly what a space bar press produces,
+  // right before the next letter) got trimmed straight back out — the space
+  // key looked like it did nothing. Trimming only matters for validation and
+  // the save payload, both of which still use `projectTemplate`.
+  const projectFieldsLive = projectFieldRows.map((r) => ({
+    key: r.key ?? `project_field_${r.rowId}`,
+    label: r.label,
+    type: r.type,
+    required: r.required,
+    ...(r.section.trim() ? { section: r.section.trim() } : {}),
+    ...(r.role ? { role: r.role } : {}),
+    ...(r.type === "choice" ? { options: r.optionsText.split(",").map((o) => o.trim()).filter(Boolean) } : {}),
+    ...(r.type === "number" && r.unit.trim() ? { unit: r.unit.trim() } : {}),
+    ...(r.type === "text" && r.multiline ? { multiline: true } : {}),
+  }));
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [orgLandingPages, setOrgLandingPages] = useState<LandingPageRow[]>([]);
   const [activeSection, setActiveSection] = useState<string>(NAV[0][0]);
@@ -1208,7 +1225,7 @@ export default function OrgProjectEditPage() {
                   fields below) — not hardcoded inputs. */}
 
               <ProjectFieldRows
-                template={projectTemplate}
+                template={projectFieldsLive}
                 values={customValues}
                 onTemplateChange={(template) => setProjectFieldRows(fieldsToRows(template))}
                 onValueChange={(key, value) => setCustomValues((cur) => ({ ...cur, [key]: value }))}

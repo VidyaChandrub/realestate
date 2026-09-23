@@ -1086,7 +1086,7 @@ export default function OrgProjectUnitsPage() {
                             </span>
                           ) : statusSavedId === row.id ? (
                             <span className="text-green fs-12">
-                              ✓
+                              <Icon name="check" size={12} />
                             </span>
                           ) : null}
                         </div>

@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { currencyPrefix, formatMoney } from "@/lib/money";
 import { customValueText, nonRoleFields, roleField, templateTraits } from "@/lib/field-template";
 import { Reveal } from "@/components/superadmin/reveal";
+import { Icon } from "@/components/icons";
 import { ProjectTabs } from "@/components/org/project-tabs";
 import { formatPossession } from "@/components/org/project-form-fields";
 import "@/app/org/org.css";
@@ -248,7 +249,7 @@ export default function OrgProjectUnitDetailPage() {
         <div className="page-head reveal in">
           <div>
             <div className="eyebrow">
-              <Link href={`/org/projects/${id}/units`}>🏠 Units</Link> ·{" "}
+              <Link href={`/org/projects/${id}/units`}><Icon name="home" size={12} /> Units</Link> ·{" "}
               <Link href={`/org/projects/${id}`}>
                 {project?.name ?? "Project"}
               </Link>
@@ -274,7 +275,7 @@ export default function OrgProjectUnitDetailPage() {
               href={`/org/projects/${id}/units?edit=${unitId}&from=unit`}
               className="btn btn-ghost"
             >
-              ✏️ Edit
+              <Icon name="edit" size={13} /> Edit
             </Link>
           </div>
         </div>
@@ -290,7 +291,7 @@ export default function OrgProjectUnitDetailPage() {
 
       {saved ? (
         <Reveal delay={1}>
-          <div className="form-alert ok mb-16">✓ Status updated.</div>
+          <div className="form-alert ok mb-16"><Icon name="check" size={13} /> Status updated.</div>
         </Reveal>
       ) : null}
 
@@ -299,7 +300,7 @@ export default function OrgProjectUnitDetailPage() {
           <div className="col gap-18">
             <Reveal delay={1}>
               <div className="media h-280">
-                <span>🏙️</span>
+                <Icon name="camera" size={28} />
                 <span className="cap">
                   {project?.name ?? ""} · {unit.unitNo}
                 </span>
@@ -309,16 +310,16 @@ export default function OrgProjectUnitDetailPage() {
             <Reveal delay={2}>
               <div className="gallery">
                 <div className="thumb media plan">
-                  <span>📐</span>
+                  <Icon name="camera" size={20} />
                 </div>
                 <div className="thumb media">
-                  <span>🛋️</span>
+                  <Icon name="camera" size={20} />
                 </div>
                 <div className="thumb media g2v">
-                  <span>🛏️</span>
+                  <Icon name="camera" size={20} />
                 </div>
                 <div className="thumb media g3v">
-                  <span>🚿</span>
+                  <Icon name="camera" size={20} />
                 </div>
               </div>
             </Reveal>
@@ -417,7 +418,7 @@ export default function OrgProjectUnitDetailPage() {
                     disabled={busyAction !== null || unit.status === "booked"}
                     onClick={() => void changeStatus("booked")}
                   >
-                    {busyAction === "booked" ? "Saving…" : "✔️ Book unit"}
+                    {busyAction === "booked" ? "Saving…" : <><Icon name="check" size={13} /> Book unit</>}
                   </button>
                   <button
                     className="btn btn-soft btn-block"
@@ -425,7 +426,7 @@ export default function OrgProjectUnitDetailPage() {
                     disabled={busyAction !== null || unit.status === "held"}
                     onClick={() => void changeStatus("held")}
                   >
-                    {busyAction === "held" ? "Saving…" : "🔒 Hold (48h)"}
+                    {busyAction === "held" ? "Saving…" : <><Icon name="lock" size={13} /> Hold (48h)</>}
                   </button>
                   <button
                     className="btn btn-ghost btn-block"
@@ -433,10 +434,10 @@ export default function OrgProjectUnitDetailPage() {
                     disabled={busyAction !== null || unit.status === "sold"}
                     onClick={() => void changeStatus("sold")}
                   >
-                    {busyAction === "sold" ? "Saving…" : "🏷️ Mark as sold"}
+                    {busyAction === "sold" ? "Saving…" : <><Icon name="flag" size={13} /> Mark as sold</>}
                   </button>
                   <button className="btn btn-ghost btn-block" type="button" disabled>
-                    🔗 Send unit details
+                    <Icon name="link" size={13} /> Send unit details
                   </button>
                   <button
                     className="btn btn-ghost btn-block"
@@ -444,7 +445,7 @@ export default function OrgProjectUnitDetailPage() {
                     disabled
                     title="Floor plan upload is coming soon"
                   >
-                    📐 Download floor plan
+                    <Icon name="document" size={13} /> Download floor plan
                   </button>
                 </div>
               </div>

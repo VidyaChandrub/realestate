@@ -49,6 +49,7 @@ import {
 } from "@/lib/project-validation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Modal } from "@/components/ui/modal";
+import { Icon } from "@/components/icons";
 import { orgBuilderPath } from "@/lib/openpage/paths";
 import "@/app/org/org.css";
 import type {
@@ -377,6 +378,23 @@ export default function AddNewProjectPage() {
     () => rowsToTemplate(projectFieldRows.filter((r) => r.label.trim())),
     [projectFieldRows],
   );
+  // Same rows, but for feeding ProjectFieldRows' own label inputs while the
+  // user is actively typing: `projectTemplate` trims each label, so on every
+  // keystroke a trailing space (exactly what a space bar press produces,
+  // right before the next letter) got trimmed straight back out — the space
+  // key looked like it did nothing. Trimming only matters for validation and
+  // the publish payload, both of which still use `projectTemplate`.
+  const projectFieldsLive = projectFieldRows.map((r) => ({
+    key: r.key ?? `project_field_${r.rowId}`,
+    label: r.label,
+    type: r.type,
+    required: r.required,
+    ...(r.section.trim() ? { section: r.section.trim() } : {}),
+    ...(r.role ? { role: r.role } : {}),
+    ...(r.type === "choice" ? { options: r.optionsText.split(",").map((o) => o.trim()).filter(Boolean) } : {}),
+    ...(r.type === "number" && r.unit.trim() ? { unit: r.unit.trim() } : {}),
+    ...(r.type === "text" && r.multiline ? { multiline: true } : {}),
+  }));
 
   useEffect(() => {
     if (!accessToken) return;
@@ -1033,7 +1051,7 @@ export default function AddNewProjectPage() {
   if (atProjectLimit && !pendingDraft) {
     return (
       <div className="card reveal in" style={{ maxWidth: 620, margin: "40px auto", padding: 28, textAlign: "center" }}>
-        <div style={{ fontSize: 34, marginBottom: 8 }}>🚧</div>
+        <div style={{ marginBottom: 8 }}><Icon name="lock" size={32} /></div>
         <h2 style={{ margin: "0 0 8px" }}>You&apos;ve reached your project limit</h2>
         <p className="muted" style={{ margin: "0 0 18px", fontSize: 14 }}>
           Your{projectQuota?.planName ? ` ${projectQuota.planName}` : ""} plan allows{" "}
@@ -1055,7 +1073,7 @@ export default function AddNewProjectPage() {
           className="card reveal in"
           style={{ marginBottom: 16, borderColor: "var(--brand)", padding: 16, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}
         >
-          <span style={{ fontSize: 22 }}>📝</span>
+          <span style={{ display: "inline-flex" }}><Icon name="document" size={22} /></span>
           <div style={{ flex: 1, minWidth: 220 }}>
             <b>Unfinished draft found</b>
             <div className="muted" style={{ fontSize: 13 }}>
@@ -1071,12 +1089,12 @@ export default function AddNewProjectPage() {
 
       <div className="page-head reveal in">
         <div>
-          <div className="eyebrow">🏗️ Projects</div>
+          <div className="eyebrow"><Icon name="building" size={12} /> Projects</div>
           <h1>Onboard a new project</h1>
           <div className="sub">Set up a real-estate development end-to-end — inventory, pricing, marketing sources, team access and go-live.</div>
         </div>
         <div className="actions">
-          <button className="btn btn-ghost" onClick={() => router.push("/org/projects")}>✕ Cancel</button>
+          <button className="btn btn-ghost" onClick={() => router.push("/org/projects")}><Icon name="close" size={14} /> Cancel</button>
         </div>
       </div>
 
@@ -1122,7 +1140,7 @@ export default function AddNewProjectPage() {
                 {customLandingPageId && <span className="badge b-green" style={{ fontSize: 10, padding: "1px 6px" }}>Edited</span>}
               </div>
               <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                <span>✨</span> {selectedTemplate ? selectedTemplate.name : "None"}
+                <Icon name="sparkles" size={14} /> {selectedTemplate ? selectedTemplate.name : "None"}
               </div>
               <button
                 type="button"
@@ -1131,7 +1149,7 @@ export default function AddNewProjectPage() {
                 disabled={customizingInBuilder}
                 style={{ fontSize: 11.5 }}
               >
-                ✏️ {customLandingPageId ? "Re-open in Builder" : "Customize in Builder"}
+                <Icon name="edit" size={12} /> {customLandingPageId ? "Re-open in Builder" : "Customize in Builder"}
               </button>
               <button
                 type="button"
@@ -1139,12 +1157,12 @@ export default function AddNewProjectPage() {
                 onClick={() => setShowTemplateModal(true)}
                 style={{ fontSize: 11.5 }}
               >
-                Change Template 🔄
+                Change Template <Icon name="templates" size={12} />
               </button>
             </div>
 
             <div className="help mt-14">
-              💡 <b>Tip:</b> Fields marked <span className="req">*</span> are checked when you continue past their step. You can save a draft anytime and finish later.
+              <Icon name="info" size={14} /> <b>Tip:</b> Fields marked <span className="req">*</span> are checked when you continue past their step. You can save a draft anytime and finish later.
             </div>
           </div>
 
@@ -1155,7 +1173,7 @@ export default function AddNewProjectPage() {
                 with required fields still empty. */}
             {jumpWarning && (
               <div className="help err mb-20">
-                <b>⚠️ {STEPS[step].label} isn&apos;t complete.</b>
+                <b><Icon name="alert" size={13} /> {STEPS[step].label} isn&apos;t complete.</b>
                 <div style={{ marginTop: 4 }}>
                   Still needed here: {jumpWarning.missing.join(", ")}. You can fill it in now, or skip ahead to <b>{STEPS[jumpWarning.to].label}</b> and come back — the project can&apos;t be published until it&apos;s filled in.
                 </div>
@@ -1205,7 +1223,7 @@ export default function AddNewProjectPage() {
                             style={{ width: "100%", height: "100%", objectFit: "cover" }}
                           />
                         ) : (
-                          <span style={{ fontSize: 26, display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>🏛️</span>
+                          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}><Icon name="building" size={24} /></span>
                         )}
                       </div>
                       <div>
@@ -1215,7 +1233,7 @@ export default function AddNewProjectPage() {
                           </span>
                           {selectedTemplate?.category ? <span className="badge b-blue">{selectedTemplate.category}</span> : null}
                           {customLandingPageId ? (
-                            <span className="badge b-green">✨ Visually Edited in Builder</span>
+                            <span className="badge b-green"><Icon name="sparkles" size={11} /> Visually Edited in Builder</span>
                           ) : null}
                         </div>
                         <div style={{ fontSize: 15, fontWeight: 700, marginTop: 1 }}>
@@ -1239,7 +1257,7 @@ export default function AddNewProjectPage() {
                         disabled={customizingInBuilder}
                         style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}
                       >
-                        <span>✏️</span> {customizingInBuilder ? "Opening Builder…" : customLandingPageId ? "Re-open in Visual Builder" : "Customize in Visual Builder"}
+                        <Icon name="edit" size={13} /> {customizingInBuilder ? "Opening Builder…" : customLandingPageId ? "Re-open in Visual Builder" : "Customize in Visual Builder"}
                       </button>
                       {customLandingPageId && (
                         <a
@@ -1249,7 +1267,7 @@ export default function AddNewProjectPage() {
                           className="btn btn-ghost btn-sm"
                           style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}
                         >
-                          <span>👁️</span> Preview
+                          <Icon name="eye" size={13} /> Preview
                         </a>
                       )}
                       <button
@@ -1258,14 +1276,14 @@ export default function AddNewProjectPage() {
                         onClick={() => setShowTemplateModal(true)}
                         style={{ display: "flex", alignItems: "center", gap: 6 }}
                       >
-                        <span>🎨</span> Change Template
+                        <Icon name="templates" size={13} /> Change Template
                       </button>
                     </div>
                   </div>
                 </div>
 
                 <div className="q-sec">
-                  <div className="lbl">📋 Identity</div>
+                  <div className="lbl"><Icon name="document" size={15} /> Identity</div>
                   <div className="grid g2">
                     <div className={fieldClass("name")}><label>Project name <span className="req">*</span></label><input className="inp" placeholder="e.g. Palm Residency" value={name} onChange={(e) => setName(e.target.value)} />{invalid("name") && <div className="field-err">Project name is required.</div>}</div>
                     <div className="field"><label>Developer / channel partner <span className="req">*</span></label><input className="inp" value={orgName} placeholder="Loading…" readOnly /><div className="hint">Your organisation, set during onboarding. Change it in Settings → General.</div></div>
@@ -1299,7 +1317,7 @@ export default function AddNewProjectPage() {
                   <div className="field"><label>Short tagline</label><input className="inp" placeholder="e.g. 2 &amp; 3 BHK homes on SG Highway" value={tagline} onChange={(e) => setTagline(e.target.value)} /><div className="hint">Shown on the public page and ad landing pages.</div></div>
                 </div>
                 <div className="q-sec">
-                  <div className="lbl">🏛️ Approvals &amp; timeline</div>
+                  <div className="lbl"><Icon name="shield" size={15} /> Approvals &amp; timeline</div>
                   <div className="grid g2">
                     <div className="field"><label>RERA registration no.</label><input className="inp" placeholder="PR/GJ/AHM/2026/00842" value={reraId} onChange={(e) => setReraId(e.target.value)} /></div>
                     <div className={fieldClass("status")}><label>Status <span className="req">*</span></label><select className="inp" value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}><option value="active">Active</option><option value="inactive">Inactive</option></select>{invalid("status") && <div className="field-err">Pick a status.</div>}</div>
@@ -1319,7 +1337,7 @@ export default function AddNewProjectPage() {
                 <div className="q-h"><div className="st">Step 2 of 9</div><h2>Inventory &amp; configuration</h2><div className="sub">Which unit types this project offers and the overall inventory picture.</div></div>
                 <div className="help mb-14">Project type: <b>{projectType || "Not selected"}</b></div>
                 <div className="q-sec">
-                  <div className="lbl">{traits.configurations ? "🏠 Unit configurations (select all)" : "🏠 Inventory"}</div>
+                  <div className="lbl">{traits.configurations ? <><Icon name="home" size={15} /> Unit configurations (select all)</> : <><Icon name="home" size={15} /> Inventory</>}</div>
                   {traits.configurations ? (
                     <div className="field">
                       <CatalogOptions
@@ -1356,7 +1374,7 @@ export default function AddNewProjectPage() {
                       hardcoded inputs, so an org can rename, edit or remove
                       any of them. */}
                   <ProjectFieldRows
-                    template={projectTemplate}
+                    template={projectFieldsLive}
                     values={customValues}
                     onTemplateChange={(template) => setProjectFieldRows(fieldsToDraftRows(template))}
                     onValueChange={(key, value) => setCustomValues((cur) => ({ ...cur, [key]: value }))}
@@ -1365,7 +1383,7 @@ export default function AddNewProjectPage() {
                   <div className="hint">Unit counts come from the Units section after publishing.</div>
                 </div>
                 <div className="q-sec">
-                  <div className="lbl">⭐ Unique selling points</div>
+                  <div className="lbl"><Icon name="star" size={15} /> Unique selling points</div>
                   <div className="field"><label>Highlights (one per line)</label><textarea className="inp" rows={4} placeholder={"Riverfront view\n5 mins from SG Highway\nVastu-compliant layouts\n90% open space"} value={highlights} onChange={(e) => setHighlights(e.target.value)} /><div className="hint">Used across ads, WhatsApp templates and AI-calling scripts.</div></div>
                 </div>
               </div>
@@ -1376,7 +1394,7 @@ export default function AddNewProjectPage() {
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 3 of 9</div><h2>Pricing &amp; payment</h2><div className="sub">How units are priced and the payment structure buyers will see.</div></div>
                 <div className="q-sec">
-                  <div className="lbl">💰 Pricing</div>
+                  <div className="lbl"><Icon name="billing" size={15} /> Pricing</div>
                   <div className="grid g2">
                     <div className={fieldClass("priceMin")}><label>Price range — from <span className="req">*</span></label><MoneyInput currency={currency} placeholder="62,00,000" value={priceMin} onChange={setPriceMin} />{invalid("priceMin") && <div className="field-err">Enter the starting price.</div>}</div>
                     <div className="field"><label>Price range — to</label><MoneyInput currency={currency} placeholder="1,20,00,000" value={priceMax} onChange={setPriceMax} /></div>
@@ -1398,7 +1416,7 @@ export default function AddNewProjectPage() {
                   </div>
                 </div>
                 <div className="q-sec">
-                  <div className="lbl">📄 Payment plan</div>
+                  <div className="lbl"><Icon name="document" size={15} /> Payment plan</div>
                   <div className="field"><label>Payment plan</label>
                     <CatalogOptions
                       category="payment_plan"
@@ -1420,7 +1438,7 @@ export default function AddNewProjectPage() {
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 4 of 9</div><h2>Location &amp; connectivity</h2><div className="sub">Where the project is and what surrounds it — powers maps and ad targeting.</div></div>
                 <div className="q-sec">
-                  <div className="lbl">📍 Address</div>
+                  <div className="lbl"><Icon name="pin" size={15} /> Address</div>
                   <div className={fieldClass("address")}><label>Full address <span className="req">*</span></label><textarea className="inp" rows={2} placeholder="Survey No. 214, SG Highway, Bopal, Ahmedabad, Gujarat 380058" value={address} onChange={(e) => setAddress(e.target.value)} />{invalid("address") && <div className="field-err">Full address is required.</div>}</div>
                   <div className="grid g3">
                     <div className={fieldClass("city")}><label>City <span className="req">*</span></label><input className="inp" placeholder="Ahmedabad" value={city} onChange={(e) => setCity(e.target.value)} />{invalid("city") && <div className="field-err">City is required.</div>}</div>
@@ -1429,7 +1447,7 @@ export default function AddNewProjectPage() {
                   </div>
                 </div>
                 <div className="q-sec">
-                  <div className="lbl">🛣️ Connectivity &amp; landmarks</div>
+                  <div className="lbl"><Icon name="map" size={15} /> Connectivity &amp; landmarks</div>
                   <div className="field"><label>Nearby connectivity (select all that apply)</label>
                     <CatalogOptions
                       category="connectivity"
@@ -1450,7 +1468,7 @@ export default function AddNewProjectPage() {
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 5 of 9</div><h2>Amenities &amp; specifications</h2><div className="sub">Lifestyle features and build quality — shown on the project page and brochures.</div></div>
                 <div className="q-sec">
-                  <div className="lbl">🏊 Amenities (select all)</div>
+                  <div className="lbl"><Icon name="sparkles" size={15} /> Amenities (select all)</div>
                   <div className="field">
                     <CatalogOptions
                       category="amenity"
@@ -1463,7 +1481,7 @@ export default function AddNewProjectPage() {
                   </div>
                 </div>
                 <div className="q-sec">
-                  <div className="lbl">🧱 Specifications</div>
+                  <div className="lbl"><Icon name="properties" size={15} /> Specifications</div>
                   <div className="hint" style={{ marginBottom: 12 }}>
                     Name each specification and describe it. The four below are just a starting point — rename or remove any of them, and add your own.
                   </div>
@@ -1481,19 +1499,19 @@ export default function AddNewProjectPage() {
             {step === 5 && (
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 6 of 9</div><h2>Marketing &amp; lead sources</h2><div className="sub">Where leads come from and how they&apos;ll be worked — connect ads, AI calling and WhatsApp.</div></div>
+                {/* Intentionally hidden: Ad sources is pure UI with no backing data collection
+                    or integration behind it — nothing happens with these toggles today. */}
+                {/*
                 <div className="q-sec">
-                  <div className="lbl">📣 Ad sources (enable &amp; set budget)</div>
-                  {/* Intentionally hidden: the backing Meta Ads feature is not implemented yet and may return later. */}
-                  {/* <div className="sw-row"><div className="tx"><b>Meta Ads (Facebook / Instagram)</b><small>Lead-form &amp; click campaigns</small></div><div className={`switch ${metaAds ? "on" : ""}`} onClick={() => setMetaAds(!metaAds)} /></div> */}
-                  {/* Intentionally hidden: the backing Google Ads feature is not implemented yet and may return later. */}
-                  {/* <div className="sw-row"><div className="tx"><b>Google Ads</b><small>Search &amp; Performance Max</small></div><div className={`switch ${googleAds ? "on" : ""}`} onClick={() => setGoogleAds(!googleAds)} /></div> */}
-                  {/* Intentionally hidden: the backing LinkedIn Ads feature is not implemented yet and may return later. */}
-                  {/* <div className="sw-row"><div className="tx"><b>LinkedIn Ads</b><small>Premium / NRI targeting</small></div><div className={`switch ${linkedinAds ? "on" : ""}`} onClick={() => setLinkedinAds(!linkedinAds)} /></div> */}
-                  {/* Intentionally hidden: the backing portal ads feature is not implemented yet and may return later. */}
-                  {/* <div className="sw-row"><div className="tx"><b>Housing / 99acres / MagicBricks</b><small>Portal listings</small></div><div className={`switch ${portalAds ? "on" : ""}`} onClick={() => setPortalAds(!portalAds)} /></div> */}
+                  <div className="lbl"><Icon name="flag" size={15} /> Ad sources (enable &amp; set budget)</div>
+                  <div className="sw-row"><div className="tx"><b>Meta Ads (Facebook / Instagram)</b><small>Lead-form &amp; click campaigns</small></div><div className={`switch ${metaAds ? "on" : ""}`} onClick={() => setMetaAds(!metaAds)} /></div>
+                  <div className="sw-row"><div className="tx"><b>Google Ads</b><small>Search &amp; Performance Max</small></div><div className={`switch ${googleAds ? "on" : ""}`} onClick={() => setGoogleAds(!googleAds)} /></div>
+                  <div className="sw-row"><div className="tx"><b>LinkedIn Ads</b><small>Premium / NRI targeting</small></div><div className={`switch ${linkedinAds ? "on" : ""}`} onClick={() => setLinkedinAds(!linkedinAds)} /></div>
+                  <div className="sw-row"><div className="tx"><b>Housing / 99acres / MagicBricks</b><small>Portal listings</small></div><div className={`switch ${portalAds ? "on" : ""}`} onClick={() => setPortalAds(!portalAds)} /></div>
                 </div>
+                */}
                 <div className="q-sec">
-                  <div className="lbl">🎯 Targets &amp; landing</div>
+                  <div className="lbl"><Icon name="target" size={15} /> Targets &amp; landing</div>
                   <div className="grid g3">
                     <div className="field"><label>Monthly ad budget</label><MoneyInput currency={currency} placeholder="1,50,000" value={monthlyBudget} onChange={setMonthlyBudget} /></div>
                     <div className="field"><label>Target CPL</label><MoneyInput currency={currency} placeholder="300" value={targetCpl} onChange={setTargetCpl} /></div>
@@ -1514,9 +1532,9 @@ export default function AddNewProjectPage() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700 }}>🚀 Publish Live Landing Page</span>
+                          <span style={{ fontSize: 13, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 5 }}><Icon name="flag" size={13} /> Publish Live Landing Page</span>
                           <span className="badge b-green">Instant Go-Live</span>
-                          {customLandingPageId && <span className="badge b-blue">✨ Visually Edited in Builder</span>}
+                          {customLandingPageId && <span className="badge b-blue"><Icon name="sparkles" size={11} /> Visually Edited in Builder</span>}
                         </div>
                         <div className="muted fs-12" style={{ marginTop: 2 }}>
                           {customLandingPageId
@@ -1555,7 +1573,7 @@ export default function AddNewProjectPage() {
                             disabled={customizingInBuilder}
                             style={{ display: "flex", alignItems: "center", gap: 6 }}
                           >
-                            <span>✏️</span> {customizingInBuilder ? "Opening Builder…" : customLandingPageId ? "Re-open in Visual Builder" : "Customize Template in Visual Builder"}
+                            <Icon name="edit" size={13} /> {customizingInBuilder ? "Opening Builder…" : customLandingPageId ? "Re-open in Visual Builder" : "Customize Template in Visual Builder"}
                           </button>
                           {customLandingPageId && (
                             <a
@@ -1565,7 +1583,7 @@ export default function AddNewProjectPage() {
                               className="btn btn-ghost btn-sm"
                               style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}
                             >
-                              <span>👁️</span> Preview
+                              <Icon name="eye" size={13} /> Preview
                             </a>
                           )}
                         </div>
@@ -1574,7 +1592,7 @@ export default function AddNewProjectPage() {
                   </div>
                 </div>
                 <div className="q-sec">
-                  <div className="lbl">🤖 Automation &amp; assignment</div>
+                  <div className="lbl"><Icon name="puzzle" size={15} /> Automation &amp; assignment</div>
                   {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
                   {/* <div className="sw-row"><div className="tx"><b>AI voice calling</b><small>Auto-call &amp; qualify new leads within 60s</small></div><div className={`switch ${aiCalling ? "on" : ""}`} onClick={() => setAiCalling(!aiCalling)} /></div> */}
                   {/* Intentionally hidden: the backing WhatsApp auto-welcome feature is not implemented yet and may return later. */}
@@ -1589,7 +1607,7 @@ export default function AddNewProjectPage() {
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 7 of 9</div><h2>Team &amp; access</h2><div className="sub">Who owns this project and which agents can work its leads.</div></div>
                 <div className="q-sec">
-                  <div className="lbl">👤 Ownership</div>
+                  <div className="lbl"><Icon name="profile" size={15} /> Ownership</div>
                   <div>
                     <div className={fieldClass("managerId")}><label>Project manager <span className="req">*</span></label><ManagerPicker managers={managers} value={managerId} onChange={setManagerId} />{invalid("managerId") && <div className="field-err">Assign a project manager.</div>}</div>
                     {/* Intentionally hidden: this is a free-text regional label ("Ahmedabad — West"), not a
@@ -1611,7 +1629,7 @@ export default function AddNewProjectPage() {
                               className={`opt project-assignee-option ${on ? "on" : ""}`}
                               onClick={() => setAgentAssign((prev) => (on ? prev.filter((x) => x !== u.id) : [...prev, u.id]))}
                             >
-                              <span className="b">{on ? "✓" : ""}</span>
+                              <span className="b">{on ? <Icon name="check" size={11} /> : ""}</span>
                               <span className="project-assignee-meta">
                                 <b>{u.name}</b>
                                 <small className="project-assignee-role">{u.role?.name ?? "No role"}</small>
@@ -1629,7 +1647,7 @@ export default function AddNewProjectPage() {
                 {/* Intentionally hidden: the Visibility & approvals controls are not implemented yet and may return later. */}
                 {/*
                 <div className="q-sec">
-                  <div className="lbl">🔐 Visibility &amp; approvals</div>
+                  <div className="lbl"><Icon name="lock" size={15} /> Visibility &amp; approvals</div>
                   <div className="sw-row"><div className="tx"><b>Require manager approval on bookings</b><small>Bookings move to Pending until approved</small></div><div className={`switch ${requireApproval ? "on" : ""}`} onClick={() => setRequireApproval(!requireApproval)} /></div>
                   <div className="sw-row"><div className="tx"><b>Visible to telecallers</b><small>Show in the calling dashboard queue</small></div><div className={`switch ${visibleTele ? "on" : ""}`} onClick={() => setVisibleTele(!visibleTele)} /></div>
                   <div className="sw-row"><div className="tx"><b>Publish to public website</b><small>List on skylinedev.in projects page</small></div><div className={`switch ${publishWeb ? "on" : ""}`} onClick={() => setPublishWeb(!publishWeb)} /></div>
@@ -1643,7 +1661,7 @@ export default function AddNewProjectPage() {
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 8 of 9</div><h2>Documents &amp; media</h2><div className="sub">Upload the assets that power the public page, brochures and AI knowledge base.</div></div>
                 <div className="q-sec">
-                  <div className="lbl">🖼️ Images</div>
+                  <div className="lbl"><Icon name="camera" size={15} /> Images</div>
                   <div className="grid g2">
                     <MediaUpload field="gallery" label="Cover / elevation image" value={coverImageUrl} onChange={setCoverImageUrl} />
                     <GalleryUpload value={galleryUrls} onChange={setGalleryUrls} />
@@ -1660,7 +1678,7 @@ export default function AddNewProjectPage() {
                   <div className="hint">Per-unit-type floor plans are added per configuration from the Units section after publishing.</div>
                 </div>
                 <div className="q-sec">
-                  <div className="lbl">📄 Documents</div>
+                  <div className="lbl"><Icon name="document" size={15} /> Documents</div>
                   <div className="grid g2">
                     <MediaUpload field="brochure" label="Brochure (PDF)" value={brochureUrl} onChange={setBrochureUrl} />
                     <MediaUpload field="brochure" label="RERA certificate (PDF)" value={reraCertificateUrl} onChange={setReraCertificateUrl} />
@@ -1678,13 +1696,13 @@ export default function AddNewProjectPage() {
                 <div className="rev">
                   <div className="rev-grid">
                     <div>
-                      <div className="q-sec"><div className="lbl">📋 Basics</div>
+                      <div className="q-sec"><div className="lbl"><Icon name="document" size={15} /> Basics</div>
                         <div className="sp"><span className="k">Project name</span><span className="v">{name || "—"}</span></div>
                         <div className="sp"><span className="k">Project type</span><span className="v">{projectType || "—"}</span></div>
                         <div className="sp"><span className="k">RERA registration no.</span><span className="v">{reraId || "—"}</span></div>
                         <div className="sp"><span className="k">Status</span><span className="v"><span className={`badge ${status === "active" ? "b-green" : "b-gray"}`}>{status === "active" ? "Active" : "Inactive"}</span></span></div>
                       </div>
-                      <div className="q-sec"><div className="lbl">🏠 Inventory</div>
+                      <div className="q-sec"><div className="lbl"><Icon name="home" size={15} /> Inventory</div>
                         {traits.configurations ? (
                           <div className="sp"><span className="k">Unit configurations</span><span className="v">{formatConfigs(selectedConfigs)}</span></div>
                         ) : null}
@@ -1695,11 +1713,11 @@ export default function AddNewProjectPage() {
                         })}
                         <div className="sp"><span className="k">Price range</span><span className="v">{priceRangeLabel(priceMin, priceMax, currency)}</span></div>
                       </div>
-                      <div className="q-sec"><div className="lbl">📍 Location</div>
+                      <div className="q-sec"><div className="lbl"><Icon name="pin" size={15} /> Location</div>
                         <div className="sp"><span className="k">City</span><span className="v">{city || "—"}</span></div>
                         <div className="sp"><span className="k">Locality</span><span className="v">{locality || "—"}</span></div>
                       </div>
-                      <div className="q-sec"><div className="lbl">🧱 Specifications</div>
+                      <div className="q-sec"><div className="lbl"><Icon name="properties" size={15} /> Specifications</div>
                         {reviewSpecRows.length === 0 ? (
                           <div className="sp"><span className="k">Specifications</span><span className="v">—</span></div>
                         ) : (
@@ -1711,7 +1729,7 @@ export default function AddNewProjectPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="q-sec"><div className="lbl">📣 Marketing</div>
+                      <div className="q-sec"><div className="lbl"><Icon name="bell" size={15} /> Marketing</div>
                         {/* Intentionally hidden: ad-source settings are not implemented yet and may return later. */}
                         {/* <div className="sp"><span className="k">Sources</span><span className="v">{[metaAds && "Meta", googleAds && "Google", linkedinAds && "LinkedIn", portalAds && "Portals"].filter(Boolean).join(", ") || "—"}</span></div> */}
                         <div className="sp"><span className="k">Monthly ad budget</span><span className="v">{monthlyBudget ? formatProjectMoney(monthlyBudget, currency) : "—"}</span></div>
@@ -1723,13 +1741,13 @@ export default function AddNewProjectPage() {
                         {/* <div className="sp"><span className="k">WhatsApp welcome</span><span className="v"><span className={`badge ${whatsappAuto ? "b-green" : "b-gray"}`}>{whatsappAuto ? "On" : "Off"}</span></span></div> */}
                         <div className="sp"><span className="k">Round-robin assignment</span><span className="v"><span className={`badge ${roundRobin ? "b-green" : "b-gray"}`}>{roundRobin ? "On" : "Off"}</span></span></div>
                       </div>
-                      <div className="q-sec"><div className="lbl">🌐 Project Template &amp; Website</div>
+                      <div className="q-sec"><div className="lbl"><Icon name="globe" size={15} /> Project Template &amp; Website</div>
                         <div className="sp"><span className="k">Template</span><span className="v">{selectedTemplate?.name || "Standard Template"}</span></div>
                         <div className="sp">
                           <span className="k">Customization</span>
                           <span className="v">
                             {customLandingPageId ? (
-                              <span className="badge b-green">✨ Visually Customized in Builder</span>
+                              <span className="badge b-green"><Icon name="sparkles" size={11} /> Visually Customized in Builder</span>
                             ) : (
                               <span className="badge b-gray">Default Presets</span>
                             )}
@@ -1746,7 +1764,7 @@ export default function AddNewProjectPage() {
                             onClick={() => openTemplateInVisualBuilder()}
                             disabled={customizingInBuilder}
                           >
-                            ✏️ {customLandingPageId ? "Re-open in Visual Builder" : "Customize Template in Visual Builder"}
+                            <Icon name="edit" size={13} /> {customLandingPageId ? "Re-open in Visual Builder" : "Customize Template in Visual Builder"}
                           </button>
                           {customLandingPageId && (
                             <a
@@ -1756,12 +1774,12 @@ export default function AddNewProjectPage() {
                               className="btn btn-ghost btn-sm"
                               style={{ textDecoration: "none" }}
                             >
-                              👁️ Preview
+                              <Icon name="eye" size={13} /> Preview
                             </a>
                           )}
                         </div>
                       </div>
-                      <div className="q-sec"><div className="lbl">👤 Team &amp; access</div>
+                      <div className="q-sec"><div className="lbl"><Icon name="profile" size={15} /> Team &amp; access</div>
                         <div className="sp"><span className="k">Project manager</span><span className="v">{selectedManager ? personLabel(selectedManager) : "Unassigned"}</span></div>
                         <div className="sp"><span className="k">Assigned sales agents</span><span className="v">{agentAssign.length} assigned</span></div>
                         {/* Intentionally hidden: booking approval, telecaller visibility, and public website publishing are not implemented yet and may return later. */}
@@ -1771,11 +1789,11 @@ export default function AddNewProjectPage() {
                         <div className="sp"><span className="k">Publish to website</span><span className="v"><span className={`badge ${publishWeb ? "b-green" : "b-gray"}`}>{publishWeb ? "On" : "Off"}</span></span></div>
                         */}
                       </div>
-                      <div className="q-sec"><div className="lbl">📄 Media</div>
-                        <div className="sp"><span className="k">Cover / elevation image</span><span className="v">{coverImageUrl ? "✓ Uploaded" : "—"}</span></div>
+                      <div className="q-sec"><div className="lbl"><Icon name="document" size={15} /> Media</div>
+                        <div className="sp"><span className="k">Cover / elevation image</span><span className="v">{coverImageUrl ? <><Icon name="check" size={11} /> Uploaded</> : "—"}</span></div>
                         <div className="sp"><span className="k">Gallery images</span><span className="v">{galleryUrls.length ? `${galleryUrls.length} photo${galleryUrls.length > 1 ? "s" : ""}` : "—"}</span></div>
-                        <div className="sp"><span className="k">Brochure</span><span className="v">{brochureUrl ? "✓ Uploaded" : "—"}</span></div>
-                        <div className="sp"><span className="k">RERA certificate</span><span className="v">{reraCertificateUrl ? "✓ Uploaded" : "—"}</span></div>
+                        <div className="sp"><span className="k">Brochure</span><span className="v">{brochureUrl ? <><Icon name="check" size={11} /> Uploaded</> : "—"}</span></div>
+                        <div className="sp"><span className="k">RERA certificate</span><span className="v">{reraCertificateUrl ? <><Icon name="check" size={11} /> Uploaded</> : "—"}</span></div>
                         <div className="sp"><span className="k">Project floor / site plan</span><span className="v">{floorPlanUrls.length ? `${floorPlanUrls.length} plan${floorPlanUrls.length > 1 ? "s" : ""}` : "—"}</span></div>
                         {/* Intentionally hidden: the backing AI knowledge-base feature is not implemented yet and may return later. */}
                         {/* <div className="sp"><span className="k">AI knowledge</span><span className="v"><span className={`badge ${aiKnowledgeBase ? "b-green" : "b-gray"}`}>{aiKnowledgeBase ? "On" : "Off"}</span></span></div> */}
@@ -1784,7 +1802,7 @@ export default function AddNewProjectPage() {
                   </div>
                    {error && (
                     <div className="help err mt-16">
-                      ⚠️ {error}
+                      <Icon name="alert" size={13} /> {error}
                       {publishedProjectId ? (
                         <>
                           {" "}
@@ -1801,7 +1819,7 @@ export default function AddNewProjectPage() {
                   )}
                   {allMissingFields.length > 0 ? (
                     <div className="help err mt-20">
-                      <b>⚠️ {allMissingFields.length} required field{allMissingFields.length > 1 ? "s" : ""} still empty.</b>
+                      <b><Icon name="alert" size={13} /> {allMissingFields.length} required field{allMissingFields.length > 1 ? "s" : ""} still empty.</b>
                       <ul>
                         {allMissingFields.map((f) => (
                           <li key={f.id}>
@@ -1814,7 +1832,7 @@ export default function AddNewProjectPage() {
                       </ul>
                     </div>
                   ) : (
-                    <div className="help mt-20">🚀 <b>Ready to go live.</b> Publishing creates the project, wires up the connected ad sources and starts routing new leads immediately.</div>
+                    <div className="help mt-20"><Icon name="flag" size={14} /> <b>Ready to go live.</b> Publishing creates the project, wires up the connected ad sources and starts routing new leads immediately.</div>
                   )}
                 </div>
               </div>
@@ -1824,7 +1842,7 @@ export default function AddNewProjectPage() {
                 reason is next to the button that refused. */}
             {showErrors && currentMissing.length > 0 && step < STEPS.length - 1 ? (
               <div className="help err mt-16">
-                <b>⚠️ Fill in {currentMissing.length === 1 ? "this field" : "these fields"} to continue:</b>
+                <b><Icon name="alert" size={13} /> Fill in {currentMissing.length === 1 ? "this field" : "these fields"} to continue:</b>
                 <ul>
                   {currentMissing.map((f) => <li key={f.id}>{f.label}</li>)}
                 </ul>
@@ -1842,7 +1860,7 @@ export default function AddNewProjectPage() {
                 ) : publishedProjectId && !createdLandingPage ? (
                   <button className="btn btn-primary" onClick={() => router.push(`/org/projects/${publishedProjectId}`)}>Go to project →</button>
                 ) : (
-                  <button className="btn btn-primary" disabled={submitting} onClick={() => void submit()}>{submitting ? "Publishing…" : "🚀 Publish project"}</button>
+                  <button className="btn btn-primary" disabled={submitting} onClick={() => void submit()}>{submitting ? "Publishing…" : <><Icon name="flag" size={14} /> Publish project</>}</button>
                 )}
               </div>
             </div>
@@ -1887,8 +1905,8 @@ export default function AddNewProjectPage() {
                           style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         />
                       ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 28 }}>
-                          🏛️
+                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+                          <Icon name="building" size={26} />
                         </div>
                       )}
                       <div
@@ -1927,14 +1945,14 @@ export default function AddNewProjectPage() {
                             disabled={customizingInBuilder}
                             style={{ display: "flex", alignItems: "center", gap: 4 }}
                           >
-                            <span>✏️</span> Customize in Builder
+                            <Icon name="edit" size={13} /> Customize in Builder
                           </button>
                           <button
                             type="button"
                             className={`btn ${isSelected ? "btn-secondary" : "btn-primary"} btn-sm`}
                             onClick={() => applyTemplate(tpl)}
                           >
-                            {isSelected ? "✓ Active Template" : "Use this template →"}
+                            {isSelected ? <><Icon name="check" size={11} /> Active Template</> : "Use this template →"}
                           </button>
                         </div>
                       </div>
@@ -1991,7 +2009,7 @@ export default function AddNewProjectPage() {
                 {typeof window !== "undefined" ? window.location.origin : ""}/p/{createdLandingPage.slug} ↗
               </a>
               <div className="muted fs-11" style={{ marginTop: 6 }}>
-                💡 You can edit, add, or remove any sections anytime without affecting the original master template.
+                <Icon name="info" size={13} /> You can edit, add, or remove any sections anytime without affecting the original master template.
               </div>
             </div>
 
@@ -2003,14 +2021,14 @@ export default function AddNewProjectPage() {
                 className="btn btn-primary btn-block"
                 style={{ textDecoration: "none" }}
               >
-                🌐 View Live Landing Page
+                <Icon name="globe" size={14} /> View Live Landing Page
               </a>
               <button
                 type="button"
                 className="btn btn-secondary btn-block"
                 onClick={() => router.push(`/org-builder?id=${createdLandingPage.id}`)}
               >
-                ✏️ Customize in Visual Builder
+                <Icon name="edit" size={14} /> Customize in Visual Builder
               </button>
               {publishedProjectId && (
                 <button
@@ -2018,7 +2036,7 @@ export default function AddNewProjectPage() {
                   className="btn btn-ghost btn-block"
                   onClick={() => router.push(`/org/projects/${publishedProjectId}`)}
                 >
-                  🏗️ Go to Project Dashboard →
+                  <Icon name="building" size={14} /> Go to Project Dashboard →
                 </button>
               )}
             </div>
