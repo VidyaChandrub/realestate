@@ -480,8 +480,12 @@ export async function renewSubscription(): Promise<BillingRenewResult> {
 
 export async function getOrgPackageChangeRequest(): Promise<{
   pendingRequest: PackageChangeRequestRow | null;
+  history: PackageChangeRequestRow[];
 }> {
-  return apiFetch<{ pendingRequest: PackageChangeRequestRow | null }>(
+  return apiFetch<{
+    pendingRequest: PackageChangeRequestRow | null;
+    history: PackageChangeRequestRow[];
+  }>(
     "/org/billing/package-change-request",
   );
 }

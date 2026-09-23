@@ -1061,6 +1061,7 @@ export default function OrgSettingsPage() {
   const [renewOk, setRenewOk] = useState<string | null>(null);
 
   const [pendingChangeRequest, setPendingChangeRequest] = useState<PackageChangeRequestRow | null>(null);
+  const [latestRejectedChangeRequest, setLatestRejectedChangeRequest] = useState<PackageChangeRequestRow | null>(null);
   const [requestModalPlan, setRequestModalPlan] = useState<Plan | null>(null);
   const [submittingRequest, setSubmittingRequest] = useState(false);
   const [cancelingRequest, setCancelingRequest] = useState(false);
@@ -1071,6 +1072,9 @@ export default function OrgSettingsPage() {
     try {
       const res = await getOrgPackageChangeRequest();
       setPendingChangeRequest(res.pendingRequest);
+      setLatestRejectedChangeRequest(
+        res.history.find((request) => request.status === "rejected") ?? null,
+      );
     } catch {
       // ignore
     }
@@ -1723,6 +1727,42 @@ export default function OrgSettingsPage() {
                 >
                   {cancelingRequest ? "Cancelling…" : "Cancel Request"}
                 </button>
+              </div>
+            ) : null}
+            {latestRejectedChangeRequest && !pendingChangeRequest ? (
+              <div
+                role="status"
+                style={{
+                  padding: "16px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(244, 63, 94, 0.28)",
+                  background: "rgba(244, 63, 94, 0.07)",
+                  marginBottom: 20,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                  <b style={{ color: "#be123c", fontSize: 14 }}>Package Change Request Rejected</b>
+                  <span className="badge b-rose">Rejected</span>
+                </div>
+                <div style={{ fontSize: 13, color: "var(--ink-2)" }}>
+                  Your request to switch to <strong>{latestRejectedChangeRequest.targetPlan?.name ?? "the selected package"}</strong> was rejected
+                  {latestRejectedChangeRequest.reviewedAt ? ` on ${formatDate(latestRejectedChangeRequest.reviewedAt)}` : ""}.
+                </div>
+                {latestRejectedChangeRequest.rejectionReason ? (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      background: "rgba(255, 255, 255, 0.72)",
+                      color: "var(--ink)",
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <strong>Reason:</strong> {latestRejectedChangeRequest.rejectionReason}
+                  </div>
+                ) : null}
               </div>
             ) : null}
             {changeError ? <div className="form-alert" style={{ marginBottom: 16 }}>{changeError}</div> : null}
