@@ -3063,6 +3063,9 @@
   align-items: center;
   margin-bottom: 10px;
 }
+.org .spec-row .field-compact {
+  margin-bottom: 0;
+}
 .org .spec-row .inp { margin: 0; }
 /* `button.` raises specificity above the generic .btn / .btn-sm rules, which
    were widening the box and left-aligning the glyph. */
@@ -3098,7 +3101,7 @@
 /* Typed field template rows (Settings → project types): name, type, extra
    (choices / unit), Required, delete. Same shell as the specification rows. */
 .org .spec-row.field-def-row {
-  grid-template-columns: minmax(130px, 1.2fr) 118px minmax(0, 1.4fr) auto 32px;
+  grid-template-columns: minmax(130px, 1.2fr) minmax(118px, 1fr) minmax(118px, 1.15fr) minmax(0, 1.4fr) minmax(118px, 1fr) 32px;
 }
 .org .field-def-req {
   display: inline-flex;
@@ -3110,9 +3113,47 @@
   margin: 0;
 }
 .org .field-def-none { text-align: center; margin: 0; }
+.org .unit-field-editor {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.org .unit-fields-title {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.org .unit-fields-hint {
+  margin-bottom: 12px;
+}
+.org .unit-field-editor .spec-row.field-def-row {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.org .unit-field-editor .spec-row.field-def-row .spec-del {
+  grid-column: 3;
+  grid-row: 2;
+  justify-self: end;
+}
 @media (max-width: 900px) {
   .org .spec-row.field-def-row { grid-template-columns: 1fr 1fr 32px; }
   .org .spec-row.field-def-row .inp:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  .org .unit-field-editor .spec-row.field-def-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px;
+  }
+  .org .unit-field-editor .spec-row.field-def-row .spec-del {
+    grid-column: 3;
+    grid-row: 2;
+  }
 }
 
 /* ====== Project wizard — required-field validation ====== */

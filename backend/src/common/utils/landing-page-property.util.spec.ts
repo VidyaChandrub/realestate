@@ -13,13 +13,10 @@ describe('landing-page-property.util', () => {
     reraId: 'PRM/KA/1',
     possession: 'Dec 2028',
     priceMin: 1_25_00_000,
-    carpetRange: '1,200 – 1,800 sq.ft',
     tagline: 'Homes by the metro',
     highlights: null,
     projectType: 'Apartment',
     constructionStage: 'Under Construction',
-    landArea: 3.5,
-    towerCount: 2,
     addressLine: 'Main Road',
     city: 'Bangalore',
     locality: 'Whitefield',
@@ -36,7 +33,6 @@ describe('landing-page-property.util', () => {
     expect(vars.starting_price).toContain('Cr');
     expect(vars.rera_number).toBe('PRM/KA/1');
     expect(vars.possession_date).toBe('Dec 2028');
-    expect(vars.carpet_area).toBe('1,200 – 1,800 sq.ft');
     expect(vars.location).toContain('Whitefield');
     expect(vars.description).toBe('Homes by the metro');
   });

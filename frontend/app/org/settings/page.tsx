@@ -851,10 +851,8 @@ function ProjectTypeEditor({
       <div className="field">
         <label>Unit fields</label>
         <div className="hint" style={{ marginBottom: 8 }}>
-          Details captured on every unit — e.g. Bedrooms, Facing. Give a field a role to power a feature
-          (Group → the availability grid; Floor → floor view; Configuration → the size/price table and prefill;
-          Price / Area → price per unit area). Deleting a role field just turns that feature off. Editing this
-          later never changes units that already exist.
+          Details captured on every unit — e.g. Bedrooms, Floor, Configuration, Price. Editing this later never
+          changes units that already exist.
         </div>
         <TypedFieldEditor rows={unitRows} onChange={setUnitRows} emptyText="No unit fields — add one if units of this type need any." />
       </div>

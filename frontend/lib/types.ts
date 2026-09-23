@@ -524,9 +524,6 @@ export interface OrgDashboardKpiData {
       priceMin?: number | null;
       priceMax?: number | null;
       currency: string;
-      towerCount?: number | null;
-      floorsDescription?: string | null;
-      landArea?: number | null;
       possession?: string | null;
       reraId?: string | null;
       coverImageUrl?: string | null;
@@ -918,9 +915,11 @@ export interface InvoiceRow {
 }
 
 // --- Projects & inventory (org-scoped) ---
-// All money fields are integer rupees. `landArea` is acres. `possession` is
-// deliberately free text ("Dec 2027"); `manager` is a free-text name, not a
-// user id.
+// All money fields are integer rupees. `possession` is deliberately free
+// text ("Dec 2027"); `manager` is a free-text name, not a user id. There is
+// no fixed "no. of towers / floors / area range / total land" concept —
+// those are ordinary default `projectFieldTemplate` entries now (see
+// FieldDef), same mechanism as Specifications.
 export type ProjectStatus = "active" | "inactive";
 export type UnitStatus = "available" | "booked" | "held" | "sold";
 
@@ -954,10 +953,6 @@ export interface Project {
   priceMin: number | null;
   priceMax: number | null;
   baseRate: number | null;
-  landArea: number | null;
-  towerCount: number | null;
-  floorsDescription: string | null;
-  carpetRange: string | null;
   /** The project type's name, copied at write time (no FK). */
   projectType: string | null;
   projectTypeId: string | null;
@@ -1173,10 +1168,6 @@ export interface CreateProjectInput {
   priceMin?: number;
   priceMax?: number;
   baseRate?: number;
-  landArea?: number;
-  towerCount?: number;
-  floorsDescription?: string;
-  carpetRange?: string;
   projectType?: string;
   projectFieldTemplate?: unknown[];
   unitFieldTemplate?: unknown[];
@@ -1230,10 +1221,6 @@ export interface UpdateProjectInput {
   priceMin?: number | null;
   priceMax?: number | null;
   baseRate?: number | null;
-  landArea?: number | null;
-  towerCount?: number | null;
-  floorsDescription?: string | null;
-  carpetRange?: string | null;
   projectType?: string | null;
   projectFieldTemplate?: unknown[];
   unitFieldTemplate?: unknown[];

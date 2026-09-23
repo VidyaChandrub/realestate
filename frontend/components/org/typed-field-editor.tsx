@@ -19,9 +19,11 @@ import {
  * the list is the display order. Built on RowListEditor, the same shell the
  * project specifications use.
  *
- * A role is fixed once a row represents a saved field (`key` is set) — only
- * its label stays editable from then on, so a role can't be silently moved
- * or removed except by deleting the whole field.
+ * A role is fixed once a row represents an already-saved field — only its
+ * label stays editable from then on, so a role can't be silently moved or
+ * removed except by deleting the whole field. A brand-new, not-yet-saved row
+ * can always have its role set (see `existing` on FieldRow — `key` alone
+ * isn't the right signal, since it gets assigned as soon as you type a name).
  */
 export function TypedFieldEditor({
   rows,
@@ -102,34 +104,29 @@ export function TypedFieldEditor({
               onChange={(e) => update({ unit: e.target.value })}
             />
           ) : row.type === "text" ? (
-            <label className="field-def-req">
-              <input
-                type="checkbox"
-                checked={row.multiline}
-                onChange={(e) => update({ multiline: e.target.checked })}
-              />
-              Long text
-            </label>
+            <span className="hint field-def-none">Text field</span>
           ) : (
             <span className="hint field-def-none">—</span>
           )}
           {roles ? (
             <select
               className="inp"
-              aria-label={`Role for ${row.label || "this field"}`}
+              aria-label={`Used for — ${row.label || "this field"}`}
               value={row.role}
-              disabled={!!row.key}
-              title={row.key ? "A field's role is fixed once saved — delete and re-add it to change this" : undefined}
+              disabled={row.existing}
+              title={row.existing ? "Fixed once saved — delete and re-add the field to change this" : "Optional — only set this if the field should power a feature below"}
               onChange={(e) => update({ role: e.target.value as FieldRole | "" })}
             >
-              <option value="">No role</option>
-              {FIELD_ROLES.map((r) => (
-                <option
-                  key={r}
-                  value={r}
-                  disabled={takenRoles.has(r) && row.role !== r}
-                >
-                  {FIELD_ROLE_LABEL[r]}
+              <option value="">Just a field</option>
+              {/* A role already claimed by another field, or one this field's
+                  type can't carry, is left out entirely rather than shown
+                  disabled — a picker full of options nothing can select is
+                  more confusing than a short one. */}
+              {FIELD_ROLES.filter(
+                (r) => (row.role === r || !takenRoles.has(r)) && ROLE_ALLOWED_TYPES[r].includes(row.type),
+              ).map((r) => (
+                <option key={r} value={r}>
+                  Used for: {FIELD_ROLE_LABEL[r]}
                 </option>
               ))}
             </select>

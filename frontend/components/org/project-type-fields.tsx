@@ -1,6 +1,7 @@
 "use client";
 
 import { TypedFieldEditor } from "@/components/org/typed-field-editor";
+import { RowListEditor } from "@/components/org/row-list-editor";
 import {
   groupBySection,
   nonRoleFields,
@@ -42,18 +43,26 @@ export function FieldInput({
   value,
   onChange,
   error,
+  showLabel = true,
+  className,
 }: {
   field: FieldDef;
   value: string;
   onChange: (value: string) => void;
   error?: string;
+  showLabel?: boolean;
+  className?: string;
 }) {
+  const wrapperClassName = ["field", error ? "field-invalid" : "", className].filter(Boolean).join(" ");
+
   return (
-    <div className={`field${error ? " field-invalid" : ""}`}>
-      <label>
-        {f.label}
-        {f.required ? <span className="req"> *</span> : null}
-      </label>
+    <div className={wrapperClassName}>
+      {showLabel ? (
+        <label>
+          {f.label}
+          {f.required ? <span className="req"> *</span> : null}
+        </label>
+      ) : null}
       {f.type === "number" ? (
         <div style={{ position: "relative" }}>
           <input
@@ -93,6 +102,65 @@ export function FieldInput({
   );
 }
 
+/** Project summary fields use the same compact label/value/delete pattern as Specifications. */
+export function ProjectFieldRows({
+  template,
+  values,
+  onTemplateChange,
+  onValueChange,
+}: {
+  template: FieldDef[];
+  values: CustomValueDraft;
+  onTemplateChange: (template: FieldDef[]) => void;
+  onValueChange: (key: string, value: string) => void;
+}) {
+  return (
+    <RowListEditor<FieldDef>
+      rows={template}
+      getKey={(field) => field.key}
+      onChange={onTemplateChange}
+      makeRow={() => ({ key: `project_field_${Date.now()}`, label: "New project field", type: "text", required: false })}
+      addLabel="+ Add project field"
+      emptyText="No project fields — add the first one below."
+      removeLabel={(field) => `Remove ${field.label || "this project field"}`}
+      renderCells={(field, update) => (
+        <>
+          <input
+            className="inp"
+            aria-label="Project field label"
+            placeholder="e.g. Number of towers"
+            value={field.label}
+            onChange={(event) => update({ label: event.target.value })}
+          />
+          <FieldInput
+            field={field}
+            value={values[field.key] ?? ""}
+            onChange={(value) => onValueChange(field.key, value)}
+            showLabel={false}
+            className="field-compact"
+          />
+        </>
+      )}
+    />
+  );
+}
+
+export function UnitFieldRows({
+  rows,
+  onChange,
+}: {
+  rows: FieldRow[];
+  onChange: (rows: FieldRow[]) => void;
+}) {
+  return (
+    <div className="field unit-field-editor">
+      <label className="unit-fields-title">Unit fields</label>
+      <div className="hint unit-fields-hint">Fields captured for each unit — e.g. Bedrooms, Floor, Price.</div>
+      <TypedFieldEditor rows={rows} onChange={onChange} emptyText="No unit fields — add a field." />
+    </div>
+  );
+}
+
 /**
  * A unit template's NON-role fields, grouped under section headings. Role
  * fields (price / area / group / floor / configuration) are never rendered
@@ -127,48 +195,5 @@ export function SectionedFieldInputs({
         </div>
       ))}
     </>
-  );
-}
-
-/**
- * Per-project editing of what the type prefilled: this project's own copy of
- * the project-level and unit-level field templates. Changes here never touch
- * the org's project type. There is no separate "group name" input — a
- * `group`-role field's own label (edited directly in the unit fields below)
- * is the grouping column's name.
- */
-export function ProjectTemplateCustomizer({
-  projectRows,
-  onProjectRows,
-  unitRows,
-  onUnitRows,
-}: {
-  projectRows: FieldRow[];
-  onProjectRows: (rows: FieldRow[]) => void;
-  unitRows: FieldRow[];
-  onUnitRows: (rows: FieldRow[]) => void;
-}) {
-  return (
-    <details className="tpl-custom" style={{ margin: "14px 0" }}>
-      <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 13.5 }}>
-        Customise this project&apos;s fields
-        <span className="muted" style={{ fontWeight: 400 }}>
-          {" "}— {projectRows.length} project field{projectRows.length === 1 ? "" : "s"}, {unitRows.length} unit field{unitRows.length === 1 ? "" : "s"}
-        </span>
-      </summary>
-      <div style={{ paddingTop: 12 }}>
-        <div className="hint" style={{ marginBottom: 12 }}>
-          Prefilled from the project type. Add, remove or edit fields for this project only — the type itself is not changed. Removing a field never deletes values already saved.
-        </div>
-        <div className="field">
-          <label>Project fields</label>
-          <TypedFieldEditor rows={projectRows} onChange={onProjectRows} emptyText="No project fields." roles={false} />
-        </div>
-        <div className="field mb-0">
-          <label>Unit fields</label>
-          <TypedFieldEditor rows={unitRows} onChange={onUnitRows} emptyText="No unit fields." />
-        </div>
-      </div>
-    </details>
   );
 }

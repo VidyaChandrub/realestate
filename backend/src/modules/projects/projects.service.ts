@@ -16,7 +16,6 @@ import {
   CustomValues,
   FieldDef,
   FieldRole,
-  groupNoun,
   nonRoleFields,
   normalizeFieldTemplate,
   roleField,
@@ -51,9 +50,6 @@ const PROJECT_SCALARS = [
   'priceMin',
   'priceMax',
   'baseRate',
-  'towerCount',
-  'floorsDescription',
-  'carpetRange',
   'areaUnit',
   // Wizard Steps 1-2 identity & timeline.
   'projectType',
@@ -213,10 +209,6 @@ export class ProjectsService {
           priceMin: dto.priceMin ?? null,
           priceMax: dto.priceMax ?? null,
           baseRate: dto.baseRate ?? null,
-          landArea: dto.landArea ?? null,
-          towerCount: dto.towerCount ?? null,
-          floorsDescription: dto.floorsDescription ?? null,
-          carpetRange: dto.carpetRange ?? null,
           projectType: dto.projectType ?? null,
           tagline: dto.tagline ?? null,
           launchDate: dto.launchDate ?? null,
@@ -519,7 +511,6 @@ export class ProjectsService {
         (existingProject.customFields ?? {}) as CustomValues,
       ) as unknown as Prisma.InputJsonValue;
     }
-    if (dto.landArea !== undefined) data.landArea = dto.landArea;
     if (dto.amenities !== undefined) {
       data.amenities = dto.amenities as unknown as Prisma.InputJsonValue;
     }
@@ -961,13 +952,6 @@ export class ProjectsService {
     await this.assertVariantInCatalog(orgId, dto.variantLabel);
 
     const tower = dto.tower?.trim() || null;
-    await this.assertTowerWithinLimit(
-      projectId,
-      project.towerCount,
-      tower,
-      undefined,
-      this.groupNounFor(template),
-    );
     const customFields = validateCustomValues(
       nonRoleFields(template),
       dto.customFields,
@@ -1072,17 +1056,6 @@ export class ProjectsService {
         existing.variantLabel,
       );
     }
-    if (dto.tower !== undefined && typeof dto.tower === 'string') {
-      const nextTower = dto.tower.trim() || null;
-      await this.assertTowerWithinLimit(
-        projectId,
-        project.towerCount,
-        nextTower,
-        id,
-        this.groupNounFor(template),
-      );
-    }
-
     const data: Prisma.UnitUncheckedUpdateInput = {};
     if (dto.configuration !== undefined) {
       data.configuration = dto.configuration.trim();
@@ -1607,13 +1580,6 @@ export class ProjectsService {
     return (Array.isArray(v) ? v : []) as unknown as FieldDef[];
   }
 
-  // The project's own word for its grouping column ("Tower", "Sector"…) —
-  // the `group`-role field's own editable label, or a generic fallback for a
-  // template that doesn't have one yet.
-  private groupNounFor(template: FieldDef[]): string {
-    return groupNoun(template) ?? 'Group';
-  }
-
   // What a unit may carry is derived from which role fields the project's
   // CURRENT unit template has — never a fixed layout. A value sent for a
   // role the template doesn't have is rejected loudly rather than silently
@@ -1732,42 +1698,6 @@ export class ProjectsService {
     }
   }
 
-  // A new tower name may only be introduced while the project's distinct
-  // tower count is below Project.towerCount. Reusing a name already in use,
-  // or clearing the tower, is always fine. A null towerCount means the
-  // project never declared a tower count — no limit is enforced.
-  private async assertTowerWithinLimit(
-    projectId: string,
-    towerCount: number | null,
-    nextTower: string | null,
-    excludeUnitId?: string,
-    noun = 'Tower',
-  ) {
-    if (!nextTower || towerCount == null) return;
-    const word = noun.toLowerCase();
-
-    const rows = await this.prisma.unit.findMany({
-      where: {
-        projectId,
-        tower: { not: null },
-        ...(excludeUnitId ? { id: { not: excludeUnitId } } : {}),
-      },
-      select: { tower: true },
-      distinct: ['tower'],
-    });
-    const existing = rows
-      .map((r) => r.tower)
-      .filter((t): t is string => t != null);
-
-    if (existing.includes(nextTower)) return;
-    if (existing.length + 1 > towerCount) {
-      throw new BadRequestException(
-        `This project allows ${towerCount} ${word}(s) and already uses ${existing.length}` +
-          (existing.length ? ` (${existing.join(', ')})` : '') +
-          `. Reuse an existing ${word} name, or raise the ${word} count on the project before adding "${nextTower}".`,
-      );
-    }
-  }
 
   // -------------------------------------------------------------------------
   // Serialisation / derived fields
@@ -1851,11 +1781,6 @@ export class ProjectsService {
       priceMin: project.priceMin,
       priceMax: project.priceMax,
       baseRate: project.baseRate,
-      // Prisma.Decimal → number for a clean JSON contract.
-      landArea: project.landArea == null ? null : Number(project.landArea),
-      towerCount: project.towerCount,
-      floorsDescription: project.floorsDescription,
-      carpetRange: project.carpetRange,
       projectType: project.projectType,
       projectTypeId: project.projectTypeId,
       areaUnit: project.areaUnit,

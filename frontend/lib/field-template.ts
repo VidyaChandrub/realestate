@@ -26,8 +26,8 @@ export type FieldRole = (typeof FIELD_ROLES)[number];
 
 export const FIELD_ROLE_LABEL: Record<FieldRole, string> = {
   price: "Price",
-  area: "Area (price per unit area)",
-  group: "Group (Tower / Block / Sector)",
+  area: "Area",
+  group: "Tower / Block / Sector",
   floor: "Floor",
   configuration: "Configuration",
 };
@@ -67,6 +67,19 @@ export function roleField(template: FieldDef[], role: FieldRole): FieldDef | nul
 /** The fields whose values belong in customFields — a role field's value has its own Unit column. */
 export function nonRoleFields(template: FieldDef[]): FieldDef[] {
   return template.filter((f) => !f.role);
+}
+
+/**
+ * Area-like defaults that should be copied into each configuration row when a
+ * project offers multiple unit types. These are not role fields (they do not
+ * map to dedicated Unit columns), but they are still meaningful defaults to
+ * persist per configuration — e.g. Built-up Area for apartments, Plot Area for
+ * plots, and both for villas.
+ */
+export function defaultableExtraFields(template: FieldDef[]): FieldDef[] {
+  return nonRoleFields(template).filter((f) => (
+    f.type === "number" && /(?:area|built|plot|carpet|super)/i.test(f.label)
+  ));
 }
 
 /** What a template's role fields give a project. Derived, never stored. */
@@ -127,6 +140,16 @@ export interface FieldRow {
   /** number: display unit as typed */
   unit: string;
   multiline: boolean;
+  /**
+   * True only for a row loaded from an already-saved template (via
+   * `fieldsToRows`) — never set true client-side just because `key` got
+   * auto-assigned. This, not `key`, is what "fixed once saved" (role, and
+   * anything else that shouldn't move after a save) should check: `key` is
+   * filled in as soon as you type a label into a brand-new row (see
+   * TypedFieldEditor's name-field onBlur), long before that row is actually
+   * persisted, so gating on `key` locked new rows immediately — a real bug.
+   */
+  existing: boolean;
 }
 
 let nextRowId = 1;
@@ -143,6 +166,7 @@ export function makeFieldRow(patch: Partial<FieldRow> = {}): FieldRow {
     optionsText: "",
     unit: "",
     multiline: false,
+    existing: false,
     ...patch,
   };
 }
@@ -159,8 +183,21 @@ export function fieldsToRows(fields: FieldDef[] | null | undefined): FieldRow[] 
       optionsText: (f.options ?? []).join(", "),
       unit: f.unit ?? "",
       multiline: f.multiline ?? false,
+      existing: true,
     }),
   );
+}
+
+/**
+ * Same as `fieldsToRows`, but every row comes back with `existing: false`.
+ * Use this wherever the fields being loaded aren't actually saved against a
+ * live project yet — e.g. the new-project wizard, where picking a project
+ * type or resuming a draft only seeds a starting point; nothing is
+ * persisted (and no Unit can reference a role field) until publish, so a
+ * role should stay editable until then.
+ */
+export function fieldsToDraftRows(fields: FieldDef[] | null | undefined): FieldRow[] {
+  return fieldsToRows(fields).map((r) => ({ ...r, existing: false }));
 }
 
 /** Mirror of the server's slugifyFieldKey. */

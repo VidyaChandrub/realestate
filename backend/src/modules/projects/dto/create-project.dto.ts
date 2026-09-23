@@ -77,31 +77,6 @@ export class CreateProjectDto {
   baseRate?: number;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @Max(100000)
-  landArea?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(10000)
-  towerCount?: number;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  floorsDescription?: string;
-
-  // Free-text carpet-area range for the whole project ("640 – 1,850 sqft").
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  carpetRange?: string;
-
-  @IsOptional()
   @IsArray()
   @ArrayMaxSize(100)
   @ValidateNested({ each: true })

@@ -323,13 +323,10 @@ export function snapshotFromProject(input: {
     reraId: string | null;
     possession: string | null;
     priceMin: number | null;
-    carpetRange: string | null;
     tagline: string | null;
     highlights: string | null;
     projectType: string | null;
     constructionStage: string | null;
-    landArea: unknown;
-    towerCount: number | null;
     addressLine: string | null;
     city: string | null;
     locality: string | null;
@@ -358,10 +355,6 @@ export function snapshotFromProject(input: {
         )
         .filter(Boolean)
     : [];
-  const land =
-    p.landArea != null && p.landArea !== ''
-      ? `${String(p.landArea)} Ac`
-      : '';
   const location = joinLocation([p.location, p.locality, p.city, p.addressLine]);
   const description = (p.tagline || p.highlights || '').trim();
 
@@ -389,15 +382,15 @@ export function snapshotFromProject(input: {
     status: p.constructionStage ?? '',
     description,
     startingPrice: formatInr(p.priceMin),
-    carpetArea: p.carpetRange ?? '',
+    carpetArea: '',
     reraNumber: p.reraId ?? '',
     location,
     possession: p.possession ?? '',
     amenities: amenityNames,
     features: p.connectivity ?? [],
     gallery: p.galleryUrls ?? [],
-    landArea: land,
-    towers: p.towerCount != null ? String(p.towerCount) : '',
+    landArea: '',
+    towers: '',
     units: input.unitCount != null ? String(input.unitCount) : '',
     brochureUrl: p.brochureUrl ?? '',
     floorPlans: fromTypes.length ? fromTypes : fromProject,

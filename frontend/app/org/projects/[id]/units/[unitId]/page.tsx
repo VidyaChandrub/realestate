@@ -186,12 +186,7 @@ export default function OrgProjectUnitDetailPage() {
       ? [
           {
             k: "Floor",
-            v:
-              unit?.floor != null
-                ? [project?.towerCount != null ? `Floor ${unit.floor} of ${project.towerCount}` : null, project?.floorsDescription ?? null]
-                    .filter(Boolean)
-                    .join(" · ") || `Floor ${unit.floor}`
-                : "—",
+            v: unit?.floor != null ? `Floor ${unit.floor}` : "—",
           },
         ]
       : []),
@@ -376,7 +371,7 @@ export default function OrgProjectUnitDetailPage() {
                       {effectivePrice != null ? formatMoney(effectivePrice, project?.currency ?? "INR") : "—"}
                     </div>
                     <div className="muted fs-12-5">
-                      {perSqft || "Price per sqft"} · all-inclusive
+                      {perArea || `Price per ${project?.areaUnit ?? "sqft"}`} · all-inclusive
                     </div>
                   </div>
                   <div className="kv mt-16">

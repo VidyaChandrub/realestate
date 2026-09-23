@@ -22,18 +22,49 @@ const field = (
   extra: Partial<FieldDef> = {},
 ): FieldSeed => ({ label, type, required: false, ...extra });
 
-const FACING_OPTIONS = [
-  'North', 'South', 'East', 'West',
-  'North-East', 'North-West', 'South-East', 'South-West',
+// Facing and Parking are deliberately NOT template fields — Unit.facing and
+// Unit.parking are already fixed, org-catalog-driven inputs on every unit
+// form (Settings → Project Catalogs → Facing / Parking), the same way
+// amenities already are at the project level. Re-adding them as template
+// fields would just duplicate that existing, already-configurable mechanism.
+
+// Default PROJECT-level fields — informational summary fields, same
+// mechanism (and same editability) as Specifications. No special behaviour
+// reads these; an org can rename, edit, reorder or delete any of them. Each
+// common type gets its own set rather than one shared list, so a Plot isn't
+// asked for a tower count and a Villa isn't asked for floors.
+// "Total Land Area" deliberately carries no fixed unit — a project's area
+// unit (sq ft / acre, chosen in Step 1) applies to `area`-role fields and
+// price-per-area, not to arbitrary plain fields like this one. An org that
+// wants a unit shown can put it in the label itself (e.g. "Total Land Area
+// (acres)"), since labels are always editable.
+const APARTMENT_PROJECT_FIELDS: FieldSeed[] = [
+  field('No. of Towers / Blocks', 'number'),
+  field('Floors / Structure', 'text'),
+  field('Total Land Area', 'number'),
+];
+const PLOT_PROJECT_FIELDS: FieldSeed[] = [
+  field('Total Land Area', 'number'),
+  field('Plot Area Range', 'text'),
+];
+const VILLA_PROJECT_FIELDS: FieldSeed[] = [
+  field('No. of Villas', 'number'),
+  field('Total Land Area', 'number'),
+  field('Villa Area Range', 'text'),
 ];
 
 // The "add common project types" starter set. Plain data: once created a
 // type is just a row — nothing ever looks a type up by these names. No field
 // is required (the org can add that back per-field in Settings if it wants
 // to); a `*`-required-by-default set was tried and the client didn't want it.
-const COMMON_TYPES: Array<{ name: string; unitFields: FieldSeed[] }> = [
+const COMMON_TYPES: Array<{ name: string; projectFields: FieldSeed[]; unitFields: FieldSeed[] }> = [
   {
     name: 'Apartment',
+    projectFields: APARTMENT_PROJECT_FIELDS,
+    // Lean on purpose — mirrors what the old (pre-dynamic) apartment form
+    // actually asked for: tower, configuration, floor, carpet + built-up
+    // area, price. An org that wants Bedrooms, Bathrooms, Super Built-up
+    // Area etc. adds them from here — they're not forced on everyone.
     unitFields: [
       field('Tower / Building', 'text', { section: 'Basic Details', role: 'group' }),
       field('Apartment Type', 'choice', {
@@ -42,38 +73,37 @@ const COMMON_TYPES: Array<{ name: string; unitFields: FieldSeed[] }> = [
         options: ['1 BHK', '2 BHK', '3 BHK', '4 BHK', 'Penthouse'],
       }),
       field('Floor Number', 'number', { section: 'Basic Details', role: 'floor' }),
-      field('Total Floors', 'number', { section: 'Basic Details' }),
-      field('Carpet Area', 'number', { section: 'Area & Layout', role: 'area', unit: 'sq ft' }),
-      field('Built-up Area', 'number', { section: 'Area & Layout', unit: 'sq ft' }),
-      field('Super Built-up Area', 'number', { section: 'Area & Layout', unit: 'sq ft' }),
-      field('Bedrooms', 'number', { section: 'Area & Layout' }),
-      field('Bathrooms', 'number', { section: 'Area & Layout' }),
-      field('Balcony Area', 'number', { section: 'Area & Layout', unit: 'sq ft' }),
-      field('Facing', 'choice', { section: 'Additional', options: FACING_OPTIONS }),
-      field('Parking', 'yesno', { section: 'Additional' }),
-      field('Parking Type', 'choice', { section: 'Additional', options: ['Covered', 'Open'] }),
-      field('Price', 'number', { section: 'Pricing', role: 'price' }),
+      field('Carpet Area', 'number', { section: 'Area & Pricing', role: 'area', unit: 'sq ft' }),
+      field('Built-up Area', 'number', { section: 'Area & Pricing', unit: 'sq ft' }),
+      field('Price', 'number', { section: 'Area & Pricing', role: 'price' }),
     ],
   },
   {
     name: 'Plot',
+    projectFields: PLOT_PROJECT_FIELDS,
     unitFields: [
       field('Plot Type', 'choice', {
         section: 'Basic Details',
         options: ['Residential', 'Commercial', 'Industrial'],
       }),
+      field('Corner Plot', 'yesno', { section: 'Basic Details' }),
+      field('Gated Community', 'yesno', { section: 'Basic Details' }),
       field('Plot Area', 'number', { section: 'Location & Size', role: 'area', unit: 'sq ft' }),
       field('Length', 'number', { section: 'Location & Size', unit: 'ft' }),
       field('Width', 'number', { section: 'Location & Size', unit: 'ft' }),
-      field('Plot Facing', 'choice', { section: 'Location & Size', options: FACING_OPTIONS }),
       field('Road Width', 'number', { section: 'Location & Size', unit: 'ft' }),
       field('Floors Allowed', 'number', { section: 'Location & Size' }),
       field('Boundary / Location', 'text', { section: 'Location & Size' }),
+      field('Water Connection', 'yesno', { section: 'Additional' }),
+      field('Electricity Connection', 'yesno', { section: 'Additional' }),
+      field('Approved By', 'text', { section: 'Additional' }),
+      field('Property Description', 'text', { section: 'Additional', multiline: true }),
       field('Price', 'number', { section: 'Pricing', role: 'price' }),
     ],
   },
   {
     name: 'Villa',
+    projectFields: VILLA_PROJECT_FIELDS,
     unitFields: [
       field('Villa Type', 'choice', {
         section: 'Basic Details',
@@ -96,7 +126,6 @@ const COMMON_TYPES: Array<{ name: string; unitFields: FieldSeed[] }> = [
         section: 'Basic Details',
         options: ['Unfurnished', 'Semi-Furnished', 'Fully Furnished'],
       }),
-      field('Facing', 'choice', { section: 'Basic Details', options: FACING_OPTIONS }),
       field('Built-up Area', 'number', { section: 'Area', role: 'area', unit: 'sq ft' }),
       field('Plot Area', 'number', { section: 'Area', unit: 'sq ft' }),
       field('Carpet Area', 'number', { section: 'Area', unit: 'sq ft' }),
@@ -104,7 +133,6 @@ const COMMON_TYPES: Array<{ name: string; unitFields: FieldSeed[] }> = [
       field('Bedrooms', 'number', { section: 'Highlights' }),
       field('Bathrooms', 'number', { section: 'Highlights' }),
       field('Balcony', 'number', { section: 'Highlights' }),
-      field('Parking', 'choice', { section: 'Highlights', options: ['None', 'Covered', 'Open'] }),
       field('Private Garden', 'yesno', { section: 'Highlights' }),
       field('Servant Room', 'yesno', { section: 'Highlights' }),
       field('Swimming Pool', 'yesno', { section: 'Highlights' }),
@@ -135,7 +163,22 @@ export class OrgProjectTypesService {
     const counts = await Promise.all(
       rows.map((r) => this.countProjects(orgId, r.id, r.name)),
     );
-    return rows.map((r, i) => ({ ...r, inUse: counts[i] }));
+    return rows.map((r, i) => {
+      const common = COMMON_TYPES.find((type) => type.name.toLowerCase() === r.name.toLowerCase());
+      const projectFields = common && (!Array.isArray(r.projectFields) || r.projectFields.length === 0)
+        ? normalizeFieldTemplate(common.projectFields)
+        : r.projectFields;
+      const unitFields = common && Array.isArray(r.unitFields)
+        ? r.unitFields.filter((raw) => {
+            if (typeof raw !== 'object' || raw === null) return true;
+            const label = typeof (raw as { label?: unknown }).label === 'string'
+              ? (raw as { label: string }).label.toLowerCase()
+              : '';
+            return !['facing', 'parking', 'parking type', 'plot facing'].includes(label);
+          })
+        : r.unitFields;
+      return { ...r, projectFields, unitFields, inUse: counts[i] };
+    });
   }
 
   async create(orgId: string, dto: CreateProjectTypeDto) {
@@ -200,8 +243,9 @@ export class OrgProjectTypesService {
   async addCommon(orgId: string) {
     const existing = await this.prisma.projectTypeDef.findMany({
       where: { orgId },
-      select: { name: true, sortOrder: true },
+      select: { id: true, name: true, sortOrder: true, projectFields: true, unitFields: true },
     });
+    const commonByName = new Map(COMMON_TYPES.map((type) => [type.name.toLowerCase(), type]));
     const have = new Set(existing.map((e) => e.name.toLowerCase()));
     let order = existing.reduce((m, e) => Math.max(m, e.sortOrder), -1) + 1;
     const missing = COMMON_TYPES.filter((t) => !have.has(t.name.toLowerCase()));
@@ -211,12 +255,36 @@ export class OrgProjectTypesService {
           orgId,
           ...this.buildData({
             name: t.name,
-            projectFields: [],
+            projectFields: t.projectFields,
             unitFields: t.unitFields,
             sortOrder: order++,
           }),
         } as Prisma.ProjectTypeDefUncheckedCreateInput,
       });
+    }
+    for (const row of existing) {
+      const common = commonByName.get(row.name.toLowerCase());
+      if (!common) continue;
+      const projectFields = Array.isArray(row.projectFields) && row.projectFields.length > 0
+        ? row.projectFields
+        : normalizeFieldTemplate(common.projectFields);
+      const currentUnitFields = Array.isArray(row.unitFields) ? row.unitFields : [];
+      const cleanedUnitFields = currentUnitFields.filter((raw) => {
+        if (typeof raw !== 'object' || raw === null) return true;
+        const label = typeof (raw as { label?: unknown }).label === 'string'
+          ? (raw as { label: string }).label.toLowerCase()
+          : '';
+        return !['facing', 'parking', 'parking type', 'plot facing'].includes(label);
+      });
+      if (projectFields !== row.projectFields || cleanedUnitFields.length !== currentUnitFields.length) {
+        await this.prisma.projectTypeDef.update({
+          where: { id: row.id },
+          data: {
+            projectFields: projectFields as Prisma.InputJsonValue,
+            unitFields: cleanedUnitFields as Prisma.InputJsonValue,
+          },
+        });
+      }
     }
     return { created: missing.length, types: await this.list(orgId) };
   }

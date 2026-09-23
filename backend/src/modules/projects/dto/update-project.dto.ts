@@ -78,30 +78,6 @@ export class UpdateProjectDto {
   baseRate?: number | null;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @Max(100000)
-  landArea?: number | null;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(10000)
-  towerCount?: number | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  floorsDescription?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  carpetRange?: string | null;
-
-  @IsOptional()
   @IsArray()
   @ArrayMaxSize(100)
   @ValidateNested({ each: true })

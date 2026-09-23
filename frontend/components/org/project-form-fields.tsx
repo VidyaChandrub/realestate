@@ -390,19 +390,15 @@ export function SpecificationRows({
 }
 
 /**
- * Tower / block field. A combobox over the tower names already used by the
- * project's other units, plus free entry — but a *new* name is only allowed
- * while the project's distinct tower count is below `towerCount`. Once every
- * slot is used it becomes select-only. Mirrors the server-side rule in
- * ProjectsService.assertTowerWithinLimit (which is authoritative — this is
- * just fast feedback). `otherTowers` must exclude the unit being edited, so
- * renaming the sole holder of a name stays possible.
+ * Group (tower / block / sector…) field. A combobox over the group names
+ * already used by the project's other units, plus free entry — no cap.
+ * `otherTowers` must exclude the unit being edited, so renaming the sole
+ * holder of a name stays possible.
  */
 export function TowerCombobox({
   value,
   onChange,
   otherTowers,
-  towerCount,
   disabled,
   listId = "tower-options",
   noun = "Tower",
@@ -410,62 +406,33 @@ export function TowerCombobox({
   value: string;
   onChange: (v: string) => void;
   otherTowers: string[];
-  towerCount: number | null;
   disabled?: boolean;
   listId?: string;
   /** What the project calls a group — "Tower" by default, or "Sector", "Phase"…. */
   noun?: string;
 }) {
   const word = noun.toLowerCase();
-  const trimmed = value.trim();
-  const known = otherTowers.includes(trimmed);
-  const selectOnly =
-    towerCount != null && otherTowers.length >= towerCount && !known;
-
-  const hint =
-    towerCount == null
-      ? `No ${word} limit set on this project.`
-      : selectOnly
-        ? `All ${towerCount} ${word}${towerCount === 1 ? "" : "s"} are in use — reuse one, or raise the project's ${word} count.`
-        : `${otherTowers.length} of ${towerCount} ${word}${towerCount === 1 ? "" : "s"} used.`;
 
   return (
     <>
-      {selectOnly ? (
-        <select
-          className="inp"
-          value={trimmed}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          <option value="">No {word}</option>
-          {otherTowers.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-          {trimmed && !known ? (
-            <option value={trimmed}>{trimmed} (current)</option>
-          ) : null}
-        </select>
-      ) : (
-        <>
-          <input
-            className="inp"
-            list={listId}
-            placeholder={otherTowers.length ? `e.g. ${noun} B` : `e.g. ${noun} A`}
-            value={value}
-            disabled={disabled}
-            onChange={(e) => onChange(e.target.value)}
-          />
-          <datalist id={listId}>
-            {otherTowers.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-        </>
-      )}
-      <div className="hint">{hint}</div>
+      <input
+        className="inp"
+        list={listId}
+        placeholder={otherTowers.length ? `e.g. ${noun} B` : `e.g. ${noun} A`}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <datalist id={listId}>
+        {otherTowers.map((t) => (
+          <option key={t} value={t} />
+        ))}
+      </datalist>
+      <div className="hint">
+        {otherTowers.length > 0
+          ? `${otherTowers.length} distinct ${word}${otherTowers.length === 1 ? "" : "s"} in use — type a new one or pick an existing.`
+          : `e.g. ${noun} A. Free text — no ${word} limit.`}
+      </div>
     </>
   );
 }
@@ -542,21 +509,25 @@ export function ConfigurationSelect({
  * on save. `key` is a stable client-side identity — for the create wizard a
  * counter, for the edit page the `UnitType` id. `area`/`price` are staged
  * under those fixed keys and mapped onto the template's actual area-/
- * price-role field keys by the caller when saving (see UnitType.fieldDefaults).
+ * price-role field keys by the caller when saving; `extra` holds any other
+ * defaultable field (e.g. Built-up Area), keyed by that field's own template
+ * key (see UnitType.fieldDefaults).
  */
 export interface ConfigSizePriceRow {
   key: string | number;
   name: string;
   area: string;
   price: string;
+  extra: Record<string, string>;
   totalUnits: string;
 }
 
 /**
- * Area / price / planned units, one row per configuration the project
- * offers. Column headers use the project's own area-/price-role field
- * labels (and the area field's display unit), so an org that calls it
- * "Built-up Area" sees that, not a hardcoded "Carpet".
+ * Area / price / planned units — plus any other fields the caller wants
+ * defaulted per configuration (e.g. Built-up Area for apartments) — one row
+ * per configuration the project offers. Column headers use the project's own
+ * field labels (and the area field's display unit), so an org that renames a
+ * field sees that name here too, not a hardcoded term.
  *
  * Shared verbatim by the create wizard's Step 2 and the project edit form so
  * the same information is captured the same way in both places — divergent
@@ -566,7 +537,7 @@ export interface ConfigSizePriceRow {
  * prefill anything when a unit is added. The component is presentational —
  * it owns no state and does no saving; the caller supplies the rows and
  * receives patches. Renders nothing if the template has neither an area- nor
- * a price-role field — there's nothing to default in that case.
+ * a price-role field, and no extra fields — there's nothing to default then.
  */
 export function ConfigSizePriceTable({
   configurations,
@@ -576,6 +547,7 @@ export function ConfigSizePriceTable({
   currency = "INR",
   areaField,
   priceField,
+  extraFields = [],
 }: {
   /** Labels currently selected, in display order. */
   configurations: string[];
@@ -587,8 +559,10 @@ export function ConfigSizePriceTable({
   areaField?: FieldDef | null;
   /** The template's `price`-role field, if any — supplies the column label. */
   priceField?: FieldDef | null;
+  /** Other defaultable fields (e.g. Built-up Area) — one column each, by their own template key. */
+  extraFields?: FieldDef[];
 }) {
-  if (configurations.length === 0 || (!areaField && !priceField)) return null;
+  if (configurations.length === 0 || (!areaField && !priceField && extraFields.length === 0)) return null;
   return (
     <div className="field">
       <label>Defaults per configuration</label>
@@ -597,6 +571,9 @@ export function ConfigSizePriceTable({
         <div className="ut-row ut-head">
           <span>Configuration</span>
           {areaField ? <span>{areaField.label}{areaField.unit ? ` (${areaField.unit})` : ""}</span> : null}
+          {extraFields.map((f) => (
+            <span key={f.key}>{f.label}{f.unit ? ` (${f.unit})` : ""}</span>
+          ))}
           {priceField ? <span>{priceField.label} ({currencyPrefix(currency).trim() || "₹"})</span> : null}
           <span>Planned units</span>
         </div>
@@ -612,6 +589,12 @@ export function ConfigSizePriceTable({
                   value={row.area}
                   onChange={(e) => onChange(row.key, { area: e.target.value })} />
               ) : null}
+              {extraFields.map((f) => (
+                <input className="inp" key={f.key} type="number" min={0} placeholder="1,200"
+                  aria-label={`${f.label} for ${label}`}
+                  value={row.extra[f.key] ?? ""}
+                  onChange={(e) => onChange(row.key, { extra: { ...row.extra, [f.key]: e.target.value } })} />
+              ))}
               {priceField ? (
                 <input className="inp" type="number" min={0} placeholder={currency === "INR" ? "64,00,000" : "640,000"}
                   aria-label={`${priceField.label} for ${label}`}

@@ -1431,20 +1431,11 @@ model Project {
   priceMin          Int?          @map("price_min") // rupees
   priceMax          Int?          @map("price_max") // rupees
   baseRate          Int?          @map("base_rate") // rupees per sqft
-  landArea          Decimal?      @map("land_area") @db.Decimal(8, 2) // acres
-  // Caps how many distinct values the unit template's `group`-role field may
-  // introduce across this project's units (whatever the org calls it —
-  // Tower, Block, Sector). Null = no limit. Meaningless when the template has
-  // no `group`-role field.
-  towerCount        Int?          @map("tower_count")
-  // Free-text structure summary ("G+22"), shown only when the unit template
-  // has a `floor`-role field.
-  floorsDescription String?       @map("floors_description")
-  // Free-text area range for the project as a whole, e.g. "640 – 1,850
-  // sqft". Per-configuration area lives on UnitType.fieldDefaults; this is the
-  // headline summary shown before unit types are entered. Shown only when the
-  // unit template has a `configuration`-role field.
-  carpetRange       String?       @map("carpet_range")
+  // No.-of-towers, floors/structure, area range and total land area used to
+  // be fixed columns with hardcoded wizard inputs. They're now ordinary
+  // (roleless) default `projectFields` template entries — same mechanism as
+  // Specifications — so an org can rename, edit or delete them freely; no
+  // schema-level concept of them remains.
   // Array of { name: string, iconUrl: string | null }. iconUrl is always
   // null for now — amenity-icon upload is out of scope (blocked on S3).
   amenities         Json          @default("[]")
@@ -1619,8 +1610,9 @@ model Unit {
   variantLabel  String? @map("variant_label")
 
   // Optional — a project whose unit template has no `group`-role field has no
-  // grouping. Drives the availability-grid grouping (no unitNo parsing). New
-  // group names are bounded server-side by Project.towerCount.
+  // grouping. Drives the availability-grid grouping (no unitNo parsing). Free
+  // text; not bounded against any project-level count (that was dropped —
+  // see Project's comment above).
   tower   String?
   // Set only when the unit template has a `floor`-role field.
   floor   Int?
