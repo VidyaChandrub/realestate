@@ -59,7 +59,7 @@ export default function LoginPage() {
     setFieldErrors({});
     setIsSubmitting(true);
     try {
-      const session = await login({ email, password });
+      const session = await login({ email, password, portal: "organisation" });
       const resumeOrgSignup = session.onboarding_step !== "completed";
       if (resumeOrgSignup) {
         // Explicit signal for /register's mount-resume effect: this visit is

@@ -8,6 +8,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { Modal } from "@/components/ui/modal";
 import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 import type {
   CreateOrgUserInput,
@@ -258,6 +259,8 @@ export default function SuperAdminOrganisationDetailPage() {
   // Deliberately its own module (not admin_organisations "Edit") — sharing
   // that bit meant turning this off also turned off editing org details.
   const canUpgradeSubscription = hasPermission("admin_org_upgrade_subscription", "edit");
+  const canAddOrgTemplates = hasPermission("admin_org_templates_add", "add");
+  const canRemoveOrgTemplates = hasPermission("admin_org_templates_remove", "delete");
 
   const [tab, setTab] = useState<Tab>("Overview");
   const [org, setOrg] = useState<OrganisationDetail | null>(null);
@@ -304,6 +307,8 @@ export default function SuperAdminOrganisationDetailPage() {
   const [addTemplateOpen, setAddTemplateOpen] = useState(false);
   const [selectedNewTemplateIds, setSelectedNewTemplateIds] = useState<string[]>([]);
   const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateRemoveTarget, setTemplateRemoveTarget] = useState<any | null>(null);
+  const [templateRemoveBlocked, setTemplateRemoveBlocked] = useState<{ name: string; count: number } | null>(null);
   const [previewTpl, setPreviewTpl] = useState<any | null>(null);
 
   useEffect(() => {
@@ -534,6 +539,38 @@ export default function SuperAdminOrganisationDetailPage() {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete organisation.");
       setDeleting(false);
     }
+  }
+
+  async function confirmRemoveTemplate() {
+    if (!org || !accessToken || !templateRemoveTarget) return;
+    const templateId = templateRemoveTarget.templateId;
+    setTemplateSaving(true);
+    try {
+      const nextIds = assignedTemplates
+        .filter((item) => item.templateId !== templateId)
+        .map((item) => item.templateId);
+      await apiFetch(`/admin/organisations/${org.id}/templates`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ templateIds: nextIds }),
+      });
+      setAssignedTemplates((prev) => prev.filter((item) => item.templateId !== templateId));
+      setTemplateRemoveTarget(null);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Failed to remove template.");
+      setTemplateRemoveTarget(null);
+    } finally {
+      setTemplateSaving(false);
+    }
+  }
+
+  function requestRemoveTemplate(template: any) {
+    const count = template.landingPageCount ?? 0;
+    if (count > 0) {
+      setTemplateRemoveBlocked({ name: template.template?.name ?? "this template", count });
+      return;
+    }
+    setTemplateRemoveTarget(template);
   }
 
   if (authLoading || !accessToken || loading) {
@@ -1031,7 +1068,9 @@ export default function SuperAdminOrganisationDetailPage() {
                 <div className="card-h">
                   <span className="t">Assigned templates</span>
                   <span className="chip">{assignedTemplates.length} selected</span>
-                  <button className="btn btn-primary btn-sm" onClick={()=> setAddTemplateOpen(true)}>+ Add template</button>
+                  {canAddOrgTemplates ? (
+                    <button className="btn btn-primary btn-sm" onClick={()=> setAddTemplateOpen(true)}>+ Add template</button>
+                  ) : null}
                 </div>
                 <div className="card-b">
                   {assignedTemplates.length===0 ? <p className="muted">No templates assigned — add from available templates (limit depends on package).</p> : (
@@ -1044,15 +1083,12 @@ export default function SuperAdminOrganisationDetailPage() {
                           <div style={{ padding:10}}>
                             <div style={{ fontWeight:700, fontSize:12}}>{at.template.name}</div>
                             <div style={{ fontSize:11, color:"var(--muted)"}}>{at.template.slug}</div>
-                            <button className="btn btn-ghost btn-sm" style={{ marginTop:6, color:"var(--rose)" }} onClick={async()=>{
-                              const nextIds = assignedTemplates.filter(x=>x.templateId!==at.templateId).map(x=>x.templateId);
-                              setTemplateSaving(true);
-                              try{
-                                await apiFetch(`/admin/organisations/${org.id}/templates`, { method:"PUT", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ templateIds: nextIds })});
-                                setAssignedTemplates(prev=> prev.filter(x=>x.templateId!==at.templateId));
-                              } catch(e:any){ notify(e.message||"Failed"); }
-                              finally{ setTemplateSaving(false); }
-                            }} disabled={templateSaving}>Remove</button>
+                            {canRemoveOrgTemplates ? (
+                              <button className="btn btn-ghost btn-sm" style={{ marginTop:6, color:"var(--rose)" }} onClick={()=>requestRemoveTemplate(at)} disabled={templateSaving}>Remove</button>
+                            ) : null}
+                            <div style={{ fontSize:11, color:"var(--muted)", marginTop:6 }}>
+                              Built pages: <strong style={{ color:"var(--ink)" }}>{at.landingPageCount ?? 0}</strong>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1405,6 +1441,23 @@ export default function SuperAdminOrganisationDetailPage() {
         </div>
       </div>
 
+      <Modal
+        open={!!templateRemoveBlocked}
+        onClose={() => setTemplateRemoveBlocked(null)}
+        title="Template In Use"
+        footer={
+          <button className="btn btn-primary" type="button" onClick={() => setTemplateRemoveBlocked(null)}>
+            Understood
+          </button>
+        }
+      >
+        <div style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.6 }}>
+          {templateRemoveBlocked
+            ? `Can't remove this template — ${templateRemoveBlocked.count} landing page${templateRemoveBlocked.count === 1 ? "" : "s"} in this organisation ${templateRemoveBlocked.count === 1 ? "was" : "were"} built from it. Delete ${templateRemoveBlocked.count === 1 ? "that page" : "those pages"} first if you want to remove the template.`
+            : ""}
+        </div>
+      </Modal>
+
       <ConfirmModal
         open={statusModalOpen}
         title={org.status === "active" ? "Suspend organisation?" : "Reactivate organisation?"}
@@ -1465,6 +1518,22 @@ export default function SuperAdminOrganisationDetailPage() {
         onConfirm={() => void handleDelete()}
         onClose={() => {
           if (!deleting) setDeleteModalOpen(false);
+        }}
+      />
+
+      <ConfirmModal
+        open={!!templateRemoveTarget}
+        title="Remove template from organisation?"
+        message={
+          templateRemoveTarget
+            ? `Remove "${templateRemoveTarget.template?.name ?? "this template"}" from this organisation? If landing pages were created from it, the removal will be blocked.`
+            : ""
+        }
+        confirmLabel={templateSaving ? "Removing…" : "Remove template"}
+        destructive
+        onConfirm={confirmRemoveTemplate}
+        onClose={() => {
+          if (!templateSaving) setTemplateRemoveTarget(null);
         }}
       />
 

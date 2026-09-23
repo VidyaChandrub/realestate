@@ -915,9 +915,18 @@ export class AdminOrganisationsService {
       where: { orgId: id },
       include: { template: { include: { templateCategory: true } } },
     });
+    const landingPageCounts = await this.prisma.landingPage.groupBy({
+      by: ['sourceTemplateId'],
+      where: { orgId: id, sourceTemplateId: { in: rows.map((r) => r.templateId) } },
+      _count: { _all: true },
+    });
+    const countsByTemplate = new Map(
+      landingPageCounts.map((row) => [row.sourceTemplateId, row._count._all]),
+    );
     return rows.map((r) => ({
       templateId: r.templateId,
       assignedAt: r.assignedAt,
+      landingPageCount: countsByTemplate.get(r.templateId) ?? 0,
       template: {
         id: r.template.id,
         name: r.template.name,
@@ -931,6 +940,23 @@ export class AdminOrganisationsService {
 
   async setOrgTemplates(id: string, actor: JwtPayload, templateIds: string[]) {
     await this.getRealOrganisation(id);
+    const currentAssignments = await this.prisma.organisationTemplate.findMany({
+      where: { orgId: id },
+      select: { templateId: true },
+    });
+    const currentIds = new Set(currentAssignments.map((row) => row.templateId));
+    const nextIds = new Set(templateIds);
+    const removedIds = [...currentIds].filter((templateId) => !nextIds.has(templateId));
+    if (removedIds.length > 0) {
+      const landingPageCount = await this.prisma.landingPage.count({
+        where: { orgId: id, sourceTemplateId: { in: removedIds } },
+      });
+      if (landingPageCount > 0) {
+        throw new BadRequestException(
+          `Can't remove this template — ${landingPageCount} landing page${landingPageCount === 1 ? '' : 's'} in this organisation ${landingPageCount === 1 ? 'was' : 'were'} built from it. Delete ${landingPageCount === 1 ? 'that page' : 'those pages'} first if you want to remove the template.`,
+        );
+      }
+    }
     // validate plan limits if subscription exists
     const sub = await this.prisma.subscription.findFirst({
       where: { orgId: id, status: { not: 'cancelled' } },

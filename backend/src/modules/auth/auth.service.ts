@@ -965,6 +965,17 @@ export class AuthService {
     const roles = user.roles;
     const isSuperAdmin = roles.includes('super_admin');
 
+    // Keep the two browser login surfaces isolated. The organisation portal
+    // is only for users attached to an organisation; the platform portal is
+    // for Super Admin and Platform Team accounts with no org membership.
+    const belongsToPlatform = !user.orgId;
+    if (
+      (dto.portal === 'organisation' && belongsToPlatform) ||
+      (dto.portal === 'platform' && !belongsToPlatform)
+    ) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
     // Self-heal a draft parked on a step the simplified 2-step wizard
     // removed (Business Details, Subscription, Templates, Modules, Invite,
     // Connect) — assigns Basic and activates the org if needed, so nobody

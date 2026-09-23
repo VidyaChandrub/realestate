@@ -47,6 +47,18 @@ const MODULE_PERMISSION_PILLS: Record<string, PermissionPill[]> = {
       permission: "canEdit",
       label: "Upgrade subscription",
     },
+    {
+      key: "addTemplates",
+      moduleKey: "admin_org_templates_add",
+      permission: "canAdd",
+      label: "Add template",
+    },
+    {
+      key: "removeTemplates",
+      moduleKey: "admin_org_templates_remove",
+      permission: "canDelete",
+      label: "Remove template",
+    },
     { key: "canDelete", permission: "canDelete", label: "Delete" },
   ],
   // The console dashboard is a read-only overview — there's nothing to add,
@@ -85,7 +97,11 @@ function permissionPillsFor(moduleKey: string): PermissionPill[] {
 // Modules that exist purely as backing storage for a pill nested under a
 // different row (see the `moduleKey` override on that pill) — never rendered
 // as a console-module row of their own.
-const HIDDEN_MODULE_KEYS = new Set<string>(["admin_org_upgrade_subscription"]);
+const HIDDEN_MODULE_KEYS = new Set<string>([
+  "admin_org_upgrade_subscription",
+  "admin_org_templates_add",
+  "admin_org_templates_remove",
+]);
 
 const PRESETS = [
   { name: "Platform Operator", key: "platform_operator", desc: "Day-to-day Super Admin console: organisations, domains, support" },

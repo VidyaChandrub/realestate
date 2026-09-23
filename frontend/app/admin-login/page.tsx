@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { mapApiFieldErrors } from "@/lib/form-errors";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/auth/password-input";
 import { Icon } from "@/components/icons";
 
 const FIELD_KEYS = ["email", "password"];
@@ -43,9 +44,9 @@ export default function SuperAdminLoginPage() {
     setNotice(null);
     setIsSubmitting(true);
     try {
-      const session = await login({ email, password });
-      if (session.role !== "super_admin") {
-        setGeneralError("This login is for Super Admins only. Organisation users must sign in at /login.");
+      const session = await login({ email, password, portal: "platform" });
+      if (session.org_id) {
+        setGeneralError("This login is for Platform Team members only. Organisation users must sign in at /login.");
         return;
       }
       // First login with emailed credentials — the forced password-change flow
@@ -78,10 +79,10 @@ export default function SuperAdminLoginPage() {
         <div className="max-w-md">
           <h2 className="text-3xl font-bold leading-tight text-white">Platform control — separate login.</h2>
           <p className="mt-4 text-sm leading-relaxed text-indigo-100">
-            Super Admin access is isolated at <span className="font-mono font-bold text-white">/admin-login</span> — different URL from the organisation login at <span className="font-mono text-white">/login</span>.
+            Platform access is isolated at <span className="font-mono font-bold text-white">/admin-login</span> — different URL from the organisation login at <span className="font-mono text-white">/login</span>.
           </p>
           <ul className="mt-6 space-y-2 text-sm text-indigo-100">
-            <li>• Only <b className="text-white">super_admin</b> role can sign in here</li>
+            <li>• Super Admin and Platform Team members sign in here</li>
             <li>• Organisation admins, managers, sales → use <Link href="/login" className="underline text-white">/login</Link></li>
             <li>• Brute-force protection + forced password change on first login</li>
           </ul>
@@ -95,9 +96,9 @@ export default function SuperAdminLoginPage() {
             <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg">
               <Icon name="shield" size={24} />
             </span>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Super Admin Sign in</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Platform Sign in</h1>
             <p className="mt-2 text-sm text-slate-500">
-              Platform owner login — <span className="font-mono font-bold text-slate-700">/admin-login</span> (different URL from <Link href="/login" className="font-mono text-indigo-600 hover:underline">/login</Link>)
+              Super Admin and Platform Team login — <span className="font-mono font-bold text-slate-700">/admin-login</span> (different URL from <Link href="/login" className="font-mono text-indigo-600 hover:underline">/login</Link>)
             </p>
           </div>
 
@@ -107,7 +108,7 @@ export default function SuperAdminLoginPage() {
                 {notice}
               </p>
             ) : null}
-            <Field label="Super Admin email" error={fieldErrors.email}>
+            <Field label="Platform email" error={fieldErrors.email}>
               <Input
                 type="email"
                 required
@@ -122,9 +123,8 @@ export default function SuperAdminLoginPage() {
             </Field>
 
             <Field label="Password" error={fieldErrors.password}>
-              <Input
-                type="password"
-                required
+              <PasswordInput
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -142,11 +142,11 @@ export default function SuperAdminLoginPage() {
             ) : null}
 
             <Button type="submit" size="lg" disabled={isSubmitting} className="mt-1 bg-slate-900 hover:bg-slate-800">
-              {isSubmitting ? "Signing in…" : "Sign in to Super Admin →"}
+              {isSubmitting ? "Signing in…" : "Sign in to Platform →"}
             </Button>
 
             <div className="rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-800 border border-amber-100">
-              Demo: <b>admin@bigestate.io</b> / <b>demo1234</b> (super_admin) — only works here at <b>/admin-login</b>. Org demo <b>sarah@acmerealty.com</b> must use <Link href="/login" className="underline">/login</Link>.
+              Platform accounts sign in at <b>/admin-login</b>. Organisation accounts must use <Link href="/login" className="underline">/login</Link>.
             </div>
           </form>
 

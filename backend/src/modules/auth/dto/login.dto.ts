@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class LoginDto {
   @IsEmail()
@@ -12,4 +12,8 @@ export class LoginDto {
   @IsOptional()
   @IsString()
   host?: string;
+
+  /** Login surface requested by the browser, used to keep portal accounts isolated. */
+  @IsIn(['organisation', 'platform'])
+  portal: 'organisation' | 'platform';
 }

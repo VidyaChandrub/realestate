@@ -212,6 +212,7 @@ export interface SignupInput {
 export interface LoginInput {
   email: string;
   password: string;
+  portal?: "organisation" | "platform";
 }
 
 export type UserRole = "super_admin" | "organisation_admin" | "team_member";
