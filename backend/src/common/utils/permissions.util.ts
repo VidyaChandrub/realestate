@@ -55,6 +55,14 @@ export const PLATFORM_PERMISSION_MODULES: ModuleDefinition[] = [
   { key: 'admin_dashboard', label: 'Dashboard', description: 'Platform overview and KPIs' },
   { key: 'admin_notifications', label: 'Notifications', description: 'Platform notification inbox' },
   { key: 'admin_organisations', label: 'Organisations', description: 'Onboard, approve and manage organisations' },
+  // Backing storage only — the frontend's roles matrix nests this as an
+  // "Upgrade subscription" pill under the Organisations row (never rendered
+  // as its own row) so it stays independent of "Edit" there and of
+  // admin_subscriptions' Change/Assign, while still living where a Super
+  // Admin looks for it. Gates only the "Upgrade subscription" button on an
+  // organisation's detail page; the plan cards it lives next to stay visible
+  // regardless.
+  { key: 'admin_org_upgrade_subscription', label: 'Organisation — Upgrade Subscription', description: "Shows the 'Upgrade subscription' button on an organisation's detail page" },
   { key: 'admin_org_roles', label: 'Organisation roles', description: 'Default roles and permissions for organisations' },
   // Covers both the Members and Roles tabs of the Platform Team page — there
   // is no separate "Platform roles" console module. A dedicated module here

@@ -255,6 +255,9 @@ export default function SuperAdminOrganisationDetailPage() {
   const canActivateOrganisation = hasPermission("admin_organisations", "add");
   const canDeactivateOrganisation = hasPermission("admin_organisations", "approve");
   const canDeleteOrganisation = hasPermission("admin_organisations", "delete");
+  // Deliberately its own module (not admin_organisations "Edit") — sharing
+  // that bit meant turning this off also turned off editing org details.
+  const canUpgradeSubscription = hasPermission("admin_org_upgrade_subscription", "edit");
 
   const [tab, setTab] = useState<Tab>("Overview");
   const [org, setOrg] = useState<OrganisationDetail | null>(null);
@@ -986,12 +989,14 @@ export default function SuperAdminOrganisationDetailPage() {
                             <div className={`badge ${p.badge}`}>{p.name}</div>
                             <div style={{ fontWeight:800, marginTop:6 }}>₹{price.toLocaleString("en-IN")}<span style={{ fontSize:11, color:"var(--muted)"}}>{upgradeBillingCycle==="monthly"?"/mo":"/yr"}</span></div>
                             <div style={{ fontSize:11, color:"var(--muted)"}}>{(p.limits as any)?.templates} templates · {p.limits?.projects} projects</div>
+                            <div style={{ fontSize:11, color:"var(--muted)", marginTop:3 }}>{p.limits?.users ?? "Unlimited"} users</div>
                             <div style={{ fontSize:11, color:"var(--muted)", marginTop:3 }}>{p.limits?.landingPagesCreate ?? "Unlimited"} created · {p.limits?.landingPages ?? "Unlimited"} published pages</div>
                             <div style={{ fontSize:11, fontWeight:700, color: isCurrent? "var(--green)": isSelected? "var(--brand)":"var(--muted)", marginTop:6 }}>{isCurrent?"Current": isSelected?"Selected":"Select"}</div>
                           </div>
                         );
                       })}
                     </div>
+                    {canUpgradeSubscription ? (
                     <div style={{ marginTop:12, display:"flex", gap:10 }}>
                       <button className="btn btn-primary btn-sm" disabled={upgrading || !upgradePlanId} onClick={async()=>{
                         if(!upgradePlanId) return;
@@ -1013,6 +1018,7 @@ export default function SuperAdminOrganisationDetailPage() {
                       </button>
                       <span className="muted" style={{ fontSize:12, alignSelf:"center"}}>Upgrade increases template limit — then add more in Templates tab.</span>
                     </div>
+                    ) : null}
                   </div>
                 </div>
               </div>

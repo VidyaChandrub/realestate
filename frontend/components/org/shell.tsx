@@ -324,6 +324,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
 
   // Keeps the subscription-expiry popup in sync with the backend.
   const dismissedExpiryRef = useRef<Set<string>>(new Set());
+  const [currentPlanName, setCurrentPlanName] = useState<string | null>(null);
 
   const pollBilling = useCallback(async () => {
     if (!accessToken) return;
@@ -336,9 +337,11 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
         if (candidateKey && dismissedExpiryRef.current.has(candidateKey)) return null;
         return next;
       });
+      setCurrentPlanName(billing.plan?.name ?? null);
     } catch {
       // The billing module is permission-gated — non-admins simply don't get
-      // the banner; their bell notifications still surface the popup.
+      // the banner or the sidebar plan name; their bell notifications still
+      // surface the popup.
     }
   }, [accessToken]);
 
@@ -433,6 +436,14 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
             iPixxel Realty<small>{user.roleLabel || "Organisation"}</small>
           </div>
         </div>
+        {currentPlanName ? (
+          <div className="s-plan">
+            <Icon name="billing" size={12} />
+            <span>
+              Current Plan: <strong>{currentPlanName}</strong>
+            </span>
+          </div>
+        ) : null}
         <nav>
           <ul className="nav">
             {NAV_GROUPS.map((group) => {

@@ -94,7 +94,6 @@ export default function SuperAdminSubscriptionsPage() {
   const canDeletePlan = hasPermission("admin_subscriptions", "delete");
   const canAssignPlan = hasPermission("admin_subscriptions", "add");
   const canChangeSubscription = hasPermission("admin_subscriptions", "edit");
-  const canCancelSubscription = hasPermission("admin_subscriptions", "delete");
   const canApproveRequest = hasPermission("admin_subscriptions", "approve");
   const canRejectRequest = hasPermission("admin_subscriptions", "delete");
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -141,9 +140,6 @@ export default function SuperAdminSubscriptionsPage() {
   const [upgradeTarget, setUpgradeTarget] = useState<Subscription | null>(null);
   const [upgradePlanId, setUpgradePlanId] = useState<string>("");
   const [upgradeCycle, setUpgradeCycle] = useState<"monthly" | "yearly">("monthly");
-  const [cancelTarget, setCancelTarget] = useState<Subscription | null>(null);
-  const [cancellingSubscription, setCancellingSubscription] = useState(false);
-
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignOrgId, setAssignOrgId] = useState("");
   const [assignPlanId, setAssignPlanId] = useState("");
@@ -555,35 +551,37 @@ export default function SuperAdminSubscriptionsPage() {
       return;
     }
     try {
-      const created = await apiFetch<Subscription>("/admin/subscriptions", {
-        method: "POST",
-        body: JSON.stringify({ orgId: assignOrgId, planId: assignPlanId, billingCycle: assignCycle }),
-      });
-      setSubs((prev) => [created, ...prev]);
-      setSubsTotal((t) => t + 1);
-      notify(`Subscription created for ${created.organisation?.name}`);
+      // An org can only ever have one non-cancelled subscription (enforced by
+      // the API). If it already has one, "Assign Plan" must behave exactly
+      // like "Change" — PATCH the existing row (same downgrade-guard
+      // validation) — instead of POSTing a create that the API would reject.
+      const existingRes = await apiFetch<{ data: Subscription[] }>(
+        `/admin/subscriptions?orgId=${encodeURIComponent(assignOrgId)}&limit=1`,
+      );
+      const existing = (existingRes.data || []).find((s) => s.status !== "cancelled");
+
+      if (existing) {
+        const updated = await apiFetch<Subscription>(`/admin/subscriptions/${existing.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ planId: assignPlanId, billingCycle: assignCycle }),
+        });
+        setSubs((prev) => (prev.some((s) => s.id === updated.id) ? prev.map((s) => (s.id === updated.id ? updated : s)) : [updated, ...prev]));
+        notify(`${updated.organisation?.name || "Org"} → ${updated.plan?.name} ${assignCycle}`);
+      } else {
+        const created = await apiFetch<Subscription>("/admin/subscriptions", {
+          method: "POST",
+          body: JSON.stringify({ orgId: assignOrgId, planId: assignPlanId, billingCycle: assignCycle }),
+        });
+        setSubs((prev) => [created, ...prev]);
+        setSubsTotal((t) => t + 1);
+        notify(`Subscription created for ${created.organisation?.name}`);
+      }
       setAssignOpen(false);
       setAssignOrgId("");
       setAssignPlanId("");
       fetchOverview();
     } catch (e: any) {
       notify(e.message || "Assign failed");
-    }
-  };
-
-  const confirmCancelSubscription = async () => {
-    if (!cancelTarget) return;
-    setCancellingSubscription(true);
-    try {
-      await apiFetch(`/admin/subscriptions/${cancelTarget.id}`, { method: "DELETE" });
-      notify(`Subscription cancelled for ${cancelTarget.organisation?.name || "organisation"}`);
-      setCancelTarget(null);
-      void fetchSubs(subsPage);
-      void fetchOverview();
-    } catch (e: any) {
-      notify(e.message || "Cancel failed");
-    } finally {
-      setCancellingSubscription(false);
     }
   };
 
@@ -1339,24 +1337,6 @@ export default function SuperAdminSubscriptionsPage() {
                               >
                                 Change
                               </button> : null}
-                              {canCancelSubscription && s.status !== "cancelled" ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setCancelTarget(s)}
-                                  style={{
-                                    padding: "5px 10px",
-                                    borderRadius: 6,
-                                    border: "1px solid #fecaca",
-                                    background: "#fef2f2",
-                                    color: "#ef4444",
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                  }}
-                                >
-                                  Cancel
-                                </button>
-                              ) : null}
                               {(s.status === "expired" || s.status === "cancelled" || s.status === "past_due") && (
                                 canChangeSubscription ? (
                                   <button
@@ -2122,21 +2102,6 @@ export default function SuperAdminSubscriptionsPage() {
         busy={deletingPlan}
         onConfirm={() => void confirmDeletePlan()}
         onClose={() => setDeletePlanId(null)}
-      />
-
-      <ConfirmModal
-        open={cancelTarget !== null}
-        title="Cancel this subscription?"
-        message={
-          cancelTarget
-            ? `This will cancel the subscription for ${cancelTarget.organisation?.name || "this organisation"}.`
-            : ""
-        }
-        confirmLabel="Cancel subscription"
-        destructive
-        busy={cancellingSubscription}
-        onConfirm={() => void confirmCancelSubscription()}
-        onClose={() => setCancelTarget(null)}
       />
     </div>
   );
