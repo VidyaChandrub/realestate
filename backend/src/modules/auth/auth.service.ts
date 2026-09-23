@@ -931,7 +931,7 @@ export class AuthService {
     const user = await this.findLoginUser(dto.email);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('email Invalid ID or email');
     }
 
     let passwordMatches = false;
@@ -941,7 +941,7 @@ export class AuthService {
       passwordMatches = false;
     }
     if (!passwordMatches) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('password Incorrect password');
     }
 
     // Account-state messaging only AFTER the password is verified, so a wrong
@@ -973,7 +973,7 @@ export class AuthService {
       (dto.portal === 'organisation' && belongsToPlatform) ||
       (dto.portal === 'platform' && !belongsToPlatform)
     ) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('email Invalid ID or email');
     }
 
     // Self-heal a draft parked on a step the simplified 2-step wizard
