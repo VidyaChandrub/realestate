@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { LeadStagesProvider } from "@/lib/lead-stages";
 import { dashboardPathFor } from "@/lib/mock/sessions";
 import { Icon, type IconName } from "@/components/icons";
+import { BuildingLogoIcon } from "@/components/brand-logo";
 import { loadTemplates } from "@/lib/openpage/store";
 import { orgBuilderPath } from "@/lib/openpage/paths";
 import {
@@ -18,6 +19,11 @@ import {
 } from "@/lib/api";
 import type { OrgBillingSummary, OrgNotification } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
+import {
+  applyThemeVariables,
+  resetThemeVariables,
+  ORG_THEME_CHANGE_EVENT,
+} from "@/components/global-theme-provider";
 
 type NavItem = {
   href: string;
@@ -235,6 +241,31 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
     }
   }, [authLoading, accessToken, user, router]);
 
+  useEffect(() => {
+    const orgContainer = document.querySelector(".org") as HTMLElement | null;
+    const orgBrand = user?.organisation?.brand_colour;
+    if (orgBrand && /^#[0-9a-fA-F]{3,8}$/.test(orgBrand)) {
+      applyThemeVariables(orgBrand, undefined, orgContainer);
+    } else if (orgContainer) {
+      resetThemeVariables(orgContainer);
+    }
+
+    const handleOrgThemeChange = (e: Event) => {
+      const custom = e as CustomEvent<{ brandColour?: string }>;
+      const color = custom.detail?.brandColour;
+      if (color && /^#[0-9a-fA-F]{3,8}$/.test(color)) {
+        applyThemeVariables(color, undefined, orgContainer);
+      } else if (orgContainer) {
+        resetThemeVariables(orgContainer);
+      }
+    };
+
+    window.addEventListener(ORG_THEME_CHANGE_EVENT, handleOrgThemeChange);
+    return () => {
+      window.removeEventListener(ORG_THEME_CHANGE_EVENT, handleOrgThemeChange);
+    };
+  }, [user?.organisation?.brand_colour]);
+
   async function handleSignOut() {
     setIsSigningOut(true);
     try {
@@ -432,21 +463,22 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
     <div className={appClass}>
       <aside className="sidebar">
         <div className="s-top">
-          <div className="logo" aria-hidden>
-            iR
+          <div className="s-logo-wrap" aria-hidden>
+            <BuildingLogoIcon size={34} />
           </div>
           <div className="s-name">
-            iPixxel Realty<small>{user.roleLabel || "Organisation"}</small>
+            iPixxel Realty<small>{user.roleLabel || "Organisation Admin"}</small>
           </div>
         </div>
-        {currentPlanName ? (
-          <div className="s-plan">
-            <Icon name="billing" size={12} />
+        <Link href="/org/settings" className="s-plan" title="Current subscription plan">
+          <div className="s-plan-inner">
+            <Icon name="crown" size={13} className="s-plan-ic" />
             <span>
-              Current Plan: <strong>{currentPlanName}</strong>
+              Current Plan: <strong>{currentPlanName || "Starter"}</strong>
             </span>
           </div>
-        ) : null}
+          <Icon name="chevron-right" size={12} className="s-plan-arrow" />
+        </Link>
         <nav>
           <ul className="nav">
             {NAV_GROUPS.map((group) => {
@@ -499,17 +531,16 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
             <div className="av">{avatarInitials}</div>
             <div className="meta">
               <b>{userName}</b>
-              <span>{user?.roleLabel || "Org Admin"}</span>
+              <span>{user?.roleLabel || "Organisation Admin"}</span>
             </div>
             <button
               type="button"
-              onClick={() => void handleSignOut()}
-              disabled={isSigningOut}
-              className="signout"
-              title="Sign out"
-              aria-label="Sign out"
+              onClick={() => router.push("/org/settings")}
+              className="side-arrow-btn"
+              title="Organisation settings & profile"
+              aria-label="Settings"
             >
-              <Icon name="logout" size={14} />
+              <Icon name="chevron-right" size={13} />
             </button>
           </div>
         </div>
@@ -886,10 +917,10 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
               gap: 10,
               padding: "12px 18px",
               borderRadius: 999,
-              background: "linear-gradient(135deg, #2a3348 0%, #0f1424 100%)",
+              background: "linear-gradient(135deg, var(--secondary, #2a3348) 0%, var(--primary, #0f1424) 100%)",
               color: "#fff",
               textDecoration: "none",
-              boxShadow: "0 18px 40px rgba(21, 27, 46, 0.32)",
+              boxShadow: "var(--sh-glow, 0 18px 40px rgba(21, 27, 46, 0.32))",
               fontSize: 13,
               fontWeight: 700,
               zIndex: 30,

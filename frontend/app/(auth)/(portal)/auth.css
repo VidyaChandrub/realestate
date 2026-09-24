@@ -42,8 +42,8 @@
   --brand-050: var(--primary-soft, color-mix(in srgb, var(--brand) 6%, white));
   --brand-100: var(--primary-border, color-mix(in srgb, var(--brand) 15%, white));
   --iris: var(--secondary, #2a3348);
-  --sky: #3d4a66;
-  --sh-glow: 0 10px 28px -10px rgba(21, 27, 46, 0.45);
+  --sky: var(--secondary, #3d4a66);
+  --sh-glow: 0 10px 28px -10px color-mix(in srgb, var(--brand) 45%, transparent);
   --font: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
   --display: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
 
@@ -135,7 +135,7 @@
   width: 46px;
   height: 46px;
   border-radius: 12px;
-  background: linear-gradient(145deg, #3d4a66, #0f1424);
+  background: linear-gradient(145deg, var(--secondary, #3d4a66), var(--primary, #0f1424));
   color: #fff;
   display: grid;
   place-items: center;
@@ -454,16 +454,16 @@
 }
 
 .superadmin .auth2 .btn-primary {
-  background: linear-gradient(180deg, #2a3348 0%, var(--brand) 100%);
+  background: linear-gradient(180deg, var(--secondary, #2a3348) 0%, var(--brand) 100%);
   border-color: transparent;
-  box-shadow: 0 8px 20px -10px rgba(21, 27, 46, 0.55);
+  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--brand) 55%, transparent);
   transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), filter 0.18s var(--ease);
 }
 
 .superadmin .auth2 .btn-primary:hover:not(:disabled) {
   filter: brightness(1.04);
   transform: translateY(-1px);
-  box-shadow: 0 12px 24px -12px rgba(21, 27, 46, 0.55);
+  box-shadow: 0 12px 24px -12px color-mix(in srgb, var(--brand) 55%, transparent);
 }
 
 .superadmin .auth2 .btn-primary:active:not(:disabled) {

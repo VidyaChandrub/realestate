@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { PermissionAction, SessionUser } from "@/lib/types";
 import { apiFetch } from "@/lib/api";
 import { Icon } from "@/components/icons";
+import { BuildingLogoIcon } from "@/components/brand-logo";
 import { NotificationsBell } from "./notifications-bell";
 
 type NavItem = {
@@ -274,13 +275,22 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
     <div className={appClass}>
       <aside className="sidebar">
         <div className="s-top">
-          <div className="logo" aria-hidden>
-            iR
+          <div className="s-logo-wrap" aria-hidden>
+            <BuildingLogoIcon size={34} />
           </div>
           <div className="s-name">
             iPixxel Realty<small>Super Admin</small>
           </div>
         </div>
+        <Link href="/admin-console/subscriptions" className="s-plan" title="Platform Console">
+          <div className="s-plan-inner">
+            <Icon name="crown" size={13} className="s-plan-ic" />
+            <span>
+              Console: <strong>Platform Core</strong>
+            </span>
+          </div>
+          <Icon name="chevron-right" size={12} className="s-plan-arrow" />
+        </Link>
         <nav>
           <ul className="nav">
             {NAV_GROUPS.map((group) => {
@@ -331,12 +341,12 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
             </div>
             <button
               type="button"
-              onClick={handleSignOut}
-              disabled={isSigningOut}
-              className="signout"
-              title="Sign out"
+              onClick={() => router.push("/admin-console/settings")}
+              className="side-arrow-btn"
+              title="Console Settings"
+              aria-label="Settings"
             >
-              <Icon name="logout" size={14} />
+              <Icon name="chevron-right" size={13} />
             </button>
           </div>
         </div>

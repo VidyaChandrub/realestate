@@ -7,6 +7,8 @@ type AuthShellProps = {
   subtitle?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  brandName?: string;
+  logoUrl?: string | null;
 };
 
 const ORG_COPY = {
@@ -42,9 +44,13 @@ export function AuthShell({
   subtitle,
   children,
   footer,
+  brandName,
+  logoUrl,
 }: AuthShellProps) {
   const copy = variant === "platform" ? PLATFORM_COPY : ORG_COPY;
   const isPlatform = variant === "platform";
+  const name = brandName || "iPixxel Realty";
+  const logoFallback = (brandName ? brandName.slice(0, 2) : "iR").toUpperCase();
 
   return (
     <div className={`auth2${isPlatform ? " auth2--platform" : ""}`}>
@@ -54,11 +60,19 @@ export function AuthShell({
         <div className="auth2-frame" aria-hidden />
 
         <header className="auth2-brand">
-          <span className="auth2-logo" aria-hidden>
-            iR
-          </span>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={name}
+              style={{ width: 46, height: 46, borderRadius: 12, objectFit: "contain", background: "rgba(255,255,255,0.08)" }}
+            />
+          ) : (
+            <span className="auth2-logo" aria-hidden>
+              {logoFallback}
+            </span>
+          )}
           <div className="auth2-brand-text">
-            <span className="auth2-name">iPixxel Realty</span>
+            <span className="auth2-name">{name}</span>
             {isPlatform ? (
               <span className="auth2-badge">Platform</span>
             ) : (
@@ -87,10 +101,18 @@ export function AuthShell({
 
       <main className="auth2-formside">
         <div className="auth2-mobile-brand">
-          <span className="auth2-logo" aria-hidden>
-            iR
-          </span>
-          <span className="auth2-name">iPixxel Realty</span>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={name}
+              style={{ width: 36, height: 36, borderRadius: 10, objectFit: "contain" }}
+            />
+          ) : (
+            <span className="auth2-logo" aria-hidden>
+              {logoFallback}
+            </span>
+          )}
+          <span className="auth2-name">{name}</span>
         </div>
         <div className="auth2-card">
           {eyebrow ? <span className="auth2-eyebrow">{eyebrow}</span> : null}

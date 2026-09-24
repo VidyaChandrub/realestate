@@ -40,6 +40,43 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       style={fontVars}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var t = localStorage.getItem("ipixxel_platform_theme");
+                if (t) {
+                  var p = JSON.parse(t);
+                  var prim = p.primaryColor || "#0f1424";
+                  var sec = p.secondaryColor || "#2a3348";
+                  var r = document.documentElement;
+                  r.style.setProperty("--primary", prim);
+                  r.style.setProperty("--secondary", sec);
+                  r.style.setProperty("--brand", prim);
+                  r.style.setProperty("--iris", sec);
+                  r.style.setProperty("--sidebar", "#090e1a");
+                  r.style.setProperty("--sidebar-2", "#060a12");
+                  r.style.setProperty("--ps-primary", prim);
+                  r.style.setProperty("--ps-secondary", sec);
+                  r.style.setProperty("--color-primary", prim);
+                  r.style.setProperty("--color-secondary", sec);
+                  r.style.setProperty("--color-brand", prim);
+                  r.style.setProperty("--primary-dark", "color-mix(in srgb, " + prim + " 85%, black)");
+                  r.style.setProperty("--primary-soft", "color-mix(in srgb, " + prim + " 6%, white)");
+                  r.style.setProperty("--primary-border", "color-mix(in srgb, " + prim + " 15%, white)");
+                  r.style.setProperty("--brand-600", "color-mix(in srgb, " + prim + " 85%, black)");
+                  r.style.setProperty("--brand-050", "color-mix(in srgb, " + prim + " 6%, white)");
+                  r.style.setProperty("--brand-100", "color-mix(in srgb, " + prim + " 15%, white)");
+                  r.style.setProperty("--secondary-050", "color-mix(in srgb, " + sec + " 8%, white)");
+                  r.style.setProperty("--secondary-100", "color-mix(in srgb, " + sec + " 18%, white)");
+                  r.style.setProperty("--sh-glow", "0 10px 28px -10px color-mix(in srgb, " + prim + " 45%, transparent)");
+                }
+              } catch(e) {}
+            `,
+          }}
+        />
+      </head>
       <body className={`${roboto.className} min-h-full flex flex-col`} suppressHydrationWarning>
         <AuthProvider>
           <GlobalThemeProvider>

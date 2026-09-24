@@ -8,6 +8,7 @@ import { dashboardPathFor } from "@/lib/mock/sessions";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
 import { mapApiFieldErrors } from "@/lib/form-errors";
+import { applyThemeVariables } from "@/components/global-theme-provider";
 
 const FIELD_KEYS = ["email", "password"];
 
@@ -48,7 +49,12 @@ export default function LoginPage() {
     fetch(`/api/public/site/portal/${encodeURIComponent(host)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.name) setPortal(data);
+        if (data?.name) {
+          setPortal(data);
+          if (data.brandColour && /^#[0-9a-fA-F]{3,8}$/.test(data.brandColour)) {
+            applyThemeVariables(data.brandColour);
+          }
+        }
       })
       .catch(() => undefined);
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -97,6 +103,9 @@ export default function LoginPage() {
 
   return (
     <AuthShell
+      variant="organisation"
+      brandName={portal?.name}
+      logoUrl={portal?.logoUrl}
       eyebrow="Workspace sign in"
       title={portal ? `Sign in to ${portal.name}` : "Welcome back"}
       subtitle={

@@ -4,10 +4,11 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { getPlatformTheme } from "@/lib/api";
 import type { PlatformTheme } from "@/lib/types";
 
-const DEFAULT_PRIMARY = "#0f1424";
-const DEFAULT_SECONDARY = "#2a3348";
-const THEME_STORAGE_KEY = "ipixxel_platform_theme";
+export const DEFAULT_PRIMARY = "#0f1424";
+export const DEFAULT_SECONDARY = "#2a3348";
+export const THEME_STORAGE_KEY = "ipixxel_platform_theme";
 export const THEME_CHANGE_EVENT = "ipixxel_theme_changed";
+export const ORG_THEME_CHANGE_EVENT = "ipixxel_org_theme_changed";
 
 interface GlobalThemeContextValue {
   primaryColor: string;
@@ -23,30 +24,66 @@ const GlobalThemeContext = createContext<GlobalThemeContextValue>({
   refreshGlobalTheme: async () => {},
 });
 
-export function applyThemeVariables(primary: string, secondary: string) {
+export function applyThemeVariables(
+  primary: string,
+  secondary?: string,
+  targetElement?: HTMLElement | null
+) {
   if (typeof document === "undefined") return;
-  const root = document.documentElement;
+  const target = targetElement || document.documentElement;
 
   const prim = primary || DEFAULT_PRIMARY;
-  const sec = secondary || DEFAULT_SECONDARY;
+  const sec = secondary || `color-mix(in srgb, ${prim} 65%, #0f1424)`;
 
-  root.style.setProperty("--primary", prim);
-  root.style.setProperty("--secondary", sec);
-  root.style.setProperty("--brand", prim);
-  root.style.setProperty("--iris", sec);
-  root.style.setProperty("--ps-primary", prim);
-  root.style.setProperty("--ps-secondary", sec);
-  root.style.setProperty("--color-primary", prim);
-  root.style.setProperty("--color-secondary", sec);
-  root.style.setProperty("--color-brand", prim);
+  target.style.setProperty("--primary", prim);
+  target.style.setProperty("--secondary", sec);
+  target.style.setProperty("--brand", prim);
+  target.style.setProperty("--sidebar", "#090e1a");
+  target.style.setProperty("--sidebar-2", "#060a12");
+  target.style.setProperty("--sidebar-active", "#0066f5");
+  target.style.setProperty("--sidebar-ink", "#94a3b8");
+  target.style.setProperty("--ps-secondary", sec);
+  target.style.setProperty("--color-primary", prim);
+  target.style.setProperty("--color-secondary", sec);
+  target.style.setProperty("--color-brand", prim);
 
   // Soft tints, hover shades, and glow shadows via standard color-mix
-  root.style.setProperty("--brand-600", `color-mix(in srgb, ${prim} 85%, black)`);
-  root.style.setProperty("--brand-050", `color-mix(in srgb, ${prim} 6%, white)`);
-  root.style.setProperty("--brand-100", `color-mix(in srgb, ${prim} 15%, white)`);
-  root.style.setProperty("--secondary-050", `color-mix(in srgb, ${sec} 8%, white)`);
-  root.style.setProperty("--secondary-100", `color-mix(in srgb, ${sec} 18%, white)`);
-  root.style.setProperty("--sh-glow", `0 10px 28px -10px color-mix(in srgb, ${prim} 45%, transparent)`);
+  target.style.setProperty("--primary-dark", `color-mix(in srgb, ${prim} 85%, black)`);
+  target.style.setProperty("--primary-soft", `color-mix(in srgb, ${prim} 6%, white)`);
+  target.style.setProperty("--primary-border", `color-mix(in srgb, ${prim} 15%, white)`);
+  target.style.setProperty("--brand-600", `color-mix(in srgb, ${prim} 85%, black)`);
+  target.style.setProperty("--brand-050", `color-mix(in srgb, ${prim} 6%, white)`);
+  target.style.setProperty("--brand-100", `color-mix(in srgb, ${prim} 15%, white)`);
+  target.style.setProperty("--secondary-050", `color-mix(in srgb, ${sec} 8%, white)`);
+  target.style.setProperty("--secondary-100", `color-mix(in srgb, ${sec} 18%, white)`);
+  target.style.setProperty("--sh-glow", `0 10px 28px -10px color-mix(in srgb, ${prim} 45%, transparent)`);
+}
+
+export function resetThemeVariables(targetElement: HTMLElement) {
+  if (!targetElement) return;
+  const props = [
+    "--primary",
+    "--secondary",
+    "--brand",
+    "--iris",
+    "--sidebar",
+    "--sidebar-2",
+    "--ps-primary",
+    "--ps-secondary",
+    "--color-primary",
+    "--color-secondary",
+    "--color-brand",
+    "--primary-dark",
+    "--primary-soft",
+    "--primary-border",
+    "--brand-600",
+    "--brand-050",
+    "--brand-100",
+    "--secondary-050",
+    "--secondary-100",
+    "--sh-glow",
+  ];
+  props.forEach((p) => targetElement.style.removeProperty(p));
 }
 
 export function GlobalThemeProvider({ children }: { children: React.ReactNode }) {

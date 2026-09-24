@@ -13,6 +13,18 @@ import { FIELD_ROLES, fieldsToRows, groupNoun, roleBaselineOf, rowsToFields, tem
 import { Modal } from "@/components/ui/modal";
 import { subdomainPreviewHost } from "@/lib/domain";
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
+import { ORG_THEME_CHANGE_EVENT } from "@/components/global-theme-provider";
+
+const ORG_COLOR_PRESETS = [
+  { hex: "#0f1424", label: "Sapphire Navy" },
+  { hex: "#2563eb", label: "Royal Blue" },
+  { hex: "#059669", label: "Emerald Green" },
+  { hex: "#0d9488", label: "Modern Teal" },
+  { hex: "#4f46e5", label: "Indigo" },
+  { hex: "#7c3aed", label: "Royal Purple" },
+  { hex: "#e11d48", label: "Crimson Rose" },
+  { hex: "#d97706", label: "Amber Gold" },
+];
 
 const LANGUAGES = [
   { value: "en-IN", label: "English (India)" },
@@ -1056,7 +1068,7 @@ function PipelineStagesCard() {
 }
 
 export default function OrgSettingsPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, updateOrganisation } = useAuth();
   const [section, setSection] = useState("general");
   const [org, setOrg] = useState<SafeOrganisation | null>(null);
   const [form, setForm] = useState<GeneralBrandingForm | null>(null);
@@ -1250,6 +1262,8 @@ export default function OrgSettingsPage() {
         method: "PATCH", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify(body),
       });
       setOrg(updated); setForm(formToOrg(updated)); setSaved(true); setDirty(false);
+      updateOrganisation(updated);
+      window.dispatchEvent(new CustomEvent(ORG_THEME_CHANGE_EVENT, { detail: { brandColour: updated.brand_colour } }));
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to save changes.");
     } finally { setSaving(false); }
@@ -1258,6 +1272,7 @@ export default function OrgSettingsPage() {
   function handleDiscard() {
     if (!org) return;
     setForm(formToOrg(org)); setDirty(false); setSaved(false); setSaveError(null);
+    window.dispatchEvent(new CustomEvent(ORG_THEME_CHANGE_EVENT, { detail: { brandColour: org.brand_colour } }));
   }
 
   async function handleChangePlan(planId: string, cycle: "monthly" | "yearly" = plansCycle) {
@@ -1438,15 +1453,59 @@ export default function OrgSettingsPage() {
                 </div>
               </div>
               <div className="field"><label>Brand colour</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <input
                     type="color"
                     className="colorpick"
                     value={/^#[0-9a-f]{6}$/i.test(form.brandColour) ? form.brandColour : "#0f1424"}
-                    onChange={(e) => updateForm({ brandColour: e.target.value })}
+                    onChange={(e) => {
+                      const color = e.target.value;
+                      updateForm({ brandColour: color });
+                      window.dispatchEvent(new CustomEvent(ORG_THEME_CHANGE_EVENT, { detail: { brandColour: color } }));
+                    }}
                     aria-label="Pick a brand colour"
                   />
-                  <span className="mono">{(form.brandColour || "#0f1424").toUpperCase()}</span>
+                  <input
+                    type="text"
+                    className="inp"
+                    style={{ width: 110, fontFamily: "monospace", textTransform: "uppercase", padding: "6px 10px" }}
+                    value={form.brandColour}
+                    onChange={(e) => {
+                      const color = e.target.value;
+                      updateForm({ brandColour: color });
+                      if (/^#[0-9a-fA-F]{3,8}$/.test(color)) {
+                        window.dispatchEvent(new CustomEvent(ORG_THEME_CHANGE_EVENT, { detail: { brandColour: color } }));
+                      }
+                    }}
+                    placeholder="#0F1424"
+                  />
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginLeft: 4 }}>
+                    {ORG_COLOR_PRESETS.map((p) => {
+                      const isSel = form.brandColour.toLowerCase() === p.hex.toLowerCase();
+                      return (
+                        <button
+                          key={p.hex}
+                          type="button"
+                          onClick={() => {
+                            updateForm({ brandColour: p.hex });
+                            window.dispatchEvent(new CustomEvent(ORG_THEME_CHANGE_EVENT, { detail: { brandColour: p.hex } }));
+                          }}
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: "50%",
+                            background: p.hex,
+                            border: isSel ? "2px solid #fff" : "1px solid rgba(0,0,0,0.15)",
+                            outline: isSel ? `2px solid ${p.hex}` : "none",
+                            cursor: "pointer",
+                            padding: 0,
+                            boxShadow: isSel ? "0 2px 8px rgba(0,0,0,0.25)" : "none",
+                          }}
+                          title={p.label}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
               {/* TODO: Email sender name — disabled "coming soon" input.
