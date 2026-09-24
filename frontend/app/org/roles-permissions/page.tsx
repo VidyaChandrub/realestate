@@ -250,6 +250,30 @@ export default function OrgRolesPermissionsPage() {
     );
   };
 
+  // "All" / "None" on a module row — sets every action for that module in the
+  // local matrix; persisted with the rest on "Save Role Permissions".
+  const handleSetModulePerms = (moduleKey: string, enabled: boolean) => {
+    setRolePermissions((prev) =>
+      prev.map((rp) => {
+        if (rp.roleKey !== selectedRoleKey) return rp;
+        return {
+          ...rp,
+          permissions: {
+            ...rp.permissions,
+            [moduleKey]: {
+              moduleKey,
+              canView: enabled,
+              canAdd: enabled,
+              canEdit: enabled,
+              canDelete: enabled,
+              canApprove: enabled,
+            },
+          },
+        };
+      }),
+    );
+  };
+
   const handleSaveRolePermissions = async () => {
     if (!accessToken || !selectedRoleKey) return;
     const activeRoleState = rolePermissions.find((r) => r.roleKey === selectedRoleKey);
@@ -467,53 +491,69 @@ export default function OrgRolesPermissionsPage() {
               </div>
             ) : null}
 
-            <div className="tbl-wrap">
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Module</th>
-                    <th style={{ textAlign: "center", width: 90 }}>View</th>
-                    <th style={{ textAlign: "center", width: 90 }}>Add</th>
-                    <th style={{ textAlign: "center", width: 90 }}>Edit</th>
-                    <th style={{ textAlign: "center", width: 90 }}>Delete</th>
-                    <th style={{ textAlign: "center", width: 90 }}>Approve</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catalog.modules.map((m) => {
-                    const permRow = currentRoleState?.permissions[m.key] ?? {
-                      moduleKey: m.key,
-                      canView: false,
-                      canAdd: false,
-                      canEdit: false,
-                      canDelete: false,
-                      canApprove: false,
-                    };
+            <div className="platform-permissions-list">
+              <div className="platform-permissions-heading">
+                <span>Module</span>
+                <span>Permissions</span>
+              </div>
+              {catalog.modules.map((m) => {
+                const permRow = currentRoleState?.permissions[m.key] ?? {
+                  moduleKey: m.key,
+                  canView: false,
+                  canAdd: false,
+                  canEdit: false,
+                  canDelete: false,
+                  canApprove: false,
+                };
 
-                    const isLocked = currentRoleState?.locked ?? false;
+                const isLocked = currentRoleState?.locked ?? false;
 
-                    return (
-                      <tr key={m.key}>
-                        <td>
-                          <div style={{ fontWeight: 600 }}>{m.label}</div>
-                          <div style={{ fontSize: 12, color: "var(--fg-subtle)" }}>{m.description}</div>
-                        </td>
-                        {(["canView", "canAdd", "canEdit", "canDelete", "canApprove"] as const).map((act) => (
-                          <td key={act} style={{ textAlign: "center" }}>
-                            <input
-                              type="checkbox"
-                              checked={isLocked ? true : permRow[act]}
-                              disabled={isLocked}
-                              onChange={() => handleToggleRolePerm(m.key, act)}
-                              style={{ width: 18, height: 18, cursor: isLocked ? "not-allowed" : "pointer" }}
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                return (
+                  <div className="platform-permission-row" key={m.key}>
+                    <div className="platform-permission-module">
+                      <div style={{ fontWeight: 700, fontSize: 13.5 }}>{m.label}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>{m.description}</div>
+                    </div>
+                    <div className="platform-permission-actions">
+                      {(["canView", "canAdd", "canEdit", "canDelete", "canApprove"] as const).map((act) => {
+                        const enabled = isLocked || permRow[act];
+                        const label = act.replace("can", "");
+                        return (
+                          <button
+                            className={`platform-permission-pill${enabled ? " is-enabled" : ""}`}
+                            key={act}
+                            type="button"
+                            disabled={isLocked || saving}
+                            onClick={() => handleToggleRolePerm(m.key, act)}
+                            aria-pressed={enabled}
+                            aria-label={`${label} permission for ${m.label}`}
+                          >
+                            <span className="platform-permission-dot" aria-hidden="true" />
+                            {label}
+                          </button>
+                        );
+                      })}
+                      <span className="platform-permission-separator" aria-hidden="true" />
+                      <button
+                        className="platform-permission-bulk"
+                        type="button"
+                        disabled={isLocked || saving}
+                        onClick={() => handleSetModulePerms(m.key, true)}
+                      >
+                        All
+                      </button>
+                      <button
+                        className="platform-permission-bulk"
+                        type="button"
+                        disabled={isLocked || saving}
+                        onClick={() => handleSetModulePerms(m.key, false)}
+                      >
+                        None
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </Reveal>
