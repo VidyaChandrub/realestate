@@ -191,7 +191,7 @@ export default function SuperAdminFormsPage() {
               gap: 6,
               fontSize: 11,
               fontWeight: 800,
-              color: "var(--brand, #4f46e5)",
+              color: "var(--brand, #0f1424)",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               marginBottom: 4,
@@ -587,7 +587,7 @@ export default function SuperAdminFormsPage() {
         /* Empty State */
         <div
           style={{
-            background: "linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(124, 58, 237, 0.04) 100%)",
+            background: "linear-gradient(135deg, rgba(21, 27, 46, 0.08) 0%, rgba(124, 58, 237, 0.04) 100%)",
             border: "1px solid var(--brand-100, #e0e3fd)",
             borderRadius: 20,
             padding: "48px 32px",
@@ -607,7 +607,7 @@ export default function SuperAdminFormsPage() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "0 8px 24px -4px rgba(79, 70, 229, 0.4)",
+              boxShadow: "0 8px 24px -4px rgba(21, 27, 46, 0.4)",
               marginBottom: 16,
             }}
           >
@@ -638,7 +638,7 @@ export default function SuperAdminFormsPage() {
                   fontSize: 14,
                   fontWeight: 700,
                   borderRadius: 12,
-                  boxShadow: "0 4px 14px rgba(79, 70, 229, 0.35)",
+                  boxShadow: "0 4px 14px rgba(21, 27, 46, 0.35)",
                 }}
               >
                 <Plus size={16} /> Create New Form
@@ -875,10 +875,10 @@ export default function SuperAdminFormsPage() {
                 {embedTab === "html"
                   ? embedSnippet(embedFor.embed?.id || embedFor.id)
                   : embedTab === "iframe"
-                  ? iframeSnippet(embedFor.embed?.id || embedFor.id)
-                  : embedTab === "shortcode"
-                  ? shortcodeSnippet(embedFor.embed?.id || embedFor.id)
-                  : embedFor.embed?.id || embedFor.id}
+                    ? iframeSnippet(embedFor.embed?.id || embedFor.id)
+                    : embedTab === "shortcode"
+                      ? shortcodeSnippet(embedFor.embed?.id || embedFor.id)
+                      : embedFor.embed?.id || embedFor.id}
               </pre>
 
               <button
@@ -889,10 +889,10 @@ export default function SuperAdminFormsPage() {
                     embedTab === "html"
                       ? embedSnippet(embedFor.embed?.id || embedFor.id)
                       : embedTab === "iframe"
-                      ? iframeSnippet(embedFor.embed?.id || embedFor.id)
-                      : embedTab === "shortcode"
-                      ? shortcodeSnippet(embedFor.embed?.id || embedFor.id)
-                      : embedFor.embed?.id || embedFor.id;
+                        ? iframeSnippet(embedFor.embed?.id || embedFor.id)
+                        : embedTab === "shortcode"
+                          ? shortcodeSnippet(embedFor.embed?.id || embedFor.id)
+                          : embedFor.embed?.id || embedFor.id;
                   copySnippet(text, "modal-snippet");
                 }}
                 style={{
@@ -966,7 +966,7 @@ function VisualFormCard({
         overflow: "hidden",
         border: hovered ? "1px solid var(--brand-100, #c7d2fe)" : "1px solid var(--line-2)",
         boxShadow: hovered
-          ? "0 14px 34px -10px rgba(79, 70, 229, 0.16), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
+          ? "0 14px 34px -10px rgba(21, 27, 46, 0.16), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
           : "0 2px 8px -2px rgba(14, 21, 37, 0.05)",
         transform: hovered ? "translateY(-4px)" : "none",
         transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",

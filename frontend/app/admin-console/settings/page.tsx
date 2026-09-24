@@ -3,29 +3,12 @@ import type { Metadata } from "next";
 // import { Reveal } from "@/components/superadmin/reveal";
 // import { Switch } from "@/components/superadmin/switch";
 import { BillingExpirySettings } from "@/components/superadmin/billing-expiry-settings";
+import { GlobalBrandingSettings } from "@/components/superadmin/global-branding-settings";
 import { Icon } from "@/components/icons";
-// import { CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Settings · iPixxel Realty Super Admin",
 };
-
-// TODO: hardcoded placeholder data — commented out until integrations are backed by the API.
-// const INTEGRATIONS = [
-//   { ic: "ic-indigo", emoji: <Icon name="billing" size={14} />, name: "Razorpay", desc: "Collect template & subscription payments in INR.", badge: "b-green", badgeTxt: "Connected", on: true },
-//   { ic: "ic-green", emoji: <Icon name="mail" size={14} />, name: "WhatsApp Business API", desc: "Lead alerts & buyer conversations for orgs.", badge: "b-green", badgeTxt: "Connected", on: true },
-//   { ic: "ic-sky", emoji: "", name: "Meta", desc: "Lead ads & pixel sync for property campaigns.", badge: "b-green", badgeTxt: "Connected", on: true },
-//   { ic: "ic-amber", emoji: <Icon name="dashboard" size={14} />, name: "Google Ads / GTM", desc: "Tag manager & conversion tracking container.", badge: "b-gray", badgeTxt: "Not connected", on: false },
-//   { ic: "ic-violet", emoji: <Icon name="mail" size={14} />, name: "SMTP Email", desc: "Transactional email for invites & receipts.", badge: "b-green", badgeTxt: "Connected", on: true },
-//   { ic: "ic-rose", emoji: <Icon name="reports" size={14} />, name: "Google Analytics", desc: "GA4 property traffic for org landing pages.", badge: "b-gray", badgeTxt: "Not connected", on: false },
-// ];
-
-// TODO: hardcoded placeholder data — commented out until security policies are backed by the API.
-// const SECURITY = [
-//   { name: "Enforce 2FA for admins", desc: "Require two-factor authentication for all platform team members.", on: true },
-//   { name: "Session timeout", desc: "Automatically sign out idle admin sessions after 30 minutes.", on: false },
-//   { name: "Strong password policy", desc: "Minimum 12 characters with mixed case, numbers and symbols.", on: true },
-// ];
 
 export default function SuperAdminSettingsPage() {
   return (
@@ -34,13 +17,15 @@ export default function SuperAdminSettingsPage() {
         <div>
           <div className="eyebrow"><Icon name="settings" size={14} /> System</div>
           <h1>Platform Settings</h1>
-          <div className="sub">Configure global platform behaviour, integrations and security policies.</div>
-        </div>
-        <div className="actions">
-          <button className="btn btn-ghost">Discard</button>
-          <button className="btn btn-primary">Save changes</button>
+          <div className="sub">Configure global platform theme branding, integrations and system policies.</div>
         </div>
       </div>
+
+      <h2 style={{ margin: "16px 0 6px" }}>Global Theme & Branding</h2>
+      <div className="sub muted reveal" style={{ marginBottom: 16 }}>
+        Configure the primary and secondary colors used across all platform applications, portals, and templates.
+      </div>
+      <GlobalBrandingSettings />
 
       {/* TODO: static tabs — commented out until tab switching is implemented.
       <div className="tabs reveal in">

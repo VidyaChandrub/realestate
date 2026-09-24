@@ -68,7 +68,7 @@ const PALETTE_GROUPS: { title: string; items: PaletteEntry[] }[] = [
     title: "Standard Fields",
     items: [
       { type: "text", label: "Text", hint: "Single line input", icon: Type, bg: "#eff6ff", fg: "#2563eb" },
-      { type: "name", label: "Full Name", hint: "Lead / Contact name", icon: User, bg: "#eef2ff", fg: "#4f46e5" },
+      { type: "name", label: "Full Name", hint: "Lead / Contact name", icon: User, bg: "#eef2ff", fg: "#0f1424" },
       { type: "email", label: "Email", hint: "Verified email address", icon: Mail, bg: "#faf5ff", fg: "#7c3aed" },
       { type: "phone", label: "Phone", hint: "Mobile / WhatsApp", icon: Phone, bg: "#ecfdf5", fg: "#059669" },
       { type: "number", label: "Number", hint: "Numeric amount / age", icon: Hash, bg: "#fffbeb", fg: "#d97706" },
@@ -100,7 +100,7 @@ const PALETTE_GROUPS: { title: string; items: PaletteEntry[] }[] = [
       { type: "consent", label: "Consent", hint: "Terms & GDPR check", icon: ShieldCheck, bg: "#ecfeff", fg: "#0891b2" },
       { type: "captcha", label: "CAPTCHA", hint: "Spam bot prevention", icon: Shield, bg: "#f1f5f9", fg: "#475569" },
       { type: "hidden", label: "Hidden Field", hint: "URL / Campaign tracking", icon: EyeOff, bg: "#f8fafc", fg: "#64748b" },
-      { type: "submit", label: "Submit Button", hint: "Action button", icon: Send, bg: "#eef2ff", fg: "#4338ca" },
+      { type: "submit", label: "Submit Button", hint: "Action button", icon: Send, bg: "#eef2ff", fg: "#0f1424" },
     ],
   },
 ];
@@ -352,19 +352,19 @@ export function FormDesigner({
 
             {form.multiStep
               ? Array.from({ length: stepCount }, (_, i) => {
-                  const count = form.fields.filter((f) => (f.step ?? 0) === i).length;
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      className={`fb-step-btn ${stepFilter === i ? "is-on" : ""}`}
-                      onClick={() => setStepFilter(i)}
-                    >
-                      <span>Step {i + 1}</span>
-                      <b>{count} fields</b>
-                    </button>
-                  );
-                })
+                const count = form.fields.filter((f) => (f.step ?? 0) === i).length;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`fb-step-btn ${stepFilter === i ? "is-on" : ""}`}
+                    onClick={() => setStepFilter(i)}
+                  >
+                    <span>Step {i + 1}</span>
+                    <b>{count} fields</b>
+                  </button>
+                );
+              })
               : null}
 
             {form.multiStep && (
@@ -527,10 +527,10 @@ export function FormDesigner({
 
                       {/* Realistic Field Preview */}
                       {field.type !== "checkbox" &&
-                      field.type !== "consent" &&
-                      field.type !== "heading" &&
-                      field.type !== "html" &&
-                      field.type !== "submit" ? (
+                        field.type !== "consent" &&
+                        field.type !== "heading" &&
+                        field.type !== "html" &&
+                        field.type !== "submit" ? (
                         <label>
                           {field.label}
                           {field.required ? <span className="fb-req-star"> *</span> : null}

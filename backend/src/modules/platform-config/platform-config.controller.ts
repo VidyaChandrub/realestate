@@ -19,3 +19,14 @@ export class PlatformConfigController {
     return this.service.updateConfig(dto);
   }
 }
+
+/** Public endpoint for fetching platform theme (primary & secondary colors) */
+@Controller('platform')
+export class PlatformThemeController {
+  constructor(private readonly service: PlatformConfigService) {}
+
+  @Get('theme')
+  getTheme() {
+    return this.service.getPublicTheme();
+  }
+}

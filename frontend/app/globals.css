@@ -3,12 +3,22 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --primary: #0f1424;
+  --secondary: #2a3348;
+  --brand: var(--primary);
+  --brand-600: color-mix(in srgb, var(--primary) 85%, black);
+  --brand-050: color-mix(in srgb, var(--primary) 6%, white);
+  --brand-100: color-mix(in srgb, var(--primary) 15%, white);
+  --iris: var(--secondary);
 }
 
 @theme inline {
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-brand: var(--brand);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-display: var(--font-roboto), Roboto, system-ui, sans-serif;
   --color-bg-0: #09090b;
   --color-bg-1: #0f0f12;
   --color-bg-2: #18181b;
@@ -40,7 +50,35 @@
 
 body {
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-roboto), Roboto, system-ui, sans-serif;
+}
+
+/* ---------- Thin scrollbars (global) ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c5cbd6 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #c5cbd6;
+  border-radius: 99px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #9aa3b5;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Scrollable but no visible scrollbar (used on modal bodies). */

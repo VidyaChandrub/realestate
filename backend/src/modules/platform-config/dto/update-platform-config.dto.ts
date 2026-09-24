@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 export class UpdatePlatformConfigDto {
   @IsOptional()
@@ -63,4 +63,20 @@ export class UpdatePlatformConfigDto {
   @IsString()
   @MaxLength(500)
   billingExpiryMessage?: string;
+
+  /** Global primary brand color (HEX, e.g. #0f1424 or #6366f1). */
+  @IsOptional()
+  @IsString()
+  @Matches(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, {
+    message: 'primaryColor must be a valid hex color code (e.g. #0f1424)',
+  })
+  primaryColor?: string;
+
+  /** Global secondary accent color (HEX, e.g. #2a3348 or #0ea5e9). */
+  @IsOptional()
+  @IsString()
+  @Matches(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, {
+    message: 'secondaryColor must be a valid hex color code (e.g. #2a3348)',
+  })
+  secondaryColor?: string;
 }

@@ -599,9 +599,9 @@ export function PlatformRolesPanel({
                     flex: 1,
                     padding: "10px 12px",
                     borderRadius: 10,
-                    border: createForm.key === p.key ? "1.5px solid #4f46e5" : "1px solid #e2e8f0",
+                    border: createForm.key === p.key ? "1.5px solid #0f1424" : "1px solid #e2e8f0",
                     background: createForm.key === p.key ? "#eef2ff" : "#ffffff",
-                    color: createForm.key === p.key ? "#4f46e5" : "#475569",
+                    color: createForm.key === p.key ? "#0f1424" : "#475569",
                     fontSize: 12.5,
                     fontWeight: 500,
                     cursor: "pointer",
@@ -717,8 +717,8 @@ export function PlatformRolesPanel({
                 cursor: createBusy || !createForm.name.trim() ? "not-allowed" : "pointer",
                 opacity: createBusy || !createForm.name.trim() ? 0.5 : 1,
                 transition: "all 0.15s ease",
-                background: "linear-gradient(135deg, #4f46e5, #4338ca)",
-                boxShadow: "0 2px 8px -2px rgba(79, 70, 229, 0.4)",
+                background: "linear-gradient(135deg, #0f1424, #0f1424)",
+                boxShadow: "0 2px 8px -2px rgba(21, 27, 46, 0.4)",
               }}
             >
               {createBusy ? "Creating…" : "Create role"}
@@ -834,8 +834,8 @@ export function PlatformRolesPanel({
                 cursor: editBusy ? "not-allowed" : "pointer",
                 opacity: editBusy ? 0.5 : 1,
                 transition: "all 0.15s ease",
-                background: "linear-gradient(135deg, #4f46e5, #4338ca)",
-                boxShadow: "0 2px 8px -2px rgba(79, 70, 229, 0.4)",
+                background: "linear-gradient(135deg, #0f1424, #0f1424)",
+                boxShadow: "0 2px 8px -2px rgba(21, 27, 46, 0.4)",
               }}
             >
               {editBusy ? "Saving…" : "Save changes"}

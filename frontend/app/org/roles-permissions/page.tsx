@@ -724,7 +724,7 @@ export default function OrgRolesPermissionsPage() {
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.borderColor = "#6366f1";
-                      e.currentTarget.style.color = "#4f46e5";
+                      e.currentTarget.style.color = "#0f1424";
                       e.currentTarget.style.background = "#eef2ff";
                     }}
                     onMouseLeave={(e) => {

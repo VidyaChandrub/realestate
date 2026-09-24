@@ -773,7 +773,7 @@ export default function AddNewProjectPage() {
           };
           try {
             window.localStorage.setItem(draftKey(orgId), JSON.stringify(updatedDraft));
-          } catch {}
+          } catch { }
         }
 
         router.push(orgBuilderPath(lp.id, "/org/projects/add-new-project"));
@@ -1223,8 +1223,8 @@ export default function AddNewProjectPage() {
                 <div
                   className="card pad-16 mb-20"
                   style={{
-                    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(79, 70, 229, 0.03) 100%)",
-                    border: "1.5px solid var(--brand, #4f46e5)",
+                    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(21, 27, 46, 0.03) 100%)",
+                    border: "1.5px solid var(--brand, #0f1424)",
                     borderRadius: 12,
                   }}
                 >
@@ -1253,7 +1253,7 @@ export default function AddNewProjectPage() {
                       </div>
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--brand, #4f46e5)" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--brand, #0f1424)" }}>
                             Selected Project Template
                           </span>
                           {selectedTemplate?.category ? <span className="badge b-blue">{selectedTemplate.category}</span> : null}
@@ -1572,7 +1572,7 @@ export default function AddNewProjectPage() {
                 {/* Intentionally hidden: auto-publishing a live landing page during
                       project creation is premature here — a project's landing page is
                       set up afterwards from the project's own page instead. */}
-                  {/*
+                {/*
                   <div className="card pad-14 mt-16" style={{ background: "var(--surface-2, #f8fafc)", border: "1.5px solid var(--line)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
@@ -1853,7 +1853,7 @@ export default function AddNewProjectPage() {
                       </div>
                     </div>
                   </div>
-                   {error && (
+                  {error && (
                     <div className="help err mt-16">
                       <Icon name="alert" size={13} /> {error}
                       {publishedProjectId ? (
@@ -1928,92 +1928,92 @@ export default function AddNewProjectPage() {
         description="These are the templates Super Admin assigned to your organisation. The selected design is copied onto this project's landing page."
         size="full"
       >
-            <div className="grid g2" style={{ gap: 20 }}>
-              {orgDbTemplates.length === 0 ? (
-                <div className="muted" style={{ gridColumn: "1 / -1", padding: 24, textAlign: "center" }}>
-                  No templates are assigned to this organisation yet. Ask Super Admin to assign templates, or open{" "}
-                  <a href="/org/templates" style={{ color: "var(--brand)", fontWeight: 600 }}>Templates</a>.
-                </div>
-              ) : orgDbTemplates.map((tpl) => {
-                const isSelected = selectedTemplate?.id === tpl.id;
-                return (
-                  <div
-                    key={tpl.id}
-                    style={{
-                      border: isSelected ? "2px solid var(--brand, #4f46e5)" : "1px solid var(--line, #e2e8f0)",
-                      borderRadius: 14,
-                      overflow: "hidden",
-                      background: isSelected ? "rgba(79, 70, 229, 0.02)" : "#fff",
-                      display: "flex",
-                      flexDirection: "column",
-                      transition: "all 0.2s ease",
-                      boxShadow: isSelected ? "0 4px 20px rgba(79, 70, 229, 0.15)" : "none",
-                    }}
-                  >
-                    <div style={{ height: 160, position: "relative", overflow: "hidden", background: "#1e293b" }}>
-                      {tpl.thumbnail ? (
-                        <img
-                          src={tpl.thumbnail}
-                          alt={tpl.name}
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
-                          <Icon name="building" size={26} />
-                        </div>
-                      )}
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          background: "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.6) 100%)",
-                        }}
-                      />
-                      <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6 }}>
-                        {tpl.category ? (
-                          <span className="badge b-teal" style={{ background: "rgba(0,0,0,0.6)", color: "#fff", backdropFilter: "blur(4px)" }}>
-                            {tpl.category}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div style={{ position: "absolute", bottom: 12, left: 12, right: 12 }}>
-                        <b style={{ color: "#fff", fontSize: 16, textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{tpl.name}</b>
-                      </div>
+        <div className="grid g2" style={{ gap: 20 }}>
+          {orgDbTemplates.length === 0 ? (
+            <div className="muted" style={{ gridColumn: "1 / -1", padding: 24, textAlign: "center" }}>
+              No templates are assigned to this organisation yet. Ask Super Admin to assign templates, or open{" "}
+              <a href="/org/templates" style={{ color: "var(--brand)", fontWeight: 600 }}>Templates</a>.
+            </div>
+          ) : orgDbTemplates.map((tpl) => {
+            const isSelected = selectedTemplate?.id === tpl.id;
+            return (
+              <div
+                key={tpl.id}
+                style={{
+                  border: isSelected ? "2px solid var(--brand, #0f1424)" : "1px solid var(--line, #e2e8f0)",
+                  borderRadius: 14,
+                  overflow: "hidden",
+                  background: isSelected ? "rgba(21, 27, 46, 0.02)" : "#fff",
+                  display: "flex",
+                  flexDirection: "column",
+                  transition: "all 0.2s ease",
+                  boxShadow: isSelected ? "0 4px 20px rgba(21, 27, 46, 0.15)" : "none",
+                }}
+              >
+                <div style={{ height: 160, position: "relative", overflow: "hidden", background: "#1e293b" }}>
+                  {tpl.thumbnail ? (
+                    <img
+                      src={tpl.thumbnail}
+                      alt={tpl.name}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+                      <Icon name="building" size={26} />
                     </div>
+                  )}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.6) 100%)",
+                    }}
+                  />
+                  <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6 }}>
+                    {tpl.category ? (
+                      <span className="badge b-teal" style={{ background: "rgba(0,0,0,0.6)", color: "#fff", backdropFilter: "blur(4px)" }}>
+                        {tpl.category}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div style={{ position: "absolute", bottom: 12, left: 12, right: 12 }}>
+                    <b style={{ color: "#fff", fontSize: 16, textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{tpl.name}</b>
+                  </div>
+                </div>
 
-                    <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1 }}>
-                      <p className="muted fs-12-5" style={{ margin: "0 0 12px", lineHeight: 1.5, flex: 1 }}>
-                        Super Admin template · {tpl.template || "landing"}
-                      </p>
+                <div style={{ padding: 16, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <p className="muted fs-12-5" style={{ margin: "0 0 12px", lineHeight: 1.5, flex: 1 }}>
+                    Super Admin template · {tpl.template || "landing"}
+                  </p>
 
-                      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                        <div className="row gap-8">
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => {
-                              applyTemplate(tpl);
-                              void openTemplateInVisualBuilder(tpl);
-                            }}
-                            disabled={customizingInBuilder}
-                            style={{ display: "flex", alignItems: "center", gap: 4 }}
-                          >
-                            <Icon name="edit" size={13} /> Customize in Builder
-                          </button>
-                          <button
-                            type="button"
-                            className={`btn ${isSelected ? "btn-secondary" : "btn-primary"} btn-sm`}
-                            onClick={() => applyTemplate(tpl)}
-                          >
-                            {isSelected ? <><Icon name="check" size={11} /> Active Template</> : "Use this template →"}
-                          </button>
-                        </div>
-                      </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <div className="row gap-8">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          applyTemplate(tpl);
+                          void openTemplateInVisualBuilder(tpl);
+                        }}
+                        disabled={customizingInBuilder}
+                        style={{ display: "flex", alignItems: "center", gap: 4 }}
+                      >
+                        <Icon name="edit" size={13} /> Customize in Builder
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${isSelected ? "btn-secondary" : "btn-primary"} btn-sm`}
+                        onClick={() => applyTemplate(tpl)}
+                      >
+                        {isSelected ? <><Icon name="check" size={11} /> Active Template</> : "Use this template →"}
+                      </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </Modal>
 
       <Modal
@@ -2052,7 +2052,7 @@ export default function AddNewProjectPage() {
                 target="_blank"
                 rel="noreferrer"
                 style={{
-                  color: "var(--brand, #4f46e5)",
+                  color: "var(--brand, #0f1424)",
                   fontWeight: 600,
                   fontSize: 14,
                   wordBreak: "break-all",

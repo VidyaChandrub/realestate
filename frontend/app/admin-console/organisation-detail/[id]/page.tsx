@@ -352,8 +352,8 @@ export default function SuperAdminOrganisationDetailPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    apiFetch<Plan[]>("/admin/plans", { headers: { Authorization: `Bearer ${accessToken}` } }).then(setPlans).catch(()=>{});
-    apiFetch<any[]>("/admin/templates", { headers: { Authorization: `Bearer ${accessToken}` } }).then(d=> setAllTemplates(Array.isArray(d)?d:(d as any).data??[])).catch(()=>{});
+    apiFetch<Plan[]>("/admin/plans", { headers: { Authorization: `Bearer ${accessToken}` } }).then(setPlans).catch(() => { });
+    apiFetch<any[]>("/admin/templates", { headers: { Authorization: `Bearer ${accessToken}` } }).then(d => setAllTemplates(Array.isArray(d) ? d : (d as any).data ?? [])).catch(() => { });
   }, [accessToken]);
 
   const [domainsData, setDomainsData] = useState<any | null>(null);
@@ -377,7 +377,7 @@ export default function SuperAdminOrganisationDetailPage() {
   useEffect(() => {
     if (!accessToken || !params.id) return;
     apiFetch<any[]>(`/admin/organisations/${params.id}/templates`, { headers: { Authorization: `Bearer ${accessToken}` } })
-      .then(setAssignedTemplates).catch(()=>setAssignedTemplates([]));
+      .then(setAssignedTemplates).catch(() => setAssignedTemplates([]));
   }, [accessToken, params.id, tab, org?.assignedTemplates]);
 
   function openCreateUser() {
@@ -612,17 +612,17 @@ export default function SuperAdminOrganisationDetailPage() {
               {org.city} · <span className="mono">{org.slug}</span> · onboarded {formatDate(org.createdAt)}
             </div>
             {(org.subdomain || org.customDomain) ? (
-              <div style={{ display:"flex", gap:12, alignItems:"center", marginTop:8, flexWrap:"wrap" }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
                 {org.subdomain ? (
                   <span className="chip">
                     <Icon name="globe" size={12} /> {org.subdomainHost ?? org.subdomain}
-                    <span style={{ textTransform:"capitalize", fontWeight:700 }}> · {org.subdomainStatus}</span>
+                    <span style={{ textTransform: "capitalize", fontWeight: 700 }}> · {org.subdomainStatus}</span>
                   </span>
                 ) : null}
                 {org.customDomain ? (
                   <span className="chip">
                     <Icon name="link" size={12} /> {org.customDomain}
-                    <span style={{ textTransform:"capitalize", fontWeight:700 }}> · {org.customDomainStatus}</span>
+                    <span style={{ textTransform: "capitalize", fontWeight: 700 }}> · {org.customDomainStatus}</span>
                   </span>
                 ) : null}
               </div>
@@ -654,7 +654,7 @@ export default function SuperAdminOrganisationDetailPage() {
         <StatTile
           label="Plan value"
           value={org.plan?.name ?? "—"}
-          accent={org.plan ? "#4f46e5" : "var(--ink)"}
+          accent={org.plan ? "#0f1424" : "var(--ink)"}
           sub={org.planValue != null ? `₹${org.planValue.toLocaleString("en-IN")}` : "—"}
         />
       </div>
@@ -791,11 +791,11 @@ export default function SuperAdminOrganisationDetailPage() {
                             <input
                               type="color"
                               className="colorpick"
-                              value={/^#[0-9a-f]{6}$/i.test(editForm.brandColour) ? editForm.brandColour : "#4f46e5"}
+                              value={/^#[0-9a-f]{6}$/i.test(editForm.brandColour) ? editForm.brandColour : "#0f1424"}
                               onChange={(e) => setEditForm((f) => ({ ...f, brandColour: e.target.value }))}
                               aria-label="Pick a brand colour"
                             />
-                            <span className="mono">{(editForm.brandColour || "#4f46e5").toUpperCase()}</span>
+                            <span className="mono">{(editForm.brandColour || "#0f1424").toUpperCase()}</span>
                           </div>
                         </div>
                       </div>
@@ -984,77 +984,77 @@ export default function SuperAdminOrganisationDetailPage() {
               <div className="card">
                 <div className="card-h">
                   <span className="t">Subscription</span>
-                  {org.subscription ? <span className={`badge ${(org.subscription as any).status==="active"?"b-green":"b-amber"}`}>{(org.subscription as any).status}</span> : <span className="badge b-gray">No subscription</span>}
+                  {org.subscription ? <span className={`badge ${(org.subscription as any).status === "active" ? "b-green" : "b-amber"}`}>{(org.subscription as any).status}</span> : <span className="badge b-gray">No subscription</span>}
                 </div>
-                <div className="card-b" style={{ display:"grid", gap:16 }}>
+                <div className="card-b" style={{ display: "grid", gap: 16 }}>
                   {org.subscription ? (
-                    <div style={{ display:"grid", gap:10, padding:14, border:"1px solid var(--line)", borderRadius:12, background:"var(--surface-2)" }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                    <div style={{ display: "grid", gap: 10, padding: 14, border: "1px solid var(--line)", borderRadius: 12, background: "var(--surface-2)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                         <span className={`badge ${(org as any).plan?.badge || "b-indigo"}`}>{(org as any).plan?.name ?? (org.subscription as any).plan?.name ?? "—"}</span>
                         <span className="chip">{(org.subscription as any).billingCycle}</span>
                         <span className="chip">₹{((org.subscription as any).amount ?? 0).toLocaleString("en-IN")}</span>
                         {(org.subscription as any).mrr ? <span className="chip">MRR ₹{(org.subscription as any).mrr.toLocaleString("en-IN")}</span> : null}
                       </div>
-                      <div className="grid g2" style={{ gap:10, fontSize:13 }}>
-                        <div><span className="muted" style={{ fontSize:11 }}>Plan value</span><br/><b>₹{((org as any).planValue ?? (org.subscription as any).amount ?? 0).toLocaleString("en-IN")}</b></div>
-                        <div><span className="muted" style={{ fontSize:11 }}>Renews</span><br/><b>{(org as any).subscriptionRenewsAt || (org.subscription as any).renewsAt ? new Date((org as any).subscriptionRenewsAt || (org.subscription as any).renewsAt).toLocaleDateString("en-GB") : "—"}</b></div>
-                        <div><span className="muted" style={{ fontSize:11 }}>Templates</span><br/><b>{assignedTemplates.length} assigned</b></div>
-                        <div><span className="muted" style={{ fontSize:11 }}>Created landing pages</span><br/><b>{(org as any).plan?.limits?.landingPagesCreate ?? "Unlimited"}</b></div>
-                        <div><span className="muted" style={{ fontSize:11 }}>Published landing pages</span><br/><b>{(org as any).plan?.limits?.landingPages ?? "Unlimited"}</b></div>
-                        <div><span className="muted" style={{ fontSize:11 }}>Status</span><br/><b>{(org.subscription as any).status}</b></div>
+                      <div className="grid g2" style={{ gap: 10, fontSize: 13 }}>
+                        <div><span className="muted" style={{ fontSize: 11 }}>Plan value</span><br /><b>₹{((org as any).planValue ?? (org.subscription as any).amount ?? 0).toLocaleString("en-IN")}</b></div>
+                        <div><span className="muted" style={{ fontSize: 11 }}>Renews</span><br /><b>{(org as any).subscriptionRenewsAt || (org.subscription as any).renewsAt ? new Date((org as any).subscriptionRenewsAt || (org.subscription as any).renewsAt).toLocaleDateString("en-GB") : "—"}</b></div>
+                        <div><span className="muted" style={{ fontSize: 11 }}>Templates</span><br /><b>{assignedTemplates.length} assigned</b></div>
+                        <div><span className="muted" style={{ fontSize: 11 }}>Created landing pages</span><br /><b>{(org as any).plan?.limits?.landingPagesCreate ?? "Unlimited"}</b></div>
+                        <div><span className="muted" style={{ fontSize: 11 }}>Published landing pages</span><br /><b>{(org as any).plan?.limits?.landingPages ?? "Unlimited"}</b></div>
+                        <div><span className="muted" style={{ fontSize: 11 }}>Status</span><br /><b>{(org.subscription as any).status}</b></div>
                       </div>
                     </div>
                   ) : <div className="help">No subscription yet — approvals created one after package selection.</div>}
 
                   <div>
-                    <div style={{ fontWeight:700, marginBottom:8 }}>Upgrade package</div>
-                    <div style={{ display:"flex", gap:8, alignItems:"center", marginBottom:10 }}>
-                      <span style={{ fontSize:12, fontWeight:600 }}>Billing:</span>
-                      <div style={{ display:"flex", gap:4, background:"#eef1f6", borderRadius:999, padding:3 }}>
-                        {(["monthly","yearly"] as const).map(c=>(
-                          <button key={c} type="button" onClick={()=>setUpgradeBillingCycle(c)} style={{ padding:"6px 12px", borderRadius:999, border:"none", background: upgradeBillingCycle===c?"#fff":"transparent", fontWeight:600, fontSize:12, cursor:"pointer", textTransform:"capitalize", boxShadow: upgradeBillingCycle===c?"0 1px 4px rgba(0,0,0,.1)":"none" }}>{c}</button>
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>Upgrade package</div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600 }}>Billing:</span>
+                      <div style={{ display: "flex", gap: 4, background: "#eef1f6", borderRadius: 999, padding: 3 }}>
+                        {(["monthly", "yearly"] as const).map(c => (
+                          <button key={c} type="button" onClick={() => setUpgradeBillingCycle(c)} style={{ padding: "6px 12px", borderRadius: 999, border: "none", background: upgradeBillingCycle === c ? "#fff" : "transparent", fontWeight: 600, fontSize: 12, cursor: "pointer", textTransform: "capitalize", boxShadow: upgradeBillingCycle === c ? "0 1px 4px rgba(0,0,0,.1)" : "none" }}>{c}</button>
                         ))}
                       </div>
                     </div>
-                    <div className="grid" style={{ gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:10 }}>
-                      {plans.map(p=>{
-                        const isCurrent = (org as any).plan?.id===p.id || (org.subscription as any)?.planId===p.id;
-                        const isSelected = upgradePlanId===p.id;
-                        const price = upgradeBillingCycle==="monthly"? p.priceMonthly : p.priceYearly;
+                    <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 10 }}>
+                      {plans.map(p => {
+                        const isCurrent = (org as any).plan?.id === p.id || (org.subscription as any)?.planId === p.id;
+                        const isSelected = upgradePlanId === p.id;
+                        const price = upgradeBillingCycle === "monthly" ? p.priceMonthly : p.priceYearly;
                         return (
-                          <div key={p.id} onClick={()=> setUpgradePlanId(p.id)} style={{ border:"2px solid", borderColor: isSelected? "var(--brand)": isCurrent? "var(--green)":"var(--line)", borderRadius:14, padding:12, cursor:"pointer", background: isSelected? "var(--brand-050)" : "#fff" }}>
+                          <div key={p.id} onClick={() => setUpgradePlanId(p.id)} style={{ border: "2px solid", borderColor: isSelected ? "var(--brand)" : isCurrent ? "var(--green)" : "var(--line)", borderRadius: 14, padding: 12, cursor: "pointer", background: isSelected ? "var(--brand-050)" : "#fff" }}>
                             <div className={`badge ${p.badge}`}>{p.name}</div>
-                            <div style={{ fontWeight:800, marginTop:6 }}>₹{price.toLocaleString("en-IN")}<span style={{ fontSize:11, color:"var(--muted)"}}>{upgradeBillingCycle==="monthly"?"/mo":"/yr"}</span></div>
-                            <div style={{ fontSize:11, color:"var(--muted)"}}>{(p.limits as any)?.templates} templates · {p.limits?.projects} projects</div>
-                            <div style={{ fontSize:11, color:"var(--muted)", marginTop:3 }}>{p.limits?.users ?? "Unlimited"} users</div>
-                            <div style={{ fontSize:11, color:"var(--muted)", marginTop:3 }}>{p.limits?.landingPagesCreate ?? "Unlimited"} created · {p.limits?.landingPages ?? "Unlimited"} published pages</div>
-                            <div style={{ fontSize:11, fontWeight:700, color: isCurrent? "var(--green)": isSelected? "var(--brand)":"var(--muted)", marginTop:6 }}>{isCurrent?"Current": isSelected?"Selected":"Select"}</div>
+                            <div style={{ fontWeight: 800, marginTop: 6 }}>₹{price.toLocaleString("en-IN")}<span style={{ fontSize: 11, color: "var(--muted)" }}>{upgradeBillingCycle === "monthly" ? "/mo" : "/yr"}</span></div>
+                            <div style={{ fontSize: 11, color: "var(--muted)" }}>{(p.limits as any)?.templates} templates · {p.limits?.projects} projects</div>
+                            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>{p.limits?.users ?? "Unlimited"} users</div>
+                            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>{p.limits?.landingPagesCreate ?? "Unlimited"} created · {p.limits?.landingPages ?? "Unlimited"} published pages</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: isCurrent ? "var(--green)" : isSelected ? "var(--brand)" : "var(--muted)", marginTop: 6 }}>{isCurrent ? "Current" : isSelected ? "Selected" : "Select"}</div>
                           </div>
                         );
                       })}
                     </div>
                     {canUpgradeSubscription ? (
-                    <div style={{ marginTop:12, display:"flex", gap:10 }}>
-                      <button className="btn btn-primary btn-sm" disabled={upgrading || !upgradePlanId} onClick={async()=>{
-                        if(!upgradePlanId) return;
-                        setUpgrading(true);
-                        try{
-                          if(org.subscription){
-                            await apiFetch(`/admin/subscriptions/${(org.subscription as any).id}`, { method:"PATCH", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ planId: upgradePlanId, billingCycle: upgradeBillingCycle }) });
-                          } else {
-                            await apiFetch(`/admin/subscriptions`, { method:"POST", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ orgId: org.id, planId: upgradePlanId, billingCycle: upgradeBillingCycle }) });
-                          }
-                          const fresh = await apiFetch<OrganisationDetail>(`/admin/organisations/${org.id}`, { headers:{ Authorization:`Bearer ${accessToken}` }});
-                          setOrg(fresh);
-                          setUpgradePlanId("");
-                          notify("Subscription upgraded");
-                        } catch(e:any){ notify(e.message||"Upgrade failed"); }
-                        finally{ setUpgrading(false); }
-                      }}>
-                        {upgrading?"Upgrading…":"Upgrade subscription"}
-                      </button>
-                      <span className="muted" style={{ fontSize:12, alignSelf:"center"}}>Upgrade increases template limit — then add more in Templates tab.</span>
-                    </div>
+                      <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+                        <button className="btn btn-primary btn-sm" disabled={upgrading || !upgradePlanId} onClick={async () => {
+                          if (!upgradePlanId) return;
+                          setUpgrading(true);
+                          try {
+                            if (org.subscription) {
+                              await apiFetch(`/admin/subscriptions/${(org.subscription as any).id}`, { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ planId: upgradePlanId, billingCycle: upgradeBillingCycle }) });
+                            } else {
+                              await apiFetch(`/admin/subscriptions`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ orgId: org.id, planId: upgradePlanId, billingCycle: upgradeBillingCycle }) });
+                            }
+                            const fresh = await apiFetch<OrganisationDetail>(`/admin/organisations/${org.id}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+                            setOrg(fresh);
+                            setUpgradePlanId("");
+                            notify("Subscription upgraded");
+                          } catch (e: any) { notify(e.message || "Upgrade failed"); }
+                          finally { setUpgrading(false); }
+                        }}>
+                          {upgrading ? "Upgrading…" : "Upgrade subscription"}
+                        </button>
+                        <span className="muted" style={{ fontSize: 12, alignSelf: "center" }}>Upgrade increases template limit — then add more in Templates tab.</span>
+                      </div>
                     ) : null}
                   </div>
                 </div>
@@ -1069,30 +1069,30 @@ export default function SuperAdminOrganisationDetailPage() {
                   <span className="t">Assigned templates</span>
                   <span className="chip">{assignedTemplates.length} selected</span>
                   {canAddOrgTemplates ? (
-                    <button className="btn btn-primary btn-sm" onClick={()=> setAddTemplateOpen(true)}>+ Add template</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => setAddTemplateOpen(true)}>+ Add template</button>
                   ) : null}
                 </div>
                 <div className="card-b">
-                  {assignedTemplates.length===0 ? <p className="muted">No templates assigned — add from available templates (limit depends on package).</p> : (
-                    <div className="grid" style={{ gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12 }}>
-                      {assignedTemplates.map((at:any)=>(
-                        <div key={at.templateId} style={{ border:"1px solid var(--line)", borderRadius:12, overflow:"hidden"}}>
-                          <div style={{ height:100, background: at.template.thumbnail? `url(${at.template.thumbnail}) center/cover`:"#eef1f6", position:"relative"}}>
-                            <button type="button" onClick={()=> setPreviewTpl(at.template)} className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 shadow" title="Preview"><Icon name="eye" size={14}/></button>
+                  {assignedTemplates.length === 0 ? <p className="muted">No templates assigned — add from available templates (limit depends on package).</p> : (
+                    <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12 }}>
+                      {assignedTemplates.map((at: any) => (
+                        <div key={at.templateId} style={{ border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
+                          <div style={{ height: 100, background: at.template.thumbnail ? `url(${at.template.thumbnail}) center/cover` : "#eef1f6", position: "relative" }}>
+                            <button type="button" onClick={() => setPreviewTpl(at.template)} className="absolute right-2 top-2 rounded-full bg-white/90 p-1.5 shadow" title="Preview"><Icon name="eye" size={14} /></button>
                           </div>
-                          <div style={{ padding:10}}>
-                            <div style={{ fontWeight:700, fontSize:12}}>{at.template.name}</div>
-                            <div style={{ fontSize:11, color:"var(--muted)"}}>{at.template.slug}</div>
-                            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, marginTop:8 }}>
-                              <div style={{ fontSize:11, color:"var(--muted)" }}>
-                                Built pages: <strong style={{ color:"var(--ink)" }}>{at.landingPageCount ?? 0}</strong>
+                          <div style={{ padding: 10 }}>
+                            <div style={{ fontWeight: 700, fontSize: 12 }}>{at.template.name}</div>
+                            <div style={{ fontSize: 11, color: "var(--muted)" }}>{at.template.slug}</div>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8 }}>
+                              <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                                Built pages: <strong style={{ color: "var(--ink)" }}>{at.landingPageCount ?? 0}</strong>
                               </div>
                               {canRemoveOrgTemplates ? (
                                 <button
                                   type="button"
                                   className="btn btn-ghost btn-sm"
-                                  style={{ padding:"6px 8px", color:"var(--rose)" }}
-                                  onClick={()=>requestRemoveTemplate(at)}
+                                  style={{ padding: "6px 8px", color: "var(--rose)" }}
+                                  onClick={() => requestRemoveTemplate(at)}
                                   disabled={templateSaving}
                                   title="Remove template"
                                   aria-label={`Remove ${at.template.name}`}
@@ -1106,62 +1106,62 @@ export default function SuperAdminOrganisationDetailPage() {
                       ))}
                     </div>
                   )}
-                  <p className="muted" style={{ fontSize:12, marginTop:10}}>Starter allows 1 template, Pro 2, Pro Max All — upgrade subscription to increase limit, then add more here.</p>
+                  <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Starter allows 1 template, Pro 2, Pro Max All — upgrade subscription to increase limit, then add more here.</p>
                 </div>
               </div>
 
               {addTemplateOpen ? (
-                <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:400, padding:20}} onClick={()=>setAddTemplateOpen(false)}>
-                  <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:16, padding:16, width:720, maxWidth:"100%", maxHeight:"85vh", overflow:"auto"}}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10}}>
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }} onClick={() => setAddTemplateOpen(false)}>
+                  <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 16, width: 720, maxWidth: "100%", maxHeight: "85vh", overflow: "auto" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                       <b>Add templates</b>
-                      <button className="btn btn-ghost btn-sm" onClick={()=>setAddTemplateOpen(false)}></button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setAddTemplateOpen(false)}></button>
                     </div>
-                    <div style={{ fontSize:12, color:"var(--muted)", marginBottom:10}}>
-                      Current plan allows {(()=>{
-                        const plan = plans.find(p=> p.id===((org as any).plan?.id || (org.subscription as any)?.planId));
-                        const raw=(plan?.limits as any)?.templates;
-                        if(!raw || raw==="All") return "All";
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
+                      Current plan allows {(() => {
+                        const plan = plans.find(p => p.id === ((org as any).plan?.id || (org.subscription as any)?.planId));
+                        const raw = (plan?.limits as any)?.templates;
+                        if (!raw || raw === "All") return "All";
                         return raw;
                       })()} templates — {assignedTemplates.length} already assigned.
                     </div>
-                    <div className="grid" style={{ gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:10, maxHeight:360, overflow:"auto"}}>
-                      {allTemplates.filter((t:any)=> (t.status==="published" && (t.pageType==="landing" || !t.pageType)) && !assignedTemplates.some((a:any)=>a.templateId===t.id)).map((tpl:any)=> {
+                    <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 10, maxHeight: 360, overflow: "auto" }}>
+                      {allTemplates.filter((t: any) => (t.status === "published" && (t.pageType === "landing" || !t.pageType)) && !assignedTemplates.some((a: any) => a.templateId === t.id)).map((tpl: any) => {
                         const sel = selectedNewTemplateIds.includes(tpl.id);
-                        const plan = plans.find(p=> p.id===((org as any).plan?.id || (org.subscription as any)?.planId));
-                        const raw=(plan?.limits as any)?.templates;
-                        const max = !raw || raw==="All"||raw==="Unlimited" ? Infinity : parseInt(String(raw),10);
+                        const plan = plans.find(p => p.id === ((org as any).plan?.id || (org.subscription as any)?.planId));
+                        const raw = (plan?.limits as any)?.templates;
+                        const max = !raw || raw === "All" || raw === "Unlimited" ? Infinity : parseInt(String(raw), 10);
                         const dis = !sel && (assignedTemplates.length + selectedNewTemplateIds.length) >= max;
                         return (
-                          <div key={tpl.id} onClick={()=> !dis && setSelectedNewTemplateIds(prev=> sel? prev.filter(x=>x!==tpl.id): [...prev, tpl.id])} style={{ border:"1px solid", borderColor: sel?"var(--brand)":"var(--line)", borderRadius:12, overflow:"hidden", cursor: dis?"not-allowed":"pointer", opacity: dis?0.5:1}}>
-                            <div style={{ height:90, background: tpl.thumbnail? `url(${tpl.thumbnail}) center/cover`:"#eef1f6", position:"relative"}}>
-                              <span className={`m-1 inline-block rounded-full px-2 py-1 text-[10px] font-bold text-white ${sel?"bg-indigo-600":"bg-black/60"}`}>{sel?"":"Select"}</span>
-                              <button type="button" onClick={(e)=>{ e.stopPropagation(); setPreviewTpl(tpl); }} className="absolute right-1 top-1 rounded-full bg-white/90 p-1"><Icon name="eye" size={12}/></button>
+                          <div key={tpl.id} onClick={() => !dis && setSelectedNewTemplateIds(prev => sel ? prev.filter(x => x !== tpl.id) : [...prev, tpl.id])} style={{ border: "1px solid", borderColor: sel ? "var(--brand)" : "var(--line)", borderRadius: 12, overflow: "hidden", cursor: dis ? "not-allowed" : "pointer", opacity: dis ? 0.5 : 1 }}>
+                            <div style={{ height: 90, background: tpl.thumbnail ? `url(${tpl.thumbnail}) center/cover` : "#eef1f6", position: "relative" }}>
+                              <span className={`m-1 inline-block rounded-full px-2 py-1 text-[10px] font-bold text-white ${sel ? "bg-indigo-600" : "bg-black/60"}`}>{sel ? "" : "Select"}</span>
+                              <button type="button" onClick={(e) => { e.stopPropagation(); setPreviewTpl(tpl); }} className="absolute right-1 top-1 rounded-full bg-white/90 p-1"><Icon name="eye" size={12} /></button>
                             </div>
-                            <div style={{ padding:8}}>
-                              <div style={{ fontWeight:700, fontSize:12}}>{tpl.name}</div>
-                              <div style={{ fontSize:11, color:"var(--muted)"}}>{tpl.slug}</div>
+                            <div style={{ padding: 8 }}>
+                              <div style={{ fontWeight: 700, fontSize: 12 }}>{tpl.name}</div>
+                              <div style={{ fontSize: 11, color: "var(--muted)" }}>{tpl.slug}</div>
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                    <div style={{ display:"flex", justifyContent:"flex-end", gap:10, marginTop:12}}>
-                      <button className="btn btn-ghost btn-sm" onClick={()=>{ setSelectedNewTemplateIds([]); setAddTemplateOpen(false); }}>Cancel</button>
-                      <button className="btn btn-primary btn-sm" disabled={templateSaving || selectedNewTemplateIds.length===0} onClick={async()=>{
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => { setSelectedNewTemplateIds([]); setAddTemplateOpen(false); }}>Cancel</button>
+                      <button className="btn btn-primary btn-sm" disabled={templateSaving || selectedNewTemplateIds.length === 0} onClick={async () => {
                         setTemplateSaving(true);
-                        try{
-                          const nextIds = [...assignedTemplates.map((a:any)=>a.templateId), ...selectedNewTemplateIds];
-                          await apiFetch(`/admin/organisations/${org.id}/templates`, { method:"PUT", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ templateIds: nextIds })});
-                          setAssignedTemplates(prev=> [...prev, ...selectedNewTemplateIds.map(id=> {
-                            const t=allTemplates.find((x:any)=>x.id===id);
-                            return { templateId:id, template:{ id: t.id, name:t.name, slug:t.slug, thumbnail:t.thumbnail, category:t.category }};
+                        try {
+                          const nextIds = [...assignedTemplates.map((a: any) => a.templateId), ...selectedNewTemplateIds];
+                          await apiFetch(`/admin/organisations/${org.id}/templates`, { method: "PUT", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ templateIds: nextIds }) });
+                          setAssignedTemplates(prev => [...prev, ...selectedNewTemplateIds.map(id => {
+                            const t = allTemplates.find((x: any) => x.id === id);
+                            return { templateId: id, template: { id: t.id, name: t.name, slug: t.slug, thumbnail: t.thumbnail, category: t.category } };
                           })]);
                           setSelectedNewTemplateIds([]); setAddTemplateOpen(false);
-                        } catch(e:any){ notify(e.message||"Failed to add"); }
-                        finally{ setTemplateSaving(false); }
+                        } catch (e: any) { notify(e.message || "Failed to add"); }
+                        finally { setTemplateSaving(false); }
                       }}>
-                        {templateSaving?"Saving…":`Add ${selectedNewTemplateIds.length} template(s)`}
+                        {templateSaving ? "Saving…" : `Add ${selectedNewTemplateIds.length} template(s)`}
                       </button>
                     </div>
                   </div>
@@ -1169,13 +1169,13 @@ export default function SuperAdminOrganisationDetailPage() {
               ) : null}
 
               {previewTpl ? (
-                <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:500, padding:20}} onClick={()=>setPreviewTpl(null)}>
-                  <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:16, overflow:"hidden", width:720, maxWidth:"100%"}}>
-                    <div style={{ height:260, background: previewTpl.thumbnail? `url(${previewTpl.thumbnail}) center/cover`: "#eef1f6", position:"relative"}}>
-                      <button onClick={()=>setPreviewTpl(null)} className="absolute right-3 top-3 rounded-full bg-black/60 p-2 text-white"><Icon name="close" size={14}/></button>
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }} onClick={() => setPreviewTpl(null)}>
+                  <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, overflow: "hidden", width: 720, maxWidth: "100%" }}>
+                    <div style={{ height: 260, background: previewTpl.thumbnail ? `url(${previewTpl.thumbnail}) center/cover` : "#eef1f6", position: "relative" }}>
+                      <button onClick={() => setPreviewTpl(null)} className="absolute right-3 top-3 rounded-full bg-black/60 p-2 text-white"><Icon name="close" size={14} /></button>
                     </div>
-                    <div style={{ padding:16}}>
-                      <b>{previewTpl.name}</b><div className="muted" style={{ fontSize:12}}>{previewTpl.slug} · {previewTpl.category}</div>
+                    <div style={{ padding: 16 }}>
+                      <b>{previewTpl.name}</b><div className="muted" style={{ fontSize: 12 }}>{previewTpl.slug} · {previewTpl.category}</div>
                     </div>
                   </div>
                 </div>
@@ -1185,7 +1185,7 @@ export default function SuperAdminOrganisationDetailPage() {
 
           {tab === "Domains" ? (
             <Reveal delay={2}>
-              <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <div
                   style={{
                     display: "grid",
@@ -1324,12 +1324,12 @@ export default function SuperAdminOrganisationDetailPage() {
                           <>
                             {/* 1. Organisation Primary Subdomain */}
                             {domainsData?.subdomain ? (
-                              <tr style={{ background:"var(--surface-2)" }}>
+                              <tr style={{ background: "var(--surface-2)" }}>
                                 <td>
-                                  <span style={{ fontWeight:800, color:"var(--brand)" }}>Organisation Portal</span>
+                                  <span style={{ fontWeight: 800, color: "var(--brand)" }}>Organisation Portal</span>
                                   <br /><span className="muted sm">Primary platform subdomain</span>
                                 </td>
-                                <td style={{ fontFamily:"monospace", fontWeight:800 }}>
+                                <td style={{ fontFamily: "monospace", fontWeight: 800 }}>
                                   {domainsData.subdomainHost ?? `${domainsData.subdomain}.localhost`}
                                 </td>
                                 <td><span className="badge b-teal">Primary Subdomain</span></td>
@@ -1340,18 +1340,18 @@ export default function SuperAdminOrganisationDetailPage() {
                                 </td>
                                 <td><span className="badge b-green">Active</span></td>
                                 <td><span className="badge b-green">Active</span></td>
-                                <td className="muted" style={{ fontSize:12 }}>{formatDate(org.createdAt)}</td>
+                                <td className="muted" style={{ fontSize: 12 }}>{formatDate(org.createdAt)}</td>
                               </tr>
                             ) : null}
 
                             {/* 2. Organisation Primary Custom Domain (if configured) */}
                             {domainsData?.customDomain ? (
-                              <tr style={{ background:"var(--surface-2)" }}>
+                              <tr style={{ background: "var(--surface-2)" }}>
                                 <td>
-                                  <span style={{ fontWeight:800, color:"var(--brand)" }}>Organisation Domain</span>
+                                  <span style={{ fontWeight: 800, color: "var(--brand)" }}>Organisation Domain</span>
                                   <br /><span className="muted sm">Primary company domain</span>
                                 </td>
-                                <td style={{ fontFamily:"monospace", fontWeight:800 }}>{domainsData.customDomain}</td>
+                                <td style={{ fontFamily: "monospace", fontWeight: 800 }}>{domainsData.customDomain}</td>
                                 <td><span className="badge b-indigo">Org Custom Domain</span></td>
                                 <td>
                                   <span className={`badge ${domainsData.customDomainStatus === "connected" ? "b-green" : domainsData.customDomainStatus === "pending" ? "b-amber" : "b-gray"}`}>
@@ -1360,18 +1360,18 @@ export default function SuperAdminOrganisationDetailPage() {
                                 </td>
                                 <td><span className="badge b-gray">Active</span></td>
                                 <td><span className="badge b-gray">Active</span></td>
-                                <td className="muted" style={{ fontSize:12 }}>—</td>
+                                <td className="muted" style={{ fontSize: 12 }}>—</td>
                               </tr>
                             ) : null}
 
                             {/* 3. Landing page served by the primary custom domain */}
                             {domainsData?.customDomainLandingPageId ? (
-                              <tr style={{ background:"var(--surface-2)" }}>
+                              <tr style={{ background: "var(--surface-2)" }}>
                                 <td>
-                                  <span style={{ fontWeight:800, color:"var(--brand)" }}>Landing Page</span>
+                                  <span style={{ fontWeight: 800, color: "var(--brand)" }}>Landing Page</span>
                                   <br /><span className="muted sm">Served at the custom domain</span>
                                 </td>
-                                <td style={{ fontFamily:"monospace", fontWeight:800 }}>
+                                <td style={{ fontFamily: "monospace", fontWeight: 800 }}>
                                   {domainsData.landingPages?.find((p: any) => p.id === domainsData.customDomainLandingPageId)?.name ??
                                     domainsData.landingPages?.[0]?.name ??
                                     "—"}
@@ -1380,7 +1380,7 @@ export default function SuperAdminOrganisationDetailPage() {
                                 <td><span className="badge b-green">Connected</span></td>
                                 <td><span className="badge b-gray">Active</span></td>
                                 <td><span className="badge b-gray">Active</span></td>
-                                <td className="muted" style={{ fontSize:12 }}>via org custom domain</td>
+                                <td className="muted" style={{ fontSize: 12 }}>via org custom domain</td>
                               </tr>
                             ) : null}
 

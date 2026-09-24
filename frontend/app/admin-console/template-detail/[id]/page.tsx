@@ -5,7 +5,15 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Copy, Eye, LayoutTemplate, Pencil, X } from "lucide-react";
 import { Reveal } from "@/components/superadmin/reveal";
-import { StatusBadge, TemplateCover, TierBadge, manageHref, statusStyle } from "@/components/superadmin/templates/shared";
+import {
+  ACCESS_TIERS,
+  accessTierOptionLabel,
+  StatusBadge,
+  TemplateCover,
+  TierBadge,
+  manageHref,
+  statusStyle,
+} from "@/components/superadmin/templates/shared";
 import {
   loadTemplate,
   duplicateTemplate,
@@ -17,6 +25,8 @@ import {
 import { builderPath, templatePreviewPath } from "@/lib/openpage/paths";
 import { ensureConfig } from "@/lib/openpage/site-config";
 import type { LandingPageData } from "@/lib/openpage/types";
+import { apiFetch } from "@/lib/api";
+import type { Plan } from "@/lib/types";
 
 type Tab = "overview" | "settings" | "preview";
 const TABS: { key: Tab; label: string }[] = [
@@ -45,9 +55,13 @@ export default function SuperAdminTemplateDetailPage() {
   const [tier, setTier] = useState<"free" | "paid" | "premium">("free");
   const [categoryId, setCategoryId] = useState<string>("");
   const [categories, setCategories] = useState<TemplateCategory[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
 
   useEffect(() => {
     loadTemplateCategories().then(setCategories).catch(() => {});
+    apiFetch<Plan[]>("/admin/plans")
+      .then(setPlans)
+      .catch(() => setPlans([]));
   }, []);
 
   useEffect(() => {
@@ -110,7 +124,7 @@ export default function SuperAdminTemplateDetailPage() {
     if (!template) return;
     const cleanSlug =
       slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || template.slug;
-      
+
     const payload = {
       ...template,
       name: name.trim() || template.name,
@@ -121,18 +135,25 @@ export default function SuperAdminTemplateDetailPage() {
       categoryId: categoryId || null,
       isPaid: tier !== "free",
     };
-    
+
     let updated;
     if (template.id.startsWith("tpl-")) {
       updated = await createTemplate(payload);
-      router.replace(manageHref(updated.id));
     } else {
       updated = await saveTemplate(payload);
     }
-    
+
     setTemplate(updated);
     setSlug(cleanSlug);
     notify("Template settings saved");
+    try {
+      window.sessionStorage.setItem("template_flash", "Template settings saved");
+    } catch {
+      // best-effort flash for the templates list
+    }
+    window.setTimeout(() => {
+      router.push("/admin-console/templates");
+    }, 600);
   }
 
   async function duplicate() {
@@ -305,11 +326,15 @@ export default function SuperAdminTemplateDetailPage() {
                       value={tier}
                       onChange={(e) => setTier(e.target.value as "free" | "paid" | "premium")}
                     >
-                      <option value="free">Free (Available to all users)</option>
-                      <option value="paid">Paid (Starter, Pro &amp; higher)</option>
-                      <option value="premium">Premium (Pro Max / Enterprise only)</option>
+                      {ACCESS_TIERS.map((t) => (
+                        <option key={t} value={t}>
+                          {accessTierOptionLabel(t, plans)}
+                        </option>
+                      ))}
                     </select>
-                    <div className="hint">Controls which plans can use this template.</div>
+                    <div className="hint">
+                      Plans come from Subscriptions — enable Paid / Premium templates on each plan.
+                    </div>
                   </div>
                 </div>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>

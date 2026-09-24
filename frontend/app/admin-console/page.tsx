@@ -140,7 +140,7 @@ export default function SuperAdminDashboardPage() {
         }}
       >
         <div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#4f46e5", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#0f1424", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
             SUPER ADMIN PLATFORM CONTROL
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>
@@ -213,8 +213,8 @@ export default function SuperAdminDashboardPage() {
                       padding: "8px 14px",
                       fontSize: 13,
                       fontWeight: periodIndex === idx ? 700 : 500,
-                      color: periodIndex === idx ? "#4f46e5" : "#334155",
-                      background: periodIndex === idx ? "rgba(79, 70, 229, 0.08)" : "transparent",
+                      color: periodIndex === idx ? "#0f1424" : "#334155",
+                      background: periodIndex === idx ? "rgba(21, 27, 46, 0.08)" : "transparent",
                       border: "none",
                       cursor: "pointer",
                       textAlign: "left",
@@ -256,12 +256,12 @@ export default function SuperAdminDashboardPage() {
               gap: 6,
               padding: "8px 16px",
               borderRadius: 10,
-              background: "#4f46e5",
+              background: "#0f1424",
               color: "#fff",
               fontSize: 13,
               fontWeight: 600,
               textDecoration: "none",
-              boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)",
+              boxShadow: "0 2px 8px rgba(21, 27, 46, 0.25)",
             }}
           >
             <Icon name="building" size={14} /> Manage Orgs
@@ -293,12 +293,12 @@ export default function SuperAdminDashboardPage() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(79, 70, 229, 0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(21, 27, 46, 0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#0f1424" }}>
                 <Icon name="building" size={18} />
               </div>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>Total Orgs</span>
             </div>
-            <Sparkline color="#4f46e5" d={SPARK_PATHS[0]} />
+            <Sparkline color="#0f1424" d={SPARK_PATHS[0]} />
           </div>
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.02em" }}>
@@ -369,8 +369,8 @@ export default function SuperAdminDashboardPage() {
               {loading
                 ? "…"
                 : stats.platformMrr >= 100000
-                ? `₹${stats.platformMrrLakhs.toFixed(1)} L`
-                : formatCurrency(stats.platformMrr)}
+                  ? `₹${stats.platformMrrLakhs.toFixed(1)} L`
+                  : formatCurrency(stats.platformMrr)}
             </div>
             <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
               {stats.activeSubscriptions > 0 ? "Active recurring revenue" : "No active subs"}
@@ -593,7 +593,7 @@ export default function SuperAdminDashboardPage() {
                       style={{
                         width: "65%",
                         height: `${heightPct}%`,
-                        background: r.g || "linear-gradient(180deg, #6366f1, #4f46e5)",
+                        background: r.g || "linear-gradient(180deg, #6366f1, #0f1424)",
                         borderRadius: "8px 8px 0 0",
                         transition: "height 0.4s ease",
                         cursor: "pointer",
@@ -637,8 +637,8 @@ export default function SuperAdminDashboardPage() {
                 gap: 10,
                 padding: "10px 14px",
                 borderRadius: 10,
-                background: "rgba(79, 70, 229, 0.08)",
-                color: "#4f46e5",
+                background: "rgba(21, 27, 46, 0.08)",
+                color: "#0f1424",
                 fontSize: 13,
                 fontWeight: 700,
                 textDecoration: "none",
@@ -737,7 +737,7 @@ export default function SuperAdminDashboardPage() {
             <h3 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", margin: 0 }}>
               Recently Onboarded Organisations
             </h3>
-            <Link href="/admin-console/organisations" style={{ fontSize: 12, fontWeight: 700, color: "#4f46e5", textDecoration: "none" }}>
+            <Link href="/admin-console/organisations" style={{ fontSize: 12, fontWeight: 700, color: "#0f1424", textDecoration: "none" }}>
               View all orgs →
             </Link>
           </div>
@@ -769,7 +769,7 @@ export default function SuperAdminDashboardPage() {
                               width: 32,
                               height: 32,
                               borderRadius: 8,
-                              background: o.av || "linear-gradient(135deg, #6366f1, #4f46e5)",
+                              background: o.av || "linear-gradient(135deg, #6366f1, #0f1424)",
                               color: "#fff",
                               fontWeight: 700,
                               fontSize: 12,
@@ -789,7 +789,7 @@ export default function SuperAdminDashboardPage() {
                         </div>
                       </td>
                       <td style={{ padding: "12px 0", textAlign: "center" }}>
-                        <span style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(79, 70, 229, 0.08)", color: "#4f46e5", fontWeight: 700, fontSize: 11 }}>
+                        <span style={{ padding: "4px 10px", borderRadius: 8, background: "rgba(21, 27, 46, 0.08)", color: "#0f1424", fontWeight: 700, fontSize: 11 }}>
                           {o.planTxt}
                         </span>
                       </td>
@@ -835,7 +835,7 @@ export default function SuperAdminDashboardPage() {
                     <span style={{ fontSize: 11, color: "#d97706", fontWeight: 800 }}>{p.amt}</span>
                   </div>
                   <div style={{ fontSize: 12, color: "#64748b", margin: "4px 0 10px" }}>{p.desc}</div>
-                  <Link href="/admin-console/org-domains" style={{ fontSize: 12, fontWeight: 700, color: "#4f46e5", textDecoration: "none" }}>
+                  <Link href="/admin-console/org-domains" style={{ fontSize: 12, fontWeight: 700, color: "#0f1424", textDecoration: "none" }}>
                     Review Request →
                   </Link>
                 </div>

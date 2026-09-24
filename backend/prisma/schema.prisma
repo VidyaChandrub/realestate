@@ -1852,6 +1852,8 @@ model PlatformConfig {
   billingGracePeriodDays  Int     @default(7) @map("billing_grace_period_days")
   billingExpiryBehavior   String  @default("restrict") @map("billing_expiry_behavior") // restrict | cancel
   billingExpiryMessage    String  @default("Your subscription is due for renewal soon. Renew to keep your landing pages and features running without interruption.") @map("billing_expiry_message")
+  primaryColor            String  @default("#0f1424") @map("primary_color")
+  secondaryColor          String  @default("#2a3348") @map("secondary_color")
   updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("platform_configs")

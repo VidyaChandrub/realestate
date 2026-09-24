@@ -444,7 +444,7 @@ export function defaultFooterStyle(design: FooterDesignId): SectionStyle {
     case "cards":
       return styleOver({
         spacing: { padding: pad(48, 40, 20, 40), margin: margin0, gap: 26 },
-        colors: { bg: "", gradient: "linear-gradient(135deg, #4f46e5, #7c3aed 55%, #a855f7)", text: "#eef0ff" },
+        colors: { bg: "", gradient: "linear-gradient(135deg, #0f1424, #7c3aed 55%, #a855f7)", text: "#eef0ff" },
         layout: { align: "left", direction: "row" },
       });
   }

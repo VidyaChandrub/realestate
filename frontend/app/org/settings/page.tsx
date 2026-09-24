@@ -50,35 +50,43 @@ const PLAN_LIMIT_ROWS: { key: "templates" | "projects" | "users" | "landingPages
 ];
 
 const NAV_GROUPS = [
-// TODO: static sections are commented out below — re-enable their nav entries when they are made dynamic.
-  { grp: "ORGANISATION", items: [
-    { s: "general", icon: "building" as IconName, t: "General" },
-    { s: "branding", icon: "sparkles" as IconName, t: "Branding" },
-    { s: "localization", icon: "globe" as IconName, t: "Localization" },
-    { s: "domain", icon: "globe" as IconName, t: "Domain" },
-  ] },
-  { grp: "SALES", items: [
-    { s: "crm", icon: "crm" as IconName, t: "CRM & Leads" },
-    // { s: "fields", icon: "puzzle" as IconName, t: "Custom Attributes" },
-    { s: "pipeline", icon: "modules" as IconName, t: "Pipeline & Sources" },
-    { s: "catalogs", icon: "properties" as IconName, t: "Project Catalogs" },
-    // { s: "scoring", icon: "star" as IconName, t: "Scoring & Assignment" },
-    // { s: "automation", icon: "link" as IconName, t: "Automation & SLA" },
-  ] },
-  { grp: "COMMUNICATION", items: [
-    // { s: "comms", icon: "phone" as IconName, t: "Calling & WhatsApp" },
-    { s: "email", icon: "mail" as IconName, t: "Email & SMTP" },
-    // { s: "notifications", icon: "bell" as IconName, t: "Notifications" },
-  ] },
+  // TODO: static sections are commented out below — re-enable their nav entries when they are made dynamic.
+  {
+    grp: "ORGANISATION", items: [
+      { s: "general", icon: "building" as IconName, t: "General" },
+      { s: "branding", icon: "sparkles" as IconName, t: "Branding" },
+      { s: "localization", icon: "globe" as IconName, t: "Localization" },
+      { s: "domain", icon: "globe" as IconName, t: "Domain" },
+    ]
+  },
+  {
+    grp: "SALES", items: [
+      { s: "crm", icon: "crm" as IconName, t: "CRM & Leads" },
+      // { s: "fields", icon: "puzzle" as IconName, t: "Custom Attributes" },
+      { s: "pipeline", icon: "modules" as IconName, t: "Pipeline & Sources" },
+      { s: "catalogs", icon: "properties" as IconName, t: "Project Catalogs" },
+      // { s: "scoring", icon: "star" as IconName, t: "Scoring & Assignment" },
+      // { s: "automation", icon: "link" as IconName, t: "Automation & SLA" },
+    ]
+  },
+  {
+    grp: "COMMUNICATION", items: [
+      // { s: "comms", icon: "phone" as IconName, t: "Calling & WhatsApp" },
+      { s: "email", icon: "mail" as IconName, t: "Email & SMTP" },
+      // { s: "notifications", icon: "bell" as IconName, t: "Notifications" },
+    ]
+  },
   // { grp: "PLATFORM", items: [
-    // { s: "data", icon: "document" as IconName, t: "Data & Import" },
-    // { s: "api", icon: "key" as IconName, t: "API & Webhooks" },
-    // { s: "audit", icon: "shield" as IconName, t: "Audit Log" },
+  // { s: "data", icon: "document" as IconName, t: "Data & Import" },
+  // { s: "api", icon: "key" as IconName, t: "API & Webhooks" },
+  // { s: "audit", icon: "shield" as IconName, t: "Audit Log" },
   // ] },
-  { grp: "ACCOUNT", items: [
-    { s: "billing", icon: "billing" as IconName, t: "Billing" },
-    // { s: "security", icon: "lock" as IconName, t: "Security" },
-  ] },
+  {
+    grp: "ACCOUNT", items: [
+      { s: "billing", icon: "billing" as IconName, t: "Billing" },
+      // { s: "security", icon: "lock" as IconName, t: "Security" },
+    ]
+  },
 ] as const;
 
 const SECTION_META: Record<string, { icon: IconName; title: string; sub: string }> = {
@@ -122,7 +130,7 @@ function formToOrg(org: SafeOrganisation): GeneralBrandingForm {
     supportEmail: org.support_email ?? "", supportPhone: org.support_phone ?? "",
     city: org.city, country: org.country ?? "", addressLine1: org.address_line1 ?? "", addressLine2: org.address_line2 ?? "",
     state: org.state ?? "", postalCode: org.postal_code ?? "", timezone: org.timezone, currency: org.currency,
-    defaultLanguage: org.default_language, brandColour: org.brand_colour ?? "#4f46e5",
+    defaultLanguage: org.default_language, brandColour: org.brand_colour ?? "#0f1424",
     logoUrl: org.logo_url ?? "", faviconUrl: org.favicon_url ?? "",
   };
 }
@@ -266,7 +274,7 @@ function SubscriptionHealthBanner({
         borderRadius: 11, border: "1px solid", flexWrap: "wrap",
         ...(tone === "rose" && { borderColor: "rgba(244,63,94,.28)", background: "rgba(244,63,94,.07)" }),
         ...(tone === "amber" && { borderColor: "rgba(245,158,11,.28)", background: "rgba(245,158,11,.07)" }),
-        ...(tone === "info" && { borderColor: "rgba(79,70,229,.22)", background: "rgba(79,70,229,.05)" }),
+        ...(tone === "info" && { borderColor: "rgba(21, 27, 46,.22)", background: "rgba(21, 27, 46,.05)" }),
         ...(tone === "gray" && { borderColor: "var(--line-2)", background: "var(--surface)" }),
       }}
     >
@@ -931,12 +939,12 @@ function PipelineStagesCard() {
 
   const dirty = Boolean(
     drafts &&
-      initial &&
-      LEAD_STAGE_ORDER.some(
-        (s) =>
-          drafts[s].label.trim() !== initial[s].label ||
-          drafts[s].color !== initial[s].color,
-      ),
+    initial &&
+    LEAD_STAGE_ORDER.some(
+      (s) =>
+        drafts[s].label.trim() !== initial[s].label ||
+        drafts[s].color !== initial[s].color,
+    ),
   );
   const hasEmptyLabel = Boolean(
     drafts && LEAD_STAGE_ORDER.some((s) => !drafts[s].label.trim()),
@@ -1166,7 +1174,7 @@ export default function OrgSettingsPage() {
     setPlansLoading(true); setInvoicesLoading(true);
     Promise.all([getPlans(), getInvoices()])
       .then(([p, inv]) => { setPlans(p); setInvoices(inv); })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => { setPlansLoading(false); setInvoicesLoading(false); });
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [accessToken]);
@@ -1298,13 +1306,13 @@ export default function OrgSettingsPage() {
   return (
     <div className="os-page">
       <div className="os-head reveal in">
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 14, minWidth: 0 }}>
-            <div className="h-text">
-              <div className="eyebrow">Workspace</div>
-              <h1>Settings</h1>
-              <div className="sub">Manage your profile, organisation, CRM &amp; custom attributes, pipeline, communication, automation, data, API and security.</div>
-            </div>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 14, minWidth: 0 }}>
+          <div className="h-text">
+            <div className="eyebrow">Workspace</div>
+            <h1>Settings</h1>
+            <div className="sub">Manage your profile, organisation, CRM &amp; custom attributes, pipeline, communication, automation, data, API and security.</div>
           </div>
+        </div>
         {saveButton}
       </div>
       {saveError ? <div className="form-alert">{saveError}</div> : null}
@@ -1434,11 +1442,11 @@ export default function OrgSettingsPage() {
                   <input
                     type="color"
                     className="colorpick"
-                    value={/^#[0-9a-f]{6}$/i.test(form.brandColour) ? form.brandColour : "#4f46e5"}
+                    value={/^#[0-9a-f]{6}$/i.test(form.brandColour) ? form.brandColour : "#0f1424"}
                     onChange={(e) => updateForm({ brandColour: e.target.value })}
                     aria-label="Pick a brand colour"
                   />
-                  <span className="mono">{(form.brandColour || "#4f46e5").toUpperCase()}</span>
+                  <span className="mono">{(form.brandColour || "#0f1424").toUpperCase()}</span>
                 </div>
               </div>
               {/* TODO: Email sender name — disabled "coming soon" input.
@@ -1719,7 +1727,7 @@ export default function OrgSettingsPage() {
           {/* BILLING */}
           <div className={`os-section${section === "billing" ? " on" : ""}`}>
             <SectionHead section="billing" />
-            
+
             {/* Success / Alert Banner */}
             {changeOk ? (
               <div style={{ padding: "12px 16px", borderRadius: 12, background: "var(--green-050)", border: "1px solid rgba(22, 163, 74, 0.3)", color: "var(--green)", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, fontSize: 13.5, fontWeight: 600 }}>
@@ -2010,7 +2018,7 @@ export default function OrgSettingsPage() {
                           position: "relative",
                           display: "flex",
                           flexDirection: "column",
-                          boxShadow: isCurrent ? "0 8px 30px -10px rgba(79, 70, 229, 0.25)" : "none",
+                          boxShadow: isCurrent ? "0 8px 30px -10px rgba(21, 27, 46, 0.25)" : "none",
                         }}
                       >
                         {isCurrent ? (
@@ -2066,8 +2074,8 @@ export default function OrgSettingsPage() {
                           {isCurrent
                             ? "✓ Current Plan"
                             : isPendingTarget
-                            ? "Request Pending"
-                            : `Switch to ${p.name}`}
+                              ? "Request Pending"
+                              : `Switch to ${p.name}`}
                         </button>
                       </div>
                     );
@@ -2113,7 +2121,7 @@ export default function OrgSettingsPage() {
                       <strong>
                         {formatMoney(
                           (plansCycle === "yearly" ? requestModalPlan.priceYearly : requestModalPlan.priceMonthly) -
-                            (billing?.plan ? (plansCycle === "yearly" ? billing.plan.priceYearly : billing.plan.priceMonthly) : 0),
+                          (billing?.plan ? (plansCycle === "yearly" ? billing.plan.priceYearly : billing.plan.priceMonthly) : 0),
                           billing?.subscription?.currency ?? "INR"
                         )} / {plansCycle === "yearly" ? "year" : "month"}
                       </strong>
@@ -2146,7 +2154,7 @@ export default function OrgSettingsPage() {
                     </div>
                   </div>
 
-                  <div style={{ padding: "10px 14px", background: "rgba(79, 70, 229, 0.06)", border: "1px solid rgba(79, 70, 229, 0.2)", borderRadius: 8, fontSize: 12.5, color: "var(--ink)" }}>
+                  <div style={{ padding: "10px 14px", background: "rgba(21, 27, 46, 0.06)", border: "1px solid rgba(21, 27, 46, 0.2)", borderRadius: 8, fontSize: 12.5, color: "var(--ink)" }}>
                     <Icon name="info" size={14} style={{ verticalAlign: "-2px", marginRight: 6, color: "var(--brand)" }} />
                     This request will be submitted for <strong>Super Admin approval</strong>. Your organisation will continue using your current active package until approved.
                   </div>

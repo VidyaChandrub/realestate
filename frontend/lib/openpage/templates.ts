@@ -108,7 +108,7 @@ export const templateMeta = [
   { id: 'portfolio', name: 'Portfolio', description: 'Showcase your work and skills', accent: '#06b6d4', blockCount: 7, templateIndex: 0, icon: 'Briefcase' },
   { id: 'restaurant', name: 'Restaurant', description: 'Menu, reservations, and ambiance', accent: '#e8a838', blockCount: 7, templateIndex: 1, icon: 'UtensilsCrossed' },
   { id: 'agency', name: 'Agency', description: 'Services, case studies, and team', accent: '#228be6', blockCount: 8, templateIndex: 2, icon: 'Building2' },
-  { id: 'blog', name: 'Blog', description: 'Articles, topics, and subscribers', accent: '#4f46e5', blockCount: 7, templateIndex: 3, icon: 'BookOpen' },
+  { id: 'blog', name: 'Blog', description: 'Articles, topics, and subscribers', accent: '#0f1424', blockCount: 7, templateIndex: 3, icon: 'BookOpen' },
 ] as const
 
 export function buildTemplate(id: string, name: string): SiteConfig {

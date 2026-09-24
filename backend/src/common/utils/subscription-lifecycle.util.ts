@@ -328,36 +328,28 @@ export function canPlanAccessTier(
     return { allowed: true };
   }
 
+  // Driven by Subscription plan capabilities (paidTemplates / premiumTemplates),
+  // not hardcoded plan names like Starter / Pro / Pro Max.
   const capabilities = ((plan?.capabilities ?? {}) as Record<string, boolean>);
-  const slug = (plan?.slug ?? '').toLowerCase();
-  const price = typeof plan?.priceMonthly === 'number' ? plan.priceMonthly : 0;
 
   if (tier === 'paid') {
-    const hasCapability =
-      capabilities.paidTemplates === true || capabilities.premiumTemplates === true;
-    const isPaidPlan =
-      price > 0 || slug === 'starter' || slug === 'pro' || slug === 'pro-max';
-
-    if (hasCapability || isPaidPlan) {
+    if (capabilities.paidTemplates === true || capabilities.premiumTemplates === true) {
       return { allowed: true };
     }
     return {
       allowed: false,
-      reason: 'This is a Paid template. Upgrade to a paid plan to use it.',
+      reason: 'This is a Paid template. Upgrade to a plan with Paid templates enabled.',
     };
   }
 
   if (tier === 'premium') {
-    const hasCapability = capabilities.premiumTemplates === true;
-    const isPremiumPlan =
-      slug === 'pro-max' || slug === 'premium' || slug === 'enterprise' || price >= 10000;
-
-    if (hasCapability || isPremiumPlan) {
+    if (capabilities.premiumTemplates === true) {
       return { allowed: true };
     }
     return {
       allowed: false,
-      reason: 'This is a Premium template. Upgrade to the Pro Max plan to access Premium templates.',
+      reason:
+        'This is a Premium template. Upgrade to a plan with Premium templates enabled.',
     };
   }
 

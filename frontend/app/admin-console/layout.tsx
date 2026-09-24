@@ -1,17 +1,13 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Roboto } from "next/font/google";
 import { SuperAdminShell } from "@/components/superadmin/shell";
 import "./superadmin.css";
 
-const inter = Inter({
+const roboto = Roboto({
+  weight: ["300", "400", "500", "700", "900"],
   subsets: ["latin"],
   variable: "--font-inter",
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-space-grotesk",
 });
 
 export const metadata: Metadata = {
@@ -21,7 +17,15 @@ export const metadata: Metadata = {
 
 export default function SuperAdminLayout({ children }: { children: ReactNode }) {
   return (
-    <div className={`superadmin ${inter.variable} ${spaceGrotesk.variable}`}>
+    <div
+      className={`superadmin ${roboto.variable} ${roboto.className}`}
+      style={
+        {
+          ["--font-space-grotesk" as string]:
+            "var(--font-inter), Roboto, sans-serif",
+        } as React.CSSProperties
+      }
+    >
       <SuperAdminShell>{children}</SuperAdminShell>
     </div>
   );

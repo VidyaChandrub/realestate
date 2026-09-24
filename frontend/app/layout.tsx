@@ -1,17 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { CSSProperties } from "react";
+import { Roboto, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/components/ui/toast";
+import { GlobalThemeProvider } from "@/components/global-theme-provider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const roboto = Roboto({
+  weight: ["300", "400", "500", "700", "900"],
   subsets: ["latin"],
+  variable: "--font-roboto",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const robotoMono = Roboto_Mono({
+  weight: ["400", "500", "700"],
   subsets: ["latin"],
+  variable: "--font-roboto-mono",
 });
 
 export const metadata: Metadata = {
@@ -19,16 +23,28 @@ export const metadata: Metadata = {
   description: "Real estate SaaS platform",
 };
 
+const fontVars = {
+  ["--font-inter"]: "var(--font-roboto), Roboto, sans-serif",
+  ["--font-space-grotesk"]: "var(--font-roboto), Roboto, sans-serif",
+  ["--font-geist-sans"]: "var(--font-roboto), Roboto, sans-serif",
+  ["--font-geist-mono"]: "var(--font-roboto-mono), 'Roboto Mono', monospace",
+  ["--font-playfair"]: "var(--font-roboto), Roboto, sans-serif",
+  ["--font-mono"]: "var(--font-roboto-mono), 'Roboto Mono', monospace",
+} as CSSProperties;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${roboto.variable} ${robotoMono.variable} h-full antialiased`}
+      style={fontVars}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+      <body className={`${roboto.className} min-h-full flex flex-col`} suppressHydrationWarning>
         <AuthProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <GlobalThemeProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </GlobalThemeProvider>
         </AuthProvider>
       </body>
     </html>

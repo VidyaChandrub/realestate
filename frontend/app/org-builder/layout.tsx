@@ -1,24 +1,15 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Roboto } from "next/font/google";
 import "@/app/openpage.css";
 
 // This has to be a top-level sibling route, not nested under app/org/ —
 // app/org/layout.tsx unconditionally wraps every child in <OrgAdminShell>,
 // and the builder is its own full-screen app with its own chrome (rail nav +
-// topnav), never meant to render inside a dashboard shell. Nesting it there
-// previously produced two overlapping sidebars. Also, openpage.css's rules
-// depend on the --font-inter/--font-playfair variables and the ps-app class
-// set up here — importing the stylesheet alone isn't enough without this
-// wrapper.
-const inter = Inter({
+// topnav), never meant to render inside a dashboard shell.
+const roboto = Roboto({
+  weight: ["300", "400", "500", "700", "900"],
+  subsets: ["latin"],
   variable: "--font-inter",
-  subsets: ["latin"],
-});
-
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 export const metadata: Metadata = {
@@ -28,7 +19,14 @@ export const metadata: Metadata = {
 
 export default function OrgBuilderLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`ps-app ${inter.variable} ${playfair.variable}`}>
+    <div
+      className={`ps-app ${roboto.variable} ${roboto.className}`}
+      style={
+        {
+          ["--font-playfair" as string]: "var(--font-inter), Roboto, sans-serif",
+        } as React.CSSProperties
+      }
+    >
       {children}
     </div>
   );

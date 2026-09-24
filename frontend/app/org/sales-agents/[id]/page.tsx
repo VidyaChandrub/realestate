@@ -509,7 +509,7 @@ export default function OrgAgentDetailPage() {
                             data-w={`${targetPct(targets?.siteVisits ?? 0, targets?.siteVisitTarget ?? 1)}%`}
                             style={{
                               width: `${targetPct(targets?.siteVisits ?? 0, targets?.siteVisitTarget ?? 1)}%`,
-                              background: "linear-gradient(90deg,#6366f1,#4f46e5)",
+                              background: "linear-gradient(90deg,#6366f1,#0f1424)",
                             }}
                           ></i>
                         </div>
@@ -637,208 +637,208 @@ export default function OrgAgentDetailPage() {
               </div>
             </div>
 
-{/* Leads */}
-              <div className={`lt-pane ${tab === 1 ? "on" : ""}`}>
-                <div className="seg" style={{ marginBottom: 16 }}>
-                  {LEADS_SEGMENTS.map((s) => (
-                    <span key={s} className={seg === s ? "on" : ""} onClick={() => setSeg(s)}>
-                      {s}
-                    </span>
-                  ))}
+            {/* Leads */}
+            <div className={`lt-pane ${tab === 1 ? "on" : ""}`}>
+              <div className="seg" style={{ marginBottom: 16 }}>
+                {LEADS_SEGMENTS.map((s) => (
+                  <span key={s} className={seg === s ? "on" : ""} onClick={() => setSeg(s)}>
+                    {s}
+                  </span>
+                ))}
+              </div>
+              <div className="card">
+                <div className="card-h">
+                  <span className="t">Assigned leads</span>
+                  <span className="x">{visibleLeads.length} shown</span>
                 </div>
-                <div className="card">
-                  <div className="card-h">
-                    <span className="t">Assigned leads</span>
-                    <span className="x">{visibleLeads.length} shown</span>
-                  </div>
-                  <div className="tbl-wrap">
-                    <table className="tbl">
-                      <thead>
-                        <tr>
-                          <th>Lead</th>
-                          <th>Source</th>
-                          <th>Status</th>
-                          <th>Value</th>
-                          <th>Captured</th>
-                          <th></th>
+                <div className="tbl-wrap">
+                  <table className="tbl">
+                    <thead>
+                      <tr>
+                        <th>Lead</th>
+                        <th>Source</th>
+                        <th>Status</th>
+                        <th>Value</th>
+                        <th>Captured</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleLeads.map((l) => (
+                        <tr key={l.key}>
+                          <td>
+                            <div className="u">
+                              <span className={`av ${l.av}`}>{l.initials}</span>
+                              <span className="nm">{l.name}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`badge ${l.sourceBadge}`}>
+                              {l.source ?? "—"}
+                            </span>
+                          </td>
+                          <td><StageBadge status={l.status} /></td>
+                          <td>{l.value}</td>
+                          <td className="muted">{l.when}</td>
+                          <td>
+                            <Link className="btn btn-ghost btn-sm" href="/org/leads">
+                              Open
+                            </Link>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {visibleLeads.map((l) => (
-                          <tr key={l.key}>
-                            <td>
-                              <div className="u">
-                                <span className={`av ${l.av}`}>{l.initials}</span>
-                                <span className="nm">{l.name}</span>
-                              </div>
-                            </td>
-                            <td>
-                              <span className={`badge ${l.sourceBadge}`}>
-                                {l.source ?? "—"}
-                              </span>
-                            </td>
-                            <td><StageBadge status={l.status} /></td>
-                            <td>{l.value}</td>
-                            <td className="muted">{l.when}</td>
-                            <td>
-                              <Link className="btn btn-ghost btn-sm" href="/org/leads">
-                                Open
-                              </Link>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Calls & comms */}
+            <div className={`lt-pane ${tab === 2 ? "on" : ""}`}>
+              {/* Comms KPI strip */}
+              <div className="grid g4" style={{ marginBottom: 18 }}>
+                <div className="stat">
+                  <div className="top">
+                    <span className="label">Calls made</span>
+                    <span className="ic ic-sky"><Icon name="phone" size={17} /></span>
+                  </div>
+                  <div className="value"><CountUp value={comms?.callsMade ?? 0} /></div>
+                  <div className="delta up">{comms?.connected ?? 0} connected</div>
+                </div>
+                <div className="stat">
+                  <div className="top">
+                    <span className="label">Connect rate</span>
+                    <span className="ic ic-green"><Icon name="check" size={17} /></span>
+                  </div>
+                  <div className="value"><CountUp value={comms?.connectRate ?? 0} suf="%" /></div>
+                  <div className="delta up">of calls answered</div>
+                </div>
+                <div className="stat">
+                  <div className="top">
+                    <span className="label">Talk time</span>
+                    <span className="ic ic-violet"><Icon name="reports" size={17} /></span>
+                  </div>
+                  <div className="value">
+                    <CountUp value={Math.round((comms?.talkSeconds ?? 0) / 60)} suf="m" />
+                  </div>
+                  <div className="delta up">avg {comms?.avgCallSeconds ?? 0}s per call</div>
+                </div>
+                <div className="stat">
+                  <div className="top">
+                    <span className="label">WhatsApp</span>
+                    <span className="ic ic-green"><Icon name="mail" size={17} /></span>
+                  </div>
+                  <div className="value"><CountUp value={comms?.whatsappSent ?? 0} /></div>
+                  <div className="delta up">
+                    {comms?.whatsappReadPct ?? 0}% read
                   </div>
                 </div>
               </div>
 
-              {/* Calls & comms */}
-              <div className={`lt-pane ${tab === 2 ? "on" : ""}`}>
-                {/* Comms KPI strip */}
-                <div className="grid g4" style={{ marginBottom: 18 }}>
-                  <div className="stat">
-                    <div className="top">
-                      <span className="label">Calls made</span>
-                      <span className="ic ic-sky"><Icon name="phone" size={17} /></span>
-                    </div>
-                    <div className="value"><CountUp value={comms?.callsMade ?? 0} /></div>
-                    <div className="delta up">{comms?.connected ?? 0} connected</div>
-                  </div>
-                  <div className="stat">
-                    <div className="top">
-                      <span className="label">Connect rate</span>
-                      <span className="ic ic-green"><Icon name="check" size={17} /></span>
-                    </div>
-                    <div className="value"><CountUp value={comms?.connectRate ?? 0} suf="%" /></div>
-                    <div className="delta up">of calls answered</div>
-                  </div>
-                  <div className="stat">
-                    <div className="top">
-                      <span className="label">Talk time</span>
-                      <span className="ic ic-violet"><Icon name="reports" size={17} /></span>
-                    </div>
-                    <div className="value">
-                      <CountUp value={Math.round((comms?.talkSeconds ?? 0) / 60)} suf="m" />
-                    </div>
-                    <div className="delta up">avg {comms?.avgCallSeconds ?? 0}s per call</div>
-                  </div>
-                  <div className="stat">
-                    <div className="top">
-                      <span className="label">WhatsApp</span>
-                      <span className="ic ic-green"><Icon name="mail" size={17} /></span>
-                    </div>
-                    <div className="value"><CountUp value={comms?.whatsappSent ?? 0} /></div>
-                    <div className="delta up">
-                      {comms?.whatsappReadPct ?? 0}% read
-                    </div>
-                  </div>
+              <div className="card">
+                <div className="card-h">
+                  <span className="t">Recent calls</span>
+                  <span className="x">{calls.length} shown</span>
                 </div>
-
-                <div className="card">
-                  <div className="card-h">
-                    <span className="t">Recent calls</span>
-                    <span className="x">{calls.length} shown</span>
-                  </div>
-                  <div className="tbl-wrap">
-                    <table className="tbl">
-                      <thead>
-                        <tr>
-                          <th>Lead</th>
-                          <th>Direction</th>
-                          <th>Outcome</th>
-                          <th>Duration</th>
-                          <th>When</th>
+                <div className="tbl-wrap">
+                  <table className="tbl">
+                    <thead>
+                      <tr>
+                        <th>Lead</th>
+                        <th>Direction</th>
+                        <th>Outcome</th>
+                        <th>Duration</th>
+                        <th>When</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {calls.map((call) => (
+                        <tr key={call.id}>
+                          <td>
+                            <div className="u">
+                              <span className={`av ${avClass(call.id)}`}>
+                                {initialsFor(callShort(call))}
+                              </span>
+                              <span className="nm">{callShort(call)}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span className="badge b-gray">
+                              {call.direction === "incoming" ? "Incoming" : "Outgoing"}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge ${CALL_OUTCOME_BADGE[call.outcome]}`}>
+                              {CALL_OUTCOME_LABEL[call.outcome]}
+                            </span>
+                          </td>
+                          <td>{formatDuration(call.durationSeconds)}</td>
+                          <td className="muted">{timeAgo(call.createdAt)}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {calls.map((call) => (
-                          <tr key={call.id}>
-                            <td>
-                              <div className="u">
-                                <span className={`av ${avClass(call.id)}`}>
-                                  {initialsFor(callShort(call))}
-                                </span>
-                                <span className="nm">{callShort(call)}</span>
-                              </div>
-                            </td>
-                            <td>
-                              <span className="badge b-gray">
-                                {call.direction === "incoming" ? "Incoming" : "Outgoing"}
-                              </span>
-                            </td>
-                            <td>
-                              <span className={`badge ${CALL_OUTCOME_BADGE[call.outcome]}`}>
-                                {CALL_OUTCOME_LABEL[call.outcome]}
-                              </span>
-                            </td>
-                            <td>{formatDuration(call.durationSeconds)}</td>
-                            <td className="muted">{timeAgo(call.createdAt)}</td>
-                          </tr>
-                        ))}
-                        {calls.length === 0 ? (
-                          <tr>
-                            <td className="muted" colSpan={5}>No calls yet.</td>
-                          </tr>
-                        ) : null}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                      {calls.length === 0 ? (
+                        <tr>
+                          <td className="muted" colSpan={5}>No calls yet.</td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
                 </div>
               </div>
+            </div>
 
-              {/* Activity */}
-              <div className={`lt-pane ${tab === 3 ? "on" : ""}`}>
-                <div className="card">
-                  <div className="card-h">
-                    <span className="t">Activity feed</span>
-                    <span className="x">{activity.length} events</span>
-                  </div>
-                  <div className="card-b">
-                    {activity.length > 0 ? (
-                      <ul className="timeline">
-                        {activity.map((event) => (
-                          <li key={event.id}>
-                            <span
-                              className="td"
-                              style={
-                                ACTIVITY_TONE[event.type]
-                                  ? { background: ACTIVITY_TONE[event.type] }
-                                  : { background: "var(--brand)" }
-                              }
-                            ></span>
-                            <div
+            {/* Activity */}
+            <div className={`lt-pane ${tab === 3 ? "on" : ""}`}>
+              <div className="card">
+                <div className="card-h">
+                  <span className="t">Activity feed</span>
+                  <span className="x">{activity.length} events</span>
+                </div>
+                <div className="card-b">
+                  {activity.length > 0 ? (
+                    <ul className="timeline">
+                      {activity.map((event) => (
+                        <li key={event.id}>
+                          <span
+                            className="td"
+                            style={
+                              ACTIVITY_TONE[event.type]
+                                ? { background: ACTIVITY_TONE[event.type] }
+                                : { background: "var(--brand)" }
+                            }
+                          ></span>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <Icon
+                              name={activityIcon(event.type)}
+                              size={15}
                               style={{
-                                display: "flex",
-                                gap: 8,
-                                alignItems: "flex-start",
+                                marginTop: 2,
+                                color: ACTIVITY_TONE[event.type] ?? "var(--brand)",
                               }}
-                            >
-                              <Icon
-                                name={activityIcon(event.type)}
-                                size={15}
-                                style={{
-                                  marginTop: 2,
-                                  color: ACTIVITY_TONE[event.type] ?? "var(--brand)",
-                                }}
-                              />
-                              <div>
-                                <div style={{ fontSize: 13.5 }}>{event.text}</div>
-                                <div className="tt">
-                                  {ACTIVITY_LABEL[event.type]} · {timeAgo(event.createdAt)}
-                                </div>
+                            />
+                            <div>
+                              <div style={{ fontSize: 13.5 }}>{event.text}</div>
+                              <div className="tt">
+                                {ACTIVITY_LABEL[event.type]} · {timeAgo(event.createdAt)}
                               </div>
                             </div>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="muted" style={{ padding: "8px 4px" }}>
-                        No activity yet.
-                      </div>
-                    )}
-                  </div>
-</div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="muted" style={{ padding: "8px 4px" }}>
+                      No activity yet.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </Reveal>
         </>

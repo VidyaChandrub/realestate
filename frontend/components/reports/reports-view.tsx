@@ -229,7 +229,7 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
                   fontSize: 12,
                   fontWeight: 700,
                   border: "none",
-                  background: !selectedOrgId ? "#4f46e5" : "transparent",
+                  background: !selectedOrgId ? "#0f1424" : "transparent",
                   color: !selectedOrgId ? "#fff" : "#64748b",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
@@ -254,7 +254,7 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
                   fontSize: 12,
                   fontWeight: 700,
                   border: "none",
-                  background: selectedOrgId ? "#4f46e5" : "transparent",
+                  background: selectedOrgId ? "#0f1424" : "transparent",
                   color: selectedOrgId ? "#fff" : "#64748b",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
@@ -308,7 +308,7 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
         }}
       >
         <div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#4f46e5", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#0f1424", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
             ANALYTICS & KPIs
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>
@@ -382,8 +382,8 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
                       padding: "8px 14px",
                       fontSize: 13,
                       fontWeight: filter.preset === opt.id ? 700 : 500,
-                      color: filter.preset === opt.id ? "#4f46e5" : "#334155",
-                      background: filter.preset === opt.id ? "rgba(79, 70, 229, 0.08)" : "transparent",
+                      color: filter.preset === opt.id ? "#0f1424" : "#334155",
+                      background: filter.preset === opt.id ? "rgba(21, 27, 46, 0.08)" : "transparent",
                       border: "none",
                       cursor: "pointer",
                       textAlign: "left",
@@ -407,13 +407,13 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
                 gap: 6,
                 padding: "8px 14px",
                 borderRadius: 10,
-                background: "#4f46e5",
+                background: "#0f1424",
                 color: "#fff",
                 fontSize: 13,
                 fontWeight: 600,
                 border: "none",
                 cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)",
+                boxShadow: "0 2px 8px rgba(21, 27, 46, 0.25)",
               }}
             >
               <Icon name="download" size={14} /> Export <Icon name="chevron-down" size={12} />
@@ -572,12 +572,12 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(79, 70, 229, 0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(21, 27, 46, 0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#0f1424" }}>
                 <Icon name="users" size={18} />
               </div>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>Total Leads</span>
             </div>
-            <Sparkline color="#4f46e5" d={SPARK_PATHS[0]} />
+            <Sparkline color="#0f1424" d={SPARK_PATHS[0]} />
           </div>
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.02em" }}>
@@ -828,7 +828,7 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Icon name="phone" size={16} style={{ color: "#4f46e5" }} />
+              <Icon name="phone" size={16} style={{ color: "#0f1424" }} />
               <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: 0 }}>
                 Lead Pipeline Stages
               </h3>
@@ -887,7 +887,7 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Icon name="document" size={16} style={{ color: "#4f46e5" }} />
+              <Icon name="document" size={16} style={{ color: "#0f1424" }} />
               <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: 0 }}>
                 Project Performance
               </h3>
@@ -948,7 +948,7 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Icon name="phone" size={16} style={{ color: "#4f46e5" }} />
+              <Icon name="phone" size={16} style={{ color: "#0f1424" }} />
               <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: 0 }}>
                 Call Outcomes
               </h3>
@@ -980,7 +980,7 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
                     <td style={{ padding: "8px 0", textAlign: "center", color: "#64748b" }}>0</td>
                     <td style={{ padding: "8px 0", width: 140 }}>
                       <div style={{ height: 6, width: "100%", background: "#f1f5f9", borderRadius: 999 }}>
-                        <div style={{ height: "100%", width: "0%", background: "#4f46e5", borderRadius: 999 }} />
+                        <div style={{ height: "100%", width: "0%", background: "#0f1424", borderRadius: 999 }} />
                       </div>
                     </td>
                     <td style={{ padding: "8px 0", textAlign: "right", color: "#94a3b8", fontWeight: 600 }}>0%</td>
@@ -1005,7 +1005,7 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Icon name="team" size={16} style={{ color: "#4f46e5" }} />
+              <Icon name="team" size={16} style={{ color: "#0f1424" }} />
               <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: 0 }}>
                 Team Leaderboard
               </h3>
@@ -1034,7 +1034,7 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
                       </td>
                       <td style={{ padding: "10px 0", textAlign: "center", fontWeight: 600, color: "#475569" }}>{agt.assignedLeads}</td>
                       <td style={{ padding: "10px 0", textAlign: "center", fontWeight: 700, color: "#10b981" }}>{agt.wonCount}</td>
-                      <td style={{ padding: "10px 0", textAlign: "center", fontWeight: 700, color: "#4f46e5" }}>{agt.conversionRate}%</td>
+                      <td style={{ padding: "10px 0", textAlign: "center", fontWeight: 700, color: "#0f1424" }}>{agt.conversionRate}%</td>
                       <td style={{ padding: "10px 0", textAlign: "right", fontWeight: 700, color: "#0f172a" }}>{formatCurrency(agt.totalRevenue)}</td>
                     </tr>
                   ))}
@@ -1069,7 +1069,7 @@ export function ReportsView({ mode = "org" }: ReportsViewProps) {
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Icon name="sparkles" size={16} style={{ color: "#4f46e5" }} />
+            <Icon name="sparkles" size={16} style={{ color: "#0f1424" }} />
             <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", margin: 0 }}>
               Recent Activity Feed
             </h3>

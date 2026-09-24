@@ -1,5 +1,5 @@
 /* ============================================================
-   iPixxel Realty — Super Admin  ·  Modern Design System (v2)
+   iPixxel Realty â€” Super Admin  Â·  Modern Design System (v2)
    Clean, airy, motion-first. Collapsible full-width sidebar.
    Scoped under .superadmin for the Next.js port.
    ============================================================ */
@@ -14,11 +14,11 @@
   --faint: #aab2c5;
   --line: #eaedf3;
   --line-2: #e2e6ee;
-  --brand: #4f46e5;
-  --brand-600: #4338ca;
-  --brand-050: #eef0fe;
-  --brand-100: #e0e3fd;
-  --iris: #6366f1;
+  --brand: var(--primary, #0f1424);
+  --brand-600: var(--primary-dark, color-mix(in srgb, var(--brand) 85%, black));
+  --brand-050: var(--primary-soft, color-mix(in srgb, var(--brand) 6%, white));
+  --brand-100: var(--primary-border, color-mix(in srgb, var(--brand) 15%, white));
+  --iris: var(--secondary, #2a3348);
   --sky: #0ea5e9;
   --teal: #0d9488;
   --green: #16a34a;
@@ -30,7 +30,7 @@
   --violet: #7c3aed;
   --violet-050: #f3edfe;
   --sidebar: #0f1424;
-  --sidebar-2: #151b2e;
+  --sidebar-2: #0f1424;
   --sidebar-ink: #aab3c9;
   --sidebar-active: #ffffff;
   --r-lg: 18px;
@@ -40,9 +40,9 @@
   --sh-sm: 0 1px 2px rgba(14, 21, 37, 0.05);
   --sh: 0 4px 14px -6px rgba(14, 21, 37, 0.1), 0 2px 6px -4px rgba(14, 21, 37, 0.06);
   --sh-lg: 0 24px 60px -20px rgba(14, 21, 37, 0.22);
-  --sh-glow: 0 8px 30px -8px rgba(79, 70, 229, 0.45);
-  --font: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --display: var(--font-space-grotesk), "Inter", sans-serif;
+  --sh-glow: 0 8px 30px -8px rgba(21, 27, 46, 0.45);
+  --font: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
+  --display: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
   --rail: 76px;
   --side: 264px;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -268,7 +268,7 @@
 }
 
 .superadmin .app.collapsed .nav a .lbl {
-  /* display:none (not just opacity:0) takes it out of the flex layout —
+  /* display:none (not just opacity:0) takes it out of the flex layout â€”
      otherwise its full text width still counts toward `justify-content:
      center` on the 76px collapsed rail, pushing the icon off-center. */
   display: none;
@@ -285,9 +285,9 @@
 }
 
 .superadmin .nav a.active {
-  background: linear-gradient(90deg, rgba(79, 70, 229, 0.9), rgba(99, 102, 241, 0.75));
+  background: linear-gradient(90deg, rgba(21, 27, 46, 0.9), rgba(99, 102, 241, 0.75));
   color: #fff;
-  box-shadow: 0 6px 18px -8px rgba(79, 70, 229, 0.8);
+  box-shadow: 0 6px 18px -8px rgba(21, 27, 46, 0.8);
 }
 
 .superadmin .nav a.active .ic {
@@ -1706,7 +1706,7 @@
 }
 
 .superadmin .wiz .st.done::before {
-  content: "✓";
+  content: "âœ“";
   background: var(--green);
   border-color: var(--green);
   color: #fff;
@@ -2018,7 +2018,7 @@
 }
 
 .superadmin .g2v {
-  background: linear-gradient(135deg, #5eead4, #0d9488);
+  background: linear-gradient(135deg, #3d4a66, #0f1424);
 }
 
 .superadmin .g3v {
@@ -2170,7 +2170,7 @@
 }
 
 /* ============================================================
-   SUPER ADMIN THEME � Shared utilities (mirror of org theme)
+   SUPER ADMIN THEME ï¿½ Shared utilities (mirror of org theme)
    Replace one-off inline styles with these reusable classes.
    ============================================================ */
 .superadmin .row {
@@ -2682,7 +2682,7 @@
 
 /* ====== Settings layout (os-*) ====== */
 /* ============================================================
-   iPixxel Realty — Organisation Settings
+   iPixxel Realty â€” Organisation Settings
    Modern, standard settings layout: icon rail + content,
    section & card headers with icon badges, floating save bar.
    Tokens come from .superadmin (admin-console/superadmin.css).
@@ -3149,7 +3149,7 @@
   box-shadow: 0 0 0 3px var(--brand-050), 0 0 0 1px var(--brand);
 }
 
-/* Native colour input styled as a swatch — brand-colour picker in the
+/* Native colour input styled as a swatch â€” brand-colour picker in the
    org-detail edit form. Output is always #rrggbb, matching the API. */
 .superadmin .colorpick {
   width: 46px;
@@ -3501,18 +3501,18 @@
   padding: 7px 16px;
   border-radius: 10px;
   border: 0;
-  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  background: linear-gradient(135deg, #0f1424 0%, #2a3348 100%);
   color: #fff;
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 2px 8px rgba(21, 27, 46, 0.25);
   transition: all 0.15s ease;
 }
 
 .superadmin .fb-btn-save:hover:not(:disabled) {
-  background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+  background: linear-gradient(135deg, #0f1424 0%, #0f1424 100%);
+  box-shadow: 0 4px 12px rgba(21, 27, 46, 0.35);
   transform: translateY(-1px);
 }
 
@@ -3934,7 +3934,7 @@
 
 .superadmin .fb-canvas-field.is-on .fb-field-type-pill {
   background: #e0e7ff;
-  color: #4338ca;
+  color: #0f1424;
 }
 
 .superadmin .fb-field-key-chip {
@@ -4216,7 +4216,7 @@
 }
 
 /* ============================================================
-   iPixxel Realty — Super Admin  ·  Modern Design System (v2)
+   iPixxel Realty â€” Super Admin  Â·  Modern Design System (v2)
    Clean, airy, motion-first. Collapsible full-width sidebar.
    Scoped under .superadmin for the Next.js port.
    ============================================================ */
@@ -4231,11 +4231,11 @@
   --faint: #aab2c5;
   --line: #eaedf3;
   --line-2: #e2e6ee;
-  --brand: #4f46e5;
-  --brand-600: #4338ca;
-  --brand-050: #eef0fe;
-  --brand-100: #e0e3fd;
-  --iris: #6366f1;
+  --brand: var(--primary, #0f1424);
+  --brand-600: var(--primary-dark, color-mix(in srgb, var(--brand) 85%, black));
+  --brand-050: var(--primary-soft, color-mix(in srgb, var(--brand) 6%, white));
+  --brand-100: var(--primary-border, color-mix(in srgb, var(--brand) 15%, white));
+  --iris: var(--secondary, #2a3348);
   --sky: #0ea5e9;
   --teal: #0d9488;
   --green: #16a34a;
@@ -4247,7 +4247,7 @@
   --violet: #7c3aed;
   --violet-050: #f3edfe;
   --sidebar: #0f1424;
-  --sidebar-2: #151b2e;
+  --sidebar-2: #0f1424;
   --sidebar-ink: #aab3c9;
   --sidebar-active: #ffffff;
   --r-lg: 18px;
@@ -4257,9 +4257,9 @@
   --sh-sm: 0 1px 2px rgba(14, 21, 37, 0.05);
   --sh: 0 4px 14px -6px rgba(14, 21, 37, 0.1), 0 2px 6px -4px rgba(14, 21, 37, 0.06);
   --sh-lg: 0 24px 60px -20px rgba(14, 21, 37, 0.22);
-  --sh-glow: 0 8px 30px -8px rgba(79, 70, 229, 0.45);
-  --font: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --display: var(--font-space-grotesk), "Inter", sans-serif;
+  --sh-glow: 0 8px 30px -8px rgba(21, 27, 46, 0.45);
+  --font: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
+  --display: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
   --rail: 76px;
   --side: 264px;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -4485,7 +4485,7 @@
 }
 
 .superadmin .app.collapsed .nav a .lbl {
-  /* display:none (not just opacity:0) takes it out of the flex layout —
+  /* display:none (not just opacity:0) takes it out of the flex layout â€”
      otherwise its full text width still counts toward `justify-content:
      center` on the 76px collapsed rail, pushing the icon off-center. */
   display: none;
@@ -4502,9 +4502,9 @@
 }
 
 .superadmin .nav a.active {
-  background: linear-gradient(90deg, rgba(79, 70, 229, 0.9), rgba(99, 102, 241, 0.75));
+  background: linear-gradient(90deg, rgba(21, 27, 46, 0.9), rgba(99, 102, 241, 0.75));
   color: #fff;
-  box-shadow: 0 6px 18px -8px rgba(79, 70, 229, 0.8);
+  box-shadow: 0 6px 18px -8px rgba(21, 27, 46, 0.8);
 }
 
 .superadmin .nav a.active .ic {
@@ -6143,7 +6143,7 @@
 }
 
 .superadmin .wiz .st.done::before {
-  content: "✓";
+  content: "âœ“";
   background: var(--green);
   border-color: var(--green);
   color: #fff;
@@ -6455,7 +6455,7 @@
 }
 
 .superadmin .g2v {
-  background: linear-gradient(135deg, #5eead4, #0d9488);
+  background: linear-gradient(135deg, #3d4a66, #0f1424);
 }
 
 .superadmin .g3v {
@@ -6607,7 +6607,7 @@
 }
 
 /* ============================================================
-   SUPER ADMIN THEME � Shared utilities (mirror of org theme)
+   SUPER ADMIN THEME ï¿½ Shared utilities (mirror of org theme)
    Replace one-off inline styles with these reusable classes.
    ============================================================ */
 .superadmin .row {
@@ -7119,7 +7119,7 @@
 
 /* ====== Settings layout (os-*) ====== */
 /* ============================================================
-   iPixxel Realty — Organisation Settings
+   iPixxel Realty â€” Organisation Settings
    Modern, standard settings layout: icon rail + content,
    section & card headers with icon badges, floating save bar.
    Tokens come from .superadmin (admin-console/superadmin.css).
@@ -7586,7 +7586,7 @@
   box-shadow: 0 0 0 3px var(--brand-050), 0 0 0 1px var(--brand);
 }
 
-/* Native colour input styled as a swatch — brand-colour picker in the
+/* Native colour input styled as a swatch â€” brand-colour picker in the
    org-detail edit form. Output is always #rrggbb, matching the API. */
 .superadmin .colorpick {
   width: 46px;
@@ -8214,4 +8214,337 @@
   background: #fff;
   color: var(--ink);
   box-shadow: var(--sh-sm);
+}
+/* ============================================================
+   Shell redesign — navy primary chrome (#0f1424)
+   Appended last so it overrides the duplicated earlier blocks.
+   ============================================================ */
+.superadmin {
+  --bg: #f4f6f8;
+  --brand: var(--primary, #0f1424);
+  --brand-600: var(--primary-dark, color-mix(in srgb, var(--brand) 85%, black));
+  --brand-050: var(--primary-soft, color-mix(in srgb, var(--brand) 6%, white));
+  --brand-100: var(--primary-border, color-mix(in srgb, var(--brand) 15%, white));
+  --iris: var(--secondary, #2a3348);
+  --sky: #3d4a66;
+  --violet: #3d4a66;
+  --violet-050: #eef0f4;
+  --sidebar: #0f1424;
+  --sidebar-2: #0f1424;
+  --sidebar-ink: #9aa6bc;
+  --sh-glow: 0 10px 28px -10px rgba(21, 27, 46, 0.45);
+  --side: 272px;
+  --rail: 78px;
+}
+
+.superadmin .app {
+  background: var(--bg);
+}
+
+.superadmin .sidebar {
+  background:
+    radial-gradient(520px 280px at 0% 0%, rgba(255, 255, 255, 0.06), transparent 60%),
+    radial-gradient(420px 260px at 100% 100%, rgba(61, 74, 102, 0.35), transparent 55%),
+    linear-gradient(180deg, var(--sidebar) 0%, var(--sidebar-2) 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.superadmin .sidebar .s-top {
+  gap: 12px;
+  padding: 22px 18px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.superadmin .sidebar > nav {
+  padding: 8px 0 12px;
+}
+
+.superadmin .sidebar .logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #3d4a66, #0f1424);
+  letter-spacing: -0.04em;
+}
+
+.superadmin .sidebar .s-name {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.superadmin .sidebar .s-name small {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 10px;
+  color: #94a3b8;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+.superadmin .nav {
+  margin: 0;
+}
+
+.superadmin .nav .grp {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: rgba(148, 163, 184, 0.75);
+  padding: 16px 12px 6px;
+  font-weight: 700;
+}
+
+.superadmin .nav a {
+  border-radius: 10px;
+}
+
+.superadmin .nav a.active {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+  color: #fff;
+  box-shadow: inset 3px 0 0 #94a3b8;
+  font-weight: 600;
+}
+
+.superadmin .nav a.active .ic {
+  opacity: 1;
+  color: #e2e8f0;
+}
+
+.superadmin .nav a .badge-n {
+  background: rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.superadmin .sidebar .s-foot {
+  padding: 14px 14px 16px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.superadmin .side-user .av,
+.superadmin .tb-avatar {
+  background: linear-gradient(145deg, #3d4a66, #0f1424);
+  border-radius: 11px;
+}
+
+.superadmin .side-user .signout {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: rgba(148, 163, 184, 0.95);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.superadmin .side-user .signout:hover {
+  color: #fda4af;
+  border-color: rgba(244, 63, 94, 0.35);
+  background: rgba(244, 63, 94, 0.1);
+}
+
+.superadmin .app.collapsed .side-user .signout {
+  display: none;
+}
+
+.superadmin .main {
+  background:
+    radial-gradient(700px 320px at 100% 0%, rgba(21, 27, 46, 0.05), transparent 55%),
+    var(--bg);
+}
+
+.superadmin .topbar {
+  height: 68px;
+  padding: 0 24px;
+  gap: 18px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.superadmin .tb-left {
+  gap: 12px;
+}
+
+.superadmin .burger {
+  width: 40px;
+  height: 40px;
+}
+
+.superadmin .tb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--brand-050);
+  border: 1px solid var(--brand-100);
+  color: var(--brand);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.superadmin .crumbs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.2;
+  font-size: inherit;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+}
+
+.superadmin .crumbs .crumbs-eyebrow {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.superadmin .crumbs b {
+  color: var(--ink);
+  font-weight: 700;
+  font-family: var(--display);
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+.superadmin .tb-search {
+  max-width: 440px;
+}
+
+.superadmin .tb-search input {
+  height: 42px;
+  background: var(--surface-2);
+}
+
+.superadmin .tb-search input:focus {
+  background: var(--surface);
+}
+
+.superadmin .tb-right {
+  gap: 8px;
+}
+
+.superadmin .icon-btn {
+  border-radius: 11px;
+}
+
+.superadmin .icon-btn:hover {
+  background: var(--brand-050);
+  border-color: var(--brand-100);
+  color: var(--brand);
+}
+
+.superadmin .tb-avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 13px;
+  box-shadow: 0 6px 16px -8px rgba(21, 27, 46, 0.45);
+}
+
+.superadmin .btn-primary {
+  background: linear-gradient(180deg, #2a3348 0%, var(--brand) 100%);
+  border-color: transparent;
+  box-shadow: 0 8px 20px -10px rgba(21, 27, 46, 0.55);
+}
+
+.superadmin .btn-primary:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+
+.superadmin .b-indigo {
+  background: var(--brand-050);
+  color: var(--brand);
+  border-color: var(--brand-100);
+}
+
+.superadmin,
+.superadmin .sidebar .s-name,
+.superadmin .crumbs b,
+.superadmin h1,
+.superadmin h2,
+.superadmin h3 {
+  font-family: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif !important;
+}
+
+/* Thin scrollbars — admin console */
+.superadmin,
+.superadmin * {
+  scrollbar-width: thin;
+  scrollbar-color: #c5cbd6 transparent;
+}
+
+.superadmin ::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.superadmin ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.superadmin ::-webkit-scrollbar-thumb {
+  background: #c5cbd6;
+  border-radius: 99px;
+}
+
+.superadmin ::-webkit-scrollbar-thumb:hover {
+  background: #9aa3b5;
+}
+
+.superadmin .sidebar ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.superadmin .sidebar ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ---------- Sidebar nav scrollbar (thin + dark) ---------- */
+.superadmin .sidebar > nav {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.superadmin .sidebar > nav::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.superadmin .sidebar > nav::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0;
+}
+
+.superadmin .sidebar > nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 99px;
+  border: none;
+  min-height: 40px;
+}
+
+.superadmin .sidebar > nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.superadmin .sidebar > nav::-webkit-scrollbar-corner {
+  background: transparent;
 }

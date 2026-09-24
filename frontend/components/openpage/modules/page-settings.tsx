@@ -44,15 +44,15 @@ const SECTIONS: {
   desc: string;
   icon: React.ComponentType<{ size?: number | string }>;
 }[] = [
-  { key: "seo", label: "SEO Config", desc: "Search engines, Open Graph & Structured Data", icon: Search },
-  { key: "analytics", label: "Analytics & Tracking", desc: "Pixels, tags, scripts & consent", icon: BarChart3 },
-  { key: "branding", label: "Branding", desc: "Colours, radius & container width", icon: Palette },
-  { key: "typography", label: "Typography", desc: "Fonts, heading scale & body text", icon: Type },
-  { key: "business", label: "Business Info", desc: "Name, contacts & location", icon: Building2 },
-  { key: "page", label: "Page Settings", desc: "Slug, status, favicon, custom code", icon: Settings2 },
-  { key: "conversions", label: "Conversion & Forms", desc: "Success behaviour & lead routing", icon: Megaphone },
-  { key: "social", label: "Social & Sharing", desc: "Social profiles & share links", icon: Share2 },
-];
+    { key: "seo", label: "SEO Config", desc: "Search engines, Open Graph & Structured Data", icon: Search },
+    { key: "analytics", label: "Analytics & Tracking", desc: "Pixels, tags, scripts & consent", icon: BarChart3 },
+    { key: "branding", label: "Branding", desc: "Colours, radius & container width", icon: Palette },
+    { key: "typography", label: "Typography", desc: "Fonts, heading scale & body text", icon: Type },
+    { key: "business", label: "Business Info", desc: "Name, contacts & location", icon: Building2 },
+    { key: "page", label: "Page Settings", desc: "Slug, status, favicon, custom code", icon: Settings2 },
+    { key: "conversions", label: "Conversion & Forms", desc: "Success behaviour & lead routing", icon: Megaphone },
+    { key: "social", label: "Social & Sharing", desc: "Social profiles & share links", icon: Share2 },
+  ];
 
 type SectionKey = "seo" | "analytics" | "branding" | "typography" | "business" | "page" | "conversions" | "social";
 
@@ -814,7 +814,7 @@ function PageScopeSection({
 
       <Card title="Custom code">
         <Row label="Custom CSS" hint={'Injected as a <style> tag on the live page. Scoped selectors with .op-site if you need to target the site.'}>
-          <Area value={settings.page.customCss ?? ""} on={(v) => patchPageBag({ customCss: v })} rows={6} placeholder={'.op-site .hero-cta {\n  background: #0f766e;\n}'} />
+          <Area value={settings.page.customCss ?? ""} on={(v) => patchPageBag({ customCss: v })} rows={6} placeholder={'.op-site .hero-cta {\n  background: #0f1424;\n}'} />
         </Row>
         <Row label="Custom JavaScript" hint={'Injected as a <script> tag on the live page.'}>
           <Area value={settings.page.customJs ?? ""} on={(v) => patchPageBag({ customJs: v })} rows={6} placeholder={'document.addEventListener("start", () => {…});'} />

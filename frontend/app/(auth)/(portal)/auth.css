@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap');
 
 /* ============================================================
    iPixxel Realty — Auth & Settings extras
@@ -26,7 +26,7 @@
 /* ============================================================
    Auth: modern real-estate split (.auth2)
    Full-bleed property photography on the left, stone-toned
-   form panel on the right. Local token override (teal / slate)
+   form panel on the right. Local token override (navy / slate)
    so auth pages feel property-first without changing the rest
    of the superadmin chrome.
    ============================================================ */
@@ -37,14 +37,15 @@
 }
 
 .superadmin .auth2 {
-  --brand: #0f766e;
-  --brand-600: #0d5f59;
-  --brand-050: #f0fdfa;
-  --brand-100: #ccfbf1;
-  --sky: #0e7490;
-  --sh-glow: 0 10px 28px -10px rgba(15, 118, 110, 0.45);
-  --font: "Plus Jakarta Sans", var(--font-inter), system-ui, sans-serif;
-  --display: "Syne", var(--font-space-grotesk), sans-serif;
+  --brand: var(--primary, #0f1424);
+  --brand-600: var(--primary-dark, color-mix(in srgb, var(--brand) 85%, black));
+  --brand-050: var(--primary-soft, color-mix(in srgb, var(--brand) 6%, white));
+  --brand-100: var(--primary-border, color-mix(in srgb, var(--brand) 15%, white));
+  --iris: var(--secondary, #2a3348);
+  --sky: #3d4a66;
+  --sh-glow: 0 10px 28px -10px rgba(21, 27, 46, 0.45);
+  --font: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
+  --display: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
 
   height: 100dvh;
   max-height: 100dvh;
@@ -134,7 +135,7 @@
   width: 46px;
   height: 46px;
   border-radius: 12px;
-  background: linear-gradient(145deg, #14b8a6, #0e7490);
+  background: linear-gradient(145deg, #3d4a66, #0f1424);
   color: #fff;
   display: grid;
   place-items: center;
@@ -205,7 +206,7 @@
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #5eead4;
+  color: #94a3b8;
 }
 
 .superadmin .auth2 .auth2-dock h2 {
@@ -313,8 +314,8 @@
   min-height: 0;
   overflow: hidden;
   background:
-    radial-gradient(700px 360px at 100% 0%, rgba(15, 118, 110, 0.08), transparent 55%),
-    radial-gradient(500px 280px at 0% 100%, rgba(14, 116, 144, 0.06), transparent 50%),
+    radial-gradient(700px 360px at 100% 0%, rgba(21, 27, 46, 0.08), transparent 55%),
+    radial-gradient(500px 280px at 0% 100%, rgba(61, 74, 102, 0.08), transparent 50%),
     linear-gradient(165deg, #f7f8fa 0%, #eef1f4 100%);
 }
 
@@ -453,16 +454,16 @@
 }
 
 .superadmin .auth2 .btn-primary {
-  background: linear-gradient(180deg, #14b8a6 0%, var(--brand) 100%);
+  background: linear-gradient(180deg, #2a3348 0%, var(--brand) 100%);
   border-color: transparent;
-  box-shadow: 0 8px 20px -10px rgba(15, 118, 110, 0.55);
+  box-shadow: 0 8px 20px -10px rgba(21, 27, 46, 0.55);
   transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), filter 0.18s var(--ease);
 }
 
 .superadmin .auth2 .btn-primary:hover:not(:disabled) {
   filter: brightness(1.04);
   transform: translateY(-1px);
-  box-shadow: 0 12px 24px -12px rgba(15, 118, 110, 0.6);
+  box-shadow: 0 12px 24px -12px rgba(21, 27, 46, 0.55);
 }
 
 .superadmin .auth2 .btn-primary:active:not(:disabled) {

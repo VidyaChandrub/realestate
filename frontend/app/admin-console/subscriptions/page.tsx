@@ -603,7 +603,7 @@ export default function SuperAdminSubscriptionsPage() {
         }}
       >
         <div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#4f46e5", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#0f1424", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
             ANALYTICS & BILLING CONTROLS
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>
@@ -655,13 +655,13 @@ export default function SuperAdminSubscriptionsPage() {
                 gap: 6,
                 padding: "8px 16px",
                 borderRadius: 10,
-                background: "#4f46e5",
+                background: "#0f1424",
                 color: "#fff",
                 fontSize: 13,
                 fontWeight: 600,
                 border: "none",
                 cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)",
+                boxShadow: "0 2px 8px rgba(21, 27, 46, 0.25)",
               }}
             >
               <Icon name="plus" size={14} /> Create Plan
@@ -694,12 +694,12 @@ export default function SuperAdminSubscriptionsPage() {
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(79, 70, 229, 0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(21, 27, 46, 0.08)", display: "flex", alignItems: "center", justifyContent: "center", color: "#0f1424" }}>
                 <Icon name="billing" size={18} />
               </div>
               <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>Monthly Recurring (MRR)</span>
             </div>
-            <Sparkline color="#4f46e5" d={SPARK_PATHS[0]} />
+            <Sparkline color="#0f1424" d={SPARK_PATHS[0]} />
           </div>
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.02em" }}>
@@ -843,7 +843,7 @@ export default function SuperAdminSubscriptionsPage() {
                   borderRadius: 10,
                   border: "none",
                   background: tab === i ? "#fff" : "transparent",
-                  color: tab === i ? "#4f46e5" : "#64748b",
+                  color: tab === i ? "#0f1424" : "#64748b",
                   fontWeight: tab === i ? 700 : 500,
                   fontSize: 13,
                   cursor: "pointer",
@@ -869,12 +869,12 @@ export default function SuperAdminSubscriptionsPage() {
                     padding: "4px 12px",
                     borderRadius: 999,
                     border: "none",
-                    background: billingCycle === c ? "#4f46e5" : "transparent",
+                    background: billingCycle === c ? "#0f1424" : "transparent",
                     color: billingCycle === c ? "#fff" : "#475569",
                     fontSize: 12,
                     fontWeight: 700,
                     cursor: "pointer",
-                    boxShadow: billingCycle === c ? "0 2px 6px rgba(79, 70, 229, 0.25)" : "none",
+                    boxShadow: billingCycle === c ? "0 2px 6px rgba(21, 27, 46, 0.25)" : "none",
                   }}
                 >
                   {c}
@@ -916,9 +916,9 @@ export default function SuperAdminSubscriptionsPage() {
                     <span
                       key={t}
                       style={{
-                        background: "rgba(79, 70, 229, 0.08)",
-                        color: "#4f46e5",
-                        border: "1px solid rgba(79, 70, 229, 0.15)",
+                        background: "rgba(21, 27, 46, 0.08)",
+                        color: "#0f1424",
+                        border: "1px solid rgba(21, 27, 46, 0.15)",
                         fontSize: 11,
                         fontWeight: 700,
                         padding: "4px 10px",
@@ -956,7 +956,7 @@ export default function SuperAdminSubscriptionsPage() {
                       <div
                         style={{
                           width: "80%",
-                          background: "linear-gradient(180deg, #6366f1, #4f46e5)",
+                          background: "linear-gradient(180deg, #6366f1, #0f1424)",
                           borderRadius: "6px 6px 0 0",
                           height: `${(h.mrr / Math.max(1, overview?.mrr || 6400)) * 90 + 18}px`,
                         }}
@@ -990,7 +990,7 @@ export default function SuperAdminSubscriptionsPage() {
                       <div key={d.planId} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <span style={{ width: 80, fontSize: 12, fontWeight: 700, color: "#334155" }}>{d.planName}</span>
                         <div style={{ flex: 1, height: 8, background: "#f1f5f9", borderRadius: 999, overflow: "hidden" }}>
-                          <div style={{ width: `${d.pct}%`, height: "100%", background: "#4f46e5", borderRadius: 999 }} />
+                          <div style={{ width: `${d.pct}%`, height: "100%", background: "#0f1424", borderRadius: 999 }} />
                         </div>
                         <span style={{ fontSize: 12, fontWeight: 600, width: 80, textAlign: "right", color: "#64748b" }}>
                           {d.count} orgs ({d.pct}%)
@@ -1034,8 +1034,8 @@ export default function SuperAdminSubscriptionsPage() {
                         background: "#fff",
                         borderRadius: 16,
                         padding: "20px 22px",
-                        border: p.isPopular ? "2px solid #4f46e5" : "1px solid #e2e8f0",
-                        boxShadow: p.isPopular ? "0 8px 24px rgba(79, 70, 229, 0.12)" : "0 2px 6px rgba(15, 23, 42, 0.03)",
+                        border: p.isPopular ? "2px solid #0f1424" : "1px solid #e2e8f0",
+                        boxShadow: p.isPopular ? "0 8px 24px rgba(21, 27, 46, 0.12)" : "0 2px 6px rgba(15, 23, 42, 0.03)",
                         position: "relative",
                         display: "flex",
                         flexDirection: "column",
@@ -1048,7 +1048,7 @@ export default function SuperAdminSubscriptionsPage() {
                             position: "absolute",
                             top: 0,
                             right: 20,
-                            background: "#4f46e5",
+                            background: "#0f1424",
                             color: "#fff",
                             fontSize: 10,
                             fontWeight: 800,
@@ -1064,7 +1064,7 @@ export default function SuperAdminSubscriptionsPage() {
 
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                          <span style={{ padding: "3px 10px", borderRadius: 8, background: "rgba(79, 70, 229, 0.08)", color: "#4f46e5", fontWeight: 700, fontSize: 12 }}>
+                          <span style={{ padding: "3px 10px", borderRadius: 8, background: "rgba(21, 27, 46, 0.08)", color: "#0f1424", fontWeight: 700, fontSize: 12 }}>
                             {p.name}
                           </span>
                           <span style={{ fontSize: 11, color: "#94a3b8" }}>{p.slug}</span>
@@ -1208,7 +1208,7 @@ export default function SuperAdminSubscriptionsPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>Organisation Subscriptions</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(79, 70, 229, 0.08)", color: "#4f46e5" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(21, 27, 46, 0.08)", color: "#0f1424" }}>
                   {subsTotal} active orgs
                 </span>
               </div>
@@ -1238,7 +1238,7 @@ export default function SuperAdminSubscriptionsPage() {
                     gap: 6,
                     padding: "8px 14px",
                     borderRadius: 10,
-                    background: "#4f46e5",
+                    background: "#0f1424",
                     color: "#fff",
                     fontSize: 13,
                     fontWeight: 600,
@@ -1282,7 +1282,7 @@ export default function SuperAdminSubscriptionsPage() {
                             <div style={{ fontSize: 11, color: "#64748b" }}>{s.organisation?.city || "Active Tenant"}</div>
                           </td>
                           <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                            <span style={{ padding: "3px 10px", borderRadius: 8, background: "rgba(79, 70, 229, 0.08)", color: "#4f46e5", fontWeight: 700, fontSize: 11 }}>
+                            <span style={{ padding: "3px 10px", borderRadius: 8, background: "rgba(21, 27, 46, 0.08)", color: "#0f1424", fontWeight: 700, fontSize: 11 }}>
                               {s.plan?.name ?? "Custom"}
                             </span>
                           </td>
@@ -1302,8 +1302,8 @@ export default function SuperAdminSubscriptionsPage() {
                                   s.status === "active"
                                     ? "rgba(16, 185, 129, 0.1)"
                                     : s.status === "past_due"
-                                    ? "rgba(245, 158, 11, 0.1)"
-                                    : "rgba(239, 68, 68, 0.1)",
+                                      ? "rgba(245, 158, 11, 0.1)"
+                                      : "rgba(239, 68, 68, 0.1)",
                                 color: s.status === "active" ? "#10b981" : s.status === "past_due" ? "#d97706" : "#ef4444",
                               }}
                             >
@@ -1400,7 +1400,7 @@ export default function SuperAdminSubscriptionsPage() {
                       padding: "6px 12px",
                       borderRadius: 8,
                       border: "none",
-                      background: requestFilterStatus === st.val ? "#4f46e5" : "#f1f5f9",
+                      background: requestFilterStatus === st.val ? "#0f1424" : "#f1f5f9",
                       color: requestFilterStatus === st.val ? "#fff" : "#475569",
                       fontSize: 12,
                       fontWeight: 600,
@@ -1460,7 +1460,7 @@ export default function SuperAdminSubscriptionsPage() {
                             </span>
                           </td>
                           <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                            <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(79, 70, 229, 0.08)", color: "#4f46e5", fontWeight: 700, fontSize: 11 }}>
+                            <span style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(21, 27, 46, 0.08)", color: "#0f1424", fontWeight: 700, fontSize: 11 }}>
                               {r.targetPlan?.name ?? "Target"}
                             </span>
                           </td>
@@ -1478,8 +1478,8 @@ export default function SuperAdminSubscriptionsPage() {
                                   r.status === "pending"
                                     ? "rgba(245, 158, 11, 0.1)"
                                     : r.status === "approved"
-                                    ? "rgba(16, 185, 129, 0.1)"
-                                    : "rgba(239, 68, 68, 0.1)",
+                                      ? "rgba(16, 185, 129, 0.1)"
+                                      : "rgba(239, 68, 68, 0.1)",
                                 color: r.status === "pending" ? "#d97706" : r.status === "approved" ? "#10b981" : "#ef4444",
                               }}
                             >
@@ -1496,7 +1496,7 @@ export default function SuperAdminSubscriptionsPage() {
                                   style={{
                                     padding: "5px 12px",
                                     borderRadius: 6,
-                                    background: "#4f46e5",
+                                    background: "#0f1424",
                                     color: "#fff",
                                     fontSize: 12,
                                     fontWeight: 700,
@@ -1619,7 +1619,7 @@ export default function SuperAdminSubscriptionsPage() {
                     type="button"
                     onClick={saveExpiryPolicy}
                     disabled={savingPolicy}
-                    style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#4f46e5", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                    style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#0f1424", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
                   >
                     {savingPolicy ? "Saving..." : "Save Expiry Policy"}
                   </button>
@@ -1635,7 +1635,7 @@ export default function SuperAdminSubscriptionsPage() {
         open={planModalOpen}
         onClose={() => setPlanModalOpen(false)}
         title={editingPlan ? "Edit Platform Tier Plan" : "Create New Platform Tier Plan"}
-        description={<>Configure pricing, numeric quota limits and system capabilities. Endpoint: <code style={{ color: "#4f46e5", fontWeight: 700 }}>/admin/plans</code></>}
+        description={<>Configure pricing, numeric quota limits and system capabilities. Endpoint: <code style={{ color: "#0f1424", fontWeight: 700 }}>/admin/plans</code></>}
         size="lg"
         footer={
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", width: "100%" }}>
@@ -1650,7 +1650,7 @@ export default function SuperAdminSubscriptionsPage() {
               type="button"
               onClick={savePlan}
               disabled={savingPlan}
-              style={{ padding: "9px 20px", borderRadius: 10, border: "none", background: "#4f46e5", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)" }}
+              style={{ padding: "9px 20px", borderRadius: 10, border: "none", background: "#0f1424", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(21, 27, 46, 0.25)" }}
             >
               {savingPlan ? "Saving…" : editingPlan ? "Save Plan Changes" : "＋ Create & Publish Plan"}
             </button>
@@ -1661,7 +1661,7 @@ export default function SuperAdminSubscriptionsPage() {
           {/* Card 1: Basic Info & Pricing */}
           <div style={{ background: "#f8fafc", borderRadius: 14, padding: 18, border: "1px solid #e2e8f0" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(79, 70, 229, 0.08)", color: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(21, 27, 46, 0.08)", color: "#0f1424", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Icon name="billing" size={16} />
               </div>
               <span style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>Basic Information &amp; Pricing</span>
@@ -1749,7 +1749,7 @@ export default function SuperAdminSubscriptionsPage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
               <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, fontWeight: 600, color: "#d97706", cursor: "pointer", background: "rgba(245, 158, 11, 0.08)", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(245, 158, 11, 0.2)" }}>
-                <input type="checkbox" checked={!!(planForm as any).isPopular} onChange={(e) => setPlanForm((p) => ({ ...p, isPopular: e.target.checked } as any))} style={{ width: 16, height: 16, accentColor: "#4f46e5" }} />
+                <input type="checkbox" checked={!!(planForm as any).isPopular} onChange={(e) => setPlanForm((p) => ({ ...p, isPopular: e.target.checked } as any))} style={{ width: 16, height: 16, accentColor: "#0f1424" }} />
                 ★ Highlight as Popular Plan
               </label>
 
@@ -1826,7 +1826,7 @@ export default function SuperAdminSubscriptionsPage() {
               <button
                 type="button"
                 onClick={addFeature}
-                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#4f46e5", color: "#fff", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0f1424", color: "#fff", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}
               >
                 + Add Feature
               </button>

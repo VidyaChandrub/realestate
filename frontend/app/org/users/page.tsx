@@ -590,7 +590,7 @@ export default function OrgUsersPage() {
                   alignItems: "center",
                   justifyContent: "center",
                   background: "#eef2ff",
-                  color: "#4f46e5",
+                  color: "#0f1424",
                 }}
               >
                 <Icon name="users" size={14} />
@@ -827,8 +827,8 @@ export default function OrgUsersPage() {
                 cursor: formSubmitting ? "not-allowed" : "pointer",
                 opacity: formSubmitting ? 0.5 : 1,
                 transition: "all 0.15s ease",
-                background: "linear-gradient(135deg, #4f46e5, #4338ca)",
-                boxShadow: "0 2px 8px -2px rgba(79, 70, 229, 0.4)",
+                background: "linear-gradient(135deg, #0f1424, #0f1424)",
+                boxShadow: "0 2px 8px -2px rgba(21, 27, 46, 0.4)",
               }}
             >
               {formSubmitting
@@ -842,283 +842,283 @@ export default function OrgUsersPage() {
       </Modal>
 
       <Reveal delay={1}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginBottom: 18,
+          }}
+        >
           <div
             style={{
-              display: "flex",
-              gap: 12,
-              alignItems: "center",
-              flexWrap: "wrap",
-              marginBottom: 18,
+              position: "relative",
+              flex: 1,
+              minWidth: 220,
+              maxWidth: 340,
             }}
           >
-            <div
+            <input
+              className="inp"
+              placeholder="Search by name or email…"
+              style={{ paddingLeft: 38 }}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+            <span
               style={{
-                position: "relative",
-                flex: 1,
-                minWidth: 220,
-                maxWidth: 340,
+                position: "absolute",
+                left: 13,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--faint)",
               }}
             >
-              <input
-                className="inp"
-                placeholder="Search by name or email…"
-                style={{ paddingLeft: 38 }}
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-              />
-              <span
-                style={{
-                  position: "absolute",
-                  left: 13,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "var(--faint)",
-                }}
-              >
-                
-              </span>
-            </div>
-            <select
-              style={{ width: 160, flexShrink: 0 }}
-              value={roleFilter}
-              onChange={(e) => {
-                setRoleFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">All roles</option>
-              {dynamicRoles.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-            <select
-              style={{ width: 160, flexShrink: 0 }}
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(
-                  e.target.value as "active" | "disabled" | "pending" | "",
-                );
-                setPage(1);
-              }}
-            >
-              <option value="">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="active">Active</option>
-              <option value="disabled">Disabled</option>
-            </select>
+
+            </span>
           </div>
-        </Reveal>
+          <select
+            style={{ width: 160, flexShrink: 0 }}
+            value={roleFilter}
+            onChange={(e) => {
+              setRoleFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All roles</option>
+            {dynamicRoles.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+          <select
+            style={{ width: 160, flexShrink: 0 }}
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(
+                e.target.value as "active" | "disabled" | "pending" | "",
+              );
+              setPage(1);
+            }}
+          >
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="active">Active</option>
+            <option value="disabled">Disabled</option>
+          </select>
+        </div>
+      </Reveal>
 
       <Reveal delay={2}>
-          <div className="card">
-            <div className="card-h">
-              <span className="t">All users</span>
-              <span className="muted" style={{ fontSize: 12.5 }}>
-                {loading ? "Loading…" : `Showing ${from}–${to} of ${total}`}
-              </span>
-            </div>
-            <div className="tbl-wrap">
-              <table className="tbl">
-                <thead>
+        <div className="card">
+          <div className="card-h">
+            <span className="t">All users</span>
+            <span className="muted" style={{ fontSize: 12.5 }}>
+              {loading ? "Loading…" : `Showing ${from}–${to} of ${total}`}
+            </span>
+          </div>
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadError ? (
                   <tr>
-                    <th>User</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th>Actions</th>
+                    <td colSpan={5} className="muted">
+                      {loadError}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {loadError ? (
-                    <tr>
-                      <td colSpan={5} className="muted">
-                        {loadError}
-                      </td>
-                    </tr>
-                  ) : !loading && rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="muted">
-                        {isFiltered
-                          ? "No users match this filter."
-                          : "No users yet — create one to get started."}
-                      </td>
-                    </tr>
-                  ) : (
-                    rows.map((user) => (
-                      <tr key={user.id}>
-                        <td>
-                          <span className="u">
-                            <span className="av">
-                              {initials(user.firstName, user.lastName)}
-                            </span>
-                            <span>
-                              <Link
-                                className="nm"
-                                href={`/org/users/${user.id}`}
-                                style={{ color: "var(--brand)" }}
-                              >
-                                {fullName(user.firstName, user.lastName, user.email)}
-                              </Link>
-                              <br />
-                              <span className="sm">{user.email}</span>
-                            </span>
+                ) : !loading && rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="muted">
+                      {isFiltered
+                        ? "No users match this filter."
+                        : "No users yet — create one to get started."}
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((user) => (
+                    <tr key={user.id}>
+                      <td>
+                        <span className="u">
+                          <span className="av">
+                            {initials(user.firstName, user.lastName)}
                           </span>
-                        </td>
-                        <td>
-                          {user.role ? (
-                            <span
-                              className={`badge ${roleBadgeClass(user.role.key)}`}
+                          <span>
+                            <Link
+                              className="nm"
+                              href={`/org/users/${user.id}`}
+                              style={{ color: "var(--brand)" }}
                             >
-                              {user.role.name}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td>
-                          <span
-                            className={`badge ${statusBadgeClass(user.status)}`}
-                          >
-                            <span
-                              className="dot"
-                              style={{ background: "currentColor" }}
-                            />
-                            {statusLabel(user)}
+                              {fullName(user.firstName, user.lastName, user.email)}
+                            </Link>
+                            <br />
+                            <span className="sm">{user.email}</span>
                           </span>
-                        </td>
-                        <td>{formatDate(user.createdAt)}</td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 6,
-                              flexWrap: "wrap",
-                              alignItems: "center",
-                            }}
+                        </span>
+                      </td>
+                      <td>
+                        {user.role ? (
+                          <span
+                            className={`badge ${roleBadgeClass(user.role.key)}`}
                           >
-                            {canEdit ? (
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                type="button"
-                                onClick={() => openEdit(user)}
-                              >
-                                Edit
-                              </button>
-                            ) : null}
-                            {canApprove &&
+                            {user.role.name}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${statusBadgeClass(user.status)}`}
+                        >
+                          <span
+                            className="dot"
+                            style={{ background: "currentColor" }}
+                          />
+                          {statusLabel(user)}
+                        </span>
+                      </td>
+                      <td>{formatDate(user.createdAt)}</td>
+                      <td>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 6,
+                            flexWrap: "wrap",
+                            alignItems: "center",
+                          }}
+                        >
+                          {canEdit ? (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              type="button"
+                              onClick={() => openEdit(user)}
+                            >
+                              Edit
+                            </button>
+                          ) : null}
+                          {canApprove &&
                             (user.status === "pending" ||
                               user.status === "disabled") ? (
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                type="button"
-                                disabled={busyId === user.id}
-                                onClick={() => askApprove(user)}
-                              >
-                                Approve
-                              </button>
-                            ) : null}
-                            {canApprove &&
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              type="button"
+                              disabled={busyId === user.id}
+                              onClick={() => askApprove(user)}
+                            >
+                              Approve
+                            </button>
+                          ) : null}
+                          {canApprove &&
                             (user.status === "pending" ||
                               user.status === "active") &&
                             !(
                               user.role?.key === "admin" &&
                               user.status === "active"
                             ) ? (
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                type="button"
-                                disabled={busyId === user.id}
-                                onClick={() => askDisapprove(user)}
-                              >
-                                {user.status === "active"
-                                  ? "Deactivate"
-                                  : "Disapprove"}
-                              </button>
-                            ) : null}
-                            {canEdit &&
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              type="button"
+                              disabled={busyId === user.id}
+                              onClick={() => askDisapprove(user)}
+                            >
+                              {user.status === "active"
+                                ? "Deactivate"
+                                : "Disapprove"}
+                            </button>
+                          ) : null}
+                          {canEdit &&
                             user.status !== "active" &&
                             user.mustChangePassword ? (
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                type="button"
-                                disabled={busyId === user.id}
-                                onClick={() => void resendInvite(user)}
-                              >
-                                {resentId === user.id ? "Sent " : "Resend Mail"}
-                              </button>
-                            ) : null}
-                            {canDelete && user.role?.key !== "admin" ? (
-                              <button
-                                className="btn btn-ghost btn-sm"
-                                type="button"
-                                disabled={busyId === user.id}
-                                onClick={() => askDelete(user)}
-                                style={{ color: "var(--rose)" }}
-                              >
-                                Delete
-                              </button>
-                            ) : null}
-                            {!canEdit && !canApprove && !canDelete ? (
-                              <span className="muted" style={{ fontSize: 12 }}>
-                                View only
-                              </span>
-                            ) : null}
-                          </div>
-                          {rowError?.id === user.id ? (
-                            <div
-                              style={{
-                                color: "var(--rose)",
-                                fontSize: 12,
-                                marginTop: 4,
-                              }}
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              type="button"
+                              disabled={busyId === user.id}
+                              onClick={() => void resendInvite(user)}
                             >
-                              {rowError.message}
-                            </div>
+                              {resentId === user.id ? "Sent " : "Resend Mail"}
+                            </button>
                           ) : null}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {totalPages > 1 ? (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: 8,
-                  padding: "14px 18px",
-                }}
-              >
-                <button
-                  className="btn btn-ghost btn-sm"
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  ← Prev
-                </button>
-                <span
-                  className="muted"
-                  style={{ fontSize: 12.5, alignSelf: "center" }}
-                >
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next →
-                </button>
-              </div>
-            ) : null}
+                          {canDelete && user.role?.key !== "admin" ? (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              type="button"
+                              disabled={busyId === user.id}
+                              onClick={() => askDelete(user)}
+                              style={{ color: "var(--rose)" }}
+                            >
+                              Delete
+                            </button>
+                          ) : null}
+                          {!canEdit && !canApprove && !canDelete ? (
+                            <span className="muted" style={{ fontSize: 12 }}>
+                              View only
+                            </span>
+                          ) : null}
+                        </div>
+                        {rowError?.id === user.id ? (
+                          <div
+                            style={{
+                              color: "var(--rose)",
+                              fontSize: 12,
+                              marginTop: 4,
+                            }}
+                          >
+                            {rowError.message}
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </Reveal>
+          {totalPages > 1 ? (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                padding: "14px 18px",
+              }}
+            >
+              <button
+                className="btn btn-ghost btn-sm"
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Prev
+              </button>
+              <span
+                className="muted"
+                style={{ fontSize: 12.5, alignSelf: "center" }}
+              >
+                Page {page} of {totalPages}
+              </span>
+              <button
+                className="btn btn-ghost btn-sm"
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next →
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </Reveal>
 
       <ConfirmModal
         open={confirm !== null}

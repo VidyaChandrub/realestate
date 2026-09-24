@@ -67,7 +67,7 @@ export function TemplateCard({
           overflow: "hidden",
           border: hovered ? "1px solid var(--brand-100, #c7d2fe)" : "1px solid var(--line-2)",
           boxShadow: hovered
-            ? "0 14px 34px -10px rgba(79, 70, 229, 0.18), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
+            ? "0 14px 34px -10px rgba(21, 27, 46, 0.18), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
             : "0 2px 8px -2px rgba(14, 21, 37, 0.05)",
           transform: hovered ? "translateY(-4px)" : "none",
           transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -153,7 +153,7 @@ export function TemplateCard({
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 8,
-                  background: "var(--brand, #4f46e5)",
+                  background: "var(--brand, #0f1424)",
                   color: "#ffffff",
                   border: "none",
                   borderRadius: 10,
@@ -161,7 +161,7 @@ export function TemplateCard({
                   fontSize: 13,
                   fontWeight: 700,
                   cursor: "pointer",
-                  boxShadow: "0 6px 18px rgba(79, 70, 229, 0.4)",
+                  boxShadow: "0 6px 18px rgba(21, 27, 46, 0.4)",
                   transition: "transform 0.15s ease",
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}

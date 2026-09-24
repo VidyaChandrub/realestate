@@ -170,7 +170,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
           </Link>
 
           <div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: "#4f46e5", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#0f1424", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>
               EDIT TIER CONFIGURATION
             </div>
             <h1 style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>
@@ -181,7 +181,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ fontSize: 12, color: "#64748b", fontWeight: 600, background: "#f1f5f9", padding: "6px 12px", borderRadius: 999 }}>
-            API Endpoint: <code style={{ color: "#4f46e5", fontWeight: 700 }}>/admin/plans/{planId}</code>
+            API Endpoint: <code style={{ color: "#0f1424", fontWeight: 700 }}>/admin/plans/{planId}</code>
           </div>
         </div>
       </div>
@@ -199,7 +199,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
             {/* Card 1: Basic Information & Pricing */}
             <div style={{ background: "#fff", borderRadius: 16, padding: 24, border: "1px solid rgba(226, 232, 240, 0.8)", boxShadow: "0 2px 6px rgba(15, 23, 42, 0.03)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(79, 70, 229, 0.08)", color: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 38, height: 38, borderRadius: 12, background: "rgba(21, 27, 46, 0.08)", color: "#0f1424", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Icon name="billing" size={18} />
                 </div>
                 <div>
@@ -305,7 +305,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
                     type="checkbox"
                     checked={form.isPopular}
                     onChange={(e) => setForm((p) => ({ ...p, isPopular: e.target.checked }))}
-                    style={{ width: 18, height: 18, accentColor: "#4f46e5" }}
+                    style={{ width: 18, height: 18, accentColor: "#0f1424" }}
                   />
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 13, color: "#d97706" }}>
@@ -344,7 +344,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                        <div style={{ width: 30, height: 30, borderRadius: 8, background: "#fff", border: "1px solid #e2e8f0", color: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 8, background: "#fff", border: "1px solid #e2e8f0", color: "#0f1424", display: "flex", alignItems: "center", justifyContent: "center" }}>
                           <Icon name={conf.icon} size={15} />
                         </div>
                         <span style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>{conf.label}</span>
@@ -402,7 +402,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
                         padding: "12px 14px",
                         border: "1px solid #f1f5f9",
                         borderRadius: 12,
-                        background: form.capabilities[cap.key] ? "rgba(79, 70, 229, 0.04)" : "#fff",
+                        background: form.capabilities[cap.key] ? "rgba(21, 27, 46, 0.04)" : "#fff",
                         cursor: "pointer",
                       }}
                     >
@@ -410,7 +410,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
                         type="checkbox"
                         checked={!!form.capabilities[cap.key]}
                         onChange={(e) => toggleCapability(cap.key, e.target.checked)}
-                        style={{ width: 18, height: 18, accentColor: "#4f46e5" }}
+                        style={{ width: 18, height: 18, accentColor: "#0f1424" }}
                       />
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>{cap.label}</div>
@@ -431,7 +431,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
                 background: "#fff",
                 borderRadius: 18,
                 padding: 24,
-                border: form.isPopular ? "2px solid #4f46e5" : "1px solid rgba(226, 232, 240, 0.8)",
+                border: form.isPopular ? "2px solid #0f1424" : "1px solid rgba(226, 232, 240, 0.8)",
                 boxShadow: "0 12px 32px rgba(15, 23, 42, 0.08)",
                 position: "relative",
               }}
@@ -442,7 +442,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
                     position: "absolute",
                     top: 0,
                     right: 20,
-                    background: "#4f46e5",
+                    background: "#0f1424",
                     color: "#fff",
                     fontSize: 10,
                     fontWeight: 800,
@@ -461,7 +461,7 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
               </div>
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <span style={{ padding: "4px 12px", borderRadius: 8, background: "rgba(79, 70, 229, 0.08)", color: "#4f46e5", fontWeight: 800, fontSize: 13 }}>
+                <span style={{ padding: "4px 12px", borderRadius: 8, background: "rgba(21, 27, 46, 0.08)", color: "#0f1424", fontWeight: 800, fontSize: 13 }}>
                   {form.name || "Plan Name"}
                 </span>
                 <span style={{ fontSize: 12, color: "#94a3b8" }}>{form.slug || "slug"}</span>
@@ -544,13 +544,13 @@ export default function EditPlanPage({ params }: { params: Promise<{ id: string 
                     width: "100%",
                     padding: "12px 18px",
                     borderRadius: 12,
-                    background: "#4f46e5",
+                    background: "#0f1424",
                     color: "#fff",
                     fontSize: 14,
                     fontWeight: 700,
                     border: "none",
                     cursor: "pointer",
-                    boxShadow: "0 4px 12px rgba(79, 70, 229, 0.25)",
+                    boxShadow: "0 4px 12px rgba(21, 27, 46, 0.25)",
                   }}
                 >
                   {saving ? "Saving Changes..." : "Save Plan Changes"}

@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Roboto } from "next/font/google";
 import "../openpage.css";
 
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
+const roboto = Roboto({
+  weight: ["300", "400", "500", "700", "900"],
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
@@ -15,5 +14,16 @@ export const metadata: Metadata = {
 };
 
 export default function LocalPreviewLayout({ children }: { children: React.ReactNode }) {
-  return <div className={`${inter.variable} ${playfair.variable}`}>{children}</div>;
+  return (
+    <div
+      className={`${roboto.variable} ${roboto.className}`}
+      style={
+        {
+          ["--font-playfair" as string]: "var(--font-inter), Roboto, sans-serif",
+        } as React.CSSProperties
+      }
+    >
+      {children}
+    </div>
+  );
 }

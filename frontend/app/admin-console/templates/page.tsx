@@ -32,6 +32,8 @@ import {
 import { CountUp } from "@/components/superadmin/count-up";
 import { Reveal } from "@/components/superadmin/reveal";
 import {
+  ACCESS_TIERS,
+  accessTierOptionLabel,
   buildTemplateRows,
   deriveStats,
   matchesFilter,
@@ -72,6 +74,8 @@ import type { LandingPageData, TemplateData } from "@/lib/openpage/types";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { SceneImage } from "@/components/openpage/art";
+import { apiFetch } from "@/lib/api";
+import type { Plan } from "@/lib/types";
 
 function thumbnailFor(id: string): string {
   switch (id) {
@@ -160,6 +164,7 @@ export default function SuperAdminTemplatesPage() {
 
   // Categories
   const [categories, setCategories] = useState<TemplateCategory[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [catName, setCatName] = useState("");
   const [catBusy, setCatBusy] = useState(false);
@@ -168,7 +173,7 @@ export default function SuperAdminTemplatesPage() {
 
   // Create Template Modal
   const [createOpen, setCreateOpen] = useState(false);
-  const [designId, setDesignId] = useState("premium");
+  const [designId, setDesignId] = useState("blank");
   const [newName, setNewName] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
@@ -183,7 +188,7 @@ export default function SuperAdminTemplatesPage() {
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
 
   const reloadCategories = useCallback(() => {
-    loadTemplateCategories().then(setCategories).catch(() => {});
+    loadTemplateCategories().then(setCategories).catch(() => { });
   }, []);
 
   const reloadTemplates = useCallback(() => {
@@ -201,6 +206,19 @@ export default function SuperAdminTemplatesPage() {
   useEffect(() => {
     reloadCategories();
     reloadTemplates();
+    apiFetch<Plan[]>("/admin/plans")
+      .then(setPlans)
+      .catch(() => setPlans([]));
+    try {
+      const flash = window.sessionStorage.getItem("template_flash");
+      if (flash) {
+        window.sessionStorage.removeItem("template_flash");
+        setToast(flash);
+        window.setTimeout(() => setToast(null), 3200);
+      }
+    } catch {
+      // ignore
+    }
   }, [reloadCategories, reloadTemplates]);
 
   // Debounce search
@@ -414,26 +432,21 @@ export default function SuperAdminTemplatesPage() {
     return map;
   }, [rows]);
 
-  const bases: TemplateData[] = useMemo(() => {
-    const reDesigns: TemplateData[] = realEstateTemplateMeta
-      .filter((t) => t.id !== "blank")
-      .map((t) => ({
-        id: t.id,
-        name: t.name,
-        category: "Real Estate",
-        icon: "LayoutTemplate",
-        pages: 1,
-        conversions: "High",
-        accent: "#6D5DFC",
-        accent2: "#1e293b",
-        thumbnail: thumbnailFor(t.id),
-        description: t.description,
-      }));
-    const reIds = new Set(reDesigns.map((t) => t.id));
-    return [...reDesigns, ...TEMPLATES.filter((t) => t.id !== "tpl-blank" && !reIds.has(t.id))];
-  }, []);
-
-  const selectedBase = bases.find((t) => t.id === designId) ?? bases[0];
+  const blankBase: TemplateData = useMemo(
+    () => ({
+      id: "blank",
+      name: "Blank canvas",
+      category: "Real Estate",
+      icon: "LayoutTemplate",
+      pages: 1,
+      conversions: "—",
+      accent: "#6D5DFC",
+      accent2: "#1e293b",
+      thumbnail: "hero",
+      description: "Empty page — add sections in the builder",
+    }),
+    [],
+  );
 
   const submitCreate = async () => {
     const trimmed = newName.trim();
@@ -441,17 +454,23 @@ export default function SuperAdminTemplatesPage() {
       setCreateError("Template name is required");
       return;
     }
-    if (!selectedBase) {
-      setCreateError("Please select a design template");
-      return;
-    }
     setCreateBusy(true);
     setCreateError(null);
     try {
-      await createFromDesign(selectedBase, trimmed, createTier, createCategoryId);
+      const meta = realEstateTemplateMeta.find((t) => t.id === designId);
+      const base: TemplateData = meta
+        ? {
+          ...blankBase,
+          id: meta.id,
+          name: meta.name,
+          description: meta.description,
+          thumbnail: thumbnailFor(meta.id),
+        }
+        : TEMPLATES.find((t) => t.id === designId) ?? blankBase;
+      await createFromDesign(base, trimmed, createTier, createCategoryId);
       setCreateOpen(false);
       setNewName("");
-      setDesignId(bases[0]?.id ?? "premium");
+      setDesignId("blank");
       setCreateTier("free");
       setCreateCategoryId("");
     } catch (e) {
@@ -482,7 +501,7 @@ export default function SuperAdminTemplatesPage() {
               gap: 6,
               fontSize: 11,
               fontWeight: 800,
-              color: "var(--brand, #4f46e5)",
+              color: "var(--brand, #0f1424)",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               marginBottom: 4,
@@ -541,7 +560,7 @@ export default function SuperAdminTemplatesPage() {
             onClick={() => {
               setNewName("");
               setCreateError(null);
-              setDesignId(bases[0]?.id ?? "premium");
+              setDesignId("blank");
               setCreateTier("free");
               setCreateCategoryId("");
               setCreateOpen(true);
@@ -633,7 +652,7 @@ export default function SuperAdminTemplatesPage() {
               alignItems: "center",
               justifyContent: "space-between",
               cursor: "pointer",
-              borderColor: tierFilter === "paid" ? "var(--indigo, #4f46e5)" : "var(--line-2)",
+              borderColor: tierFilter === "paid" ? "var(--indigo, #0f1424)" : "var(--line-2)",
             }}
             onClick={() => setTierFilter(tierFilter === "paid" ? "all" : "paid")}
           >
@@ -802,10 +821,10 @@ export default function SuperAdminTemplatesPage() {
                 t === "all"
                   ? stats.total
                   : t === "free"
-                  ? tierCounts.free
-                  : t === "paid"
-                  ? tierCounts.paid
-                  : tierCounts.premium;
+                    ? tierCounts.free
+                    : t === "paid"
+                      ? tierCounts.paid
+                      : tierCounts.premium;
 
               return (
                 <button
@@ -1356,8 +1375,8 @@ export default function SuperAdminTemplatesPage() {
                   previewDevice === "desktop"
                     ? "100%"
                     : previewDevice === "tablet"
-                    ? 768
-                    : 375,
+                      ? 768
+                      : 375,
                 height: 520,
                 background: "#ffffff",
                 borderRadius: previewDevice === "desktop" ? 8 : 16,
@@ -1583,62 +1602,12 @@ export default function SuperAdminTemplatesPage() {
               value={createTier}
               onChange={(e) => setCreateTier(e.target.value as any)}
             >
-              <option value="free">Free (All plans)</option>
-              <option value="paid">Paid (Starter, Pro &amp; higher)</option>
-              <option value="premium">Premium (Pro Max / Enterprise)</option>
+              {ACCESS_TIERS.map((t) => (
+                <option key={t} value={t}>
+                  {accessTierOptionLabel(t, plans)}
+                </option>
+              ))}
             </select>
-          </div>
-        </div>
-
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label>
-            Start from design <span style={{ color: "var(--rose)", fontWeight: 700 }}>*</span>
-          </label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10, maxHeight: 300, overflowY: "auto", padding: 2 }}>
-            {bases.map((t) => {
-              const active = designId === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setDesignId(t.id)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: 10,
-                    borderRadius: 12,
-                    border: active ? "2px solid var(--brand)" : "1px solid var(--line-2)",
-                    background: active ? "var(--brand-050)" : "var(--surface)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 48,
-                      height: 36,
-                      borderRadius: 6,
-                      overflow: "hidden",
-                      background: t.accent2,
-                      flexShrink: 0,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#fff",
-                    }}
-                  >
-                    <TemplateThumb thumbnail={t.thumbnail} accent={t.accent2} />
-                  </span>
-                  <span style={{ minWidth: 0 }}>
-                    <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "var(--ink)" }}>{t.name}</span>
-                    <span style={{ display: "block", fontSize: 11, color: "var(--muted)", marginTop: 2, lineHeight: 1.3, maxHeight: 28, overflow: "hidden" }}>
-                      {t.description}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
           </div>
         </div>
       </Modal>
