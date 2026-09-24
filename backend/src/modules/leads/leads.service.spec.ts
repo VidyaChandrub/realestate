@@ -27,6 +27,7 @@ describe('LeadsService', () => {
     roleModulePermission: { findMany: jest.Mock };
     userModulePermission: { findMany: jest.Mock };
     activityEvent: { create: jest.Mock };
+    $transaction: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -55,6 +56,8 @@ describe('LeadsService', () => {
       roleModulePermission: { findMany: jest.fn().mockResolvedValue([]) },
       userModulePermission: { findMany: jest.fn().mockResolvedValue([]) },
       activityEvent: { create: jest.fn().mockResolvedValue({}) },
+      // Interactive transactions run the callback against the same mock.
+      $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -314,6 +317,118 @@ describe('LeadsService', () => {
       expect(persisted.phoneNumber).toBeUndefined();
       expect(persisted['Phone number']).toBeUndefined();
       expect(persisted['Interested in']).toBeUndefined();
+    });
+  });
+
+  describe('importFromCsv', () => {
+    const row = (overrides: Record<string, unknown> = {}) => ({
+      name: 'Asha Rao',
+      phone: '+91 98250 41200',
+      email: 'asha@example.com',
+      project: 'Skyline Heights',
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      prisma.project.findMany.mockResolvedValue([
+        { id: 'proj-1', name: 'Skyline Heights' },
+        { id: 'proj-2', name: 'Palm Grove' },
+        { id: 'proj-3', name: 'Palm Grove ' },
+      ]);
+      prisma.lead.create.mockImplementation(
+        ({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({
+            id: `lead-${prisma.lead.create.mock.calls.length}`,
+            ...data,
+          }),
+      );
+    });
+
+    it('adds only complete rows and reports the partial ones', async () => {
+      const res = await service.importFromCsv('org-1', actor(), {
+        rows: [
+          row({ rowNumber: 2 }),
+          row({ rowNumber: 3, email: '' }),
+          row({ rowNumber: 4, name: 'Vikram' }),
+          row({ rowNumber: 5, project: '  ', phone: '' }),
+          row({ rowNumber: 6, name: 'Meera' }),
+        ],
+      });
+
+      expect(res).toEqual({
+        total: 5,
+        created: 3,
+        failed: 2,
+        errors: [
+          { row: 3, reason: 'Missing Email' },
+          { row: 5, reason: 'Missing Phone, Project' },
+        ],
+      });
+      expect(prisma.lead.create).toHaveBeenCalledTimes(3);
+      expect(prisma.activityEvent.create).toHaveBeenCalledTimes(3);
+    });
+
+    it('binds the lead to the project matched by name (case-insensitive)', async () => {
+      await service.importFromCsv('org-1', actor(), {
+        rows: [row({ project: 'skyline heights' })],
+      });
+
+      expect(prisma.project.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { orgId: 'org-1' } }),
+      );
+      expect(prisma.lead.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            orgId: 'org-1',
+            projectId: 'proj-1',
+            formName: 'CSV import',
+            source: 'crm',
+            data: expect.objectContaining({
+              fullName: 'Asha Rao',
+              phone: '+91 98250 41200',
+              email: 'asha@example.com',
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('skips rows with a bad email, bad phone, unknown or ambiguous project', async () => {
+      const res = await service.importFromCsv('org-1', actor(), {
+        rows: [
+          row({ email: 'not-an-email' }),
+          row({ phone: '12ab' }),
+          row({ project: 'Nowhere Towers' }),
+          row({ project: 'palm grove' }),
+        ],
+      });
+
+      expect(res.created).toBe(0);
+      expect(res.errors).toEqual([
+        { row: 2, reason: 'Invalid email address' },
+        { row: 3, reason: 'Invalid phone number (7–15 digits)' },
+        { row: 4, reason: 'Project "Nowhere Towers" not found' },
+        {
+          row: 5,
+          reason: 'Project "palm grove" matches more than one project',
+        },
+      ]);
+      expect(prisma.lead.create).not.toHaveBeenCalled();
+    });
+
+    it('reports a row as failed when saving it throws, and keeps going', async () => {
+      prisma.lead.create
+        .mockRejectedValueOnce(new Error('db down'))
+        .mockResolvedValueOnce({ id: 'lead-2' });
+
+      const res = await service.importFromCsv('org-1', actor(), {
+        rows: [row({ rowNumber: 2 }), row({ rowNumber: 3 })],
+      });
+
+      expect(res.created).toBe(1);
+      expect(res.errors).toEqual([
+        { row: 2, reason: 'Could not be saved — please try again' },
+      ]);
     });
   });
 

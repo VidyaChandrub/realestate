@@ -1488,6 +1488,14 @@ export interface CrmLeadEditFields {
   consentEmail: boolean;
 }
 
+/** Result of POST /org/leads/import — `errors` lists each skipped CSV row. */
+export interface LeadImportResult {
+  total: number;
+  created: number;
+  failed: number;
+  errors: { row: number; reason: string }[];
+}
+
 export interface CrmLead extends Partial<CrmLeadEditFields> {
   id: string;
   orgId?: string;

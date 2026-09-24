@@ -110,7 +110,9 @@ import type {
   LeadFormRecord,
   CreateFormInput,
   UpdateFormInput,
+  LeadImportResult,
 } from "./types";
+import type { LeadImportRow } from "./lead-import";
 
 const API_BASE = "/api";
 
@@ -588,6 +590,14 @@ export async function createCrmLead(input: {
   return apiFetch<CrmLead>("/org/leads/manual", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+/** Bulk-create leads from parsed CSV rows; invalid rows are skipped server-side. */
+export async function importCrmLeads(rows: LeadImportRow[]): Promise<LeadImportResult> {
+  return apiFetch<LeadImportResult>("/org/leads/import", {
+    method: "POST",
+    body: JSON.stringify({ rows }),
   });
 }
 
