@@ -50,6 +50,7 @@ const PLAN_LIMIT_ROWS: { key: "templates" | "projects" | "users" | "landingPages
 ];
 
 const NAV_GROUPS = [
+// TODO: static sections are commented out below — re-enable their nav entries when they are made dynamic.
   { grp: "ORGANISATION", items: [
     { s: "general", icon: "building" as IconName, t: "General" },
     { s: "branding", icon: "sparkles" as IconName, t: "Branding" },
@@ -58,25 +59,25 @@ const NAV_GROUPS = [
   ] },
   { grp: "SALES", items: [
     { s: "crm", icon: "crm" as IconName, t: "CRM & Leads" },
-    { s: "fields", icon: "puzzle" as IconName, t: "Custom Attributes" },
+    // { s: "fields", icon: "puzzle" as IconName, t: "Custom Attributes" },
     { s: "pipeline", icon: "modules" as IconName, t: "Pipeline & Sources" },
     { s: "catalogs", icon: "properties" as IconName, t: "Project Catalogs" },
-    { s: "scoring", icon: "star" as IconName, t: "Scoring & Assignment" },
-    { s: "automation", icon: "link" as IconName, t: "Automation & SLA" },
+    // { s: "scoring", icon: "star" as IconName, t: "Scoring & Assignment" },
+    // { s: "automation", icon: "link" as IconName, t: "Automation & SLA" },
   ] },
   { grp: "COMMUNICATION", items: [
-    { s: "comms", icon: "phone" as IconName, t: "Calling & WhatsApp" },
+    // { s: "comms", icon: "phone" as IconName, t: "Calling & WhatsApp" },
     { s: "email", icon: "mail" as IconName, t: "Email & SMTP" },
-    { s: "notifications", icon: "bell" as IconName, t: "Notifications" },
+    // { s: "notifications", icon: "bell" as IconName, t: "Notifications" },
   ] },
-  { grp: "PLATFORM", items: [
-    { s: "data", icon: "document" as IconName, t: "Data & Import" },
-    { s: "api", icon: "key" as IconName, t: "API & Webhooks" },
-    { s: "audit", icon: "shield" as IconName, t: "Audit Log" },
-  ] },
+  // { grp: "PLATFORM", items: [
+    // { s: "data", icon: "document" as IconName, t: "Data & Import" },
+    // { s: "api", icon: "key" as IconName, t: "API & Webhooks" },
+    // { s: "audit", icon: "shield" as IconName, t: "Audit Log" },
+  // ] },
   { grp: "ACCOUNT", items: [
     { s: "billing", icon: "billing" as IconName, t: "Billing" },
-    { s: "security", icon: "lock" as IconName, t: "Security" },
+    // { s: "security", icon: "lock" as IconName, t: "Security" },
   ] },
 ] as const;
 
@@ -101,10 +102,11 @@ const SECTION_META: Record<string, { icon: IconName; title: string; sub: string 
   security: { icon: "lock", title: "Security", sub: "Sign-in policy and danger zone" },
 };
 
-function Toggle({ on = false }: { on?: boolean }) {
-  const [s, setS] = useState(on);
-  return <div className={`switch${s ? " on" : ""}`} onClick={() => setS((v) => !v)} />;
-}
+// TODO: only used by the commented-out static sections — re-enable with them.
+// function Toggle({ on = false }: { on?: boolean }) {
+//   const [s, setS] = useState(on);
+//   return <div className={`switch${s ? " on" : ""}`} onClick={() => setS((v) => !v)} />;
+// }
 
 interface GeneralBrandingForm {
   name: string; legalName: string; industry: OrgIndustry | "";
@@ -1426,10 +1428,12 @@ export default function OrgSettingsPage() {
                   <span className="mono">{(form.brandColour || "#4f46e5").toUpperCase()}</span>
                 </div>
               </div>
+              {/* TODO: Email sender name — disabled "coming soon" input.
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>Email sender name</label>
                 <input className="inp" value="" disabled placeholder="Coming soon — part of the Email module" />
               </div>
+              */}
             </Card>
           </div>
 
@@ -1442,6 +1446,7 @@ export default function OrgSettingsPage() {
                 <div className="field"><label>Currency</label><select className="inp" value={form.currency} onChange={(e) => updateForm({ currency: e.target.value })}>{!CURRENCY_OPTIONS.some((c) => c.value === form.currency) && form.currency ? <option value={form.currency}>{form.currency}</option> : null}{CURRENCY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
                 <div className="field"><label>Language</label><select className="inp" value={form.defaultLanguage} onChange={(e) => updateForm({ defaultLanguage: e.target.value })}>{!LANGUAGES.some((l) => l.value === form.defaultLanguage) && form.defaultLanguage ? <option value={form.defaultLanguage}>{form.defaultLanguage}</option> : null}{LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}</select></div>
               </div>
+              {/* TODO: Number/Date/Time format & Week starts — disabled "coming soon" selects.
               <div className="row3">
                 <div className="field"><label>Number format</label><select className="inp" value="" disabled><option value="">Coming soon</option></select></div>
                 <div className="field"><label>Date format</label><select className="inp" value="" disabled><option value="">Coming soon</option></select></div>
@@ -1450,6 +1455,7 @@ export default function OrgSettingsPage() {
               <div className="field" style={{ marginBottom: 0, maxWidth: "calc(33.33% - 8px)" }}>
                 <label>Week starts</label><select className="inp" value="" disabled><option value="">Coming soon</option></select>
               </div>
+              */}
             </Card>
           </div>
 
@@ -1462,6 +1468,7 @@ export default function OrgSettingsPage() {
           {/* CRM */}
           <div className={`os-section${section === "crm" ? " on" : ""}`}>
             <SectionHead section="crm" />
+            {/* TODO: static Lead capture & Required fields cards — toggles/pills not persisted.
             <Card icon="crm" title="Lead capture & behaviour" sub="How leads are created and handled">
               <div className="card-b" style={{ padding: 0 }}>
                 {[
@@ -1484,6 +1491,7 @@ export default function OrgSettingsPage() {
                 <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add field</span>
               </div>
             </Card>
+            */}
             <CatalogSection
               groups={LEAD_CATALOG_GROUPS}
               heading={{
@@ -1494,6 +1502,7 @@ export default function OrgSettingsPage() {
           </div>
 
           {/* FIELDS */}
+          {/* TODO: static Custom Attributes — hardcoded sample attributes, Edit/Add not wired.
           <div className={`os-section${section === "fields" ? " on" : ""}`}>
             <SectionHead section="fields" />
             <Card icon="puzzle" title="Custom attributes" sub="Add your own fields to leads, contacts, projects & bookings">
@@ -1518,11 +1527,13 @@ export default function OrgSettingsPage() {
               <button className="btn btn-primary btn-sm" style={{ marginTop: 14 }}>+ Add attribute</button>
             </Card>
           </div>
+          */}
 
           {/* PIPELINE */}
           <div className={`os-section${section === "pipeline" ? " on" : ""}`}>
             <SectionHead section="pipeline" />
             <PipelineStagesCard />
+            {/* TODO: static Lost reasons & Lead sources cards — fixed pills, add/remove not wired.
             <Card icon="modules" title="Lost reasons" sub="Why deals are marked lost">
               <div className="pill-list">
                 {["Budget mismatch", "Bought elsewhere", "Not responding", "Location not suitable", "Just browsing"].map((p) => <span key={p} className="pill">{p}<span className="x">×</span></span>)}
@@ -1535,6 +1546,7 @@ export default function OrgSettingsPage() {
                 <span className="pill" style={{ cursor: "pointer", color: "var(--brand)" }}>+ Add source</span>
               </div>
             </Card>
+            */}
           </div>
 
           {/* CATALOGS */}
@@ -1545,6 +1557,7 @@ export default function OrgSettingsPage() {
           </div>
 
           {/* SCORING */}
+          {/* TODO: static Scoring & Assignment — hardcoded scoring rules & assignment settings, not persisted.
           <div className={`os-section${section === "scoring" ? " on" : ""}`}>
             <SectionHead section="scoring" />
             <Card icon="star" title="Lead scoring" sub="Points that make a lead Hot / Warm / Cold">
@@ -1565,8 +1578,10 @@ export default function OrgSettingsPage() {
               <div className="swrow" style={{ borderBottom: 0 }}><div className="tx"><b>Cap leads per agent/day</b></div><input className="inp" style={{ width: 80 }} defaultValue="25" /></div>
             </Card>
           </div>
+          */}
 
           {/* AUTOMATION */}
+          {/* TODO: static Automation & SLA — hardcoded toggles & SLA target, not persisted.
           <div className={`os-section${section === "automation" ? " on" : ""}`}>
             <SectionHead section="automation" />
             <Card icon="link" title="Response SLA" sub="Targets & escalation">
@@ -1584,8 +1599,10 @@ export default function OrgSettingsPage() {
               </div>
             </Card>
           </div>
+          */}
 
           {/* COMMS */}
+          {/* TODO: static Calling & WhatsApp — hardcoded toggles & sample number, not persisted.
           <div className={`os-section${section === "comms" ? " on" : ""}`}>
             <SectionHead section="comms" />
             <Card icon="phone" title="Calling" sub="Dialler & AI voice">
@@ -1605,6 +1622,7 @@ export default function OrgSettingsPage() {
               <div className="swrow" style={{ borderBottom: 0 }}><div className="tx"><b>Send read receipts</b></div><Toggle on /></div>
             </Card>
           </div>
+          */}
 
           {/* EMAIL */}
           <div className={`os-section${section === "email" ? " on" : ""}`}>
@@ -1615,6 +1633,7 @@ export default function OrgSettingsPage() {
           </div>
 
           {/* NOTIFICATIONS */}
+          {/* TODO: static Notifications — hardcoded event/channel toggles, not persisted.
           <div className={`os-section${section === "notifications" ? " on" : ""}`}>
             <SectionHead section="notifications" />
             <Card icon="bell" title="Notifications" sub="Channels per event type">
@@ -1631,8 +1650,10 @@ export default function OrgSettingsPage() {
               </table></div>
             </Card>
           </div>
+          */}
 
           {/* DATA */}
+          {/* TODO: static Data & Import — import drop zone & export buttons have no handlers.
           <div className={`os-section${section === "data" ? " on" : ""}`}>
             <SectionHead section="data" />
             <Card icon="document" title="Import & export" sub="Move data in and out">
@@ -1646,8 +1667,10 @@ export default function OrgSettingsPage() {
               </div>
             </Card>
           </div>
+          */}
 
           {/* API */}
+          {/* TODO: static API & Webhooks — placeholder "coming soon" copy only.
           <div className={`os-section${section === "api" ? " on" : ""}`}>
             <SectionHead section="api" />
             <Card icon="key" title="API keys" sub="Programmatic access">
@@ -1661,8 +1684,10 @@ export default function OrgSettingsPage() {
               </p>
             </Card>
           </div>
+          */}
 
           {/* AUDIT */}
+          {/* TODO: static Audit Log — hardcoded sample rows, not loaded from the API.
           <div className={`os-section${section === "audit" ? " on" : ""}`}>
             <SectionHead section="audit" />
             <Card icon="shield" title="Audit log" sub="Recent admin & security events">
@@ -1676,6 +1701,7 @@ export default function OrgSettingsPage() {
               </table></div>
             </Card>
           </div>
+          */}
 
           {/* BILLING */}
           <div className={`os-section${section === "billing" ? " on" : ""}`}>
@@ -2130,7 +2156,7 @@ export default function OrgSettingsPage() {
                       <span className="mono">{inv.number}</span><span>{formatDate(inv.issuedAt)}</span><span>{inv.planName}</span>
                       <span>{formatMoney(inv.amount, inv.currency)}</span>
                       <span><span className={`badge ${INVOICE_STATUS_BADGE[inv.status] ?? "b-amber"}`}>{INVOICE_STATUS_LABEL[inv.status] ?? inv.status}</span></span>
-                      <span><button className="btn btn-ghost btn-sm" disabled style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>⬇ Download</button></span>
+                      <span>{/* TODO: invoice download not implemented yet. <button className="btn btn-ghost btn-sm" disabled style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>⬇ Download</button> */}</span>
                     </div>
                   ))}
                 </div>
@@ -2139,6 +2165,7 @@ export default function OrgSettingsPage() {
           </div>
 
           {/* SECURITY */}
+          {/* TODO: static Security section — sign-in policy toggles & danger-zone buttons are not persisted/wired.
           <div className={`os-section${section === "security" ? " on" : ""}`}>
             <SectionHead section="security" />
             <Card icon="lock" title="Sign-in policy" sub="Access & authentication">
@@ -2156,6 +2183,7 @@ export default function OrgSettingsPage() {
               </div>
             </Card>
           </div>
+          */}
 
           {dirty ? (
             <div className="os-savebar">
