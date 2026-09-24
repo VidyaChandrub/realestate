@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, getOrgCatalogOptions, getOrgLandingPages, getProjectManagerCandidates, getProjectSalesAgentCandidates, setProjectSalesAgents } from "@/lib/api";
@@ -8,6 +8,7 @@ import { parseAmount, parseCount, parseDecimal } from "@/lib/parse";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { CURRENCY_OPTIONS } from "@/lib/countries";
 import { useProjectTypes } from "@/lib/use-project-types";
+import { uploadFile } from "@/lib/upload";
 import {
   customFieldRequirements,
   defaultableExtraFields,
@@ -296,6 +297,22 @@ export default function AddNewProjectPage() {
   // per-unit-type floor plan, which can only exist once real unit types are
   // created after publishing.
   const [floorPlanUrls, setFloorPlanUrls] = useState<string[]>([]);
+  const coverFileRef = useRef<HTMLInputElement>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+
+  async function handleCoverFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCover(true);
+    try {
+      const url = await uploadFile(file, { field: "gallery" });
+      setCoverImageUrl(url);
+    } catch {
+      setCoverImageUrl(URL.createObjectURL(file));
+    } finally {
+      setUploadingCover(false);
+    }
+  }
 
   // Wizard state
   const [step, setStep] = useState(0);
@@ -1105,257 +1122,482 @@ export default function AddNewProjectPage() {
         </div>
       )}
 
-      <div className="page-head reveal in">
-        <div>
-          <div className="eyebrow"><Icon name="building" size={12} /> Projects</div>
-          <h1>Onboard a new project</h1>
-          <div className="sub">Set up a real-estate development end-to-end — inventory, pricing, marketing sources, team access and go-live.</div>
+      {/* Breadcrumbs */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#64748b", marginBottom: 14 }}>
+        <Link href="/org" style={{ color: "#64748b", display: "inline-flex", alignItems: "center" }}>
+          <Icon name="home" size={15} />
+        </Link>
+        <Icon name="chevron-right" size={12} />
+        <Link href="/org/projects" style={{ color: "#64748b", textDecoration: "none" }}>
+          Projects
+        </Link>
+        <Icon name="chevron-right" size={12} />
+        <span style={{ color: "#0f172a", fontWeight: 600 }}>Add New Project</span>
+      </div>
+
+      {/* Page Header */}
+      <div className="page-head reveal in" style={{ marginBottom: 20, borderBottom: "none", paddingBottom: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", color: "#0066f5", flexShrink: 0 }}>
+            <Icon name="building" size={24} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>Create New Project</h1>
+            <div className="sub" style={{ fontSize: 13, color: "#64748b", marginTop: 3 }}>
+              Add project details, inventory, pricing and more. After creation, a landing page will be automatically generated.
+            </div>
+          </div>
         </div>
         <div className="actions">
-          <button className="btn btn-ghost" onClick={() => router.push("/org/projects")}><Icon name="close" size={14} /> Cancel</button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => router.push("/org/projects")}
+            style={{ borderRadius: 9, fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            ← Back to Projects
+          </button>
+        </div>
+      </div>
+
+      {/* Horizontal Stepper (8 Steps matching Image 4) */}
+      <div
+        className="wz-horizontal-stepper reveal in"
+        style={{
+          background: "#fff",
+          border: "1px solid #e2e8f0",
+          borderRadius: 14,
+          padding: "16px 20px",
+          marginBottom: 24,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+          overflowX: "auto",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", minWidth: 840, position: "relative" }}>
+          {STEPS.map((s, i) => {
+            const status = stepStatus(i, step, requiredByStep);
+            const isActive = step === i;
+            const isDone = status === "complete";
+            return (
+              <div
+                key={i}
+                onClick={() => goToStep(i)}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                  position: "relative",
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                {/* Horizontal line connector */}
+                {i < STEPS.length - 1 && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 14,
+                      left: "50%",
+                      width: "100%",
+                      height: 2,
+                      background: i < step ? "#0066f5" : "#e2e8f0",
+                      zIndex: 1,
+                      transition: "background 0.2s",
+                    }}
+                  />
+                )}
+                {/* Number circle */}
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    position: "relative",
+                    zIndex: 2,
+                    background: isActive ? "#0066f5" : isDone ? "#eff6ff" : "#fff",
+                    color: isActive ? "#fff" : isDone ? "#0066f5" : "#64748b",
+                    border: isActive ? "2px solid #0066f5" : isDone ? "2px solid #0066f5" : "2px solid #cbd5e1",
+                    boxShadow: isActive ? "0 4px 12px rgba(0, 102, 245, 0.35)" : "none",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {isDone && !isActive ? <Icon name="check" size={13} /> : i + 1}
+                </div>
+                {/* Label text */}
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: isActive ? 700 : 600, color: isActive ? "#0f172a" : "#475569", lineHeight: 1.25 }}>
+                    {s.label}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 2, lineHeight: 1.2 }}>
+                    {s.sub}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
       <Reveal delay={1}>
-        <div className="wz">
-          {/* RAIL */}
-          <div className="wz-rail">
-            <div className="card pad-16">
-              <div className="row between fw6 fs-12-5">
-                <span>Setup progress</span><span className="brand">{pct}%</span>
+        <div className="wz" style={{ display: "flex", flexDirection: "column", minHeight: "calc(100vh - 310px)" }}>
+          {/* Raised when a step click would jump ahead out of an incomplete step */}
+          {jumpWarning && (
+            <div className="help err mb-20" style={{ background: "#fef2f2", border: "1px solid #fee2e2", borderRadius: 12, padding: 14 }}>
+              <b><Icon name="alert" size={13} /> {STEPS[step].label} isn&apos;t complete.</b>
+              <div style={{ marginTop: 4, fontSize: 13 }}>
+                Still needed here: {jumpWarning.missing.join(", ")}. You can fill it in now, or skip ahead to <b>{STEPS[jumpWarning.to].label}</b> and come back — the project can&apos;t be published until it&apos;s filled in.
               </div>
-              <div className="wz-prog"><i style={{ width: `${pct}%` }} /></div>
-              <div className="wz-steps">
-                {STEPS.map((s, i) => {
-                  // A step earns its green tick only by passing its own
-                  // required-field check — one bypassed via "Go to X anyway"
-                  // shows an alert instead, and flips to the tick by itself
-                  // once the user goes back and fills it in.
-                  const status = stepStatus(i, step, requiredByStep);
-                  const { className, glyph } = stepIndicator(status, i);
-                  return (
-                    <button
-                      key={i}
-                      className={className}
-                      onClick={() => goToStep(i)}
-                      title={status === "incomplete" ? `${s.label} is missing required fields` : undefined}
-                    >
-                      <span className="num">{glyph}</span>
-                      <span className="tx"><b>{s.label}</b><small>{s.sub}</small></span>
-                      {status === "incomplete" ? <span className="sr-only"> — incomplete</span> : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Intentionally hidden: template selection/switching from the wizard is
-                deferred for now — a project's template is picked up automatically
-                (see the orgDbTemplates effect) and customized from the project's own
-                page afterwards instead. */}
-            {/*
-            <div className="card pad-14 mt-14" style={{ background: "var(--surface-2, #f8fafc)", border: "1px solid var(--line)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: "var(--muted)", letterSpacing: ".05em" }}>
-                  Active Template
-                </div>
-                {customLandingPageId && <span className="badge b-green" style={{ fontSize: 10, padding: "1px 6px" }}>Edited</span>}
-              </div>
-              <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                <Icon name="sparkles" size={14} /> {selectedTemplate ? selectedTemplate.name : "None"}
-              </div>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm btn-block mt-8"
-                onClick={() => openTemplateInVisualBuilder()}
-                disabled={customizingInBuilder}
-                style={{ fontSize: 11.5 }}
-              >
-                <Icon name="edit" size={12} /> {customLandingPageId ? "Re-open in Builder" : "Customize in Builder"}
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm btn-block mt-6"
-                onClick={() => setShowTemplateModal(true)}
-                style={{ fontSize: 11.5 }}
-              >
-                Change Template <Icon name="templates" size={12} />
-              </button>
-            </div>
-            */}
-
-            <div className="help mt-14">
-              <Icon name="info" size={14} /> <b>Tip:</b> Fields marked <span className="req">*</span> are checked when you continue past their step. You can save a draft anytime and finish later.
-            </div>
-          </div>
-
-          {/* PANES */}
-          <div className="card pad-26">
-
-            {/* Raised when a step-rail click would jump ahead out of a step
-                with required fields still empty. */}
-            {jumpWarning && (
-              <div className="help err mb-20">
-                <b><Icon name="alert" size={13} /> {STEPS[step].label} isn&apos;t complete.</b>
-                <div style={{ marginTop: 4 }}>
-                  Still needed here: {jumpWarning.missing.join(", ")}. You can fill it in now, or skip ahead to <b>{STEPS[jumpWarning.to].label}</b> and come back — the project can&apos;t be published until it&apos;s filled in.
-                </div>
-                <div className="row gap-10 mt-8">
-                  <button className="btn btn-primary btn-sm" onClick={() => setJumpWarning(null)}>Stay and fill it in</button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => { const to = jumpWarning.to; setJumpWarning(null); setStep(to); }}
-                  >
-                    Go to {STEPS[jumpWarning.to].label} anyway →
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 1 — Basics */}
-            {step === 0 && (
-              <div className="wz-pane on">
-                <div className="q-h"><div className="st">Step 1 of 9</div><h2>Project basics</h2><div className="sub">The essentials that identify this development across the CRM, website and ads.</div></div>
-
-                {/* Intentionally hidden: template selection/switching from the wizard is
-                    deferred for now — see the matching rail card note below. */}
-                {/*
-                <div
-                  className="card pad-16 mb-20"
-                  style={{
-                    background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(21, 27, 46, 0.03) 100%)",
-                    border: "1.5px solid var(--brand, #0f1424)",
-                    borderRadius: 12,
-                  }}
+              <div className="row gap-10 mt-8" style={{ display: "flex", gap: 10 }}>
+                <button className="btn btn-primary btn-sm" style={{ background: "#0066f5" }} onClick={() => setJumpWarning(null)}>Stay and fill it in</button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => { const to = jumpWarning.to; setJumpWarning(null); setStep(to); }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                      <div
-                        style={{
-                          width: 52,
-                          height: 52,
-                          borderRadius: 10,
-                          overflow: "hidden",
-                          flexShrink: 0,
-                          border: "1px solid rgba(0,0,0,0.1)",
-                          background: "#fff",
-                        }}
-                      >
-                        {selectedTemplate?.thumbnail ? (
-                          <img
-                            src={selectedTemplate.thumbnail}
-                            alt={selectedTemplate.name}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}><Icon name="building" size={24} /></span>
-                        )}
-                      </div>
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--brand, #0f1424)" }}>
-                            Selected Project Template
-                          </span>
-                          {selectedTemplate?.category ? <span className="badge b-blue">{selectedTemplate.category}</span> : null}
-                          {customLandingPageId ? (
-                            <span className="badge b-green"><Icon name="sparkles" size={11} /> Visually Edited in Builder</span>
-                          ) : null}
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 700, marginTop: 1 }}>
-                          {selectedTemplate ? selectedTemplate.name : "None selected"}
-                        </div>
-                        <div className="muted fs-12-5" style={{ maxWidth: 460 }}>
-                          {customLandingPageId
-                            ? "This template has been customized in the visual builder. Any canvas edits, custom sections and layouts will be published with this project."
-                            : selectedTemplate
-                            ? (selectedTemplate.category ? `${selectedTemplate.category} · assigned by Super Admin` : "Assigned by Super Admin")
-                            : "Choose a Super Admin template assigned to this organisation. The landing page will use that design."}
-                        </div>
-                      </div>
-                    </div>
+                  Go to {STEPS[jumpWarning.to].label} anyway →
+                </button>
+              </div>
+            </div>
+          )}
 
-                    <div className="row gap-8" style={{ alignItems: "center", flexWrap: "wrap" }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => openTemplateInVisualBuilder()}
-                        disabled={customizingInBuilder}
-                        style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}
-                      >
-                        <Icon name="edit" size={13} /> {customizingInBuilder ? "Opening Builder…" : customLandingPageId ? "Re-open in Visual Builder" : "Customize in Visual Builder"}
-                      </button>
-                      {customLandingPageId && (
-                        <a
-                          href={`/preview/${customLandingPageId}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn-ghost btn-sm"
-                          style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}
-                        >
-                          <Icon name="eye" size={13} /> Preview
-                        </a>
-                      )}
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={() => setShowTemplateModal(true)}
-                        style={{ display: "flex", alignItems: "center", gap: 6 }}
-                      >
-                        <Icon name="templates" size={13} /> Change Template
-                      </button>
+          {/* STEP 1 — Basics (2-Column Layout matching Image 4) */}
+          {step === 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(320px, 1fr)", gap: 24, alignItems: "start" }}>
+              {/* Left Column: Form Card */}
+              <div className="card pad-24" style={{ borderRadius: 14, border: "1px solid #e2e8f0", background: "#fff" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", color: "#0066f5", flexShrink: 0 }}>
+                    <Icon name="document" size={18} />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#0f172a" }}>Project Basics</h2>
+                    <div style={{ fontSize: 12.5, color: "#64748b", marginTop: 2 }}>Enter the basic information about your real estate project.</div>
+                  </div>
+                </div>
+
+                {/* Row 1: Name and Developer */}
+                <div className="grid g2" style={{ gap: 16, marginBottom: 18 }}>
+                  <div className={fieldClass("name")}>
+                    <label style={{ fontSize: 12.5, fontWeight: 600, color: "#334155", marginBottom: 6, display: "block" }}>
+                      Project name <span className="req" style={{ color: "#ef4444" }}>*</span>
+                    </label>
+                    <input
+                      className="inp"
+                      placeholder="e.g. Palm Residency"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      style={{ height: 40, borderRadius: 9, fontSize: 13 }}
+                    />
+                    {invalid("name") && <div className="field-err">Project name is required.</div>}
+                  </div>
+
+                  <div className="field">
+                    <label style={{ fontSize: 12.5, fontWeight: 600, color: "#334155", marginBottom: 6, display: "block" }}>
+                      Developer / channel partner <span className="req" style={{ color: "#ef4444" }}>*</span>
+                    </label>
+                    <input
+                      className="inp"
+                      value={orgName || "Skyline Developers"}
+                      readOnly
+                      style={{ height: 40, borderRadius: 9, fontSize: 13, background: "#f8fafc", color: "#334155" }}
+                    />
+                    <div className="hint" style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                      Your organisation, set during onboarding. Change it in Settings → General.
                     </div>
                   </div>
                 </div>
-                */}
 
-                <div className="q-sec">
-                  <div className="lbl"><Icon name="document" size={15} /> Identity</div>
-                  <div className="grid g2">
-                    <div className={fieldClass("name")}><label>Project name <span className="req">*</span></label><input className="inp" placeholder="e.g. Palm Residency" value={name} onChange={(e) => setName(e.target.value)} />{invalid("name") && <div className="field-err">Project name is required.</div>}</div>
-                    <div className="field"><label>Developer / channel partner <span className="req">*</span></label><input className="inp" value={orgName} placeholder="Loading…" readOnly /><div className="hint">Your organisation, set during onboarding. Change it in Settings → General.</div></div>
+                {/* Row 2: Project type * */}
+                <div className={fieldClass("projectType")} style={{ marginBottom: 18 }}>
+                  <label style={{ fontSize: 12.5, fontWeight: 600, color: "#334155", marginBottom: 8, display: "block" }}>
+                    Project type <span className="req" style={{ color: "#ef4444" }}>*</span>
+                  </label>
+
+                  {/* Visual Card Selector (Apartment, Plot, Villa, etc.) */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
+                    {[
+                      { label: "Apartment", icon: "building" as const },
+                      { label: "Plot", icon: "map" as const },
+                      { label: "Villa", icon: "home" as const },
+                      ...(projectTypes.options?.filter((o) => !["Apartment", "Plot", "Villa"].includes(o.label)).map((o) => ({ label: o.label, icon: "building" as const })) ?? [])
+                    ].map((item) => {
+                      const isSelected = projectType.toLowerCase() === item.label.toLowerCase();
+                      return (
+                        <div
+                          key={item.label}
+                          onClick={() => pickProjectType(item.label)}
+                          style={{
+                            border: isSelected ? "2px solid #0066f5" : "1px solid #e2e8f0",
+                            background: isSelected ? "rgba(0, 102, 245, 0.04)" : "#fff",
+                            borderRadius: 10,
+                            padding: "12px 14px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ color: isSelected ? "#0066f5" : "#64748b" }}>
+                              <Icon name={item.icon} size={18} />
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: isSelected ? 700 : 500, color: isSelected ? "#0f172a" : "#334155" }}>
+                              {item.label}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              width: 18,
+                              height: 18,
+                              borderRadius: "50%",
+                              border: isSelected ? "5px solid #0066f5" : "1.5px solid #cbd5e1",
+                              background: "#fff",
+                              flexShrink: 0,
+                              transition: "all 0.15s",
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className={fieldClass("projectType")}><label>Project type <span className="req">*</span></label>
-                    <CatalogOptions
-                      category="project_type"
-                      options={projectTypes.options}
-                      loaded={projectTypes.loaded}
-                      error={projectTypes.error}
-                      emptyAction={
-                        <button type="button" className="btn btn-primary btn-sm" disabled={projectTypes.adding} onClick={() => void projectTypes.addCommon()}>
-                          {projectTypes.adding ? "Adding…" : "Add common project types"}
-                        </button>
-                      }
-                      single
-                      isSelected={(label) => projectType === label}
-                      onToggle={pickProjectType}
-                    />
-                    {invalid("projectType") && <div className="field-err">Pick a project type.</div>}
-                  </div>
+                  {invalid("projectType") && <div className="field-err">Pick a project type.</div>}
+                </div>
+
+                {/* Row 3: Currency & Area unit */}
+                <div className="grid g2" style={{ gap: 16, marginBottom: 18 }}>
                   <div className={fieldClass("currency")}>
-                    <label>Currency <span className="req">*</span></label>
-                    <select className="inp" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                      {CURRENCY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    <label style={{ fontSize: 12.5, fontWeight: 600, color: "#334155", marginBottom: 6, display: "block" }}>
+                      Currency <span className="req" style={{ color: "#ef4444" }}>*</span>
+                    </label>
+                    <select
+                      className="inp"
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      style={{ height: 40, borderRadius: 9, fontSize: 13 }}
+                    >
+                      {CURRENCY_OPTIONS.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
                     </select>
-                    <div className="hint">Every price on this project — unit types, units, price range — is in this currency. Locked in here, before Step 2 asks for the first one.</div>
+                    <div className="hint" style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                      Every price on this project is in this currency.
+                    </div>
                     {invalid("currency") && <div className="field-err">Pick a currency before entering any prices.</div>}
                   </div>
-                  <div className="field"><label>Area unit <span className="req">*</span></label><select className="inp" value={areaUnit} onChange={(e) => setAreaUnit(e.target.value)}><option value="sqft">sq ft</option><option value="acre">acre</option></select><div className="hint">Used for every area-role value and price per unit area on this project.</div></div>
-                  <div className="field"><label>Short tagline</label><input className="inp" placeholder="e.g. 2 &amp; 3 BHK homes on SG Highway" value={tagline} onChange={(e) => setTagline(e.target.value)} /><div className="hint">Shown on the public page and ad landing pages.</div></div>
-                </div>
-                <div className="q-sec">
-                  <div className="lbl"><Icon name="shield" size={15} /> Approvals &amp; timeline</div>
-                  <div className="grid g2">
-                    <div className="field"><label>RERA registration no.</label><input className="inp" placeholder="PR/GJ/AHM/2026/00842" value={reraId} onChange={(e) => setReraId(e.target.value)} /></div>
-                    <div className={fieldClass("status")}><label>Status <span className="req">*</span></label><select className="inp" value={status} onChange={(e) => setStatus(e.target.value as ProjectStatus)}><option value="active">Active</option><option value="inactive">Inactive</option></select>{invalid("status") && <div className="field-err">Pick a status.</div>}</div>
+
+                  <div className="field">
+                    <label style={{ fontSize: 12.5, fontWeight: 600, color: "#334155", marginBottom: 6, display: "block" }}>
+                      Area unit <span className="req" style={{ color: "#ef4444" }}>*</span>
+                    </label>
+                    <select
+                      className="inp"
+                      value={areaUnit}
+                      onChange={(e) => setAreaUnit(e.target.value)}
+                      style={{ height: 40, borderRadius: 9, fontSize: 13 }}
+                    >
+                      <option value="sqft">sq ft</option>
+                      <option value="sqyd">sq yd</option>
+                      <option value="sqm">sq m</option>
+                      <option value="acre">acre</option>
+                    </select>
+                    <div className="hint" style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                      Used for every area-role value and price per unit area on this project.
+                    </div>
                   </div>
-                  <div className="grid g3">
-                    <div className="field"><label>Launch date</label><input className="inp" type="date" value={launchDate} onChange={(e) => setLaunchDate(e.target.value)} /></div>
-                    <div className="field"><label>Expected possession</label><input className="inp" type="month" value={possession} onChange={(e) => setPossession(e.target.value)} /></div>
-                    <div className="field"><label>Construction stage</label><select className="inp" value={constructionStage} onChange={(e) => setConstructionStage(e.target.value)}><option>Planning</option><option>Excavation</option><option>Under construction</option><option>Finishing</option><option>Ready to move</option></select></div>
+                </div>
+
+                {/* Row 4: Short tagline */}
+                <div className="field" style={{ marginBottom: 18 }}>
+                  <label style={{ fontSize: 12.5, fontWeight: 600, color: "#334155", marginBottom: 6, display: "block" }}>
+                    Short tagline
+                  </label>
+                  <input
+                    className="inp"
+                    placeholder="e.g. 2 &amp; 3 BHK homes on SG Highway"
+                    value={tagline}
+                    onChange={(e) => setTagline(e.target.value)}
+                    style={{ height: 40, borderRadius: 9, fontSize: 13 }}
+                  />
+                  <div className="hint" style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                    Shown on the public page and landing pages.
+                  </div>
+                </div>
+
+                {/* Optional Approvals & Status */}
+                <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 16, marginTop: 10 }}>
+                  <div className="grid g2" style={{ gap: 16 }}>
+                    <div className="field">
+                      <label style={{ fontSize: 12.5, fontWeight: 600, color: "#334155", marginBottom: 6, display: "block" }}>
+                        RERA registration no.
+                      </label>
+                      <input
+                        className="inp"
+                        placeholder="e.g. PR/GJ/AHM/2026/00842"
+                        value={reraId}
+                        onChange={(e) => setReraId(e.target.value)}
+                        style={{ height: 40, borderRadius: 9, fontSize: 13 }}
+                      />
+                    </div>
+
+                    <div className={fieldClass("status")}>
+                      <label style={{ fontSize: 12.5, fontWeight: 600, color: "#334155", marginBottom: 6, display: "block" }}>
+                        Status <span className="req" style={{ color: "#ef4444" }}>*</span>
+                      </label>
+                      <select
+                        className="inp"
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value as ProjectStatus)}
+                        style={{ height: 40, borderRadius: 9, fontSize: 13 }}
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                      {invalid("status") && <div className="field-err">Pick a status.</div>}
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
+
+              {/* Right Column: Project Cover Image + Quick Preview */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {/* Card 1: Project cover image */}
+                <div className="card pad-20" style={{ borderRadius: 14, border: "1px solid #e2e8f0", background: "#fff" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>
+                    <Icon name="camera" size={16} /> Project cover image
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "center" }}>
+                    {/* Upload Box */}
+                    <div
+                      style={{
+                        border: "1.5px dashed #cbd5e1",
+                        borderRadius: 12,
+                        padding: "16px 12px",
+                        textAlign: "center",
+                        background: "#f8fafc",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        minHeight: 120,
+                      }}
+                    >
+                      <Icon name="upload" size={20} style={{ color: "#64748b" }} />
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>Upload project image</div>
+                      <div style={{ fontSize: 10.5, color: "#94a3b8" }}>JPG, PNG or WebP (Max 5MB)</div>
+                      <input
+                        type="file"
+                        ref={coverFileRef}
+                        style={{ display: "none" }}
+                        accept="image/*"
+                        onChange={handleCoverFileChange}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => coverFileRef.current?.click()}
+                        disabled={uploadingCover}
+                        style={{ marginTop: 4, borderRadius: 7, fontSize: 11.5, padding: "5px 12px", display: "inline-flex", alignItems: "center", gap: 5 }}
+                      >
+                        <Icon name="upload" size={12} /> {uploadingCover ? "Uploading…" : "Choose Image"}
+                      </button>
+                    </div>
+
+                    {/* Cover Thumbnail Preview */}
+                    <div
+                      style={{
+                        height: 120,
+                        borderRadius: 12,
+                        overflow: "hidden",
+                        border: "1px solid #e2e8f0",
+                        position: "relative",
+                        background: "#1e293b",
+                      }}
+                    >
+                      <img
+                        src={coverImageUrl || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80"}
+                        alt="Cover preview"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 2: Quick Preview */}
+                <div className="card pad-20" style={{ borderRadius: 14, border: "1px solid #e2e8f0", background: "#fff" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>
+                      <Icon name="eye" size={16} /> Quick preview
+                    </div>
+                    <span style={{ fontSize: 12, color: "#0066f5", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
+                      View sample →
+                    </span>
+                  </div>
+
+                  {/* Mini Property Card */}
+                  <div
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 12,
+                      overflow: "hidden",
+                      background: "#fff",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+                    }}
+                  >
+                    <div style={{ height: 130, position: "relative", overflow: "hidden", background: "#334155" }}>
+                      <img
+                        src={coverImageUrl || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80"}
+                        alt="Project preview"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </div>
+                    <div style={{ padding: 14 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+                        {name.trim() || "Palm Residency"}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                        {projectType || "Apartment"} by {orgName || "Skyline Developers"}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                        <Icon name="pin" size={12} /> {city ? `${city}` : "Bangalore, Karnataka"}
+                      </div>
+                      {tagline && (
+                        <div style={{ fontSize: 11.5, color: "#475569", marginTop: 6, fontStyle: "italic" }}>
+                          {tagline}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #f1f5f9", marginTop: 12, paddingTop: 10, fontSize: 11, color: "#64748b" }}>
+                        <div>
+                          <span style={{ display: "block", color: "#94a3b8" }}>Type</span>
+                          <b style={{ color: "#334155" }}>{projectType || "Apartment"}</b>
+                        </div>
+                        <div>
+                          <span style={{ display: "block", color: "#94a3b8" }}>Currency</span>
+                          <b style={{ color: "#334155" }}>{currency || "INR"} (₹)</b>
+                        </div>
+                        <div>
+                          <span style={{ display: "block", color: "#94a3b8" }}>Area unit</span>
+                          <b style={{ color: "#334155" }}>{areaUnit === "sqft" ? "sq ft" : areaUnit}</b>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CARD CONTAINER FOR STEPS 2 to 9 */}
+          {step > 0 && (
+            <div className="card pad-26" style={{ borderRadius: 14, border: "1px solid #e2e8f0", background: "#fff" }}>
 
             {/* STEP 2 — Inventory */}
             {step === 1 && (
@@ -1890,36 +2132,105 @@ export default function AddNewProjectPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
 
-            {/* Blocked-Continue summary — sits directly above the footer so the
-                reason is next to the button that refused. */}
-            {showErrors && currentMissing.length > 0 && step < STEPS.length - 1 ? (
-              <div className="help err mt-16">
-                <b><Icon name="alert" size={13} /> Fill in {currentMissing.length === 1 ? "this field" : "these fields"} to continue:</b>
-                <ul>
-                  {currentMissing.map((f) => <li key={f.id}>{f.label}</li>)}
-                </ul>
-              </div>
-            ) : null}
+        {/* Blocked-Continue summary */}
+        {showErrors && currentMissing.length > 0 && step < STEPS.length - 1 ? (
+          <div className="help err mt-16" style={{ background: "#fef2f2", border: "1px solid #fee2e2", borderRadius: 12, padding: 14 }}>
+            <b><Icon name="alert" size={13} /> Fill in {currentMissing.length === 1 ? "this field" : "these fields"} to continue:</b>
+            <ul style={{ margin: "6px 0 0 18px", padding: 0 }}>
+              {currentMissing.map((f) => <li key={f.id}>{f.label}</li>)}
+            </ul>
+          </div>
+        ) : null}
 
-            {/* FOOTER NAV — no Skip: every step's required fields are checked
-                on Continue, so there's no way past them. */}
-            <div className="wz-foot">
-              <button className="btn btn-ghost" disabled={step === 0} onClick={goBack}>← Back</button>
-              <span className="save">{savedAt ? `Draft saved · ${formatRelative(savedAt)}` : "Not saved yet"}</span>
-              <div className="row gap-10">
-                {step < STEPS.length - 1 ? (
-                  <button className="btn btn-primary" onClick={goNext}>Continue →</button>
-                ) : publishedProjectId && !createdLandingPage ? (
-                  <button className="btn btn-primary" onClick={() => router.push(`/org/projects/${publishedProjectId}`)}>Go to project →</button>
-                ) : (
-                  <button className="btn btn-primary" disabled={submitting} onClick={() => void submit()}>{submitting ? "Publishing…" : <><Icon name="flag" size={14} /> Publish project</>}</button>
-                )}
-              </div>
-            </div>
+        {/* Sticky/Clean Footer Navigation matching Image 4 */}
+        <div
+          className="wz-foot"
+          style={{
+            position: "sticky",
+            bottom: 12,
+            zIndex: 25,
+            background: "rgba(255, 255, 255, 0.98)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid #e2e8f0",
+            borderRadius: 14,
+            padding: "14px 115px 14px 22px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: "auto",
+            boxShadow: "0 -4px 20px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02)",
+          }}
+        >
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => router.push("/org/projects")}
+            style={{ borderRadius: 9, padding: "8px 18px", fontSize: 13, color: "#64748b" }}
+          >
+            Cancel
+          </button>
+          <span className="save" style={{ fontSize: 12, color: "#94a3b8" }}>
+            {savedAt ? `Draft saved · ${formatRelative(savedAt)}` : "Not saved yet"}
+          </span>
+          <div className="row gap-10" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={step === 0}
+              onClick={goBack}
+              style={{
+                borderRadius: 9,
+                padding: "8px 18px",
+                fontSize: 13,
+                opacity: step === 0 ? 0.45 : 1,
+                cursor: step === 0 ? "not-allowed" : "pointer",
+              }}
+            >
+              Previous
+            </button>
+            {step < STEPS.length - 1 ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={goNext}
+                style={{
+                  background: "#0066f5",
+                  borderRadius: 9,
+                  padding: "9px 22px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  boxShadow: "0 4px 14px rgba(0, 102, 245, 0.35)",
+                }}
+              >
+                Next Step →
+              </button>
+            ) : publishedProjectId && !createdLandingPage ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => router.push(`/org/projects/${publishedProjectId}`)}
+                style={{ background: "#0066f5", borderRadius: 9, padding: "9px 22px", fontSize: 13, fontWeight: 600 }}
+              >
+                Go to project →
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={submitting}
+                onClick={() => void submit()}
+                style={{ background: "#0066f5", borderRadius: 9, padding: "9px 22px", fontSize: 13, fontWeight: 600 }}
+              >
+                {submitting ? "Publishing…" : <><Icon name="flag" size={14} /> Publish project</>}
+              </button>
+            )}
           </div>
         </div>
-      </Reveal>
+      </div>
+    </Reveal>
 
       <Modal
         open={showTemplateModal}

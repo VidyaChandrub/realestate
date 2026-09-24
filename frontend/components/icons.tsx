@@ -63,7 +63,9 @@ export type IconName =
   | "upload"
   | "info"
   | "trending"
-  | "crown";
+  | "crown"
+  | "activity"
+  | "pause";
 
 interface IconProps extends SVGProps<SVGSVGElement> {
   name: IconName;
@@ -415,6 +417,15 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M3 18L5 7L9.5 12L12 4L14.5 12L19 7L21 18H3Z" />
       <path d="M3 19.5H21" />
+    </>
+  ),
+  activity: (
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  ),
+  pause: (
+    <>
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
     </>
   ),
 };

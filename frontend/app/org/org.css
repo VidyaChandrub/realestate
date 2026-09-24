@@ -4155,3 +4155,28 @@
 .org ::-webkit-scrollbar-thumb:hover {
   background: #9aa3b5;
 }
+
+/* Horizontal wizard stepper & project cards enhancements */
+.org .wz-horizontal-stepper {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.org .wz-horizontal-stepper::-webkit-scrollbar {
+  height: 4px;
+}
+
+.org .wz-horizontal-stepper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+
+.org .pcard {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.org .pcard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.08);
+}
+
