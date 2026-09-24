@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { dashboardPathFor } from "@/lib/mock/sessions";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
 import { mapApiFieldErrors } from "@/lib/form-errors";
 
@@ -95,115 +96,86 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="auth">
-      <div className="brandside">
-        <div className="glow" />
-        <div style={{ position: "relative" }}>
-          <div className="logo">iR</div>
-        </div>
-        <div style={{ position: "relative" }}>
-          <h1 className="reveal in">From ad click to site visit — nothing leaks.</h1>
-          <p className="reveal in" data-delay="1" style={{ marginTop: 18 }}>
-            iPixxel Realty captures every property enquiry from Meta, Google, WhatsApp and your
-            landing pages into one CRM — so your sales team follows up before the lead goes cold.
-          </p>
-          <div
-            className="reveal in"
-            data-delay="2"
-            style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 30 }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 15, color: "#e6e9f8" }}>
-              ✅ <span>Auto-capture leads from every ad &amp; landing page</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 15, color: "#e6e9f8" }}>
-              ✅ <span>Call centre &amp; WhatsApp follow-ups in one place</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 15, color: "#e6e9f8" }}>
-              ✅ <span>Live pipeline — New to Won, per project &amp; agent</span>
-            </div>
-          </div>
-        </div>
-        <div style={{ position: "relative", color: "#8891b4", fontSize: 13 }}>
-          Trusted by Skyline Developers, Green Acres &amp; Dubai Prime Estates
-        </div>
-      </div>
-
-      <div className="formside">
-        <div className="fw">
-          <div className="reveal in">
-            <h2>{portal ? `Sign in to ${portal.name}` : "Sign in to iPixxel Realty"}</h2>
-            <p className="muted" style={{ marginTop: 8 }}>
-              {portal
-                ? "Use your organisation credentials. After sign-in you will land on your dashboard."
-                : "One login for Super Admin, Org Admin, Managers & Sales."}
-            </p>
-            {portal?.sitePath ? (
-              <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
-                Looking for the public website? <a href={portal.sitePath} style={{ color: "var(--brand)", fontWeight: 600 }}>Open landing page</a>
-              </p>
+    <AuthShell
+      eyebrow="Workspace sign in"
+      title={portal ? `Sign in to ${portal.name}` : "Welcome back"}
+      subtitle={
+        portal ? (
+          <>
+            Use your organisation credentials. After sign-in you will land on your dashboard.
+            {portal.sitePath ? (
+              <>
+                {" "}
+                Looking for the public website?{" "}
+                <a href={portal.sitePath} style={{ fontWeight: 600 }}>
+                  Open landing page
+                </a>
+              </>
             ) : null}
-          </div>
-          {notice ? (
-            <p role="status" className="help reveal in" style={{ marginTop: 18, borderColor: "var(--rose-050)", background: "var(--rose-050)", color: "var(--rose)" }}>
-              {notice}
-            </p>
-          ) : null}
-          <form className="reveal in" data-delay="1" style={{ marginTop: 26 }} onSubmit={handleSubmit} noValidate>
-            <div className="field">
-              <label>Work email</label>
-              <input
-                className="inp"
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setFieldErrors((prev) => ({ ...prev, email: "" }));
-                }}
-                autoComplete="email"
-                placeholder="admin@skylinedev.com"
-              />
-              {fieldErrors.email ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.email}</div> : null}
-            </div>
-            <div className="field">
-              <label>Password</label>
-              <PasswordInput
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setFieldErrors((prev) => ({ ...prev, password: "" }));
-                }}
-                autoComplete="current-password"
-                placeholder="••••••••••"
-              />
-              {fieldErrors.password ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.password}</div> : null}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <label className="check">
-                <input type="checkbox" checked={keepSignedIn} onChange={(e) => setKeepSignedIn(e.target.checked)} /> Keep me signed in
-              </label>
-              <Link href="/forgot-password" style={{ color: "var(--brand)", fontWeight: 600, fontSize: 13.5 }}>
-                Forgot password?
-              </Link>
-            </div>
-
-            {generalError ? (
-              <p role="alert" className="help" style={{ color: "var(--rose)", borderColor: "var(--rose-050)", background: "var(--rose-050)", marginBottom: 14 }}>
-                {generalError}
-              </p>
-            ) : null}
-
-            <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in…" : "Sign in →"}
-            </button>
-          </form>
-
-    
-          <p className="muted reveal in" data-delay="3" style={{ textAlign: "center", marginTop: 24, fontSize: 13.5 }}>
-            New here?{" "}
-            <Link href="/register" style={{ color: "var(--brand)", fontWeight: 600 }}>Create an organisation</Link>
-          </p>
+          </>
+        ) : (
+          "Org Admin, Managers & Sales — your property pipeline in one login."
+        )
+      }
+      footer={
+        <>
+          New here? <Link href="/register">Create an organisation</Link>
+        </>
+      }
+    >
+      {notice ? (
+        <p role="status" className="help" style={{ marginTop: 18, borderColor: "var(--rose-050)", background: "var(--rose-050)", color: "var(--rose)" }}>
+          {notice}
+        </p>
+      ) : null}
+      <form style={{ marginTop: 24 }} onSubmit={handleSubmit} noValidate>
+        <div className="field">
+          <label>Work email</label>
+          <input
+            className="inp"
+            type="email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setFieldErrors((prev) => ({ ...prev, email: "" }));
+            }}
+            autoComplete="email"
+            placeholder="admin@skylinedev.com"
+          />
+          {fieldErrors.email ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.email}</div> : null}
         </div>
-      </div>
-    </div>
+        <div className="field">
+          <label>Password</label>
+          <PasswordInput
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setFieldErrors((prev) => ({ ...prev, password: "" }));
+            }}
+            autoComplete="current-password"
+            placeholder="••••••••••"
+          />
+          {fieldErrors.password ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.password}</div> : null}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <label className="check">
+            <input type="checkbox" checked={keepSignedIn} onChange={(e) => setKeepSignedIn(e.target.checked)} /> Keep me signed in
+          </label>
+          <Link href="/forgot-password" style={{ color: "var(--brand)", fontWeight: 600, fontSize: 13.5 }}>
+            Forgot password?
+          </Link>
+        </div>
+
+        {generalError ? (
+          <p role="alert" className="help" style={{ color: "var(--rose)", borderColor: "var(--rose-050)", background: "var(--rose-050)", marginBottom: 14 }}>
+            {generalError}
+          </p>
+        ) : null}
+
+        <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Signing in…" : "Sign in →"}
+        </button>
+      </form>
+    </AuthShell>
   );
 }
