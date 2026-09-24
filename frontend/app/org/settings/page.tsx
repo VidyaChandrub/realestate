@@ -543,7 +543,7 @@ type CatalogGroup = {
 // kept generic for that reason (the enum values stay `unit_type` / `facing` /
 // `parking`).
 const CATALOG_GROUPS: CatalogGroup[] = [
-  { category: "unit_type", title: "Configurations", sub: "Configuration labels for units and lead requirements — e.g. 2 BHK, 3 BHK, Penthouse, Villa, Plot", placeholder: "Add a configuration…" },
+  { category: "unit_type", title: "Configuration for standalone units", sub: "Configuration labels for standalone units and lead requirements — e.g. 2 BHK, 3 BHK, Penthouse, Villa, Plot", placeholder: "Add a configuration…" },
   { category: "connectivity", title: "Connectivity & landmarks", sub: "Nearby categories — e.g. Metro / transit, Schools, Hospitals, Airport", placeholder: "Add a connectivity category…" },
   { category: "amenity", title: "Amenities", sub: "Lifestyle features — e.g. Clubhouse, Gymnasium, Swimming pool", placeholder: "Add an amenity…" },
   { category: "price_includes", title: "Price includes", sub: "What the quoted price covers — e.g. Floor rise, 1 covered parking, Club membership, GST", placeholder: "Add a price inclusion…" },

@@ -1033,6 +1033,8 @@ export interface PublicProject extends Project {
 
 export interface ProjectListRow extends Project {
   unitTypeCount: number;
+  /** Units actually added to this project (any status). */
+  unitCount: number;
   /** Landing pages bound to this project (its `content.propertyBinding`), regardless of status. */
   landingPageCount: number;
 }

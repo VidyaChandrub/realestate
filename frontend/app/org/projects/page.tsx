@@ -277,7 +277,7 @@ export default function OrgProjectsPage() {
                     <div className="pmeta">
                       <div><span className="k">Type</span><b>{p.projectType || "—"}</b></div>
                       <div><span className="k">Starting</span><b>{formatMoney(p.priceMin, p.currency)}</b></div>
-                      <div><span className="k">Unit types</span><b>{p.unitTypeCount}</b></div>
+                      <div><span className="k">Units</span><b>{p.unitCount}</b></div>
                       <div><span className="k">Landing pages</span><b>{p.landingPageCount}</b></div>
                       <div><span className="k">Manager</span>                      <b><span className="u"><span className="av xs">{managerInitials(p.manager?.name)}</span></span></b></div>
                     </div>
