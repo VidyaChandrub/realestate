@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
 import { AddLeadModal } from "@/components/org/add-lead-modal";
+import { ImportLeadsModal, downloadLeadImportSample } from "@/components/org/import-leads-modal";
 import { LeadStatusSelect } from "@/components/org/lead-status-select";
 import { LEAD_STAGE_ORDER, StageBadge, useLeadStages } from "@/lib/lead-stages";
 
@@ -69,6 +70,17 @@ export default function OrgLeadsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState(() => searchParams.get("assignedTo") ?? "");
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [sampleBusy, setSampleBusy] = useState(false);
+
+  async function downloadSample() {
+    setSampleBusy(true);
+    try {
+      await downloadLeadImportSample();
+    } finally {
+      setSampleBusy(false);
+    }
+  }
 
   const load = useCallback(async () => {
     setError(null);
@@ -156,10 +168,25 @@ export default function OrgLeadsPage() {
         active="lead-center"
         actions={
           admin || canAdd ? (
-            <button className="btn btn-primary" onClick={() => setAddOpen(true)}>＋ Add lead</button>
+            <>
+              <button className="btn btn-ghost" type="button" onClick={() => void downloadSample()} disabled={sampleBusy}>
+                <Icon name="download" size={14} /> {sampleBusy ? "Preparing…" : "Sample CSV"}
+              </button>
+              <button className="btn btn-ghost" type="button" onClick={() => setImportOpen(true)}>
+                <Icon name="document" size={14} /> Import CSV
+              </button>
+              <button className="btn btn-primary" onClick={() => setAddOpen(true)}>＋ Add lead</button>
+            </>
           ) : undefined
         }
       />
+      {importOpen ? (
+        <ImportLeadsModal
+          open
+          onClose={() => setImportOpen(false)}
+          onImported={() => void load()}
+        />
+      ) : null}
       <AddLeadModal
         open={addOpen}
         onClose={() => setAddOpen(false)}

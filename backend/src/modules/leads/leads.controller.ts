@@ -17,6 +17,7 @@ import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { LeadsService } from './leads.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { CreateManualLeadDto } from './dto/create-manual-lead.dto';
+import { ImportLeadsDto } from './dto/import-leads.dto';
 import { AssignLeadDto } from './dto/assign-lead.dto';
 import { ListLeadsQueryDto } from './dto/list-leads-query.dto';
 import { CreateLeadNoteDto } from './dto/create-lead-note.dto';
@@ -41,6 +42,17 @@ export class LeadsController {
   @Post('manual')
   createManual(@CurrentUser() user: JwtPayload, @Body() dto: CreateManualLeadDto) {
     return this.service.createFromCrm(user.orgId as string, user, dto);
+  }
+
+  /**
+   * Bulk lead import from a CSV parsed client-side. Same permission as a
+   * manual lead; rows are validated individually and invalid ones skipped.
+   */
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('crm', 'add')
+  @Post('import')
+  importCsv(@CurrentUser() user: JwtPayload, @Body() dto: ImportLeadsDto) {
+    return this.service.importFromCsv(user.orgId as string, user, dto);
   }
 
   /**

@@ -8,11 +8,13 @@ import type { ListLeadsQueryDto } from './dto/list-leads-query.dto';
 import type { CreateLeadNoteDto } from './dto/create-lead-note.dto';
 import type { UpdateLeadNextActionDto } from './dto/update-lead-next-action.dto';
 import type { UpdateLeadDto } from './dto/update-lead.dto';
+import type { ImportLeadsDto } from './dto/import-leads.dto';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import {
   leadContactFromData,
   normalizeLeadData,
 } from '../../common/utils/lead-data.util';
+import { isValidLoosePhone } from '../../common/utils/phone.util';
 import {
   actorLeadOrClauses,
   canSeeAllLeads,
@@ -21,6 +23,53 @@ import { listLeadAssignableUsers } from '../../common/utils/lead-assignee.util';
 
 /** Sentinel org id for Super Admin template captures (Lead.orgId has no FK). */
 export const PLATFORM_LEAD_ORG_ID = 'platform';
+
+// Per-row rules for CSV lead import.
+const LEAD_IMPORT_NAME_MAX = 120;
+const LEAD_IMPORT_EMAIL_MAX = 254;
+const LEAD_IMPORT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Why a CSV import row must be skipped, or null when it can be saved. All four
+ * fields are required; `projectIds` are the org projects matching its name.
+ */
+function importRowError(
+  row: { name: string; phone: string; email: string; projectName: string },
+  projectIds: string[],
+): string | null {
+  const missing = [
+    !row.name && 'Name',
+    !row.phone && 'Phone',
+    !row.email && 'Email',
+    !row.projectName && 'Project',
+  ].filter(Boolean);
+  if (missing.length > 0) return `Missing ${missing.join(', ')}`;
+  if (row.name.length > LEAD_IMPORT_NAME_MAX) {
+    return `Name is longer than ${LEAD_IMPORT_NAME_MAX} characters`;
+  }
+  if (!isValidLoosePhone(row.phone)) {
+    return 'Invalid phone number (7–15 digits)';
+  }
+  if (
+    row.email.length > LEAD_IMPORT_EMAIL_MAX ||
+    !LEAD_IMPORT_EMAIL_REGEX.test(row.email)
+  ) {
+    return 'Invalid email address';
+  }
+  if (projectIds.length === 0) return `Project "${row.projectName}" not found`;
+  if (projectIds.length > 1) {
+    return `Project "${row.projectName}" matches more than one project`;
+  }
+  return null;
+}
+
+export type LeadImportResult = {
+  total: number;
+  created: number;
+  failed: number;
+  /** One entry per skipped row; `row` is the 1-based line in the CSV. */
+  errors: { row: number; reason: string }[];
+};
 
 type ResolvedPublicPage = {
   id: string;
@@ -243,38 +292,149 @@ export class LeadsService {
       dto.assignedToId ??
       (await this.nextRoundRobinAssignee(orgId, dto.projectId ?? null));
 
-    const lead = await this.prisma.lead.create({
-      data: {
-        orgId,
-        projectId: dto.projectId ?? null,
-        formName: dto.formName ?? 'Manual lead',
-        source: dto.source ?? 'crm',
-        data: data as Prisma.InputJsonValue,
-        configurations: [],
-        tags: [],
-        assignedToId,
-      },
-      include: {
-        assignedTo: {
-          select: { id: true, firstName: true, lastName: true, email: true },
-        },
-        project: { select: { id: true, name: true } },
-      },
-    });
-
-    await this.prisma.activityEvent.create({
-      data: {
-        orgId,
-        agentId: actor.sub,
-        leadId: lead.id,
-        type: 'status_updated',
-        text: assignedToId
-          ? 'Lead created in CRM and assigned'
-          : 'Lead created in CRM',
-      },
+    const lead = await this.insertCrmLead(orgId, actor, {
+      projectId: dto.projectId ?? null,
+      formName: dto.formName ?? 'Manual lead',
+      source: dto.source ?? 'crm',
+      data,
+      assignedToId,
+      activityText: assignedToId
+        ? 'Lead created in CRM and assigned'
+        : 'Lead created in CRM',
     });
 
     return this.toListItem(lead);
+  }
+
+  /**
+   * Bulk-create leads from CSV rows. Each row is validated independently —
+   * Name, Phone, Email and Project are all required, email/phone must be
+   * well-formed and Project must name one of the org's projects. Invalid rows
+   * are skipped (never written) and reported with their line number; valid
+   * rows go through the same insert path as a manual CRM lead.
+   */
+  async importFromCsv(
+    orgId: string,
+    actor: JwtPayload,
+    dto: ImportLeadsDto,
+  ): Promise<LeadImportResult> {
+    const projects = await this.prisma.project.findMany({
+      where: { orgId },
+      select: { id: true, name: true },
+    });
+    // Case-insensitive name → ids. More than one id means the name is
+    // ambiguous and the row can't be bound safely.
+    const projectsByName = new Map<string, string[]>();
+    for (const p of projects) {
+      const key = p.name.trim().toLowerCase();
+      projectsByName.set(key, [...(projectsByName.get(key) ?? []), p.id]);
+    }
+
+    const errors: LeadImportResult['errors'] = [];
+    let created = 0;
+
+    for (const [index, row] of dto.rows.entries()) {
+      // Header is line 1, so the first data row is line 2 unless the client
+      // sent the real line number (it skips blank lines).
+      const rowNumber = row.rowNumber ?? index + 2;
+      const name = (row.name ?? '').trim();
+      const phone = (row.phone ?? '').trim();
+      const email = (row.email ?? '').trim();
+      const projectName = (row.project ?? '').trim();
+      const projectIds = projectsByName.get(projectName.toLowerCase()) ?? [];
+
+      const reason = importRowError(
+        { name, phone, email, projectName },
+        projectIds,
+      );
+      if (reason) {
+        errors.push({ row: rowNumber, reason });
+        continue;
+      }
+
+      const projectId = projectIds[0];
+      try {
+        const assignedToId = await this.nextRoundRobinAssignee(
+          orgId,
+          projectId,
+        );
+        await this.insertCrmLead(orgId, actor, {
+          projectId,
+          formName: 'CSV import',
+          source: 'crm',
+          data: normalizeLeadData({ fullName: name, name, phone, email }),
+          assignedToId,
+          activityText: assignedToId
+            ? 'Lead imported from CSV and assigned'
+            : 'Lead imported from CSV',
+        });
+        created += 1;
+      } catch {
+        errors.push({
+          row: rowNumber,
+          reason: 'Could not be saved — please try again',
+        });
+      }
+    }
+
+    return {
+      total: dto.rows.length,
+      created,
+      failed: dto.rows.length - created,
+      errors,
+    };
+  }
+
+  /**
+   * Shared write path for CRM-created leads (manual form and CSV import). The
+   * lead and its activity event are written in one transaction so a failure
+   * never leaves a lead without its creation event (or reports a saved lead
+   * as failed during an import).
+   */
+  private async insertCrmLead(
+    orgId: string,
+    actor: JwtPayload,
+    input: {
+      projectId: string | null;
+      formName: string;
+      source: string;
+      data: Record<string, unknown>;
+      assignedToId: string | null;
+      activityText: string;
+    },
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const lead = await tx.lead.create({
+        data: {
+          orgId,
+          projectId: input.projectId,
+          formName: input.formName,
+          source: input.source,
+          data: input.data as Prisma.InputJsonValue,
+          configurations: [],
+          tags: [],
+          assignedToId: input.assignedToId,
+        },
+        include: {
+          assignedTo: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
+          project: { select: { id: true, name: true } },
+        },
+      });
+
+      await tx.activityEvent.create({
+        data: {
+          orgId,
+          agentId: actor.sub,
+          leadId: lead.id,
+          type: 'status_updated',
+          text: input.activityText,
+        },
+      });
+
+      return lead;
+    });
   }
 
   /**
