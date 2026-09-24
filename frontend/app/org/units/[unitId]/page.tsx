@@ -18,6 +18,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import {
   ConfigurationSelect,
+  NoManagersNote,
   UnitMediaFields,
   formatUpdatedAt,
   areaPricePerAreaLabel,
@@ -109,6 +110,7 @@ export default function StandaloneUnitPage() {
   // Assignment pickers — same org-level lists a project's Team & access
   // section uses.
   const [managers, setManagers] = useState<OrgUser[]>([]);
+  const [managersLoaded, setManagersLoaded] = useState(false);
   const [salesAgentCandidates, setSalesAgentCandidates] = useState<
     CrmAssignableUser[]
   >([]);
@@ -151,7 +153,10 @@ export default function StandaloneUnitPage() {
       "/org/users?role=manager&limit=100&status=active",
       { headers: { Authorization: `Bearer ${accessToken}` } },
     )
-      .then((res) => setManagers(res.data))
+      .then((res) => {
+        setManagers(res.data);
+        setManagersLoaded(true);
+      })
       .catch(() => setManagers([]));
     getSalesAgentCandidates()
       .then((res) => setSalesAgentCandidates(res.data))
@@ -473,18 +478,26 @@ export default function StandaloneUnitPage() {
               <div className="grid g2">
                 <div className="field">
                   <label>Manager</label>
-                  <select
-                    className="inp"
-                    value={form.managerId}
-                    onChange={(e) => patch({ managerId: e.target.value })}
-                  >
-                    <option value="">Unassigned</option>
-                    {managers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {userLabel(m)}
-                      </option>
-                    ))}
-                  </select>
+                  {managersLoaded && managers.length === 0 ? (
+                    <NoManagersNote noun="unit" />
+                  ) : (
+                    <select
+                      className="inp"
+                      value={form.managerId}
+                      onChange={(e) => patch({ managerId: e.target.value })}
+                    >
+                      <option value="">Unassigned</option>
+                      {managers.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {userLabel(m)}
+                        </option>
+                      ))}
+                      {/* The current manager (e.g. an auto-assigned admin) stays selectable. */}
+                      {unit.manager && !managers.some((m) => m.id === unit.manager?.id) ? (
+                        <option value={unit.manager.id}>{unit.manager.name}</option>
+                      ) : null}
+                    </select>
+                  )}
                 </div>
               </div>
               <div className="field mb-0">

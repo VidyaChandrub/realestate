@@ -37,6 +37,12 @@ export interface ProjectRequiredValues {
   address: string;
   city: string;
   managerId: string;
+  /**
+   * True once the manager list has loaded empty — a small agency with no
+   * Manager. The project is then auto-assigned to the org admin server-side,
+   * so the manager pick stops being required.
+   */
+  noManagers?: boolean;
 }
 
 /** The wizard's steps, in order. The rail and the step headers both read this. */
@@ -88,7 +94,7 @@ export function projectRequirements(
       { id: "city", label: "City", error: "City is required.", filled: !!v.city.trim() },
     ],
     6: [
-      { id: "managerId", label: "Project manager", error: "Assign a project manager.", filled: !!v.managerId },
+      { id: "managerId", label: "Project manager", error: "Assign a project manager.", filled: !!v.managerId || !!v.noManagers },
     ],
   };
   for (const [step, fields] of Object.entries(extra)) {

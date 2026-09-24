@@ -16,6 +16,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
 import {
   ConfigurationSelect,
+  NoManagersNote,
   UnitMediaFields,
   areaPricePerAreaLabel,
   UnitAttributeSelect,
@@ -61,7 +62,8 @@ export default function UnitCreatePage() {
   const router = useRouter();
   const { accessToken } = useAuth();
 
-  const [mode, setMode] = useState<"project" | "standalone">("standalone");
+  // Standalone only for now — the "Inside a project" picker is commented out below.
+  const [mode] = useState<"project" | "standalone">("standalone");
   const [projects, setProjects] = useState<ProjectListRow[]>([]);
   const [projectId, setProjectId] = useState("");
   // The org's unit-type catalog (Settings → Project Catalogs) — the sole
@@ -87,6 +89,7 @@ export default function UnitCreatePage() {
   // access section.
   const [managerId, setManagerId] = useState("");
   const [managers, setManagers] = useState<OrgUser[]>([]);
+  const [managersLoaded, setManagersLoaded] = useState(false);
   const [agentAssign, setAgentAssign] = useState<string[]>([]);
   const [salesAgentCandidates, setSalesAgentCandidates] = useState<
     CrmAssignableUser[]
@@ -132,7 +135,9 @@ export default function UnitCreatePage() {
       { headers: { Authorization: `Bearer ${accessToken}` } },
     )
       .then((res) => {
-        if (!cancelled) setManagers(res.data);
+        if (cancelled) return;
+        setManagers(res.data);
+        setManagersLoaded(true);
       })
       .catch(() => {
         if (!cancelled) setManagers([]);
@@ -207,8 +212,7 @@ export default function UnitCreatePage() {
           </div>
           <h1>Add a unit</h1>
           <div className="sub">
-            Add a standalone resale / broker listing with no project, or jump
-            to a project&apos;s Units page to add one there.
+            Add a standalone resale / broker listing with no project.
           </div>
         </div>
         <div className="actions">
@@ -237,6 +241,8 @@ export default function UnitCreatePage() {
       <Reveal delay={1}>
         <div className="cgrid">
           <div className="card pad-26">
+            {/* "Inside a project" is hidden for now — project units are added
+                from the project's own Units page. Kept for when it returns.
             <div className="sec">
               <div className="lbl"><Icon name="properties" size={15} /> How do you want to add this unit?</div>
               <div className="mode">
@@ -258,6 +264,7 @@ export default function UnitCreatePage() {
                 </div>
               </div>
             </div>
+            */}
 
             {!standalone ? (
               <div className="sec nb">
@@ -407,18 +414,22 @@ export default function UnitCreatePage() {
                   <div className="grid g2">
                     <div className="field">
                       <label>Manager</label>
-                      <select
-                        className="inp"
-                        value={managerId}
-                        onChange={(e) => setManagerId(e.target.value)}
-                      >
-                        <option value="">Unassigned</option>
-                        {managers.map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {userLabel(u)}
-                          </option>
-                        ))}
-                      </select>
+                      {managersLoaded && managers.length === 0 ? (
+                        <NoManagersNote noun="unit" />
+                      ) : (
+                        <select
+                          className="inp"
+                          value={managerId}
+                          onChange={(e) => setManagerId(e.target.value)}
+                        >
+                          <option value="">Unassigned</option>
+                          {managers.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {userLabel(u)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   </div>
                   <div className="field mb-0">

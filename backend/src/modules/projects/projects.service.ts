@@ -157,7 +157,7 @@ export class ProjectsService {
   // -------------------------------------------------------------------------
 
   async create(orgId: string, dto: CreateProjectDto) {
-    if (dto.managerId) await this.assertOrgUser(orgId, dto.managerId);
+    const managerId = await this.resolveManagerId(orgId, dto.managerId);
 
     // Plan project quota — enforced only when the org has a subscription
     // (mirrors the template-quota behaviour). All projects count, any status.
@@ -203,7 +203,7 @@ export class ProjectsService {
           location: dto.location ?? null,
           reraId: dto.reraId ?? null,
           possession: dto.possession ?? null,
-          managerId: dto.managerId ?? null,
+          managerId,
           // Required on the DTO now (@IsNotEmpty) — no silent 'active' default.
           status: dto.status,
           priceMin: dto.priceMin ?? null,
@@ -291,7 +291,7 @@ export class ProjectsService {
         take: limit,
         include: {
           ...PROJECT_INCLUDE,
-          _count: { select: { unitTypes: true } },
+          _count: { select: { unitTypes: true, units: true } },
         },
       }),
       this.prisma.project.count({ where }),
@@ -316,6 +316,7 @@ export class ProjectsService {
     const data = rows.map((row) => ({
       ...this.serializeProject(row),
       unitTypeCount: row._count.unitTypes,
+      unitCount: row._count.units,
       landingPageCount: landingPageCountByProject.get(row.id) ?? 0,
     }));
 
@@ -402,7 +403,10 @@ export class ProjectsService {
 
   async update(orgId: string, id: string, dto: UpdateProjectDto, actor?: JwtPayload) {
     const existingProject = await this.getOwnedProject(orgId, id, actor);
-    if (dto.managerId) await this.assertOrgUser(orgId, dto.managerId);
+    const managerId =
+      dto.managerId !== undefined
+        ? await this.resolveManagerId(orgId, dto.managerId)
+        : undefined;
 
     // Block a currency switch once real unit/unit-type prices exist — those
     // numbers were entered under the old currency and would be silently
@@ -488,6 +492,7 @@ export class ProjectsService {
         (data as Record<string, unknown>)[key] = dto[key];
       }
     }
+    if (managerId !== undefined) data.managerId = managerId;
 
     // Switching type re-copies its templates onto the project (the caller may
     // then edit them further). Existing units keep whatever values they
@@ -1209,7 +1214,7 @@ export class ProjectsService {
     }
     await this.assertConfigurationInCatalog(orgId, dto.configuration);
     await this.assertVariantInCatalog(orgId, dto.variantLabel);
-    if (dto.managerId) await this.assertOrgUser(orgId, dto.managerId);
+    const managerId = await this.resolveManagerId(orgId, dto.managerId);
     const agentIds = [...new Set(dto.salesAgentIds ?? [])];
     await this.assertAssignableAgents(orgId, agentIds);
 
@@ -1233,7 +1238,7 @@ export class ProjectsService {
           floorPlanUrl: dto.floorPlanUrl ?? null,
           galleryUrls: dto.galleryUrls ?? [],
           status: dto.status ?? 'available',
-          managerId: dto.managerId ?? null,
+          managerId,
           createdById: actorId ?? null,
           updatedById: actorId ?? null,
         },
@@ -1283,9 +1288,10 @@ export class ProjectsService {
         existing.variantLabel,
       );
     }
-    if (dto.managerId !== undefined && dto.managerId) {
-      await this.assertOrgUser(orgId, dto.managerId);
-    }
+    const managerId =
+      dto.managerId !== undefined
+        ? await this.resolveManagerId(orgId, dto.managerId)
+        : undefined;
     // Full-set replace, like a project's sales agents: omit the field to
     // leave the current agents untouched, send `[]` to clear them all. Only
     // newly-added ids need to pass the eligibility check (see
@@ -1338,7 +1344,7 @@ export class ProjectsService {
     }
     if (dto.floorPlanUrl !== undefined) data.floorPlanUrl = dto.floorPlanUrl;
     if (dto.galleryUrls !== undefined) data.galleryUrls = dto.galleryUrls;
-    if (dto.managerId !== undefined) data.managerId = dto.managerId || null;
+    if (managerId !== undefined) data.managerId = managerId;
     data.updatedById = actorId ?? null;
 
     await this.prisma.$transaction(async (tx) => {
@@ -1560,6 +1566,42 @@ export class ProjectsService {
         'Manager must be a user in your organisation',
       );
     }
+  }
+
+  /**
+   * The manager to store for a project / standalone unit. An explicit pick is
+   * verified and kept. With no pick, a small agency that has no Manager at
+   * all (one admin running everything) gets its earliest active org admin
+   * auto-assigned, so the record never sits ownerless — the forms say so
+   * next to the picker. When Managers do exist, "no pick" stays null.
+   */
+  private async resolveManagerId(
+    orgId: string,
+    requested: string | null | undefined,
+  ): Promise<string | null> {
+    if (requested) {
+      await this.assertOrgUser(orgId, requested);
+      return requested;
+    }
+    const manager = await this.prisma.user.findFirst({
+      where: {
+        orgId,
+        status: 'active',
+        userRoles: { some: { role: { key: 'manager' } } },
+      },
+      select: { id: true },
+    });
+    if (manager) return null;
+    const admin = await this.prisma.user.findFirst({
+      where: {
+        orgId,
+        status: 'active',
+        userRoles: { some: { role: { key: 'admin' } } },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    return admin?.id ?? null;
   }
 
   private async getOwnedUnitType(orgId: string, projectId: string, id: string) {

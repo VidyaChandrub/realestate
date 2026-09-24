@@ -95,21 +95,20 @@ export function ManagerPicker({
   value,
   onChange,
   current,
+  loaded = true,
 }: {
   managers: ProjectAssigneeCandidate[];
   value: string;
   onChange: (id: string) => void;
   /** The project's existing manager — kept selectable even if the list no longer includes them. */
   current?: { id: string; name: string } | null;
+  /** False while the manager list is still loading. */
+  loaded?: boolean;
 }) {
+  if (!loaded) return <div className="hint">Loading managers…</div>;
   const extra = current && !managers.some((m) => m.id === current.id) ? current : null;
-  if (managers.length === 0 && !extra) {
-    return (
-      <div className="hint">
-        No managers in your organisation yet — add one under Users.
-      </div>
-    );
-  }
+  const autoNote = managers.length === 0 ? <NoManagersNote noun="project" /> : null;
+  if (managers.length === 0 && !extra) return autoNote;
   const pick = (id: string) => onChange(value === id ? "" : id);
   const cards: { id: string; name: string; role: string; assigned: string | null; title?: string }[] = [
     ...managers.map((u) => ({
@@ -122,6 +121,8 @@ export function ManagerPicker({
     ...(extra ? [{ id: extra.id, name: extra.name, role: "Current manager", assigned: null }] : []),
   ];
   return (
+    <>
+    {autoNote}
     <div className="opts project-assignee-options" role="radiogroup" aria-label="Project manager">
       {cards.map((c) => {
         const on = value === c.id;
@@ -154,6 +155,22 @@ export function ManagerPicker({
           </span>
         );
       })}
+    </div>
+    </>
+  );
+}
+
+/**
+ * Shown in place of a manager pick when the organisation has no Manager at
+ * all (a small agency run by one admin): the server then auto-assigns the
+ * org admin (ProjectsService.resolveManagerId), so nothing blocks on it.
+ */
+export function NoManagersNote({ noun }: { noun: "project" | "unit" }) {
+  return (
+    <div className="form-alert ok" style={{ fontSize: 13, marginBottom: 10 }}>
+      No managers in your organisation yet — this {noun} will be auto-assigned
+      to the organisation admin. Add a manager under{" "}
+      <Link className="brand-link" href="/org/users">Users</Link> to assign one instead.
     </div>
   );
 }

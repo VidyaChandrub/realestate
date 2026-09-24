@@ -161,6 +161,7 @@ export default function OrgProjectEditPage() {
   const [managerId, setManagerId] = useState("");
   const [status, setStatus] = useState<ProjectStatus>("active");
   const [managers, setManagers] = useState<ProjectAssigneeCandidate[]>([]);
+  const [managersLoaded, setManagersLoaded] = useState(false);
   const [currentManager, setCurrentManager] = useState<{ id: string; name: string } | null>(null);
 
   // --- Pricing & payment ---
@@ -414,7 +415,7 @@ export default function OrgProjectEditPage() {
     // Everyone holding the manager role (same set the Users list gives for
     // role=manager), each with the projects they're already on.
     getProjectManagerCandidates()
-      .then((res) => setManagers(res.data))
+      .then((res) => { setManagers(res.data); setManagersLoaded(true); })
       .catch(() => setManagers([]));
     // Everyone except Admins and Managers, resolved server-side — the same
     // rule the PUT enforces.
@@ -460,7 +461,7 @@ export default function OrgProjectEditPage() {
     ? assignedAgents.filter((a) => !salesUsers.some((u) => u.id === a.id))
     : [];
   const requirements = projectRequirements(
-    { name, projectType, currency, status, priceMin, address: addressLine, city, managerId },
+    { name, projectType, currency, status, priceMin, address: addressLine, city, managerId, noManagers: managersLoaded && managers.length === 0 },
     { 1: customFieldRequirements(projectTemplate.filter((f) => filledKeys.has(f.key)), customValues) },
   );
   const missingFields = allMissing(requirements);
@@ -1348,7 +1349,7 @@ export default function OrgProjectEditPage() {
               <div>
                 <div className={fieldClass("managerId")}>
                   <label>Project manager <span className="req">*</span></label>
-                  <ManagerPicker managers={managers} value={managerId} onChange={setManagerId} current={currentManager} />
+                  <ManagerPicker managers={managers} value={managerId} onChange={setManagerId} current={currentManager} loaded={managersLoaded} />
                   {fieldError("managerId") ? <div className="field-err">{fieldError("managerId")}</div> : null}
                 </div>
                 {/* Intentionally hidden: this is a free-text regional label ("Ahmedabad — West"), not a

@@ -699,11 +699,10 @@ export default function OrgProjectOverviewPage() {
               one, so this lists them rather than assuming a single page. */}
           <Reveal delay={1}>
             <div className="card">
-              <div className="card-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div className="card-h">
                 <span className="t" style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <Icon name="globe" size={14} /> Landing pages
                 </span>
-                <Link href="/org/landing-pages" className="x brand-link">Manage all →</Link>
               </div>
               <div className="card-b col gap-10">
                 {landingPagesLoading ? (
@@ -725,21 +724,9 @@ export default function OrgProjectOverviewPage() {
                         </div>
                         <div className="muted fs-12">/p/{lp.slug}</div>
                       </div>
-                      <div className="row gap-8" style={{ alignItems: "center", flexShrink: 0 }}>
-                        <span className={`badge ${LANDING_PAGE_STATUS_BADGE[lp.status]}`}>{LANDING_PAGE_STATUS_LABEL[lp.status]}</span>
-                        {lp.status === "published" ? (
-                          <a href={`/p/${lp.slug}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm" aria-label={`Open ${lp.name} live`}>
-                            <Icon name="external" size={13} />
-                          </a>
-                        ) : null}
-                        <Link
-                          href={`/org-builder?id=${lp.id}&returnUrl=${encodeURIComponent(`/org/projects/${id}`)}`}
-                          className="btn btn-ghost btn-sm"
-                          aria-label={`Edit ${lp.name} in builder`}
-                        >
-                          <Icon name="edit" size={13} />
-                        </Link>
-                      </div>
+                      <span className={`badge ${LANDING_PAGE_STATUS_BADGE[lp.status]}`} style={{ flexShrink: 0 }}>
+                        {LANDING_PAGE_STATUS_LABEL[lp.status]}
+                      </span>
                     </div>
                   ))
                 )}

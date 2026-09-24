@@ -275,6 +275,8 @@ export default function AddNewProjectPage() {
   // Step 7 — team
   const [managerId, setManagerId] = useState("");
   const [managers, setManagers] = useState<ProjectAssigneeCandidate[]>([]);
+  const [managersLoaded, setManagersLoaded] = useState(false);
+  const noManagers = managersLoaded && managers.length === 0;
   const [salesAgents, setSalesAgents] = useState<ProjectAssigneeCandidate[]>([]);
   const [salesTeam, setSalesTeam] = useState("Ahmedabad — West");
   // User ids of the agents ticked in Step 7.
@@ -418,7 +420,7 @@ export default function AddNewProjectPage() {
     // Everyone holding the manager role (same set the Users list gives for
     // role=manager), each with the projects they're already on.
     getProjectManagerCandidates()
-      .then((res) => setManagers(res.data))
+      .then((res) => { setManagers(res.data); setManagersLoaded(true); })
       .catch(() => setManagers([]));
     // Everyone except Admins and Managers, resolved server-side — the same
     // rule the PUT enforces.
@@ -492,10 +494,10 @@ export default function AddNewProjectPage() {
   const requiredByStep = useMemo(
     () =>
       projectRequirements(
-        { name, projectType, currency, status, priceMin, address, city, managerId },
+        { name, projectType, currency, status, priceMin, address, city, managerId, noManagers },
         { 1: customFieldRequirements(projectTemplate, customValues) },
       ),
-    [name, projectType, currency, status, priceMin, address, city, managerId, projectTemplate, customValues],
+    [name, projectType, currency, status, priceMin, address, city, managerId, noManagers, projectTemplate, customValues],
   );
 
   const missingOnStep = useCallback(
@@ -1652,7 +1654,7 @@ export default function AddNewProjectPage() {
                 <div className="q-sec">
                   <div className="lbl"><Icon name="profile" size={15} /> Ownership</div>
                   <div>
-                    <div className={fieldClass("managerId")}><label>Project manager <span className="req">*</span></label><ManagerPicker managers={managers} value={managerId} onChange={setManagerId} />{invalid("managerId") && <div className="field-err">Assign a project manager.</div>}</div>
+                    <div className={fieldClass("managerId")}><label>Project manager <span className="req">*</span></label><ManagerPicker managers={managers} value={managerId} onChange={setManagerId} loaded={managersLoaded} />{invalid("managerId") && <div className="field-err">Assign a project manager.</div>}</div>
                     {/* Intentionally hidden: this is a free-text regional label ("Ahmedabad — West"), not a
                         reference to the real Team model (org-teams module) — Project.salesTeam is stored
                         and echoed back but never read anywhere in the backend. May return once it's wired
@@ -1831,7 +1833,7 @@ export default function AddNewProjectPage() {
                       </div>
                       */}
                       <div className="q-sec"><div className="lbl"><Icon name="profile" size={15} /> Team &amp; access</div>
-                        <div className="sp"><span className="k">Project manager</span><span className="v">{selectedManager ? personLabel(selectedManager) : "Unassigned"}</span></div>
+                        <div className="sp"><span className="k">Project manager</span><span className="v">{selectedManager ? personLabel(selectedManager) : noManagers ? "Organisation admin (auto-assigned)" : "Unassigned"}</span></div>
                         <div className="sp"><span className="k">Assigned sales agents</span><span className="v">{agentAssign.length} assigned</span></div>
                         {/* Intentionally hidden: booking approval, telecaller visibility, and public website publishing are not implemented yet and may return later. */}
                         {/*
