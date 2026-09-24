@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, createCrmLead, getCrmLeads, getProjectSalesAgents } from "@/lib/api";
+import { apiFetch, createCrmLead, getCrmLeads, getProjectLandingPages, getProjectSalesAgents } from "@/lib/api";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { normalizeSpecifications, specificationRows } from "@/lib/specifications";
 import { roleField, templateTraits } from "@/lib/field-template";
@@ -12,9 +12,26 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
-import { Modal } from "@/components/ui/modal";
 import "@/app/org/org.css";
-import type { OrgTemplatesListResponse, ProjectDetail, ProjectSalesAgent } from "@/lib/types";
+import type { LandingPageRow, LandingPageStatus, ProjectDetail, ProjectSalesAgent } from "@/lib/types";
+
+const LANDING_PAGE_STATUS_BADGE: Record<LandingPageStatus, string> = {
+  draft: "b-gray",
+  pending_approval: "b-amber",
+  approved: "b-teal",
+  rejected: "b-rose",
+  published: "b-green",
+  unpublished: "b-gray",
+};
+
+const LANDING_PAGE_STATUS_LABEL: Record<LandingPageStatus, string> = {
+  draft: "Draft",
+  pending_approval: "Pending approval",
+  approved: "Approved",
+  rejected: "Rejected",
+  published: "Published",
+  unpublished: "Unpublished",
+};
 
 /**
  * Direct Lead Entry — the manual walk-in form on this page.
@@ -52,23 +69,6 @@ const BUDGET_BANDS = [
   "₹2.5 Cr+",
 ];
 
-async function createLandingPageFromOrgTemplate(accessToken: string, pageName: string, projectId: string) {
-  const list = await apiFetch<OrgTemplatesListResponse>("/org/templates?limit=1", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  const templateId = list.data[0]?.id;
-  if (!templateId) {
-    throw new Error(
-      "No Super Admin templates are assigned to this organisation. Assign a template first.",
-    );
-  }
-  return apiFetch<{ id: string; slug: string }>("/org/landing-pages", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ templateId, name: pageName, projectId }),
-  });
-}
-
 function managerInitials(name: string | null | undefined): string {
   if (!name) return "—";
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -77,7 +77,6 @@ function managerInitials(name: string | null | undefined): string {
 }
 
 export default function OrgProjectOverviewPage() {
-  const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
   const { accessToken } = useAuth();
@@ -86,9 +85,8 @@ export default function OrgProjectOverviewPage() {
   const [salesAgents, setSalesAgents] = useState<ProjectSalesAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [publishingPage, setPublishingPage] = useState(false);
-  const [pagePublishSuccess, setPagePublishSuccess] = useState<string | null>(null);
-  const [pageError, setPageError] = useState<string | null>(null);
+  const [projectLandingPages, setProjectLandingPages] = useState<LandingPageRow[]>([]);
+  const [landingPagesLoading, setLandingPagesLoading] = useState(true);
   const [leadCount, setLeadCount] = useState(0);
 
   // Direct Lead Entry form.
@@ -126,6 +124,15 @@ export default function OrgProjectOverviewPage() {
       .then((res) => setLeadCount(res.total ?? res.data.length))
       .catch(() => setLeadCount(0));
   }, [id]);
+
+  useEffect(() => {
+    if (!accessToken || !id) return;
+    setLandingPagesLoading(true);
+    getProjectLandingPages(id)
+      .then(setProjectLandingPages)
+      .catch(() => setProjectLandingPages([]))
+      .finally(() => setLandingPagesLoading(false));
+  }, [accessToken, id]);
 
   /**
    * Create the lead through the CRM's own manual endpoint — the same call the
@@ -320,7 +327,6 @@ export default function OrgProjectOverviewPage() {
             <Link href={`/org/projects/${id}/edit`} className="btn btn-ghost">
               <Icon name="edit" size={13} /> Edit
             </Link>
-            <button className="btn btn-primary" type="button">＋ Add lead</button>
           </>
         }
       />
@@ -665,10 +671,14 @@ export default function OrgProjectOverviewPage() {
                   <div className="spec-grid">
                     {/* Intentionally hidden: ad-source settings are not implemented yet and may return later. */}
                     {/* <div className="sp"><div className="k">Ad sources</div><div className="v">{mkt.adSources?.length ? mkt.adSources.join(", ") : "—"}</div></div> */}
-                    <div className="sp"><div className="k">Monthly ad budget</div><div className="v">{formatMoney(mkt.monthlyBudget ?? null, project.currency)}</div></div>
-                    <div className="sp"><div className="k">Target CPL</div><div className="v">{formatMoney(mkt.targetCpl ?? null, project.currency)}</div></div>
-                    <div className="sp"><div className="k">Monthly lead goal</div><div className="v">{mkt.leadGoal ? `${mkt.leadGoal} leads` : "—"}</div></div>
-                    <div className="sp"><div className="k">Landing page</div><div className="v">{mkt.landingPageChoice || "—"}</div></div>
+                    {/* Intentionally hidden: ad budget / CPL / lead-goal targets have no ad-platform
+                        integration behind them — same reasoning as Ad sources above. */}
+                    {/* <div className="sp"><div className="k">Monthly ad budget</div><div className="v">{formatMoney(mkt.monthlyBudget ?? null, project.currency)}</div></div> */}
+                    {/* <div className="sp"><div className="k">Target CPL</div><div className="v">{formatMoney(mkt.targetCpl ?? null, project.currency)}</div></div> */}
+                    {/* <div className="sp"><div className="k">Monthly lead goal</div><div className="v">{mkt.leadGoal ? `${mkt.leadGoal} leads` : "—"}</div></div> */}
+                    {/* Intentionally hidden: landing page selection here is deferred — see the
+                        Website & Landing Page widget elsewhere on this page instead. */}
+                    {/* <div className="sp"><div className="k">Landing page</div><div className="v">{mkt.landingPageChoice || "—"}</div></div> */}
                     {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
                     {/* <div className="sp"><div className="k">AI voice calling</div><div className="v">{onOff(mkt.aiCallingEnabled)}</div></div> */}
                     {/* Intentionally hidden: the backing WhatsApp auto-welcome feature is not implemented yet and may return later. */}
@@ -685,176 +695,53 @@ export default function OrgProjectOverviewPage() {
 
         {/* Right Column / Side Widgets */}
         <div className="col gap-18">
-          {/* Website & Live Landing Page Hub Widget */}
+          {/* Landing pages bound to this project — a project can have more than
+              one, so this lists them rather than assuming a single page. */}
           <Reveal delay={1}>
-            <div className="card" style={{ border: "1.5px solid var(--brand, #4f46e5)" }}>
+            <div className="card">
               <div className="card-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="t" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <Icon name="globe" size={14} /> Website &amp; Landing Page
+                  <Icon name="globe" size={14} /> Landing pages
                 </span>
-                {project.publishedToWebsite || pagePublishSuccess ? (
-                  <span className="badge b-green">● Published</span>
-                ) : (
-                  <span className="badge b-gray">Not Published</span>
-                )}
+                <Link href="/org/landing-pages" className="x brand-link">Manage all →</Link>
               </div>
-              <div className="card-b col gap-12">
-                {project.publishedToWebsite || mkt.landingPageSlug || pagePublishSuccess ? (
-                  <>
-                    <div style={{ background: "var(--surface-2, #f8fafc)", padding: 12, borderRadius: 8, border: "1px solid var(--line)" }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--muted)", letterSpacing: ".05em" }}>
-                        Live Destination URL
-                      </div>
-                      <a
-                        href={`/p/${pagePublishSuccess || mkt.landingPageSlug || project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: "inline-block",
-                          marginTop: 4,
-                          fontSize: 13.5,
-                          fontWeight: 600,
-                          color: "var(--brand, #4f46e5)",
-                          wordBreak: "break-all",
-                        }}
-                      >
-                        /p/{pagePublishSuccess || mkt.landingPageSlug || project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")} ↗
-                      </a>
-                    </div>
-
-                    <div className="row gap-8 wrap">
-                      <a
-                        href={`/p/${pagePublishSuccess || mkt.landingPageSlug || project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-primary btn-sm"
-                        style={{ flex: 1, textDecoration: "none", textAlign: "center" }}
-                      >
-                        Open Live Site ↗
-                      </a>
-                      {mkt.landingPageId ? (
-                        <Link
-                          href={`/org-builder?id=${mkt.landingPageId}&returnUrl=${encodeURIComponent(`/org/projects/${id}`)}`}
-                          className="btn btn-secondary btn-sm"
-                          style={{ flex: 1, textDecoration: "none", textAlign: "center" }}
-                        >
-                          <Icon name="edit" size={13} /> Edit in Builder
-                        </Link>
-                      ) : (
-                        <Link
-                          href="/org/landing-pages"
-                          className="btn btn-secondary btn-sm"
-                          style={{ flex: 1, textDecoration: "none", textAlign: "center" }}
-                        >
-                          <Icon name="document" size={13} /> Pages
-                        </Link>
-                      )}
-                    </div>
-                    <div className="muted fs-11" style={{ lineHeight: 1.4 }}>
-                      <Icon name="info" size={13} /> You can add, edit, or customize sections in the visual builder anytime without affecting original templates.
-                    </div>
-                  </>
+              <div className="card-b col gap-10">
+                {landingPagesLoading ? (
+                  <span className="muted fs-13">Loading…</span>
+                ) : projectLandingPages.length === 0 ? (
+                  <p className="muted fs-13" style={{ margin: 0 }}>
+                    No landing pages yet for this project. Create one from Landing Pages and bind it here.
+                  </p>
                 ) : (
-                  <>
-                    <p className="muted fs-13" style={{ margin: 0 }}>
-                      This project does not have a landing page yet. You can customize the template visually in the builder or launch it live with 1 click.
-                    </p>
-                    <div className="col gap-8">
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-block"
-                        disabled={publishingPage}
-                        onClick={async () => {
-                          if (!accessToken || !project) return;
-                          setPublishingPage(true);
-                          try {
-                            const pageName = `${project.name} — Official Landing Page`;
-                            const lp = await createLandingPageFromOrgTemplate(accessToken, pageName, project.id);
-
-                            if (lp?.id) {
-                              await apiFetch(`/org/projects/${project.id}`, {
-                                method: "PATCH",
-                                headers: { Authorization: `Bearer ${accessToken}` },
-                                body: JSON.stringify({
-                                  marketing: {
-                                    ...mkt,
-                                    landingPageId: lp.id,
-                                    landingPageSlug: lp.slug,
-                                    landingPageChoice: pageName,
-                                  },
-                                }),
-                              });
-
-                              router.push(`/org-builder?id=${encodeURIComponent(lp.id)}&returnUrl=${encodeURIComponent(`/org/projects/${id}`)}`);
-                            }
-                          } catch (e) {
-                            setPageError(e instanceof Error ? e.message : "Failed to create landing page.");
-                          } finally {
-                            setPublishingPage(false);
-                          }
-                        }}
-                      >
-                        {publishingPage ? "Preparing Builder…" : <><Icon name="edit" size={13} /> Customize in Visual Builder</>}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-block"
-                        disabled={publishingPage}
-                        onClick={async () => {
-                          if (!accessToken || !project) return;
-                          setPublishingPage(true);
-                          try {
-                            const pageName = `${project.name} — Official Landing Page`;
-                            const lp = await createLandingPageFromOrgTemplate(accessToken, pageName, project.id);
-
-                            if (lp?.id) {
-                              await apiFetch(`/org/landing-pages/${lp.id}/publish`, {
-                                method: "POST",
-                                headers: { Authorization: `Bearer ${accessToken}` },
-                              });
-
-                              await apiFetch(`/org/projects/${project.id}`, {
-                                method: "PATCH",
-                                headers: { Authorization: `Bearer ${accessToken}` },
-                                body: JSON.stringify({
-                                  publishedToWebsite: true,
-                                  marketing: {
-                                    ...mkt,
-                                    landingPageId: lp.id,
-                                    landingPageSlug: lp.slug,
-                                    landingPageChoice: pageName,
-                                  },
-                                }),
-                              });
-
-                              setProject((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      publishedToWebsite: true,
-                                      marketing: {
-                                        ...mkt,
-                                        landingPageId: lp.id,
-                                        landingPageSlug: lp.slug,
-                                        landingPageChoice: pageName,
-                                      },
-                                    }
-                                  : null,
-                              );
-                              setPagePublishSuccess(lp.slug);
-                            }
-                          } catch (e) {
-                            setPageError(e instanceof Error ? e.message : "Failed to publish landing page.");
-                          } finally {
-                            setPublishingPage(false);
-                          }
-                        }}
-                      >
-                        {publishingPage ? "Publishing…" : <><Icon name="flag" size={13} /> Publish Live Landing Page</>}
-                      </button>
+                  projectLandingPages.map((lp) => (
+                    <div
+                      key={lp.id}
+                      className="row between"
+                      style={{ alignItems: "center", gap: 10, paddingBottom: 10, borderBottom: "1px solid var(--line)" }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {lp.name}
+                        </div>
+                        <div className="muted fs-12">/p/{lp.slug}</div>
+                      </div>
+                      <div className="row gap-8" style={{ alignItems: "center", flexShrink: 0 }}>
+                        <span className={`badge ${LANDING_PAGE_STATUS_BADGE[lp.status]}`}>{LANDING_PAGE_STATUS_LABEL[lp.status]}</span>
+                        {lp.status === "published" ? (
+                          <a href={`/p/${lp.slug}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm" aria-label={`Open ${lp.name} live`}>
+                            <Icon name="external" size={13} />
+                          </a>
+                        ) : null}
+                        <Link
+                          href={`/org-builder?id=${lp.id}&returnUrl=${encodeURIComponent(`/org/projects/${id}`)}`}
+                          className="btn btn-ghost btn-sm"
+                          aria-label={`Edit ${lp.name} in builder`}
+                        >
+                          <Icon name="edit" size={13} />
+                        </Link>
+                      </div>
                     </div>
-                  </>
+                  ))
                 )}
               </div>
             </div>
@@ -1015,19 +902,6 @@ export default function OrgProjectOverviewPage() {
           */}
         </div>
       </div>
-      <Modal
-        open={!!pageError}
-        onClose={() => setPageError(null)}
-        title="Couldn't complete"
-        size="sm"
-        footer={
-          <button className="btn btn-primary" type="button" onClick={() => setPageError(null)}>
-            OK
-          </button>
-        }
-      >
-        <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: "#475569" }}>{pageError}</p>
-      </Modal>
     </>
   );
 }

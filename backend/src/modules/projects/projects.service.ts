@@ -283,7 +283,7 @@ export class ProjectsService {
 
     const where: Prisma.ProjectWhereInput = andConditions.length > 1 ? { AND: andConditions } : andConditions[0]!;
 
-    const [rows, total] = await Promise.all([
+    const [rows, total, landingPageCounts] = await Promise.all([
       this.prisma.project.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
@@ -295,11 +295,28 @@ export class ProjectsService {
         },
       }),
       this.prisma.project.count({ where }),
+      // A landing page's project link lives in its own `content.config.
+      // propertyBinding` JSON, not a real FK column (see org-landing-pages'
+      // resolveBinding/bindLandingPageContent) — grouped raw query rather
+      // than an N+1 per-project lookup or a Prisma relation that doesn't
+      // exist on the schema.
+      this.prisma.$queryRaw<Array<{ projectId: string; count: bigint }>>`
+        SELECT (content->'config'->'propertyBinding'->>'projectId') AS "projectId", COUNT(*) AS count
+        FROM templates.landing_pages
+        WHERE org_id = ${orgId}
+          AND content->'config'->'propertyBinding'->>'kind' = 'project'
+        GROUP BY (content->'config'->'propertyBinding'->>'projectId')
+      `,
     ]);
+
+    const landingPageCountByProject = new Map(
+      landingPageCounts.map((r) => [r.projectId, Number(r.count)]),
+    );
 
     const data = rows.map((row) => ({
       ...this.serializeProject(row),
       unitTypeCount: row._count.unitTypes,
+      landingPageCount: landingPageCountByProject.get(row.id) ?? 0,
     }));
 
     return { data, total, page, limit };

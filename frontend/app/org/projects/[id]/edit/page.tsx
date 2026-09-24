@@ -12,6 +12,7 @@ import {
   defaultableExtraFields,
   draftToPayload,
   fieldsToRows,
+  roleBaselineOf,
   roleField,
   templateTraits,
   rowsToTemplate,
@@ -19,6 +20,7 @@ import {
   valuesToDraft,
   type CustomValueDraft,
   type FieldDef,
+  type FieldRole,
   type FieldRow,
 } from "@/lib/field-template";
 import { ProjectFieldRows, UnitFieldRows } from "@/components/org/project-type-fields";
@@ -246,6 +248,16 @@ export default function OrgProjectEditPage() {
   const [hasInventory, setHasInventory] = useState(false);
   const [projectFieldRows, setProjectFieldRows] = useState<FieldRow[]>([]);
   const [unitFieldRows, setUnitFieldRows] = useState<FieldRow[]>([]);
+  // What the project's type currently has a field for, in Settings right
+  // now — the reference the "missing role" recovery strip compares live
+  // edits against. Derived live, not snapshotted at load: a Plot never had
+  // Floor and never will (no strip), but an Apartment missing its Group
+  // field is a standing gap that should keep showing up here even after
+  // that deletion is saved and the page is reopened later — not a
+  // one-session notice that quietly disappears the moment you save.
+  const unitRoleBaseline = roleBaselineOf(
+    projectTypes.types?.find((t) => t.name === projectType)?.unitFields,
+  );
   const [customValues, setCustomValues] = useState<CustomValueDraft>({});
   // Keys that already held a value when the page loaded: only those are
   // enforced as required here (see the server rule — old records are never
@@ -1230,7 +1242,7 @@ export default function OrgProjectEditPage() {
                 onTemplateChange={(template) => setProjectFieldRows(fieldsToRows(template))}
                 onValueChange={(key, value) => setCustomValues((cur) => ({ ...cur, [key]: value }))}
               />
-              <UnitFieldRows rows={unitFieldRows} onChange={setUnitFieldRows} />
+              <UnitFieldRows rows={unitFieldRows} onChange={setUnitFieldRows} roleBaseline={unitRoleBaseline} />
 
               <div className="field">
                 <label>Highlights (one per line)</label>
@@ -1276,6 +1288,9 @@ export default function OrgProjectEditPage() {
           <div className="card" id="sec-marketing" style={{ scrollMarginTop: 128 }}>
             <div className="card-h"><span className="t">Marketing &amp; leads</span></div>
             <div className="card-b">
+              {/* Intentionally hidden: ad-source settings have no ad-platform integration behind
+                  them — same reasoning as the wizard's Ad sources section. */}
+              {/*
               <div className="field">
                 <label>Ad sources</label>
                 <div className="opts">
@@ -1286,11 +1301,19 @@ export default function OrgProjectEditPage() {
                   ))}
                 </div>
               </div>
+              */}
+              {/* Intentionally hidden: ad budget / CPL / lead-goal targets have no ad-platform
+                  integration behind them — same reasoning as the wizard's Targets section. */}
+              {/*
               <div className="row3">
                 <div className="field"><label>Monthly ad budget</label><MoneyInput currency={currency} value={monthlyBudget} onChange={setMonthlyBudget} placeholder="1,50,000" /></div>
                 <div className="field"><label>Target CPL</label><MoneyInput currency={currency} value={targetCpl} onChange={setTargetCpl} placeholder="300" /></div>
                 <div className="field"><label>Monthly lead goal</label><input className="inp" type="number" min={0} value={leadGoal} onChange={(e) => setLeadGoal(e.target.value)} /></div>
               </div>
+              */}
+              {/* Intentionally hidden: landing page selection here is deferred — a project's
+                  landing page is set up from the project's own Overview page instead. */}
+              {/*
               <div className="field">
                 <label>Landing page</label>
                 <select value={landingPageChoice} onChange={(e) => setLandingPageChoice(e.target.value)}>
@@ -1307,6 +1330,7 @@ export default function OrgProjectEditPage() {
                   ) : null}
                 </select>
               </div>
+              */}
               {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
               {/* <div className="sw-row"><div className="tx"><b>AI voice calling</b><small>Auto-call &amp; qualify new leads</small></div><div className={`switch ${aiCalling ? "on" : ""}`} onClick={() => setAiCalling(!aiCalling)} /></div> */}
               {/* Intentionally hidden: the backing WhatsApp auto-welcome feature is not implemented yet and may return later. */}

@@ -294,6 +294,16 @@ export class OrgLandingPagesService {
         { slug: { contains: query.search, mode: 'insensitive' } },
       ];
     }
+    // A page's project link lives in its own content.config.propertyBinding
+    // JSON, not a real FK column (see resolveBinding/bindLandingPageContent
+    // below) — filter on that path rather than a relation that doesn't exist
+    // on the schema.
+    if (query.projectId) {
+      where.content = {
+        path: ['config', 'propertyBinding', 'projectId'],
+        equals: query.projectId,
+      };
+    }
 
     const [rows, total] = await Promise.all([
       this.prisma.landingPage.findMany({

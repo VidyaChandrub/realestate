@@ -41,6 +41,30 @@ export const ROLE_ALLOWED_TYPES: Record<FieldRole, FieldType[]> = {
   configuration: ["text", "choice"],
 };
 
+/**
+ * Plain-language copy for the confirmation shown when deleting a field that
+ * currently carries a role. No "role"/"mapping"/"wiring" jargon — just what
+ * breaks.
+ */
+export const ROLE_DELETE_CONSEQUENCE: Record<FieldRole, string> = {
+  price: "This field is currently used as the unit price. If you delete it, units will not have a price field until another field is selected as Price.",
+  area: "This field is currently used as the unit area. If you delete it, units will not have an area field until another field is selected as Area.",
+  group: "This field is currently used to group units (tower / block / sector). If you delete it, units will not be grouped in the availability grid until another field is selected as the group field.",
+  floor: "This field is currently used as the unit floor. If you delete it, there will not be a floor-wise view until another field is selected as Floor.",
+  configuration: "This field is currently used as the unit configuration. If you delete it, there will not be a configuration picker when adding units until another field is selected as Configuration.",
+};
+
+/** The roles present in `baseline` that no field in `rows` currently carries. */
+export function missingRoles(rows: Pick<FieldRow, "role">[], baseline: Set<FieldRole>): FieldRole[] {
+  const current = new Set(rows.map((r) => r.role).filter(Boolean));
+  return FIELD_ROLES.filter((r) => baseline.has(r) && !current.has(r));
+}
+
+/** The role set a saved template carries — the reference `missingRoles` compares live edits against. */
+export function roleBaselineOf(fields: FieldDef[] | null | undefined): Set<FieldRole> {
+  return new Set((fields ?? []).map((f) => f.role).filter((r): r is FieldRole => !!r));
+}
+
 export interface FieldDef {
   /** Stable identity — values are stored against it, never against the label. */
   key: string;
@@ -133,23 +157,19 @@ export interface FieldRow {
   type: FieldType;
   required: boolean;
   section: string;
-  /** Fixed once the row represents a saved field — see `role`. */
+  /**
+   * Not editable through the row UI — a role is only ever set or changed via
+   * the field-roles panel (see `FieldRolesPanel` in typed-field-editor.tsx),
+   * never a per-row control. Carried through unchanged on rename, reorder,
+   * and every other row edit; only cleared automatically if the row's type
+   * changes to one the role can't carry.
+   */
   role: FieldRole | "";
   /** choice: comma-separated choices as typed */
   optionsText: string;
   /** number: display unit as typed */
   unit: string;
   multiline: boolean;
-  /**
-   * True only for a row loaded from an already-saved template (via
-   * `fieldsToRows`) — never set true client-side just because `key` got
-   * auto-assigned. This, not `key`, is what "fixed once saved" (role, and
-   * anything else that shouldn't move after a save) should check: `key` is
-   * filled in as soon as you type a label into a brand-new row (see
-   * TypedFieldEditor's name-field onBlur), long before that row is actually
-   * persisted, so gating on `key` locked new rows immediately — a real bug.
-   */
-  existing: boolean;
 }
 
 let nextRowId = 1;
@@ -166,7 +186,6 @@ export function makeFieldRow(patch: Partial<FieldRow> = {}): FieldRow {
     optionsText: "",
     unit: "",
     multiline: false,
-    existing: false,
     ...patch,
   };
 }
@@ -183,21 +202,8 @@ export function fieldsToRows(fields: FieldDef[] | null | undefined): FieldRow[] 
       optionsText: (f.options ?? []).join(", "),
       unit: f.unit ?? "",
       multiline: f.multiline ?? false,
-      existing: true,
     }),
   );
-}
-
-/**
- * Same as `fieldsToRows`, but every row comes back with `existing: false`.
- * Use this wherever the fields being loaded aren't actually saved against a
- * live project yet — e.g. the new-project wizard, where picking a project
- * type or resuming a draft only seeds a starting point; nothing is
- * persisted (and no Unit can reference a role field) until publish, so a
- * role should stay editable until then.
- */
-export function fieldsToDraftRows(fields: FieldDef[] | null | undefined): FieldRow[] {
-  return fieldsToRows(fields).map((r) => ({ ...r, existing: false }));
 }
 
 /** Mirror of the server's slugifyFieldKey. */

@@ -275,8 +275,10 @@ export default function OrgProjectsPage() {
                       <div className="loc"><Icon name="pin" size={12} /> {[p.location, p.reraId].filter(Boolean).join(" · ") || "—"}</div>
                     </div>
                     <div className="pmeta">
+                      <div><span className="k">Type</span><b>{p.projectType || "—"}</b></div>
                       <div><span className="k">Starting</span><b>{formatMoney(p.priceMin, p.currency)}</b></div>
                       <div><span className="k">Unit types</span><b>{p.unitTypeCount}</b></div>
+                      <div><span className="k">Landing pages</span><b>{p.landingPageCount}</b></div>
                       <div><span className="k">Manager</span>                      <b><span className="u"><span className="av xs">{managerInitials(p.manager?.name)}</span></span></b></div>
                     </div>
                     <div className="row gap-8">
@@ -300,18 +302,20 @@ export default function OrgProjectsPage() {
                 <thead>
                   <tr>
                     <th>Project</th>
+                    <th>Type</th>
                     <th>Manager</th>
                     <th>Status</th>
                     <th>Price range</th>
                     <th>Unit types</th>
+                    <th>Landing pages</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {loadError ? (
-                    <tr><td colSpan={6} className="muted">{loadError}</td></tr>
+                    <tr><td colSpan={8} className="muted">{loadError}</td></tr>
                   ) : !loading && rows.length === 0 ? (
-                    <tr><td colSpan={6} className="muted">{isFiltered ? "No projects match this filter." : "No projects yet."}</td></tr>
+                    <tr><td colSpan={8} className="muted">{isFiltered ? "No projects match this filter." : "No projects yet."}</td></tr>
                   ) : (
                     rows.map((p) => (
                       <tr key={p.id}>
@@ -319,6 +323,7 @@ export default function OrgProjectsPage() {
                           <Link href={`/org/projects/${p.id}`} className="brand-link">{p.name}</Link>
                           <div className="sm muted">{[p.location, p.reraId ? `RERA ${p.reraId}` : null].filter(Boolean).join(" · ") || "—"}</div>
                         </td>
+                        <td>{p.projectType || "—"}</td>
                         <td>
                           <div className="u">
                             <span className="av">{managerInitials(p.manager?.name)}</span>
@@ -334,6 +339,7 @@ export default function OrgProjectsPage() {
                         </td>
                         <td>{formatMoneyRange(p.priceMin, p.priceMax, p.currency)}</td>
                         <td>{p.unitTypeCount}</td>
+                        <td>{p.landingPageCount}</td>
                         <td><Link href={`/org/projects/${p.id}`} className="btn btn-ghost btn-sm">Open</Link></td>
                       </tr>
                     ))

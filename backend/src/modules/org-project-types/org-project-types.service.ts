@@ -313,6 +313,14 @@ export class OrgProjectTypesService {
     return row;
   }
 
+  // A field can gain a role it never had (recovery: picking an existing
+  // plain field to fill a role a deleted field used to carry) and can lose
+  // one it had (the field roles panel unassigning it, same end state as
+  // deleting the field and re-adding it plain, just without losing the
+  // field's own label/data). What's still frozen is a field flipping
+  // directly from one role to a DIFFERENT one in a single edit — that would
+  // silently repurpose the same field's meaning rather than moving the role
+  // to a field the user actually picked for it.
   private assertRolesImmutable(
     existing: FieldDef[],
     next: FieldDef[],
@@ -320,11 +328,12 @@ export class OrgProjectTypesService {
   ) {
     const nextByKey = new Map(next.map((field) => [field.key, field]));
     for (const field of existing) {
+      if (!field.role) continue;
       const replacement = nextByKey.get(field.key);
       if (!replacement) continue;
-      if ((field.role ?? null) !== (replacement.role ?? null)) {
+      if (replacement.role && field.role !== replacement.role) {
         throw new BadRequestException(
-          `The role of an existing ${scope} field cannot be changed. Delete the field and add a new one instead.`,
+          `A field can't change directly from one role to another in ${scope} fields. Unassign it first, then assign the new role.`,
         );
       }
     }

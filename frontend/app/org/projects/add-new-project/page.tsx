@@ -12,7 +12,8 @@ import {
   customFieldRequirements,
   defaultableExtraFields,
   draftToPayload,
-  fieldsToDraftRows,
+  fieldsToRows,
+  roleBaselineOf,
   roleField,
   rowsToTemplate,
   templateTraits,
@@ -20,6 +21,7 @@ import {
   valuesToDraft,
   type CustomValueDraft,
   type FieldDef,
+  type FieldRole,
   type FieldRow,
 } from "@/lib/field-template";
 import { ProjectFieldRows, UnitFieldRows } from "@/components/org/project-type-fields";
@@ -313,7 +315,10 @@ export default function AddNewProjectPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<OrgTemplateSummary | null>(null);
   const [templateAppliedToast, setTemplateAppliedToast] = useState<string | null>(null);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [publishLandingPageNow, setPublishLandingPageNow] = useState(true);
+  // Its own toggle is hidden (see Step 6) — default off so publishing a
+  // project never silently auto-creates a live landing page with no visible
+  // control over it.
+  const [publishLandingPageNow, setPublishLandingPageNow] = useState(false);
   const [landingPageTitle, setLandingPageTitle] = useState("");
   const [createdLandingPage, setCreatedLandingPage] = useState<{ id: string; slug: string; name: string } | null>(null);
   const [orgDbTemplates, setOrgDbTemplates] = useState<OrgTemplateSummary[]>([]);
@@ -364,6 +369,17 @@ export default function AddNewProjectPage() {
   const [unitFieldRows, setUnitFieldRows] = useState<FieldRow[]>([]);
   const [customValues, setCustomValues] = useState<CustomValueDraft>({});
   const dynamicUnitTemplate = rowsToTemplate(unitFieldRows.filter((r) => r.label.trim()));
+  // What the picked type currently has a field for, in Settings right now —
+  // the reference the "missing role" recovery strip compares live edits
+  // against. Derived live (not snapshotted at load) so it stays correct
+  // across a type switch, and — the point of it — keeps flagging a role
+  // this project lost even after that deletion is saved and the page is
+  // reopened: a Plot never had Floor and never will (no strip), but an
+  // Apartment missing its Group field is a standing gap until fixed, not a
+  // one-session notice that quietly disappears the moment you save.
+  const unitRoleBaseline = roleBaselineOf(
+    projectTypes.types?.find((t) => t.name === projectType)?.unitFields,
+  );
   const dynamicExtraFields = defaultableExtraFields(dynamicUnitTemplate);
   const traits = templateTraits(dynamicUnitTemplate);
   // The type's configuration-role field IS the source of "which configs can
@@ -514,8 +530,8 @@ export default function AddNewProjectPage() {
     const next = projectType === label ? "" : label;
     const def = projectTypes.types?.find((t) => t.name === next) ?? null;
     setProjectType(next);
-    setProjectFieldRows(fieldsToDraftRows(def?.projectFields));
-    setUnitFieldRows(fieldsToDraftRows(def?.unitFields));
+    setProjectFieldRows(fieldsToRows(def?.projectFields));
+    setUnitFieldRows(fieldsToRows(def?.unitFields));
     setCustomValues({});
     const t = templateTraits(def?.unitFields ?? []);
     if (!t.configurations) { setSelectedConfigs([]); setUnitTypes([]); }
@@ -668,7 +684,7 @@ export default function AddNewProjectPage() {
     // Older drafts predate the `extra` bag — default it so a resumed draft
     // never crashes the defaults table.
     setUnitTypes((d.unitTypes ?? []).map((u) => ({ ...u, extra: u.extra ?? {} })));
-    setProjectFieldRows(fieldsToDraftRows(d.projectFields)); setUnitFieldRows(fieldsToDraftRows(d.unitFields));
+    setProjectFieldRows(fieldsToRows(d.projectFields)); setUnitFieldRows(fieldsToRows(d.unitFields));
     setCustomValues(d.customValues ?? {});
     setPriceMin(d.priceMin ?? ""); setPriceMax(d.priceMax ?? ""); setBaseRate(d.baseRate ?? ""); setBookingAmount(d.bookingAmount ?? "");
     setCurrency(d.currency ?? "INR"); setAreaUnit(d.areaUnit ?? "sqft"); setPriceIncludes(d.priceIncludes ?? []);
@@ -1131,7 +1147,11 @@ export default function AddNewProjectPage() {
               </div>
             </div>
 
-            {/* Selected Template Badge in Rail */}
+            {/* Intentionally hidden: template selection/switching from the wizard is
+                deferred for now — a project's template is picked up automatically
+                (see the orgDbTemplates effect) and customized from the project's own
+                page afterwards instead. */}
+            {/*
             <div className="card pad-14 mt-14" style={{ background: "var(--surface-2, #f8fafc)", border: "1px solid var(--line)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: "var(--muted)", letterSpacing: ".05em" }}>
@@ -1160,6 +1180,7 @@ export default function AddNewProjectPage() {
                 Change Template <Icon name="templates" size={12} />
               </button>
             </div>
+            */}
 
             <div className="help mt-14">
               <Icon name="info" size={14} /> <b>Tip:</b> Fields marked <span className="req">*</span> are checked when you continue past their step. You can save a draft anytime and finish later.
@@ -1194,7 +1215,9 @@ export default function AddNewProjectPage() {
               <div className="wz-pane on">
                 <div className="q-h"><div className="st">Step 1 of 9</div><h2>Project basics</h2><div className="sub">The essentials that identify this development across the CRM, website and ads.</div></div>
 
-                {/* PREDEFINED TEMPLATE SELECTOR BANNER */}
+                {/* Intentionally hidden: template selection/switching from the wizard is
+                    deferred for now — see the matching rail card note below. */}
+                {/*
                 <div
                   className="card pad-16 mb-20"
                   style={{
@@ -1281,6 +1304,7 @@ export default function AddNewProjectPage() {
                     </div>
                   </div>
                 </div>
+                */}
 
                 <div className="q-sec">
                   <div className="lbl"><Icon name="document" size={15} /> Identity</div>
@@ -1376,10 +1400,10 @@ export default function AddNewProjectPage() {
                   <ProjectFieldRows
                     template={projectFieldsLive}
                     values={customValues}
-                    onTemplateChange={(template) => setProjectFieldRows(fieldsToDraftRows(template))}
+                    onTemplateChange={(template) => setProjectFieldRows(fieldsToRows(template))}
                     onValueChange={(key, value) => setCustomValues((cur) => ({ ...cur, [key]: value }))}
                   />
-                  <UnitFieldRows rows={unitFieldRows} onChange={setUnitFieldRows} />
+                  <UnitFieldRows rows={unitFieldRows} onChange={setUnitFieldRows} roleBaseline={unitRoleBaseline} />
                   <div className="hint">Unit counts come from the Units section after publishing.</div>
                 </div>
                 <div className="q-sec">
@@ -1510,13 +1534,26 @@ export default function AddNewProjectPage() {
                   <div className="sw-row"><div className="tx"><b>Housing / 99acres / MagicBricks</b><small>Portal listings</small></div><div className={`switch ${portalAds ? "on" : ""}`} onClick={() => setPortalAds(!portalAds)} /></div>
                 </div>
                 */}
+                {/* Intentionally hidden: ad budget / CPL / lead-goal targets have no
+                    ad-platform integration behind them yet (same reasoning as Ad
+                    sources above) — inputs with nothing acting on them. May return
+                    once ad tracking is actually wired up. */}
+                {/*
                 <div className="q-sec">
-                  <div className="lbl"><Icon name="target" size={15} /> Targets &amp; landing</div>
+                  <div className="lbl"><Icon name="target" size={15} /> Targets</div>
                   <div className="grid g3">
                     <div className="field"><label>Monthly ad budget</label><MoneyInput currency={currency} placeholder="1,50,000" value={monthlyBudget} onChange={setMonthlyBudget} /></div>
                     <div className="field"><label>Target CPL</label><MoneyInput currency={currency} placeholder="300" value={targetCpl} onChange={setTargetCpl} /></div>
                     <div className="field"><label>Monthly lead goal</label><input className="inp" type="number" placeholder="400" value={leadGoal} onChange={(e) => setLeadGoal(e.target.value)} /></div>
                   </div>
+                </div>
+                */}
+                {/* Intentionally hidden: landing page selection here is deferred — a
+                    project's landing page is set up from the project's own Overview
+                    page instead, same reasoning as the Publish card just below. */}
+                {/*
+                <div className="q-sec">
+                  <div className="lbl"><Icon name="globe" size={15} /> Landing page</div>
                   <div className="field"><label>Landing page</label>
                     <select className="inp" value={landingPage} onChange={(e) => setLandingPage(e.target.value)}>
                       <option>Create new from template…</option>
@@ -1527,7 +1564,13 @@ export default function AddNewProjectPage() {
                     </select>
                     {orgLandingPages.length === 0 ? <div className="hint">No landing pages yet — create one from Landing Pages.</div> : null}
                   </div>
+                </div>
+                */}
 
+                {/* Intentionally hidden: auto-publishing a live landing page during
+                      project creation is premature here — a project's landing page is
+                      set up afterwards from the project's own page instead. */}
+                  {/*
                   <div className="card pad-14 mt-16" style={{ background: "var(--surface-2, #f8fafc)", border: "1.5px solid var(--line)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
@@ -1590,7 +1633,7 @@ export default function AddNewProjectPage() {
                       </>
                     )}
                   </div>
-                </div>
+                  */}
                 <div className="q-sec">
                   <div className="lbl"><Icon name="puzzle" size={15} /> Automation &amp; assignment</div>
                   {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
@@ -1732,15 +1775,22 @@ export default function AddNewProjectPage() {
                       <div className="q-sec"><div className="lbl"><Icon name="bell" size={15} /> Marketing</div>
                         {/* Intentionally hidden: ad-source settings are not implemented yet and may return later. */}
                         {/* <div className="sp"><span className="k">Sources</span><span className="v">{[metaAds && "Meta", googleAds && "Google", linkedinAds && "LinkedIn", portalAds && "Portals"].filter(Boolean).join(", ") || "—"}</span></div> */}
-                        <div className="sp"><span className="k">Monthly ad budget</span><span className="v">{monthlyBudget ? formatProjectMoney(monthlyBudget, currency) : "—"}</span></div>
-                        <div className="sp"><span className="k">Target CPL</span><span className="v">{targetCpl ? formatProjectMoney(targetCpl, currency) : "—"}</span></div>
-                        <div className="sp"><span className="k">Monthly lead goal</span><span className="v">{leadGoal || "—"}</span></div>
+                        {/* Intentionally hidden: ad budget / CPL / lead-goal targets have no
+                            ad-platform integration behind them — same reasoning as Sources above. */}
+                        {/* <div className="sp"><span className="k">Monthly ad budget</span><span className="v">{monthlyBudget ? formatProjectMoney(monthlyBudget, currency) : "—"}</span></div> */}
+                        {/* <div className="sp"><span className="k">Target CPL</span><span className="v">{targetCpl ? formatProjectMoney(targetCpl, currency) : "—"}</span></div> */}
+                        {/* <div className="sp"><span className="k">Monthly lead goal</span><span className="v">{leadGoal || "—"}</span></div> */}
                         {/* Intentionally hidden: the backing AI voice calling feature is not implemented yet and may return later. */}
                         {/* <div className="sp"><span className="k">AI calling</span><span className="v"><span className={`badge ${aiCalling ? "b-green" : "b-gray"}`}>{aiCalling ? "On" : "Off"}</span></span></div> */}
                         {/* Intentionally hidden: the backing WhatsApp auto-welcome feature is not implemented yet and may return later. */}
                         {/* <div className="sp"><span className="k">WhatsApp welcome</span><span className="v"><span className={`badge ${whatsappAuto ? "b-green" : "b-gray"}`}>{whatsappAuto ? "On" : "Off"}</span></span></div> */}
                         <div className="sp"><span className="k">Round-robin assignment</span><span className="v"><span className={`badge ${roundRobin ? "b-green" : "b-gray"}`}>{roundRobin ? "On" : "Off"}</span></span></div>
                       </div>
+                      {/* Intentionally hidden: template selection and live-landing-page
+                          auto-publish are deferred from the wizard (see Step 1 and Step 6) —
+                          nothing left here to summarize until that's set up from the
+                          project's own page instead. */}
+                      {/*
                       <div className="q-sec"><div className="lbl"><Icon name="globe" size={15} /> Project Template &amp; Website</div>
                         <div className="sp"><span className="k">Template</span><span className="v">{selectedTemplate?.name || "Standard Template"}</span></div>
                         <div className="sp">
@@ -1779,6 +1829,7 @@ export default function AddNewProjectPage() {
                           )}
                         </div>
                       </div>
+                      */}
                       <div className="q-sec"><div className="lbl"><Icon name="profile" size={15} /> Team &amp; access</div>
                         <div className="sp"><span className="k">Project manager</span><span className="v">{selectedManager ? personLabel(selectedManager) : "Unassigned"}</span></div>
                         <div className="sp"><span className="k">Assigned sales agents</span><span className="v">{agentAssign.length} assigned</span></div>
@@ -1832,7 +1883,7 @@ export default function AddNewProjectPage() {
                       </ul>
                     </div>
                   ) : (
-                    <div className="help mt-20"><Icon name="flag" size={14} /> <b>Ready to go live.</b> Publishing creates the project, wires up the connected ad sources and starts routing new leads immediately.</div>
+                    <div className="help mt-20"><Icon name="flag" size={14} /> <b>Ready to go live.</b> Publishing creates the project and starts routing new leads immediately.</div>
                   )}
                 </div>
               </div>

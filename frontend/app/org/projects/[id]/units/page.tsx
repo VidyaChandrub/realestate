@@ -697,13 +697,18 @@ export default function OrgProjectUnitsPage() {
   const canPickConfiguration =
     projectConfigurationOptions.length > 0 || unitForm.configuration !== "";
 
-  // Availability grid: units grouped by the explicit `tower` field. Units
-  // with no tower fall into one "All units" bucket. Floor range per tower
-  // is the min/max of `floor` across the units that actually exist.
+  // Availability grid: units grouped by the explicit `tower` field — but
+  // only while the template currently has a group-role field. A unit's own
+  // `tower` value survives that field being deleted from the template (data
+  // isn't wiped when a role goes away), so without this check the grid kept
+  // splitting into stale per-tower sections using a generic "Group" label
+  // instead of actually turning grouping off. Units with no tower (or once
+  // grouping is off) fall into one "All units" bucket. Floor range per
+  // tower is the min/max of `floor` across the units that actually exist.
   const towers = (() => {
     const byTower = new Map<string, Unit[]>();
     for (const u of units) {
-      const key = u.tower && u.tower.trim() ? u.tower.trim() : NO_TOWER;
+      const key = traits.grouped && u.tower && u.tower.trim() ? u.tower.trim() : NO_TOWER;
       const bucket = byTower.get(key);
       if (bucket) bucket.push(u);
       else byTower.set(key, [u]);
@@ -1275,6 +1280,7 @@ export default function OrgProjectUnitsPage() {
                   {unitAttempted && !unitForm.configuration ? <div className="field-err">Pick a configuration for this unit.</div> : null}
                 </div>
                 ) : null}
+                {traits.grouped ? (
                 <div className="field">
                   <label>{groupWord}</label>
                   <TowerCombobox
@@ -1284,6 +1290,7 @@ export default function OrgProjectUnitsPage() {
                     noun={groupWord}
                   />
                 </div>
+                ) : null}
                 {traits.floors ? (
                 <div className="field">
                   <label>{roleField(unitTemplate, "floor")?.label ?? "Floor"}</label>

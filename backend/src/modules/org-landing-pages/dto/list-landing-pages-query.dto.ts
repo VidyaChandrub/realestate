@@ -32,4 +32,9 @@ export class ListLandingPagesQueryDto {
   @IsOptional()
   @IsIn(LANDING_PAGE_STATUS_VALUES)
   status?: LandingPageStatusValue;
+
+  /** Only pages bound to this project (see propertyBinding in content.config). */
+  @IsOptional()
+  @IsString()
+  projectId?: string;
 }
