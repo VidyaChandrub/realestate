@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { PermissionAction, SessionUser } from "@/lib/types";
 import { apiFetch } from "@/lib/api";
 import { Icon } from "@/components/icons";
+import { BuildingLogoIcon } from "@/components/brand-logo";
 import { NotificationsBell } from "./notifications-bell";
 
 type NavItem = {
@@ -274,11 +275,22 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
     <div className={appClass}>
       <aside className="sidebar">
         <div className="s-top">
-          <div className="logo">iR</div>
+          <div className="s-logo-wrap" aria-hidden>
+            <BuildingLogoIcon size={34} />
+          </div>
           <div className="s-name">
             iPixxel Realty<small>Super Admin</small>
           </div>
         </div>
+        <Link href="/admin-console/subscriptions" className="s-plan" title="Platform Console">
+          <div className="s-plan-inner">
+            <Icon name="crown" size={13} className="s-plan-ic" />
+            <span>
+              Console: <strong>Platform Core</strong>
+            </span>
+          </div>
+          <Icon name="chevron-right" size={12} className="s-plan-arrow" />
+        </Link>
         <nav>
           <ul className="nav">
             {NAV_GROUPS.map((group) => {
@@ -329,12 +341,12 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
             </div>
             <button
               type="button"
-              onClick={handleSignOut}
-              disabled={isSigningOut}
-              className="signout"
-              title="Sign out"
+              onClick={() => router.push("/admin-console/settings")}
+              className="side-arrow-btn"
+              title="Console Settings"
+              aria-label="Settings"
             >
-              <Icon name="logout" size={14} />
+              <Icon name="chevron-right" size={13} />
             </button>
           </div>
         </div>
@@ -348,26 +360,10 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
                 <path d="M3 6h18M3 12h18M3 18h18" />
               </svg>
             </button>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "4px 9px",
-                borderRadius: 999,
-                background: "linear-gradient(135deg, rgba(79,70,229,0.12), rgba(124,58,237,0.12))",
-                border: "1px solid rgba(79,70,229,0.2)",
-                color: "var(--brand, #6366f1)",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-              }}
-            >
-              Platform
-            </div>
+            <span className="tb-chip">Platform</span>
             <div className="crumbs">
-              Super Admin · <b>{crumb}</b>
+              <span className="crumbs-eyebrow">Super Admin</span>
+              <b>{crumb}</b>
             </div>
           </div>
           <div className="tb-search">
@@ -394,6 +390,7 @@ export function SuperAdminShell({ children }: { children: ReactNode }) {
 
               {profileOpen && (
                 <div
+                  className="tb-profile-menu"
                   style={{
                     position: "absolute",
                     top: "calc(100% + 10px)",

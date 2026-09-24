@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
 
 // Forced password change for first-time / temp-password accounts. Reached
@@ -101,137 +102,106 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="auth">
-      <div className="brandside">
-        <div className="glow" />
-        <div style={{ position: "relative" }}>
-          <div className="logo">iR</div>
+    <AuthShell
+      eyebrow="Security"
+      title="Change your password"
+      subtitle={
+        user?.email
+          ? `Signed in as ${user.email}. Your account was set up with a temporary password — choose a new one you'll remember.`
+          : "Set a new password for your account."
+      }
+      footer={
+        <>
+          ← Back to <Link href={loginHref}>Sign in</Link>
+        </>
+      }
+    >
+      {done ? (
+        <div className="help" style={{ marginTop: 22 }}>
+          ✅ Password changed successfully. You can now{" "}
+          <Link href={loginHref} style={{ fontWeight: 600 }}>
+            sign in
+          </Link>{" "}
+          with your new password.
         </div>
-        <div style={{ position: "relative" }}>
-          <h1 className="reveal in">One more step before you&apos;re in.</h1>
-          <p className="reveal in" data-delay="1" style={{ marginTop: 18 }}>
-            Your account was set up with a temporary password. Choose a new one
-            you&apos;ll remember — you&apos;ll use it every time you sign in from
-            now on.
-          </p>
-        </div>
-        <div style={{ position: "relative", color: "#8891b4", fontSize: 13 }}>
-          iPixxel Realty · Real-estate CRM &amp; landing pages
-        </div>
-      </div>
-
-      <div className="formside">
-        <div className="fw">
-          <div className="reveal in">
-            <h2>Change your password</h2>
-            <p className="muted" style={{ marginTop: 8 }}>
-              {user?.email
-                ? `Signed in as ${user.email}.`
-                : "Set a new password for your account."}
-            </p>
+      ) : (
+        <form style={{ marginTop: 24 }} onSubmit={handleSubmit} noValidate>
+          <div className="field">
+            <label>Old password</label>
+            <PasswordInput
+              value={oldPassword}
+              onChange={(e) => {
+                setOldPassword(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, oldPassword: "" }));
+              }}
+              autoComplete="current-password"
+              placeholder="••••••••••"
+            />
+            {fieldErrors.oldPassword ? (
+              <div className="hint" style={{ color: "var(--rose)" }}>
+                {fieldErrors.oldPassword}
+              </div>
+            ) : null}
+          </div>
+          <div className="field">
+            <label>New password</label>
+            <PasswordInput
+              value={newPassword}
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, newPassword: "" }));
+              }}
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+            />
+            {fieldErrors.newPassword ? (
+              <div className="hint" style={{ color: "var(--rose)" }}>
+                {fieldErrors.newPassword}
+              </div>
+            ) : null}
+          </div>
+          <div className="field">
+            <label>Confirm new password</label>
+            <PasswordInput
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, confirmPassword: "" }));
+              }}
+              autoComplete="new-password"
+              placeholder="Re-enter new password"
+            />
+            {fieldErrors.confirmPassword ? (
+              <div className="hint" style={{ color: "var(--rose)" }}>
+                {fieldErrors.confirmPassword}
+              </div>
+            ) : null}
           </div>
 
-          {done ? (
-            <div
-              className="help reveal in"
-              data-delay="1"
-              style={{ marginTop: 26 }}
+          {generalError ? (
+            <p
+              role="alert"
+              className="help"
+              style={{
+                color: "var(--rose)",
+                borderColor: "var(--rose-050)",
+                background: "var(--rose-050)",
+                marginBottom: 14,
+              }}
             >
-              ✅ Password changed successfully. You can now{" "}
-              <Link
-                href={loginHref}
-                style={{ color: "var(--brand)", fontWeight: 600 }}
-              >
-                sign in
-              </Link>{" "}
-              with your new password.
-            </div>
-          ) : (
-            <form
-              className="reveal in"
-              data-delay="1"
-              style={{ marginTop: 26 }}
-              onSubmit={handleSubmit}
-              noValidate
-            >
-              <div className="field">
-                <label>Old password</label>
-                <PasswordInput
-                  value={oldPassword}
-                  onChange={(e) => {
-                    setOldPassword(e.target.value);
-                    setFieldErrors((prev) => ({ ...prev, oldPassword: "" }));
-                  }}
-                  autoComplete="current-password"
-                  placeholder="••••••••••"
-                />
-                {fieldErrors.oldPassword ? (
-                  <div className="hint" style={{ color: "var(--rose)" }}>
-                    {fieldErrors.oldPassword}
-                  </div>
-                ) : null}
-              </div>
-              <div className="field">
-                <label>New password</label>
-                <PasswordInput
-                  value={newPassword}
-                  onChange={(e) => {
-                    setNewPassword(e.target.value);
-                    setFieldErrors((prev) => ({ ...prev, newPassword: "" }));
-                  }}
-                  autoComplete="new-password"
-                  placeholder="At least 8 characters"
-                />
-                {fieldErrors.newPassword ? (
-                  <div className="hint" style={{ color: "var(--rose)" }}>
-                    {fieldErrors.newPassword}
-                  </div>
-                ) : null}
-              </div>
-              <div className="field">
-                <label>Confirm new password</label>
-                <PasswordInput
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    setFieldErrors((prev) => ({ ...prev, confirmPassword: "" }));
-                  }}
-                  autoComplete="new-password"
-                  placeholder="Re-enter new password"
-                />
-                {fieldErrors.confirmPassword ? (
-                  <div className="hint" style={{ color: "var(--rose)" }}>
-                    {fieldErrors.confirmPassword}
-                  </div>
-                ) : null}
-              </div>
+              {generalError}
+            </p>
+          ) : null}
 
-              {generalError ? (
-                <p
-                  role="alert"
-                  className="help"
-                  style={{
-                    color: "var(--rose)",
-                    borderColor: "var(--rose-050)",
-                    background: "var(--rose-050)",
-                    marginBottom: 14,
-                  }}
-                >
-                  {generalError}
-                </p>
-              ) : null}
-
-              <button
-                className="btn btn-primary btn-block btn-lg"
-                type="submit"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Saving…" : "Change password"}
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
+          <button
+            className="btn btn-primary btn-block btn-lg"
+            type="submit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Saving…" : "Change password"}
+          </button>
+        </form>
+      )}
+    </AuthShell>
   );
 }

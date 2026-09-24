@@ -72,8 +72,8 @@ export function Modal({
   const scopeClass = pathname.startsWith("/admin-console")
     ? "superadmin"
     : pathname.startsWith("/org")
-    ? "org"
-    : "superadmin org";
+      ? "org"
+      : "superadmin org";
 
   return createPortal(
     <div
@@ -118,7 +118,7 @@ export function Modal({
           style={{
             height: 3,
             borderRadius: "16px 16px 0 0",
-            background: "linear-gradient(90deg, #4f46e5, #6366f1, #0ea5e9)",
+            background: "linear-gradient(90deg, #0f1424, #6366f1, #0ea5e9)",
             position: "absolute",
             top: 0,
             left: 0,

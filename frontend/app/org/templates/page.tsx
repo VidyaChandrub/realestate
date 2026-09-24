@@ -309,7 +309,7 @@ export default function OrgTemplatesPage() {
               gap: 6,
               fontSize: 11,
               fontWeight: 800,
-              color: "var(--brand, #4f46e5)",
+              color: "var(--brand, #0f1424)",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               marginBottom: 4,
@@ -646,7 +646,7 @@ export default function OrgTemplatesPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div
             style={{
-              background: "linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(124, 58, 237, 0.04) 100%)",
+              background: "linear-gradient(135deg, rgba(21, 27, 46, 0.08) 0%, rgba(124, 58, 237, 0.04) 100%)",
               border: "1px solid var(--brand-100, #e0e3fd)",
               borderRadius: 20,
               padding: "44px 32px",
@@ -668,7 +668,7 @@ export default function OrgTemplatesPage() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                boxShadow: "0 8px 24px -4px rgba(79, 70, 229, 0.4)",
+                boxShadow: "0 8px 24px -4px rgba(21, 27, 46, 0.4)",
                 marginBottom: 16,
               }}
             >
@@ -707,7 +707,7 @@ export default function OrgTemplatesPage() {
                     fontSize: 14,
                     fontWeight: 700,
                     borderRadius: 12,
-                    boxShadow: "0 4px 14px rgba(79, 70, 229, 0.35)",
+                    boxShadow: "0 4px 14px rgba(21, 27, 46, 0.35)",
                   }}
                 >
                   <Plus size={16} /> Browse &amp; Add Templates from Plan
@@ -754,7 +754,7 @@ export default function OrgTemplatesPage() {
                     }}
                   >
                     <div style={{ position: "relative" }}>
-                      <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent="#4f46e5" height={160}>
+                      <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent="#0f1424" height={160}>
                         <div style={{ position: "absolute", top: 10, left: 10 }}>
                           <TierBadge tier={tmpl.tier} />
                         </div>
@@ -993,8 +993,8 @@ export default function OrgTemplatesPage() {
                     previewDevice === "desktop"
                       ? "100%"
                       : previewDevice === "tablet"
-                      ? 768
-                      : 375,
+                        ? 768
+                        : 375,
                   height: 520,
                   background: "#ffffff",
                   borderRadius: previewDevice === "desktop" ? 8 : 16,
@@ -1057,20 +1057,19 @@ export default function OrgTemplatesPage() {
                   </div>
                 </div>
                 <span
-                  className={`badge ${
-                    availableData.remainingQuota === 0
+                  className={`badge ${availableData.remainingQuota === 0
                       ? "b-amber"
                       : availableData.remainingQuota != null
-                      ? "b-indigo"
-                      : "b-green"
-                  }`}
+                        ? "b-indigo"
+                        : "b-green"
+                    }`}
                   style={{ fontWeight: 700 }}
                 >
                   {availableData.remainingQuota === 0
                     ? "Quota Reached"
                     : availableData.remainingQuota != null
-                    ? `${availableData.remainingQuota} remaining slots`
-                    : "Unlimited access"}
+                      ? `${availableData.remainingQuota} remaining slots`
+                      : "Unlimited access"}
                 </span>
               </div>
 
@@ -1124,7 +1123,7 @@ export default function OrgTemplatesPage() {
                     <div
                       key={tmpl.id}
                       style={{
-                        border: isAssigned ? "2px solid var(--brand, #4f46e5)" : "1px solid var(--line-2)",
+                        border: isAssigned ? "2px solid var(--brand, #0f1424)" : "1px solid var(--line-2)",
                         borderRadius: 14,
                         overflow: "hidden",
                         background: "var(--surface)",
@@ -1134,7 +1133,7 @@ export default function OrgTemplatesPage() {
                       }}
                     >
                       <div style={{ position: "relative" }}>
-                        <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent={isAssigned ? "#4f46e5" : "#94a3b8"} height={150}>
+                        <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent={isAssigned ? "#0f1424" : "#94a3b8"} height={150}>
                           <div style={{ position: "absolute", top: 8, left: 8 }}>
                             <TierBadge tier={tmpl.tier} />
                           </div>
@@ -1233,8 +1232,8 @@ export default function OrgTemplatesPage() {
                               {assigningId === tmpl.id
                                 ? "Adding…"
                                 : isQuotaFull
-                                ? "Quota Full"
-                                : "+ Add to Workspace"}
+                                  ? "Quota Full"
+                                  : "+ Add to Workspace"}
                             </button>
                           )}
                         </div>
@@ -1420,7 +1419,7 @@ function OrgVisualTemplateCard({
           overflow: "hidden",
           border: hovered ? "1px solid var(--brand-100, #c7d2fe)" : "1px solid var(--line-2)",
           boxShadow: hovered
-            ? "0 14px 34px -10px rgba(79, 70, 229, 0.18), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
+            ? "0 14px 34px -10px rgba(21, 27, 46, 0.18), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
             : "0 2px 8px -2px rgba(14, 21, 37, 0.05)",
           transform: hovered ? "translateY(-4px)" : "none",
           transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -1430,7 +1429,7 @@ function OrgVisualTemplateCard({
       >
         {/* Cover Preview Container */}
         <div style={{ position: "relative", overflow: "hidden" }}>
-          <TemplateCover thumbnail={row.thumbnail ?? "hero"} accent="#4f46e5" height={188} radius="18px 18px 0 0">
+          <TemplateCover thumbnail={row.thumbnail ?? "hero"} accent="#0f1424" height={188} radius="18px 18px 0 0">
             {/* Top Badges */}
             <div
               style={{
@@ -1502,7 +1501,7 @@ function OrgVisualTemplateCard({
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 8,
-                  background: "var(--brand, #4f46e5)",
+                  background: "var(--brand, #0f1424)",
                   color: "#ffffff",
                   border: "none",
                   borderRadius: 10,
@@ -1510,7 +1509,7 @@ function OrgVisualTemplateCard({
                   fontSize: 13,
                   fontWeight: 700,
                   cursor: "pointer",
-                  boxShadow: "0 6px 18px rgba(79, 70, 229, 0.4)",
+                  boxShadow: "0 6px 18px rgba(21, 27, 46, 0.4)",
                   transition: "transform 0.15s ease",
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}

@@ -1,5 +1,5 @@
 /* ============================================================
-   iPixxel Realty — Super Admin  ·  Modern Design System (v2)
+   iPixxel Realty â€” Super Admin  Â·  Modern Design System (v2)
    Clean, airy, motion-first. Collapsible full-width sidebar.
    Scoped under .org for the Next.js port.
    ============================================================ */
@@ -14,11 +14,11 @@
   --faint: #aab2c5;
   --line: #eaedf3;
   --line-2: #e2e6ee;
-  --brand: #4f46e5;
-  --brand-600: #4338ca;
-  --brand-050: #eef0fe;
-  --brand-100: #e0e3fd;
-  --iris: #6366f1;
+  --brand: var(--primary, #0f1424);
+  --brand-600: var(--primary-dark, color-mix(in srgb, var(--brand) 85%, black));
+  --brand-050: var(--primary-soft, color-mix(in srgb, var(--brand) 6%, white));
+  --brand-100: var(--primary-border, color-mix(in srgb, var(--brand) 15%, white));
+  --iris: var(--secondary, #2a3348);
   --sky: #0ea5e9;
   --teal: #0d9488;
   --green: #16a34a;
@@ -30,8 +30,8 @@
   --rose-100: #fbd0d9;
   --violet: #7c3aed;
   --violet-050: #f3edfe;
-  --sidebar: #0f1424;
-  --sidebar-2: #151b2e;
+  --sidebar: var(--primary, #0f1424);
+  --sidebar-2: var(--secondary, #2a3348);
   --sidebar-ink: #aab3c9;
   --sidebar-active: #ffffff;
   --r-lg: 18px;
@@ -42,9 +42,9 @@
   --sh: 0 4px 14px -6px rgba(14, 21, 37, 0.1), 0 2px 6px -4px rgba(14, 21, 37, 0.06);
   --sh-1: 0 6px 20px -8px rgba(14, 21, 37, 0.14);
   --sh-lg: 0 24px 60px -20px rgba(14, 21, 37, 0.22);
-  --sh-glow: 0 8px 30px -8px rgba(79, 70, 229, 0.45);
-  --font: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --display: var(--font-space-grotesk), "Inter", sans-serif;
+  --sh-glow: 0 8px 30px -8px color-mix(in srgb, var(--brand) 45%, transparent);
+  --font: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
+  --display: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
   --rail: 76px;
   --side: 264px;
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -311,9 +311,9 @@
 }
 
 .org .nav a.active {
-  background: linear-gradient(90deg, rgba(79, 70, 229, 0.9), rgba(99, 102, 241, 0.75));
+  background: linear-gradient(90deg, rgba(21, 27, 46, 0.9), rgba(99, 102, 241, 0.75));
   color: #fff;
-  box-shadow: 0 6px 18px -8px rgba(79, 70, 229, 0.8);
+  box-shadow: 0 6px 18px -8px rgba(21, 27, 46, 0.8);
 }
 
 .org .nav a.active .ic {
@@ -569,7 +569,7 @@
   border: 2px solid var(--surface);
 }
 
-/* Numeric unread badge (e.g. the notification bell) — same treatment as the
+/* Numeric unread badge (e.g. the notification bell) â€” same treatment as the
    Super Admin console's .nb-count, so both portals read the same way. */
 .org .icon-btn .count {
   position: absolute;
@@ -1462,7 +1462,7 @@
 }
 
 .org .wiz .st.done::before {
-  content: "✓";
+  content: "âœ“";
   background: var(--green);
   border-color: var(--green);
   color: #fff;
@@ -1711,7 +1711,7 @@
 
 /* ---------- Collapsed rail: keep every icon centered ---------- */
 @media (min-width: 821px) {
-  /* Brand logo — drop the name entirely so the logo can center */
+  /* Brand logo â€” drop the name entirely so the logo can center */
   .org .app.collapsed .sidebar .s-top {
     justify-content: center;
     gap: 0;
@@ -1722,7 +1722,7 @@
     display: none;
   }
 
-  /* Nav items — remove the label from layout so the icon isn't
+  /* Nav items â€” remove the label from layout so the icon isn't
      pushed off the left edge, then center each link as a square */
   .org .app.collapsed .nav {
     padding-left: 0;
@@ -1738,7 +1738,7 @@
     padding: 11px 0;
   }
 
-  /* Footer user avatar — meta and sign-out are already hidden */
+  /* Footer user avatar â€” meta and sign-out are already hidden */
   .org .app.collapsed .sidebar .s-foot {
     padding-left: 0;
     padding-right: 0;
@@ -1812,7 +1812,7 @@
   transform: translateY(-2px);
 }
 
-.org .g2v { background: linear-gradient(135deg, #5eead4, #0d9488); }
+.org .g2v { background: linear-gradient(135deg, var(--secondary, #3d4a66), var(--primary, #0f1424)); }
 .org .g3v { background: linear-gradient(135deg, #fbbf24, #f97316); }
 .org .g4v { background: linear-gradient(135deg, #f0abfc, #a855f7); }
 
@@ -1958,19 +1958,19 @@
 
 
 /* ============================================================
-   ORGANIZATION THEME � CRM module
+   ORGANIZATION THEME ï¿½ CRM module
    (Leads / Calling / WhatsApp / Billing)
    Consolidated from app/org/crm.css
    ============================================================ */
 
 /* ============================================================
-   iPixxel Realty — CRM module (Leads / Calling / WhatsApp)
+   iPixxel Realty â€” CRM module (Leads / Calling / WhatsApp)
    Prototype-specific components ported from the static HTML.
    Tokens come from .superadmin (admin-console/superadmin.css).
    ============================================================ */
 
 /* ---- shared form primitives ---- */
-/* NOTE: .field/.inp/.row2/.divider/.mono live in org.css (Organization theme) — do not duplicate here. */
+/* NOTE: .field/.inp/.row2/.divider/.mono live in org.css (Organization theme) â€” do not duplicate here. */
 
 /* ---- balance / credits banner ---- */
 .balance-card,
@@ -2293,13 +2293,13 @@
 
 
 /* ============================================================
-   ORGANIZATION THEME � Projects module
+   ORGANIZATION THEME ï¿½ Projects module
    Grid/list, cards, availability, units, onboarding wizard
    Consolidated from app/org/projects/projects.css
    ============================================================ */
 
 /* ============================================================
-   iPixxel Realty — Projects module
+   iPixxel Realty â€” Projects module
    Grid/list views, project cards, availability bars,
    unit cards, availability matrix, project onboarding wizard.
    ============================================================ */
@@ -2461,7 +2461,7 @@
 .drop:hover{border-color:var(--brand);color:var(--brand)}
 .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
 @media(max-width:640px){.rev-grid{grid-template-columns:1fr}}
-/* Review rows are flat key/value lines — explicitly reset the generic
+/* Review rows are flat key/value lines â€” explicitly reset the generic
    boxed `.sp` stat-tile style (background/border/radius, 20px display font
    on `.v`) so it doesn't bleed through this partial override. */
 .rev .sp{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;font-size:13.5px}
@@ -2485,7 +2485,7 @@
 @media(max-width:900px){.cgrid{grid-template-columns:1fr}}
 
 /* ---------- Form sections & grids ---------- */
-/* NOTE: .g2/.g3/.switch live in org.css (Organization theme) — do not duplicate here. */
+/* NOTE: .g2/.g3/.switch live in org.css (Organization theme) â€” do not duplicate here. */
 .sec{border-top:1px solid var(--line);margin-top:22px;padding-top:18px}
 .sec:first-of-type{border-top:0;margin-top:0;padding-top:0}
 .sec>.lbl{font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
@@ -2498,7 +2498,7 @@
 .mono{font-family:monospace}
 
 /* ============================================================
-   ORGANIZATION THEME � Shared utilities
+   ORGANIZATION THEME ï¿½ Shared utilities
    Replace one-off inline styles with these reusable classes.
    ============================================================ */
 .org .row { display: flex; align-items: center; gap: 12px; }
@@ -2630,7 +2630,7 @@
 
 /* ====== Org Settings layout (os-*) ====== */
 /* ============================================================
-   iPixxel Realty — Organisation Settings
+   iPixxel Realty â€” Organisation Settings
    Modern, standard settings layout: icon rail + content,
    section & card headers with icon badges, floating save bar.
    Tokens come from .org (admin-console/superadmin.css).
@@ -2945,7 +2945,7 @@
 .org .colorset span { width: 30px; height: 30px; border-radius: 8px; cursor: pointer; }
 .org .colorset span.on { box-shadow: 0 0 0 3px var(--brand-050), 0 0 0 1px var(--brand); }
 
-/* Native colour input styled as a swatch — brand-colour picker in the
+/* Native colour input styled as a swatch â€” brand-colour picker in the
    branding section. Output is always #rrggbb, matching the API. */
 .org .colorpick { width: 46px; height: 36px; padding: 2px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); cursor: pointer; flex-shrink: 0; }
 .org .colorpick::-webkit-color-swatch-wrapper { padding: 0; }
@@ -2968,7 +2968,7 @@
 .org .swrow .tx .muted { font-size: 12.5px; margin-top: 2px; }
 
 /* ============================================================
-   iPixxel Realty — Sales Agents (list + agent dashboard)
+   iPixxel Realty â€” Sales Agents (list + agent dashboard)
    Ported from team.html / agent-detail.html mockups.
    ============================================================ */
 
@@ -3055,7 +3055,7 @@
 .org .askill .t { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
 .org .askill .t b { font-weight: 600; }
 
-/* ====== Project wizard — dynamic specification rows ====== */
+/* ====== Project wizard â€” dynamic specification rows ====== */
 /* Side-by-side label + value, with a delete control on every row (including
    the four the wizard pre-fills). Collapses to stacked inputs on narrow
    screens so the value field never gets squeezed to nothing. */
@@ -3101,7 +3101,7 @@
   .org .spec-row .inp:first-child { grid-column: 1 / -1; }
 }
 
-/* Typed field template rows (Settings → project types): name, section, type,
+/* Typed field template rows (Settings â†’ project types): name, section, type,
    extra (choices / unit), delete. Same shell as the specification rows. */
 .org .spec-row.field-def-row {
   grid-template-columns: minmax(130px, 1.2fr) minmax(118px, 1fr) minmax(118px, 1.15fr) minmax(0, 1.4fr) 32px;
@@ -3159,7 +3159,7 @@
   }
 }
 
-/* ====== Project wizard — required-field validation ====== */
+/* ====== Project wizard â€” required-field validation ====== */
 /* A field that failed this step's Continue check, plus the summary block
    shown next to Continue and the warning raised when jumping ahead from an
    incomplete step via the step rail. */
@@ -3179,7 +3179,7 @@
 .org .help.err b { color: var(--rose); }
 .org .help.err ul { margin: 6px 0 0; padding-left: 20px; }
 
-/* ====== Project wizard — step-rail status ====== */
+/* ====== Project wizard â€” step-rail status ====== */
 /* A step earns the green tick only by passing its own required-field check.
    One bypassed via "Go to X anyway" is still incomplete, so it gets an amber
    alert instead of a tick that would imply work that was never done. */
@@ -3189,7 +3189,7 @@
   border-color: var(--amber, #f59e0b);
   color: #fff;
 }
-/* Visually hidden, still read by screen readers — the alert glyph alone
+/* Visually hidden, still read by screen readers â€” the alert glyph alone
    doesn't say "incomplete". */
 .org .sr-only {
   position: absolute;
@@ -3203,7 +3203,7 @@
   border: 0;
 }
 
-/* ====== Wizard Step 2 — size & price per configuration ====== */
+/* ====== Wizard Step 2 â€” size & price per configuration ====== */
 /* One row per picked configuration. These values are what let the unit form
    prefill later, so they're asked for here rather than only on the Units page. */
 .org .ut-row {
@@ -3232,7 +3232,7 @@
 /* ====== Row actions menu (kebab) ====== */
 /* The shared RowActionsMenu (components/superadmin/row-actions-menu) portals
    into whichever theme wrapper it sits in. Its styling is scoped per wrapper
-   because each theme supplies its own custom properties — these mirror the
+   because each theme supplies its own custom properties â€” these mirror the
    .superadmin rules so the same component reads correctly in the org app. */
 .org .row-menu-trigger {
   width: 34px;
@@ -3295,7 +3295,7 @@
 .org .row-menu-item:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ============================================================
-   Team Chat — 3-column chat shell (channels · thread · info)
+   Team Chat â€” 3-column chat shell (channels Â· thread Â· info)
    Plain REST + polling, mirroring the .wa-* inbox look.
    ============================================================ */
 .org .tc-shell {
@@ -3682,3 +3682,501 @@
     justify-content: flex-start;
   }
 }
+
+.org,
+.org * {
+  scrollbar-width: thin;
+  scrollbar-color: #c5cbd6 transparent;
+}
+
+.org ::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.org ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.org ::-webkit-scrollbar-thumb {
+  background: #c5cbd6;
+  border-radius: 99px;
+}
+
+.org ::-webkit-scrollbar-thumb:hover {
+  background: #9aa3b5;
+}
+
+/* ============================================================
+   Org shell redesign — match Super Admin teal chrome
+   ============================================================ */
+.org {
+  --bg: #f4f6f8;
+  --brand: var(--primary, #0f1424);
+  --brand-600: var(--primary-dark, color-mix(in srgb, var(--brand) 85%, black));
+  --brand-050: var(--primary-soft, color-mix(in srgb, var(--brand) 6%, white));
+  --brand-100: var(--primary-border, color-mix(in srgb, var(--brand) 15%, white));
+  --iris: var(--secondary, #2a3348);
+  --sky: var(--secondary, #3d4a66);
+  --violet: var(--secondary, #3d4a66);
+  --violet-050: #eef0f4;
+  --sidebar: var(--primary, #0f1424);
+  --sidebar-2: var(--secondary, #2a3348);
+  --sidebar-ink: #9aa6bc;
+  --sh-glow: 0 10px 28px -10px color-mix(in srgb, var(--brand) 45%, transparent);
+  --side: 272px;
+  --rail: 78px;
+}
+
+.org .app {
+  background: var(--bg);
+}
+
+.org .sidebar {
+  width: var(--side, 260px);
+  background:
+    radial-gradient(400px 300px at 0% 0%, rgba(30, 58, 138, 0.15), transparent 70%),
+    radial-gradient(350px 250px at 100% 100%, rgba(15, 23, 42, 0.6), transparent 60%),
+    linear-gradient(180deg, #090e1a 0%, #060a12 100%) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #94a3b8 !important;
+}
+
+.org .sidebar .s-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 18px 16px;
+  border-bottom: none !important;
+}
+
+.org .sidebar .s-logo-wrap {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.org .sidebar .s-name {
+  font-family: var(--display, var(--font-roboto, sans-serif));
+  font-weight: 700;
+  font-size: 15.5px;
+  color: #ffffff !important;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.org .sidebar .s-name small {
+  display: block;
+  font-family: var(--font, var(--font-roboto, sans-serif));
+  font-weight: 500;
+  font-size: 11px;
+  color: #94a3b8 !important;
+  letter-spacing: 0.01em;
+  margin-top: 3px;
+  text-transform: capitalize;
+}
+
+.org .sidebar .s-plan {
+  margin: 0 16px 14px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #94a3b8 !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-decoration: none;
+  font-size: 11.5px;
+  font-weight: 500;
+  transition: all 0.18s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.org .sidebar .s-plan:hover {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+}
+
+.org .sidebar .s-plan-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.org .sidebar .s-plan-ic {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.org .sidebar .s-plan strong {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.org .sidebar .s-plan-arrow {
+  color: #64748b;
+  flex-shrink: 0;
+  transition: transform 0.18s;
+}
+
+.org .sidebar .s-plan:hover .s-plan-arrow {
+  color: #ffffff;
+  transform: translateX(2px);
+}
+
+.org .sidebar > nav {
+  padding: 4px 0 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.org .sidebar > nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.org .sidebar > nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 99px;
+}
+
+.org .nav {
+  margin: 0;
+  padding: 0 12px;
+}
+
+.org .nav .grp {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: #64748b !important;
+  padding: 14px 12px 6px !important;
+}
+
+.org .nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  color: #94a3b8 !important;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  position: relative;
+  transition: background 0.15s, color 0.15s;
+}
+
+.org .nav a .ic {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8 !important;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.org .nav a:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #ffffff !important;
+}
+
+.org .nav a:hover .ic {
+  color: #ffffff !important;
+  opacity: 1;
+}
+
+.org .nav a.active {
+  background: #0066f5 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 14px rgba(0, 102, 245, 0.42) !important;
+  border-radius: 10px !important;
+}
+
+.org .nav a.active .ic {
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+.org .nav a.active .lbl {
+  color: #ffffff !important;
+}
+
+.org .app.collapsed .nav a .lbl {
+  display: none;
+  opacity: 0;
+}
+
+.org .sidebar .s-foot {
+  margin-top: auto;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: transparent !important;
+  flex-shrink: 0;
+}
+
+.org .side-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px;
+  border-radius: 10px;
+  transition: background 0.15s;
+}
+
+.org .side-user .av {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 50% !important;
+  background: #0066f5 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 102, 245, 0.35);
+}
+
+.org .side-user .meta {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.org .side-user .meta b {
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.org .side-user .meta span {
+  color: #64748b !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  display: block;
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+.org .side-arrow-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #94a3b8 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.org .side-arrow-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+.org .app.collapsed .side-arrow-btn {
+  display: none;
+}
+
+.org .main {
+  background:
+    radial-gradient(700px 320px at 100% 0%, rgba(21, 27, 46, 0.05), transparent 55%),
+    var(--bg);
+}
+
+.org .topbar {
+  height: 68px;
+  padding: 0 24px;
+  gap: 18px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+.org .tb-left {
+  gap: 12px;
+}
+
+.org .burger {
+  width: 40px;
+  height: 40px;
+}
+
+.org .tb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--brand-050);
+  border: 1px solid var(--brand-100);
+  color: var(--brand);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.org .crumbs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.2;
+  font-size: inherit;
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
+}
+
+.org .crumbs .crumbs-eyebrow {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.org .crumbs b {
+  color: var(--ink);
+  font-weight: 700;
+  font-family: var(--display);
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+.org .tb-search input {
+  height: 42px;
+  background: var(--surface-2);
+}
+
+.org .tb-search input:focus {
+  background: var(--surface);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-050);
+}
+
+.org .tb-builder-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--brand-100);
+  background: var(--brand-050);
+  color: var(--brand);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: 0.15s;
+}
+
+.org .tb-builder-btn:hover:not(:disabled) {
+  background: #d8dce6;
+  border-color: #b8c0d0;
+}
+
+.org .tb-builder-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.org .icon-btn:hover {
+  background: var(--brand-050);
+  border-color: var(--brand-100);
+  color: var(--brand);
+}
+
+.org .tb-avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 13px;
+  box-shadow: 0 6px 16px -8px rgba(21, 27, 46, 0.45);
+}
+
+.org .btn-primary {
+  background: linear-gradient(180deg, var(--secondary, #2a3348) 0%, var(--brand) 100%);
+  border-color: transparent;
+  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--brand) 55%, transparent);
+}
+
+.org .b-indigo {
+  background: var(--brand-050);
+  color: var(--brand);
+  border-color: var(--brand-100);
+}
+
+.org,
+.org * {
+  scrollbar-width: thin;
+  scrollbar-color: #c5cbd6 transparent;
+}
+
+.org ::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.org ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.org ::-webkit-scrollbar-thumb {
+  background: #c5cbd6;
+  border-radius: 99px;
+}
+
+.org ::-webkit-scrollbar-thumb:hover {
+  background: #9aa3b5;
+}
+
+/* Horizontal wizard stepper & project cards enhancements */
+.org .wz-horizontal-stepper {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.org .wz-horizontal-stepper::-webkit-scrollbar {
+  height: 4px;
+}
+
+.org .wz-horizontal-stepper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+
+.org .pcard {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.org .pcard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.08);
+}
+

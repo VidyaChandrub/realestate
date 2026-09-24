@@ -49,7 +49,7 @@ export function ConfirmModal({
             justifyContent: "center",
             flexShrink: 0,
             background: destructive ? "#fef2f2" : "#eef2ff",
-            color: destructive ? "#e11d48" : "#4f46e5",
+            color: destructive ? "#e11d48" : "#0f1424",
           }}
         >
           <Icon name={destructive ? "alert" : "info"} size={20} />
@@ -127,24 +127,24 @@ export function ConfirmModal({
             transition: "all 0.15s ease",
             background: destructive
               ? "linear-gradient(135deg, #e11d48, #be123c)"
-              : "linear-gradient(135deg, #4f46e5, #4338ca)",
+              : "linear-gradient(135deg, #0f1424, #0f1424)",
             boxShadow: destructive
               ? "0 2px 8px -2px rgba(225, 29, 72, 0.4)"
-              : "0 2px 8px -2px rgba(79, 70, 229, 0.4)",
+              : "0 2px 8px -2px rgba(21, 27, 46, 0.4)",
           }}
           onMouseEnter={(e) => {
             if (!busy) {
               e.currentTarget.style.transform = "translateY(-1px)";
               e.currentTarget.style.boxShadow = destructive
                 ? "0 4px 12px -2px rgba(225, 29, 72, 0.5)"
-                : "0 4px 12px -2px rgba(79, 70, 229, 0.5)";
+                : "0 4px 12px -2px rgba(21, 27, 46, 0.5)";
             }
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = "translateY(0)";
             e.currentTarget.style.boxShadow = destructive
               ? "0 2px 8px -2px rgba(225, 29, 72, 0.4)"
-              : "0 2px 8px -2px rgba(79, 70, 229, 0.4)";
+              : "0 2px 8px -2px rgba(21, 27, 46, 0.4)";
           }}
         >
           {busy ? (

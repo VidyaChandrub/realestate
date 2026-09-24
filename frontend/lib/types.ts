@@ -1992,6 +1992,8 @@ export interface PlatformConfig {
   billingGracePeriodDays: number; // days a past_due subscription stays usable
   billingExpiryBehavior: "restrict" | "cancel"; // what happens after the grace window
   billingExpiryMessage: string; // popup body for expiring / past-due events
+  primaryColor?: string; // global primary brand color (HEX)
+  secondaryColor?: string; // global secondary accent color (HEX)
   updatedAt: string | null;
 }
 
@@ -2008,6 +2010,13 @@ export interface UpdatePlatformConfigInput {
   billingGracePeriodDays?: number;
   billingExpiryBehavior?: "restrict" | "cancel";
   billingExpiryMessage?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+}
+
+export interface PlatformTheme {
+  primaryColor: string;
+  secondaryColor: string;
 }
 
 /** GET /admin/org-domain-requests/:id/verify — live DNS + site check for an org subdomain. */

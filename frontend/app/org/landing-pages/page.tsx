@@ -428,7 +428,7 @@ export default function OrgLandingPagesPage() {
     !searchInput
       ? true
       : r.name.toLowerCase().includes(searchInput.toLowerCase()) ||
-        r.slug.toLowerCase().includes(searchInput.toLowerCase()),
+      r.slug.toLowerCase().includes(searchInput.toLowerCase()),
   );
 
   const total = result?.total ?? 0;
@@ -459,7 +459,7 @@ export default function OrgLandingPagesPage() {
               gap: 6,
               fontSize: 11,
               fontWeight: 800,
-              color: "var(--brand, #4f46e5)",
+              color: "var(--brand, #0f1424)",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               marginBottom: 4,
@@ -727,7 +727,7 @@ export default function OrgLandingPagesPage() {
         /* Empty State Hero */
         <div
           style={{
-            background: "linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(124, 58, 237, 0.04) 100%)",
+            background: "linear-gradient(135deg, rgba(21, 27, 46, 0.08) 0%, rgba(124, 58, 237, 0.04) 100%)",
             border: "1px solid var(--brand-100, #e0e3fd)",
             borderRadius: 20,
             padding: "48px 32px",
@@ -747,7 +747,7 @@ export default function OrgLandingPagesPage() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "0 8px 24px -4px rgba(79, 70, 229, 0.4)",
+              boxShadow: "0 8px 24px -4px rgba(21, 27, 46, 0.4)",
               marginBottom: 16,
             }}
           >
@@ -771,33 +771,33 @@ export default function OrgLandingPagesPage() {
             ) : (
               !atLandingPageCreateLimit && (
                 <>
-                <button
-                  type="button"
-                  onClick={openTemplatePicker}
-                  className="btn btn-primary"
-                  style={{
-                    padding: "10px 22px",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    borderRadius: 12,
-                    boxShadow: "0 4px 14px rgba(79, 70, 229, 0.35)",
-                  }}
-                >
-                  <Plus size={16} /> Choose from Templates
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-soft"
-                  onClick={() => {
-                    setScratchName("");
-                    setScratchBind({ kind: "none" });
-                    setScratchError(null);
-                    setScratchOpen(true);
-                  }}
-                  style={{ padding: "10px 20px", fontSize: 14, fontWeight: 600, borderRadius: 12 }}
-                >
-                  <Sparkles size={15} /> Start from Scratch
-                </button>
+                  <button
+                    type="button"
+                    onClick={openTemplatePicker}
+                    className="btn btn-primary"
+                    style={{
+                      padding: "10px 22px",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      borderRadius: 12,
+                      boxShadow: "0 4px 14px rgba(21, 27, 46, 0.35)",
+                    }}
+                  >
+                    <Plus size={16} /> Choose from Templates
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-soft"
+                    onClick={() => {
+                      setScratchName("");
+                      setScratchBind({ kind: "none" });
+                      setScratchError(null);
+                      setScratchOpen(true);
+                    }}
+                    style={{ padding: "10px 20px", fontSize: 14, fontWeight: 600, borderRadius: 12 }}
+                  >
+                    <Sparkles size={15} /> Start from Scratch
+                  </button>
                 </>
               )
             )}
@@ -995,20 +995,19 @@ export default function OrgLandingPagesPage() {
                   </div>
                 </div>
                 <span
-                  className={`badge ${
-                    templateQuota.remainingQuota === 0
+                  className={`badge ${templateQuota.remainingQuota === 0
                       ? "b-amber"
                       : templateQuota.remainingQuota != null
-                      ? "b-indigo"
-                      : "b-green"
-                  }`}
+                        ? "b-indigo"
+                        : "b-green"
+                    }`}
                   style={{ fontWeight: 700 }}
                 >
                   {templateQuota.remainingQuota === 0
                     ? "Quota Reached"
                     : templateQuota.remainingQuota != null
-                    ? `${templateQuota.remainingQuota} remaining slots`
-                    : "Unlimited access"}
+                      ? `${templateQuota.remainingQuota} remaining slots`
+                      : "Unlimited access"}
                 </span>
               </div>
             )}
@@ -1055,7 +1054,7 @@ export default function OrgLandingPagesPage() {
                       flexDirection: "column",
                     }}
                   >
-                    <TemplateCover thumbnail={template.thumbnail ?? "hero"} accent="#4f46e5" height={150}>
+                    <TemplateCover thumbnail={template.thumbnail ?? "hero"} accent="#0f1424" height={150}>
                       <div style={{ position: "absolute", top: 8, left: 8 }}>
                         <TierBadge tier={template.tier} />
                       </div>
@@ -1376,7 +1375,7 @@ function OrgLandingPageVisualCard({
         overflow: "hidden",
         border: hovered ? "1px solid var(--brand-100, #c7d2fe)" : "1px solid var(--line-2)",
         boxShadow: hovered
-          ? "0 14px 34px -10px rgba(79, 70, 229, 0.18), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
+          ? "0 14px 34px -10px rgba(21, 27, 46, 0.18), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
           : "0 2px 8px -2px rgba(14, 21, 37, 0.05)",
         transform: hovered ? "translateY(-4px)" : "none",
         transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -1386,7 +1385,7 @@ function OrgLandingPageVisualCard({
     >
       {/* Cover Preview */}
       <div style={{ position: "relative", overflow: "hidden" }}>
-        <TemplateCover thumbnail={row.thumbnail ?? "hero"} accent="#4f46e5" height={188} radius="18px 18px 0 0">
+        <TemplateCover thumbnail={row.thumbnail ?? "hero"} accent="#0f1424" height={188} radius="18px 18px 0 0">
           {/* Top Badges */}
           <div
             style={{
@@ -1476,7 +1475,7 @@ function OrgLandingPageVisualCard({
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 8,
-                background: "var(--brand, #4f46e5)",
+                background: "var(--brand, #0f1424)",
                 color: "#ffffff",
                 border: "none",
                 borderRadius: 10,
@@ -1484,7 +1483,7 @@ function OrgLandingPageVisualCard({
                 fontSize: 13,
                 fontWeight: 700,
                 cursor: "pointer",
-                boxShadow: "0 6px 18px rgba(79, 70, 229, 0.4)",
+                boxShadow: "0 6px 18px rgba(21, 27, 46, 0.4)",
               }}
             >
               <Pencil size={14} /> Open Builder

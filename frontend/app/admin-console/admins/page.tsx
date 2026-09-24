@@ -250,70 +250,70 @@ export default function SuperAdminAdminsPage() {
   return (
     <>
       {permEditing ? null : (
-      <div className="page-head reveal in">
-        <div>
-          <div className="eyebrow">
-            <Icon name="users" size={14} /> Manage
+        <div className="page-head reveal in">
+          <div>
+            <div className="eyebrow">
+              <Icon name="users" size={14} /> Manage
+            </div>
+            <h1>Platform Team</h1>
+            <div className="sub">Create console users and the platform roles you assign to them — in one place.</div>
           </div>
-          <h1>Platform Team</h1>
-          <div className="sub">Create console users and the platform roles you assign to them — in one place.</div>
-        </div>
-        <div className="actions">
-          <button className="btn btn-ghost" type="button" onClick={() => void load()} disabled={loading}>
-            <Icon name="refresh" size={16} />
-            <span style={{ marginLeft: 6 }}>Refresh</span>
-          </button>
-          {canAdd ? (
-            <button className="btn btn-ghost" type="button" onClick={() => { setTab("roles"); setCreateRoleOpen(true); }}>
-              + Create role
+          <div className="actions">
+            <button className="btn btn-ghost" type="button" onClick={() => void load()} disabled={loading}>
+              <Icon name="refresh" size={16} />
+              <span style={{ marginLeft: 6 }}>Refresh</span>
             </button>
-          ) : null}
-          {canAdd ? (
-            <button className="btn btn-primary" type="button" onClick={() => { setTab("members"); openCreate(); }}>
-              + Create admin
-            </button>
-          ) : null}
+            {canAdd ? (
+              <button className="btn btn-ghost" type="button" onClick={() => { setTab("roles"); setCreateRoleOpen(true); }}>
+                + Create role
+              </button>
+            ) : null}
+            {canAdd ? (
+              <button className="btn btn-primary" type="button" onClick={() => { setTab("members"); openCreate(); }}>
+                + Create admin
+              </button>
+            ) : null}
+          </div>
         </div>
-      </div>
       )}
 
       {permEditing ? null : (
-      <>
-      <div className="help reveal" style={{ marginBottom: 16 }}>
-        <Icon name="shield" size={14} /> Create a <b>role</b> (console permissions), then <b>create an admin</b> and assign that role.
-        Organisation CRM/project permissions stay under <b>Organisation roles</b>.
-      </div>
+        <>
+          <div className="help reveal" style={{ marginBottom: 16 }}>
+            <Icon name="shield" size={14} /> Create a <b>role</b> (console permissions), then <b>create an admin</b> and assign that role.
+            Organisation CRM/project permissions stay under <b>Organisation roles</b>.
+          </div>
 
-      {canView ? (
-      <div
-        style={{
-          display: "flex",
-          gap: 6,
-          marginBottom: 16,
-          background: "var(--surface)",
-          border: "1px solid var(--line-2)",
-          borderRadius: 12,
-          padding: 4,
-          width: "fit-content",
-        }}
-      >
-        <button
-          type="button"
-          className={`btn btn-sm ${tab === "members" ? "btn-primary" : "btn-ghost"}`}
-          onClick={() => setTab("members")}
-        >
-          Members
-        </button>
-        <button
-          type="button"
-          className={`btn btn-sm ${tab === "roles" ? "btn-primary" : "btn-ghost"}`}
-          onClick={() => setTab("roles")}
-        >
-          Roles
-        </button>
-      </div>
-      ) : null}
-      </>
+          {canView ? (
+            <div
+              style={{
+                display: "flex",
+                gap: 6,
+                marginBottom: 16,
+                background: "var(--surface)",
+                border: "1px solid var(--line-2)",
+                borderRadius: 12,
+                padding: 4,
+                width: "fit-content",
+              }}
+            >
+              <button
+                type="button"
+                className={`btn btn-sm ${tab === "members" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setTab("members")}
+              >
+                Members
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${tab === "roles" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setTab("roles")}
+              >
+                Roles
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
 
       {error && tab === "members" ? <div className="form-alert" style={{ marginBottom: 16 }}>{error}</div> : null}
@@ -330,109 +330,109 @@ export default function SuperAdminAdminsPage() {
       ) : null}
 
       {tab === "members" && !permEditing && canView ? (
-      <div className="card reveal">
-        <div className="card-h">
-          <span className="t">Internal team members</span>
-          <span className="badge b-gray">{members.length} members</span>
-        </div>
-        <div className="tbl-wrap">
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Member</th>
-                <th>Role</th>
-                <th>Access</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+        <div className="card reveal">
+          <div className="card-h">
+            <span className="t">Internal team members</span>
+            <span className="badge b-gray">{members.length} members</span>
+          </div>
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead>
                 <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
-                    Loading…
-                  </td>
+                  <th>Member</th>
+                  <th>Role</th>
+                  <th>Access</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
                 </tr>
-              ) : members.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
-                    No team members — create your first Super Admin.
-                  </td>
-                </tr>
-              ) : (
-                members.map((m) => {
-                  const isSuperAdminRow = m.roles.some((r) => r.key === "super_admin");
-                  return (
-                  <tr key={m.id}>
-                    <td>
-                      <div className="u">
-                        <span className="av">{initials(m.firstName, m.lastName, m.email)}</span>
-                        <span>
-                          <span className="nm">{fullName(m.firstName, m.lastName, m.email)}</span>
-                          <br />
-                          <span className="sm">{m.email}</span>
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${m.role?.key === "super_admin" ? "b-indigo" : "b-violet"}`}>
-                        {m.role?.name ?? "—"}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {(m.roles.length ? m.roles : []).map((r) => (
-                          <span className="chip" key={r.key}>
-                            {r.name}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge ${m.status === "active" ? "b-green" : "b-rose"}`}>
-                        <span className="dot" style={{ background: "currentColor" }} />
-                        {m.status === "active" ? "Active" : "Disabled"}
-                      </span>
-                    </td>
-                    <td>{formatDate(m.createdAt)}</td>
-                    <td>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {/* A Super Admin row can only be edited by another
-                            Super Admin — a created platform team member,
-                            even with Edit permission, cannot touch it. */}
-                        {canEdit && (!isSuperAdminRow || viewerIsSuperAdmin) ? (
-                          <button className="btn btn-ghost btn-sm" type="button" onClick={() => openEdit(m)}>
-                            Edit
-                          </button>
-                        ) : null}
-                        {/* Super Admin members cannot be enabled/disabled from
-                            here — the action is only for other platform roles. */}
-                        {canDisable && !isSuperAdminRow ? (
-                          <button className="btn btn-ghost btn-sm" type="button" onClick={() => void toggleStatus(m)}>
-                            {m.status === "active" ? "Disable" : "Enable"}
-                          </button>
-                        ) : null}
-                        {/* Super Admin accounts can never be deleted, by anyone. */}
-                        {canDelete && !isSuperAdminRow && user?.id !== m.id ? (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            type="button"
-                            onClick={() => setConfirmDelete(m)}
-                          >
-                            Delete
-                          </button>
-                        ) : null}
-                      </div>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
+                      Loading…
                     </td>
                   </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                ) : members.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
+                      No team members — create your first Super Admin.
+                    </td>
+                  </tr>
+                ) : (
+                  members.map((m) => {
+                    const isSuperAdminRow = m.roles.some((r) => r.key === "super_admin");
+                    return (
+                      <tr key={m.id}>
+                        <td>
+                          <div className="u">
+                            <span className="av">{initials(m.firstName, m.lastName, m.email)}</span>
+                            <span>
+                              <span className="nm">{fullName(m.firstName, m.lastName, m.email)}</span>
+                              <br />
+                              <span className="sm">{m.email}</span>
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`badge ${m.role?.key === "super_admin" ? "b-indigo" : "b-violet"}`}>
+                            {m.role?.name ?? "—"}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {(m.roles.length ? m.roles : []).map((r) => (
+                              <span className="chip" key={r.key}>
+                                {r.name}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`badge ${m.status === "active" ? "b-green" : "b-rose"}`}>
+                            <span className="dot" style={{ background: "currentColor" }} />
+                            {m.status === "active" ? "Active" : "Disabled"}
+                          </span>
+                        </td>
+                        <td>{formatDate(m.createdAt)}</td>
+                        <td>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            {/* A Super Admin row can only be edited by another
+                            Super Admin — a created platform team member,
+                            even with Edit permission, cannot touch it. */}
+                            {canEdit && (!isSuperAdminRow || viewerIsSuperAdmin) ? (
+                              <button className="btn btn-ghost btn-sm" type="button" onClick={() => openEdit(m)}>
+                                Edit
+                              </button>
+                            ) : null}
+                            {/* Super Admin members cannot be enabled/disabled from
+                            here — the action is only for other platform roles. */}
+                            {canDisable && !isSuperAdminRow ? (
+                              <button className="btn btn-ghost btn-sm" type="button" onClick={() => void toggleStatus(m)}>
+                                {m.status === "active" ? "Disable" : "Enable"}
+                              </button>
+                            ) : null}
+                            {/* Super Admin accounts can never be deleted, by anyone. */}
+                            {canDelete && !isSuperAdminRow && user?.id !== m.id ? (
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                type="button"
+                                onClick={() => setConfirmDelete(m)}
+                              >
+                                Delete
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
       ) : null}
 
       <Modal
@@ -483,7 +483,7 @@ export default function SuperAdminAdminsPage() {
                   alignItems: "center",
                   justifyContent: "center",
                   background: "#eef2ff",
-                  color: "#4f46e5",
+                  color: "#0f1424",
                 }}
               >
                 <Icon name="users" size={14} />
@@ -684,8 +684,8 @@ export default function SuperAdminAdminsPage() {
                 cursor: submitting ? "not-allowed" : "pointer",
                 opacity: submitting ? 0.5 : 1,
                 transition: "all 0.15s ease",
-                background: "linear-gradient(135deg, #4f46e5, #4338ca)",
-                boxShadow: "0 2px 8px -2px rgba(79, 70, 229, 0.4)",
+                background: "linear-gradient(135deg, #0f1424, #0f1424)",
+                boxShadow: "0 2px 8px -2px rgba(21, 27, 46, 0.4)",
               }}
             >
               {submitting ? "Saving…" : editing ? "Save changes" : "Create admin"}

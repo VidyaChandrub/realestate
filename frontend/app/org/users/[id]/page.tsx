@@ -472,9 +472,8 @@ export default function OrgUserDashboardPage() {
             style={{ fontSize: 12.5, marginLeft: "auto", alignSelf: "center" }}
           >
             {rangeActive
-              ? `Scoped to leads & activity captured${
-                  dashFrom ? ` from ${dashFrom}` : ""
-                }${dashTo ? ` to ${dashTo}` : ""}`
+              ? `Scoped to leads & activity captured${dashFrom ? ` from ${dashFrom}` : ""
+              }${dashTo ? ` to ${dashTo}` : ""}`
               : "Showing all-time data"}
           </span>
         </div>
@@ -602,7 +601,7 @@ export default function OrgUserDashboardPage() {
                             data-w={`${targetPct(targets?.siteVisits ?? 0, targets?.siteVisitTarget ?? 1)}%`}
                             style={{
                               width: `${targetPct(targets?.siteVisits ?? 0, targets?.siteVisitTarget ?? 1)}%`,
-                              background: "linear-gradient(90deg,#6366f1,#4f46e5)",
+                              background: "linear-gradient(90deg,#6366f1,#0f1424)",
                             }}
                           ></i>
                         </div>

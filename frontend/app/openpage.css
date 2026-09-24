@@ -1,4 +1,4 @@
-.ps-app {
+﻿.ps-app {
   --ps-primary: #6d5dfc;
   --ps-primary-dark: #5448e8;
   --ps-primary-soft: rgba(109, 93, 252, 0.16);
@@ -41,7 +41,7 @@
   --ps-gold: #cda45e;
 
   min-height: 100vh;
-  font-family: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-roboto), var(--font-inter), Roboto, ui-sans-serif, system-ui, sans-serif;
   color: var(--ps-ink);
   background: var(--ps-bg);
   -webkit-font-smoothing: antialiased;
@@ -59,8 +59,8 @@
 
 /* ---- scrollbars ---- */
 .ps-app ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
 }
 .ps-app ::-webkit-scrollbar-track {
   background: transparent;
@@ -913,7 +913,7 @@
 
 /* ---- canvas property site ---- */
 .ps-canvas-serif {
-  font-family: var(--font-playfair), "Playfair Display", Georgia, serif;
+  font-family: var(--font-roboto), var(--font-inter), Roboto, system-ui, sans-serif;
 }
 
 .ps-sec-holder {
@@ -1222,7 +1222,7 @@
   right: 0;
   border-left: 1px solid var(--ps-line);
 }
-/* Small-screen settings panel — anchored to the top of the builder area,
+/* Small-screen settings panel â€” anchored to the top of the builder area,
    scrollable, slides down over the canvas instead of from the right. */
 .ps-drawer-top {
   position: absolute;
@@ -1454,9 +1454,9 @@
   }
 }
 
-/* ─────────────────────────────────────────────────────────────
- * Popup design — modern glassmorphism modal with smooth animations
- * ───────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+ * Popup design â€” modern glassmorphism modal with smooth animations
+ * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .op-popup-overlay {
   position: fixed;
@@ -1552,7 +1552,7 @@
 
 .op-popup-title {
   margin: 0 0 10px;
-  font-family: var(--ps-font-display, "Plus Jakarta Sans", "Inter", sans-serif);
+  font-family: var(--ps-font-display, var(--font-roboto), Roboto, sans-serif);
   font-size: 21px;
   font-weight: 800;
   line-height: 1.2;
@@ -1704,7 +1704,7 @@
   font-size: 21px;
   font-weight: 800;
   color: #0f172a;
-  font-family: var(--ps-font-display, "Plus Jakarta Sans", "Inter", sans-serif);
+  font-family: var(--ps-font-display, var(--font-roboto), Roboto, sans-serif);
 }
 
 .op-popup-success-desc {

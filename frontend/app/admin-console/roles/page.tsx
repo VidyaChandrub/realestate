@@ -165,10 +165,10 @@ export default function SuperAdminRolesPage() {
     () =>
       roles.filter(
         (r) =>
-          (!search.trim() ||
-            r.name.toLowerCase().includes(search.trim().toLowerCase()) ||
-            r.key.toLowerCase().includes(search.trim().toLowerCase()) ||
-            (r.description ?? "").toLowerCase().includes(search.trim().toLowerCase())),
+        (!search.trim() ||
+          r.name.toLowerCase().includes(search.trim().toLowerCase()) ||
+          r.key.toLowerCase().includes(search.trim().toLowerCase()) ||
+          (r.description ?? "").toLowerCase().includes(search.trim().toLowerCase())),
       ),
     [roles, search],
   );
@@ -538,7 +538,7 @@ export default function SuperAdminRolesPage() {
         }}
       >
         <StatTile label="Total roles" value={stats.total} />
-        <StatTile label="System roles" value={stats.system} accent="#4f46e5" />
+        <StatTile label="System roles" value={stats.system} accent="#0f1424" />
         <StatTile
           label="Custom roles"
           value={stats.custom}
@@ -649,7 +649,7 @@ export default function SuperAdminRolesPage() {
                             <button
                               className="btn btn-ghost btn-sm"
                               type="button"
-                              style={{ color: "var(--indigo, #4f46e5)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}
+                              style={{ color: "var(--indigo, #0f1424)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}
                               onClick={() => openPermissionsModal(r)}
                             >
                               <Icon name="shield" size={13} /> Permissions
@@ -740,7 +740,7 @@ export default function SuperAdminRolesPage() {
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = "#6366f1";
-                    e.currentTarget.style.color = "#4f46e5";
+                    e.currentTarget.style.color = "#0f1424";
                     e.currentTarget.style.background = "#eef2ff";
                   }}
                   onMouseLeave={(e) => {
@@ -813,7 +813,7 @@ export default function SuperAdminRolesPage() {
                 boxShadow: "0 2px 8px rgba(99, 102, 241, 0.12)",
               }}
             >
-              <div style={{ fontWeight: 600, fontSize: 13.5, color: "#4338ca" }}>🏢 Organisation Scope</div>
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: "#0f1424" }}>🏢 Organisation Scope</div>
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
                 These roles apply inside customer organisations — not the Super Admin console.
               </div>
@@ -918,7 +918,7 @@ export default function SuperAdminRolesPage() {
                 boxShadow: "0 2px 8px rgba(99, 102, 241, 0.12)",
               }}
             >
-              <div style={{ fontWeight: 600, fontSize: 13.5, color: "#4338ca" }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: "#0f1424" }}>
                 {editingRole?.scope === "team" ? "👥 Team Scope" : "🏢 Organisation Scope"}
               </div>
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>

@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { LeadStagesProvider } from "@/lib/lead-stages";
 import { dashboardPathFor } from "@/lib/mock/sessions";
 import { Icon, type IconName } from "@/components/icons";
+import { BuildingLogoIcon } from "@/components/brand-logo";
 import { loadTemplates } from "@/lib/openpage/store";
 import { orgBuilderPath } from "@/lib/openpage/paths";
 import {
@@ -18,6 +19,11 @@ import {
 } from "@/lib/api";
 import type { OrgBillingSummary, OrgNotification } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
+import {
+  applyThemeVariables,
+  resetThemeVariables,
+  ORG_THEME_CHANGE_EVENT,
+} from "@/components/global-theme-provider";
 
 type NavItem = {
   href: string;
@@ -118,8 +124,8 @@ const CRUMB_MAP: Record<string, string> = {
 
 // Accent dot colour per notification type, same palette the mock data used.
 const NOTIFICATION_ACCENT: Record<string, string> = {
-  support_ticket_created: "#4f46e5",
-  support_ticket_message: "#4f46e5",
+  support_ticket_created: "#0f1424",
+  support_ticket_message: "#0f1424",
   support_ticket_status_changed: "#10b981",
 };
 
@@ -235,6 +241,31 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
     }
   }, [authLoading, accessToken, user, router]);
 
+  useEffect(() => {
+    const orgContainer = document.querySelector(".org") as HTMLElement | null;
+    const orgBrand = user?.organisation?.brand_colour;
+    if (orgBrand && /^#[0-9a-fA-F]{3,8}$/.test(orgBrand)) {
+      applyThemeVariables(orgBrand, undefined, orgContainer);
+    } else if (orgContainer) {
+      resetThemeVariables(orgContainer);
+    }
+
+    const handleOrgThemeChange = (e: Event) => {
+      const custom = e as CustomEvent<{ brandColour?: string }>;
+      const color = custom.detail?.brandColour;
+      if (color && /^#[0-9a-fA-F]{3,8}$/.test(color)) {
+        applyThemeVariables(color, undefined, orgContainer);
+      } else if (orgContainer) {
+        resetThemeVariables(orgContainer);
+      }
+    };
+
+    window.addEventListener(ORG_THEME_CHANGE_EVENT, handleOrgThemeChange);
+    return () => {
+      window.removeEventListener(ORG_THEME_CHANGE_EVENT, handleOrgThemeChange);
+    };
+  }, [user?.organisation?.brand_colour]);
+
   async function handleSignOut() {
     setIsSigningOut(true);
     try {
@@ -283,10 +314,10 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
     (/^\/org\/projects\/(?!add-new-project$)[^/]+/.test(pathname)
       ? "Projects · Detail"
       : CRUMB_MAP[
-          Object.keys(CRUMB_MAP)
-            .filter((base) => pathname.startsWith(`${base}/`))
-            .sort((a, b) => b.length - a.length)[0]
-        ]) ??
+      Object.keys(CRUMB_MAP)
+        .filter((base) => pathname.startsWith(`${base}/`))
+        .sort((a, b) => b.length - a.length)[0]
+      ]) ??
     "Dashboard";
 
   const [rawNotifications, setRawNotifications] = useState<OrgNotification[]>([]);
@@ -371,7 +402,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
     meta: n.body ?? "",
     time: relativeNotificationTime(n.createdAt),
     unread: !n.readAt,
-    accent: NOTIFICATION_ACCENT[n.type] ?? "#4f46e5",
+    accent: NOTIFICATION_ACCENT[n.type] ?? "#0f1424",
     entityId: n.entityId,
     type: n.type,
   }));
@@ -432,19 +463,22 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
     <div className={appClass}>
       <aside className="sidebar">
         <div className="s-top">
-          <div className="logo">iR</div>
+          <div className="s-logo-wrap" aria-hidden>
+            <BuildingLogoIcon size={34} />
+          </div>
           <div className="s-name">
-            iPixxel Realty<small>{user.roleLabel || "Organisation"}</small>
+            iPixxel Realty<small>{user.roleLabel || "Organisation Admin"}</small>
           </div>
         </div>
-        {currentPlanName ? (
-          <div className="s-plan">
-            <Icon name="billing" size={12} />
+        <Link href="/org/settings" className="s-plan" title="Current subscription plan">
+          <div className="s-plan-inner">
+            <Icon name="crown" size={13} className="s-plan-ic" />
             <span>
-              Current Plan: <strong>{currentPlanName}</strong>
+              Current Plan: <strong>{currentPlanName || "Starter"}</strong>
             </span>
           </div>
-        ) : null}
+          <Icon name="chevron-right" size={12} className="s-plan-arrow" />
+        </Link>
         <nav>
           <ul className="nav">
             {NAV_GROUPS.map((group) => {
@@ -497,17 +531,16 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
             <div className="av">{avatarInitials}</div>
             <div className="meta">
               <b>{userName}</b>
-              <span>{user?.roleLabel || "Org Admin"}</span>
+              <span>{user?.roleLabel || "Organisation Admin"}</span>
             </div>
             <button
               type="button"
-              onClick={() => void handleSignOut()}
-              disabled={isSigningOut}
-              className="signout"
-              title="Sign out"
-              aria-label="Sign out"
+              onClick={() => router.push("/org/settings")}
+              className="side-arrow-btn"
+              title="Organisation settings & profile"
+              aria-label="Settings"
             >
-              <Icon name="logout" size={14} />
+              <Icon name="chevron-right" size={13} />
             </button>
           </div>
         </div>
@@ -521,26 +554,10 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                 <path d="M3 6h18M3 12h18M3 18h18" />
               </svg>
             </button>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "7px 10px",
-                borderRadius: 999,
-                background: "rgba(79, 70, 229, 0.08)",
-                border: "1px solid rgba(79, 70, 229, 0.12)",
-                color: "#4f46e5",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              Dashboard
-            </div>
+            <span className="tb-chip">Organisation</span>
             <div className="crumbs">
-              Organisation · <b>{crumb}</b>
+              <span className="crumbs-eyebrow">Workspace</span>
+              <b>{crumb}</b>
             </div>
           </div>
 
@@ -550,26 +567,13 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
             <span className="kbd">⌘K</span>
           </div>
 
-          <div className="tb-right" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div className="tb-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button
               type="button"
+              className="tb-builder-btn"
               onClick={openBuilder}
               disabled={builderLoading}
               title="Open the page builder"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 7,
-                padding: "8px 13px",
-                borderRadius: 11,
-                border: "1px solid rgba(79,70,229,0.18)",
-                background: "rgba(79,70,229,0.08)",
-                color: "#4f46e5",
-                fontSize: 12.5,
-                fontWeight: 700,
-                cursor: builderLoading ? "wait" : "pointer",
-                whiteSpace: "nowrap",
-              }}
             >
               <Icon name="puzzle" size={14} /> {builderLoading ? "Opening…" : "Open Builder"}
             </button>
@@ -628,8 +632,8 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                       disabled={unreadNotificationCount === 0}
                       style={{
                         border: "none",
-                        background: "rgba(79, 70, 229, 0.08)",
-                        color: "#4f46e5",
+                        background: "rgba(21, 27, 46, 0.08)",
+                        color: "#0f1424",
                         borderRadius: 10,
                         padding: "8px 10px",
                         fontWeight: 600,
@@ -657,7 +661,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                           gap: 12,
                           padding: "14px 16px",
                           borderBottom: "1px solid rgba(148, 163, 184, 0.12)",
-                          background: item.unread ? "rgba(79, 70, 229, 0.02)" : "transparent",
+                          background: item.unread ? "rgba(21, 27, 46, 0.02)" : "transparent",
                           cursor: "pointer",
                         }}
                       >
@@ -755,10 +759,10 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                     </div>
                   </div>
 
-                    <Link
-                      href="/org/settings?section=profile"
-                      onClick={() => setProfileMenuOpen(false)}
-                      style={{
+                  <Link
+                    href="/org/settings?section=profile"
+                    onClick={() => setProfileMenuOpen(false)}
+                    style={{
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
@@ -835,9 +839,8 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
               margin: "16px 24px 0",
               padding: "12px 16px",
               borderRadius: 14,
-              border: `1px solid ${
-                expiryBanner.tone === "rose" ? "rgba(244, 63, 94, 0.25)" : "rgba(245, 158, 11, 0.3)"
-              }`,
+              border: `1px solid ${expiryBanner.tone === "rose" ? "rgba(244, 63, 94, 0.25)" : "rgba(245, 158, 11, 0.3)"
+                }`,
               background:
                 expiryBanner.tone === "rose"
                   ? "rgba(244, 63, 94, 0.07)"
@@ -866,7 +869,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                 border: "none",
                 borderRadius: 10,
                 padding: "8px 14px",
-                background: "#4f46e5",
+                background: "#0f1424",
                 color: "#fff",
                 fontSize: 12.5,
                 fontWeight: 700,
@@ -914,10 +917,10 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
               gap: 10,
               padding: "12px 18px",
               borderRadius: 999,
-              background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+              background: "linear-gradient(135deg, var(--secondary, #2a3348) 0%, var(--primary, #0f1424) 100%)",
               color: "#fff",
               textDecoration: "none",
-              boxShadow: "0 18px 40px rgba(79, 70, 229, 0.32)",
+              boxShadow: "var(--sh-glow, 0 18px 40px rgba(21, 27, 46, 0.32))",
               fontSize: 13,
               fontWeight: 700,
               zIndex: 30,

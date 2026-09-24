@@ -18,7 +18,7 @@ import type {
 const PAGE_SIZE = 20;
 
 const AV_TONES = [
-  "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+  "linear-gradient(135deg, #6366f1 0%, #0f1424 100%)",
   "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)",
   "linear-gradient(135deg, #10b981 0%, #059669 100%)",
   "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
@@ -38,13 +38,13 @@ function hashString(input: string): number {
 function formatDateTime(value: string): { dateStr: string; timeStr: string; relative: string } {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return { dateStr: value, timeStr: "", relative: "" };
-  
+
   const day = String(d.getDate()).padStart(2, "0");
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const yyyy = d.getFullYear();
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
-  
+
   const dateStr = `${day} ${months[d.getMonth()]} ${yyyy}`;
   const timeStr = `${hh}:${mm}`;
 
@@ -81,7 +81,7 @@ function actionBadgeStyle(action: string): { bg: string; color: string; border: 
     return { bg: "rgba(16, 185, 129, 0.1)", color: "#059669", border: "rgba(16, 185, 129, 0.25)", label: action };
   }
   if (act.includes("update") || act.includes("edit") || act.includes("change") || act.includes("patch") || act.includes("renew")) {
-    return { bg: "rgba(79, 70, 229, 0.1)", color: "#4f46e5", border: "rgba(79, 70, 229, 0.25)", label: action };
+    return { bg: "rgba(21, 27, 46, 0.1)", color: "#0f1424", border: "rgba(21, 27, 46, 0.25)", label: action };
   }
   if (act.includes("delete") || act.includes("remove") || act.includes("cancel") || act.includes("revoke") || act.includes("reject")) {
     return { bg: "rgba(239, 68, 68, 0.1)", color: "#dc2626", border: "rgba(239, 68, 68, 0.25)", label: action };
@@ -296,11 +296,11 @@ export default function SuperAdminAuditLogsPage() {
                 gap: 6,
                 padding: "3px 10px",
                 borderRadius: 999,
-                background: "rgba(79, 70, 229, 0.08)",
-                color: "#4f46e5",
+                background: "rgba(21, 27, 46, 0.08)",
+                color: "#0f1424",
                 fontSize: 12,
                 fontWeight: 700,
-                border: "1px solid rgba(79, 70, 229, 0.15)",
+                border: "1px solid rgba(21, 27, 46, 0.15)",
               }}
             >
               <Icon name="shield" size={14} /> Security &amp; Compliance Audit
@@ -374,12 +374,12 @@ export default function SuperAdminAuditLogsPage() {
               padding: "9px 18px",
               borderRadius: 10,
               border: "none",
-              background: "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)",
+              background: "linear-gradient(135deg, #0f1424 0%, #0f1424 100%)",
               color: "#fff",
               fontSize: 13,
               fontWeight: 700,
               cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(79, 70, 229, 0.3)",
+              boxShadow: "0 2px 8px rgba(21, 27, 46, 0.3)",
             }}
           >
             <Icon name="download" size={15} />
@@ -414,8 +414,8 @@ export default function SuperAdminAuditLogsPage() {
               width: 44,
               height: 44,
               borderRadius: 12,
-              background: "rgba(79, 70, 229, 0.08)",
-              color: "#4f46e5",
+              background: "rgba(21, 27, 46, 0.08)",
+              color: "#0f1424",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -688,9 +688,9 @@ export default function SuperAdminAuditLogsPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, paddingTop: 12, borderTop: "1px dashed #e2e8f0", flexWrap: "wrap" }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>Active Filters:</span>
             {search ? (
-              <span style={{ background: "rgba(79, 70, 229, 0.08)", color: "#4f46e5", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ background: "rgba(21, 27, 46, 0.08)", color: "#0f1424", padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
                 Search: "{search}"
-                <button type="button" onClick={() => { setSearchInput(""); setSearch(""); }} style={{ border: "none", background: "none", cursor: "pointer", color: "#4f46e5", fontWeight: 700 }}>×</button>
+                <button type="button" onClick={() => { setSearchInput(""); setSearch(""); }} style={{ border: "none", background: "none", cursor: "pointer", color: "#0f1424", fontWeight: 700 }}>×</button>
               </span>
             ) : null}
             {actorId ? (
@@ -808,7 +808,7 @@ export default function SuperAdminAuditLogsPage() {
                         <button
                           type="button"
                           onClick={clearFilters}
-                          style={{ marginTop: 6, padding: "7px 16px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", color: "#4f46e5", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}
+                          style={{ marginTop: 6, padding: "7px 16px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", color: "#0f1424", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}
                         >
                           Reset Filters
                         </button>
@@ -838,7 +838,7 @@ export default function SuperAdminAuditLogsPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748b", marginTop: 2 }}>
                           <span>{dt.timeStr}</span>
                           <span>•</span>
-                          <span style={{ color: "#4f46e5", fontWeight: 600 }}>{dt.relative}</span>
+                          <span style={{ color: "#0f1424", fontWeight: 600 }}>{dt.relative}</span>
                         </div>
                       </td>
 
@@ -965,7 +965,7 @@ export default function SuperAdminAuditLogsPage() {
                             borderRadius: 8,
                             border: "1px solid #cbd5e1",
                             background: "#fff",
-                            color: "#4f46e5",
+                            color: "#0f1424",
                             fontSize: 12,
                             fontWeight: 700,
                             cursor: "pointer",
@@ -1087,7 +1087,7 @@ export default function SuperAdminAuditLogsPage() {
                 padding: "8px 18px",
                 borderRadius: 8,
                 border: "none",
-                background: "#4f46e5",
+                background: "#0f1424",
                 color: "#fff",
                 fontSize: 12.5,
                 fontWeight: 700,

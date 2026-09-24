@@ -149,6 +149,60 @@ export function TierBadge({ tier }: { tier?: "free" | "paid" | "premium" }) {
   );
 }
 
+export type AccessTier = "free" | "paid" | "premium";
+export const ACCESS_TIERS: AccessTier[] = ["free", "paid", "premium"];
+
+/** Active subscription plans that unlock a given template access tier. */
+export function plansForAccessTier(
+  plans: Array<{
+    name: string;
+    isActive?: boolean;
+    priceMonthly?: number;
+    capabilities?: Record<string, boolean> | null;
+  }>,
+  tier: AccessTier,
+): string[] {
+  const active = plans.filter((p) => p.isActive !== false);
+  if (tier === "free") {
+    return active.map((p) => p.name);
+  }
+
+  return active
+    .filter((p) => {
+      const caps = p.capabilities ?? {};
+      if (tier === "premium") {
+        return caps.premiumTemplates === true;
+      }
+      // paid
+      return caps.paidTemplates === true || caps.premiumTemplates === true;
+    })
+    .map((p) => p.name);
+}
+
+/** Dropdown label: tier name + live plan names from Subscriptions. */
+export function accessTierOptionLabel(
+  tier: AccessTier,
+  plans: Array<{
+    name: string;
+    isActive?: boolean;
+    capabilities?: Record<string, boolean> | null;
+  }>,
+): string {
+  const title = tier === "free" ? "Free" : tier === "paid" ? "Paid" : "Premium";
+  const names = plansForAccessTier(plans, tier);
+
+  if (tier === "free") {
+    return names.length > 0
+      ? `${title} (All plans: ${names.join(", ")})`
+      : `${title} (All plans)`;
+  }
+
+  if (names.length === 0) {
+    return `${title} (enable on a plan in Subscriptions)`;
+  }
+  return `${title} (${names.join(", ")})`;
+}
+
 export type TemplateStats = {
   total: number;
   predefined: number;

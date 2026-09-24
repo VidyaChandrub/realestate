@@ -300,8 +300,8 @@ export default function OrgProjectOverviewPage() {
       v: !hasInventory
         ? "—"
         : String(
-            project.rollup.totalUnitsPlanned || project.rollup.unitsCreated,
-          ),
+          project.rollup.totalUnitsPlanned || project.rollup.unitsCreated,
+        ),
     },
     {
       k: "Available",
@@ -468,50 +468,50 @@ export default function OrgProjectOverviewPage() {
 
           {/* Configurations & Floor Plan Breakdown Widget — the `tower` layout's */}
           {traits.configurations ? (
-          <Reveal delay={3}>
-            <div className="card">
-              <div className="card-h">
-                <span className="t">Configurations</span>
-                <Link className="x brand-link" href={`/org/projects/${id}/units`}>Manage inventory →</Link>
-              </div>
-              <div className="card-b">
-                {configLabels.length === 0 ? (
-                  <p className="muted">No configurations yet — add units, or a planned mix, from the Units tab.</p>
-                ) : (
-                  <div className="grid g3">
-                    {configLabels.map((label) => {
-                      const ut = project.unitTypes.find((u) => u.name === label);
-                      const act = project.configurations.find((c) => c.label === label);
-                      const available = act?.available ?? ut?.availableUnits ?? 0;
-                      return (
-                        <Link key={label} href={`/org/projects/${id}/units`} className="utype-card">
-                          <div className="cover media plan">
-                            <Icon name="camera" size={18} />
-                            <span className="cap">{label}</span>
-                          </div>
-                          <div className="info">
-                            <b>{label}</b>
-                            <div className="muted fs-12-5">
-                              {(() => {
-                                const areaField = roleField(project.unitFieldTemplate ?? [], "area");
-                                const priceField = roleField(project.unitFieldTemplate ?? [], "price");
-                                const area = areaField ? ut?.fieldDefaults?.[areaField.key] : null;
-                                const price = priceField ? ut?.fieldDefaults?.[priceField.key] : null;
-                                return [area != null ? `${area} ${project.areaUnit}` : null, price != null ? formatMoney(Number(price), project.currency) : null].filter(Boolean).join(" · ") || (ut ? "—" : "Derived from units");
-                              })()}
+            <Reveal delay={3}>
+              <div className="card">
+                <div className="card-h">
+                  <span className="t">Configurations</span>
+                  <Link className="x brand-link" href={`/org/projects/${id}/units`}>Manage inventory →</Link>
+                </div>
+                <div className="card-b">
+                  {configLabels.length === 0 ? (
+                    <p className="muted">No configurations yet — add units, or a planned mix, from the Units tab.</p>
+                  ) : (
+                    <div className="grid g3">
+                      {configLabels.map((label) => {
+                        const ut = project.unitTypes.find((u) => u.name === label);
+                        const act = project.configurations.find((c) => c.label === label);
+                        const available = act?.available ?? ut?.availableUnits ?? 0;
+                        return (
+                          <Link key={label} href={`/org/projects/${id}/units`} className="utype-card">
+                            <div className="cover media plan">
+                              <Icon name="camera" size={18} />
+                              <span className="cap">{label}</span>
                             </div>
-                            <span className={`badge ${available > 0 ? "b-green" : "b-amber"} mt-8`}>
-                              {available} available
-                            </span>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
+                            <div className="info">
+                              <b>{label}</b>
+                              <div className="muted fs-12-5">
+                                {(() => {
+                                  const areaField = roleField(project.unitFieldTemplate ?? [], "area");
+                                  const priceField = roleField(project.unitFieldTemplate ?? [], "price");
+                                  const area = areaField ? ut?.fieldDefaults?.[areaField.key] : null;
+                                  const price = priceField ? ut?.fieldDefaults?.[priceField.key] : null;
+                                  return [area != null ? `${area} ${project.areaUnit}` : null, price != null ? formatMoney(Number(price), project.currency) : null].filter(Boolean).join(" · ") || (ut ? "—" : "Derived from units");
+                                })()}
+                              </div>
+                              <span className={`badge ${available > 0 ? "b-green" : "b-amber"} mt-8`}>
+                                {available} available
+                              </span>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </Reveal>
+            </Reveal>
           ) : null}
 
           {/* Pricing, Commercials & Inclusions Widget */}
@@ -547,7 +547,7 @@ export default function OrgProjectOverviewPage() {
                     </div>
                     <div className="row wrap gap-8">
                       {project.priceIncludes.map((inc) => (
-                        <span className="chip" key={inc} style={{ background: "rgba(99, 102, 241, 0.08)", borderColor: "rgba(99, 102, 241, 0.2)", color: "var(--indigo, #4f46e5)" }}>
+                        <span className="chip" key={inc} style={{ background: "rgba(99, 102, 241, 0.08)", borderColor: "rgba(99, 102, 241, 0.2)", color: "var(--indigo, #0f1424)" }}>
                           <Icon name="check" size={11} /> {inc}
                         </span>
                       ))}
@@ -837,7 +837,7 @@ export default function OrgProjectOverviewPage() {
               <div className="card-b col gap-12">
                 {project.manager ? (
                   <div className="u" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span className="av" style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--indigo, #4f46e5)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>
+                    <span className="av" style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--indigo, #0f1424)", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>
                       {managerInitials(project.manager.name)}
                     </span>
                     <div>

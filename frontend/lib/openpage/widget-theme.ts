@@ -40,7 +40,7 @@ const WT_STANDARD = {
   border: "1px solid rgba(16,24,40,.08)",
   borderStrong: "1px solid rgba(16,24,40,.12)",
   borderFaint: "1px solid rgba(16,24,40,.05)",
-  borderHover: "1px solid rgba(79,70,229,.18)",
+  borderHover: "1px solid rgba(21, 27, 46,.18)",
 
   // Text
   ink: "#0f172a",

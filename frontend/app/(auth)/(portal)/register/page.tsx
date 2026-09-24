@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { Icon, type IconName } from "@/components/icons";
+import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
 import { mapApiFieldErrors } from "@/lib/form-errors";
 import {
@@ -715,147 +716,122 @@ export default function RegisterPage() {
 
   if (accountExists) {
     return (
-      <div className="auth">
-        <div className="brandside">
-          <div className="glow" />
-          <div className="logo">iR</div>
-          <div>
-            <h1 className="reveal in">Welcome back.</h1>
-            <p className="reveal in" data-delay="1" style={{ marginTop: 18 }}>
-              An account already exists for <b>{form.work_email}</b>.
-            </p>
-          </div>
+      <AuthShell
+        eyebrow="Account"
+        title="You already have an account"
+        subtitle={
+          <>
+            An account already exists for <b>{form.work_email}</b>. Sign in instead of registering again.
+          </>
+        }
+        footer={
+          <>
+            Registering with a different email?{" "}
+            <button type="button" onClick={() => setAccountExists(false)} style={{ background: "none", border: "none", color: "var(--brand)", fontWeight: 600, cursor: "pointer", font: "inherit", padding: 0 }}>
+              Use a different email
+            </button>
+          </>
+        }
+      >
+        <div className="help" style={{ marginTop: 18 }}>
+          This email has already finished workspace setup — head to sign in to continue.
         </div>
-        <div className="formside">
-          <div className="fw">
-            <div className="help" style={{ marginTop: 0 }}>
-              <b>You already have an account</b>
-              <p style={{ margin: "8px 0 0" }}>
-                This email has already finished workspace setup — sign in instead of registering again.
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-              <Link className="btn btn-primary btn-block" href="/login">Go to sign in</Link>
-              <button className="btn btn-ghost" type="button" onClick={() => setAccountExists(false)}>Use a different email</button>
-            </div>
-          </div>
+        <div style={{ marginTop: 18 }}>
+          <Link className="btn btn-primary btn-block btn-lg" href="/login">
+            Go to sign in →
+          </Link>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   if (awaitingVerification) {
     return (
-      <div className="auth">
-        <div className="brandside">
-          <div className="glow" />
-          <div className="logo">iR</div>
-          <div>
-            <h1 className="reveal in">Check your inbox.</h1>
-            <p className="reveal in" data-delay="1" style={{ marginTop: 18 }}>
-              We sent a 6-digit code to <b>{form.work_email}</b>. Enter it to activate your account.
-            </p>
+      <AuthShell
+        eyebrow="Email verification"
+        title="Check your inbox"
+        subtitle={
+          <>
+            We sent a 6-digit code to <b>{form.work_email}</b>. Enter it to activate your account.
+          </>
+        }
+        footer={null}
+      >
+        <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+          The code expires in 60 minutes.
+        </p>
+        <form style={{ marginTop: 22 }} onSubmit={handleVerifyEmail} noValidate>
+          <div className="field">
+            <label>Verification code</label>
+            <input
+              className="inp"
+              inputMode="numeric"
+              maxLength={6}
+              value={verifyCode}
+              onChange={(e) => {
+                setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                setVerifyError(null);
+              }}
+              placeholder="000000"
+              aria-label="Verification code"
+              style={{ letterSpacing: "0.35em", textAlign: "center", fontWeight: 700 }}
+            />
           </div>
-        </div>
-        <div className="formside">
-          <div className="fw">
-            <h2>Verify your email</h2>
-            <p className="muted" style={{ marginTop: 8 }}>
-              The code expires in 60 minutes.
+          {verifyError ? (
+            <p role="alert" className="help" style={{ color: "var(--rose)", borderColor: "var(--rose-050)", background: "var(--rose-050)", marginBottom: 14 }}>
+              {verifyError}
             </p>
-            <form style={{ marginTop: 26 }} onSubmit={handleVerifyEmail} noValidate>
-              <div className="field">
-                <label>Verification code</label>
-                <input
-                  className="inp"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={verifyCode}
-                  onChange={(e) => {
-                    setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6));
-                    setVerifyError(null);
-                  }}
-                  placeholder="000000"
-                  aria-label="Verification code"
-                  style={{ letterSpacing: "0.35em", textAlign: "center", fontWeight: 700 }}
-                />
-              </div>
-              {verifyError ? (
-                <p role="alert" className="help" style={{ color: "var(--rose)", borderColor: "var(--rose-050)", background: "var(--rose-050)", marginBottom: 14 }}>
-                  {verifyError}
-                </p>
-              ) : null}
-              <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={verifyBusy || verifyCode.length !== 6}>
-                {verifyBusy ? "Verifying…" : "Verify email →"}
-              </button>
-            </form>
-            <p className="muted" style={{ textAlign: "center", marginTop: 20, fontSize: 13.5 }}>
-              Didn&apos;t receive it?{" "}
-              {resendSecondsLeft > 0 ? (
-                <span>Resend code in {resendSecondsLeft}s</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleResendVerification}
-                  disabled={resendBusy}
-                  style={{ color: "var(--brand)", fontWeight: 600, background: "none", border: "none", cursor: resendBusy ? "default" : "pointer" }}
-                >
-                  {resendBusy ? "Sending…" : resendState === "sent" ? "Code re-sent" : "Resend code"}
-                </button>
-              )}
-            </p>
-          </div>
-        </div>
-      </div>
+          ) : null}
+          <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={verifyBusy || verifyCode.length !== 6}>
+            {verifyBusy ? "Verifying…" : "Verify email →"}
+          </button>
+        </form>
+        <p className="muted" style={{ textAlign: "center", marginTop: 20, fontSize: 13.5 }}>
+          Didn&apos;t receive it?{" "}
+          {resendSecondsLeft > 0 ? (
+            <span>Resend code in {resendSecondsLeft}s</span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resendBusy}
+              style={{ color: "var(--brand)", fontWeight: 600, background: "none", border: "none", cursor: resendBusy ? "default" : "pointer", fontSize: "inherit", font: "inherit" }}
+            >
+              {resendBusy ? "Sending…" : resendState === "sent" ? "Code re-sent" : "Resend code"}
+            </button>
+          )}
+        </p>
+      </AuthShell>
     );
   }
 
   const isLast = cur === TOTAL - 1;
 
   return (
-    <div className="auth">
-      <div className="brandside">
-        <div className="glow" />
-        <div style={{ position: "relative" }}>
-          <div className="logo">iR</div>
-        </div>
-        <div style={{ position: "relative" }}>
-          <h1 className="reveal in">Set up your real-estate workspace in minutes.</h1>
-          <p className="reveal in" data-delay="1" style={{ marginTop: 16 }}>
-            For developers, brokers &amp; channel partners — capture every lead from ad click to
-            booking, all under your own subdomain.
-          </p>
-          <div className="steps-rail reveal in" data-delay="2" id="rail">
-            {STEPS.map((s) => (
-              <div
-                key={s.n}
-                className={`sr${cur + 1 === s.n ? " on" : ""}${cur + 1 > s.n ? " done" : ""}`}
-              >
-                <span className="n">{cur + 1 > s.n ? "✓" : s.n}</span>
-                <div>
-                  <b>{s.label}</b>
-                  <small>{s.sub}</small>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={{ position: "relative", color: "#8891b4", fontSize: 13 }}>
-          14-day free trial · No card required
-        </div>
-      </div>
-
-      <div className="formside">
-        <form className="fw" onSubmit={handleSubmit}>
+    <>
+      <AuthShell
+        eyebrow={`Step ${cur + 1} of ${TOTAL} · ${STEPS[cur].label}`}
+        title={cur === 0 ? "Create your account" : "Your organisation"}
+        subtitle={
+          cur === 0
+            ? "You'll be the organisation admin — set up your login details."
+            : "Tell us who you are — we'll tailor the workspace."
+        }
+        footer={
+          <>
+            Already have an account? <Link href="/login">Sign in</Link>
+            <span style={{ color: "var(--faint)" }}> · 14-day free trial</span>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit}>
           <div className="fprog">
             <i style={{ width: `${Math.round(((cur + 1) / (TOTAL + 1)) * 100)}%` }} />
           </div>
 
           {/* STEP 1 — account */}
           <div className={`wpane${cur === 0 ? " on" : ""}`}>
-            <h2>Create your account</h2>
-            <p className="muted" style={{ marginTop: 6 }}>You&apos;ll be the organisation admin.</p>
-            <div style={{ marginTop: 22 }}>
+            <div>
               <div className="row2">
                 <div className="field">
                   <label>First name <span className="req">*</span></label>
@@ -908,9 +884,7 @@ export default function RegisterPage() {
 
           {/* STEP 2 — organisation (final step) */}
           <div className={`wpane${cur === 1 ? " on" : ""}`}>
-            <h2>Your organisation</h2>
-            <p className="muted" style={{ marginTop: 6 }}>Tell us who you are — we&apos;ll tailor the workspace.</p>
-            <div style={{ marginTop: 22 }}>
+            <div>
               <div className="field">
                 <label>What describes you best? <span className="req">*</span></label>
                 <div className="cards2" id="orgType">
@@ -961,7 +935,7 @@ export default function RegisterPage() {
                   </select>
                 </div>
               ) : null}
-              <label className="check" style={{ marginTop: 18 }}>
+              <label className="check" style={{ marginTop: 10 }}>
                 <input
                   type="checkbox"
                   checked={agreedToTerms}
@@ -992,13 +966,8 @@ export default function RegisterPage() {
               </button>
             )}
           </div>
-
-          <p className="muted" style={{ textAlign: "center", marginTop: 20, fontSize: 13.5 }}>
-            Already have an account?{" "}
-            <Link href="/login" style={{ color: "var(--brand)", fontWeight: 600 }}>Sign in</Link>
-          </p>
         </form>
-      </div>
+      </AuthShell>
 
       {draftCollision ? (
         <div
@@ -1082,6 +1051,6 @@ export default function RegisterPage() {
           </div>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

@@ -17,6 +17,7 @@ import type {
   LoginResponse,
   PermissionAction,
   Permissions,
+  SafeOrganisation,
   SafeUser,
   SessionUser,
   SignupInput,
@@ -58,6 +59,7 @@ interface AuthContextValue {
   hasPermission: (module: string, action: PermissionAction) => boolean;
   isOrgAdmin: () => boolean;
   refreshPermissions: () => Promise<Permissions | null>;
+  updateOrganisation: (org: Partial<SafeOrganisation>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -451,6 +453,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return isOrgAdminSession();
   }, [user]);
 
+  const updateOrganisation = useCallback(
+    (orgUpdate: Partial<SafeOrganisation>) => {
+      setUser((prev) => {
+        if (!prev) return null;
+        const updatedOrg = prev.organisation
+          ? { ...prev.organisation, ...orgUpdate }
+          : ({ ...orgUpdate } as SafeOrganisation);
+        const updatedUser: SessionUser = {
+          ...prev,
+          organisation: updatedOrg,
+        };
+        try {
+          localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(updatedUser));
+        } catch {
+          /* ignore */
+        }
+        return updatedUser;
+      });
+    },
+    [],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -465,6 +489,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasPermission,
       isOrgAdmin,
       refreshPermissions,
+      updateOrganisation,
     }),
     [
       user,
@@ -478,6 +503,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       hasPermission,
       isOrgAdmin,
       refreshPermissions,
+      updateOrganisation,
     ],
   );
 

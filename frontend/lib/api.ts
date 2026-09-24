@@ -87,6 +87,7 @@ import type {
   AdminDashboardResponse,
   PlatformConfig,
   UpdatePlatformConfigInput,
+  PlatformTheme,
   SubdomainVerifyResult,
   PlatformTeamMember,
   PlatformTeamRole,
@@ -789,6 +790,15 @@ export async function updatePlatformConfig(
     method: "PUT",
     body: JSON.stringify(input),
   });
+}
+
+/** Public unauthenticated fetch of global primary and secondary colors. */
+export async function getPlatformTheme(): Promise<PlatformTheme> {
+  try {
+    return await apiFetch<PlatformTheme>("/platform/theme");
+  } catch {
+    return { primaryColor: "#0f1424", secondaryColor: "#2a3348" };
+  }
 }
 
 // --- In-app notifications (Super Admin bell) ---
