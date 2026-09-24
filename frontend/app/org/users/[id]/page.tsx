@@ -277,9 +277,8 @@ export default function OrgUserDashboardPage() {
     error: boolean;
   } | null>(null);
   const [tab, setTab] = useState(0);
-  // Leads tab filters: pipeline status + an exact "captured on" calendar date.
+  // Leads tab filter: pipeline status. (Capture date is scoped by the dashboard-wide range above.)
   const [leadStatus, setLeadStatus] = useState<LeadStatusFilter>(LEAD_STATUS_ALL);
-  const [capturedOn, setCapturedOn] = useState<string>("");
 
   // Dashboard-wide capture-date window. Both empty = all-time. Changing either
   // re-fetches the whole dashboard scoped to that range.
@@ -349,7 +348,6 @@ export default function OrgUserDashboardPage() {
 
   const visibleLeads = leads.filter((l) => {
     if (leadStatus !== LEAD_STATUS_ALL && l.status !== leadStatus) return false;
-    if (capturedOn && localDateKey(l.capturedAt) !== capturedOn) return false;
     return true;
   });
 
@@ -766,29 +764,12 @@ export default function OrgUserDashboardPage() {
                     ))}
                   </select>
                 </div>
-                <div className="field" style={{ margin: 0, minWidth: 170 }}>
-                  <label
-                    htmlFor="lead-captured-filter"
-                    style={{ fontSize: 12, color: "var(--muted)" }}
-                  >
-                    Captured on
-                  </label>
-                  <input
-                    id="lead-captured-filter"
-                    type="date"
-                    className="inp"
-                    value={capturedOn}
-                    max={localDateKey(new Date().toISOString())}
-                    onChange={(e) => setCapturedOn(e.target.value)}
-                  />
-                </div>
-                {(leadStatus !== LEAD_STATUS_ALL || capturedOn) && (
+                {leadStatus !== LEAD_STATUS_ALL && (
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
                     onClick={() => {
                       setLeadStatus(LEAD_STATUS_ALL);
-                      setCapturedOn("");
                     }}
                   >
                     Clear filters
@@ -803,7 +784,6 @@ export default function OrgUserDashboardPage() {
                     {leadStatus !== LEAD_STATUS_ALL
                       ? ` · ${stageLabel(leadStatus)}`
                       : ""}
-                    {capturedOn ? ` · ${capturedOn}` : ""}
                   </span>
                 </div>
                 <div className="tbl-wrap">

@@ -41,7 +41,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/org/leads", icon: "target", label: "Lead Center", tip: "Lead Center" },
       { href: "/org/projects", icon: "building", label: "Projects", tip: "Projects" },
-      { href: "/org/sales-agents", icon: "users", label: "Sales Agents", tip: "Sales Agents" },
+      // TODO: Sales Agents module hidden from the sidebar (not needed for now) — uncomment to bring it back.
+      // { href: "/org/sales-agents", icon: "users", label: "Sales Agents", tip: "Sales Agents" },
       { href: "/org/reports", icon: "reports", label: "Reports & Analytics", tip: "Reports & Analytics" },
     ],
   },
