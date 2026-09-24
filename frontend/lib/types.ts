@@ -1033,6 +1033,8 @@ export interface PublicProject extends Project {
 
 export interface ProjectListRow extends Project {
   unitTypeCount: number;
+  /** Landing pages bound to this project (its `content.propertyBinding`), regardless of status. */
+  landingPageCount: number;
 }
 
 /** A sales user assigned to a project (GET/PUT /org/projects/:id/sales-agents). */

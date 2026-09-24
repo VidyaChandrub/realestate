@@ -1169,6 +1169,14 @@ export async function getOrgLandingPages(): Promise<LandingPageRow[]> {
   return res.data;
 }
 
+/** Landing pages bound to one project (for the project Overview page's landing-page list). */
+export async function getProjectLandingPages(projectId: string): Promise<LandingPageRow[]> {
+  const res = await apiFetch<OrgLandingPagesListResponse>(
+    `/org/landing-pages?page=1&limit=100&projectId=${encodeURIComponent(projectId)}`,
+  );
+  return res.data;
+}
+
 // --- Super Admin Email & SMTP Management ---
 
 export async function getSmtpConfig(): Promise<SmtpConfig> {

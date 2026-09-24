@@ -161,7 +161,7 @@ export default function OrgProjectUnitDetailPage() {
     ? [
         unit?.configuration ?? null,
         unit?.variantLabel ?? null,
-        unit?.tower ?? null,
+        traits.grouped ? unit?.tower ?? null : null,
         unit?.floor != null ? `Floor ${unit.floor}` : null,
         effectiveArea != null ? `${effectiveArea.toLocaleString("en-IN")} ${project?.areaUnit ?? "sqft"}` : null,
         unit?.facing != null ? `${unit.facing} facing` : null,
@@ -169,7 +169,7 @@ export default function OrgProjectUnitDetailPage() {
     : [
         project?.projectType ?? null,
         unit?.variantLabel ?? null,
-        unit?.tower ? `${groupWord} ${unit.tower}` : null,
+        traits.grouped && unit?.tower ? `${groupWord} ${unit.tower}` : null,
         unit?.area != null ? `${unit.area.toLocaleString("en-IN")} sqft` : null,
         unit?.facing != null ? `${unit.facing} facing` : null,
       ]

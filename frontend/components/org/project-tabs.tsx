@@ -12,13 +12,21 @@ const TAB_DEFS = [
   { key: "overview", label: "Overview", suffix: "" },
   { key: "units", label: "Units", suffix: "/units" },
   { key: "leads", label: "Leads", suffix: "/leads" },
-  { key: "insights", label: "Insights", suffix: "/insights" },
-  { key: "integrations", label: "Integrations", suffix: "/integrations" },
-  { key: "ai-calling", label: "AI Calling", suffix: "/ai-calling" },
-  { key: "knowledge", label: "Knowledge", suffix: "/knowledge" },
+  // Intentionally hidden from the nav: these pages aren't working yet — kept
+  // out of the tab bar so nobody navigates into a half-built screen, without
+  // deleting the pages themselves (still reachable directly if needed).
+  // { key: "insights", label: "Insights", suffix: "/insights" },
+  // { key: "integrations", label: "Integrations", suffix: "/integrations" },
+  // { key: "ai-calling", label: "AI Calling", suffix: "/ai-calling" },
+  // { key: "knowledge", label: "Knowledge", suffix: "/knowledge" },
 ] as const;
 
-export type ProjectTabKey = (typeof TAB_DEFS)[number]["key"];
+export type ProjectTabKey =
+  | (typeof TAB_DEFS)[number]["key"]
+  | "insights"
+  | "integrations"
+  | "ai-calling"
+  | "knowledge";
 
 /** Minimal project shape the header needs. Optional everywhere — the static
  *  tabs (Leads/Insights/…) render the chrome without fetching a project. */

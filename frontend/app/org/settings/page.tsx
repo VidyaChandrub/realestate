@@ -8,8 +8,8 @@ import { DEFAULT_LEAD_STAGES, LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { OrgSmtpSettings } from "@/components/org/org-smtp-settings";
-import { TypedFieldEditor } from "@/components/org/typed-field-editor";
-import { fieldsToRows, groupNoun, rowsToFields, templateTraits, validateFieldRows, type FieldRow } from "@/lib/field-template";
+import { FieldRolesPanel, TypedFieldEditor } from "@/components/org/typed-field-editor";
+import { FIELD_ROLES, fieldsToRows, groupNoun, roleBaselineOf, rowsToFields, templateTraits, validateFieldRows, type FieldRole, type FieldRow } from "@/lib/field-template";
 import { Modal } from "@/components/ui/modal";
 import { subdomainPreviewHost } from "@/lib/domain";
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
@@ -807,6 +807,18 @@ function ProjectTypeEditor({
   const [name, setName] = useState(initial?.name ?? "");
   const [projectRows, setProjectRows] = useState<FieldRow[]>(() => fieldsToRows(initial?.projectFields));
   const [unitRows, setUnitRows] = useState<FieldRow[]>(() => fieldsToRows(initial?.unitFields));
+  // What this type originally had a field for, frozen at the moment this
+  // editor opened — see FieldRolesPanel. A brand-new type (`initial` null)
+  // has no prior state to compare against, so nothing would ever read as
+  // "missing" and there'd be no way left to set up a role at all once it's
+  // saved — treat creation as recovering from a blank slate instead: seed
+  // every role as "expected", so all five strips are available to wire up
+  // right away, and whichever ones are actually left unassigned at save time
+  // go quiet for good on every future edit (the type's own saved state
+  // becomes the new baseline then, same as any existing type).
+  const [unitRoleBaseline] = useState<Set<FieldRole>>(() =>
+    initial ? roleBaselineOf(initial.unitFields) : new Set(FIELD_ROLES),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -856,6 +868,7 @@ function ProjectTypeEditor({
           Details captured on every unit — e.g. Bedrooms, Floor, Configuration, Price. Editing this later never
           changes units that already exist.
         </div>
+        <FieldRolesPanel rows={unitRows} baseline={unitRoleBaseline} onChange={setUnitRows} />
         <TypedFieldEditor rows={unitRows} onChange={setUnitRows} emptyText="No unit fields — add one if units of this type need any." />
       </div>
 

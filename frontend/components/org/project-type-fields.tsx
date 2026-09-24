@@ -1,12 +1,13 @@
 "use client";
 
-import { TypedFieldEditor } from "@/components/org/typed-field-editor";
+import { FieldRolesPanel, TypedFieldEditor } from "@/components/org/typed-field-editor";
 import { RowListEditor } from "@/components/org/row-list-editor";
 import {
   groupBySection,
   nonRoleFields,
   type CustomValueDraft,
   type FieldDef,
+  type FieldRole,
   type FieldRow,
 } from "@/lib/field-template";
 
@@ -148,14 +149,18 @@ export function ProjectFieldRows({
 export function UnitFieldRows({
   rows,
   onChange,
+  roleBaseline = new Set(),
 }: {
   rows: FieldRow[];
   onChange: (rows: FieldRow[]) => void;
+  /** The role set this list originally had — see `FieldRolesPanel`. */
+  roleBaseline?: Set<FieldRole>;
 }) {
   return (
     <div className="field unit-field-editor">
       <label className="unit-fields-title">Unit fields</label>
       <div className="hint unit-fields-hint">Fields captured for each unit — e.g. Bedrooms, Floor, Price.</div>
+      <FieldRolesPanel rows={rows} baseline={roleBaseline} onChange={onChange} />
       <TypedFieldEditor rows={rows} onChange={onChange} emptyText="No unit fields — add a field." />
     </div>
   );
