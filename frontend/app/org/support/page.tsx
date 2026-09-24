@@ -53,13 +53,14 @@ const STATUS_LABEL: Record<string, string> = {
   resolved: "Resolved",
 };
 
-const QUICK_HELP = [
-  { icon: "🚀", label: "Getting started" },
-  { icon: "📱", label: "Connecting Meta leads" },
-  { icon: "📞", label: "Setting up AI calling" },
-  { icon: "💬", label: "WhatsApp templates" },
-  { icon: "🔀", label: "Distributing leads" },
-];
+// TODO: only used by the commented-out Quick help card — re-enable with it.
+// const QUICK_HELP = [
+//   { icon: "🚀", label: "Getting started" },
+//   { icon: "📱", label: "Connecting Meta leads" },
+//   { icon: "📞", label: "Setting up AI calling" },
+//   { icon: "💬", label: "WhatsApp templates" },
+//   { icon: "🔀", label: "Distributing leads" },
+// ];
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -199,7 +200,8 @@ export default function OrgSupportPage() {
         </div>
       </div>
 
-      <div className="grid g-2-1">
+      {/* TODO: was className="grid g-2-1" (2:1 with the sidebar below) — restore when the sidebar is re-enabled. */}
+      <div className="grid">
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {canAdd ? (
             <Reveal delay={1}>
@@ -396,6 +398,7 @@ export default function OrgSupportPage() {
           </Reveal>
         </div>
 
+        {/* TODO: static sidebar — Quick help (links go to "#"), Documentation (button has no handler) and Chat on WhatsApp (hardcoded number). Re-enable together with the "g-2-1" grid class above.
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <Reveal delay={1}>
             <div className="card">
@@ -474,6 +477,7 @@ export default function OrgSupportPage() {
             </div>
           </Reveal>
         </div>
+        */}
       </div>
     </>
   );

@@ -1,28 +1,31 @@
 import type { Metadata } from "next";
-import { Reveal } from "@/components/superadmin/reveal";
-import { Switch } from "@/components/superadmin/switch";
+// TODO: re-enable with the General / Integrations / Security sections once they are made dynamic.
+// import { Reveal } from "@/components/superadmin/reveal";
+// import { Switch } from "@/components/superadmin/switch";
 import { BillingExpirySettings } from "@/components/superadmin/billing-expiry-settings";
 import { Icon } from "@/components/icons";
-import { CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
+// import { CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
 
 export const metadata: Metadata = {
   title: "Settings · iPixxel Realty Super Admin",
 };
 
-const INTEGRATIONS = [
-  { ic: "ic-indigo", emoji: <Icon name="billing" size={14} />, name: "Razorpay", desc: "Collect template & subscription payments in INR.", badge: "b-green", badgeTxt: "Connected", on: true },
-  { ic: "ic-green", emoji: <Icon name="mail" size={14} />, name: "WhatsApp Business API", desc: "Lead alerts & buyer conversations for orgs.", badge: "b-green", badgeTxt: "Connected", on: true },
-  { ic: "ic-sky", emoji: "", name: "Meta", desc: "Lead ads & pixel sync for property campaigns.", badge: "b-green", badgeTxt: "Connected", on: true },
-  { ic: "ic-amber", emoji: <Icon name="dashboard" size={14} />, name: "Google Ads / GTM", desc: "Tag manager & conversion tracking container.", badge: "b-gray", badgeTxt: "Not connected", on: false },
-  { ic: "ic-violet", emoji: <Icon name="mail" size={14} />, name: "SMTP Email", desc: "Transactional email for invites & receipts.", badge: "b-green", badgeTxt: "Connected", on: true },
-  { ic: "ic-rose", emoji: <Icon name="reports" size={14} />, name: "Google Analytics", desc: "GA4 property traffic for org landing pages.", badge: "b-gray", badgeTxt: "Not connected", on: false },
-];
+// TODO: hardcoded placeholder data — commented out until integrations are backed by the API.
+// const INTEGRATIONS = [
+//   { ic: "ic-indigo", emoji: <Icon name="billing" size={14} />, name: "Razorpay", desc: "Collect template & subscription payments in INR.", badge: "b-green", badgeTxt: "Connected", on: true },
+//   { ic: "ic-green", emoji: <Icon name="mail" size={14} />, name: "WhatsApp Business API", desc: "Lead alerts & buyer conversations for orgs.", badge: "b-green", badgeTxt: "Connected", on: true },
+//   { ic: "ic-sky", emoji: "", name: "Meta", desc: "Lead ads & pixel sync for property campaigns.", badge: "b-green", badgeTxt: "Connected", on: true },
+//   { ic: "ic-amber", emoji: <Icon name="dashboard" size={14} />, name: "Google Ads / GTM", desc: "Tag manager & conversion tracking container.", badge: "b-gray", badgeTxt: "Not connected", on: false },
+//   { ic: "ic-violet", emoji: <Icon name="mail" size={14} />, name: "SMTP Email", desc: "Transactional email for invites & receipts.", badge: "b-green", badgeTxt: "Connected", on: true },
+//   { ic: "ic-rose", emoji: <Icon name="reports" size={14} />, name: "Google Analytics", desc: "GA4 property traffic for org landing pages.", badge: "b-gray", badgeTxt: "Not connected", on: false },
+// ];
 
-const SECURITY = [
-  { name: "Enforce 2FA for admins", desc: "Require two-factor authentication for all platform team members.", on: true },
-  { name: "Session timeout", desc: "Automatically sign out idle admin sessions after 30 minutes.", on: false },
-  { name: "Strong password policy", desc: "Minimum 12 characters with mixed case, numbers and symbols.", on: true },
-];
+// TODO: hardcoded placeholder data — commented out until security policies are backed by the API.
+// const SECURITY = [
+//   { name: "Enforce 2FA for admins", desc: "Require two-factor authentication for all platform team members.", on: true },
+//   { name: "Session timeout", desc: "Automatically sign out idle admin sessions after 30 minutes.", on: false },
+//   { name: "Strong password policy", desc: "Minimum 12 characters with mixed case, numbers and symbols.", on: true },
+// ];
 
 export default function SuperAdminSettingsPage() {
   return (
@@ -39,6 +42,7 @@ export default function SuperAdminSettingsPage() {
         </div>
       </div>
 
+      {/* TODO: static tabs — commented out until tab switching is implemented.
       <div className="tabs reveal in">
         <a className="active">General</a>
         <a>Branding</a>
@@ -46,7 +50,9 @@ export default function SuperAdminSettingsPage() {
         <a>Security</a>
         <a>Billing</a>
       </div>
+      */}
 
+      {/* TODO: static General card — commented out until these fields are loaded/saved via the API.
       <div className="card reveal" style={{ marginBottom: 22 }}>
         <div className="card-h">
           <span className="t">General</span>
@@ -91,7 +97,9 @@ export default function SuperAdminSettingsPage() {
           </div>
         </div>
       </div>
+      */}
 
+      {/* TODO: static Integrations grid — commented out until connection status/toggles are backed by the API.
       <h2 style={{ margin: "28px 0 6px" }}>Integrations</h2>
       <div className="sub muted reveal" style={{ marginBottom: 16 }}>
         Connect the third-party services powering payments, messaging and analytics.
@@ -137,6 +145,7 @@ export default function SuperAdminSettingsPage() {
           </Reveal>
         ))}
       </div>
+      */}
 
       <h2 style={{ margin: "8px 0 6px" }}>Billing</h2>
       <div className="sub muted reveal" style={{ marginBottom: 16 }}>
@@ -144,6 +153,7 @@ export default function SuperAdminSettingsPage() {
       </div>
       <BillingExpirySettings />
 
+      {/* TODO: static Security section — commented out until these policies are persisted and enforced.
       <h2 style={{ margin: "8px 0 6px" }}>Security</h2>
       <div className="card reveal">
         <div className="card-b" style={{ padding: "6px 20px" }}>
@@ -170,6 +180,7 @@ export default function SuperAdminSettingsPage() {
           ))}
         </div>
       </div>
+      */}
     </>
   );
 }
