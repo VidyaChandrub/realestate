@@ -17,7 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Reveal } from "@/components/superadmin/reveal";
-import { StatusBadge, TemplateCover, TierBadge, manageHref, type TemplateRow } from "./shared";
+import { StatusBadge, TemplateCover, TierBadge, manageHref, type TemplatePlan, type TemplateRow } from "./shared";
 
 /* Modern Visual Card for Super Admin & Template Studio
  * Features 16:10 preview thumbnail, hover quick actions overlay,
@@ -36,7 +36,7 @@ export function TemplateCard({
   onQuickPreview,
 }: {
   row: TemplateRow;
-  plans?: Array<{ name: string; isActive?: boolean; priceMonthly?: number }>;
+  plans?: TemplatePlan[];
   delay?: number;
   onEdit: () => void;
   onPreview: () => void;

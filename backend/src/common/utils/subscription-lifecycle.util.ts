@@ -71,6 +71,7 @@ type PrismaLike = Pick<
   | 'landingPage'
   | 'organisationTemplate'
   | 'template'
+  | 'plan'
 >;
 
 /** Read the Super Admin's expiry policy, falling back to safe defaults. */
@@ -287,7 +288,7 @@ export async function getOrgActivePlan(
   prisma: PrismaLike,
   orgId: string,
 ): Promise<{
-  subscription: Subscription;
+  subscription: Subscription | null;
   plan: {
     id?: string;
     name: string;
@@ -303,17 +304,66 @@ export async function getOrgActivePlan(
     where: { orgId, status: { not: 'cancelled' } },
     include: { plan: true },
   });
-  if (!sub || !isSubscriptionUsable(sub.status)) return null;
+  if (sub && isSubscriptionUsable(sub.status)) {
+    return {
+      subscription: sub,
+      plan: {
+        id: (sub as any).plan?.id,
+        name: (sub as any).plan?.name,
+        slug: (sub as any).plan?.slug,
+        priceMonthly: (sub as any).plan?.priceMonthly,
+        limits: (sub as any).plan?.limits,
+        capabilities: (sub as any).plan?.capabilities,
+      },
+    };
+  }
 
+  // Fallback to the platform's fixed Free / System plan
+  try {
+    const freePlan = await prisma.plan.findFirst({
+      where: {
+        OR: [
+          { isSystem: true },
+          { priceMonthly: 0 },
+          { slug: 'basic' },
+          { slug: 'free' },
+        ],
+        isActive: true,
+      },
+    });
+
+    if (freePlan) {
+      return {
+        subscription: sub,
+        plan: {
+          id: freePlan.id,
+          name: freePlan.name,
+          slug: freePlan.slug,
+          priceMonthly: freePlan.priceMonthly,
+          limits: freePlan.limits,
+          capabilities: freePlan.capabilities,
+        },
+      };
+    }
+  } catch {
+    // ignore query failure if schema lacks columns
+  }
+
+  // Virtual fixed Free Plan
   return {
     subscription: sub,
     plan: {
-      id: (sub as any).plan?.id,
-      name: (sub as any).plan?.name,
-      slug: (sub as any).plan?.slug,
-      priceMonthly: (sub as any).plan?.priceMonthly,
-      limits: (sub as any).plan?.limits,
-      capabilities: (sub as any).plan?.capabilities,
+      name: 'Free Plan',
+      slug: 'free',
+      priceMonthly: 0,
+      limits: {
+        projects: 1,
+        users: 1,
+        templates: 1,
+        landingPages: 1,
+        landingPagesCreate: 2,
+      },
+      capabilities: {},
     },
   };
 }

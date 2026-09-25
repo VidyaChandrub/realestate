@@ -135,26 +135,39 @@ export interface TemplatePlanOption {
   hint: string;
 }
 
+export type TemplatePlan = {
+  name: string;
+  slug?: string;
+  isActive?: boolean;
+  priceMonthly?: number;
+  capabilities?: Record<string, boolean> | null;
+};
+
 /** Compute dynamic plan-first options based on actual active subscription plans */
 export function getTemplatePlanOptions(
-  plans: Array<{
-    name: string;
-    slug?: string;
-    isActive?: boolean;
-    priceMonthly?: number;
-    capabilities?: Record<string, boolean> | null;
-  }> = [],
+  plans: TemplatePlan[] = [],
 ): TemplatePlanOption[] {
   const active = (plans || []).filter((p) => p.isActive !== false);
   const sorted = [...active].sort((a, b) => (a.priceMonthly ?? 0) - (b.priceMonthly ?? 0));
 
-  const freePlan = sorted.find((p) => (p.priceMonthly ?? 0) === 0) || sorted[0];
-  const paidPlans = sorted.filter((p) => (p.priceMonthly ?? 0) > 0);
-  const topPlan = paidPlans.length > 1 ? paidPlans[paidPlans.length - 1] : null;
-  const midPaidPlans = topPlan ? paidPlans.slice(0, -1) : paidPlans;
+  // Find explicit free/system plan or represent the fixed platform Free Plan
+  const freePlan = sorted.find(
+    (p) => (p.priceMonthly ?? 0) === 0 || p.slug === "free" || p.slug === "basic",
+  );
+  const paidPlans = sorted.filter(
+    (p) => (p.priceMonthly ?? 0) > 0 && p.slug !== "free" && p.slug !== "basic",
+  );
+  const topPlan =
+    paidPlans.length > 1
+      ? paidPlans[paidPlans.length - 1]
+      : paidPlans.length === 1
+        ? paidPlans[0]
+        : null;
+  const midPaidPlans = topPlan && paidPlans.length > 1 ? paidPlans.slice(0, -1) : paidPlans;
 
-  const freeLabel = freePlan ? `All Plans (Default / ${freePlan.name})` : "All Plans (Free)";
-  const freeBadge = "All Plans";
+  const freeName = freePlan?.name || "Free Plan";
+  const freeLabel = `${freeName} (Fixed / All Plans)`;
+  const freeBadge = freeName;
 
   const paidLabel =
     midPaidPlans.length > 0
@@ -172,13 +185,13 @@ export function getTemplatePlanOptions(
       tier: "free",
       label: freeLabel,
       badgeLabel: freeBadge,
-      hint: "Accessible to every workspace on any subscription plan.",
+      hint: "Accessible to every workspace on the Free Plan and all subscription tiers.",
     },
     {
       tier: "paid",
       label: paidLabel,
       badgeLabel: paidBadge,
-      hint: "Requires a paid plan subscription.",
+      hint: "Requires a paid plan subscription (e.g. Starter or higher).",
     },
     {
       tier: "premium",
@@ -191,11 +204,7 @@ export function getTemplatePlanOptions(
 
 export function tierStyle(
   tier?: "free" | "paid" | "premium",
-  plans?: Array<{
-    name: string;
-    isActive?: boolean;
-    priceMonthly?: number;
-  }>,
+  plans?: TemplatePlan[],
 ): { cls: string; label: string } {
   const t = tier ?? "free";
   const opts = getTemplatePlanOptions(plans || []);
@@ -208,7 +217,7 @@ export function tierStyle(
       return { cls: "b-indigo", label: opt?.badgeLabel || "Paid" };
     case "free":
     default:
-      return { cls: "b-green", label: opt?.badgeLabel || "All Plans" };
+      return { cls: "b-green", label: opt?.badgeLabel || "Free Plan" };
   }
 }
 
@@ -217,11 +226,7 @@ export function TierBadge({
   plans,
 }: {
   tier?: "free" | "paid" | "premium";
-  plans?: Array<{
-    name: string;
-    isActive?: boolean;
-    priceMonthly?: number;
-  }>;
+  plans?: TemplatePlan[];
 }) {
   const t = tierStyle(tier, plans);
   return (
@@ -236,17 +241,14 @@ export const ACCESS_TIERS: AccessTier[] = ["free", "paid", "premium"];
 
 /** Active subscription plans that unlock a given template access tier. */
 export function plansForAccessTier(
-  plans: Array<{
-    name: string;
-    isActive?: boolean;
-    priceMonthly?: number;
-    capabilities?: Record<string, boolean> | null;
-  }>,
+  plans: TemplatePlan[],
   tier: AccessTier,
 ): string[] {
   const active = (plans || []).filter((p) => p.isActive !== false);
   if (tier === "free") {
-    return active.map((p) => p.name);
+    const freePlanName = active.find((p) => (p.priceMonthly ?? 0) === 0 || p.slug === "free" || p.slug === "basic")?.name;
+    const names = active.map((p) => p.name);
+    return freePlanName ? names : ["Free Plan (Fixed)", ...names];
   }
 
   return active
@@ -265,16 +267,11 @@ export function plansForAccessTier(
 /** Dropdown label: uses subscription plans directly. */
 export function accessTierOptionLabel(
   tier: AccessTier,
-  plans: Array<{
-    name: string;
-    isActive?: boolean;
-    priceMonthly?: number;
-    capabilities?: Record<string, boolean> | null;
-  }>,
+  plans: TemplatePlan[],
 ): string {
   const opts = getTemplatePlanOptions(plans);
   const found = opts.find((o) => o.tier === tier);
-  return found?.label || (tier === "free" ? "All Plans" : tier === "paid" ? "Paid Plans" : "Premium");
+  return found?.label || (tier === "free" ? "Free Plan (Fixed / All Plans)" : tier === "paid" ? "Paid Plans" : "Premium");
 }
 
 export type TemplateStats = {

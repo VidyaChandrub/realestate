@@ -531,7 +531,7 @@ export default function SuperAdminTemplatesPage() {
             Template Management
           </h1>
           <div className="sub" style={{ marginTop: 4, maxWidth: 680, fontSize: 13.5, color: "var(--muted)" }}>
-            Govern, preview, and categorize landing page designs across Free, Paid, and Premium tiers.
+            Govern, preview, and categorize landing page designs across Free Plan, Paid, and Premium tiers.
           </div>
         </div>
 
@@ -622,7 +622,7 @@ export default function SuperAdminTemplatesPage() {
             </div>
           </div>
 
-          {/* Card: Free Tier / All Plans */}
+          {/* Card: Free Plan / Fixed Tier */}
           <div
             style={{
               background: "var(--surface)",
@@ -639,14 +639,14 @@ export default function SuperAdminTemplatesPage() {
           >
             <div>
               <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
-                {freeOption?.badgeLabel || "All Plans"}
+                {freeOption?.badgeLabel || "Free Plan"}
               </div>
               <div style={{ fontSize: 22, fontWeight: 800, color: "var(--green)", marginTop: 2 }}>
                 <CountUp value={tierCounts.free} />
               </div>
             </div>
             <span className="badge b-green" style={{ fontWeight: 700 }}>
-              {freeOption?.badgeLabel || "All Plans"}
+              {freeOption?.badgeLabel || "Free Plan"}
             </span>
           </div>
 
@@ -862,9 +862,9 @@ export default function SuperAdminTemplatesPage() {
                   }}
                 >
                   {t === "all"
-                    ? "All Plans"
+                    ? "All Tiers"
                     : t === "free"
-                      ? (freeOption?.badgeLabel || "All Plans")
+                      ? (freeOption?.badgeLabel || "Free Plan")
                       : t === "paid"
                         ? (paidOption?.badgeLabel || "Paid")
                         : (premOption?.badgeLabel || "Ultra Pro")}
