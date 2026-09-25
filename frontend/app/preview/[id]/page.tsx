@@ -58,8 +58,8 @@ export default function PreviewLandingPage() {
       updated: "",
       updatedAt: data.updatedAt,
       thumbnail: data.thumbnail ?? "",
-      sections: data.content.sections,
-      config: data.content.config,
+      sections: data.content?.sections ?? [],
+      config: data.content?.config ?? (defaultSiteConfig as SiteConfig),
       kind: "custom",
       pageType: "landing",
     };
@@ -92,7 +92,7 @@ export default function PreviewLandingPage() {
   }
 
   // Render ONLY the landing page — no dashboard shell, no extra header.
-  // SEO and Tracking are per-page via data.content.config
+  // SEO and Tracking are per-page via data.content?.config
   const previewPage: LandingPageData = {
     id: data.id,
     name: data.name,
@@ -104,14 +104,14 @@ export default function PreviewLandingPage() {
     conversions: "—",
     updated: "",
     thumbnail: data.thumbnail ?? "",
-    sections: data.content.sections ?? [],
-    config: data.content.config,
-    openPageSite: data.content.site ?? undefined,
+    sections: data.content?.sections ?? [],
+    config: data.content?.config ?? (defaultSiteConfig as SiteConfig),
+    openPageSite: data.content?.site ?? undefined,
     kind: "custom",
     pageType: "landing",
   };
   const site = ensureSiteForms(siteFromLandingPage(previewPage));
-  const previewForms = (site.forms ?? data.content.config?.forms ?? []) as never;
+  const previewForms = (site.forms ?? data.content?.config?.forms ?? []) as never;
 
   return (
     <div className="ps-app" style={{ minHeight: "100vh", background: "#fff" }}>
@@ -125,7 +125,7 @@ export default function PreviewLandingPage() {
         }
         forms={previewForms}
       />
-      <OpenPageTrackingScripts tracking={data.content.config.tracking} />
+      <OpenPageTrackingScripts tracking={data.content?.config?.tracking} />
     </div>
   );
 }

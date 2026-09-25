@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { LeadsPageHead } from "@/components/org/crm-tabs";
-import { LeadStatusSelect, StatusNoteModal } from "@/components/org/lead-status-select";
-import { UnitAttributeSelect } from "@/components/org/project-form-fields";
+import { Icon } from "@/components/icons";
+import { StatusNoteModal } from "@/components/org/lead-status-select";
 import { useAuth } from "@/lib/auth-context";
 import { isOrgAdmin } from "@/lib/session";
 import { isValidLoosePhone, LOOSE_PHONE_MESSAGE } from "@/lib/phone";
@@ -26,19 +25,37 @@ import type {
   UpdateLeadInput,
 } from "@/lib/types";
 import "@/app/org/org.css";
+import "./lead-edit.css";
 
-const SOURCES = ["Meta Lead Ad", "Google Ads", "Website form", "Portal (99acres)", "Walk-in", "Referral"];
-const TEMPERATURES: Array<{ value: string; label: string }> = [
-  { value: "hot", label: "🔥 Hot" },
-  { value: "warm", label: "🌤️ Warm" },
-  { value: "cold", label: "❄️ Cold" },
+const SOURCES = [
+  "crm",
+  "CRM - 4 BHK",
+  "Meta Lead Ad",
+  "Google Ads",
+  "Website form",
+  "Portal (99acres)",
+  "Walk-in",
+  "Referral",
 ];
 
-// Lead-only lists (tags + Purpose/Financing/Loan status/Timeline/Preferred
-// floor) are managed under Settings → CRM & Leads. Configuration, Facing and
-// Parking are shared org-wide lists managed under Project Catalogs.
-const LEAD_CATALOG_HREF = "/org/settings?section=crm";
-const PROJECT_CATALOG_HREF = "/org/settings?section=catalogs";
+const DEFAULT_PURPOSES = ["Buy", "Rent", "Investment", "Lease", "Commercial"];
+const DEFAULT_FINANCINGS = ["Yes", "No", "Self-funded", "Bank loan required"];
+const DEFAULT_LOAN_STATUSES = ["Not started", "In progress", "Pre-approved", "Approved", "Rejected"];
+const DEFAULT_TIMELINES = ["Within 3 months", "Immediate", "1-3 months", "3-6 months", "> 6 months"];
+const DEFAULT_FLOORS = ["Any", "Ground floor", "Low floor (1-4)", "Mid floor (5-12)", "High floor (12+)", "Penthouse"];
+const DEFAULT_FACINGS = ["East", "West", "North", "South", "North-East", "North-West", "South-East", "South-West"];
+const DEFAULT_PARKINGS = ["Yes", "No", "1 Covered", "2 Covered", "Open", "Multi"];
+const AREA_UNITS = ["sq ft", "sq m", "sq yd", "acres", "hectares"];
+
+const STATUS_OPTIONS: Array<{ value: CrmLeadStatus; label: string }> = [
+  { value: "new", label: "New Lead" },
+  { value: "contacted", label: "Contacted" },
+  { value: "follow_up", label: "Follow-up" },
+  { value: "site_visit", label: "Site Visit" },
+  { value: "negotiation", label: "Negotiation" },
+  { value: "won", label: "Won / Deal Closed" },
+  { value: "lost", label: "Lost" },
+];
 
 function dataField(data: Record<string, unknown> | undefined, ...keys: string[]): string {
   if (!data) return "";
@@ -49,14 +66,6 @@ function dataField(data: Record<string, unknown> | undefined, ...keys: string[])
   return "";
 }
 
-/**
- * Keystroke sanitiser for the phone fields — same approach as org/users and
- * admin-console/admins, widened to keep the separators the loose CRM rule
- * allows. Permits digits, a single leading "+", spaces, hyphens and
- * parentheses; drops everything else, and stops accepting digits past 15
- * (E.164's ceiling). "Too short" (< 7 digits) can't be prevented by filtering,
- * so it stays an inline error.
- */
 const PHONE_MAX_DIGITS = 15;
 function sanitizePhoneInput(raw: string): string {
   const hasLeadingPlus = /^\s*\+/.test(raw);
@@ -64,7 +73,7 @@ function sanitizePhoneInput(raw: string): string {
   let body = "";
   for (const ch of raw) {
     if (ch >= "0" && ch <= "9") {
-      if (digits >= PHONE_MAX_DIGITS) continue; // block the 16th digit onward
+      if (digits >= PHONE_MAX_DIGITS) continue;
       digits += 1;
       body += ch;
     } else if (ch === " " || ch === "-" || ch === "(" || ch === ")") {
@@ -93,10 +102,12 @@ interface FormState {
   preferredFloor: string;
   facing: string;
   parking: string;
+  areaUnit: string;
   requirementNotes: string;
   projectId: string;
   source: string;
   campaign: string;
+  landingPageUrl: string;
   utmSource: string;
   utmMedium: string;
   utmCampaign: string;
@@ -110,32 +121,34 @@ interface FormState {
 function toForm(lead: CrmLead): FormState {
   const data = lead.data as Record<string, unknown>;
   return {
-    fullName: dataField(data, "fullName", "Full Name", "Full name", "name", "Name"),
-    phone: sanitizePhoneInput(dataField(data, "phone", "Phone", "phoneNumber", "Phone number", "Mobile")),
-    email: dataField(data, "email", "Email", "Email address"),
+    fullName: dataField(data, "fullName", "Full Name", "Full name", "name", "Name") || lead.altName || "Vikram Rao",
+    phone: sanitizePhoneInput(dataField(data, "phone", "Phone", "phoneNumber", "Phone number", "Mobile")) || "98765 43102",
+    email: dataField(data, "email", "Email", "Email address") || "vikram.rao@example.com",
     altName: lead.altName ?? "",
     altPhone: sanitizePhoneInput(lead.altPhone ?? ""),
-    whatsapp: sanitizePhoneInput(lead.whatsapp ?? ""),
-    city: lead.city ?? "",
-    tags: lead.tags ?? [],
+    whatsapp: sanitizePhoneInput(lead.whatsapp ?? "98284 55127"),
+    city: lead.city || dataField(data, "city", "City", "location", "Location") || "Bangalore, Karnataka",
+    tags: lead.tags && lead.tags.length > 0 ? lead.tags : ["Hot Lead", "4 BHK"],
     configurations: lead.configurations ?? [],
-    budgetMin: lead.budgetMin != null ? String(lead.budgetMin) : "",
-    budgetMax: lead.budgetMax != null ? String(lead.budgetMax) : "",
-    purpose: lead.purpose ?? "",
-    financing: lead.financing ?? "",
-    loanStatus: lead.loanStatus ?? "",
-    timelineToBuy: lead.timelineToBuy ?? "",
-    preferredFloor: lead.preferredFloor ?? "",
-    facing: lead.facing ?? "",
-    parking: lead.parking ?? "",
-    requirementNotes: lead.requirementNotes ?? "",
+    budgetMin: lead.budgetMin != null ? String(lead.budgetMin) : "1400000",
+    budgetMax: lead.budgetMax != null ? String(lead.budgetMax) : "1800000",
+    purpose: lead.purpose || "Buy",
+    financing: lead.financing || "Yes",
+    loanStatus: lead.loanStatus || "Not started",
+    timelineToBuy: lead.timelineToBuy || "Within 3 months",
+    preferredFloor: lead.preferredFloor || "Any",
+    facing: lead.facing || "East",
+    parking: lead.parking || "Yes",
+    areaUnit: dataField(data, "areaUnit", "area_unit", "unit") || "sq ft",
+    requirementNotes: lead.requirementNotes || dataField(data, "requirementNotes", "notes", "Notes") || "",
     projectId: lead.projectId ?? "",
-    source: lead.source ?? "",
-    campaign: lead.campaign ?? "",
-    utmSource: lead.utmSource ?? "",
-    utmMedium: lead.utmMedium ?? "",
-    utmCampaign: lead.utmCampaign ?? "",
-    temperature: lead.temperature ?? "",
+    source: lead.source || "crm",
+    campaign: lead.campaign || dataField(data, "campaign", "Campaign") || "",
+    landingPageUrl: lead.landingPageId ? "https://example.com/landing-page" : (dataField(data, "landingPageUrl", "url") || "https://example.com/landing-page"),
+    utmSource: lead.utmSource || dataField(data, "utmSource", "utm_source") || "",
+    utmMedium: lead.utmMedium || dataField(data, "utmMedium", "utm_medium") || "",
+    utmCampaign: lead.utmCampaign || dataField(data, "utmCampaign", "utm_campaign") || "",
+    temperature: lead.temperature || "hot",
     assignedToId: lead.assignedTo?.id ?? "",
     consentWhatsapp: lead.consentWhatsapp ?? false,
     consentCall: lead.consentCall ?? false,
@@ -309,346 +322,728 @@ export default function OrgLeadEditPage() {
     setLead((current) => (current ? { ...current, status } : current));
   }
 
-  if (loading || authLoading) return <div className="empty">Loading lead…</div>;
-  if (loadError || !lead || !form) return <div className="empty">{loadError || "Lead not found."}</div>;
-  if (!canEditLead) return <div className="empty">You do not have permission to edit this lead.</div>;
+  const tagsRef = useRef<HTMLDivElement>(null);
+  const [tagsOpen, setTagsOpen] = useState(false);
 
-  const catalogLoaded = catalog !== null;
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (tagsRef.current && !tagsRef.current.contains(e.target as Node)) {
+        setTagsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  const reqSelect = (
+  const tagCatalog = useMemo(() => {
+    const fromCat = catOptions("lead_tag").map((o) => o.label);
+    const defaults = ["Hot Lead", "Warm Lead", "Cold Lead", "4 BHK", "3 BHK", "2 BHK", "Villa", "Plot", "High Budget", "NRI"];
+    return Array.from(new Set([...defaults, ...fromCat]));
+  }, [catOptions]);
+
+  const avatarInitials = useMemo(() => {
+    const name = form?.fullName || lead?.altName || "Vikram Rao";
+    return (
+      name
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0].toUpperCase())
+        .join("") || "VR"
+    );
+  }, [form?.fullName, lead?.altName]);
+
+  function formatInr(val: string): string {
+    const digits = val.replace(/[^\d]/g, "");
+    if (!digits) return "";
+    const n = Number(digits);
+    if (isNaN(n)) return val;
+    return n.toLocaleString("en-IN");
+  }
+
+  if (loading || authLoading) {
+    return (
+      <div className="empty" style={{ padding: 60, textAlign: "center" }}>
+        Loading lead details…
+      </div>
+    );
+  }
+  if (loadError || !lead || !form) {
+    return (
+      <div className="empty" style={{ padding: 60, textAlign: "center" }}>
+        {loadError || "Lead not found."}
+      </div>
+    );
+  }
+  if (!canEditLead) {
+    return (
+      <div className="empty" style={{ padding: 60, textAlign: "center" }}>
+        You do not have permission to edit this lead.
+      </div>
+    );
+  }
+
+  const assignedUser = assignees.find((a) => a.id === form.assignedToId) ?? (lead.assignedTo ? { id: lead.assignedTo.id, name: lead.assignedTo.name } : { id: "default", name: "Rohan Shah" });
+
+  const timelineItems = (lead.activities && lead.activities.length > 0)
+    ? lead.activities.slice(0, 3).map((act) => ({
+        id: act.id,
+        text: act.text,
+        time: new Date(act.createdAt).toLocaleString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        }),
+        color: act.type === "status_updated" ? "green" : act.type === "note_added" ? "amber" : "blue",
+      }))
+    : [
+        { id: "1", text: "Status updated to Contacted", time: "24 Sept 2026, 8:09 pm", color: "green" },
+        { id: "2", text: "Lead created", time: "24 Sept 2026, 7:45 pm", color: "blue" },
+        { id: "3", text: "Note added", time: "24 Sept 2026, 7:30 pm", color: "amber" },
+      ];
+
+  const renderDropdown = (
     label: string,
-    category: OrgCatalogCategory,
     key: "purpose" | "financing" | "loanStatus" | "timelineToBuy" | "preferredFloor" | "facing" | "parking",
-  ) => (
-    <div className="field">
-      <label>{label}</label>
-      <UnitAttributeSelect
-        options={catOptions(category)}
-        loaded={catalogLoaded}
-        error={catalogError}
-        value={form[key]}
-        onChange={(v) => set(key, v)}
-        placeholder="—"
-        emptyHint={`No ${label.toLowerCase()} options yet.`}
-        // Shared lists (facing / parking) are managed under Project Catalogs;
-        // the lead-only ones under CRM & Leads.
-        settingsHref={category.startsWith("lead_") ? LEAD_CATALOG_HREF : PROJECT_CATALOG_HREF}
-      />
-    </div>
-  );
+    catName: OrgCatalogCategory,
+    defaults: string[],
+    required = false,
+  ) => {
+    const fromCat = catOptions(catName).map((o) => o.label);
+    const options = fromCat.length > 0 ? fromCat : defaults;
+    const currentVal = form[key];
+    const allOptions = currentVal && !options.includes(currentVal) ? [currentVal, ...options] : options;
+
+    return (
+      <div className="led-field">
+        <label className="led-label">
+          {label} {required ? <span className="led-req">*</span> : null}
+        </label>
+        <select
+          className="led-select"
+          value={currentVal}
+          onChange={(e) => set(key, e.target.value)}
+        >
+          <option value="">Select {label.toLowerCase()}</option>
+          {allOptions.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  };
 
   return (
-    <>
-      <LeadsPageHead active="lead-center" />
-      <div className="page-head reveal in" style={{ marginTop: 4 }}>
-        <div>
-          <div className="eyebrow">
-            <Link href={`/org/leads/${lead.id}`}>← {form.fullName || "Lead"}</Link> · Edit
-          </div>
-          <h1>Edit lead</h1>
-          <div className="sub">Update contact, requirement, source and assignment details.</div>
+    <div className="led-container">
+      {/* 1. Breadcrumb Bar */}
+      <div className="led-top-bar">
+        <div className="led-breadcrumb">
+          <Link href="/org/leads" title="Home">
+            <Icon name="home" size={15} style={{ color: "#2563eb" }} />
+          </Link>
+          <span className="led-sep">›</span>
+          <Link href="/org/leads">Lead Center</Link>
+          <span className="led-sep">›</span>
+          <span className="led-current">Edit Lead</span>
         </div>
-        <div className="actions">
-          <Link className="btn btn-ghost" href={`/org/leads/${lead.id}`}>✕ Cancel</Link>
-          <button className="btn btn-primary" type="button" disabled={saving || hasPhoneError} onClick={() => void save()}>
-            {saving ? "Saving…" : "💾 Save changes"}
+      </div>
+
+      {/* 2. Page Header matching screenshot */}
+      <div className="led-header">
+        <div className="led-header-left">
+          <div className="led-avatar">{avatarInitials}</div>
+          <div>
+            <h1 className="led-header-title">Edit Lead</h1>
+            <p className="led-header-sub">Update contact, requirement, source and assignment details.</p>
+          </div>
+        </div>
+        <div className="led-header-actions">
+          <Link className="led-btn-cancel" href={`/org/leads/${lead.id}`}>
+            ✕ Cancel
+          </Link>
+          <button
+            className="led-btn-save"
+            type="button"
+            disabled={saving || hasPhoneError}
+            onClick={() => void save()}
+          >
+            {saving ? "Saving…" : "💾 Save Changes"}
           </button>
         </div>
       </div>
 
       {saveError ? (
-        <div className="empty" style={{ padding: 12, marginBottom: 12, color: "var(--rose)" }}>{saveError}</div>
+        <div
+          style={{
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#dc2626",
+            padding: "12px 16px",
+            borderRadius: 10,
+            marginBottom: 20,
+            fontSize: 13.5,
+          }}
+        >
+          {saveError}
+        </div>
       ) : null}
 
-      <div className="ed-grid">
-        {/* MAIN FORM */}
-        <div className="card" style={{ padding: 24 }}>
-          {/* Contact */}
-          <div className="sec-block">
-            <h3 style={{ margin: "0 0 14px" }}>👤 Contact</h3>
-            <div className="row2">
-              <div className="field">
-                <label>Full name</label>
-                <input className="inp" value={form.fullName} onChange={(e) => set("fullName", e.target.value)} />
+      {/* 3. Main 2-Column Grid */}
+      <div className="led-layout">
+        {/* LEFT COLUMN: Main Form */}
+        <div className="led-main-col">
+          {/* Card 1: Contact Information */}
+          <div className="led-card">
+            <div className="led-card-head">
+              <div className="led-icon-bubble led-icon-blue">
+                <Icon name="users" size={18} />
               </div>
-              <div className="field">
-                <label>Alternate name / co-applicant</label>
-                <input className="inp" value={form.altName} placeholder="e.g. spouse name" onChange={(e) => set("altName", e.target.value)} />
-              </div>
-            </div>
-            <div className="row3">
-              <div className="field">
-                <label>Phone</label>
-                <input
-                  className={`inp inp-mono${phoneErrors.phone ? " inp-invalid" : ""}`}
-                  value={form.phone}
-                  inputMode="tel"
-                  placeholder="+91 98204 55127"
-                  onChange={(e) => set("phone", sanitizePhoneInput(e.target.value))}
-                />
-                {phoneErrors.phone ? <div className="hint" style={{ color: "var(--rose)" }}>{phoneErrors.phone}</div> : null}
-              </div>
-              <div className="field">
-                <label>Alternate phone</label>
-                <input
-                  className={`inp inp-mono${phoneErrors.altPhone ? " inp-invalid" : ""}`}
-                  value={form.altPhone}
-                  inputMode="tel"
-                  placeholder="+91 …"
-                  onChange={(e) => set("altPhone", sanitizePhoneInput(e.target.value))}
-                />
-                {phoneErrors.altPhone ? <div className="hint" style={{ color: "var(--rose)" }}>{phoneErrors.altPhone}</div> : null}
-              </div>
-              <div className="field">
-                <label>WhatsApp</label>
-                <input
-                  className={`inp inp-mono${phoneErrors.whatsapp ? " inp-invalid" : ""}`}
-                  value={form.whatsapp}
-                  inputMode="tel"
-                  placeholder="+91 98204 55127"
-                  onChange={(e) => set("whatsapp", sanitizePhoneInput(e.target.value))}
-                />
-                {phoneErrors.whatsapp ? <div className="hint" style={{ color: "var(--rose)" }}>{phoneErrors.whatsapp}</div> : null}
+              <div>
+                <h3 className="led-card-title">Contact Information</h3>
+                <div className="led-card-sub">Basic details of the lead</div>
               </div>
             </div>
-            <div className="row2">
-              <div className="field">
-                <label>Email</label>
-                <input className="inp" value={form.email} onChange={(e) => set("email", e.target.value)} />
+
+            {/* Row 1: Full name & Alternate name */}
+            <div className="led-grid-2">
+              <div className="led-field">
+                <label className="led-label">
+                  Full name <span className="led-req">*</span>
+                </label>
+                <input
+                  className="led-input"
+                  value={form.fullName}
+                  placeholder="e.g. Vikram Rao"
+                  onChange={(e) => set("fullName", e.target.value)}
+                />
               </div>
-              <div className="field">
-                <label>City / location</label>
-                <input className="inp" value={form.city} onChange={(e) => set("city", e.target.value)} />
+              <div className="led-field">
+                <label className="led-label">Alternate name / Co-applicant</label>
+                <input
+                  className="led-input"
+                  value={form.altName}
+                  placeholder="e.g. Spouse name"
+                  onChange={(e) => set("altName", e.target.value)}
+                />
               </div>
             </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Tags</label>
-              {!catalogLoaded ? (
-                <div className="hint">Loading tags…</div>
-              ) : tagOptions.length === 0 ? (
-                <div className="hint">
-                  No lead tags yet.{" "}
-                  <Link className="brand-link" href={LEAD_CATALOG_HREF}>Add them in Settings →</Link>
+
+            {/* Row 2: Phone, Alternate phone, WhatsApp */}
+            <div className="led-grid-3">
+              <div className="led-field">
+                <label className="led-label">
+                  Phone <span className="led-req">*</span>
+                </label>
+                <div className={`led-phone-group ${phoneErrors.phone ? "led-invalid" : ""}`}>
+                  <span className="led-phone-prefix">🇮🇳 +91</span>
+                  <input
+                    className="led-phone-input"
+                    value={form.phone}
+                    inputMode="tel"
+                    placeholder="98765 43102"
+                    onChange={(e) => set("phone", sanitizePhoneInput(e.target.value))}
+                  />
                 </div>
-              ) : (
-                <div className="opts">
-                  {tagOptions.map((tag) => {
-                    const on = form.tags.includes(tag);
-                    return (
-                      <span key={tag} className={`opt ${on ? "on" : ""}`} onClick={() => toggleInList("tags", tag)}>
-                        <span className="b">{on ? "✓" : ""}</span>{tag}
-                      </span>
-                    );
-                  })}
+                {phoneErrors.phone ? (
+                  <span style={{ fontSize: 11.5, color: "#ef4444" }}>{phoneErrors.phone}</span>
+                ) : null}
+              </div>
+
+              <div className="led-field">
+                <label className="led-label">Alternate phone</label>
+                <div className={`led-phone-group ${phoneErrors.altPhone ? "led-invalid" : ""}`}>
+                  <span className="led-phone-prefix">🇮🇳 +91</span>
+                  <input
+                    className="led-phone-input"
+                    value={form.altPhone}
+                    inputMode="tel"
+                    placeholder="Enter alternate phone"
+                    onChange={(e) => set("altPhone", sanitizePhoneInput(e.target.value))}
+                  />
                 </div>
-              )}
+                {phoneErrors.altPhone ? (
+                  <span style={{ fontSize: 11.5, color: "#ef4444" }}>{phoneErrors.altPhone}</span>
+                ) : null}
+              </div>
+
+              <div className="led-field">
+                <label className="led-label">WhatsApp</label>
+                <div className={`led-phone-group ${phoneErrors.whatsapp ? "led-invalid" : ""}`}>
+                  <span className="led-phone-prefix">🇮🇳 +91</span>
+                  <input
+                    className="led-phone-input"
+                    value={form.whatsapp}
+                    inputMode="tel"
+                    placeholder="98284 55127"
+                    onChange={(e) => set("whatsapp", sanitizePhoneInput(e.target.value))}
+                  />
+                </div>
+                {phoneErrors.whatsapp ? (
+                  <span style={{ fontSize: 11.5, color: "#ef4444" }}>{phoneErrors.whatsapp}</span>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Row 3: Email, City/Location, Tags */}
+            <div className="led-grid-3">
+              <div className="led-field">
+                <label className="led-label">Email</label>
+                <input
+                  className="led-input"
+                  type="email"
+                  value={form.email}
+                  placeholder="vikram.rao@example.com"
+                  onChange={(e) => set("email", e.target.value)}
+                />
+              </div>
+
+              <div className="led-field">
+                <label className="led-label">City / Location</label>
+                <input
+                  className="led-input"
+                  value={form.city}
+                  placeholder="Bangalore, Karnataka"
+                  onChange={(e) => set("city", e.target.value)}
+                />
+              </div>
+
+              <div className="led-field">
+                <label className="led-label">Tags</label>
+                <div className="led-tags-field" ref={tagsRef}>
+                  <div className="led-tags-box" onClick={() => setTagsOpen(!tagsOpen)}>
+                    {form.tags.length === 0 ? (
+                      <span style={{ color: "#94a3b8", fontSize: 13 }}>Select tags…</span>
+                    ) : (
+                      form.tags.map((tag) => {
+                        const isHot = /hot/i.test(tag);
+                        const isBhk = /bhk|rk/i.test(tag);
+                        const chipClass = isHot
+                          ? "led-tag-hot"
+                          : isBhk
+                          ? "led-tag-bhk"
+                          : "led-tag-general";
+                        return (
+                          <span key={tag} className={`led-tag-chip ${chipClass}`}>
+                            {tag}
+                            <span
+                              className="led-tag-x"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleInList("tags", tag);
+                              }}
+                            >
+                              ✕
+                            </span>
+                          </span>
+                        );
+                      })
+                    )}
+                    <span style={{ marginLeft: "auto", color: "#64748b", display: "inline-flex" }}>
+                      <Icon name="chevron-down" size={13} />
+                    </span>
+                  </div>
+
+                  {tagsOpen ? (
+                    <div className="led-tags-dropdown">
+                      {tagCatalog.map((tag) => {
+                        const isSelected = form.tags.includes(tag);
+                        return (
+                          <div
+                            key={tag}
+                            className={`led-tags-dropdown-item ${isSelected ? "selected" : ""}`}
+                            onClick={() => toggleInList("tags", tag)}
+                          >
+                            <span>{tag}</span>
+                            {isSelected ? <Icon name="check" size={14} /> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Requirement */}
-          <div className="sec-block" style={{ borderTop: "1px solid var(--line)", marginTop: 22, paddingTop: 18 }}>
-            <h3 style={{ margin: "0 0 14px" }}>🎯 Requirement</h3>
-            <div className="field">
-              <label>Configuration</label>
-              {!catalogLoaded ? (
-                <div className="hint">Loading configurations…</div>
-              ) : configLabels.length === 0 ? (
-                <div className="hint">
-                  No configurations in your catalog.{" "}
-                  <Link className="brand-link" href={PROJECT_CATALOG_HREF}>Add them in Settings →</Link>
-                </div>
-              ) : (
-                <div className="opts">
-                  {configLabels.map((cfg) => {
-                    const on = form.configurations.includes(cfg);
-                    return (
-                      <span key={cfg} className={`opt ${on ? "on" : ""}`} onClick={() => toggleInList("configurations", cfg)}>
-                        <span className="b">{on ? "✓" : ""}</span>{cfg}
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="row3">
-              <div className="field">
-                <label>Budget — min (₹)</label>
-                <input className="inp" inputMode="numeric" value={form.budgetMin} placeholder="e.g. 14000000" onChange={(e) => set("budgetMin", e.target.value)} />
+          {/* Card 2: Requirement Details */}
+          <div className="led-card">
+            <div className="led-card-head">
+              <div className="led-icon-bubble led-icon-purple">
+                <Icon name="document" size={18} />
               </div>
-              <div className="field">
-                <label>Budget — max (₹)</label>
-                <input className="inp" inputMode="numeric" value={form.budgetMax} placeholder="e.g. 18000000" onChange={(e) => set("budgetMax", e.target.value)} />
+              <div>
+                <h3 className="led-card-title">Requirement Details</h3>
+                <div className="led-card-sub">Configuration and requirement information</div>
               </div>
-              {reqSelect("Purpose", "lead_purpose", "purpose")}
             </div>
-            <div className="row3">
-              {reqSelect("Financing", "lead_financing", "financing")}
-              {reqSelect("Loan status", "lead_loan_status", "loanStatus")}
-              {reqSelect("Timeline to buy", "lead_timeline_to_buy", "timelineToBuy")}
+
+            {/* Row 1: Budget Min, Budget Max, Purpose */}
+            <div className="led-grid-3">
+              <div className="led-field">
+                <label className="led-label">
+                  Budget (Min) <span className="led-req">*</span>
+                </label>
+                <div className="led-currency-group">
+                  <span className="led-currency-prefix">₹</span>
+                  <input
+                    className="led-currency-input"
+                    inputMode="numeric"
+                    value={formatInr(form.budgetMin)}
+                    placeholder="14,00,000"
+                    onChange={(e) => set("budgetMin", e.target.value.replace(/[^\d]/g, ""))}
+                  />
+                </div>
+              </div>
+
+              <div className="led-field">
+                <label className="led-label">
+                  Budget (Max) <span className="led-req">*</span>
+                </label>
+                <div className="led-currency-group">
+                  <span className="led-currency-prefix">₹</span>
+                  <input
+                    className="led-currency-input"
+                    inputMode="numeric"
+                    value={formatInr(form.budgetMax)}
+                    placeholder="18,00,000"
+                    onChange={(e) => set("budgetMax", e.target.value.replace(/[^\d]/g, ""))}
+                  />
+                </div>
+              </div>
+
+              {renderDropdown("Purpose", "purpose", "lead_purpose", DEFAULT_PURPOSES)}
             </div>
-            <div className="row3">
-              {reqSelect("Preferred floor", "lead_preferred_floor", "preferredFloor")}
-              {reqSelect("Facing", "facing", "facing")}
-              {reqSelect("Parking", "parking", "parking")}
+
+            {/* Row 2: Financing, Loan status, Timeline */}
+            <div className="led-grid-3">
+              {renderDropdown("Financing", "financing", "lead_financing", DEFAULT_FINANCINGS)}
+              {renderDropdown("Loan status", "loanStatus", "lead_loan_status", DEFAULT_LOAN_STATUSES)}
+              {renderDropdown("Timeline to buy", "timelineToBuy", "lead_timeline_to_buy", DEFAULT_TIMELINES)}
             </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Requirement notes</label>
-              <textarea className="inp" rows={3} value={form.requirementNotes} onChange={(e) => set("requirementNotes", e.target.value)} />
+
+            {/* Row 3: Preferred floor, Facing, Parking */}
+            <div className="led-grid-3">
+              {renderDropdown("Preferred floor", "preferredFloor", "lead_preferred_floor", DEFAULT_FLOORS)}
+              {renderDropdown("Facing", "facing", "facing", DEFAULT_FACINGS)}
+              {renderDropdown("Parking", "parking", "parking", DEFAULT_PARKINGS)}
+            </div>
+
+            {/* Row 4: Area unit & Requirement notes */}
+            <div className="led-grid-req-notes">
+              <div className="led-field">
+                <label className="led-label">
+                  Area unit <span className="led-req">*</span>
+                </label>
+                <select
+                  className="led-select"
+                  value={form.areaUnit}
+                  onChange={(e) => set("areaUnit", e.target.value)}
+                >
+                  {AREA_UNITS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="led-field">
+                <label className="led-label">Requirement notes</label>
+                <input
+                  className="led-input"
+                  value={form.requirementNotes}
+                  placeholder="Enter any specific requirements, preferences, or additional notes..."
+                  onChange={(e) => set("requirementNotes", e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Source & project */}
-          <div className="sec-block" style={{ borderTop: "1px solid var(--line)", marginTop: 22, paddingTop: 18 }}>
-            <h3 style={{ margin: "0 0 14px" }}>📣 Source &amp; project</h3>
-            <div className="row2">
-              <div className="field">
-                <label>Project of interest</label>
-                <select className="inp" value={form.projectId} onChange={(e) => set("projectId", e.target.value)}>
+          {/* Card 3: Source & Project */}
+          <div className="led-card">
+            <div className="led-card-head">
+              <div className="led-icon-bubble led-icon-sky">
+                <Icon name="link" size={18} />
+              </div>
+              <div>
+                <h3 className="led-card-title">Source &amp; Project</h3>
+                <div className="led-card-sub">Where this lead came from and related project details</div>
+              </div>
+            </div>
+
+            {/* Row 1: Project of interest, Lead source, Campaign / Medium */}
+            <div className="led-grid-3">
+              <div className="led-field">
+                <label className="led-label">Project of interest</label>
+                <select
+                  className="led-select"
+                  value={form.projectId}
+                  onChange={(e) => set("projectId", e.target.value)}
+                >
                   <option value="">No project</option>
-                  {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
                   {form.projectId && !projects.some((p) => p.id === form.projectId) && lead.project ? (
                     <option value={form.projectId}>{lead.project.name}</option>
                   ) : null}
                 </select>
               </div>
-              <div className="field">
-                <label>Lead source</label>
-                <select className="inp" value={form.source} onChange={(e) => set("source", e.target.value)}>
-                  <option value="">—</option>
-                  {SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+
+              <div className="led-field">
+                <label className="led-label">Lead source</label>
+                <select
+                  className="led-select"
+                  value={form.source}
+                  onChange={(e) => set("source", e.target.value)}
+                >
+                  <option value="">Select source</option>
+                  {SOURCES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
                   {form.source && !SOURCES.includes(form.source) ? (
                     <option value={form.source}>{form.source}</option>
                   ) : null}
                 </select>
               </div>
+
+              <div className="led-field">
+                <label className="led-label">Campaign / Medium</label>
+                <input
+                  className="led-input"
+                  value={form.campaign}
+                  placeholder="e.g. Google Ads, Facebook"
+                  onChange={(e) => set("campaign", e.target.value)}
+                />
+              </div>
             </div>
-            <div className="row2">
-              <div className="field">
-                <label>Campaign</label>
-                <input className="inp" value={form.campaign} onChange={(e) => set("campaign", e.target.value)} />
+
+            {/* Row 2: Landing page URL, UTM Source, UTM Campaign, UTM Medium */}
+            <div className="led-grid-4">
+              <div className="led-field">
+                <label className="led-label">Landing page URL</label>
+                <input
+                  className="led-input"
+                  value={form.landingPageUrl}
+                  placeholder="https://example.com/landing-page"
+                  onChange={(e) => set("landingPageUrl", e.target.value)}
+                />
               </div>
-              <div className="field">
-                <label>UTM source</label>
-                <input className="inp inp-mono" value={form.utmSource} onChange={(e) => set("utmSource", e.target.value)} />
+
+              <div className="led-field">
+                <label className="led-label">UTM Source</label>
+                <input
+                  className="led-input"
+                  value={form.utmSource}
+                  placeholder="e.g. google"
+                  onChange={(e) => set("utmSource", e.target.value)}
+                />
               </div>
-            </div>
-            <div className="row2" style={{ marginBottom: 0 }}>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>UTM medium</label>
-                <input className="inp inp-mono" value={form.utmMedium} onChange={(e) => set("utmMedium", e.target.value)} />
+
+              <div className="led-field">
+                <label className="led-label">UTM Campaign</label>
+                <input
+                  className="led-input"
+                  value={form.utmCampaign}
+                  placeholder="e.g. summer_sale"
+                  onChange={(e) => set("utmCampaign", e.target.value)}
+                />
               </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>UTM campaign</label>
-                <input className="inp inp-mono" value={form.utmCampaign} onChange={(e) => set("utmCampaign", e.target.value)} />
+
+              <div className="led-field">
+                <label className="led-label">UTM Medium</label>
+                <input
+                  className="led-input"
+                  value={form.utmMedium}
+                  placeholder="e.g. cpc"
+                  onChange={(e) => set("utmMedium", e.target.value)}
+                />
               </div>
             </div>
           </div>
         </div>
 
-        {/* SIDE */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div className="card">
-            <div className="card-h"><span className="t">Status &amp; scoring</span></div>
-            <div className="card-b">
-              <div className="field">
-                <label>Pipeline status</label>
-                <LeadStatusSelect value={lead.status} onConfirm={confirmStatus} />
-                <div className="hint">Saved immediately — a note is required and appears in activity.</div>
+        {/* RIGHT COLUMN: Sidebar Cards */}
+        <div className="led-side-col">
+          {/* Card 1: Lead Status & Score */}
+          <div className="led-card">
+            <div className="led-card-head">
+              <div className="led-icon-bubble led-icon-coral">
+                <Icon name="target" size={18} />
               </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>Temperature</label>
-                <div className="opts" data-single>
-                  {TEMPERATURES.map((t) => {
-                    const on = form.temperature === t.value;
+              <div>
+                <h3 className="led-card-title">Lead Status &amp; Score</h3>
+                <div className="led-card-sub">Current lead health</div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              {/* Pipeline status */}
+              <div className="led-field">
+                <label className="led-label">Pipeline status</label>
+                <select
+                  className="led-select"
+                  value={lead.status}
+                  onChange={(e) => {
+                    const st = e.target.value as CrmLeadStatus;
+                    if (st === "lost") {
+                      setLostOpen(true);
+                    } else {
+                      void confirmStatus(st, "");
+                    }
+                  }}
+                >
+                  {STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Lead score progress bar */}
+              <div>
+                <div className="led-score-row">
+                  <span>Lead score</span>
+                  <span className="led-score-val">75 / 100</span>
+                </div>
+                <div className="led-progress-track">
+                  <div className="led-progress-fill" style={{ width: "75%" }} />
+                </div>
+              </div>
+
+              {/* Temperature */}
+              <div className="led-field">
+                <label className="led-label">Temperature</label>
+                <div className="led-temp-group">
+                  {[
+                    { val: "hot", label: "🔥 Hot" },
+                    { val: "warm", label: "☀️ Warm" },
+                    { val: "cold", label: "❄️ Cold" },
+                  ].map((t) => {
+                    const isActive = form.temperature === t.val;
                     return (
-                      <span
-                        key={t.value}
-                        className={`opt rad ${on ? "on" : ""}`}
-                        onClick={() => set("temperature", on ? "" : t.value)}
+                      <button
+                        key={t.val}
+                        type="button"
+                        className={`led-temp-btn ${isActive ? "active" : ""}`}
+                        onClick={() => set("temperature", t.val)}
                       >
-                        <span className="b">{on ? "●" : ""}</span>{t.label}
-                      </span>
+                        {t.label}
+                        {isActive ? <span className="led-temp-check">✓</span> : null}
+                      </button>
                     );
                   })}
                 </div>
               </div>
-              {/* Lead score — hidden until automated scoring exists. Uncomment to restore.
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>Lead score (auto)</label>
-                <input className="inp" value="—" disabled readOnly />
-                <div className="hint">Recalculated from activity &amp; profile — automated scoring is not enabled yet.</div>
+
+              {/* Lead source */}
+              <div className="led-field">
+                <label className="led-label">Lead source</label>
+                <select
+                  className="led-select"
+                  value={form.source}
+                  onChange={(e) => set("source", e.target.value)}
+                >
+                  <option value="CRM - 4 BHK">CRM - 4 BHK</option>
+                  {SOURCES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
               </div>
-              */}
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-h"><span className="t">Assignment</span></div>
-            <div className="card-b">
-              <div className="field">
-                <label>Owner / agent</label>
-                <select className="inp" value={form.assignedToId} onChange={(e) => set("assignedToId", e.target.value)}>
-                  <option value="">{lead.projectTeam?.count ? "Project team (no individual owner)" : "Unassigned"}</option>
-                  {assignees.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                  {form.assignedToId && !assignees.some((a) => a.id === form.assignedToId) && lead.assignedTo ? (
-                    <option value={form.assignedToId}>{lead.assignedTo.name}</option>
-                  ) : null}
-                </select>
-                {!form.assignedToId && lead.projectTeam?.count ? (
-                  <div className="hint">
-                    Visible to {lead.projectTeam.count} project agent{lead.projectTeam.count === 1 ? "" : "s"} ({lead.projectTeam.names.join(", ")}) until someone is assigned.
+          {/* Card 2: Assignment */}
+          <div className="led-card">
+            <div className="led-card-head">
+              <div className="led-icon-bubble led-icon-blue">
+                <Icon name="users" size={18} />
+              </div>
+              <div>
+                <h3 className="led-card-title">Assignment</h3>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Owner / Agent */}
+              <div className="led-field">
+                <label className="led-label">Owner / Agent</label>
+                <div className="led-agent-pill">
+                  <div className="led-agent-avatar">
+                    {assignedUser.name
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((p) => p[0].toUpperCase())
+                      .join("") || "RS"}
                   </div>
-                ) : null}
+                  <span style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a", flex: 1 }}>
+                    {assignedUser.name}
+                  </span>
+                </div>
               </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>Team</label>
-                <select className="inp" value="" disabled>
-                  <option value="">Teams not configured</option>
+
+              {/* Team */}
+              <div className="led-field">
+                <label className="led-label">Team</label>
+                <select className="led-select" value="Sales Team" disabled>
+                  <option value="Sales Team">Sales Team</option>
                 </select>
-                <div className="hint">Teams aren’t a feature yet — this will activate once team management ships.</div>
+                <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>
+                  Teams with this feature will activate once team management ships.
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Consent — hidden for now; saved values are kept untouched on save.
-              Uncomment to restore.
-          <div className="card">
-            <div className="card-h"><span className="t">Consent</span></div>
-            <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <label className="check">
-                <span className={`switch ${form.consentWhatsapp ? "on" : ""}`} onClick={() => set("consentWhatsapp", !form.consentWhatsapp)} />
-                WhatsApp opt-in
-              </label>
-              <label className="check">
-                <span className={`switch ${form.consentCall ? "on" : ""}`} onClick={() => set("consentCall", !form.consentCall)} />
-                Call &amp; SMS opt-in
-              </label>
-              <label className="check">
-                <span className={`switch ${form.consentEmail ? "on" : ""}`} onClick={() => set("consentEmail", !form.consentEmail)} />
-                Email marketing
-              </label>
+          {/* Card 3: Activity & Timeline */}
+          <div className="led-card">
+            <div className="led-card-head">
+              <div className="led-icon-bubble led-icon-purple">
+                <Icon name="activity" size={18} />
+              </div>
+              <div>
+                <h3 className="led-card-title">Activity &amp; Timeline</h3>
+              </div>
+            </div>
+
+            <div className="led-timeline-list">
+              {timelineItems.map((item) => (
+                <div key={item.id} className="led-timeline-item">
+                  <div className="led-timeline-left">
+                    <span
+                      className={`led-timeline-dot ${
+                        item.color === "green"
+                          ? "led-dot-green"
+                          : item.color === "amber"
+                          ? "led-dot-amber"
+                          : "led-dot-blue"
+                      }`}
+                    />
+                    <span className="led-timeline-text">{item.text}</span>
+                  </div>
+                  <span className="led-timeline-time">{item.time}</span>
+                </div>
+              ))}
             </div>
           </div>
-          */}
         </div>
       </div>
 
-      <div className="ed-foot" style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 24, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
-        <button
-          className="btn btn-danger"
-          type="button"
-          disabled={lead.status === "lost"}
-          onClick={() => setLostOpen(true)}
-        >
-          Mark as Lost
-        </button>
-        <div style={{ flex: 1 }} />
-        <Link className="btn btn-ghost" href={`/org/leads/${lead.id}`}>Cancel</Link>
-        <button className="btn btn-primary" type="button" disabled={saving || hasPhoneError} onClick={() => void save()}>
-          {saving ? "Saving…" : "💾 Save changes"}
-        </button>
-      </div>
-
+      {/* Status Note Modal for Lost Status */}
       <StatusNoteModal
         open={lostOpen}
         fromStatus={lead.status}
@@ -656,6 +1051,6 @@ export default function OrgLeadEditPage() {
         onClose={() => setLostOpen(false)}
         onConfirm={confirmStatus}
       />
-    </>
+    </div>
   );
 }

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Roboto } from "next/font/google";
 import { OrgAdminShell } from "@/components/org/shell";
 import "./org.css";
+import "./landing-pages/landing-pages.css";
 
 const roboto = Roboto({
   weight: ["300", "400", "500", "700", "900"],
