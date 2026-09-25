@@ -80,7 +80,11 @@ export default function OrgFormsPage() {
     setTimeout(() => setToast(null), 2800);
   };
 
+  // One flag per Lead Forms pill — enforced for the org admin too.
   const canView = hasPermission("forms", "view");
+  const canCreate = hasPermission("forms", "add");
+  const canEdit = hasPermission("forms", "edit");
+  const canDelete = hasPermission("forms", "delete");
 
   function refresh(quiet = false) {
     if (!canView) return;
@@ -244,6 +248,7 @@ export default function OrgFormsPage() {
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
 
+          {canCreate ? (
           <button
             type="button"
             className="btn btn-primary"
@@ -260,6 +265,7 @@ export default function OrgFormsPage() {
           >
             <Plus size={16} /> Create New Form
           </button>
+          ) : null}
         </div>
       </div>
 
@@ -643,7 +649,7 @@ export default function OrgFormsPage() {
               <button type="button" className="btn btn-ghost" onClick={() => setQ("")}>
                 Clear Search
               </button>
-            ) : (
+            ) : canCreate ? (
               <button
                 type="button"
                 className="btn btn-primary"
@@ -658,7 +664,7 @@ export default function OrgFormsPage() {
               >
                 <Plus size={16} /> Create New Form
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       ) : viewMode === "table" ? (
@@ -742,12 +748,14 @@ export default function OrgFormsPage() {
                     <td style={{ fontSize: 12.5, color: "var(--muted)" }}>{formatWhen(form.createdAt)}</td>
                     <td style={{ textAlign: "right" }}>
                       <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                        {canEdit ? (
                         <Link
                           href={`/org/forms/${form.backendId}`}
                           className="btn btn-soft btn-sm"
                         >
                           <Pencil size={12} /> Edit
                         </Link>
+                        ) : null}
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
@@ -763,6 +771,7 @@ export default function OrgFormsPage() {
                         >
                           <Eye size={13} />
                         </Link>
+                        {canCreate ? (
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
@@ -772,6 +781,8 @@ export default function OrgFormsPage() {
                         >
                           <Copy size={13} />
                         </button>
+                        ) : null}
+                        {canDelete ? (
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
@@ -782,6 +793,7 @@ export default function OrgFormsPage() {
                         >
                           <Trash2 size={13} />
                         </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -804,8 +816,9 @@ export default function OrgFormsPage() {
               key={form.backendId}
               form={form}
               onEmbed={() => setEmbedFor(form)}
-              onDuplicate={() => duplicate(form.backendId)}
-              onDelete={() => setDeleteFor(form)}
+              onDuplicate={canCreate ? () => duplicate(form.backendId) : undefined}
+              onDelete={canDelete ? () => setDeleteFor(form) : undefined}
+              canEdit={canEdit}
               onCopyId={() => copySnippet(form.embed?.id || form.id, form.backendId)}
             />
           ))}
@@ -976,12 +989,15 @@ function OrgVisualFormCard({
   onDuplicate,
   onDelete,
   onCopyId,
+  canEdit,
 }: {
   form: BackedForm;
   onEmbed: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
+  // Omitted handlers hide their menu item (the user lacks that permission).
+  onDuplicate?: () => void;
+  onDelete?: () => void;
   onCopyId: () => void;
+  canEdit: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1185,6 +1201,7 @@ function OrgVisualFormCard({
             alignItems: "center",
           }}
         >
+          {canEdit ? (
           <Link
             href={`/org/forms/${form.backendId}`}
             className="btn btn-soft btn-sm"
@@ -1200,6 +1217,7 @@ function OrgVisualFormCard({
           >
             <Pencil size={13} /> Edit Builder
           </Link>
+          ) : null}
 
           <Link
             href={`/org/forms/${form.backendId}?preview=1`}
@@ -1232,8 +1250,9 @@ function OrgVisualFormCard({
             <Code2 size={14} />
           </button>
 
-          {/* More menu */}
-          <div style={{ position: "relative" }}>
+          {/* More menu — only when there is something in it */}
+          {onDuplicate || onDelete ? (
+          <div style={{ position: "relative", marginLeft: "auto" }}>
             <button
               type="button"
               className="btn btn-ghost btn-sm"
@@ -1262,31 +1281,36 @@ function OrgVisualFormCard({
                   gap: 2,
                 }}
               >
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDuplicate();
-                  }}
-                  style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
-                >
-                  <Copy size={13} /> Duplicate
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDelete();
-                  }}
-                  style={{ justifyContent: "flex-start", gap: 8, fontSize: 12, color: "var(--rose)" }}
-                >
-                  <Trash2 size={13} /> Delete
-                </button>
+                {onDuplicate ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onDuplicate();
+                    }}
+                    style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
+                  >
+                    <Copy size={13} /> Duplicate
+                  </button>
+                ) : null}
+                {onDelete ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onDelete();
+                    }}
+                    style={{ justifyContent: "flex-start", gap: 8, fontSize: 12, color: "var(--rose)" }}
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                ) : null}
               </div>
             )}
           </div>
+          ) : null}
         </div>
       </div>
     </div>

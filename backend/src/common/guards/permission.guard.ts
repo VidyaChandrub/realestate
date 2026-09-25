@@ -16,7 +16,9 @@ import {
   assertPermission,
   computeEffectivePermissions,
   mergeRolePermissions,
+  PERMISSION_COLUMN_SELECT,
   SYSTEM_ORG_ID,
+  type PermissionAction,
 } from '../utils/permissions.util';
 
 /**
@@ -26,7 +28,8 @@ import {
  * only narrows further based on the @RequirePermission decorator.
  *
  * Rules:
- *   - user with super_admin or the org's admin role always passes.
+ *   - user with super_admin always passes; the org's admin role passes unless
+ *     the route sets `enforceForOrgAdmin` (then its Super Admin defaults apply).
  *   - otherwise the effective permission is resolved from the DB (role rows +
  *     any per-user override rows), falling back to role defaults, and the
  *     requested (module, action) must be granted.
@@ -52,74 +55,112 @@ export class PermissionGuard implements CanActivate {
     const request = context
       .switchToHttp()
       .getRequest<Request & { user: JwtPayload }>();
-    const actor = request.user;
-    const orgId = actor?.orgId;
-    if (!orgId) {
-      throw new ForbiddenException('Organisation access required');
-    }
-
-    // Resolve roles + permission rows for this org member.
-    const user = await this.prisma.user.findUnique({
-      where: { id: actor.sub },
-      select: {
-        id: true,
-        orgId: true,
-        userRoles: { select: { role: { select: { key: true } } } },
-      },
-    });
-    if (!user || user.orgId !== orgId) {
-      throw new ForbiddenException('User not found in this organisation');
-    }
-
-    const roleKeys = user.userRoles.map((ur) => ur.role.key);
-
-    // Unrestricted roles bypass immediately — no DB reads needed for them.
-    if (isUnrestricted(roleKeys)) {
-      return true;
-    }
-
-    const [rawRolePermissions, userOverrides] = await Promise.all([
-      this.prisma.roleModulePermission.findMany({
-        where: {
-          orgId: { in: [orgId, SYSTEM_ORG_ID] },
-          role: { key: { in: roleKeys } },
-        },
-        select: {
-          orgId: true,
-          moduleKey: true,
-          canView: true,
-          canAdd: true,
-          canEdit: true,
-          canDelete: true,
-          canApprove: true,
-        },
-      }),
-      this.prisma.userModulePermission.findMany({
-        where: { orgId, userId: actor.sub },
-        select: {
-          moduleKey: true,
-          canView: true,
-          canAdd: true,
-          canEdit: true,
-          canDelete: true,
-          canApprove: true,
-        },
-      }),
-    ]);
-
-    const rolePermissions = mergeRolePermissions(rawRolePermissions);
-
-    const effective = computeEffectivePermissions({
-      roleKeys,
-      rolePermissions: rolePermissions.map((row) => ({ role: { key: roleKeys[0] ?? '' }, ...row })),
-      userOverrides,
-    });
-
-    assertPermission(effective, required.module, required.action);
+    await assertOrgPermission(
+      this.prisma,
+      request.user,
+      required.module,
+      required.action,
+      required.enforceForOrgAdmin === true,
+    );
     return true;
   }
 }
 
-function isUnrestricted(roleKeys: string[]): boolean {
-  return roleKeys.includes('super_admin') || roleKeys.includes('admin');
+/**
+ * Throws a 403 unless the org member `actor` holds (module, action). Shared by
+ * PermissionGuard and handlers whose required action depends on the request
+ * body (e.g. setting a user active vs disabled).
+ */
+export async function assertOrgPermission(
+  prisma: Pick<
+    PrismaService,
+    'user' | 'roleModulePermission' | 'userModulePermission'
+  >,
+  actor: JwtPayload | undefined,
+  module: string,
+  action: PermissionAction,
+  enforceForOrgAdmin: boolean,
+): Promise<void> {
+  const orgId = actor?.orgId;
+  if (!actor || !orgId) {
+    throw new ForbiddenException('Organisation access required');
+  }
+
+  // Resolve roles + permission rows for this org member.
+  const user = await prisma.user.findUnique({
+    where: { id: actor.sub },
+    select: {
+      id: true,
+      orgId: true,
+      userRoles: { select: { role: { select: { key: true } } } },
+    },
+  });
+  if (!user || user.orgId !== orgId) {
+    throw new ForbiddenException('User not found in this organisation');
+  }
+
+  const roleKeys = user.userRoles.map((ur) => ur.role.key);
+
+  // Unrestricted roles bypass immediately — no DB reads needed for them.
+  if (isUnrestricted(roleKeys, enforceForOrgAdmin)) {
+    return;
+  }
+
+  const [rawRolePermissions, userOverrides] = await Promise.all([
+    prisma.roleModulePermission.findMany({
+      where: {
+        orgId: { in: [orgId, SYSTEM_ORG_ID] },
+        role: { key: { in: roleKeys } },
+      },
+      select: { orgId: true, moduleKey: true, ...PERMISSION_COLUMN_SELECT },
+    }),
+    prisma.userModulePermission.findMany({
+      where: { orgId, userId: actor.sub },
+      select: { moduleKey: true, ...PERMISSION_COLUMN_SELECT },
+    }),
+  ]);
+
+  const rolePermissions = mergeRolePermissions(rawRolePermissions);
+
+  const effective = computeEffectivePermissions({
+    roleKeys,
+    rolePermissions: rolePermissions.map((row) => ({
+      role: { key: roleKeys[0] ?? '' },
+      ...row,
+    })),
+    userOverrides,
+  });
+
+  assertPermission(effective, module, action);
+}
+
+/**
+ * Passes when the member holds ANY of the given actions on the module (e.g. a
+ * support attachment is uploaded for either a new ticket or a reply).
+ */
+export async function assertAnyOrgPermission(
+  prisma: Parameters<typeof assertOrgPermission>[0],
+  actor: JwtPayload | undefined,
+  module: string,
+  actions: PermissionAction[],
+  enforceForOrgAdmin: boolean,
+): Promise<void> {
+  let lastError: unknown = new ForbiddenException('Permission denied');
+  for (const action of actions) {
+    try {
+      await assertOrgPermission(prisma, actor, module, action, enforceForOrgAdmin);
+      return;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}
+
+function isUnrestricted(
+  roleKeys: string[],
+  enforceForOrgAdmin: boolean,
+): boolean {
+  if (roleKeys.includes('super_admin')) return true;
+  return !enforceForOrgAdmin && roleKeys.includes('admin');
 }

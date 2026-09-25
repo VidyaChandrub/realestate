@@ -36,6 +36,18 @@ export class UserPermissionItemDto {
   @IsOptional()
   @IsBoolean()
   canApprove?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  canActivate?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  canDeactivate?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  canAddLead?: boolean | null;
 }
 
 /** Full-set replace of one user's permission overrides within the org. */

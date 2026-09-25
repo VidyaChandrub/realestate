@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback, useId } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { firstAllowedOrgPath } from "@/components/org/shell";
 import { apiFetch } from "@/lib/api";
 import { Icon } from "@/components/icons";
 import type { CrmLeadStatus, OrgDashboardKpiData } from "@/lib/types";
@@ -73,8 +75,19 @@ const SPARK_PATHS = [
 ];
 
 export default function OrgDashboardPage() {
-  const { accessToken, user } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
+  const router = useRouter();
   const { label: stageLabel, color: stageColor } = useLeadStages();
+  const canViewDashboard = hasPermission("dashboard", "view");
+  const fallbackPath = canViewDashboard
+    ? null
+    : firstAllowedOrgPath(hasPermission);
+
+  // Without Dashboard > View, /org (the default landing page) forwards to the
+  // first page this user may open instead of rendering the dashboard.
+  useEffect(() => {
+    if (!canViewDashboard && fallbackPath) router.replace(fallbackPath);
+  }, [canViewDashboard, fallbackPath, router]);
 
   const [periodIndex, setPeriodIndex] = useState(2); // default 30d
   const [data, setData] = useState<OrgDashboardKpiData | null>(null);
@@ -83,7 +96,7 @@ export default function OrgDashboardPage() {
   const [periodDropdownOpen, setPeriodDropdownOpen] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
-    if (!accessToken) return;
+    if (!accessToken || !canViewDashboard) return;
     setLoading(true);
     setError(null);
     const periodValue = PERIOD_OPTIONS[periodIndex]?.value ?? "30d";
@@ -97,7 +110,7 @@ export default function OrgDashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, periodIndex]);
+  }, [accessToken, canViewDashboard, periodIndex]);
 
   useEffect(() => {
     fetchDashboard();
@@ -124,6 +137,19 @@ export default function OrgDashboardPage() {
   const kpis = data?.kpis;
   const pipeline = data?.pipelineBreakdown ?? [];
   const totalPipelineLeads = pipeline.reduce((sum, p) => sum + p.count, 0);
+
+  if (!canViewDashboard) {
+    // Redirecting — or nothing is assigned yet, so explain instead of erroring.
+    if (fallbackPath) return null;
+    return (
+      <div className="card" style={{ padding: 32, textAlign: "center" }}>
+        <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 6 }}>No modules assigned yet</div>
+        <div className="muted" style={{ fontSize: 13 }}>
+          Your role doesn&apos;t have access to any pages. Ask your organisation admin to grant permissions.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

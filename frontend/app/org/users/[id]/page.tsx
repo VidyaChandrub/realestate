@@ -262,14 +262,15 @@ export default function OrgUserDashboardPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
   const router = useRouter();
-  const { accessToken, hasPermission, isOrgAdmin } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
   const { label: stageLabel, color: stageColor, stages } = useLeadStages();
 
+  // Users > View is required for org admins too (set by Super Admin).
   useEffect(() => {
-    if (accessToken && !isOrgAdmin() && !hasPermission("users", "view")) {
+    if (accessToken && !hasPermission("users", "view")) {
       router.replace("/org");
     }
-  }, [accessToken, hasPermission, isOrgAdmin, router]);
+  }, [accessToken, hasPermission, router]);
 
   const [state, setState] = useState<{
     id: string;

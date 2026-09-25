@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { SUPPORT_ACTIONS } from "@/lib/permissions";
 import {
   createSupportTicket,
   createSupportUploadUrl,
@@ -90,17 +91,19 @@ async function uploadSupportFile(file: File): Promise<string> {
 }
 
 export default function OrgSupportPage() {
-  const { accessToken, hasPermission, isOrgAdmin } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Support pills — enforced for the org admin too (set by Super Admin).
+  const canView = hasPermission("support", "view");
+  const canAdd = hasPermission("support", SUPPORT_ACTIONS.raiseTicket);
+
   useEffect(() => {
-    if (accessToken && !isOrgAdmin() && !hasPermission("support", "view")) {
+    if (accessToken && !canView) {
       router.replace("/org");
     }
-  }, [accessToken, hasPermission, isOrgAdmin, router]);
-
-  const canAdd = isOrgAdmin() || hasPermission("support", "add");
+  }, [accessToken, canView, router]);
 
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([]);
   const [loading, setLoading] = useState(true);

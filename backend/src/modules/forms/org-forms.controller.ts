@@ -21,37 +21,40 @@ import { UpdateFormDto } from './dto/update-form.dto';
 // Org-scoped Lead Forms — the org's own builder library. orgId always comes
 // from the JWT, never the client, so org A can never read/touch org B's
 // forms. Gated by the `forms` module so the Super Admin console and org
-// members each only ever see their own side.
+// members each only ever see their own side. Routes map to the Lead Forms
+// pills and hold the org admin to what Super Admin granted.
+const ENFORCE = { enforceForOrgAdmin: true } as const;
+
 @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
 @Controller('org/forms')
 export class OrgFormsController {
   constructor(private readonly service: FormsService) {}
 
-  @RequirePermission('forms', 'view')
+  @RequirePermission('forms', 'view', ENFORCE)
   @Get()
   list(@CurrentUser() user: JwtPayload) {
     return this.service.list(user.orgId as string);
   }
 
-  @RequirePermission('forms', 'view')
+  @RequirePermission('forms', 'view', ENFORCE)
   @Get(':id')
   get(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.get(user.orgId as string, id);
   }
 
-  @RequirePermission('forms', 'add')
+  @RequirePermission('forms', 'add', ENFORCE)
   @Post()
   create(@CurrentUser() user: JwtPayload, @Body() dto: CreateFormDto) {
     return this.service.create(user.orgId as string, dto);
   }
 
-  @RequirePermission('forms', 'add')
+  @RequirePermission('forms', 'add', ENFORCE)
   @Post(':id/duplicate')
   duplicate(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.duplicate(user.orgId as string, id);
   }
 
-  @RequirePermission('forms', 'edit')
+  @RequirePermission('forms', 'edit', ENFORCE)
   @Patch(':id')
   update(
     @CurrentUser() user: JwtPayload,
@@ -61,7 +64,7 @@ export class OrgFormsController {
     return this.service.update(user.orgId as string, id, dto);
   }
 
-  @RequirePermission('forms', 'delete')
+  @RequirePermission('forms', 'delete', ENFORCE)
   @Delete(':id')
   remove(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.remove(user.orgId as string, id);

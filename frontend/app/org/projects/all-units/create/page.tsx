@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { PROJECT_UNIT_ACTIONS } from "@/lib/permissions";
 import {
   apiFetch,
   createStandaloneUnit,
@@ -60,7 +61,11 @@ function userLabel(u: OrgUser): string {
  */
 export default function UnitCreatePage() {
   const router = useRouter();
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
+  const canAddUnit = hasPermission("projects", PROJECT_UNIT_ACTIONS.add);
+  useEffect(() => {
+    if (accessToken && !canAddUnit) router.replace("/org/projects/all-units");
+  }, [accessToken, canAddUnit, router]);
 
   // Standalone only for now — the "Inside a project" picker is commented out below.
   const [mode] = useState<"project" | "standalone">("standalone");

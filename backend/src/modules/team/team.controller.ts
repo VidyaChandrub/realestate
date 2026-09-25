@@ -13,7 +13,7 @@ export class TeamController {
   constructor(private readonly teamService: TeamService) {}
 
   @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
-  @RequirePermission('users', 'add')
+  @RequirePermission('users', 'add', { enforceForOrgAdmin: true })
   @Post('invite')
   invite(@CurrentUser() actor: JwtPayload, @Body() dto: InviteDto) {
     return this.teamService.invite(actor, dto);

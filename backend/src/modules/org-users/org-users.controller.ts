@@ -24,10 +24,12 @@ import { UpdateOrgUserDto } from './dto/update-org-user.dto';
 import { UpdateOrgUserStatusDto } from './dto/update-org-user-status.dto';
 import { ListOrgUsersQueryDto } from './dto/list-org-users-query.dto';
 
+const ENFORCE = { enforceForOrgAdmin: true } as const;
+
 // orgId always comes from the JWT, never a client-supplied param — core
-// multi-tenant isolation rule for every /org/* endpoint. The org-wide `admin`
-// role always passes the permission guard (unrestricted); a manager/sales who
-// has been granted `users` access can also manage members.
+// multi-tenant isolation rule for every /org/* endpoint. Every route checks the
+// caller's Users permissions — including the org `admin`, whose Users access
+// is set by Super Admin in Organisation roles (`enforceForOrgAdmin`).
 @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
 @Controller('org/users')
 export class OrgUsersController {
@@ -36,19 +38,28 @@ export class OrgUsersController {
     private readonly salesAgentsService: SalesAgentsService,
   ) {}
 
-  @RequirePermission('users', 'view')
+  @RequirePermission('users', 'view', ENFORCE)
   @Get()
   list(@CurrentUser() actor: JwtPayload, @Query() query: ListOrgUsersQueryDto) {
     return this.orgUsersService.list(actor.orgId as string, query);
   }
 
-  @RequirePermission('users', 'add')
-  @Post()
-  create(@CurrentUser() actor: JwtPayload, @Body() dto: CreateOrgUserDto) {
-    return this.orgUsersService.create(actor.orgId as string, dto);
+  // Role options for the create/edit form. Declared before ':id' so it isn't
+  // captured as a user id. Unlike /org/permissions/modules (admin-only), any
+  // member who can manage users can load it.
+  @RequirePermission('users', 'view', ENFORCE)
+  @Get('roles')
+  roles(@CurrentUser() actor: JwtPayload) {
+    return this.orgUsersService.roles(actor.orgId as string, actor);
   }
 
-  @RequirePermission('users', 'view')
+  @RequirePermission('users', 'add', ENFORCE)
+  @Post()
+  create(@CurrentUser() actor: JwtPayload, @Body() dto: CreateOrgUserDto) {
+    return this.orgUsersService.create(actor.orgId as string, actor, dto);
+  }
+
+  @RequirePermission('users', 'view', ENFORCE)
   @Get(':id')
   getById(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {
     return this.orgUsersService.getById(actor.orgId as string, id);
@@ -57,7 +68,7 @@ export class OrgUsersController {
   // Live per-user performance dashboard (lead pipeline, closures, revenue,
   // calls, activity) — the same payload the Sales Agents dashboard renders,
   // but available for any org member regardless of role.
-  @RequirePermission('users', 'view')
+  @RequirePermission('users', 'view', ENFORCE)
   @Get(':id/dashboard')
   dashboard(
     @CurrentUser() actor: JwtPayload,
@@ -73,17 +84,19 @@ export class OrgUsersController {
     );
   }
 
-  @RequirePermission('users', 'edit')
+  @RequirePermission('users', 'edit', ENFORCE)
   @Patch(':id')
   update(
     @CurrentUser() actor: JwtPayload,
     @Param('id') id: string,
     @Body() dto: UpdateOrgUserDto,
   ) {
-    return this.orgUsersService.update(actor.orgId as string, id, dto);
+    return this.orgUsersService.update(actor.orgId as string, actor, id, dto);
   }
 
-  @RequirePermission('users', 'edit')
+  // The action checked depends on the target status (activate / deactivate /
+  // edit), so the service re-checks after this baseline view check.
+  @RequirePermission('users', 'view', ENFORCE)
   @Patch(':id/status')
   updateStatus(
     @CurrentUser() actor: JwtPayload,
@@ -92,16 +105,16 @@ export class OrgUsersController {
   ) {
     return this.orgUsersService.updateStatus(
       actor.orgId as string,
+      actor,
       id,
-      actor.sub,
       dto,
     );
   }
 
   // Approve a pending member so they can authenticate (they are still forced
   // through the change-password flow before getting normal access). Also
-  // re-approves a previously disapproved member.
-  @RequirePermission('users', 'approve')
+  // re-activates a previously deactivated member. Gated by Users > Activate.
+  @RequirePermission('users', 'activate', ENFORCE)
   @Post(':id/approve')
   @HttpCode(200)
   approve(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {
@@ -109,10 +122,9 @@ export class OrgUsersController {
   }
 
   // Disapprove / deactivate a member: revokes login and invalidates any live
-  // session on the member's next authenticated request. Gated by `approve` —
-  // the same grant that lets a member approve/activate — since deactivating is
-  // just the reverse direction of that same control.
-  @RequirePermission('users', 'approve')
+  // session on the member's next authenticated request. Gated by
+  // Users > Deactivate.
+  @RequirePermission('users', 'deactivate', ENFORCE)
   @Post(':id/disapprove')
   @HttpCode(200)
   disapprove(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {
@@ -123,7 +135,7 @@ export class OrgUsersController {
     );
   }
 
-  @RequirePermission('users', 'edit')
+  @RequirePermission('users', 'edit', ENFORCE)
   @Post(':id/resend-invite')
   @HttpCode(200)
   resendInvite(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {
@@ -133,7 +145,7 @@ export class OrgUsersController {
   // Permanently remove a member. Blocked for organisation admins and for the
   // caller's own account. Related rows (roles, sessions, call logs, activity)
   // cascade; assigned leads are unassigned (FK ON DELETE SET NULL).
-  @RequirePermission('users', 'delete')
+  @RequirePermission('users', 'delete', ENFORCE)
   @Delete(':id')
   @HttpCode(200)
   remove(@CurrentUser() actor: JwtPayload, @Param('id') id: string) {

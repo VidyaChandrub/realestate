@@ -205,7 +205,12 @@ function formatRelative(ts: number): string {
 
 export default function AddNewProjectPage() {
   const router = useRouter();
-  const { accessToken, user } = useAuth();
+  const { accessToken, user, hasPermission } = useAuth();
+  // Projects > New project opens this wizard.
+  const canCreate = hasPermission("projects", "add");
+  useEffect(() => {
+    if (accessToken && !canCreate) router.replace("/org/projects");
+  }, [accessToken, canCreate, router]);
   const orgId = user?.org_id ?? null;
 
   // Step 1 — basics

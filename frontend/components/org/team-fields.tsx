@@ -98,12 +98,15 @@ export function useOrgRoleOptions() {
 
   useEffect(() => {
     if (!accessToken) return;
-    apiFetch<{ roles: { key: string; name: string }[] }>("/org/permissions/modules", {
+    // Same list the Users page uses (Users > View) — only roles the caller
+    // may hand out, so Admin is offered to org admins only.
+    apiFetch<{ key: string; name: string; assignable: boolean }[]>("/org/users/roles", {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
       .then((res) => {
-        if (res.roles && res.roles.length > 0) {
-          setRoles(res.roles.map((r) => ({ value: r.key, label: r.name })));
+        const assignable = res.filter((r) => r.assignable);
+        if (assignable.length > 0) {
+          setRoles(assignable.map((r) => ({ value: r.key, label: r.name })));
         }
       })
       .catch(() => {

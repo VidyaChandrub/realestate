@@ -6508,6 +6508,74 @@
   opacity: 0.5;
 }
 
+/* Save confirmation flash — same look as Super Admin > Organisation roles. */
+.org .platform-permission-toast {
+  position: fixed;
+  top: 88px;
+  right: 24px;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 11px 12px;
+  border: 1px solid #b7e4c7;
+  border-radius: 12px;
+  background: #f0fdf4;
+  color: #166534;
+  box-shadow: var(--sh-lg);
+  font-size: 13px;
+  font-weight: 700;
+  animation: org-permission-toast-in 0.2s ease-out;
+}
+
+.org .platform-permission-toast.is-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.org .platform-permission-toast-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #fff;
+  font-size: 13px;
+}
+
+.org .platform-permission-toast.is-error .platform-permission-toast-icon {
+  background: #ef4444;
+}
+
+.org .platform-permission-toast button {
+  margin-left: auto;
+  padding: 0 3px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@keyframes org-permission-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 900px) {
   .org .platform-permission-row {
     align-items: flex-start;

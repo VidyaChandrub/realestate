@@ -9,6 +9,7 @@ import { Icon } from "@/components/icons";
 import { ProjectPageHead } from "@/components/org/project-tabs";
 import { assignCrmLead, getCrmAssignableUsers, getCrmLeads } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { PROJECT_LEAD_ACTION } from "@/lib/permissions";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
 import { AddLeadModal } from "@/components/org/add-lead-modal";
@@ -40,7 +41,8 @@ export default function OrgProjectLeadsPage() {
   const projectId = params?.id ?? "";
   const { isOrgAdmin, hasPermission } = useAuth();
   const canAssign = Boolean(isOrgAdmin?.()) || hasPermission("crm", "edit");
-  const canAdd = Boolean(isOrgAdmin?.()) || hasPermission("crm", "add");
+  // Projects > Add lead (enforced for the org admin too).
+  const canAdd = hasPermission("projects", PROJECT_LEAD_ACTION);
   const { label: stageLabel } = useLeadStages();
   const [leads, setLeads] = useState<CrmLead[] | null>(null);
   const [kpi, setKpi] = useState({ total: 0, new: 0, siteVisits: 0, won: 0 });

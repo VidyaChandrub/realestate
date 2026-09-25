@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -16,6 +16,8 @@ interface ModuleDef {
   label: string;
   description: string;
   actions: string[];
+  // Pill text per action when it names a specific button (e.g. Publish).
+  actionLabels?: Record<string, string>;
 }
 
 interface RoleDef {
@@ -25,6 +27,8 @@ interface RoleDef {
   locked: boolean;
   custom?: boolean;
   id?: string;
+  /** Members holding this org-created role (custom roles only). */
+  userCount?: number;
 }
 
 interface PermissionsCatalogResponse {
@@ -33,14 +37,17 @@ interface PermissionsCatalogResponse {
   roles: RoleDef[];
 }
 
-interface ModulePermissionRow {
-  moduleKey: string;
-  canView: boolean;
-  canAdd: boolean;
-  canEdit: boolean;
-  canDelete: boolean;
-  canApprove: boolean;
-}
+type PermissionColumn =
+  | "canView"
+  | "canAdd"
+  | "canEdit"
+  | "canDelete"
+  | "canApprove"
+  | "canActivate"
+  | "canDeactivate"
+  | "canAddLead";
+
+type ModulePermissionRow = { moduleKey: string } & Record<PermissionColumn, boolean>;
 
 interface RolePermissionState {
   roleKey: string;
@@ -53,22 +60,106 @@ interface UserPermissionState {
   userId: string;
   userName: string;
   role: string | null;
-  permissions: Record<string, { view: boolean; add: boolean; edit: boolean; delete: boolean; approve: boolean }>;
+  // Effective access per module (role + overrides), for the "Inherit" label.
+  permissions: Record<string, ModulePermissionRow>;
   userOverrides: Record<string, Partial<Record<string, boolean | null>>>;
 }
 
 const TABS = ["Role Permissions Matrix", "User Permission Overrides"] as const;
-const ACTIONS = ["view", "add", "edit", "delete", "approve"] as const;
+const ACTIONS = ["view", "add", "edit", "delete", "approve", "activate", "deactivate", "add_lead"] as const;
+// Actions offered when the catalog doesn't list a module's own set.
+const DEFAULT_ACTIONS = ["view", "add", "edit", "delete", "approve"];
+const ACTION_COLUMNS: Record<(typeof ACTIONS)[number], PermissionColumn> = {
+  view: "canView",
+  add: "canAdd",
+  edit: "canEdit",
+  delete: "canDelete",
+  approve: "canApprove",
+  activate: "canActivate",
+  deactivate: "canDeactivate",
+  add_lead: "canAddLead",
+};
+const COLUMN_ACTIONS = Object.fromEntries(
+  Object.entries(ACTION_COLUMNS).map(([action, column]) => [column, action]),
+) as Record<PermissionColumn, (typeof ACTIONS)[number]>;
+const ACTION_LABELS: Record<PermissionColumn, string> = {
+  canView: "View",
+  canAdd: "Add",
+  canEdit: "Edit",
+  canDelete: "Delete",
+  canApprove: "Approve",
+  canActivate: "Activate",
+  canDeactivate: "Deactivate",
+  canAddLead: "Add lead",
+};
+
+function emptyRow(moduleKey: string): ModulePermissionRow {
+  return {
+    moduleKey,
+    canView: false,
+    canAdd: false,
+    canEdit: false,
+    canDelete: false,
+    canApprove: false,
+    canActivate: false,
+    canDeactivate: false,
+    canAddLead: false,
+  };
+}
+
+/** Copies the permission columns of an API row (missing ones = false). */
+function toRow(moduleKey: string, source: Partial<Record<PermissionColumn, boolean | null>> | undefined) {
+  const row = emptyRow(moduleKey);
+  for (const col of Object.values(ACTION_COLUMNS)) row[col] = source?.[col] === true;
+  return row;
+}
+
+// A module only offers the actions the backend catalog lists for it (e.g.
+// Dashboard is view-only); a module without a list offers every action.
+function supportsAction(mod: ModuleDef | undefined, action: string) {
+  return (mod?.actions?.length ? mod.actions : DEFAULT_ACTIONS).includes(action);
+}
+
+/** Pill text for an action — the button it unlocks when the module names one. */
+function actionLabel(mod: ModuleDef | undefined, action: (typeof ACTIONS)[number]) {
+  return mod?.actionLabels?.[action] ?? ACTION_LABELS[ACTION_COLUMNS[action]];
+}
+
+function supportedColumns(mod: ModuleDef | undefined) {
+  return ACTIONS.filter((act) => supportsAction(mod, act)).map((act) => ACTION_COLUMNS[act]);
+}
 
 export default function OrgRolesPermissionsPage() {
-  const { accessToken, isOrgAdmin } = useAuth();
+  const { accessToken, hasPermission, user } = useAuth();
+  const isAdmin = (user?.roleKeys ?? []).includes("admin");
+  // Roles & Permissions pills — for the org admin too (set by Super Admin).
+  const canView = hasPermission("roles_permissions", "view");
+  const canCreateRole = hasPermission("roles_permissions", "add");
+  const canEditRoles = hasPermission("roles_permissions", "edit");
+  const canDeleteRole = hasPermission("roles_permissions", "delete");
+  // Per-user overrides stay org-admin only.
+  const visibleTabs = isAdmin ? [...TABS] : [TABS[0]];
+
+  /**
+   * Whether the current user may change this role's pills. Mirrors the
+   * server rules for members: no changes to a role they hold themselves.
+   */
+  const roleIsReadOnly = (role: { roleKey: string; locked: boolean } | undefined) =>
+    !role ||
+    role.locked ||
+    !canEditRoles ||
+    (!isAdmin && (user?.roleKeys ?? []).includes(role.roleKey));
+
+  /** Members can only switch ON actions they hold themselves. */
+  const canGrant = (moduleKey: string, column: PermissionColumn) =>
+    isAdmin || hasPermission(moduleKey, COLUMN_ACTIONS[column]);
   const router = useRouter();
 
   useEffect(() => {
-    if (accessToken && !isOrgAdmin()) {
+    if (accessToken && !canView) {
       router.replace("/org");
     }
-  }, [accessToken, isOrgAdmin, router]);
+  }, [accessToken, canView, router]);
 
   const [tabIndex, setTabIndex] = useState(0);
   const [catalog, setCatalog] = useState<PermissionsCatalogResponse | null>(null);
@@ -81,8 +172,20 @@ export default function OrgRolesPermissionsPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  // Top-right flash after each save — same look as Super Admin >
+  // Organisation roles. A new message replaces the current one.
+  const [flash, setFlash] = useState<{ message: string; variant: "success" | "error" } | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    },
+    [],
+  );
   const [saving, setSaving] = useState(false);
+  // "<moduleKey>" while a role matrix change is being saved — pills are
+  // disabled until it lands so rapid clicks can't race each other.
+  const [savingModule, setSavingModule] = useState<string | null>(null);
 
   const [showNewRoleModal, setShowNewRoleModal] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
@@ -91,11 +194,15 @@ export default function OrgRolesPermissionsPage() {
   const [createRoleError, setCreateRoleError] = useState<string | null>(null);
 
   const [confirmDeleteRole, setConfirmDeleteRole] = useState<RoleDef | null>(null);
+  // Shown instead of the delete confirmation when the role still has members.
+  const [roleInUse, setRoleInUse] = useState<RoleDef | null>(null);
   const [deletingRole, setDeletingRole] = useState(false);
 
-  const notify = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2500);
+  const notify = (msg: string, variant: "success" | "error" = "success") => {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    setFlash({ message: msg, variant });
+    // Errors stay a little longer so they can be read.
+    flashTimer.current = setTimeout(() => setFlash(null), variant === "error" ? 5000 : 3000);
   };
 
   const loadCatalogAndRoles = useCallback(async () => {
@@ -119,14 +226,7 @@ export default function OrgRolesPermissionsPage() {
         const permMap: Record<string, ModulePermissionRow> = {};
         for (const m of catRes.modules) {
           const modRow = found?.permissions?.find((p: any) => p.moduleKey === m.key);
-          permMap[m.key] = {
-            moduleKey: m.key,
-            canView: modRow?.canView ?? false,
-            canAdd: modRow?.canAdd ?? false,
-            canEdit: modRow?.canEdit ?? false,
-            canDelete: modRow?.canDelete ?? false,
-            canApprove: modRow?.canApprove ?? false,
-          };
+          permMap[m.key] = toRow(m.key, modRow);
         }
         return {
           roleKey: r.key,
@@ -173,49 +273,40 @@ export default function OrgRolesPermissionsPage() {
         ? [selectedUserObj.firstName, selectedUserObj.lastName].filter(Boolean).join(" ") || selectedUserObj.email
         : userId;
 
-      const permMap: Record<string, { view: boolean; add: boolean; edit: boolean; delete: boolean; approve: boolean }> = {};
+      const permMap: Record<string, ModulePermissionRow> = {};
       const overrideMap: Record<string, Partial<Record<string, boolean | null>>> = {};
 
-      if (res.permissions) {
-        for (const [modKey, actions] of Object.entries(res.permissions as Record<string, any>)) {
-          permMap[modKey] = {
-            view: !!actions.view,
-            add: !!actions.add,
-            edit: !!actions.edit,
-            delete: !!actions.delete,
-            approve: !!actions.approve,
-          };
-        }
+      for (const [modKey, row] of Object.entries((res.effective ?? {}) as Record<string, any>)) {
+        permMap[modKey] = toRow(modKey, row);
       }
 
-      if (res.userPermissions) {
-        for (const item of res.userPermissions as any[]) {
-          overrideMap[item.moduleKey] = {
-            view: item.canView,
-            add: item.canAdd,
-            edit: item.canEdit,
-            delete: item.canDelete,
-            approve: item.canApprove,
-          };
+      // Only explicit (non-null) override values are kept; null = inherit.
+      for (const item of (res.overrides ?? []) as any[]) {
+        const actions: Partial<Record<string, boolean | null>> = {};
+        for (const act of ACTIONS) {
+          const value = item[ACTION_COLUMNS[act]];
+          if (typeof value === "boolean") actions[act] = value;
         }
+        if (Object.keys(actions).length > 0) overrideMap[item.moduleKey] = actions;
       }
 
       setUserPermissionState({
         userId,
         userName: name,
-        role: res.role ?? selectedUserObj?.role?.key ?? null,
+        role: res.role?.key ?? selectedUserObj?.role?.key ?? null,
         permissions: permMap,
         userOverrides: overrideMap,
       });
     } catch (err: any) {
-      notify(err.message || "Failed to load user permissions.");
+      notify(err.message || "Failed to load user permissions.", "error");
     }
   }, [accessToken, users]);
 
   useEffect(() => {
     loadCatalogAndRoles();
-    loadUsers();
-  }, [loadCatalogAndRoles, loadUsers]);
+    // Only the overrides tab (org admin only) needs the member list.
+    if (isAdmin) loadUsers();
+  }, [loadCatalogAndRoles, loadUsers, isAdmin]);
 
   useEffect(() => {
     if (tabIndex === 1 && selectedUserId) {
@@ -223,89 +314,92 @@ export default function OrgRolesPermissionsPage() {
     }
   }, [tabIndex, selectedUserId, loadUserPermissions]);
 
-  const handleToggleRolePerm = (moduleKey: string, action: keyof ModulePermissionRow) => {
-    setRolePermissions((prev) =>
-      prev.map((rp) => {
-        if (rp.roleKey !== selectedRoleKey) return rp;
-        const currentMod = rp.permissions[moduleKey] ?? {
-          moduleKey,
-          canView: false,
-          canAdd: false,
-          canEdit: false,
-          canDelete: false,
-          canApprove: false,
-        };
-        const updatedMod = {
-          ...currentMod,
-          [action]: !currentMod[action],
-        };
-        return {
-          ...rp,
-          permissions: {
-            ...rp.permissions,
-            [moduleKey]: updatedMod,
-          },
-        };
-      }),
-    );
-  };
-
-  // "All" / "None" on a module row — sets every action for that module in the
-  // local matrix; persisted with the rest on "Save Role Permissions".
-  const handleSetModulePerms = (moduleKey: string, enabled: boolean) => {
-    setRolePermissions((prev) =>
-      prev.map((rp) => {
-        if (rp.roleKey !== selectedRoleKey) return rp;
-        return {
-          ...rp,
-          permissions: {
-            ...rp.permissions,
-            [moduleKey]: {
-              moduleKey,
-              canView: enabled,
-              canAdd: enabled,
-              canEdit: enabled,
-              canDelete: enabled,
-              canApprove: enabled,
-            },
-          },
-        };
-      }),
-    );
-  };
-
-  const handleSaveRolePermissions = async () => {
-    if (!accessToken || !selectedRoleKey) return;
-    const activeRoleState = rolePermissions.find((r) => r.roleKey === selectedRoleKey);
-    if (!activeRoleState) return;
-
-    if (activeRoleState.locked) {
-      notify("Organisation Admin role always has full access and cannot be restricted.");
+  /**
+   * Saves one module's new row for the selected role right away (optimistic),
+   * then confirms with a toast — or rolls back and shows the error. Mirrors
+   * Super Admin > Organisation roles, which also saves on every click.
+   */
+  const saveModuleRow = async (moduleKey: string, nextRow: ModulePermissionRow, message: string) => {
+    if (!accessToken || savingModule) return;
+    const roleState = rolePermissions.find((r) => r.roleKey === selectedRoleKey);
+    if (!roleState) return;
+    if (roleState.locked) {
+      notify("Organisation Admin access is managed by the platform and cannot be changed here.", "error");
+      return;
+    }
+    if (roleIsReadOnly(roleState)) {
+      notify("You can't change the permissions of this role.", "error");
       return;
     }
 
-    setSaving(true);
-    try {
-      const payload = Object.values(activeRoleState.permissions).map((p) => ({
-        moduleKey: p.moduleKey,
-        canView: p.canView,
-        canAdd: p.canAdd,
-        canEdit: p.canEdit,
-        canDelete: p.canDelete,
-        canApprove: p.canApprove,
-      }));
+    const previous = roleState.permissions;
+    const nextPermissions = { ...previous, [moduleKey]: nextRow };
+    const applyToRole = (permissions: Record<string, ModulePermissionRow>) =>
+      setRolePermissions((prev) =>
+        prev.map((rp) => (rp.roleKey === roleState.roleKey ? { ...rp, permissions } : rp)),
+      );
 
-      await apiFetch(`/org/permissions/roles/${selectedRoleKey}`, {
+    applyToRole(nextPermissions);
+    setSavingModule(moduleKey);
+    try {
+      // The API replaces the role's whole set, so send every module — each
+      // limited to the actions that module supports.
+      const payload = Object.values(nextPermissions).map((p) => {
+        const mod = catalog?.modules.find((m) => m.key === p.moduleKey);
+        const item = emptyRow(p.moduleKey);
+        for (const col of supportedColumns(mod)) item[col] = p[col];
+        return item;
+      });
+      await apiFetch(`/org/permissions/roles/${roleState.roleKey}`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ permissions: payload }),
       });
-      notify(`Role permissions saved for '${activeRoleState.roleName}'`);
-    } catch (err: any) {
-      notify(err.message || "Failed to save role permissions.");
+      notify(message);
+    } catch (err) {
+      applyToRole(previous);
+      notify(err instanceof Error ? err.message : "Failed to save role permissions.", "error");
     } finally {
-      setSaving(false);
+      setSavingModule(null);
     }
+  };
+
+  const handleToggleRolePerm = (moduleKey: string, column: PermissionColumn) => {
+    const roleState = rolePermissions.find((r) => r.roleKey === selectedRoleKey);
+    if (!roleState) return;
+    const mod = catalog?.modules.find((m) => m.key === moduleKey);
+    const current = roleState.permissions[moduleKey] ?? emptyRow(moduleKey);
+    const enabled = !current[column];
+    const label = actionLabel(mod, COLUMN_ACTIONS[column]);
+    const next = { ...current, [column]: enabled };
+    // Same rule as Super Admin > Organisation roles: every action needs View,
+    // so granting one also grants View, and removing View removes them all.
+    if (enabled && column !== "canView") next.canView = true;
+    if (!enabled && column === "canView") {
+      for (const col of Object.values(ACTION_COLUMNS)) next[col] = false;
+    }
+    void saveModuleRow(
+      moduleKey,
+      next,
+      `${label} permission ${enabled ? "enabled" : "removed"} for ${mod?.label ?? moduleKey} (${roleState.roleName})`,
+    );
+  };
+
+  // "All" / "None" on a module row — every action the module supports.
+  const handleSetModulePerms = (moduleKey: string, enabled: boolean) => {
+    const roleState = rolePermissions.find((r) => r.roleKey === selectedRoleKey);
+    if (!roleState) return;
+    const mod = catalog?.modules.find((m) => m.key === moduleKey);
+    const current = roleState.permissions[moduleKey] ?? emptyRow(moduleKey);
+    const next = emptyRow(moduleKey);
+    for (const col of supportedColumns(mod)) {
+      next[col] = enabled ? current[col] || canGrant(moduleKey, col) : false;
+    }
+    void saveModuleRow(
+      moduleKey,
+      next,
+      `All permissions ${enabled ? "enabled" : "removed"} for ${mod?.label ?? moduleKey} (${roleState.roleName})`,
+    );
   };
 
   const handleCreateOrgRole = async () => {
@@ -345,7 +439,7 @@ export default function OrgRolesPermissionsPage() {
       setConfirmDeleteRole(null);
       await loadCatalogAndRoles();
     } catch (err: any) {
-      notify(err.message || "Failed to delete role.");
+      notify(err.message || "Failed to delete role.", "error");
     } finally {
       setDeletingRole(false);
     }
@@ -378,18 +472,18 @@ export default function OrgRolesPermissionsPage() {
     if (!accessToken || !selectedUserId || !userPermissionState) return;
     setSaving(true);
     try {
-      const payload: { moduleKey: string; view?: boolean | null; add?: boolean | null; edit?: boolean | null; delete?: boolean | null; approve?: boolean | null }[] = [];
+      const payload: ({ moduleKey: string } & Partial<Record<PermissionColumn, boolean | null>>)[] = [];
 
       for (const [modKey, actions] of Object.entries(userPermissionState.userOverrides)) {
         if (Object.keys(actions).length > 0) {
-          payload.push({
+          const mod = catalog?.modules.find((m) => m.key === modKey);
+          const item: { moduleKey: string } & Partial<Record<PermissionColumn, boolean | null>> = {
             moduleKey: modKey,
-            view: actions.view ?? null,
-            add: actions.add ?? null,
-            edit: actions.edit ?? null,
-            delete: actions.delete ?? null,
-            approve: actions.approve ?? null,
-          });
+          };
+          for (const act of ACTIONS) {
+            item[ACTION_COLUMNS[act]] = supportsAction(mod, act) ? actions[act] ?? null : null;
+          }
+          payload.push(item);
         }
       }
 
@@ -402,7 +496,7 @@ export default function OrgRolesPermissionsPage() {
       notify(`User permission overrides saved for '${userPermissionState.userName}'`);
       loadUserPermissions(selectedUserId);
     } catch (err: any) {
-      notify(err.message || "Failed to save user overrides.");
+      notify(err.message || "Failed to save user overrides.", "error");
     } finally {
       setSaving(false);
     }
@@ -425,7 +519,7 @@ export default function OrgRolesPermissionsPage() {
       <Reveal delay={1}>
         <div style={{ marginBottom: 18 }}>
           <Seg
-            options={[...TABS]}
+            options={visibleTabs}
             value={tabIndex}
             onChange={(i) => setTabIndex(i)}
           />
@@ -452,42 +546,49 @@ export default function OrgRolesPermissionsPage() {
                     >
                       {r.name} {r.locked ? "(Admin)" : ""}
                     </button>
-                    {r.custom ? (
+                    {r.custom && canDeleteRole ? (
                       <button
                         type="button"
                         title={`Delete '${r.name}'`}
                         className="btn btn-ghost btn-sm"
                         style={{ padding: "2px 6px", color: "var(--rose, #e11d48)" }}
-                        onClick={() => setConfirmDeleteRole(r)}
+                        onClick={() =>
+                          (r.userCount ?? 0) > 0 ? setRoleInUse(r) : setConfirmDeleteRole(r)
+                        }
                       >
                         <Icon name="trash" size={13} />
                       </button>
                     ) : null}
                   </span>
                 ))}
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => setShowNewRoleModal(true)}
-                >
-                  <Icon name="plus" size={13} /> Create Role
-                </button>
+                {canCreateRole ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setShowNewRoleModal(true)}
+                  >
+                    <Icon name="plus" size={13} /> Create Role
+                  </button>
+                ) : null}
               </div>
-              <div>
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  disabled={saving || currentRoleState?.locked}
-                  onClick={handleSaveRolePermissions}
-                >
-                  {saving ? "Saving…" : "Save Role Permissions"}
-                </button>
-              </div>
+              {!roleIsReadOnly(currentRoleState) ? (
+                <span className="muted" style={{ fontSize: 12.5 }}>
+                  {savingModule ? "Saving…" : "Changes save automatically"}
+                </span>
+              ) : null}
             </div>
+
+            {currentRoleState && !currentRoleState.locked && roleIsReadOnly(currentRoleState) ? (
+              <div style={{ padding: "12px 18px", background: "var(--amber-light, #fffbeb)", color: "var(--amber-dark, #92400e)", borderBottom: "1px solid var(--border)", fontSize: 13 }}>
+                🔒 {canEditRoles
+                  ? <>You can&apos;t change the permissions of <strong>{currentRoleState.roleName}</strong> because it is your own role.</>
+                  : <>You can view role permissions but not change them.</>}
+              </div>
+            ) : null}
 
             {currentRoleState?.locked ? (
               <div style={{ padding: "12px 18px", background: "var(--amber-light, #fffbeb)", color: "var(--amber-dark, #92400e)", borderBottom: "1px solid var(--border)", fontSize: 13 }}>
-                🔒 The <strong>{currentRoleState.roleName}</strong> role always has full access across all modules and cannot be restricted.
+                🔒 The <strong>{currentRoleState.roleName}</strong> role&apos;s access is managed by the platform and cannot be changed here.
               </div>
             ) : null}
 
@@ -497,16 +598,9 @@ export default function OrgRolesPermissionsPage() {
                 <span>Permissions</span>
               </div>
               {catalog.modules.map((m) => {
-                const permRow = currentRoleState?.permissions[m.key] ?? {
-                  moduleKey: m.key,
-                  canView: false,
-                  canAdd: false,
-                  canEdit: false,
-                  canDelete: false,
-                  canApprove: false,
-                };
+                const permRow = currentRoleState?.permissions[m.key] ?? emptyRow(m.key);
 
-                const isLocked = currentRoleState?.locked ?? false;
+                const isLocked = roleIsReadOnly(currentRoleState);
 
                 return (
                   <div className="platform-permission-row" key={m.key}>
@@ -515,15 +609,20 @@ export default function OrgRolesPermissionsPage() {
                       <div className="muted" style={{ fontSize: 12 }}>{m.description}</div>
                     </div>
                     <div className="platform-permission-actions">
-                      {(["canView", "canAdd", "canEdit", "canDelete", "canApprove"] as const).map((act) => {
-                        const enabled = isLocked || permRow[act];
-                        const label = act.replace("can", "");
+                      {supportedColumns(m).map((act) => {
+                        // Locked roles (Admin) show exactly what Super Admin
+                        // granted — disabled actions stay white.
+                        const enabled = permRow[act];
+                        const label = actionLabel(m, COLUMN_ACTIONS[act]);
+                        // Members can't switch on what they don't hold.
+                        const cannotGrant = !enabled && !canGrant(m.key, act);
                         return (
                           <button
                             className={`platform-permission-pill${enabled ? " is-enabled" : ""}`}
                             key={act}
                             type="button"
-                            disabled={isLocked || saving}
+                            disabled={isLocked || cannotGrant || savingModule !== null}
+                            title={cannotGrant && !isLocked ? "You can only grant permissions you have yourself" : undefined}
                             onClick={() => handleToggleRolePerm(m.key, act)}
                             aria-pressed={enabled}
                             aria-label={`${label} permission for ${m.label}`}
@@ -537,7 +636,7 @@ export default function OrgRolesPermissionsPage() {
                       <button
                         className="platform-permission-bulk"
                         type="button"
-                        disabled={isLocked || saving}
+                        disabled={isLocked || savingModule !== null}
                         onClick={() => handleSetModulePerms(m.key, true)}
                       >
                         All
@@ -545,7 +644,7 @@ export default function OrgRolesPermissionsPage() {
                       <button
                         className="platform-permission-bulk"
                         type="button"
-                        disabled={isLocked || saving}
+                        disabled={isLocked || savingModule !== null}
                         onClick={() => handleSetModulePerms(m.key, false)}
                       >
                         None
@@ -611,13 +710,7 @@ export default function OrgRolesPermissionsPage() {
                 <tbody>
                   {catalog.modules.map((m) => {
                     const modOverrides = userPermissionState?.userOverrides[m.key] ?? {};
-                    const effectiveMod = userPermissionState?.permissions[m.key] ?? {
-                      view: false,
-                      add: false,
-                      edit: false,
-                      delete: false,
-                      approve: false,
-                    };
+                    const effectiveMod = userPermissionState?.permissions[m.key] ?? emptyRow(m.key);
                     const isAdminUser = userPermissionState?.role === "admin";
 
                     return (
@@ -627,8 +720,15 @@ export default function OrgRolesPermissionsPage() {
                           <div style={{ fontSize: 12, color: "var(--fg-subtle)" }}>{m.description}</div>
                         </td>
                         {ACTIONS.map((act) => {
+                          if (!supportsAction(m, act)) {
+                            return (
+                              <td key={act} style={{ textAlign: "center", color: "var(--fg-subtle)" }} title="Not applicable to this module">
+                                —
+                              </td>
+                            );
+                          }
                           const overrideVal = modOverrides[act];
-                          const isEffective = isAdminUser ? true : effectiveMod[act];
+                          const isEffective = effectiveMod[ACTION_COLUMNS[act]];
 
                           let selectVal = "inherit";
                           if (overrideVal === true) selectVal = "grant";
@@ -656,6 +756,11 @@ export default function OrgRolesPermissionsPage() {
                                 <option value="grant">Explicit Grant</option>
                                 <option value="deny">Explicit Deny</option>
                               </select>
+                              {m.actionLabels?.[act] ? (
+                                <div style={{ fontSize: 11, color: "var(--fg-subtle)", marginTop: 3 }}>
+                                  {m.actionLabels[act]}
+                                </div>
+                              ) : null}
                             </td>
                           );
                         })}
@@ -669,11 +774,19 @@ export default function OrgRolesPermissionsPage() {
         </Reveal>
       ) : null}
 
-      {toast ? (
-        <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}>
-          <div className="card" style={{ padding: "12px 16px", boxShadow: "var(--sh-lg)" }}>
-            {toast}
-          </div>
+
+      {flash ? (
+        <div
+          className={`platform-permission-toast${flash.variant === "error" ? " is-error" : ""}`}
+          role={flash.variant === "error" ? "alert" : "status"}
+        >
+          <span className="platform-permission-toast-icon" aria-hidden="true">
+            {flash.variant === "error" ? "!" : "✓"}
+          </span>
+          <span>{flash.message}</span>
+          <button type="button" onClick={() => setFlash(null)} aria-label="Dismiss notification">
+            ×
+          </button>
         </div>
       ) : null}
 
@@ -797,6 +910,20 @@ export default function OrgRolesPermissionsPage() {
           </form>
         </Modal>
       ) : null}
+
+      <ConfirmModal
+        open={roleInUse !== null}
+        title={`Can't delete role '${roleInUse?.name ?? ""}' yet`}
+        message={
+          roleInUse
+            ? `This role is assigned to ${roleInUse.userCount === 1 ? "1 user" : `${roleInUse.userCount} users`}. Remove those users or change their role from the Users page first, then you can delete this role.`
+            : ""
+        }
+        confirmLabel="OK"
+        cancelLabel="Close"
+        onConfirm={() => setRoleInUse(null)}
+        onClose={() => setRoleInUse(null)}
+      />
 
       <ConfirmModal
         open={confirmDeleteRole !== null}

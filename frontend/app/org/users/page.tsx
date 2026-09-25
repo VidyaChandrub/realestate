@@ -20,6 +20,8 @@ import type {
 
 const LIMIT = 20;
 
+type RoleOption = { value: string; label: string; assignable: boolean };
+
 const DEFAULT_ROLE_OPTIONS: { value: string; label: string }[] = [
   { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
@@ -134,23 +136,23 @@ function formatDate(iso: string): string {
 export default function OrgUsersPage() {
   const { accessToken, hasPermission, isOrgAdmin } = useAuth();
   const router = useRouter();
+  const isAdmin = isOrgAdmin();
+
+  // Per-action gating for the Users module — for org admins too, whose Users
+  // access is set by Super Admin in Organisation roles. `view` opens the page
+  // and the list; each button needs its own grant.
+  const canView = hasPermission("users", "view");
+  const canAdd = hasPermission("users", "add");
+  const canEdit = hasPermission("users", "edit");
+  const canActivate = hasPermission("users", "activate");
+  const canDeactivate = hasPermission("users", "deactivate");
+  const canDelete = hasPermission("users", "delete");
 
   useEffect(() => {
-    if (accessToken && !isOrgAdmin() && !hasPermission("users", "view")) {
+    if (accessToken && !canView) {
       router.replace("/org");
     }
-  }, [accessToken, hasPermission, isOrgAdmin, router]);
-
-  // Per-action gating for the Users module. `view` (checked above) lets a
-  // member open this page; each write action then needs its own grant.
-  // Org admins are unrestricted. "Approve" covers the whole activate/
-  // deactivate pair — approving a pending member and deactivating an active
-  // one are two directions of the same control.
-  const isAdmin = isOrgAdmin();
-  const canAdd = isAdmin || hasPermission("users", "add");
-  const canEdit = isAdmin || hasPermission("users", "edit");
-  const canApprove = isAdmin || hasPermission("users", "approve");
-  const canDelete = isAdmin || hasPermission("users", "delete");
+  }, [accessToken, canView, router]);
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -159,7 +161,9 @@ export default function OrgUsersPage() {
     "active" | "disabled" | "pending" | ""
   >("");
   const [page, setPage] = useState(1);
-  const [dynamicRoles, setDynamicRoles] = useState<{ value: string; label: string }[]>([]);
+  const [dynamicRoles, setDynamicRoles] = useState<RoleOption[]>([]);
+  // Only roles the caller may hand out (Admin is reserved for org admins).
+  const assignableRoles = dynamicRoles.filter((r) => r.assignable);
 
   const [result, setResult] = useState<OrgUsersListResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -182,21 +186,25 @@ export default function OrgUsersPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (!accessToken) return;
-    apiFetch<{ roles: { key: string; name: string }[] }>("/org/permissions/modules", {
+    if (!accessToken || !canView) return;
+    const fallback = DEFAULT_ROLE_OPTIONS.map((r) => ({
+      ...r,
+      assignable: isAdmin || r.value !== "admin",
+    }));
+    apiFetch<{ key: string; name: string; assignable: boolean }[]>("/org/users/roles", {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-      .then((res) => {
-        if (res.roles && res.roles.length > 0) {
-          setDynamicRoles(res.roles.map((r) => ({ value: r.key, label: r.name })));
-        } else {
-          setDynamicRoles(DEFAULT_ROLE_OPTIONS);
-        }
+      .then((roles) => {
+        setDynamicRoles(
+          roles.length > 0
+            ? roles.map((r) => ({ value: r.key, label: r.name, assignable: r.assignable }))
+            : fallback,
+        );
       })
       .catch(() => {
-        setDynamicRoles(DEFAULT_ROLE_OPTIONS);
+        setDynamicRoles(fallback);
       });
-  }, [accessToken]);
+  }, [accessToken, canView, isAdmin]);
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<{
@@ -225,7 +233,7 @@ export default function OrgUsersPage() {
   }, [searchInput]);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || !canView) return;
     /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     setLoadError(null);
@@ -248,7 +256,7 @@ export default function OrgUsersPage() {
         ),
       )
       .finally(() => setLoading(false));
-  }, [accessToken, page, search, roleFilter, statusFilter, reloadTick]);
+  }, [accessToken, canView, page, search, roleFilter, statusFilter, reloadTick]);
 
   // Refresh seat usage on load and after any create / status change.
   useEffect(() => {
@@ -414,11 +422,14 @@ export default function OrgUsersPage() {
   }
 
   function askApprove(user: OrgUser) {
+    const reactivating = user.status === "disabled";
     setConfirm({
-      title: "Approve user?",
-      message: `${fullName(user.firstName, user.lastName, user.email)} will be able to sign in and will be asked to set a new password on first login.`,
-      confirmLabel: "Approve",
-      run: () => runRowAction(user, "approve", "Failed to approve user."),
+      title: reactivating ? "Activate user?" : "Approve user?",
+      message: reactivating
+        ? `${fullName(user.firstName, user.lastName, user.email)} will be able to sign in again.`
+        : `${fullName(user.firstName, user.lastName, user.email)} will be able to sign in and will be asked to set a new password on first login.`,
+      confirmLabel: reactivating ? "Activate" : "Approve",
+      run: () => runRowAction(user, "approve", "Failed to activate user."),
     });
   }
 
@@ -750,10 +761,10 @@ export default function OrgUsersPage() {
                     }))
                   }
                 >
-                  {dynamicRoles.length === 0 ? (
+                  {assignableRoles.length === 0 ? (
                     <option value="">Select a role</option>
                   ) : null}
-                  {dynamicRoles.map((r) => (
+                  {assignableRoles.map((r) => (
                     <option key={r.value} value={r.value}>
                       {r.label}
                     </option>
@@ -1007,7 +1018,7 @@ export default function OrgUsersPage() {
                               Edit
                             </button>
                           ) : null}
-                          {canApprove &&
+                          {canActivate &&
                             (user.status === "pending" ||
                               user.status === "disabled") ? (
                             <button
@@ -1016,10 +1027,10 @@ export default function OrgUsersPage() {
                               disabled={busyId === user.id}
                               onClick={() => askApprove(user)}
                             >
-                              Approve
+                              {user.status === "disabled" ? "Activate" : "Approve"}
                             </button>
                           ) : null}
-                          {canApprove &&
+                          {canDeactivate &&
                             (user.status === "pending" ||
                               user.status === "active") &&
                             !(
@@ -1060,7 +1071,7 @@ export default function OrgUsersPage() {
                               Delete
                             </button>
                           ) : null}
-                          {!canEdit && !canApprove && !canDelete ? (
+                          {!canEdit && !canActivate && !canDeactivate && !canDelete ? (
                             <span className="muted" style={{ fontSize: 12 }}>
                               View only
                             </span>

@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { FormDesigner } from "@/components/superadmin/forms/FormDesigner";
 import { getFormDef, saveFormDef } from "@/lib/openpage/forms-backend";
+import { DynamicLeadForm } from "@/components/openpage/dynamic-lead-form";
+import { useAuth } from "@/lib/auth-context";
 // FormDesigner's builder chrome is styled under `.superadmin` (fb-* rules in
 // superadmin.css, all superadmin-prefixed); the wrapper below gives the editor
 // those styles inside the org shell without leaking them org-wide.
@@ -13,6 +15,10 @@ import "@/app/admin-console/superadmin.css";
 
 export default function OrgFormEditorPage() {
   const params = useParams<{ id: string }>();
+  // Lead Forms > Edit opens the builder; View alone gets a read-only preview
+  // (the list's Preview link lands here too).
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission("forms", "edit");
   const [form, setForm] = useState<Awaited<ReturnType<typeof getFormDef>> | null>(null);
   const [missing, setMissing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -58,6 +64,23 @@ export default function OrgFormEditorPage() {
   }
 
   if (!form) return <p className="muted">Loading form…</p>;
+
+  if (!canEdit) {
+    return (
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0 }}>{form.name || "Lead form"}</h2>
+          <Link href="/org/forms" className="btn btn-ghost btn-sm" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <ChevronLeft size={14} /> Back to Lead Forms
+          </Link>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>Preview only — you don&apos;t have permission to edit this form.</p>
+        <div className="superadmin" style={{ maxWidth: 560 }}>
+          <DynamicLeadForm form={form} live={false} place="admin-preview" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

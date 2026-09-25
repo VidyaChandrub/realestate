@@ -130,6 +130,8 @@ export function TopNav({
   onUnpublish,
   publishLabel = "Publish",
   unpublishLabel = "Unpublish",
+  canPublish = true,
+  canUnpublish = true,
   onNotify,
   onActivity,
   onHelp,
@@ -155,6 +157,10 @@ export function TopNav({
   onUnpublish: () => void;
   publishLabel?: string;
   unpublishLabel?: string;
+  /** False hides the Publish button (user lacks that permission). */
+  canPublish?: boolean;
+  /** False hides the Unpublish button (user lacks that permission). */
+  canUnpublish?: boolean;
   onNotify: () => void;
   onActivity: () => void;
   onHelp: () => void;
@@ -411,7 +417,7 @@ export function TopNav({
               >
                 <Save size={14} /> <span className="ps-btn-label">Save</span>
               </button>
-              {published ? (
+              {published && canUnpublish ? (
                 <button
                   type="button"
                   onClick={onUnpublish}
@@ -420,6 +426,7 @@ export function TopNav({
                   {unpublishLabel}
                 </button>
               ) : null}
+              {canPublish ? (
               <button
                 type="button"
                 onClick={unsaved ? undefined : onPublish}
@@ -431,6 +438,7 @@ export function TopNav({
                 <Rocket size={14} />
                 <span className="ps-btn-label">{publishLabel}</span>
               </button>
+              ) : null}
             </div>
           </>
         ) : (

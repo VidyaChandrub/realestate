@@ -217,7 +217,17 @@ export interface LoginInput {
 
 export type UserRole = "super_admin" | "organisation_admin" | "team_member";
 
-export type PermissionAction = "view" | "add" | "edit" | "delete" | "approve";
+export type PermissionAction =
+  | "view"
+  | "add"
+  | "edit"
+  | "delete"
+  | "approve"
+  // Users module: approve/re-enable and disable a member.
+  | "activate"
+  | "deactivate"
+  // Projects: create a lead from a project page.
+  | "add_lead";
 
 export type Permissions = Record<
   string,

@@ -43,6 +43,17 @@ export class PrismaService
       `ALTER TABLE "identity"."organisations" ADD COLUMN IF NOT EXISTS "custom_domain_landing_page_id" TEXT`,
       `ALTER TABLE "access"."role_module_permissions" ADD COLUMN IF NOT EXISTS "org_id" TEXT NOT NULL DEFAULT 'system'`,
       `ALTER TABLE "access"."role_module_permissions" ADD COLUMN IF NOT EXISTS "can_approve" BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE "access"."role_module_permissions" ADD COLUMN IF NOT EXISTS "can_activate" BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE "access"."role_module_permissions" ADD COLUMN IF NOT EXISTS "can_deactivate" BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE "access"."user_module_permissions" ADD COLUMN IF NOT EXISTS "can_activate" BOOLEAN`,
+      `ALTER TABLE "access"."user_module_permissions" ADD COLUMN IF NOT EXISTS "can_deactivate" BOOLEAN`,
+      `ALTER TABLE "access"."role_module_permissions" ADD COLUMN IF NOT EXISTS "can_add_lead" BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE "access"."user_module_permissions" ADD COLUMN IF NOT EXISTS "can_add_lead" BOOLEAN`,
+      // Users > Approve was split into Activate + Deactivate (see migration
+      // 20260924120000). Idempotent: once moved, can_approve is cleared, and
+      // saves never write can_approve for the Users module again.
+      `UPDATE "access"."role_module_permissions" SET "can_activate" = true, "can_deactivate" = true, "can_approve" = false WHERE "module_key" = 'users' AND "can_approve" = true`,
+      `UPDATE "access"."user_module_permissions" SET "can_activate" = "can_approve", "can_deactivate" = "can_approve", "can_approve" = NULL WHERE "module_key" = 'users' AND "can_approve" IS NOT NULL`,
       `ALTER TABLE "identity"."media_files" ADD COLUMN IF NOT EXISTS "alt" TEXT`,
       `ALTER TABLE "billing"."plans" ADD COLUMN IF NOT EXISTS "capabilities" JSONB`,
       `ALTER TABLE "billing"."plans" ADD COLUMN IF NOT EXISTS "is_system" BOOLEAN NOT NULL DEFAULT false`,

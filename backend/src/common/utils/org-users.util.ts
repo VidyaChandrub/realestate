@@ -20,6 +20,20 @@ export const ASSIGNABLE_ROLES = [
 ] as const;
 export type AssignableRole = string;
 
+// Only an Organisation Admin may hand out the Admin role — otherwise any
+// member with Users > Add/Edit could promote someone (or a new account they
+// control) to full, unrestricted access.
+export function assertCanAssignRole(
+  actor: { roles?: string[] },
+  roleKey: string | undefined,
+) {
+  if (roleKey === 'admin' && !actor.roles?.includes('admin')) {
+    throw new ForbiddenException(
+      'Only an organisation admin can assign the Admin role',
+    );
+  }
+}
+
 export const ORG_USER_STATUS_VALUES = [
   'active',
   'disabled',

@@ -1,5 +1,7 @@
 "use client";
 
+import { useAuth } from "@/lib/auth-context";
+import { PROJECT_LEAD_ACTION } from "@/lib/permissions";
 // Static mockup carried over from the previous hardcoded project folder.
 // Lead-source integrations / distribution rules are out of scope for this
 // build — nothing here is wired to the backend. It exists so the project
@@ -81,12 +83,15 @@ const RULES = [
 ];
 
 export default function OrgProjectIntegrationsPage() {
+  // Projects > Add lead shows the header button.
+  const { hasPermission } = useAuth();
+  const canAddLead = hasPermission("projects", PROJECT_LEAD_ACTION);
   return (
     <>
       <ProjectPageHead
         active="integrations"
         actions={
-          <button className="btn btn-primary">＋ Add lead</button>
+          canAddLead ? <button className="btn btn-primary">＋ Add lead</button> : null
         }
       />
 

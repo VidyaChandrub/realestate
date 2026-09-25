@@ -13,6 +13,7 @@ import {
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { PROJECT_UNIT_ACTIONS } from '../../common/utils/permissions.util';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
@@ -31,6 +32,10 @@ import { CreateUnitDto } from './dto/create-unit.dto';
 import { UpdateUnitDto, UpdateUnitStatusDto } from './dto/update-unit.dto';
 import { ListUnitsQueryDto } from './dto/list-units-query.dto';
 
+// Every route checks its Projects pill — for the org admin too, whose access
+// Super Admin sets in Organisation roles (`enforceForOrgAdmin`).
+const ENFORCE = { enforceForOrgAdmin: true } as const;
+
 // Every route derives orgId from the JWT — never from a param or body — so
 // one org can never read or touch another org's projects, unit types, or
 // units. Non-admin users are guarded by PermissionGuard and scoped to their
@@ -42,7 +47,7 @@ export class ProjectsController {
 
   // --- Media uploads ---
   @Post('upload-url')
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   createUploadUrl(
     @CurrentUser() user: JwtPayload,
     @Body() dto: CreateUploadUrlDto,
@@ -53,13 +58,13 @@ export class ProjectsController {
   // --- Projects ---
 
   @Post()
-  @RequirePermission('projects', 'add')
+  @RequirePermission('projects', 'add', ENFORCE)
   create(@CurrentUser() user: JwtPayload, @Body() dto: CreateProjectDto) {
     return this.service.create(user.orgId as string, dto);
   }
 
   @Get()
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   list(@CurrentUser() user: JwtPayload, @Query() query: ListProjectsQueryDto) {
     return this.service.list(user.orgId as string, query, user);
   }
@@ -70,7 +75,7 @@ export class ProjectsController {
    * swallowed by the getById route.
    */
   @Get('sales-agent-candidates')
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   listSalesAgentCandidates(@CurrentUser() user: JwtPayload) {
     return this.service.listSalesAgentCandidates(user.orgId as string);
   }
@@ -81,7 +86,7 @@ export class ProjectsController {
    * `?type=manager` lists the users holding the manager role.
    */
   @Get('project-assignee-candidates')
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   listProjectAssigneeCandidates(
     @CurrentUser() user: JwtPayload,
     @Query() query: ListAssigneeCandidatesQueryDto,
@@ -93,13 +98,13 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   getById(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.getById(user.orgId as string, id, user);
   }
 
   @Patch(':id')
-  @RequirePermission('projects', 'edit')
+  @RequirePermission('projects', 'edit', ENFORCE)
   update(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
@@ -109,7 +114,7 @@ export class ProjectsController {
   }
 
   @Delete(':id')
-  @RequirePermission('projects', 'delete')
+  @RequirePermission('projects', 'delete', ENFORCE)
   remove(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.remove(user.orgId as string, id, user);
   }
@@ -117,13 +122,13 @@ export class ProjectsController {
   // --- Sales agents assigned to a project (Step 7 of the wizard) ---
 
   @Get(':id/sales-agents')
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   listSalesAgents(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.listSalesAgents(user.orgId as string, id);
   }
 
   @Put(':id/sales-agents')
-  @RequirePermission('projects', 'edit')
+  @RequirePermission('projects', 'edit', ENFORCE)
   setSalesAgents(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
@@ -135,7 +140,7 @@ export class ProjectsController {
   // --- Unit types (nested under a project) ---
 
   @Post(':projectId/unit-types')
-  @RequirePermission('projects', 'add')
+  @RequirePermission('projects', PROJECT_UNIT_ACTIONS.add, ENFORCE)
   createUnitType(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
@@ -145,7 +150,7 @@ export class ProjectsController {
   }
 
   @Get(':projectId/unit-types')
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   listUnitTypes(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
@@ -154,7 +159,7 @@ export class ProjectsController {
   }
 
   @Get(':projectId/unit-types/:id')
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   getUnitType(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
@@ -164,7 +169,7 @@ export class ProjectsController {
   }
 
   @Patch(':projectId/unit-types/:id')
-  @RequirePermission('projects', 'edit')
+  @RequirePermission('projects', PROJECT_UNIT_ACTIONS.edit, ENFORCE)
   updateUnitType(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
@@ -180,7 +185,7 @@ export class ProjectsController {
   }
 
   @Delete(':projectId/unit-types/:id')
-  @RequirePermission('projects', 'delete')
+  @RequirePermission('projects', PROJECT_UNIT_ACTIONS.delete, ENFORCE)
   removeUnitType(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
@@ -192,7 +197,7 @@ export class ProjectsController {
   // --- Units (flat per project; the owning unit type is in the body) ---
 
   @Post(':projectId/units')
-  @RequirePermission('projects', 'add')
+  @RequirePermission('projects', PROJECT_UNIT_ACTIONS.add, ENFORCE)
   createUnit(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
@@ -207,7 +212,7 @@ export class ProjectsController {
   }
 
   @Get(':projectId/units')
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   listUnits(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
@@ -217,7 +222,7 @@ export class ProjectsController {
   }
 
   @Get(':projectId/units/:id')
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   getUnit(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
@@ -227,7 +232,7 @@ export class ProjectsController {
   }
 
   @Patch(':projectId/units/:id')
-  @RequirePermission('projects', 'edit')
+  @RequirePermission('projects', PROJECT_UNIT_ACTIONS.edit, ENFORCE)
   updateUnit(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
@@ -244,7 +249,7 @@ export class ProjectsController {
   }
 
   @Patch(':projectId/units/:id/status')
-  @RequirePermission('projects', 'edit')
+  @RequirePermission('projects', PROJECT_UNIT_ACTIONS.edit, ENFORCE)
   updateUnitStatus(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
@@ -261,7 +266,7 @@ export class ProjectsController {
   }
 
   @Delete(':projectId/units/:id')
-  @RequirePermission('projects', 'delete')
+  @RequirePermission('projects', PROJECT_UNIT_ACTIONS.delete, ENFORCE)
   removeUnit(
     @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,

@@ -37,6 +37,20 @@ const STORAGE_KEYS = {
   user: "be.user",
 } as const;
 
+// Modules where Super Admin's Organisation roles setting for the Admin role is
+// enforced for the Org Admin too (see RequirePermission `enforceForOrgAdmin`).
+const ORG_ADMIN_ENFORCED_MODULES: ReadonlySet<string> = new Set([
+  "dashboard",
+  "users",
+  "landing_pages",
+  "templates",
+  "projects",
+  "forms",
+  "settings",
+  "support",
+  "roles_permissions",
+]);
+
 interface AuthContextValue {
   user: SessionUser | null;
   accessToken: string | null;
@@ -321,7 +335,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return user.role === "super_admin";
       }
-      if (isOrgAdminSession()) return true;
+      if (isOrgAdminSession()) {
+        // Org Admin is unrestricted except for modules Super Admin governs for
+        // the Admin role (mirrors the backend's `enforceForOrgAdmin`). If the
+        // module hasn't loaded yet, keep the Admin's full access.
+        const adminPerm = user.permissions?.[module];
+        if (!ORG_ADMIN_ENFORCED_MODULES.has(module) || !adminPerm) return true;
+        return adminPerm[action] === true;
+      }
       return user.permissions?.[module]?.[action] === true;
     },
     [user],

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, type ChangeEvent } from "react";
+import { useEffect, useState, useCallback, type ChangeEvent, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, cancelPackageChangeRequest, changePlan, addCommonProjectTypes, createOrgCatalogOption, createOrgProjectType, deleteOrgCatalogOption, deleteOrgProjectType, getInvoices, getOrgCatalogOptions, getOrgProjectTypes, updateOrgProjectType, getOrgDomainInfo, getOrgLeadStageDisplays, getOrgPackageChangeRequest, getPlans, renewSubscription, requestCustomDomain, submitPackageChangeRequest, updateOrgLeadStageDisplay } from "@/lib/api";
 import type { BillingRenewResult, ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, OrgProjectType, PackageChangeRequestRow, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
@@ -8,6 +9,7 @@ import { DEFAULT_LEAD_STAGES, LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { OrgSmtpSettings } from "@/components/org/org-smtp-settings";
+import { SETTINGS_ACTIONS } from "@/lib/permissions";
 import { FieldRolesPanel, TypedFieldEditor } from "@/components/org/typed-field-editor";
 import { FIELD_ROLES, fieldsToRows, groupNoun, roleBaselineOf, rowsToFields, templateTraits, validateFieldRows, type FieldRole, type FieldRow } from "@/lib/field-template";
 import { Modal } from "@/components/ui/modal";
@@ -61,6 +63,10 @@ const PLAN_LIMIT_ROWS: { key: "templates" | "projects" | "users" | "landingPages
   { key: "landingPages", label: "Landing pages" },
   { key: "landingPagesCreate", label: "Created landing pages" },
 ];
+
+// A <fieldset disabled> greys out every control inside a section the user
+// can view but not change; this resets the fieldset's default box styling.
+const READ_ONLY_FIELDSET: CSSProperties = { border: 0, padding: 0, margin: 0, minWidth: 0 };
 
 const NAV_GROUPS = [
   // TODO: static sections are commented out below — re-enable their nav entries when they are made dynamic.
@@ -369,7 +375,7 @@ const DOMAIN_STATUS_LABEL: Record<string, string> = {
   none: "Not set", pending: "Pending approval", approved: "Approved", active: "Active", rejected: "Rejected", connected: "Connected",
 };
 
-function DomainSection() {
+function DomainSection({ canRequest }: { canRequest: boolean }) {
   const [info, setInfo] = useState<OrgDomainInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -483,6 +489,7 @@ function DomainSection() {
                 Bring your own domain (e.g. homes.skylinedev.com). Once a super admin approves it, it is
                 mapped to the landing page you pick below. Only available once your organisation is active.
               </div>
+              <fieldset disabled={!canRequest} style={READ_ONLY_FIELDSET}>
               <form onSubmit={handleRequest} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div className="field" style={{ marginBottom: 0 }}>
                   <label>Landing page to serve</label>
@@ -522,6 +529,7 @@ function DomainSection() {
                   </button>
                 </div>
               </form>
+              </fieldset>
               {sent ? <div className="muted" style={{ color: "var(--green)", marginTop: 8 }}>{sent}</div> : null}
               {error ? <div className="muted" style={{ color: "var(--rose)", marginTop: 8 }}>{error}</div> : null}
               {info.requests?.length ? (
@@ -590,8 +598,13 @@ const LEAD_CATALOG_GROUPS: CatalogGroup[] = [
 function CatalogSection({
   groups = CATALOG_GROUPS,
   heading,
+  canAdd,
+  canDelete,
 }: {
   groups?: CatalogGroup[];
+  /** Projects > New project adds options; Projects > Delete removes them. */
+  canAdd: boolean;
+  canDelete: boolean;
   /** Optional intro shown above the cards, to set them apart from other
    *  content in a shared section (e.g. the CRM & Leads toggles). */
   heading?: { title: string; sub: string };
@@ -666,14 +679,17 @@ function CatalogSection({
                   ) : rows.map((o) => (
                     <span key={o.id} className="pill" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                       {o.label}
+                      {canDelete ? (
                       <span
                         className="x"
                         style={{ cursor: busy ? "wait" : "pointer", opacity: busy === o.id ? 0.4 : 1 }}
                         onClick={() => { if (!busy) void removeOption(o.id); }}
                       >×</span>
+                      ) : null}
                     </span>
                   ))}
                 </div>
+                {canAdd ? (
                 <form
                   onSubmit={(e) => { e.preventDefault(); void addOption(g.category); }}
                   style={{ display: "flex", gap: 8, marginTop: 12, maxWidth: 440 }}
@@ -689,6 +705,7 @@ function CatalogSection({
                     {busy === g.category ? "Adding…" : "+ Add"}
                   </button>
                 </form>
+                ) : null}
               </>
             )}
           </Card>
@@ -705,7 +722,16 @@ function CatalogSection({
  * is derived from which role fields the unit template carries. Where an org
  * defines what "Plots" or "Farmhouses" means, with no code change.
  */
-function ProjectTypesSection() {
+function ProjectTypesSection({
+  canAdd,
+  canEdit,
+  canDelete,
+}: {
+  /** Projects > New project / Edit / Delete. */
+  canAdd: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
   const [types, setTypes] = useState<OrgProjectType[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -762,12 +788,16 @@ function ProjectTypesSection() {
       sub="Each type sets how a project's inventory is structured and which extra fields it captures — e.g. Apartments, Villas, Plots, Farmhouses"
       action={
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn btn-ghost btn-sm" type="button" disabled={busy === "common"} onClick={() => void addCommon()}>
-            {busy === "common" ? "Adding…" : "Add common types"}
-          </button>
-          <button className="btn btn-primary btn-sm" type="button" onClick={() => setEditing("new")} disabled={editing === "new"}>
-            + New type
-          </button>
+          {canAdd ? (
+            <>
+              <button className="btn btn-ghost btn-sm" type="button" disabled={busy === "common"} onClick={() => void addCommon()}>
+                {busy === "common" ? "Adding…" : "Add common types"}
+              </button>
+              <button className="btn btn-primary btn-sm" type="button" onClick={() => setEditing("new")} disabled={editing === "new"}>
+                + New type
+              </button>
+            </>
+          ) : null}
         </div>
       }
     >
@@ -800,10 +830,14 @@ function ProjectTypesSection() {
                 {t.inUse > 0 ? ` · used by ${t.inUse} project${t.inUse === 1 ? "" : "s"}` : ""}
               </span>
               <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                <button className="btn btn-ghost btn-sm" type="button" onClick={() => setEditing(editing === t.id ? null : t.id)}>
-                  {editing === t.id ? "Close" : "Edit"}
-                </button>
-                <button className="btn btn-ghost btn-sm" type="button" disabled={busy === t.id} onClick={() => setPendingDelete(t)}>Delete</button>
+                {canEdit ? (
+                  <button className="btn btn-ghost btn-sm" type="button" onClick={() => setEditing(editing === t.id ? null : t.id)}>
+                    {editing === t.id ? "Close" : "Edit"}
+                  </button>
+                ) : null}
+                {canDelete ? (
+                  <button className="btn btn-ghost btn-sm" type="button" disabled={busy === t.id} onClick={() => setPendingDelete(t)}>Delete</button>
+                ) : null}
               </span>
             </div>
             {editing === t.id ? (
@@ -932,7 +966,7 @@ type StageDraft = { label: string; color: string };
  * reordered here; only label + colour are editable. Saving pushes the change
  * into the shared LeadStages store so every screen updates without a reload.
  */
-function PipelineStagesCard() {
+function PipelineStagesCard({ canEdit }: { canEdit: boolean }) {
   const { applyServer } = useLeadStages();
   const [drafts, setDrafts] = useState<Record<CrmLeadStatus, StageDraft> | null>(null);
   const [initial, setInitial] = useState<Record<CrmLeadStatus, StageDraft> | null>(null);
@@ -1032,6 +1066,7 @@ function PipelineStagesCard() {
       title="Pipeline stages"
       sub="Rename a stage or change its colour. The seven stages are fixed — only the label and colour shown across the app change."
     >
+      <fieldset disabled={!canEdit} style={READ_ONLY_FIELDSET}>
       {loadError ? <div className="form-alert">{loadError}</div> : null}
       {saveError ? <div className="form-alert">{saveError}</div> : null}
       {drafts === null ? (
@@ -1085,12 +1120,37 @@ function PipelineStagesCard() {
           </div>
         </>
       )}
+      </fieldset>
     </Card>
   );
 }
 
 export default function OrgSettingsPage() {
-  const { accessToken, updateOrganisation } = useAuth();
+  const { accessToken, updateOrganisation, hasPermission } = useAuth();
+  const router = useRouter();
+  // Settings pills (enforced for the org admin too); the Domain, Billing, CRM
+  // option lists and Project Catalogs sections follow their own modules.
+  const canViewSettings = hasPermission("settings", "view");
+  const canEditProfile = hasPermission("settings", SETTINGS_ACTIONS.editProfile);
+  const canEditEmail = hasPermission("settings", SETTINGS_ACTIONS.editEmail);
+  const canEditPipeline = hasPermission("settings", SETTINGS_ACTIONS.editPipeline);
+  const canViewDomain = hasPermission("domains", "view");
+  const canRequestDomain = hasPermission("domains", "add");
+  const canViewBilling = hasPermission("billing", "view");
+  const canEditBilling = hasPermission("billing", "edit");
+  const canViewProjects = hasPermission("projects", "view");
+  const canAddProjectConfig = hasPermission("projects", "add");
+  const canEditProjectConfig = hasPermission("projects", "edit");
+  const canDeleteProjectConfig = hasPermission("projects", "delete");
+  const sectionAllowed = (s: string) => {
+    if (s === "domain") return canViewDomain;
+    if (s === "billing") return canViewBilling;
+    if (s === "crm" || s === "catalogs") return canViewProjects;
+    return canViewSettings;
+  };
+  useEffect(() => {
+    if (accessToken && !canViewSettings) router.replace("/org");
+  }, [accessToken, canViewSettings, router]);
   const [section, setSection] = useState("general");
   const [org, setOrg] = useState<SafeOrganisation | null>(null);
   const [form, setForm] = useState<GeneralBrandingForm | null>(null);
@@ -1196,22 +1256,22 @@ export default function OrgSettingsPage() {
   }, [accessToken]);
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || !canViewBilling) return;
     apiFetch<OrgBillingSummary>("/org/billing", { headers: { Authorization: `Bearer ${accessToken}` } })
       .then(setBilling).catch((err) => setBillingError(err instanceof Error ? err.message : "Failed to load billing."))
       .finally(() => setBillingLoading(false));
-  }, [accessToken]);
+  }, [accessToken, canViewBilling]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
-    if (!accessToken) return;
+    if (!accessToken || !canViewBilling) return;
     setPlansLoading(true); setInvoicesLoading(true);
     Promise.all([getPlans(), getInvoices()])
       .then(([p, inv]) => { setPlans(p); setInvoices(inv); })
       .catch(() => { })
       .finally(() => { setPlansLoading(false); setInvoicesLoading(false); });
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [accessToken]);
+  }, [accessToken, canViewBilling]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -1328,10 +1388,14 @@ export default function OrgSettingsPage() {
   const q = navQuery.trim().toLowerCase();
   const filteredGroups = NAV_GROUPS.map((g) => ({
     ...g,
-    items: g.items.filter((it) => (q ? it.t.toLowerCase().includes(q) : true)),
+    items: g.items.filter((it) => sectionAllowed(it.s) && (q ? it.t.toLowerCase().includes(q) : true)),
   })).filter((g) => g.items.length > 0);
 
-  const saveButton = (
+  const activeSection = sectionAllowed(section)
+    ? section
+    : NAV_GROUPS.flatMap((g) => g.items.map((i) => i.s as string)).find(sectionAllowed) ?? section;
+
+  const saveButton = !canEditProfile ? null : (
     <div className="os-actions">
       <button className="btn btn-ghost" onClick={handleDiscard} disabled={saving || !dirty}>Discard</button>
       <button className="btn btn-primary" onClick={() => void handleSave()} disabled={saving}>
@@ -1374,7 +1438,7 @@ export default function OrgSettingsPage() {
                 {g.items.map((it) => (
                   <button
                     key={it.s}
-                    className={`os-nav-item${section === it.s ? " on" : ""}`}
+                    className={`os-nav-item${activeSection === it.s ? " on" : ""}`}
                     onClick={() => setSection(it.s)}
                   >
                     <span className="os-nav-ic"><Icon name={it.icon} size={16} /></span>
@@ -1387,8 +1451,9 @@ export default function OrgSettingsPage() {
         </aside>
 
         <div className="os-content">
+          <fieldset disabled={!canEditProfile} style={READ_ONLY_FIELDSET}>
           {/* GENERAL */}
-          <div className={`os-section${section === "general" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "general" ? " on" : ""}`}>
             <SectionHead section="general" />
             <Card icon="building" title="Organisation profile" sub="Basic details" >
               <div className="row2">
@@ -1447,7 +1512,7 @@ export default function OrgSettingsPage() {
           </div>
 
           {/* BRANDING */}
-          <div className={`os-section${section === "branding" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "branding" ? " on" : ""}`}>
             <SectionHead section="branding" />
             <Card icon="sparkles" title="Logo & identity" sub="Shown across the app, landing pages & emails">
               <div className="row2">
@@ -1540,7 +1605,7 @@ export default function OrgSettingsPage() {
           </div>
 
           {/* LOCALIZATION */}
-          <div className={`os-section${section === "localization" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "localization" ? " on" : ""}`}>
             <SectionHead section="localization" />
             <Card icon="globe" title="Formats & language" sub="Regional preferences">
               <div className="row3">
@@ -1561,14 +1626,16 @@ export default function OrgSettingsPage() {
             </Card>
           </div>
 
+          </fieldset>
+
           {/* DOMAIN */}
-          <div className={`os-section${section === "domain" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "domain" ? " on" : ""}`}>
             <SectionHead section="domain" />
-            <DomainSection />
+            {canViewDomain ? <DomainSection canRequest={canRequestDomain} /> : null}
           </div>
 
           {/* CRM */}
-          <div className={`os-section${section === "crm" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "crm" ? " on" : ""}`}>
             <SectionHead section="crm" />
             {/* TODO: static Lead capture & Required fields cards — toggles/pills not persisted.
             <Card icon="crm" title="Lead capture & behaviour" sub="How leads are created and handled">
@@ -1594,18 +1661,22 @@ export default function OrgSettingsPage() {
               </div>
             </Card>
             */}
+            {canViewProjects ? (
             <CatalogSection
               groups={LEAD_CATALOG_GROUPS}
+              canAdd={canAddProjectConfig}
+              canDelete={canDeleteProjectConfig}
               heading={{
                 title: "Lead option lists",
                 sub: "Tags and the Requirement-section dropdown choices on the lead edit page. Each list starts empty — build it from your own options. (Configuration, Facing and Parking are shared lists — manage those under Project Catalogs.)",
               }}
             />
+            ) : null}
           </div>
 
           {/* FIELDS */}
           {/* TODO: static Custom Attributes — hardcoded sample attributes, Edit/Add not wired.
-          <div className={`os-section${section === "fields" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "fields" ? " on" : ""}`}>
             <SectionHead section="fields" />
             <Card icon="puzzle" title="Custom attributes" sub="Add your own fields to leads, contacts, projects & bookings">
               <div className="tbl-wrap"><table className="tbl">
@@ -1632,9 +1703,9 @@ export default function OrgSettingsPage() {
           */}
 
           {/* PIPELINE */}
-          <div className={`os-section${section === "pipeline" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "pipeline" ? " on" : ""}`}>
             <SectionHead section="pipeline" />
-            <PipelineStagesCard />
+            <PipelineStagesCard canEdit={canEditPipeline} />
             {/* TODO: static Lost reasons & Lead sources cards — fixed pills, add/remove not wired.
             <Card icon="modules" title="Lost reasons" sub="Why deals are marked lost">
               <div className="pill-list">
@@ -1652,15 +1723,23 @@ export default function OrgSettingsPage() {
           </div>
 
           {/* CATALOGS */}
-          <div className={`os-section${section === "catalogs" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "catalogs" ? " on" : ""}`}>
             <SectionHead section="catalogs" />
-            <ProjectTypesSection />
-            <CatalogSection />
+            {canViewProjects ? (
+              <>
+                <ProjectTypesSection
+                  canAdd={canAddProjectConfig}
+                  canEdit={canEditProjectConfig}
+                  canDelete={canDeleteProjectConfig}
+                />
+                <CatalogSection canAdd={canAddProjectConfig} canDelete={canDeleteProjectConfig} />
+              </>
+            ) : null}
           </div>
 
           {/* SCORING */}
           {/* TODO: static Scoring & Assignment — hardcoded scoring rules & assignment settings, not persisted.
-          <div className={`os-section${section === "scoring" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "scoring" ? " on" : ""}`}>
             <SectionHead section="scoring" />
             <Card icon="star" title="Lead scoring" sub="Points that make a lead Hot / Warm / Cold">
               <div className="card-b" style={{ padding: 0 }}>
@@ -1684,7 +1763,7 @@ export default function OrgSettingsPage() {
 
           {/* AUTOMATION */}
           {/* TODO: static Automation & SLA — hardcoded toggles & SLA target, not persisted.
-          <div className={`os-section${section === "automation" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "automation" ? " on" : ""}`}>
             <SectionHead section="automation" />
             <Card icon="link" title="Response SLA" sub="Targets & escalation">
               <div className="card-b" style={{ padding: 0 }}>
@@ -1705,7 +1784,7 @@ export default function OrgSettingsPage() {
 
           {/* COMMS */}
           {/* TODO: static Calling & WhatsApp — hardcoded toggles & sample number, not persisted.
-          <div className={`os-section${section === "comms" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "comms" ? " on" : ""}`}>
             <SectionHead section="comms" />
             <Card icon="phone" title="Calling" sub="Dialler & AI voice">
               <div className="card-b" style={{ padding: 0 }}>
@@ -1727,16 +1806,18 @@ export default function OrgSettingsPage() {
           */}
 
           {/* EMAIL */}
-          <div className={`os-section${section === "email" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "email" ? " on" : ""}`}>
             <SectionHead section="email" />
             <Card icon="mail" title="Organisation SMTP" sub="Used for team invites, password resets and notifications from this workspace">
-              <OrgSmtpSettings />
+              <fieldset disabled={!canEditEmail} style={READ_ONLY_FIELDSET}>
+                <OrgSmtpSettings />
+              </fieldset>
             </Card>
           </div>
 
           {/* NOTIFICATIONS */}
           {/* TODO: static Notifications — hardcoded event/channel toggles, not persisted.
-          <div className={`os-section${section === "notifications" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "notifications" ? " on" : ""}`}>
             <SectionHead section="notifications" />
             <Card icon="bell" title="Notifications" sub="Channels per event type">
               <div className="tbl-wrap"><table className="tbl">
@@ -1756,7 +1837,7 @@ export default function OrgSettingsPage() {
 
           {/* DATA */}
           {/* TODO: static Data & Import — import drop zone & export buttons have no handlers.
-          <div className={`os-section${section === "data" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "data" ? " on" : ""}`}>
             <SectionHead section="data" />
             <Card icon="document" title="Import & export" sub="Move data in and out">
               <div className="row2">
@@ -1773,7 +1854,7 @@ export default function OrgSettingsPage() {
 
           {/* API */}
           {/* TODO: static API & Webhooks — placeholder "coming soon" copy only.
-          <div className={`os-section${section === "api" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "api" ? " on" : ""}`}>
             <SectionHead section="api" />
             <Card icon="key" title="API keys" sub="Programmatic access">
               <p className="muted" style={{ margin: 0 }}>
@@ -1790,7 +1871,7 @@ export default function OrgSettingsPage() {
 
           {/* AUDIT */}
           {/* TODO: static Audit Log — hardcoded sample rows, not loaded from the API.
-          <div className={`os-section${section === "audit" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "audit" ? " on" : ""}`}>
             <SectionHead section="audit" />
             <Card icon="shield" title="Audit log" sub="Recent admin & security events">
               <div className="tbl-wrap"><table className="tbl">
@@ -1806,7 +1887,7 @@ export default function OrgSettingsPage() {
           */}
 
           {/* BILLING */}
-          <div className={`os-section${section === "billing" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "billing" ? " on" : ""}`}>
             <SectionHead section="billing" />
 
             {/* Success / Alert Banner */}
@@ -1850,7 +1931,7 @@ export default function OrgSettingsPage() {
                 <button
                   className="btn btn-ghost btn-sm"
                   style={{ color: "var(--rose)", borderColor: "rgba(244,63,94,0.3)" }}
-                  disabled={cancelingRequest}
+                  disabled={cancelingRequest || !canEditBilling}
                   onClick={() => void handleCancelPackageChangeRequest()}
                 >
                   {cancelingRequest ? "Cancelling…" : "Cancel Request"}
@@ -1946,7 +2027,7 @@ export default function OrgSettingsPage() {
                         </span>
                         <span className="muted" style={{ fontSize: 12 }}> / {billing.subscription.billingCycle === "yearly" ? "year" : "month"}</span>
                       </div>
-                      <button className="btn btn-ghost btn-sm" onClick={() => void handleRenew()} disabled={renewLoading}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => void handleRenew()} disabled={renewLoading || !canEditBilling}>
                         {renewLoading ? "Renewing…" : "Manage Subscription"}
                       </button>
                     </div>
@@ -2142,7 +2223,8 @@ export default function OrgSettingsPage() {
 
                         <button
                           className={`btn ${isCurrent ? "" : isPendingTarget ? "btn-ghost" : "btn-primary"}`}
-                          disabled={isCurrent || !!pendingChangeRequest}
+                          disabled={isCurrent || !!pendingChangeRequest || !canEditBilling}
+                          title={canEditBilling ? undefined : "You don't have permission to change the plan"}
                           onClick={() => setRequestModalPlan(p)}
                           style={{
                             width: "100%",
@@ -2268,7 +2350,7 @@ export default function OrgSettingsPage() {
 
           {/* SECURITY */}
           {/* TODO: static Security section — sign-in policy toggles & danger-zone buttons are not persisted/wired.
-          <div className={`os-section${section === "security" ? " on" : ""}`}>
+          <div className={`os-section${activeSection === "security" ? " on" : ""}`}>
             <SectionHead section="security" />
             <Card icon="lock" title="Sign-in policy" sub="Access & authentication">
               <div className="card-b" style={{ padding: 0 }}>

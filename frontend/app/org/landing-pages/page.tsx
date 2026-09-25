@@ -108,8 +108,23 @@ function formatDate(iso: string): string {
 }
 
 export default function OrgLandingPagesPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
   const router = useRouter();
+
+  // One flag per Landing Pages pill (named after the button it unlocks) —
+  // enforced for the org admin too, whose access Super Admin sets. The
+  // template picker also needs Templates > View to list the templates.
+  const canView = hasPermission("landing_pages", "view");
+  const canCreate = hasPermission("landing_pages", "add");
+  const canEdit = hasPermission("landing_pages", "edit");
+  const canDelete = hasPermission("landing_pages", "delete");
+  const canPublish = hasPermission("landing_pages", "activate");
+  const canPause = hasPermission("landing_pages", "deactivate");
+  const canPickTemplate = canCreate && hasPermission("templates", "view");
+
+  useEffect(() => {
+    if (accessToken && !canView) router.replace("/org");
+  }, [accessToken, canView, router]);
 
   // Create scratch modal state
   const [scratchOpen, setScratchOpen] = useState(false);
@@ -186,7 +201,7 @@ export default function OrgLandingPagesPage() {
   }
 
   const fetchList = useCallback(() => {
-    if (!accessToken) return;
+    if (!accessToken || !canView) return;
     setLoading(true);
     setLoadError(null);
     const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
@@ -198,7 +213,7 @@ export default function OrgLandingPagesPage() {
       .then(setResult)
       .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load pages."))
       .finally(() => setLoading(false));
-  }, [accessToken, page, tabIndex]);
+  }, [accessToken, canView, page, tabIndex]);
 
   useEffect(() => {
     fetchList();
@@ -478,7 +493,7 @@ export default function OrgLandingPagesPage() {
 
         {/* Global Header Actions */}
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          {!atLandingPageCreateLimit && (
+          {canCreate && !atLandingPageCreateLimit && (
             <>
               <button
                 className="btn btn-soft"
@@ -501,21 +516,23 @@ export default function OrgLandingPagesPage() {
                 <Sparkles size={15} /> Create from scratch
               </button>
 
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={openTemplatePicker}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  borderRadius: 11,
-                  fontWeight: 700,
-                  padding: "9px 18px",
-                }}
-              >
-                <Plus size={16} /> New from template
-              </button>
+              {canPickTemplate ? (
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={openTemplatePicker}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    borderRadius: 11,
+                    fontWeight: 700,
+                    padding: "9px 18px",
+                  }}
+                >
+                  <Plus size={16} /> New from template
+                </button>
+              ) : null}
             </>
           )}
         </div>
@@ -769,8 +786,9 @@ export default function OrgLandingPagesPage() {
                 Clear Search
               </button>
             ) : (
-              !atLandingPageCreateLimit && (
+              canCreate && !atLandingPageCreateLimit && (
                 <>
+                  {canPickTemplate ? (
                   <button
                     type="button"
                     onClick={openTemplatePicker}
@@ -785,6 +803,7 @@ export default function OrgLandingPagesPage() {
                   >
                     <Plus size={16} /> Choose from Templates
                   </button>
+                  ) : null}
                   <button
                     type="button"
                     className="btn btn-soft"
@@ -844,13 +863,15 @@ export default function OrgLandingPagesPage() {
                     <td style={{ fontSize: 12.5, color: "var(--muted)" }}>{formatDate(row.updatedAt)}</td>
                     <td style={{ textAlign: "right" }}>
                       <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-                        <button
-                          type="button"
-                          className="btn btn-soft btn-sm"
-                          onClick={() => startEdit(row)}
-                        >
-                          <Edit2 size={12} /> Edit
-                        </button>
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            className="btn btn-soft btn-sm"
+                            onClick={() => startEdit(row)}
+                          >
+                            <Edit2 size={12} /> Edit
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
@@ -859,6 +880,7 @@ export default function OrgLandingPagesPage() {
                           <Eye size={12} /> View
                         </button>
                         {row.status === "published" ? (
+                          canPause ? (
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
@@ -867,7 +889,8 @@ export default function OrgLandingPagesPage() {
                           >
                             Unpublish
                           </button>
-                        ) : (
+                          ) : null
+                        ) : canPublish ? (
                           <button
                             type="button"
                             className="btn btn-primary btn-sm"
@@ -877,24 +900,28 @@ export default function OrgLandingPagesPage() {
                           >
                             Publish
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => duplicatePage(row.id)}
-                          title="Duplicate"
-                        >
-                          <Copy size={12} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => setDeleteTarget({ id: row.id, name: row.name })}
-                          style={{ color: "var(--rose)" }}
-                          title="Delete"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        ) : null}
+                        {canCreate ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => duplicatePage(row.id)}
+                            title="Duplicate"
+                          >
+                            <Copy size={12} />
+                          </button>
+                        ) : null}
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setDeleteTarget({ id: row.id, name: row.name })}
+                            style={{ color: "var(--rose)" }}
+                            title="Delete"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -917,12 +944,12 @@ export default function OrgLandingPagesPage() {
               key={row.id}
               row={row}
               busy={busyId === row.id}
-              onEdit={() => startEdit(row)}
+              onEdit={canEdit ? () => startEdit(row) : undefined}
               onView={() => openView(row.id)}
-              onPublish={() => publishPage(row.id)}
-              onUnpublish={() => unpublishPage(row.id)}
-              onDuplicate={() => duplicatePage(row.id)}
-              onDelete={() => setDeleteTarget({ id: row.id, name: row.name })}
+              onPublish={canPublish ? () => publishPage(row.id) : undefined}
+              onUnpublish={canPause ? () => unpublishPage(row.id) : undefined}
+              onDuplicate={canCreate ? () => duplicatePage(row.id) : undefined}
+              onDelete={canDelete ? () => setDeleteTarget({ id: row.id, name: row.name }) : undefined}
             />
           ))}
         </div>
@@ -1347,12 +1374,13 @@ function OrgLandingPageVisualCard({
 }: {
   row: LandingPageRow;
   busy: boolean;
-  onEdit: () => void;
+  // Omitted handlers hide their button (the user lacks that permission).
+  onEdit?: () => void;
   onView: () => void;
-  onPublish: () => void;
-  onUnpublish: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
+  onPublish?: () => void;
+  onUnpublish?: () => void;
+  onDuplicate?: () => void;
+  onDelete?: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1465,6 +1493,7 @@ function OrgLandingPageVisualCard({
               padding: 16,
             }}
           >
+            {onEdit ? (
             <button
               type="button"
               onClick={onEdit}
@@ -1488,6 +1517,7 @@ function OrgLandingPageVisualCard({
             >
               <Pencil size={14} /> Open Builder
             </button>
+            ) : null}
 
             <button
               type="button"
@@ -1529,7 +1559,7 @@ function OrgLandingPageVisualCard({
         <div>
           <button
             type="button"
-            onClick={onEdit}
+            onClick={onEdit ?? onView}
             style={{
               border: "none",
               background: "transparent",
@@ -1592,6 +1622,7 @@ function OrgLandingPageVisualCard({
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+          {onEdit ? (
           <button
             type="button"
             onClick={onEdit}
@@ -1600,8 +1631,10 @@ function OrgLandingPageVisualCard({
           >
             <Pencil size={13} /> Edit
           </button>
+          ) : null}
 
           {isPublished ? (
+            onUnpublish ? (
             <button
               type="button"
               className="btn btn-ghost btn-sm"
@@ -1611,7 +1644,8 @@ function OrgLandingPageVisualCard({
             >
               <PauseCircle size={13} /> Pause
             </button>
-          ) : (
+            ) : null
+          ) : onPublish ? (
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -1621,10 +1655,12 @@ function OrgLandingPageVisualCard({
             >
               <Rocket size={13} /> Publish
             </button>
-          )}
+          ) : null}
 
-          {/* More menu */}
-          <div style={{ position: "relative" }}>
+          {/* More menu — pinned to the right edge (marginLeft: auto) so its
+              right-anchored popup stays inside the card even when Edit /
+              Publish / Pause are hidden by permissions. */}
+          <div style={{ position: "relative", marginLeft: "auto" }}>
             <button
               type="button"
               className="btn btn-ghost btn-sm"
@@ -1664,28 +1700,32 @@ function OrgLandingPageVisualCard({
                 >
                   <Eye size={13} /> Live Preview
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDuplicate();
-                  }}
-                  style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
-                >
-                  <Copy size={13} /> Duplicate
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDelete();
-                  }}
-                  style={{ justifyContent: "flex-start", gap: 8, fontSize: 12, color: "var(--rose)" }}
-                >
-                  <Trash2 size={13} /> Delete
-                </button>
+                {onDuplicate ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onDuplicate();
+                    }}
+                    style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
+                  >
+                    <Copy size={13} /> Duplicate
+                  </button>
+                ) : null}
+                {onDelete ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onDelete();
+                    }}
+                    style={{ justifyContent: "flex-start", gap: 8, fontSize: 12, color: "var(--rose)" }}
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                ) : null}
               </div>
             )}
           </div>

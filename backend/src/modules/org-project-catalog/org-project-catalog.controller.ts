@@ -20,6 +20,10 @@ import { CreateCatalogOptionDto } from './dto/create-catalog-option.dto';
 import { UpdateCatalogOptionDto } from './dto/update-catalog-option.dto';
 import { ListCatalogOptionsQueryDto } from './dto/list-catalog-options-query.dto';
 
+// Every route checks its Projects pill — for the org admin too, whose access
+// Super Admin sets in Organisation roles (`enforceForOrgAdmin`).
+const ENFORCE = { enforceForOrgAdmin: true } as const;
+
 // Org-managed custom catalogs for the project onboarding wizard. Every route
 // derives orgId from the JWT — never from a client-supplied param — so one
 // org can never read or touch another org's options.
@@ -28,7 +32,7 @@ import { ListCatalogOptionsQueryDto } from './dto/list-catalog-options-query.dto
 export class OrgProjectCatalogController {
   constructor(private readonly service: OrgProjectCatalogService) {}
 
-  @RequirePermission('projects', 'view')
+  @RequirePermission('projects', 'view', ENFORCE)
   @Get()
   list(
     @CurrentUser() user: JwtPayload,
@@ -37,13 +41,13 @@ export class OrgProjectCatalogController {
     return this.service.list(user.orgId as string, query.category);
   }
 
-  @RequirePermission('projects', 'add')
+  @RequirePermission('projects', 'add', ENFORCE)
   @Post()
   create(@CurrentUser() user: JwtPayload, @Body() dto: CreateCatalogOptionDto) {
     return this.service.create(user.orgId as string, dto);
   }
 
-  @RequirePermission('projects', 'edit')
+  @RequirePermission('projects', 'edit', ENFORCE)
   @Patch(':id')
   update(
     @CurrentUser() user: JwtPayload,
@@ -53,7 +57,7 @@ export class OrgProjectCatalogController {
     return this.service.update(user.orgId as string, id, dto);
   }
 
-  @RequirePermission('projects', 'delete')
+  @RequirePermission('projects', 'delete', ENFORCE)
   @Delete(':id')
   remove(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.remove(user.orgId as string, id);
