@@ -142,14 +142,14 @@ export default function OrgProjectsPage() {
       style={{ position: "absolute", right: 0, bottom: 0, width: "52%", height: 38, pointerEvents: "none" }}
     >
       <defs>
-        <linearGradient id={`spark-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={`spark-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.28" />
           <stop offset="100%" stopColor={color} stopOpacity="0.0" />
         </linearGradient>
       </defs>
       <path
         d="M0 34 C25 32, 40 37, 60 25 C80 13, 95 20, 110 8 C115 4, 118 6, 120 3 L120 40 L0 40 Z"
-        fill={`url(#spark-${color.replace('#','')})`}
+        fill={`url(#spark-${color.replace('#', '')})`}
       />
       <path
         d="M0 34 C25 32, 40 37, 60 25 C80 13, 95 20, 110 8 C115 4, 118 6, 120 3"
@@ -222,7 +222,7 @@ export default function OrgProjectsPage() {
       ) : null}
 
       {/* KPI Cards Row (4 Cards) */}
-      <div className="grid g4 reveal in mb-24" style={{ gap: 16 }}>
+      <div className="grid g4 reveal in mb-6" style={{ gap: 16 }}>
         {/* Card 1: Active Projects */}
         <Reveal delay={1}>
           <div
