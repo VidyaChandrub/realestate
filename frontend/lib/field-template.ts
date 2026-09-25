@@ -81,6 +81,12 @@ export interface FieldDef {
   unit?: string;
   /** text only — render as a textarea instead of a single-line input. */
   multiline?: boolean;
+  /**
+   * number, non-role fields only — an explicit opt-in to also get a column
+   * in "Defaults per configuration" and prefill on Add Unit the same way
+   * Price and Area do. Never inferred from the field's name.
+   */
+  extraDefault?: boolean;
 }
 
 /** The field currently carrying `role` in a template, or null. */
@@ -94,16 +100,14 @@ export function nonRoleFields(template: FieldDef[]): FieldDef[] {
 }
 
 /**
- * Area-like defaults that should be copied into each configuration row when a
- * project offers multiple unit types. These are not role fields (they do not
- * map to dedicated Unit columns), but they are still meaningful defaults to
- * persist per configuration — e.g. Built-up Area for apartments, Plot Area for
- * plots, and both for villas.
+ * Non-role Number fields explicitly opted in (via `extraDefault`) to also get
+ * a column in "Defaults per configuration" and prefill on Add Unit — e.g.
+ * Built-up Area alongside the actual Area-role field. Deliberately not
+ * inferred from the field's name: which fields show up here is exactly what
+ * was ticked in the field-roles panel, nothing else.
  */
 export function defaultableExtraFields(template: FieldDef[]): FieldDef[] {
-  return nonRoleFields(template).filter((f) => (
-    f.type === "number" && /(?:area|built|plot|carpet|super)/i.test(f.label)
-  ));
+  return nonRoleFields(template).filter((f) => f.type === "number" && f.extraDefault === true);
 }
 
 /** What a template's role fields give a project. Derived, never stored. */
@@ -170,6 +174,8 @@ export interface FieldRow {
   /** number: display unit as typed */
   unit: string;
   multiline: boolean;
+  /** number, non-role fields only — see `FieldDef.extraDefault`. */
+  extraDefault: boolean;
 }
 
 let nextRowId = 1;
@@ -186,6 +192,7 @@ export function makeFieldRow(patch: Partial<FieldRow> = {}): FieldRow {
     optionsText: "",
     unit: "",
     multiline: false,
+    extraDefault: false,
     ...patch,
   };
 }
@@ -202,6 +209,7 @@ export function fieldsToRows(fields: FieldDef[] | null | undefined): FieldRow[] 
       optionsText: (f.options ?? []).join(", "),
       unit: f.unit ?? "",
       multiline: f.multiline ?? false,
+      extraDefault: f.extraDefault ?? false,
     }),
   );
 }
@@ -246,6 +254,7 @@ export function rowsToFields(rows: FieldRow[]): Array<FieldDef> {
         : {}),
       ...(r.type === "number" && r.unit.trim() ? { unit: r.unit.trim() } : {}),
       ...(r.type === "text" && r.multiline ? { multiline: true } : {}),
+      ...(r.type === "number" && !r.role && r.extraDefault ? { extraDefault: true } : {}),
     }));
 }
 
