@@ -17,6 +17,7 @@ import {
   dtoToModulePermission,
   fullModulePermission,
   moduleActions,
+  roleInUseMessage,
   PERMISSION_MODULES,
   PLATFORM_PERMISSION_MODULES,
   SYSTEM_ORG_ID,
@@ -239,6 +240,15 @@ export class AdminRolesService {
       }
     }
 
+    // A role still assigned to users can't be switched off — it would leave
+    // those users with a role that no longer applies.
+    if (dto.status === 'inactive' && role.status !== 'inactive') {
+      const assigned = await this.prisma.userRole.count({ where: { roleId: id } });
+      if (assigned > 0) {
+        throw new BadRequestException(roleInUseMessage(role.name, assigned, 'make it inactive'));
+      }
+    }
+
     return this.prisma.role.update({
       where: { id },
       data: {
@@ -264,7 +274,7 @@ export class AdminRolesService {
     }
     if (role._count.userRoles > 0) {
       throw new BadRequestException(
-        `Cannot delete role '${role.name}' because ${role._count.userRoles} user(s) are currently assigned to it`,
+        roleInUseMessage(role.name, role._count.userRoles, 'delete it'),
       );
     }
     await this.prisma.role.delete({ where: { id } });

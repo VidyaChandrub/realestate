@@ -27,6 +27,8 @@ interface RoleDef {
   locked: boolean;
   custom?: boolean;
   id?: string;
+  /** Members holding this org-created role (custom roles only). */
+  userCount?: number;
 }
 
 interface PermissionsCatalogResponse {
@@ -192,6 +194,8 @@ export default function OrgRolesPermissionsPage() {
   const [createRoleError, setCreateRoleError] = useState<string | null>(null);
 
   const [confirmDeleteRole, setConfirmDeleteRole] = useState<RoleDef | null>(null);
+  // Shown instead of the delete confirmation when the role still has members.
+  const [roleInUse, setRoleInUse] = useState<RoleDef | null>(null);
   const [deletingRole, setDeletingRole] = useState(false);
 
   const notify = (msg: string, variant: "success" | "error" = "success") => {
@@ -548,7 +552,9 @@ export default function OrgRolesPermissionsPage() {
                         title={`Delete '${r.name}'`}
                         className="btn btn-ghost btn-sm"
                         style={{ padding: "2px 6px", color: "var(--rose, #e11d48)" }}
-                        onClick={() => setConfirmDeleteRole(r)}
+                        onClick={() =>
+                          (r.userCount ?? 0) > 0 ? setRoleInUse(r) : setConfirmDeleteRole(r)
+                        }
                       >
                         <Icon name="trash" size={13} />
                       </button>
@@ -904,6 +910,20 @@ export default function OrgRolesPermissionsPage() {
           </form>
         </Modal>
       ) : null}
+
+      <ConfirmModal
+        open={roleInUse !== null}
+        title={`Can't delete role '${roleInUse?.name ?? ""}' yet`}
+        message={
+          roleInUse
+            ? `This role is assigned to ${roleInUse.userCount === 1 ? "1 user" : `${roleInUse.userCount} users`}. Remove those users or change their role from the Users page first, then you can delete this role.`
+            : ""
+        }
+        confirmLabel="OK"
+        cancelLabel="Close"
+        onConfirm={() => setRoleInUse(null)}
+        onClose={() => setRoleInUse(null)}
+      />
 
       <ConfirmModal
         open={confirmDeleteRole !== null}

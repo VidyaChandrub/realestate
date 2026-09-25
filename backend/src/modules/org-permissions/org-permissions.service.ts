@@ -18,6 +18,7 @@ import {
   mergeRolePermissions,
   moduleActions,
   modulePermissionUpsertData,
+  roleInUseMessage,
   SYSTEM_ORG_ID,
   type ModulePermission,
   type PermissionAction,
@@ -52,6 +53,20 @@ export class OrgPermissionsService {
       orderBy: { sortOrder: 'asc' },
     });
 
+    // Members per org-created role, so the UI can explain why a role in use
+    // can't be deleted before trying (the delete itself re-checks).
+    const customIds = roles.filter((r) => r.orgId === orgId).map((r) => r.id);
+    const assignments = customIds.length
+      ? await this.prisma.userRole.findMany({
+          where: { roleId: { in: customIds } },
+          select: { roleId: true },
+        })
+      : [];
+    const userCounts = new Map<string, number>();
+    for (const a of assignments) {
+      userCounts.set(a.roleId, (userCounts.get(a.roleId) ?? 0) + 1);
+    }
+
     return {
       actions: [...PERMISSION_ACTIONS],
       modules: PERMISSION_MODULES.map((def) => ({
@@ -70,6 +85,7 @@ export class OrgPermissionsService {
         locked: UNRESTRICTABLE.has(role.key),
         // Org-created custom role — the org admin can rename/delete it.
         custom: role.orgId === orgId,
+        userCount: role.orgId === orgId ? userCounts.get(role.id) ?? 0 : undefined,
       })),
     };
   }
@@ -125,6 +141,12 @@ export class OrgPermissionsService {
     if (!role) {
       throw new NotFoundException('Role not found');
     }
+    if (dto.status === 'inactive' && role.status !== 'inactive') {
+      const assigned = await this.prisma.userRole.count({ where: { roleId } });
+      if (assigned > 0) {
+        throw new BadRequestException(roleInUseMessage(role.name, assigned, 'make it inactive'));
+      }
+    }
 
     return this.prisma.role.update({
       where: { id: roleId },
@@ -147,7 +169,7 @@ export class OrgPermissionsService {
     }
     if (role._count.userRoles > 0) {
       throw new BadRequestException(
-        `Cannot delete role '${role.name}' because ${role._count.userRoles} user(s) are currently assigned to it`,
+        roleInUseMessage(role.name, role._count.userRoles, 'delete it'),
       );
     }
 

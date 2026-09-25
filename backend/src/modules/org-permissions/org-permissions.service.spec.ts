@@ -106,3 +106,42 @@ describe('OrgPermissionsService.updateRole safety rules', () => {
     expect(prisma.$transaction).toHaveBeenCalled();
   });
 });
+
+describe('OrgPermissionsService custom roles in use', () => {
+  function makeRoleService(assigned: number) {
+    const role = { id: 'r-custom', orgId: 'org1', name: 'salesman', status: 'active' };
+    const prisma: any = {
+      role: {
+        findFirst: jest.fn().mockResolvedValue({ ...role, _count: { userRoles: assigned } }),
+        update: jest.fn().mockResolvedValue(role),
+        delete: jest.fn().mockResolvedValue(role),
+      },
+      userRole: { count: jest.fn().mockResolvedValue(assigned) },
+    };
+    return { service: new OrgPermissionsService(prisma), prisma };
+  }
+
+  it('refuses to delete a role that still has users', async () => {
+    const { service, prisma } = makeRoleService(2);
+    await expect(service.removeOrgRole('org1', 'r-custom')).rejects.toThrow(
+      /assigned to 2 users/,
+    );
+    expect(prisma.role.delete).not.toHaveBeenCalled();
+  });
+
+  it('refuses to make a role inactive while it has users', async () => {
+    const { service, prisma } = makeRoleService(1);
+    await expect(
+      service.updateOrgRole('org1', 'r-custom', { status: 'inactive' }),
+    ).rejects.toThrow(/assigned to 1 user\./);
+    expect(prisma.role.update).not.toHaveBeenCalled();
+  });
+
+  it('deletes or deactivates a role with no users', async () => {
+    const { service, prisma } = makeRoleService(0);
+    await service.updateOrgRole('org1', 'r-custom', { status: 'inactive' });
+    await service.removeOrgRole('org1', 'r-custom');
+    expect(prisma.role.update).toHaveBeenCalled();
+    expect(prisma.role.delete).toHaveBeenCalled();
+  });
+});

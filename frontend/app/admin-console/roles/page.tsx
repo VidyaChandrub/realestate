@@ -54,6 +54,12 @@ function setColumns(row: { actions?: string[] }, enabled: (col: PermissionColumn
   return out;
 }
 
+/** Same wording as the API's "role still has users" refusal. */
+function roleInUseMessage(roleName: string, users: number, action: string) {
+  const who = users === 1 ? "1 user" : `${users} users`;
+  return `Role '${roleName}' is assigned to ${who}. Remove or reassign ${users === 1 ? "that user" : "those users"} first, then you can ${action}.`;
+}
+
 function StatTile({
   label,
   value,
@@ -137,6 +143,8 @@ export default function SuperAdminRolesPage() {
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const [confirmDeleteState, setConfirmDeleteState] = useState<DynamicRole | null>(null);
+  // Shown instead of the delete confirmation when the role still has users.
+  const [roleInUse, setRoleInUse] = useState<{ role: DynamicRole; action: string } | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   // Default permissions configuration modal state
@@ -250,6 +258,12 @@ export default function SuperAdminRolesPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!accessToken || !editingRole) return;
+    // A role still assigned to users can't be made inactive (server re-checks).
+    const assigned = editingRole._count?.userRoles ?? 0;
+    if (editForm.status === "inactive" && editingRole.status !== "inactive" && assigned > 0) {
+      setEditError(roleInUseMessage(editingRole.name, assigned, "make it inactive"));
+      return;
+    }
     setEditSubmitting(true);
     setEditError(null);
     try {
@@ -727,7 +741,11 @@ export default function SuperAdminRolesPage() {
                               className="btn btn-ghost btn-sm"
                               type="button"
                               style={{ color: "var(--rose, #e11d48)", fontWeight: 500 }}
-                              onClick={() => setConfirmDeleteState(r)}
+                              onClick={() =>
+                                (r._count?.userRoles ?? 0) > 0
+                                  ? setRoleInUse({ role: r, action: "delete it" })
+                                  : setConfirmDeleteState(r)
+                              }
                             >
                               Delete
                             </button>
@@ -1034,6 +1052,21 @@ export default function SuperAdminRolesPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Role still has users — explain instead of deleting */}
+      <ConfirmModal
+        open={roleInUse !== null}
+        title={`Can't delete role '${roleInUse?.role.name ?? ""}' yet`}
+        message={
+          roleInUse
+            ? roleInUseMessage(roleInUse.role.name, roleInUse.role._count?.userRoles ?? 0, roleInUse.action)
+            : ""
+        }
+        confirmLabel="OK"
+        cancelLabel="Close"
+        onConfirm={() => setRoleInUse(null)}
+        onClose={() => setRoleInUse(null)}
+      />
 
       {/* Delete Confirmation */}
       <ConfirmModal

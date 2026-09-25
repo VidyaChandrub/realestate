@@ -672,3 +672,9 @@ export function modulePermissionUpsertData(input: ModulePermission) {
     canAddLead: perm.canAddLead,
   };
 }
+
+/** Shared wording for "this role still has users" refusals. */
+export function roleInUseMessage(roleName: string, users: number, action: string) {
+  const who = users === 1 ? '1 user' : `${users} users`;
+  return `Role '${roleName}' is assigned to ${who}. Remove or reassign ${users === 1 ? 'that user' : 'those users'} first, then you can ${action}.`;
+}
