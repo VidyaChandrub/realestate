@@ -555,7 +555,7 @@ export default function OrgLeadEditPage() {
                 <LeadStatusSelect value={lead.status} onConfirm={confirmStatus} />
                 <div className="hint">Saved immediately — a note is required and appears in activity.</div>
               </div>
-              <div className="field">
+              <div className="field" style={{ marginBottom: 0 }}>
                 <label>Temperature</label>
                 <div className="opts" data-single>
                   {TEMPERATURES.map((t) => {
@@ -572,11 +572,13 @@ export default function OrgLeadEditPage() {
                   })}
                 </div>
               </div>
+              {/* Lead score — hidden until automated scoring exists. Uncomment to restore.
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>Lead score (auto)</label>
                 <input className="inp" value="—" disabled readOnly />
                 <div className="hint">Recalculated from activity &amp; profile — automated scoring is not enabled yet.</div>
               </div>
+              */}
             </div>
           </div>
 
@@ -608,6 +610,8 @@ export default function OrgLeadEditPage() {
             </div>
           </div>
 
+          {/* Consent — hidden for now; saved values are kept untouched on save.
+              Uncomment to restore.
           <div className="card">
             <div className="card-h"><span className="t">Consent</span></div>
             <div className="card-b" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -625,6 +629,7 @@ export default function OrgLeadEditPage() {
               </label>
             </div>
           </div>
+          */}
         </div>
       </div>
 

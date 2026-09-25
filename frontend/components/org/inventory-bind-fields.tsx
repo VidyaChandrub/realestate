@@ -22,6 +22,8 @@ export function InventoryBindFields({
   disabled,
   lockedProjectId,
   onAvailabilityChange,
+  hint,
+  required,
 }: {
   accessToken: string | null;
   value: InventoryBindValue;
@@ -29,6 +31,10 @@ export function InventoryBindFields({
   disabled?: boolean;
   lockedProjectId?: string;
   onAvailabilityChange?: (hasInventory: boolean) => void;
+  /** Replaces the landing-page help text under the select. */
+  hint?: string;
+  /** Shows the required mark on the label. */
+  required?: boolean;
 }) {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [units, setUnits] = useState<{ id: string; label: string }[]>([]);
@@ -78,6 +84,7 @@ export function InventoryBindFields({
     <div style={{ marginBottom: 14 }}>
       <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
         Project or standalone unit
+        {required ? <span className="req" style={{ color: "#ef4444" }}> *</span> : null}
       </label>
       <select
         className="inp"
@@ -117,7 +124,9 @@ export function InventoryBindFields({
         ) : null}
       </select>
       <div className="muted" style={{ fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>
-        {hasInventory
+        {hint
+          ? hint
+          : hasInventory
           ? "Only the selected record is filled into this page ({{property_name}}, price, RERA, location, and related widgets)."
           : "No projects or standalone units yet — the page will keep placeholder copy until you add inventory."}
       </div>

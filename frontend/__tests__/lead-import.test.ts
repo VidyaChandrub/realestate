@@ -19,7 +19,7 @@ describe("parseCsv", () => {
 });
 
 describe("parseLeadCsv", () => {
-  it("maps rows by header name (any order / spelling) and keeps line numbers", () => {
+  it("maps rows by header name (any order / spelling), ignores extra columns, keeps line numbers", () => {
     const res = parseLeadCsv(
       "Project Name,Email Address,Mobile,Full Name\n" +
         "Skyline, asha@example.com ,+91 98250 41200,Asha Rao\n" +
@@ -28,34 +28,32 @@ describe("parseLeadCsv", () => {
     );
     expect(res).toEqual({
       rows: [
-        { rowNumber: 2, name: "Asha Rao", phone: "+91 98250 41200", email: "asha@example.com", project: "Skyline" },
-        { rowNumber: 4, name: "Vikram", phone: "99099 12345", email: "", project: "Skyline" },
+        { rowNumber: 2, name: "Asha Rao", phone: "+91 98250 41200", email: "asha@example.com" },
+        { rowNumber: 4, name: "Vikram", phone: "99099 12345", email: "" },
       ],
     });
   });
 
   it("reports missing required columns", () => {
     const res = parseLeadCsv("Name,Phone\nAsha,123\n");
-    expect(res).toEqual({ error: expect.stringContaining("Missing columns: Email, Project") });
+    expect(res).toEqual({ error: expect.stringContaining("Missing column: Email") });
   });
 
   it("rejects an empty file or one with only a header", () => {
     expect(parseLeadCsv("")).toEqual({ error: "The file is empty." });
-    expect(parseLeadCsv("Name,Phone,Email,Project\n")).toEqual({
+    expect(parseLeadCsv("Name,Phone,Email\n")).toEqual({
       error: "The file has no lead rows below the header.",
     });
   });
 
   it(`rejects more than ${LEAD_IMPORT_MAX_ROWS} rows`, () => {
-    const body = Array.from({ length: LEAD_IMPORT_MAX_ROWS + 1 }, (_, i) => `N${i},1234567,a${i}@x.co,P`).join("\n");
-    const res = parseLeadCsv(`Name,Phone,Email,Project\n${body}`);
+    const body = Array.from({ length: LEAD_IMPORT_MAX_ROWS + 1 }, (_, i) => `N${i},1234567,a${i}@x.co`).join("\n");
+    const res = parseLeadCsv(`Name,Phone,Email\n${body}`);
     expect("error" in res && res.error).toContain(`at most ${LEAD_IMPORT_MAX_ROWS}`);
   });
 
   it("builds a sample that parses back into complete rows", () => {
-    const res = parseLeadCsv(buildCsv(sampleLeadCsvRows(["Skyline Heights"])));
-    expect("rows" in res && res.rows.every((r) => r.name && r.phone && r.email && r.project === "Skyline Heights")).toBe(
-      true,
-    );
+    const res = parseLeadCsv(buildCsv(sampleLeadCsvRows()));
+    expect("rows" in res && res.rows.every((r) => r.name && r.phone && r.email)).toBe(true);
   });
 });

@@ -21,6 +21,13 @@ import {
 } from '../../common/utils/lead-scope.util';
 import { listLeadAssignableUsers } from '../../common/utils/lead-assignee.util';
 
+/** The unit a lead is about — stored as `data.unitId` (Lead has no column). */
+function leadUnitId(data: unknown): string | null {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const unitId = normalizeLeadData(data as Record<string, unknown>).unitId;
+  return typeof unitId === 'string' && unitId ? unitId : null;
+}
+
 /** Sentinel org id for Super Admin template captures (Lead.orgId has no FK). */
 export const PLATFORM_LEAD_ORG_ID = 'platform';
 
@@ -30,18 +37,18 @@ const LEAD_IMPORT_EMAIL_MAX = 254;
 const LEAD_IMPORT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Why a CSV import row must be skipped, or null when it can be saved. All four
- * fields are required; `projectIds` are the org projects matching its name.
+ * Why a CSV import row must be skipped, or null when it can be saved. All
+ * three fields are required.
  */
-function importRowError(
-  row: { name: string; phone: string; email: string; projectName: string },
-  projectIds: string[],
-): string | null {
+function importRowError(row: {
+  name: string;
+  phone: string;
+  email: string;
+}): string | null {
   const missing = [
     !row.name && 'Name',
     !row.phone && 'Phone',
     !row.email && 'Email',
-    !row.projectName && 'Project',
   ].filter(Boolean);
   if (missing.length > 0) return `Missing ${missing.join(', ')}`;
   if (row.name.length > LEAD_IMPORT_NAME_MAX) {
@@ -55,10 +62,6 @@ function importRowError(
     !LEAD_IMPORT_EMAIL_REGEX.test(row.email)
   ) {
     return 'Invalid email address';
-  }
-  if (projectIds.length === 0) return `Project "${row.projectName}" not found`;
-  if (projectIds.length > 1) {
-    return `Project "${row.projectName}" matches more than one project`;
   }
   return null;
 }
@@ -307,28 +310,39 @@ export class LeadsService {
   }
 
   /**
-   * Bulk-create leads from CSV rows. Each row is validated independently —
-   * Name, Phone, Email and Project are all required, email/phone must be
-   * well-formed and Project must name one of the org's projects. Invalid rows
-   * are skipped (never written) and reported with their line number; valid
-   * rows go through the same insert path as a manual CRM lead.
+   * Bulk-create leads from CSV rows into one project or one standalone unit,
+   * picked for the whole file in the import dialog. Each row is validated
+   * independently — Name, Phone and Email are all required and email/phone
+   * must be well-formed. Invalid rows are skipped (never written) and reported
+   * with their line number; valid rows go through the same insert path as a
+   * manual CRM lead. Project leads follow the project's round-robin setting;
+   * standalone-unit leads are always left unassigned.
    */
   async importFromCsv(
     orgId: string,
     actor: JwtPayload,
     dto: ImportLeadsDto,
   ): Promise<LeadImportResult> {
-    const projects = await this.prisma.project.findMany({
-      where: { orgId },
-      select: { id: true, name: true },
-    });
-    // Case-insensitive name → ids. More than one id means the name is
-    // ambiguous and the row can't be bound safely.
-    const projectsByName = new Map<string, string[]>();
-    for (const p of projects) {
-      const key = p.name.trim().toLowerCase();
-      projectsByName.set(key, [...(projectsByName.get(key) ?? []), p.id]);
+    if (!!dto.projectId === !!dto.unitId) {
+      throw new BadRequestException(
+        'Select a project or a standalone unit to import these leads into',
+      );
     }
+    if (dto.projectId) {
+      const project = await this.prisma.project.findFirst({
+        where: { id: dto.projectId, orgId },
+        select: { id: true },
+      });
+      if (!project) throw new NotFoundException('Project not found');
+    }
+    if (dto.unitId) {
+      const unit = await this.prisma.unit.findFirst({
+        where: { id: dto.unitId, orgId, projectId: null },
+        select: { id: true },
+      });
+      if (!unit) throw new NotFoundException('Standalone unit not found');
+    }
+    const projectId = dto.projectId ?? null;
 
     const errors: LeadImportResult['errors'] = [];
     let created = 0;
@@ -340,19 +354,13 @@ export class LeadsService {
       const name = (row.name ?? '').trim();
       const phone = (row.phone ?? '').trim();
       const email = (row.email ?? '').trim();
-      const projectName = (row.project ?? '').trim();
-      const projectIds = projectsByName.get(projectName.toLowerCase()) ?? [];
 
-      const reason = importRowError(
-        { name, phone, email, projectName },
-        projectIds,
-      );
+      const reason = importRowError({ name, phone, email });
       if (reason) {
         errors.push({ row: rowNumber, reason });
         continue;
       }
 
-      const projectId = projectIds[0];
       try {
         const assignedToId = await this.nextRoundRobinAssignee(
           orgId,
@@ -362,7 +370,10 @@ export class LeadsService {
           projectId,
           formName: 'CSV import',
           source: 'crm',
-          data: normalizeLeadData({ fullName: name, name, phone, email }),
+          data: normalizeLeadData(
+            { fullName: name, name, phone, email },
+            { unitId: dto.unitId },
+          ),
           assignedToId,
           activityText: assignedToId
             ? 'Lead imported from CSV and assigned'
@@ -707,14 +718,25 @@ export class LeadsService {
     const statusCount = (status: string) =>
       byStatus.find((row) => row.status === status)?._count._all ?? 0;
 
-    const teams = await this.projectTeamsByProject(
-      leads.filter((l) => !l.assignedToId).map((l) => l.projectId),
-    );
+    const [teams, projectAgents, unitAgents] = await Promise.all([
+      this.projectTeamsByProject(
+        leads.filter((l) => !l.assignedToId).map((l) => l.projectId),
+      ),
+      this.projectAgentsByProject(
+        orgId,
+        leads.map((l) => l.projectId),
+      ),
+      this.standaloneUnitAgentsByUnit(
+        orgId,
+        leads.filter((l) => !l.projectId).map((l) => leadUnitId(l.data)),
+      ),
+    ]);
 
     return {
       data: leads.map((lead) => ({
         ...this.toListItem(lead),
         projectTeam: this.projectTeamFor(lead, teams),
+        assignableAgents: this.assignableAgentsFor(lead, projectAgents, unitAgents),
       })),
       total,
       page,
@@ -1193,6 +1215,94 @@ export class LeadsService {
       map.set(row.projectId, entry);
     }
     return map;
+  }
+
+  /**
+   * Active sales agents per project — the people a project lead can be
+   * assigned to from the CRM list. Leads without a project aren't looked up
+   * here; they fall back to the org-wide assignable list.
+   */
+  private async projectAgentsByProject(
+    orgId: string,
+    projectIds: Array<string | null | undefined>,
+  ): Promise<Map<string, Array<{ id: string; name: string }>>> {
+    const map = new Map<string, Array<{ id: string; name: string }>>();
+    const ids = [...new Set(projectIds.filter((id): id is string => !!id))];
+    if (ids.length === 0) return map;
+    const rows = await this.prisma.projectSalesAgent.findMany({
+      where: { projectId: { in: ids }, user: { orgId, status: 'active' } },
+      select: {
+        projectId: true,
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+      },
+      orderBy: { assignedAt: 'asc' },
+    });
+    for (const id of ids) map.set(id, []);
+    for (const row of rows) {
+      map.get(row.projectId)?.push({
+        id: row.user.id,
+        name:
+          [row.user.firstName, row.user.lastName].filter(Boolean).join(' ') ||
+          row.user.email,
+      });
+    }
+    return map;
+  }
+
+  /**
+   * A standalone unit's own team (UnitSalesAgent), for leads on units with no
+   * project. Units with nobody on the team are left out of the map.
+   */
+  private async standaloneUnitAgentsByUnit(
+    orgId: string,
+    unitIds: Array<string | null>,
+  ): Promise<Map<string, Array<{ id: string; name: string }>>> {
+    const map = new Map<string, Array<{ id: string; name: string }>>();
+    const ids = [...new Set(unitIds.filter((id): id is string => !!id))];
+    if (ids.length === 0) return map;
+    const rows = await this.prisma.unitSalesAgent.findMany({
+      where: {
+        unitId: { in: ids },
+        unit: { orgId, projectId: null },
+        user: { orgId, status: 'active' },
+      },
+      select: {
+        unitId: true,
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+      },
+      orderBy: { assignedAt: 'asc' },
+    });
+    for (const row of rows) {
+      const list = map.get(row.unitId) ?? [];
+      list.push({
+        id: row.user.id,
+        name:
+          [row.user.firstName, row.user.lastName].filter(Boolean).join(' ') ||
+          row.user.email,
+      });
+      map.set(row.unitId, list);
+    }
+    return map;
+  }
+
+  /**
+   * Who a lead can be assigned to from the CRM list: its project's sales
+   * agents, or a standalone unit's team. Null means "no restriction" — the
+   * client offers the org-wide assignable list (no project, or a standalone
+   * unit with nobody on its team).
+   */
+  private assignableAgentsFor(
+    lead: { projectId?: string | null; data: unknown },
+    projectAgents: Map<string, Array<{ id: string; name: string }>>,
+    unitAgents: Map<string, Array<{ id: string; name: string }>>,
+  ): Array<{ id: string; name: string }> | null {
+    if (lead.projectId) return projectAgents.get(lead.projectId) ?? [];
+    const unitId = leadUnitId(lead.data);
+    return (unitId && unitAgents.get(unitId)) || null;
   }
 
   /** `projectTeam` for one lead, or null when it has an owner / no project. */

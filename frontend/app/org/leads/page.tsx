@@ -149,6 +149,16 @@ export default function OrgLeadsPage() {
     [assignable],
   );
 
+  // Project leads can only go to that project's sales agents, standalone-unit
+  // leads to the unit's team; otherwise (no project, or a unit with no team)
+  // the org-wide list. The current assignee stays listed even if they're no
+  // longer on the team, so the select shows the real value.
+  function rowAssigneeOptions(lead: CrmLead) {
+    const base = lead.assignableAgents ?? assigneeOptions;
+    const current = lead.assignedTo;
+    return current && !base.some((a) => a.id === current.id) ? [...base, current] : base;
+  }
+
   const allSelected = useMemo(() => {
     if (!leads || leads.length === 0) return false;
     return leads.every((l) => selectedLeads.has(l.id));
@@ -604,7 +614,7 @@ export default function OrgLeadsPage() {
                               }
                             >
                               <option value="">Unassigned</option>
-                              {assigneeOptions.map((a) => (
+                              {rowAssigneeOptions(lead).map((a) => (
                                 <option key={a.id} value={a.id}>
                                   {a.name}
                                 </option>

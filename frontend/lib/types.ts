@@ -1517,6 +1517,12 @@ export interface CrmLead extends Partial<CrmLeadEditFields> {
    * Null when the lead has an owner or its project has no agents.
    */
   projectTeam?: { count: number; names: string[] } | null;
+  /**
+   * List endpoint only: who this lead can be assigned to — its project's sales
+   * agents, or a standalone unit's team. Null when there's no restriction (no
+   * project, or a standalone unit with nobody on its team): any assignable user.
+   */
+  assignableAgents?: CrmAssignee[] | null;
   createdAt: string;
   activities?: Array<{
     id: string;

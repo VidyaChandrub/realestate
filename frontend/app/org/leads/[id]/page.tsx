@@ -27,6 +27,18 @@ function formatDate(value: string) {
   });
 }
 
+function formatRupees(value: number) {
+  return `₹${value.toLocaleString("en-IN")}`;
+}
+
+/** "₹1,40,00,000 – ₹1,80,00,000", one side when only min/max is set, or "—". */
+function formatBudgetRange(min?: number | null, max?: number | null) {
+  if (min != null && max != null) return `${formatRupees(min)} – ${formatRupees(max)}`;
+  if (min != null) return `From ${formatRupees(min)}`;
+  if (max != null) return `Up to ${formatRupees(max)}`;
+  return "—";
+}
+
 function localDateTime(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -48,8 +60,6 @@ function DataRows({ entries, empty }: { entries: Array<[string, unknown]>; empty
   );
 }
 
-const DEFAULT_TAGS = ["4 BHK", "Bangalore", "Premium", "Hot Lead"];
-
 export default function OrgLeadDetailPage() {
   const { id: routeId } = useParams<{ id: string }>();
   const id = Array.isArray(routeId) ? routeId[0] : routeId;
@@ -62,6 +72,7 @@ export default function OrgLeadDetailPage() {
   const [addingNote, setAddingNote] = useState(false);
   const [activeTab, setActiveTab] = useState<"activity" | "requirements" | "communications" | "documents" | "deal">("activity");
   const [composerTab, setComposerTab] = useState<"note" | "call" | "email" | "whatsapp">("note");
+  const [activityFilter, setActivityFilter] = useState<"all" | "status" | "notes">("all");
   
   // Next action scheduling
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -77,12 +88,7 @@ export default function OrgLeadDetailPage() {
 
   // Temperature dropdown
   const [tempOpen, setTempOpen] = useState(false);
-  const [temperature, setTemperature] = useState<string>("hot");
-
-  // Tags management
-  const [tags, setTags] = useState<string[]>(DEFAULT_TAGS);
-  const [addingTag, setAddingTag] = useState(false);
-  const [newTagText, setNewTagText] = useState("");
+  const [temperature, setTemperature] = useState<string | null>(null);
 
   const canEditLead = hasPermission("crm", "edit") || isOrgAdmin();
   const canAddNote = hasPermission("crm", "add") || canEditLead;
@@ -93,7 +99,6 @@ export default function OrgLeadDetailPage() {
     setReminderAt(localDateTime(result.nextAction?.reminderAt));
     setActionNote(result.nextAction?.note ?? "");
     if (result.temperature) setTemperature(result.temperature);
-    if (result.tags && result.tags.length > 0) setTags(result.tags);
   }
 
   useEffect(() => {
@@ -127,38 +132,6 @@ export default function OrgLeadDetailPage() {
       await updateCrmLead(lead.id, { temperature: newTemp });
     } catch {
       // rollback or ignore
-    }
-  }
-
-  async function handleRemoveTag(tagToRemove: string) {
-    const updated = tags.filter((t) => t !== tagToRemove);
-    setTags(updated);
-    if (lead) {
-      try {
-        await updateCrmLead(lead.id, { tags: updated });
-      } catch {
-        // ignore
-      }
-    }
-  }
-
-  async function handleAddTag() {
-    const text = newTagText.trim();
-    if (!text || tags.includes(text)) {
-      setAddingTag(false);
-      setNewTagText("");
-      return;
-    }
-    const updated = [...tags, text];
-    setTags(updated);
-    setAddingTag(false);
-    setNewTagText("");
-    if (lead) {
-      try {
-        await updateCrmLead(lead.id, { tags: updated });
-      } catch {
-        // ignore
-      }
     }
   }
 
@@ -249,42 +222,16 @@ export default function OrgLeadDetailPage() {
       actor: call.actor ?? null,
     }));
 
-    // If activities are empty (new lead), provide representative timeline events as shown in Screenshot 2
-    if (acts.length === 0 && calls.length === 0 && lead) {
-      return [
-        {
-          id: "demo-status",
-          type: "status_updated",
-          text: `Lead marked as ${lead.status === "new" ? "New" : "Contacted"} by ${lead.assignedTo?.name || "Rohan Shah"}`,
-          createdAt: lead.createdAt,
-          actor: { id: "1", name: lead.assignedTo?.name || "Rohan Shah" },
-        },
-        {
-          id: "demo-call",
-          type: "call_logged",
-          text: "Discussed project requirements. Customer interested in 4 BHK option.",
-          createdAt: new Date(Date.parse(lead.createdAt) - 1440000).toISOString(),
-          actor: { id: "1", name: lead.assignedTo?.name || "Rohan Shah" },
-        },
-        {
-          id: "demo-note",
-          type: "note_added",
-          text: "Customer is looking for a premium apartment near Sarjapur Road.",
-          createdAt: new Date(Date.parse(lead.createdAt) - 2340000).toISOString(),
-          actor: { id: "1", name: lead.assignedTo?.name || "Rohan Shah" },
-        },
-        {
-          id: "demo-created",
-          type: "lead_created",
-          text: `Lead captured from ${leadDisplaySource(lead) || "CRM · 4 BHK"}`,
-          createdAt: lead.createdAt,
-          actor: { id: "sys", name: "System" },
-        },
-      ];
-    }
-
     return [...acts, ...calls].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   }, [lead]);
+
+  // "All" also includes call logs and any other event types.
+  const visibleTimeline =
+    activityFilter === "status"
+      ? timeline.filter((e) => e.type === "status_updated")
+      : activityFilter === "notes"
+        ? timeline.filter((e) => e.type === "note_added")
+        : timeline;
 
   const requirements = Object.entries(lead?.data ?? {}).filter(([key]) =>
     /budget|bhk|bed|area|require|preference|timeline|interest|floor|facing|parking/i.test(key),
@@ -323,15 +270,15 @@ export default function OrgLeadDetailPage() {
     field(lead.data, "Email", "Email address", "email") === "—"
       ? "vikram.rao@example.com"
       : field(lead.data, "Email", "Email address", "email");
-  const company = field(lead.data, "Company", "company", "Organisation", "organization");
-  const location =
-    lead.city || field(lead.data, "Location", "City", "city", "location") || "Bangalore, Karnataka";
-  const preferredBudget =
-    lead.configurations?.length
-      ? lead.configurations.join(", ")
-      : field(lead.data, "Preferred Budget", "Budget", "budget", "BHK", "bhk") || "4 BHK";
-  const projectType =
-    lead.purpose || field(lead.data, "Project Type", "purpose", "Interest") || "Buy";
+  // These mirror the Edit lead form's fields: City / location, Configuration
+  // (falls back to what a website form captured, e.g. "Interested in"),
+  // Budget min/max and Purpose.
+  const location = lead.city || field(lead.data, "Location", "City", "city", "location");
+  const configuration = lead.configurations?.length
+    ? lead.configurations.join(", ")
+    : field(lead.data, "interestedIn", "Interested in", "Configuration", "BHK", "bhk");
+  const preferredBudget = formatBudgetRange(lead.budgetMin, lead.budgetMax);
+  const purpose = lead.purpose || "—";
   const project = lead.project?.name ?? field(lead.data, "Project", "project");
   const unit = field(lead.data, "Unit", "unit");
 
@@ -408,31 +355,34 @@ export default function OrgLeadDetailPage() {
                 <h1 style={{ fontSize: 22, fontWeight: 700, color: "#0f172a", margin: 0 }}>
                   {name}
                 </h1>
-                {canEditLead ? (
-                  <Link
-                    href={`/org/leads/${lead.id}/edit`}
-                    style={{ color: "#94a3b8", display: "inline-flex" }}
-                    title="Edit Name"
-                  >
-                    <Icon name="edit" size={14} />
-                  </Link>
-                ) : null}
-
-                {/* Hot Lead badge with dropdown */}
+                {/* Temperature badge with dropdown — neutral until one is set */}
                 <div style={{ position: "relative", display: "inline-block" }}>
                   <button
                     type="button"
                     className="ld-hero-tag"
                     onClick={() => setTempOpen(!tempOpen)}
                     title="Change Lead Temperature"
+                    style={
+                      temperature
+                        ? undefined
+                        : { background: "#f1f5f9", color: "#64748b", borderColor: "#e2e8f0" }
+                    }
                   >
-                    <span>🔥</span>
+                    {temperature === "hot" ? (
+                      <span>🔥</span>
+                    ) : temperature === "warm" ? (
+                      <span>🌤️</span>
+                    ) : temperature === "cold" ? (
+                      <span>❄️</span>
+                    ) : null}
                     <span>
                       {temperature === "hot"
                         ? "Hot Lead"
                         : temperature === "warm"
                         ? "Warm Lead"
-                        : "Cold Lead"}
+                        : temperature === "cold"
+                        ? "Cold Lead"
+                        : "Set temperature"}
                     </span>
                     <span style={{ fontSize: 10, opacity: 0.7 }}>˅</span>
                   </button>
@@ -552,7 +502,7 @@ export default function OrgLeadDetailPage() {
             <div className="ld-hero-meta-col">
               <span className="ld-hero-meta-lbl">Lead Source</span>
               <span className="lc-badge-source">
-                {leadDisplaySource(lead) || "CRM · 4 BHK"}
+                {leadDisplaySource(lead) || "—"}
               </span>
             </div>
 
@@ -567,20 +517,23 @@ export default function OrgLeadDetailPage() {
 
             <div className="ld-hero-meta-col">
               <span className="ld-hero-meta-lbl">Assigned To</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div className="lc-avatar-orange">
-                  {lead.assignedTo?.name
-                    ? lead.assignedTo.name
-                        .split(/\s+/)
-                        .map((p) => p[0].toUpperCase())
-                        .slice(0, 2)
-                        .join("")
-                    : "RS"}
+              {lead.assignedTo?.name ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div className="lc-avatar-orange">
+                    {lead.assignedTo.name
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .map((p) => p[0].toUpperCase())
+                      .slice(0, 2)
+                      .join("")}
+                  </div>
+                  <span style={{ fontWeight: 600, color: "#0f172a", fontSize: 13.5 }}>
+                    {lead.assignedTo.name}
+                  </span>
                 </div>
-                <span style={{ fontWeight: 600, color: "#0f172a", fontSize: 13.5 }}>
-                  {lead.assignedTo?.name ?? "Rohan Shah"}
-                </span>
-              </div>
+              ) : (
+                <span style={{ fontWeight: 500, color: "#94a3b8", fontSize: 13.5 }}>Unassigned</span>
+              )}
             </div>
           </div>
 
@@ -638,34 +591,34 @@ export default function OrgLeadDetailPage() {
                 </div>
                 <div className="ld-row">
                   <span className="ld-row-key">
-                    <Icon name="building" size={13} /> Company
-                  </span>
-                  <span className="ld-row-val">{company || "—"}</span>
-                </div>
-                <div className="ld-row">
-                  <span className="ld-row-key">
                     <Icon name="pin" size={13} /> Location
                   </span>
                   <span className="ld-row-val">{location}</span>
                 </div>
                 <div className="ld-row">
                   <span className="ld-row-key">
-                    <Icon name="billing" size={13} /> Preferred Budget
+                    <Icon name="properties" size={13} /> Configuration
+                  </span>
+                  <span className="ld-row-val">{configuration}</span>
+                </div>
+                <div className="ld-row">
+                  <span className="ld-row-key">
+                    <Icon name="billing" size={13} /> Budget
                   </span>
                   <span className="ld-row-val">{preferredBudget}</span>
                 </div>
                 <div className="ld-row">
                   <span className="ld-row-key">
-                    <Icon name="properties" size={13} /> Project Type
+                    <Icon name="target" size={13} /> Purpose
                   </span>
-                  <span className="ld-row-val">{projectType}</span>
+                  <span className="ld-row-val">{purpose}</span>
                 </div>
                 <div className="ld-row">
                   <span className="ld-row-key">
                     <Icon name="target" size={13} /> Source
                   </span>
                   <span className="lc-badge-source">
-                    {leadDisplaySource(lead) || "CRM · 4 BHK"}
+                    {leadDisplaySource(lead) || "—"}
                   </span>
                 </div>
               </div>
@@ -677,11 +630,6 @@ export default function OrgLeadDetailPage() {
             <div className="ld-card">
               <div className="ld-card-head">
                 <h3 className="ld-card-title">Pipeline Status</h3>
-                {canEditLead ? (
-                  <Link href={`/org/leads/${lead.id}/edit`} style={{ color: "#94a3b8" }} title="Edit status">
-                    <Icon name="edit" size={14} />
-                  </Link>
-                ) : null}
               </div>
               <div className="ld-card-body">
                 {canEditLead ? (
@@ -698,11 +646,6 @@ export default function OrgLeadDetailPage() {
             <div className="ld-card">
               <div className="ld-card-head">
                 <h3 className="ld-card-title">Project Details</h3>
-                {canEditLead ? (
-                  <Link href={`/org/leads/${lead.id}/edit`} style={{ color: "#94a3b8" }} title="Edit project details">
-                    <Icon name="edit" size={14} />
-                  </Link>
-                ) : null}
               </div>
               <div className="ld-card-body">
                 <div className="ld-row">
@@ -727,18 +670,22 @@ export default function OrgLeadDetailPage() {
                   <span className="ld-row-key">
                     <Icon name="users" size={13} /> Assigned Agent
                   </span>
-                  <span
-                    style={{
-                      background: "#eff6ff",
-                      color: "#2563eb",
-                      padding: "4px 12px",
-                      borderRadius: 999,
-                      fontSize: 12.5,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {lead.assignedTo?.name ?? "Rohan Shah"}
-                  </span>
+                  {lead.assignedTo?.name ? (
+                    <span
+                      style={{
+                        background: "#eff6ff",
+                        color: "#2563eb",
+                        padding: "4px 12px",
+                        borderRadius: 999,
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {lead.assignedTo.name}
+                    </span>
+                  ) : (
+                    <span className="ld-row-val" style={{ color: "#94a3b8" }}>Unassigned</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -852,20 +799,32 @@ export default function OrgLeadDetailPage() {
                     <select
                       className="lc-select-pill"
                       style={{ height: 32, fontSize: 12.5, padding: "0 28px 0 12px" }}
-                      defaultValue="all"
+                      value={activityFilter}
+                      onChange={(e) => setActivityFilter(e.target.value as typeof activityFilter)}
                     >
                       <option value="all">All Activity</option>
-                      <option value="notes">Notes only</option>
-                      <option value="calls">Calls only</option>
-                      <option value="status">Status changes</option>
+                      <option value="status">Status updated</option>
+                      <option value="notes">Notes added</option>
                     </select>
                   </div>
 
                   {/* Connected Timeline Feed matching Screenshot 2 */}
+                  {visibleTimeline.length === 0 ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#94a3b8", fontSize: 13, padding: "8px 0" }}>
+                      <Icon name="info" size={15} />
+                      <span>
+                        {activityFilter === "status"
+                          ? "No status updates yet."
+                          : activityFilter === "notes"
+                            ? "No notes yet."
+                            : "No activity yet."}
+                      </span>
+                    </div>
+                  ) : null}
                   <div className="ld-timeline-wrap">
-                    <div className="ld-timeline-line" />
+                    {visibleTimeline.length > 0 ? <div className="ld-timeline-line" /> : null}
 
-                    {timeline.map((event) => {
+                    {visibleTimeline.map((event) => {
                       const isCall = event.type === "call_logged";
                       const isNote = event.type === "note_added";
                       const isCreated = event.type === "lead_created";
@@ -970,7 +929,7 @@ export default function OrgLeadDetailPage() {
         {/* Right Column: Quick Actions, Next Action, Tags, Related   */}
         {/* ========================================================= */}
         <div>
-          {/* Card 1: Quick Actions */}
+          {/* Card 1: Quick Actions — hidden for now. Uncomment to restore.
           <Reveal delay={2}>
             <div className="ld-card">
               <div className="ld-card-head">
@@ -1007,6 +966,7 @@ export default function OrgLeadDetailPage() {
               </div>
             </div>
           </Reveal>
+          */}
 
           {/* Card 2: Next Action */}
           <Reveal delay={3}>
@@ -1122,75 +1082,30 @@ export default function OrgLeadDetailPage() {
             <div className="ld-card">
               <div className="ld-card-head">
                 <h3 className="ld-card-title">Tags</h3>
-                <button
-                  type="button"
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "#64748b",
-                    cursor: "pointer",
-                    padding: 4,
-                  }}
-                  onClick={() => setAddingTag(!addingTag)}
-                  title="Add tag"
-                >
-                  <Icon name="plus" size={15} />
-                </button>
               </div>
               <div className="ld-card-body">
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {tags.map((tag) => (
-                    <span className="ld-tag-pill" key={tag}>
-                      <span>{tag}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTag(tag)}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          color: "#94a3b8",
-                          cursor: "pointer",
-                          padding: 0,
-                          fontSize: 13,
-                          lineHeight: 1,
-                        }}
-                        title={`Remove ${tag}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-
-                {addingTag ? (
-                  <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                    <input
-                      className="inp"
-                      style={{ height: 32, fontSize: 12.5 }}
-                      placeholder="New tag…"
-                      value={newTagText}
-                      onChange={(e) => setNewTagText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          void handleAddTag();
-                        }
-                      }}
-                    />
-                    <button
-                      className="btn btn-primary btn-sm"
-                      type="button"
-                      onClick={() => void handleAddTag()}
-                    >
-                      Add
-                    </button>
+                {/* Read-only: tags come from the CRM tag catalog (Settings) and
+                    are picked in the Edit lead form. */}
+                {lead.tags && lead.tags.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {lead.tags.map((tag) => (
+                      <span className="ld-tag-pill" key={tag}>
+                        <span>{tag}</span>
+                      </span>
+                    ))}
                   </div>
-                ) : null}
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#94a3b8", fontSize: 13 }}>
+                    <Icon name="info" size={15} />
+                    <span>No tags yet.</span>
+                  </div>
+                )}
               </div>
             </div>
           </Reveal>
 
-          {/* Card 4: Related Leads */}
+          {/* Card 4: Related Leads — hidden until it's functional (the Add
+              button does nothing and nothing is loaded). Uncomment to restore.
           <Reveal delay={5}>
             <div className="ld-card">
               <div className="ld-card-head">
@@ -1211,6 +1126,7 @@ export default function OrgLeadDetailPage() {
               </div>
             </div>
           </Reveal>
+          */}
         </div>
       </div>
     </div>

@@ -1,10 +1,11 @@
 // CSV lead import — maps an uploaded sheet onto the rows POSTed to
 // /org/leads/import. The server re-validates every row (required fields,
-// email/phone format, project match); this only reads the file shape.
+// email/phone format); this only reads the file shape. The project or
+// standalone unit is picked once for the whole file in the import dialog.
 
 import { parseCsv } from "@/lib/csv";
 
-export const LEAD_IMPORT_COLUMNS = ["Name", "Phone", "Email", "Project"] as const;
+export const LEAD_IMPORT_COLUMNS = ["Name", "Phone", "Email"] as const;
 /** Must match LEAD_IMPORT_MAX_ROWS on the backend. */
 export const LEAD_IMPORT_MAX_ROWS = 1000;
 export const LEAD_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
@@ -15,10 +16,9 @@ export type LeadImportRow = {
   name: string;
   phone: string;
   email: string;
-  project: string;
 };
 
-type Field = "name" | "phone" | "email" | "project";
+type Field = "name" | "phone" | "email";
 
 // Accepted header spellings, compared lowercase with non-alphanumerics removed
 // ("Full Name", "full_name" → "fullname").
@@ -26,14 +26,12 @@ const HEADER_ALIASES: Record<Field, string[]> = {
   name: ["name", "fullname", "leadname"],
   phone: ["phone", "phonenumber", "mobile", "mobilenumber", "contactnumber"],
   email: ["email", "emailaddress", "emailid"],
-  project: ["project", "projectname"],
 };
 
 const FIELD_LABEL: Record<Field, string> = {
   name: "Name",
   phone: "Phone",
   email: "Email",
-  project: "Project",
 };
 
 const headerKey = (h: string) => h.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -70,7 +68,6 @@ export function parseLeadCsv(text: string): ParsedLeadCsv {
       name: cell("name"),
       phone: cell("phone"),
       email: cell("email"),
-      project: cell("project"),
     });
   }
 
@@ -83,13 +80,11 @@ export function parseLeadCsv(text: string): ParsedLeadCsv {
   return { rows };
 }
 
-/** Sample sheet: header + example rows bound to the org's real projects. */
-export function sampleLeadCsvRows(projectNames: string[]): string[][] {
-  const p1 = projectNames[0] ?? "Your Project Name";
-  const p2 = projectNames[1] ?? p1;
+/** Sample sheet: header + example rows. */
+export function sampleLeadCsvRows(): string[][] {
   return [
     [...LEAD_IMPORT_COLUMNS],
-    ["Asha Rao", "+91 98250 41200", "asha.rao@example.com", p1],
-    ["Vikram Mehta", "+91 99099 12345", "vikram.mehta@example.com", p2],
+    ["Asha Rao", "+91 98250 41200", "asha.rao@example.com"],
+    ["Vikram Mehta", "+91 99099 12345", "vikram.mehta@example.com"],
   ];
 }

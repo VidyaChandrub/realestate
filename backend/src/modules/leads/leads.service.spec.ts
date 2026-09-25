@@ -23,6 +23,7 @@ describe('LeadsService', () => {
     template: { findUnique: jest.Mock };
     project: { findMany: jest.Mock; findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     projectSalesAgent: { findMany: jest.Mock; findFirst: jest.Mock };
+    unit: { findFirst: jest.Mock };
     user: { findFirst: jest.Mock; findMany: jest.Mock };
     roleModulePermission: { findMany: jest.Mock };
     userModulePermission: { findMany: jest.Mock };
@@ -52,6 +53,7 @@ describe('LeadsService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
       },
+      unit: { findFirst: jest.fn().mockResolvedValue(null) },
       user: { findFirst: jest.fn(), findMany: jest.fn() },
       roleModulePermission: { findMany: jest.fn().mockResolvedValue([]) },
       userModulePermission: { findMany: jest.fn().mockResolvedValue([]) },
@@ -325,16 +327,12 @@ describe('LeadsService', () => {
       name: 'Asha Rao',
       phone: '+91 98250 41200',
       email: 'asha@example.com',
-      project: 'Skyline Heights',
       ...overrides,
     });
 
     beforeEach(() => {
-      prisma.project.findMany.mockResolvedValue([
-        { id: 'proj-1', name: 'Skyline Heights' },
-        { id: 'proj-2', name: 'Palm Grove' },
-        { id: 'proj-3', name: 'Palm Grove ' },
-      ]);
+      prisma.project.findFirst.mockResolvedValue({ id: 'proj-1' });
+      prisma.unit.findFirst.mockResolvedValue({ id: 'unit-1' });
       prisma.lead.create.mockImplementation(
         ({ data }: { data: Record<string, unknown> }) =>
           Promise.resolve({
@@ -346,11 +344,12 @@ describe('LeadsService', () => {
 
     it('adds only complete rows and reports the partial ones', async () => {
       const res = await service.importFromCsv('org-1', actor(), {
+        projectId: 'proj-1',
         rows: [
           row({ rowNumber: 2 }),
           row({ rowNumber: 3, email: '' }),
           row({ rowNumber: 4, name: 'Vikram' }),
-          row({ rowNumber: 5, project: '  ', phone: '' }),
+          row({ rowNumber: 5, name: '  ', phone: '' }),
           row({ rowNumber: 6, name: 'Meera' }),
         ],
       });
@@ -361,20 +360,21 @@ describe('LeadsService', () => {
         failed: 2,
         errors: [
           { row: 3, reason: 'Missing Email' },
-          { row: 5, reason: 'Missing Phone, Project' },
+          { row: 5, reason: 'Missing Name, Phone' },
         ],
       });
       expect(prisma.lead.create).toHaveBeenCalledTimes(3);
       expect(prisma.activityEvent.create).toHaveBeenCalledTimes(3);
     });
 
-    it('binds the lead to the project matched by name (case-insensitive)', async () => {
+    it('binds every row to the project picked for the file', async () => {
       await service.importFromCsv('org-1', actor(), {
-        rows: [row({ project: 'skyline heights' })],
+        projectId: 'proj-1',
+        rows: [row()],
       });
 
-      expect(prisma.project.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { orgId: 'org-1' } }),
+      expect(prisma.project.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'proj-1', orgId: 'org-1' } }),
       );
       expect(prisma.lead.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -393,25 +393,71 @@ describe('LeadsService', () => {
       );
     });
 
-    it('skips rows with a bad email, bad phone, unknown or ambiguous project', async () => {
+    it('binds rows to a standalone unit, unassigned and with no project', async () => {
+      await service.importFromCsv('org-1', actor(), {
+        unitId: 'unit-1',
+        rows: [row()],
+      });
+
+      expect(prisma.unit.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'unit-1', orgId: 'org-1', projectId: null },
+        }),
+      );
+      expect(prisma.lead.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            projectId: null,
+            assignedToId: null,
+            data: expect.objectContaining({ unitId: 'unit-1' }),
+          }),
+        }),
+      );
+    });
+
+    it('requires exactly one of project or standalone unit', async () => {
+      await expect(
+        service.importFromCsv('org-1', actor(), { rows: [row()] }),
+      ).rejects.toThrow('Select a project or a standalone unit');
+      await expect(
+        service.importFromCsv('org-1', actor(), {
+          projectId: 'proj-1',
+          unitId: 'unit-1',
+          rows: [row()],
+        }),
+      ).rejects.toThrow('Select a project or a standalone unit');
+      expect(prisma.lead.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a project or unit outside the org (or a project-bound unit)', async () => {
+      prisma.project.findFirst.mockResolvedValue(null);
+      prisma.unit.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.importFromCsv('org-1', actor(), {
+          projectId: 'proj-x',
+          rows: [row()],
+        }),
+      ).rejects.toThrow('Project not found');
+      await expect(
+        service.importFromCsv('org-1', actor(), {
+          unitId: 'unit-x',
+          rows: [row()],
+        }),
+      ).rejects.toThrow('Standalone unit not found');
+      expect(prisma.lead.create).not.toHaveBeenCalled();
+    });
+
+    it('skips rows with a bad email or bad phone', async () => {
       const res = await service.importFromCsv('org-1', actor(), {
-        rows: [
-          row({ email: 'not-an-email' }),
-          row({ phone: '12ab' }),
-          row({ project: 'Nowhere Towers' }),
-          row({ project: 'palm grove' }),
-        ],
+        projectId: 'proj-1',
+        rows: [row({ email: 'not-an-email' }), row({ phone: '12ab' })],
       });
 
       expect(res.created).toBe(0);
       expect(res.errors).toEqual([
         { row: 2, reason: 'Invalid email address' },
         { row: 3, reason: 'Invalid phone number (7–15 digits)' },
-        { row: 4, reason: 'Project "Nowhere Towers" not found' },
-        {
-          row: 5,
-          reason: 'Project "palm grove" matches more than one project',
-        },
       ]);
       expect(prisma.lead.create).not.toHaveBeenCalled();
     });
@@ -422,6 +468,7 @@ describe('LeadsService', () => {
         .mockResolvedValueOnce({ id: 'lead-2' });
 
       const res = await service.importFromCsv('org-1', actor(), {
+        projectId: 'proj-1',
         rows: [row({ rowNumber: 2 }), row({ rowNumber: 3 })],
       });
 

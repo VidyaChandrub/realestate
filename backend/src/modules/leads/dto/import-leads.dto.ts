@@ -5,6 +5,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
   ValidateNested,
@@ -19,7 +20,7 @@ export const LEAD_IMPORT_MAX_ROWS = 1000;
  * with a missing/invalid field must not reject the whole request — the
  * service validates each row on its own and reports it as skipped. The
  * MaxLength caps only guard against abusive payloads; the per-row rules
- * (required, email/phone format, project match) live in the service.
+ * (required, email/phone format) live in the service.
  */
 export class ImportLeadRowDto {
   /** 1-based line number in the uploaded file, echoed back in errors. */
@@ -42,14 +43,22 @@ export class ImportLeadRowDto {
   @IsString()
   @MaxLength(1000)
   email?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(1000)
-  project?: string;
 }
 
+/**
+ * The whole file is imported into one project or one standalone unit, picked
+ * in the import dialog — exactly one of the two is required (checked in the
+ * service so the error message is readable).
+ */
 export class ImportLeadsDto {
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  unitId?: string;
+
   @IsArray()
   @ArrayNotEmpty()
   @ArrayMaxSize(LEAD_IMPORT_MAX_ROWS)
