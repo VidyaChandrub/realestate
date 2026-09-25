@@ -33,23 +33,29 @@ const field = (
 // reads these; an org can rename, edit, reorder or delete any of them. Each
 // common type gets its own set rather than one shared list, so a Plot isn't
 // asked for a tower count and a Villa isn't asked for floors.
-// "Total Land Area" deliberately carries no fixed unit — a project's area
-// unit (sq ft / acre, chosen in Step 1) applies to `area`-role fields and
-// price-per-area, not to arbitrary plain fields like this one. An org that
-// wants a unit shown can put it in the label itself (e.g. "Total Land Area
-// (acres)"), since labels are always editable.
+// All plain text, deliberately — the Settings editor for these has no type
+// control (there's nothing to change it to, so no point showing one), and a
+// number field left over from before that meant a value's input box would
+// silently behave differently (spinner arrows, no free text) from every
+// other project field with no visible reason why. Text keeps every one of
+// these boxes identical and self-explanatory. A "Total Land Area" carries no
+// fixed unit either — a project's area unit (sq ft / acre, chosen in Step 1)
+// applies to `area`-role fields and price-per-area, not to arbitrary plain
+// fields like this one. An org that wants a unit shown can put it in the
+// label itself (e.g. "Total Land Area (acres)"), since labels are always
+// editable.
 const APARTMENT_PROJECT_FIELDS: FieldSeed[] = [
-  field('No. of Towers / Blocks', 'number'),
+  field('No. of Towers / Blocks', 'text'),
   field('Floors / Structure', 'text'),
-  field('Total Land Area', 'number'),
+  field('Total Land Area', 'text'),
 ];
 const PLOT_PROJECT_FIELDS: FieldSeed[] = [
-  field('Total Land Area', 'number'),
+  field('Total Land Area', 'text'),
   field('Plot Area Range', 'text'),
 ];
 const VILLA_PROJECT_FIELDS: FieldSeed[] = [
-  field('No. of Villas', 'number'),
-  field('Total Land Area', 'number'),
+  field('No. of Villas', 'text'),
+  field('Total Land Area', 'text'),
   field('Villa Area Range', 'text'),
 ];
 

@@ -50,6 +50,10 @@ export interface FieldDef {
   unit?: string;
   // text only — render hint for a textarea instead of a single-line input.
   multiline?: boolean;
+  // number, non-role fields only — an explicit opt-in to also get a column in
+  // "Defaults per configuration" and prefill on Add Unit the same way Price
+  // and Area do. Never inferred from the field's name.
+  extraDefault?: boolean;
 }
 
 export const MAX_TEMPLATE_FIELDS = 40;
@@ -217,6 +221,9 @@ export function normalizeFieldTemplate(input: unknown): FieldDef[] {
     }
     if (type === 'text' && f.multiline === true) {
       def.multiline = true;
+    }
+    if (type === 'number' && !def.role && f.extraDefault === true) {
+      def.extraDefault = true;
     }
     return def;
   });

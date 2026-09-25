@@ -11,6 +11,7 @@ import { OrgSmtpSettings } from "@/components/org/org-smtp-settings";
 import { FieldRolesPanel, TypedFieldEditor } from "@/components/org/typed-field-editor";
 import { FIELD_ROLES, fieldsToRows, groupNoun, roleBaselineOf, rowsToFields, templateTraits, validateFieldRows, type FieldRole, type FieldRow } from "@/lib/field-template";
 import { Modal } from "@/components/ui/modal";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { subdomainPreviewHost } from "@/lib/domain";
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
 import { ORG_THEME_CHANGE_EVENT } from "@/components/global-theme-provider";
@@ -710,6 +711,7 @@ function ProjectTypesSection() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<OrgProjectType | null>(null);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -732,10 +734,6 @@ function ProjectTypesSection() {
   }
 
   async function remove(t: OrgProjectType) {
-    const note = t.inUse > 0
-      ? ` The ${t.inUse} project(s) already using it keep their own copy and are not affected.`
-      : "";
-    if (!window.confirm(`Delete the project type "${t.name}"?${note}`)) return;
     setBusy(t.id); setError(null);
     try {
       await deleteOrgProjectType(t.id);
@@ -757,6 +755,7 @@ function ProjectTypesSection() {
   }
 
   return (
+    <>
     <Card
       icon="properties"
       title="Project types"
@@ -804,7 +803,7 @@ function ProjectTypesSection() {
                 <button className="btn btn-ghost btn-sm" type="button" onClick={() => setEditing(editing === t.id ? null : t.id)}>
                   {editing === t.id ? "Close" : "Edit"}
                 </button>
-                <button className="btn btn-ghost btn-sm" type="button" disabled={busy === t.id} onClick={() => void remove(t)}>Delete</button>
+                <button className="btn btn-ghost btn-sm" type="button" disabled={busy === t.id} onClick={() => setPendingDelete(t)}>Delete</button>
               </span>
             </div>
             {editing === t.id ? (
@@ -814,6 +813,29 @@ function ProjectTypesSection() {
         );
       })}
     </Card>
+    <ConfirmModal
+      open={!!pendingDelete}
+      title={`Delete "${pendingDelete?.name ?? ""}"?`}
+      message={
+        pendingDelete
+          ? `This project type will be permanently deleted. This can't be undone.${
+              pendingDelete.inUse > 0
+                ? ` The ${pendingDelete.inUse} project(s) already using it keep their own copy and are not affected.`
+                : ""
+            }`
+          : undefined
+      }
+      confirmLabel="Delete"
+      destructive
+      busy={busy === pendingDelete?.id}
+      onConfirm={async () => {
+        if (!pendingDelete) return;
+        await remove(pendingDelete);
+        setPendingDelete(null);
+      }}
+      onClose={() => setPendingDelete(null)}
+    />
+    </>
   );
 }
 

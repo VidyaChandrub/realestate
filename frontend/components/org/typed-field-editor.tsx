@@ -54,7 +54,7 @@ export function TypedFieldEditor({
       addLabel={addLabel}
       emptyText={emptyText}
       removeLabel={(r) => `Remove ${r.label || "this field"}`}
-      rowClassName="field-def-row"
+      rowClassName={roles ? "field-def-row" : "field-def-row field-def-row-notype"}
       confirmRemove={
         roles
           ? (row) =>
@@ -91,46 +91,70 @@ export function TypedFieldEditor({
               onChange={(e) => update({ section: e.target.value })}
             />
           ) : null}
-          <select
-            className="inp"
-            aria-label={`Type of ${row.label || "this field"}`}
-            value={row.type}
-            onChange={(e) => {
-              const type = e.target.value as FieldType;
-              // A role can't survive a type change it's no longer valid for
-              // (e.g. Price moving off Number) — there's no per-row control
-              // left to fix that manually, so drop it rather than leave the
-              // template invalid.
-              const role = row.role && !ROLE_ALLOWED_TYPES[row.role].includes(type) ? "" : row.role;
-              update({ type, role });
-            }}
-          >
-            {(Object.keys(FIELD_TYPE_LABEL) as FieldType[]).map((t) => (
-              <option key={t} value={t}>{FIELD_TYPE_LABEL[t]}</option>
-            ))}
-          </select>
-          {row.type === "choice" ? (
-            <input
-              className="inp"
-              aria-label={`Choices for ${row.label || "this field"}`}
-              placeholder="Choices, separated by commas"
-              value={row.optionsText}
-              onChange={(e) => update({ optionsText: e.target.value })}
-            />
-          ) : row.type === "number" ? (
-            <input
-              className="inp"
-              aria-label={`Unit for ${row.label || "this field"}`}
-              placeholder="Unit (optional), e.g. acres"
-              value={row.unit}
-              maxLength={20}
-              onChange={(e) => update({ unit: e.target.value })}
-            />
-          ) : row.type === "text" ? (
-            <span className="hint field-def-none">Text field</span>
-          ) : (
-            <span className="hint field-def-none">—</span>
-          )}
+          {/* A project field created inside an actual project (ProjectFieldRows)
+              is always plain text with no way to pick a different type — hiding
+              the type control here too keeps Settings from offering something
+              that isn't actually available once you're working on a project. */}
+          {roles ? (
+            <>
+              <select
+                className="inp"
+                aria-label={`Type of ${row.label || "this field"}`}
+                value={row.type}
+                onChange={(e) => {
+                  const type = e.target.value as FieldType;
+                  // A role can't survive a type change it's no longer valid for
+                  // (e.g. Price moving off Number) — there's no per-row control
+                  // left to fix that manually, so drop it rather than leave the
+                  // template invalid. Same reasoning for extraDefault, which only
+                  // means anything on a Number field.
+                  const role = row.role && !ROLE_ALLOWED_TYPES[row.role].includes(type) ? "" : row.role;
+                  const extraDefault = type === "number" ? row.extraDefault : false;
+                  update({ type, role, extraDefault });
+                }}
+              >
+                {(Object.keys(FIELD_TYPE_LABEL) as FieldType[]).map((t) => (
+                  <option key={t} value={t}>{FIELD_TYPE_LABEL[t]}</option>
+                ))}
+              </select>
+              {row.type === "choice" ? (
+                <input
+                  className="inp"
+                  aria-label={`Choices for ${row.label || "this field"}`}
+                  placeholder="Choices, separated by commas"
+                  value={row.optionsText}
+                  onChange={(e) => update({ optionsText: e.target.value })}
+                />
+              ) : row.type === "number" ? (
+                <input
+                  className="inp"
+                  aria-label={`Unit for ${row.label || "this field"}`}
+                  placeholder="Unit (optional), e.g. acres"
+                  value={row.unit}
+                  maxLength={20}
+                  onChange={(e) => update({ unit: e.target.value })}
+                />
+              ) : row.type === "text" ? (
+                <span className="hint field-def-none">Text field</span>
+              ) : (
+                <span className="hint field-def-none">—</span>
+              )}
+            </>
+          ) : null}
+          {/* Spans the full row, on its own line — tells you upfront what a
+              field's type makes it eligible for, so seeing it show up (or not)
+              in the panel above is never a surprise. */}
+          {roles ? (
+            <span className="hint" style={{ gridColumn: "1 / -1", fontSize: 11 }}>
+              {row.role
+                ? `Currently used for: ${FIELD_ROLE_LABEL[row.role]}`
+                : row.type === "number"
+                ? "Can be used for: Price, Area, Floor, or an extra default — set up in the panel above."
+                : row.type === "text" || row.type === "choice"
+                ? "Can be used for: Tower / Block / Sector or Configuration — set up in the panel above."
+                : "Not used for any special feature."}
+            </span>
+          ) : null}
         </>
       )}
     />
@@ -168,7 +192,8 @@ export function FieldRolesPanel({
     <div className="field-roles-panel mb-8">
       <button
         type="button"
-        className="btn btn-ghost btn-sm"
+        className="btn btn-soft btn-sm"
+        style={{ fontWeight: 700, border: "1.5px solid var(--brand, #4f46e5)" }}
         onClick={() => setOpen((v) => !v)}
       >
         <Icon name={open ? "chevron-down" : "chevron-right"} size={13} />
@@ -182,8 +207,8 @@ export function FieldRolesPanel({
       {open ? (
         <div className="help mt-8" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div className="hint">
-            These fields power features elsewhere — the availability grid, floor view, pricing and configuration
-            defaults. Pick which field does what; leave any of them unset if this project doesn&apos;t need it.
+            Tell the system which fields represent Price, Area, Towers, and Floors. We&apos;ll use them to organize
+            your inventory grid and auto-fill pricing.
           </div>
           {FIELD_ROLES.map((role) => {
             const current = rows.find((r) => r.role === role) ?? null;
@@ -223,6 +248,50 @@ export function FieldRolesPanel({
               </div>
             );
           })}
+          {(() => {
+            // Every non-role field is listed, not just Number ones — a
+            // Text/Choice/Yes-No field shows up too, greyed out with the
+            // reason spelled out, so it's never a mystery why it's not
+            // available here instead of just silently missing from the list.
+            const extraCandidates = rows.filter((r) => r.label.trim() && !r.role);
+            if (extraCandidates.length === 0) return null;
+            return (
+              <div style={{ paddingTop: 8, borderTop: "1px solid var(--line)" }}>
+                <div className="hint" style={{ marginBottom: 6 }}>
+                  Extra default columns (optional) — Check any extra number fields you want to set defaults for
+                  (e.g., Built-up Area). These will auto-fill when adding a unit.
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {extraCandidates.map((r) => {
+                    const eligible = r.type === "number";
+                    return (
+                      <div key={r.rowId}>
+                        <label
+                          style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, opacity: eligible ? 1 : 0.5 }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={eligible && r.extraDefault}
+                            disabled={!eligible}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              onChange(rows.map((row) => (row.rowId === r.rowId ? { ...row, extraDefault: checked } : row)));
+                            }}
+                          />
+                          {r.label}
+                        </label>
+                        {!eligible ? (
+                          <div className="hint" style={{ fontSize: 11, marginLeft: 24 }}>
+                            Only number fields can be used as defaults.
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       ) : null}
     </div>
