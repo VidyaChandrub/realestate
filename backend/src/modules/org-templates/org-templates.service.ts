@@ -174,7 +174,7 @@ export class OrgTemplatesService {
       assignedCount,
       maxAllowed: Number.isFinite(maxAllowed) ? maxAllowed : null,
       remainingQuota,
-      planName: plan?.name ?? 'Current',
+      planName: plan?.name ?? 'Free Plan',
     };
   }
 

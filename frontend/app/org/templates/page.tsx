@@ -493,11 +493,11 @@ export default function OrgTemplatesPage() {
                     borderRadius: 8,
                     cursor: "pointer",
                     boxShadow: active ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
-                    textTransform: "capitalize",
+                    textTransform: "none",
                     transition: "all 0.15s ease",
                   }}
                 >
-                  {t === "all" ? "All Tiers" : t}
+                  {t === "all" ? "All Tiers" : t === "free" ? "Free Plan" : t === "paid" ? "Paid Plans" : "Premium Plans"}
                 </button>
               );
             })}
@@ -1077,14 +1077,14 @@ export default function OrgTemplatesPage() {
               <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
                 <select
                   className="inp"
-                  style={{ width: 140, height: 36 }}
+                  style={{ width: 150, height: 36 }}
                   value={addModalTierFilter}
                   onChange={(e) => setAddModalTierFilter(e.target.value)}
                 >
                   <option value="all">All Tiers</option>
-                  <option value="free">Free</option>
-                  <option value="paid">Paid</option>
-                  <option value="premium">Premium</option>
+                  <option value="free">Free Plan</option>
+                  <option value="paid">Paid Plans</option>
+                  <option value="premium">Premium Plans</option>
                 </select>
                 <select
                   className="inp"

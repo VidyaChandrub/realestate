@@ -80,6 +80,52 @@ export class PlansService {
     if (query.isActive !== undefined) where.isActive = query.isActive;
     if (query.isPopular !== undefined) where.isPopular = query.isPopular;
 
+    // Ensure the platform's fixed default Free Plan exists
+    try {
+      const hasSystem = await this.prisma.plan.findFirst({
+        where: {
+          OR: [
+            { isSystem: true },
+            { priceMonthly: 0 },
+            { slug: 'basic' },
+            { slug: 'free' },
+          ],
+        },
+      });
+      if (!hasSystem) {
+        await this.prisma.plan.create({
+          data: {
+            name: 'Free Plan',
+            slug: 'basic',
+            description: 'Fixed core plan for every organisation with essential access.',
+            priceMonthly: 0,
+            priceYearly: 0,
+            features: [
+              '1 Landing Page & Template slot',
+              'Basic project and unit showcase',
+              'Single user access',
+              'Lead collection forms',
+            ],
+            limits: {
+              projects: 1,
+              users: 1,
+              templates: 1,
+              landingPages: 1,
+              landingPagesCreate: 2,
+            } as any,
+            capabilities: {},
+            color: '#ecfdf5',
+            badge: 'b-green',
+            isSystem: true,
+            isPopular: false,
+            isActive: true,
+          },
+        });
+      }
+    } catch {
+      // Best-effort ensure, ignore if schema in transition
+    }
+
     // The platform's default plan (isSystem — the ₹0 Basic every new org lands
     // on) always leads, ahead of "popular" and price ordering: it is the one
     // plan that must never be buried or overshadowed. This single endpoint
