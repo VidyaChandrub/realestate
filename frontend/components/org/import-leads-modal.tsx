@@ -4,8 +4,14 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { Icon } from "@/components/icons";
-import { apiFetch, importCrmLeads } from "@/lib/api";
+import { importCrmLeads } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { downloadCsv } from "@/lib/csv";
+import {
+  InventoryBindFields,
+  inventoryBindPayload,
+  type InventoryBindValue,
+} from "@/components/org/inventory-bind-fields";
 import {
   LEAD_IMPORT_MAX_BYTES,
   LEAD_IMPORT_MAX_ROWS,
@@ -13,22 +19,13 @@ import {
   sampleLeadCsvRows,
   type LeadImportRow,
 } from "@/lib/lead-import";
-import type { LeadImportResult, ProjectsListResponse } from "@/lib/types";
+import type { LeadImportResult } from "@/lib/types";
 
-/**
- * Download the sample import sheet, pre-filled with the org's real project
- * names so the example rows import as-is. Falls back to a placeholder name
- * if the project list can't be loaded.
- */
+const NO_TARGET_ERROR = "Select the project or standalone unit to import these leads into.";
+
+/** Download the sample import sheet (Name, Phone, Email). */
 export async function downloadLeadImportSample(): Promise<void> {
-  let names: string[] = [];
-  try {
-    const res = await apiFetch<ProjectsListResponse>("/org/projects?page=1&limit=2");
-    names = (res.data ?? []).map((p) => p.name);
-  } catch {
-    names = [];
-  }
-  downloadCsv("leads-import-sample.csv", sampleLeadCsvRows(names));
+  downloadCsv("leads-import-sample.csv", sampleLeadCsvRows());
 }
 
 /** Flash-message wording, e.g. "3 of 5 leads added successfully". */
@@ -49,6 +46,7 @@ export function ImportLeadsModal({
   onImported: (result: LeadImportResult) => void;
 }) {
   const { toast } = useToast();
+  const { accessToken } = useAuth();
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<LeadImportRow[] | null>(null);
@@ -56,6 +54,8 @@ export function ImportLeadsModal({
   const [importing, setImporting] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [result, setResult] = useState<LeadImportResult | null>(null);
+  // The project or standalone unit every row in the file is imported into.
+  const [target, setTarget] = useState<InventoryBindValue>({ kind: "none" });
 
   function reset() {
     setFileName("");
@@ -94,10 +94,14 @@ export function ImportLeadsModal({
 
   async function runImport() {
     if (!rows || rows.length === 0) return;
+    if (target.kind === "none") {
+      setError(NO_TARGET_ERROR);
+      return;
+    }
     setImporting(true);
     setError("");
     try {
-      const res = await importCrmLeads(rows);
+      const res = await importCrmLeads(inventoryBindPayload(target), rows);
       setResult(res);
       toast({
         title: importSummary(res),
@@ -221,12 +225,31 @@ export function ImportLeadsModal({
       ) : (
         <div style={{ display: "grid", gap: 14 }}>
           <div className="help" style={{ margin: 0 }}>
-            Columns: <b>Name</b>, <b>Phone</b>, <b>Email</b>, <b>Project</b> — all four are required. Rows with a missing
-            or invalid value are skipped and listed after the import. <b>Project</b> must match one of your project names
-            (case doesn&apos;t matter). Up to {LEAD_IMPORT_MAX_ROWS} rows per file.
+            Columns: <b>Name</b>, <b>Phone</b>, <b>Email</b> — all three are required. Rows with a missing or invalid
+            value are skipped and listed after the import. Pick the project or standalone unit these leads belong to
+            below — every row in the file goes to it. Up to {LEAD_IMPORT_MAX_ROWS} rows per file.
           </div>
-          <div>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void downloadSample()} disabled={downloading}>
+          <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+              <InventoryBindFields
+                accessToken={accessToken}
+                value={target}
+                onChange={(next) => {
+                  setTarget(next);
+                  if (next.kind !== "none" && error === NO_TARGET_ERROR) setError("");
+                }}
+                disabled={importing}
+                required
+                hint="All leads in this file are added to the selected project or unit."
+              />
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ marginTop: 20 }}
+              onClick={() => void downloadSample()}
+              disabled={downloading}
+            >
               <Icon name="download" size={14} /> {downloading ? "Preparing…" : "Download sample CSV"}
             </button>
           </div>

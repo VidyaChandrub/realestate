@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Code } from "lucide-react";
 import type { BlockConfig, BlockType } from "@/components/openpage/blocks/types";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { Section } from "./shared-components";
 import { MediaPicker } from "@/components/media-picker";
-import { loadFormLibrary, type FormDefinition } from "@/lib/openpage/forms-store";
-import { mergeFormLibraries } from "@/lib/openpage/resolve-form";
+import { type FormDefinition } from "@/lib/openpage/forms-store";
+import { useBuilderLeadForms } from "@/components/openpage/builder/forms-context";
 
 interface FieldDef {
   key: string
@@ -704,10 +704,17 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
     const page = pages.find((p) => p.id === s.activePageId) ?? pages[0]
     return page.blocks
   })
-  const selectableForms = useMemo(() => {
-    const library = typeof window !== "undefined" ? loadFormLibrary() : []
-    return mergeFormLibraries(forms, library)
-  }, [forms])
+  // Only forms that exist under Lead Forms are offered — not the page's own
+  // template-seeded forms or stale localStorage entries.
+  const leadForms = useBuilderLeadForms()
+  const selectableForms = leadForms ?? []
+  const selectedFormId = field.type === 'form-select'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? String((block.props as any)[field.key] || '')
+    : ''
+  const orphanForm = selectedFormId && leadForms && !leadForms.some((f) => f.id === selectedFormId)
+    ? forms.find((f) => f.id === selectedFormId)
+    : undefined
 
   // For variant field, it's on the block itself
   const value = field.key === 'variant'
@@ -881,15 +888,20 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
             onChange={(e) => ensureFormOnPage(e.target.value)}
             className="w-full px-2 py-1.5 rounded border border-border-default bg-bg-2 text-text-0 text-xs outline-none focus:border-green cursor-pointer"
           >
-            <option value="">Default (first form)</option>
-            {selectableForms.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}{forms.some((p) => p.id === f.id) ? "" : " (library)"}
+            <option value="">{leadForms === null ? 'Loading forms…' : 'Select a form'}</option>
+            {orphanForm ? (
+              <option value={orphanForm.id} disabled>
+                {orphanForm.name} (not in Lead Forms)
               </option>
+            ) : null}
+            {selectableForms.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
             ))}
           </select>
           <p className="text-[10px] text-text-3 mt-1">
-            Selecting a library form copies it onto this page so leads save on publish/preview.
+            {leadForms && leadForms.length === 0
+              ? 'No forms yet — create one under Lead Forms.'
+              : 'Forms come from Lead Forms. Selecting one copies it onto this page so leads save on publish/preview.'}
           </p>
         </div>
       )

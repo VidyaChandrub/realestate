@@ -18,6 +18,7 @@ import type { LandingPageData, ModuleKey } from "@/lib/openpage/types";
 import { loadTemplate, loadTemplates, saveTemplate, saveTemplateNow, publishLandingPage, unpublishLandingPage, type Resource } from "@/lib/openpage/store";
 import { uploadBuilderImage } from "@/lib/openpage/persist";
 import { BuilderUploadProvider, type BuilderImageUploader } from "@/components/openpage/builder/upload-context";
+import { BuilderFormScopeProvider } from "@/components/openpage/builder/forms-context";
 import { templatePreviewPath } from "@/lib/openpage/paths";
 import { TopNav } from "@/components/openpage/topnav";
 import { EditorLayout } from "@/components/openpage/editor/EditorLayout";
@@ -475,6 +476,7 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
 
   return (
     <BuilderUploadProvider uploader={imageUploader}>
+    <BuilderFormScopeProvider scope={resource === "landing-page" ? "org" : "admin"}>
     {activePage ? <OpenPageBridge page={activePage} onPersist={persistOpenPage} /> : null}
     <div className="ps-studio-root">
       <TopNav
@@ -616,6 +618,7 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
         </div>
       ) : null}
     </div>
+    </BuilderFormScopeProvider>
     </BuilderUploadProvider>
   );
 }

@@ -595,10 +595,14 @@ export async function createCrmLead(input: {
 }
 
 /** Bulk-create leads from parsed CSV rows; invalid rows are skipped server-side. */
-export async function importCrmLeads(rows: LeadImportRow[]): Promise<LeadImportResult> {
+/** `target` is the project or standalone unit every row is imported into. */
+export async function importCrmLeads(
+  target: { projectId?: string; unitId?: string },
+  rows: LeadImportRow[],
+): Promise<LeadImportResult> {
   return apiFetch<LeadImportResult>("/org/leads/import", {
     method: "POST",
-    body: JSON.stringify({ rows }),
+    body: JSON.stringify({ ...target, rows }),
   });
 }
 
