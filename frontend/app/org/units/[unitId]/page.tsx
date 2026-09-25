@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { PROJECT_UNIT_ACTIONS } from "@/lib/permissions";
 import {
   apiFetch,
   deleteStandaloneUnit,
@@ -91,7 +92,9 @@ export default function StandaloneUnitPage() {
   const params = useParams<{ unitId: string }>();
   const unitId = params?.unitId ?? "";
   const router = useRouter();
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
+  const canEditUnit = hasPermission("projects", PROJECT_UNIT_ACTIONS.edit);
+  const canDeleteUnit = hasPermission("projects", PROJECT_UNIT_ACTIONS.delete);
 
   const [unit, setUnit] = useState<Unit | null>(null);
   const [loading, setLoading] = useState(true);
@@ -334,20 +337,24 @@ export default function StandaloneUnitPage() {
             </>
           ) : (
             <>
-              <button
-                className="btn btn-ghost text-rose"
-                type="button"
-                onClick={() => setConfirmDelete(true)}
-              >
-                🗑 Delete
-              </button>
-              <button
-                className="btn btn-primary"
-                type="button"
-                onClick={() => setEditing(true)}
-              >
-                ✏️ Edit
-              </button>
+              {canDeleteUnit ? (
+                <button
+                  className="btn btn-ghost text-rose"
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  🗑 Delete
+                </button>
+              ) : null}
+              {canEditUnit ? (
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => setEditing(true)}
+                >
+                  ✏️ Edit
+                </button>
+              ) : null}
             </>
           )}
         </div>

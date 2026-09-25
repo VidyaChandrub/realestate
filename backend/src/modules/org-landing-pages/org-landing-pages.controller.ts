@@ -24,43 +24,47 @@ import { ListLandingPagesQueryDto } from './dto/list-landing-pages-query.dto';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 
 // Every route derives orgId from the JWT — never from a client-supplied
-// param — so one org can never read or touch another org's pages.
+// param — so one org can never read or touch another org's pages. Each route
+// maps to one Landing Pages pill, and the org `admin` is held to what Super
+// Admin granted the Admin role (`enforceForOrgAdmin`).
+const ENFORCE = { enforceForOrgAdmin: true } as const;
+
 @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
 @Controller('org/landing-pages')
 export class OrgLandingPagesController {
   constructor(private readonly service: OrgLandingPagesService) {}
 
-  @RequirePermission('websites', 'add')
+  @RequirePermission('landing_pages', 'add', ENFORCE)
   @Post()
   create(@CurrentUser() user: JwtPayload, @Body() dto: CreateLandingPageDto) {
     return this.service.create(user.orgId as string, dto);
   }
 
-  @RequirePermission('websites', 'view')
+  @RequirePermission('landing_pages', 'view', ENFORCE)
   @Get()
   list(@CurrentUser() user: JwtPayload, @Query() query: ListLandingPagesQueryDto) {
     return this.service.list(user.orgId as string, query);
   }
 
-  @RequirePermission('websites', 'view')
+  @RequirePermission('landing_pages', 'view', ENFORCE)
   @Get('seo/sitemap.xml')
   sitemap(@CurrentUser() user: JwtPayload) {
     return this.service.sitemap(user.orgId as string);
   }
 
-  @RequirePermission('websites', 'view')
+  @RequirePermission('landing_pages', 'view', ENFORCE)
   @Get('seo/robots.txt')
   robots(@CurrentUser() user: JwtPayload) {
     return this.service.robots(user.orgId as string);
   }
 
-  @RequirePermission('websites', 'view')
+  @RequirePermission('landing_pages', 'view', ENFORCE)
   @Get(':id')
   getById(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.getById(user.orgId as string, id);
   }
 
-  @RequirePermission('websites', 'edit')
+  @RequirePermission('landing_pages', 'edit', ENFORCE)
   @Patch(':id')
   update(
     @CurrentUser() user: JwtPayload,
@@ -70,7 +74,8 @@ export class OrgLandingPagesController {
     return this.service.update(user.orgId as string, id, dto);
   }
 
-  @RequirePermission('websites', 'edit')
+  // Landing Pages > Publish.
+  @RequirePermission('landing_pages', 'activate', ENFORCE)
   @Post(':id/publish')
   @Put(':id/publish')
   @HttpCode(200)
@@ -78,7 +83,8 @@ export class OrgLandingPagesController {
     return this.service.publish(user.orgId as string, id);
   }
 
-  @RequirePermission('websites', 'edit')
+  // Landing Pages > Pause / Unpublish.
+  @RequirePermission('landing_pages', 'deactivate', ENFORCE)
   @Post(':id/unpublish')
   @Put(':id/unpublish')
   @HttpCode(200)
@@ -86,13 +92,13 @@ export class OrgLandingPagesController {
     return this.service.unpublish(user.orgId as string, id);
   }
 
-  @RequirePermission('websites', 'delete')
+  @RequirePermission('landing_pages', 'delete', ENFORCE)
   @Delete(':id')
   remove(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.remove(user.orgId as string, id);
   }
 
-  @RequirePermission('websites', 'add')
+  @RequirePermission('landing_pages', 'add', ENFORCE)
   @Post(':id/duplicate')
   duplicate(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.duplicate(user.orgId as string, id);
@@ -100,7 +106,7 @@ export class OrgLandingPagesController {
 
   // Presigned URL for a builder image upload — the browser PUTs straight to
   // R2, then stores the returned publicUrl in `content` (no base64).
-  @RequirePermission('websites', 'edit')
+  @RequirePermission('landing_pages', 'edit', ENFORCE)
   @Post(':id/upload-url')
   createUploadUrl(
     @CurrentUser() user: JwtPayload,

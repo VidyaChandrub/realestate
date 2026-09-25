@@ -1,7 +1,10 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.interface';
-import { provisionInvitedUser } from '../../common/utils/org-users.util';
+import {
+  assertCanAssignRole,
+  provisionInvitedUser,
+} from '../../common/utils/org-users.util';
 import { InviteDto } from './dto/invite.dto';
 
 @Injectable()
@@ -12,6 +15,8 @@ export class TeamService {
     if (!actor.orgId) {
       throw new ForbiddenException('Organisation context required');
     }
+
+    assertCanAssignRole(actor, dto.role);
 
     return provisionInvitedUser(this.prisma, actor.orgId, {
       firstName: dto.first_name,

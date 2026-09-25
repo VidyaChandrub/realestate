@@ -6,25 +6,30 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import {
-  ACTION_TO_COLUMN,
   PERMISSION_ACTIONS,
+  PERMISSION_COLUMN_SELECT,
   PERMISSION_MODULES,
+  actionToColumn,
+  clampToModuleActions,
   computeEffectivePermissions,
+  dtoToModulePermission,
   emptyModulePermission,
   loadRolePermissions,
   mergeRolePermissions,
+  moduleActions,
   modulePermissionUpsertData,
   SYSTEM_ORG_ID,
   type ModulePermission,
   type PermissionAction,
+  type PermissionColumn,
 } from '../../common/utils/permissions.util';
 import { UpdateRolePermissionsDto } from './dto/update-role-permissions.dto';
 import { SetUserPermissionsDto } from './dto/set-user-permissions.dto';
+import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 
-// Roles the org admin is allowed to configure for their own org. The org's
-// own `admin` role is intentionally included so its rows persist (and the UI
-// can show a locked, full-access state) — but it can never actually be
-// restricted.
+// Roles the org admin can never configure for their own org. They are shown
+// locked in the UI; the org `admin` role's defaults are set by Super Admin in
+// Organisation roles.
 const UNRESTRICTABLE = new Set(['admin', 'super_admin']);
 
 export type UserPermissionItem = Partial<Record<PermissionAction, boolean>> & {
@@ -53,7 +58,8 @@ export class OrgPermissionsService {
         key: def.key,
         label: def.label,
         description: def.description,
-        actions: [...PERMISSION_ACTIONS],
+        actions: [...moduleActions(def.key)],
+        actionLabels: def.actionLabels ?? {},
       })),
       roles: roles.map((role) => ({
         id: role.id,
@@ -156,14 +162,21 @@ export class OrgPermissionsService {
 
   /**
    * Full-set replace of ONE role's permissions within this org. Missing
-   * modules are cleared so they fall back to the role default. `admin` /
-   * `super_admin` rows are accepted but never actually restrict.
+   * modules are cleared so they fall back to the role default. The org's own
+   * `admin` / `super_admin` roles are governed by Super Admin only.
    */
   async updateRole(
     orgId: string,
+    actor: JwtPayload,
     roleKey: string,
     dto: UpdateRolePermissionsDto,
   ) {
+    if (UNRESTRICTABLE.has(roleKey)) {
+      throw new BadRequestException(
+        'Organisation Admin permissions are managed by the platform and cannot be changed here',
+      );
+    }
+
     const role = await this.prisma.role.findFirst({
       where: {
         key: roleKey,
@@ -177,6 +190,8 @@ export class OrgPermissionsService {
       throw new BadRequestException('That role is not configurable');
     }
 
+    await this.assertCanChangeRole(orgId, actor, roleKey, dto);
+
     const input = dto.permissions;
     const seen = new Set<string>();
 
@@ -184,7 +199,9 @@ export class OrgPermissionsService {
       for (const item of input) {
         if (seen.has(item.moduleKey)) continue;
         seen.add(item.moduleKey);
-        const data = modulePermissionUpsertData(item);
+        const data = modulePermissionUpsertData(
+          dtoToModulePermission(item.moduleKey, item),
+        );
         await tx.roleModulePermission.upsert({
           where: {
             orgId_roleId_moduleKey: {
@@ -213,6 +230,67 @@ export class OrgPermissionsService {
     return rows.find((r) => r.roleKey === roleKey) ?? null;
   }
 
+  /**
+   * Safety rules for members (non org-admins) holding Roles & Permissions >
+   * Edit role permissions, so the right can't be used to escalate:
+   *   1. they can't change a role they hold themselves;
+   *   2. they can only switch ON an action they hold themselves (grants that
+   *      are already on and that they lack are left untouched, not blocked).
+   * The org admin is exempt — their own access is set by Super Admin.
+   */
+  private async assertCanChangeRole(
+    orgId: string,
+    actor: JwtPayload,
+    roleKey: string,
+    dto: UpdateRolePermissionsDto,
+  ) {
+    const actorUser = await this.prisma.user.findFirst({
+      where: { id: actor.sub, orgId },
+      select: { userRoles: { select: { role: { select: { key: true } } } } },
+    });
+    const actorRoleKeys = actorUser?.userRoles.map((ur) => ur.role.key) ?? [];
+    if (actorRoleKeys.includes('admin')) return;
+
+    if (actorRoleKeys.includes(roleKey)) {
+      throw new ForbiddenException(
+        "You can't change the permissions of a role you hold yourself",
+      );
+    }
+
+    const [roles, actorEffective] = await Promise.all([
+      loadRolePermissions(this.prisma, orgId),
+      this.resolveEffective(orgId, actor.sub, actorRoleKeys),
+    ]);
+    const current = new Map(
+      (roles.find((r) => r.roleKey === roleKey)?.permissions ?? []).map((p) => [
+        p.moduleKey,
+        p,
+      ]),
+    );
+
+    const denied: string[] = [];
+    for (const item of dto.permissions) {
+      const def = PERMISSION_MODULES.find((m) => m.key === item.moduleKey);
+      if (!def) continue;
+      const next = clampToModuleActions(dtoToModulePermission(item.moduleKey, item));
+      const before = current.get(item.moduleKey);
+      for (const action of moduleActions(item.moduleKey)) {
+        const column = actionToColumn(action);
+        const turningOn = next[column] && !before?.[column];
+        if (turningOn && !actorEffective.has(item.moduleKey, action)) {
+          const label =
+            def.actionLabels?.[action] ?? action[0].toUpperCase() + action.slice(1);
+          denied.push(`${def.label} › ${label}`);
+        }
+      }
+    }
+    if (denied.length > 0) {
+      throw new ForbiddenException(
+        `You can only grant permissions you have yourself: ${denied.join(", ")}`,
+      );
+    }
+  }
+
   /** Effective (role + overrides) permissions for a specific user. */
   async getUserPermissions(orgId: string, userId: string) {
     return this.loadUserPermissions(orgId, userId);
@@ -220,8 +298,8 @@ export class OrgPermissionsService {
 
   /**
    * Full-set replace of one user's per-module overrides. Sending a null (or
-   * omitting) an action clears that override so it inherits from the role. A
-   * module whose five columns are all clear is removed entirely.
+   * omitting) a column clears that override so it inherits from the role. A
+   * module whose columns are all clear is removed entirely.
    */
   async setUserPermissions(
     orgId: string,
@@ -244,32 +322,31 @@ export class OrgPermissionsService {
     }
     if (target.userRoles.some((ur) => ur.role.key === 'admin')) {
       throw new BadRequestException(
-        'Organisation admins always have full access and cannot be restricted',
+        'Organisation admin access is managed by the platform and cannot be overridden',
       );
     }
 
-    // Normalise to (module -> {action: boolean}) keeping only explicit values.
-    const byModule = new Map<string, Partial<Record<PermissionAction, boolean>>>();
+    // Normalise to (module -> {column: boolean}) keeping only explicit values
+    // for actions the module supports (e.g. Dashboard "add" is ignored).
+    const byModule = new Map<string, Partial<Record<PermissionColumn, boolean>>>();
     for (const item of dto.permissions) {
-      const actions = byModule.get(item.moduleKey) ?? {};
-      for (const action of PERMISSION_ACTIONS) {
-        const value = (item as unknown as Record<PermissionAction, boolean | null | undefined>)[action];
-        if (typeof value === 'boolean') actions[action] = value;
+      const columns = byModule.get(item.moduleKey) ?? {};
+      for (const action of moduleActions(item.moduleKey)) {
+        const column = actionToColumn(action);
+        const value = item[column];
+        if (typeof value === 'boolean') columns[column] = value;
       }
-      byModule.set(item.moduleKey, actions);
+      byModule.set(item.moduleKey, columns);
     }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.userModulePermission.deleteMany({ where: { orgId, userId } });
 
-      for (const [moduleKey, actions] of byModule) {
-        if (Object.keys(actions).length === 0) continue;
-        const row: Record<string, unknown> = { orgId, userId, moduleKey };
-        for (const action of PERMISSION_ACTIONS) {
-          const value = actions[action];
-          if (typeof value === 'boolean') row[ACTION_TO_COLUMN[action]] = value;
-        }
-        await tx.userModulePermission.create({ data: row as never });
+      for (const [moduleKey, columns] of byModule) {
+        if (Object.keys(columns).length === 0) continue;
+        await tx.userModulePermission.create({
+          data: { orgId, userId, moduleKey, ...columns },
+        });
       }
     });
 
@@ -290,89 +367,56 @@ export class OrgPermissionsService {
     }
 
     const roleKeys = user.userRoles.map((ur) => ur.role.key);
-    let rawRolePermissions: Array<{
-      orgId: string;
-      role: { key: string };
-      moduleKey: string;
-      canView: boolean;
-      canAdd: boolean;
-      canEdit: boolean;
-      canDelete: boolean;
-      canApprove: boolean;
-    }> = [];
-    let userOverrides: Array<{
-      moduleKey: string;
-      canView: boolean | null;
-      canAdd: boolean | null;
-      canEdit: boolean | null;
-      canDelete: boolean | null;
-      canApprove: boolean | null;
-    }> = [];
+    let effective: ReturnType<typeof computeEffectivePermissions>;
     try {
-      if (roleKeys.length) {
-        rawRolePermissions = await this.prisma.roleModulePermission.findMany({
-          where: {
-            orgId: { in: [orgId, SYSTEM_ORG_ID] },
-            role: { key: { in: roleKeys } },
-          },
-          select: {
-            orgId: true,
-            role: { select: { key: true } },
-            moduleKey: true,
-            canView: true,
-            canAdd: true,
-            canEdit: true,
-            canDelete: true,
-            canApprove: true,
-          },
-        });
-      }
-      userOverrides = await this.prisma.userModulePermission.findMany({
-        where: { orgId, userId },
-        select: {
-          moduleKey: true,
-          canView: true,
-          canAdd: true,
-          canEdit: true,
-          canDelete: true,
-          canApprove: true,
-        },
-      });
+      effective = await this.resolveEffective(orgId, userId, roleKeys);
     } catch {
-      rawRolePermissions = [];
-      userOverrides = [];
-    }
-    const rolePermissions = mergeRolePermissions(rawRolePermissions);
-
-    const effective = computeEffectivePermissions({
-      roleKeys,
-      rolePermissions,
-      userOverrides,
-    });
-
-    const byModule: Record<string, ModulePermission> = {};
-    for (const module of PERMISSION_MODULES) {
-      byModule[module.key] =
-        effective.byModule[module.key] ?? { ...emptyModulePermission(module.key) };
+      effective = computeEffectivePermissions({
+        roleKeys,
+        rolePermissions: [],
+        userOverrides: [],
+      });
     }
 
     return {
       role: roleKeys[0] ?? null,
       roleName: user.userRoles[0]?.role.name ?? null,
       roles: roleKeys,
-      permissions: Object.fromEntries(
-        Object.entries(byModule).map(([key, value]) => [
-          key,
-          {
-            view: value.canView,
-            add: value.canAdd,
-            edit: value.canEdit,
-            delete: value.canDelete,
-            approve: value.canApprove,
-          },
-        ]),
-      ),
+      permissions: toActionMap(effective.byModule),
     };
+  }
+
+  private async resolveEffective(
+    orgId: string,
+    userId: string,
+    roleKeys: string[],
+  ) {
+    const [rawRolePermissions, userOverrides] = await Promise.all([
+      roleKeys.length
+        ? this.prisma.roleModulePermission.findMany({
+            where: {
+              orgId: { in: [orgId, SYSTEM_ORG_ID] },
+              role: { key: { in: roleKeys } },
+            },
+            select: {
+              orgId: true,
+              role: { select: { key: true } },
+              moduleKey: true,
+              ...PERMISSION_COLUMN_SELECT,
+            },
+          })
+        : Promise.resolve([]),
+      this.prisma.userModulePermission.findMany({
+        where: { orgId, userId },
+        select: { moduleKey: true, ...PERMISSION_COLUMN_SELECT },
+      }),
+    ]);
+
+    return computeEffectivePermissions({
+      roleKeys,
+      rolePermissions: mergeRolePermissions(rawRolePermissions),
+      userOverrides,
+    });
   }
 
   private async loadUserPermissions(orgId: string, userId: string) {
@@ -383,14 +427,7 @@ export class OrgPermissionsService {
         userRoles: { select: { role: { select: { key: true, name: true } } } },
         userPermissions: {
           where: { orgId },
-          select: {
-            moduleKey: true,
-            canView: true,
-            canAdd: true,
-            canEdit: true,
-            canDelete: true,
-            canApprove: true,
-          },
+          select: { moduleKey: true, ...PERMISSION_COLUMN_SELECT },
         },
       },
     });
@@ -399,29 +436,7 @@ export class OrgPermissionsService {
     }
 
     const roleKeys = user.userRoles.map((ur) => ur.role.key);
-    const rawRolePermissions = await this.prisma.roleModulePermission.findMany({
-      where: {
-        orgId: { in: [orgId, SYSTEM_ORG_ID] },
-        role: { key: { in: roleKeys } },
-      },
-      select: {
-        orgId: true,
-        role: { select: { key: true } },
-        moduleKey: true,
-        canView: true,
-        canAdd: true,
-        canEdit: true,
-        canDelete: true,
-        canApprove: true,
-      },
-    });
-    const rolePermissions = mergeRolePermissions(rawRolePermissions);
-
-    const effective = computeEffectivePermissions({
-      roleKeys,
-      rolePermissions,
-      userOverrides: user.userPermissions,
-    });
+    const effective = await this.resolveEffective(orgId, userId, roleKeys);
 
     return {
       userId: user.id,
@@ -429,21 +444,24 @@ export class OrgPermissionsService {
         ? { key: user.userRoles[0].role.key, name: user.userRoles[0].role.name }
         : null,
       effective: effective.byModule,
-      overrides: PERMISSION_MODULES.map((module) => {
-        const override = user.userPermissions.find(
-          (p) => p.moduleKey === module.key,
-        );
-        return override
-          ? {
-              moduleKey: module.key,
-              canView: override.canView,
-              canAdd: override.canAdd,
-              canEdit: override.canEdit,
-              canDelete: override.canDelete,
-              canApprove: override.canApprove,
-            }
-          : null;
-      }).filter((x): x is NonNullable<typeof x> => x !== null),
+      overrides: PERMISSION_MODULES.map(
+        (module) =>
+          user.userPermissions.find((p) => p.moduleKey === module.key) ?? null,
+      ).filter((x): x is NonNullable<typeof x> => x !== null),
     };
   }
+}
+
+/** { moduleKey: ModulePermission } -> { moduleKey: { view, add, ... } }. */
+function toActionMap(byModule: Record<string, ModulePermission>) {
+  const out: Record<string, Record<PermissionAction, boolean>> = {};
+  for (const module of PERMISSION_MODULES) {
+    const row = byModule[module.key] ?? emptyModulePermission(module.key);
+    const actions = {} as Record<PermissionAction, boolean>;
+    for (const action of PERMISSION_ACTIONS) {
+      actions[action] = row[actionToColumn(action)];
+    }
+    out[module.key] = actions;
+  }
+  return out;
 }

@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsOptional,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -28,6 +29,20 @@ export class RolePermissionItemDto {
 
   @IsBoolean()
   canApprove: boolean;
+
+  // Users module only; optional so older clients keep working.
+  @IsOptional()
+  @IsBoolean()
+  canActivate?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  canDeactivate?: boolean;
+
+  // Projects module only (Add lead).
+  @IsOptional()
+  @IsBoolean()
+  canAddLead?: boolean;
 }
 
 export class UpdateRolePermissionsDto {

@@ -51,8 +51,20 @@ import "@/app/openpage.css";
 const LIMIT = 12;
 
 export default function OrgTemplatesPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
   const router = useRouter();
+
+  // One flag per Templates pill (named after the button it unlocks) —
+  // enforced for the org admin too, whose access Super Admin sets. "Use"
+  // creates a landing page, so it follows Landing Pages > Create.
+  const canView = hasPermission("templates", "view");
+  const canAdd = hasPermission("templates", "add");
+  const canRemove = hasPermission("templates", "delete");
+  const canUse = hasPermission("landing_pages", "add");
+
+  useEffect(() => {
+    if (accessToken && !canView) router.replace("/org");
+  }, [accessToken, canView, router]);
 
   // Create page from template state
   const [useTemplate, setUseTemplate] = useState<{ id: string; name: string } | null>(null);
@@ -137,7 +149,7 @@ export default function OrgTemplatesPage() {
   }
 
   const fetchAssignedTemplates = useCallback(() => {
-    if (!accessToken) return;
+    if (!accessToken || !canView) return;
     setLoading(true);
     setLoadError(null);
     const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
@@ -151,10 +163,10 @@ export default function OrgTemplatesPage() {
       .then(setResult)
       .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load templates."))
       .finally(() => setLoading(false));
-  }, [accessToken, page, search, category, tierFilter]);
+  }, [accessToken, canView, page, search, category, tierFilter]);
 
   const loadAvailableTemplates = useCallback(() => {
-    if (!accessToken) return;
+    if (!accessToken || !canView) return;
     setAvailableLoading(true);
     setAvailableError(null);
     apiFetch<AvailableTemplatesResponse>("/org/templates/available", {
@@ -163,7 +175,7 @@ export default function OrgTemplatesPage() {
       .then(setAvailableData)
       .catch((err) => setAvailableError(err instanceof Error ? err.message : "Failed to load available templates."))
       .finally(() => setAvailableLoading(false));
-  }, [accessToken]);
+  }, [accessToken, canView]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -351,6 +363,7 @@ export default function OrgTemplatesPage() {
             </div>
           )}
 
+          {canAdd ? (
           <button
             className="btn btn-primary"
             type="button"
@@ -366,6 +379,7 @@ export default function OrgTemplatesPage() {
           >
             <Plus size={16} /> Add Template from Plan
           </button>
+          ) : null}
         </div>
       </div>
 
@@ -697,7 +711,7 @@ export default function OrgTemplatesPage() {
                 >
                   Clear Filters
                 </button>
-              ) : (
+              ) : canAdd ? (
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -712,7 +726,7 @@ export default function OrgTemplatesPage() {
                 >
                   <Plus size={16} /> Browse &amp; Add Templates from Plan
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -723,6 +737,7 @@ export default function OrgTemplatesPage() {
                 <div style={{ fontSize: 14, fontWeight: 800, color: "var(--ink)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Available in Your Plan Catalog
                 </div>
+                {canAdd ? (
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
@@ -731,6 +746,7 @@ export default function OrgTemplatesPage() {
                 >
                   View All ({availableData.data.length}) →
                 </button>
+                ) : null}
               </div>
 
               <div
@@ -789,6 +805,7 @@ export default function OrgTemplatesPage() {
                         >
                           Preview
                         </button>
+                        {canAdd ? (
                         <button
                           type="button"
                           className="btn btn-primary btn-sm"
@@ -798,6 +815,7 @@ export default function OrgTemplatesPage() {
                         >
                           {assigningId === tmpl.id ? "Adding…" : "+ Add"}
                         </button>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -824,8 +842,8 @@ export default function OrgTemplatesPage() {
               row={row}
               delay={i % 6}
               onPreview={() => openPreview(row.id)}
-              onUse={() => openUseTemplate(row.id, row.name)}
-              onRemove={() => requestRemoveTemplate(row.id, row.name)}
+              onUse={canUse ? () => openUseTemplate(row.id, row.name) : undefined}
+              onRemove={canRemove ? () => requestRemoveTemplate(row.id, row.name) : undefined}
               removing={removingId === row.id}
             />
           ))}
@@ -934,6 +952,7 @@ export default function OrgTemplatesPage() {
 
               <div style={{ display: "flex", gap: 8 }}>
                 {previewedIsAssigned ? (
+                  canUse ? (
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"
@@ -947,7 +966,8 @@ export default function OrgTemplatesPage() {
                   >
                     <Sparkles size={14} /> Use this template
                   </button>
-                ) : (
+                  ) : null
+                ) : canAdd ? (
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"
@@ -961,7 +981,7 @@ export default function OrgTemplatesPage() {
                   >
                     <Plus size={14} /> Add to Workspace
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
           }
@@ -1398,8 +1418,9 @@ function OrgVisualTemplateCard({
   row: OrgTemplateSummary;
   delay: number;
   onPreview: () => void;
-  onUse: () => void;
-  onRemove: () => void;
+  // Omitted handlers hide their button (the user lacks that permission).
+  onUse?: () => void;
+  onRemove?: () => void;
   removing: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -1491,6 +1512,7 @@ function OrgVisualTemplateCard({
                 padding: 16,
               }}
             >
+              {onUse ? (
               <button
                 type="button"
                 onClick={onUse}
@@ -1517,6 +1539,7 @@ function OrgVisualTemplateCard({
               >
                 <Sparkles size={14} /> Create Landing Page
               </button>
+              ) : null}
 
               <button
                 type="button"
@@ -1600,6 +1623,7 @@ function OrgVisualTemplateCard({
               borderTop: "1px solid var(--line)",
             }}
           >
+            {onUse ? (
             <button
               type="button"
               onClick={onUse}
@@ -1616,6 +1640,7 @@ function OrgVisualTemplateCard({
             >
               <Sparkles size={13} /> Use
             </button>
+            ) : null}
 
             <button
               type="button"
@@ -1634,6 +1659,7 @@ function OrgVisualTemplateCard({
               <Eye size={13} /> Preview
             </button>
 
+            {onRemove ? (
             <button
               type="button"
               onClick={onRemove}
@@ -1648,6 +1674,7 @@ function OrgVisualTemplateCard({
             >
               <Trash2 size={13} />
             </button>
+            ) : null}
           </div>
         </div>
       </div>

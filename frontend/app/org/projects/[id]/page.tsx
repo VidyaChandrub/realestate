@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { PROJECT_LEAD_ACTION } from "@/lib/permissions";
 import { apiFetch, createCrmLead, getCrmLeads, getProjectLandingPages, getProjectSalesAgents } from "@/lib/api";
 import { formatMoney, formatMoneyRange } from "@/lib/money";
 import { normalizeSpecifications, specificationRows } from "@/lib/specifications";
@@ -79,7 +80,11 @@ function managerInitials(name: string | null | undefined): string {
 export default function OrgProjectOverviewPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
+  // Projects > Edit shows the Edit button; Projects > Add lead shows the
+  // Direct Lead Entry form (the lead is created for this project).
+  const canEdit = hasPermission("projects", "edit");
+  const canCreateLead = hasPermission("projects", PROJECT_LEAD_ACTION);
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [salesAgents, setSalesAgents] = useState<ProjectSalesAgent[]>([]);
@@ -323,11 +328,11 @@ export default function OrgProjectOverviewPage() {
           manager: project.manager?.name ?? null,
         }}
         actions={
-          <>
+          canEdit ? (
             <Link href={`/org/projects/${id}/edit`} className="btn btn-ghost">
               <Icon name="edit" size={13} /> Edit
             </Link>
-          </>
+          ) : null
         }
       />
 
@@ -738,6 +743,8 @@ export default function OrgProjectOverviewPage() {
             <div className="card">
               <div className="card-h"><span className="t">Direct Lead Entry</span></div>
               <div className="card-b">
+                {canCreateLead ? (
+                <>
                 <div className="field">
                   <label>Full name <span className="req">*</span></label>
                   <input
@@ -820,6 +827,12 @@ export default function OrgProjectOverviewPage() {
                 >
                   {leadSaving ? "Creating lead…" : "Submit & Create Lead →"}
                 </button>
+                </>
+                ) : (
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    You don&apos;t have permission to create leads.
+                  </div>
+                )}
                 {project.brochureUrl ? (
                   <a href={project.brochureUrl} target="_blank" rel="noreferrer" className="btn btn-ghost btn-block mt-8"><Icon name="download" size={13} /> Download Brochure</a>
                 ) : null}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { PROJECT_UNIT_ACTIONS } from "@/lib/permissions";
 import { apiFetch, getOrgCatalogOptions } from "@/lib/api";
 import { parseAmount, parseCount, parseDecimal, parseInteger } from "@/lib/parse";
 import { currencyPrefix, formatMoney } from "@/lib/money";
@@ -145,7 +146,11 @@ export default function OrgProjectUnitsPage() {
    */
   const returnToUnit = useRef<string | null>(null);
   const id = params?.id ?? "";
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
+  // Projects > Add unit / Edit unit / Delete unit (unit types included).
+  const canAddUnit = hasPermission("projects", PROJECT_UNIT_ACTIONS.add);
+  const canEditUnit = hasPermission("projects", PROJECT_UNIT_ACTIONS.edit);
+  const canDeleteUnit = hasPermission("projects", PROJECT_UNIT_ACTIONS.delete);
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -356,12 +361,14 @@ export default function OrgProjectUnitsPage() {
 
   // --- unit type handlers ---
   function openUtCreate() {
+    if (!canAddUnit) return;
     setUtMode("create");
     setUtEditingId(null);
     setUtForm(EMPTY_UT_FORM);
     setUtError(null);
   }
   function openUtEdit(ut: UnitType) {
+    if (!canEditUnit) return;
     setUtMode("edit");
     setUtEditingId(ut.id);
     setUtForm({
@@ -432,6 +439,7 @@ export default function OrgProjectUnitsPage() {
   }
 
   function openUnitCreate() {
+    if (!canAddUnit) return;
     setUnitMode("create");
     setUnitEditingId(null);
     setUnitForm(emptyUnitForm());
@@ -439,6 +447,7 @@ export default function OrgProjectUnitsPage() {
     setUnitAttempted(false);
   }
   function openUnitEdit(unit: Unit) {
+    if (!canEditUnit) return;
     setUnitMode("edit");
     setUnitEditingId(unit.id);
     setUnitForm({
@@ -760,7 +769,7 @@ export default function OrgProjectUnitsPage() {
         }
         actions={
           <>
-            {traits.configurations ? (
+            {traits.configurations && canAddUnit ? (
               <button
                 className="btn btn-ghost"
                 type="button"
@@ -769,6 +778,7 @@ export default function OrgProjectUnitsPage() {
                 ＋ Add configuration
               </button>
             ) : null}
+            {canAddUnit ? (
             <button
               className="btn btn-primary"
               type="button"
@@ -782,6 +792,7 @@ export default function OrgProjectUnitsPage() {
             >
               ＋ Add unit
             </button>
+            ) : null}
           </>
         }
       />
@@ -911,7 +922,9 @@ export default function OrgProjectUnitsPage() {
                                   });
                                 },
                               },
-                            ]}
+                            ].filter((a) =>
+                              a.key === "edit" ? canEditUnit : a.key === "remove" ? canDeleteUnit : true,
+                            )}
                           />
                         </>
                       ) : (
@@ -1122,7 +1135,9 @@ export default function OrgProjectUnitsPage() {
                                   extra: "",
                                 }),
                             },
-                          ]}
+                          ].filter((a) =>
+                            a.key === "edit" ? canEditUnit : a.key === "delete" ? canDeleteUnit : true,
+                          )}
                         />
                       </td>
                     </tr>

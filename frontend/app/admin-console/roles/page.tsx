@@ -17,6 +17,43 @@ const ORG_PRESETS = [
   { name: "Project Admin", key: "project_admin", desc: "Manages real estate project listings, units, and inventory" },
 ];
 
+const PERMISSION_COLUMNS = [
+  "canView",
+  "canAdd",
+  "canEdit",
+  "canDelete",
+  "canApprove",
+  "canActivate",
+  "canDeactivate",
+  "canAddLead",
+] as const;
+type PermissionColumn = (typeof PERMISSION_COLUMNS)[number];
+
+/** The API action for a column — camelCase columns map to snake_case actions
+ *  (canAddLead -> add_lead). */
+function columnAction(column: PermissionColumn): string {
+  return column
+    .slice(3)
+    .replace(/([a-z])([A-Z])/g, "$1_$2")
+    .toLowerCase();
+}
+// Actions offered when the API doesn't list a module's own set.
+const DEFAULT_ACTIONS = ["view", "add", "edit", "delete", "approve"];
+
+// A module only offers the actions the API lists for it (e.g. Dashboard is
+// view-only, Users has Activate/Deactivate instead of Approve).
+function supportsAction(row: { actions?: string[] }, column: PermissionColumn) {
+  const actions = row.actions?.length ? row.actions : DEFAULT_ACTIONS;
+  return actions.includes(columnAction(column));
+}
+
+/** Every column set to `enabled` where the module supports it, else false. */
+function setColumns(row: { actions?: string[] }, enabled: (col: PermissionColumn) => boolean) {
+  const out = {} as Record<PermissionColumn, boolean>;
+  for (const col of PERMISSION_COLUMNS) out[col] = supportsAction(row, col) && enabled(col);
+  return out;
+}
+
 function StatTile({
   label,
   value,
@@ -108,11 +145,18 @@ export default function SuperAdminRolesPage() {
     moduleKey: string;
     label: string;
     description: string;
+    // Actions the module supports (e.g. Dashboard is view-only). Missing = all.
+    actions?: string[];
+    // Pill text per action when it names a specific button (e.g. Publish).
+    actionLabels?: Record<string, string>;
     canView: boolean;
     canAdd: boolean;
     canEdit: boolean;
     canDelete: boolean;
     canApprove: boolean;
+    canActivate?: boolean;
+    canDeactivate?: boolean;
+    canAddLead?: boolean;
   }[]>([]);
   const [permLoading, setPermLoading] = useState(false);
   const [permSaving, setPermSaving] = useState(false);
@@ -254,11 +298,16 @@ export default function SuperAdminRolesPage() {
           moduleKey: string;
           label: string;
           description: string;
+          actions?: string[];
+          actionLabels?: Record<string, string>;
           canView: boolean;
           canAdd: boolean;
           canEdit: boolean;
           canDelete: boolean;
           canApprove: boolean;
+          canActivate?: boolean;
+          canDeactivate?: boolean;
+          canAddLead?: boolean;
         }[];
       }>(`/admin/roles/${role.id}/permissions`, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -290,6 +339,9 @@ export default function SuperAdminRolesPage() {
             canEdit: p.canEdit,
             canDelete: p.canDelete,
             canApprove: p.canApprove,
+            canActivate: p.canActivate ?? false,
+            canDeactivate: p.canDeactivate ?? false,
+            canAddLead: p.canAddLead ?? false,
           })),
         }),
       });
@@ -303,33 +355,29 @@ export default function SuperAdminRolesPage() {
     }
   };
 
-  const togglePerm = (moduleKey: string, action: "canView" | "canAdd" | "canEdit" | "canDelete" | "canApprove") => {
+  const togglePerm = (moduleKey: string, action: PermissionColumn) => {
     const nextRows = permissionsData.map((item) => {
       if (item.moduleKey !== moduleKey) return item;
       const nextVal = !item[action];
       const updated = { ...item, [action]: nextVal };
       if (nextVal && action !== "canView") updated.canView = true;
       if (!nextVal && action === "canView") {
-        updated.canAdd = false;
-        updated.canEdit = false;
-        updated.canDelete = false;
-        updated.canApprove = false;
+        // Without View nothing else in the module is reachable.
+        Object.assign(updated, setColumns(item, () => false));
       }
       return updated;
     });
-    const moduleLabel = permissionsData.find((item) => item.moduleKey === moduleKey)?.label ?? "module";
+    const moduleRow = permissionsData.find((item) => item.moduleKey === moduleKey);
+    const moduleLabel = moduleRow?.label ?? "module";
+    const pillLabel = moduleRow?.actionLabels?.[columnAction(action)] ?? action.replace("can", "");
     const nextValue = nextRows.find((item) => item.moduleKey === moduleKey)?.[action] ?? false;
-    void savePermissionRows(nextRows, `${moduleKey}:${action}`, `${action.replace("can", "")} permission ${nextValue ? "enabled" : "removed"} for ${moduleLabel}`);
+    void savePermissionRows(nextRows, `${moduleKey}:${action}`, `${pillLabel} permission ${nextValue ? "enabled" : "removed"} for ${moduleLabel}`);
   };
 
   const setAllPerms = (grantAll: boolean, viewOnly: boolean = false) => {
     const nextRows = permissionsData.map((item) => ({
       ...item,
-      canView: grantAll || viewOnly,
-      canAdd: grantAll && !viewOnly,
-      canEdit: grantAll && !viewOnly,
-      canDelete: grantAll && !viewOnly,
-      canApprove: grantAll && !viewOnly,
+      ...setColumns(item, (col) => (col === "canView" ? grantAll || viewOnly : grantAll && !viewOnly)),
     }));
     void savePermissionRows(nextRows, "all-modules", grantAll ? "All permissions enabled" : viewOnly ? "View-only permissions enabled" : "All permissions removed");
   };
@@ -338,7 +386,7 @@ export default function SuperAdminRolesPage() {
     const item = permissionsData.find((row) => row.moduleKey === moduleKey);
     const nextRows = permissionsData.map((row) =>
       row.moduleKey === moduleKey
-        ? { ...row, canView: enabled, canAdd: enabled, canEdit: enabled, canDelete: enabled, canApprove: enabled }
+        ? { ...row, ...setColumns(row, () => enabled) }
         : row,
     );
     void savePermissionRows(nextRows, `${moduleKey}:all`, `${item?.label ?? "Module"} permissions ${enabled ? "enabled" : "removed"}`);
@@ -464,9 +512,10 @@ export default function SuperAdminRolesPage() {
                           <div className="muted" style={{ fontSize: 12 }}>{item.description}</div>
                         </div>
                         <div className="platform-permission-actions">
-                          {(["canView", "canAdd", "canEdit", "canDelete", "canApprove"] as const).map((action) => {
+                          {PERMISSION_COLUMNS.filter((action) => supportsAction(item, action)).map((action) => {
                             const enabled = permissionsModalRole.key === "super_admin" || item[action];
-                            const label = action.replace("can", "");
+                            const actionKey = columnAction(action);
+                            const label = item.actionLabels?.[actionKey] ?? action.replace("can", "");
                             return (
                               <button
                                 className={`platform-permission-pill${enabled ? " is-enabled" : ""}`}

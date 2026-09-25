@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { PROJECT_UNIT_ACTIONS } from "@/lib/permissions";
 import { apiFetch, getOrgUnits } from "@/lib/api";
 import { formatMoney } from "@/lib/money";
 import { formatUpdatedAt } from "@/components/org/project-form-fields";
@@ -41,7 +42,8 @@ const STATUS_LABEL: Record<UnitStatus, string> = {
 };
 
 export default function AllUnitsPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
+  const canAddUnit = hasPermission("projects", PROJECT_UNIT_ACTIONS.add);
 
   const [search, setSearch] = useState("");
   const [statusTab, setStatusTab] = useState(0);
@@ -129,12 +131,14 @@ export default function AllUnitsPage() {
           </div>
         </div>
         <div className="actions">
-          <Link
-            href="/org/projects/all-units/create"
-            className="btn btn-primary"
-          >
-            ＋ Add unit
-          </Link>
+          {canAddUnit ? (
+            <Link
+              href="/org/projects/all-units/create"
+              className="btn btn-primary"
+            >
+              ＋ Add unit
+            </Link>
+          ) : null}
         </div>
       </div>
 

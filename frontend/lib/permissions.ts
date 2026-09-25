@@ -29,6 +29,29 @@ export const MODULES = {
 
 export type ModuleKey = keyof typeof MODULES;
 
+// Pills stored in a spare action column — mirrors PROJECT_UNIT_ACTIONS /
+// SETTINGS_ACTIONS / SUPPORT_ACTIONS in the backend's permissions.util.ts, so
+// call sites read as the button they gate.
+export const PROJECT_UNIT_ACTIONS = {
+  add: "approve",
+  edit: "activate",
+  delete: "deactivate",
+} as const satisfies Record<string, PermissionAction>;
+
+/** Projects > Add lead — mirrors PROJECT_LEAD_ACTION in the backend. */
+export const PROJECT_LEAD_ACTION = "add_lead" satisfies PermissionAction;
+
+export const SETTINGS_ACTIONS = {
+  editProfile: "edit",
+  editEmail: "approve",
+  editPipeline: "activate",
+} as const satisfies Record<string, PermissionAction>;
+
+export const SUPPORT_ACTIONS = {
+  raiseTicket: "add",
+  reply: "edit",
+} as const satisfies Record<string, PermissionAction>;
+
 export function allPermissions(): Permissions {
   const perms: Permissions = {};
   for (const mod of Object.values(MODULES)) {

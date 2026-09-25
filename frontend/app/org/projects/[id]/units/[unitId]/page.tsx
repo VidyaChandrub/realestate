@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { PROJECT_UNIT_ACTIONS } from "@/lib/permissions";
 import { apiFetch } from "@/lib/api";
 import { currencyPrefix, formatMoney } from "@/lib/money";
 import { customValueText, nonRoleFields, roleField, templateTraits } from "@/lib/field-template";
@@ -50,7 +51,9 @@ export default function OrgProjectUnitDetailPage() {
   const params = useParams<{ id: string; unitId: string }>();
   const id = params?.id ?? "";
   const unitId = params?.unitId ?? "";
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
+  // Edit and the status actions (Book / Hold / Mark as sold) = Edit unit.
+  const canEditUnit = hasPermission("projects", PROJECT_UNIT_ACTIONS.edit);
 
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [unit, setUnit] = useState<Unit | null>(null);
@@ -271,12 +274,14 @@ export default function OrgProjectUnitDetailPage() {
             <Link href={`/org/projects/${id}/units`} className="btn btn-ghost">
               ← Back
             </Link>
-            <Link
-              href={`/org/projects/${id}/units?edit=${unitId}&from=unit`}
-              className="btn btn-ghost"
-            >
-              <Icon name="edit" size={13} /> Edit
-            </Link>
+            {canEditUnit ? (
+              <Link
+                href={`/org/projects/${id}/units?edit=${unitId}&from=unit`}
+                className="btn btn-ghost"
+              >
+                <Icon name="edit" size={13} /> Edit
+              </Link>
+            ) : null}
           </div>
         </div>
       </Reveal>
@@ -415,7 +420,8 @@ export default function OrgProjectUnitDetailPage() {
                   <button
                     className="btn btn-primary btn-block"
                     type="button"
-                    disabled={busyAction !== null || unit.status === "booked"}
+                    disabled={!canEditUnit || busyAction !== null || unit.status === "booked"}
+                    title={canEditUnit ? undefined : "You don't have permission to change unit status"}
                     onClick={() => void changeStatus("booked")}
                   >
                     {busyAction === "booked" ? "Saving…" : <><Icon name="check" size={13} /> Book unit</>}
@@ -423,7 +429,8 @@ export default function OrgProjectUnitDetailPage() {
                   <button
                     className="btn btn-soft btn-block"
                     type="button"
-                    disabled={busyAction !== null || unit.status === "held"}
+                    disabled={!canEditUnit || busyAction !== null || unit.status === "held"}
+                    title={canEditUnit ? undefined : "You don't have permission to change unit status"}
                     onClick={() => void changeStatus("held")}
                   >
                     {busyAction === "held" ? "Saving…" : <><Icon name="lock" size={13} /> Hold (48h)</>}
@@ -431,7 +438,8 @@ export default function OrgProjectUnitDetailPage() {
                   <button
                     className="btn btn-ghost btn-block"
                     type="button"
-                    disabled={busyAction !== null || unit.status === "sold"}
+                    disabled={!canEditUnit || busyAction !== null || unit.status === "sold"}
+                    title={canEditUnit ? undefined : "You don't have permission to change unit status"}
                     onClick={() => void changeStatus("sold")}
                   >
                     {busyAction === "sold" ? "Saving…" : <><Icon name="flag" size={13} /> Mark as sold</>}

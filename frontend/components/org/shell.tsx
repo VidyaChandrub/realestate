@@ -17,7 +17,7 @@ import {
   markAllOrgNotificationsRead,
   markOrgNotificationRead,
 } from "@/lib/api";
-import type { OrgBillingSummary, OrgNotification } from "@/lib/types";
+import type { OrgBillingSummary, OrgNotification, PermissionAction } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 import {
   applyThemeVariables,
@@ -86,6 +86,49 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
 ];
+
+type PermissionCheck = (module: string, action: PermissionAction) => boolean;
+
+/** Whether a sidebar entry is visible to the current user. */
+export function isOrgNavItemAllowed(
+  href: string,
+  hasPermission: PermissionCheck,
+): boolean {
+  if (href === "/org") return hasPermission("dashboard", "view");
+  if (href.startsWith("/org/leads")) return hasPermission("crm", "view");
+  if (href.startsWith("/org/projects")) return hasPermission("projects", "view");
+  if (href.startsWith("/org/calling")) return hasPermission("calling", "view");
+  if (href.startsWith("/org/whatsapp")) return hasPermission("whatsapp", "view");
+  if (href.startsWith("/org/landing-pages")) return hasPermission("landing_pages", "view");
+  if (href.startsWith("/org/templates")) return hasPermission("templates", "view");
+  if (href.startsWith("/org/media")) return hasPermission("websites", "view");
+  if (href.startsWith("/org/forms")) return hasPermission("forms", "view");
+  // Sales Agents is hidden and no longer a permission module — kept only so
+  // the commented-out nav item above still resolves if it is restored.
+  if (href.startsWith("/org/sales-agents")) return hasPermission("sales_agents", "view");
+  if (href.startsWith("/org/reports")) return hasPermission("crm", "view") || hasPermission("dashboard", "view");
+  if (href.startsWith("/org/teams") || href.startsWith("/org/team-chat")) return hasPermission("teams", "view");
+  if (href.startsWith("/org/users")) return hasPermission("users", "view");
+  if (href.startsWith("/org/roles-permissions")) return hasPermission("roles_permissions", "view");
+  if (href.startsWith("/org/integrations")) return hasPermission("integrations", "view");
+  if (href.startsWith("/org/settings")) return hasPermission("settings", "view");
+  if (href.startsWith("/org/support")) return hasPermission("support", "view");
+  return false;
+}
+
+/** First sidebar page (other than the Dashboard) the user may open, if any. */
+export function firstAllowedOrgPath(
+  hasPermission: PermissionCheck,
+): string | null {
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      if (item.href !== "/org" && isOrgNavItemAllowed(item.href, hasPermission)) {
+        return item.href;
+      }
+    }
+  }
+  return null;
+}
 
 const CRUMB_MAP: Record<string, string> = {
   "/org": "Dashboard",
@@ -482,24 +525,9 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
         <nav>
           <ul className="nav">
             {NAV_GROUPS.map((group) => {
-              const visibleItems = group.items.filter((item) => {
-                if (item.href === "/org") return hasPermission("dashboard", "view");
-                if (item.href.startsWith("/org/leads")) return hasPermission("crm", "view");
-                if (item.href.startsWith("/org/projects")) return hasPermission("projects", "view");
-                if (item.href.startsWith("/org/calling")) return hasPermission("calling", "view");
-                if (item.href.startsWith("/org/whatsapp")) return hasPermission("whatsapp", "view");
-                if (item.href.startsWith("/org/landing-pages") || item.href.startsWith("/org/templates") || item.href.startsWith("/org/media")) return hasPermission("websites", "view");
-                if (item.href.startsWith("/org/forms")) return hasPermission("forms", "view");
-                if (item.href.startsWith("/org/sales-agents")) return hasPermission("sales_agents", "view");
-                if (item.href.startsWith("/org/reports")) return hasPermission("crm", "view") || hasPermission("dashboard", "view");
-                if (item.href.startsWith("/org/teams") || item.href.startsWith("/org/team-chat")) return hasPermission("teams", "view");
-                if (item.href.startsWith("/org/users")) return hasPermission("users", "view");
-                if (item.href.startsWith("/org/roles-permissions")) return user.role === "organisation_admin";
-                if (item.href.startsWith("/org/integrations")) return hasPermission("integrations", "view");
-                if (item.href.startsWith("/org/settings")) return hasPermission("settings", "view");
-                if (item.href.startsWith("/org/support")) return hasPermission("support", "view");
-                return false;
-              });
+              const visibleItems = group.items.filter((item) =>
+                isOrgNavItemAllowed(item.href, hasPermission),
+              );
 
               if (visibleItems.length === 0) return null;
 
@@ -568,15 +596,18 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="tb-right" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button
-              type="button"
-              className="tb-builder-btn"
-              onClick={openBuilder}
-              disabled={builderLoading}
-              title="Open the page builder"
-            >
-              <Icon name="puzzle" size={14} /> {builderLoading ? "Opening…" : "Open Builder"}
-            </button>
+            {/* Opens a landing page in the builder — needs Landing Pages > Edit. */}
+            {hasPermission("landing_pages", "edit") ? (
+              <button
+                type="button"
+                className="tb-builder-btn"
+                onClick={openBuilder}
+                disabled={builderLoading}
+                title="Open the page builder"
+              >
+                <Icon name="puzzle" size={14} /> {builderLoading ? "Opening…" : "Open Builder"}
+              </button>
+            ) : null}
             <div style={{ position: "relative" }} data-notification-menu>
               <button
                 type="button"

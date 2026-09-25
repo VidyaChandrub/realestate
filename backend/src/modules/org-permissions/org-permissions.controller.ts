@@ -12,6 +12,8 @@ import {
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgAdminGuard } from '../../common/guards/org-admin.guard';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { OrgPermissionsService } from './org-permissions.service';
@@ -24,12 +26,16 @@ import { UpdateOrgRoleDto } from './dto/update-org-role.dto';
 // (and optionally each individual user / sales agent) can view/add/edit/delete
 ///approve per page. Every route derives orgId from the JWT — never from a
 // client-supplied param — so one org can never touch another org's config.
+// Role management follows the Roles & Permissions pills (the org admin is held
+// to what Super Admin granted); per-user overrides stay org-admin only.
+const ROLES = { enforceForOrgAdmin: true } as const;
 @Controller('org/permissions')
 export class OrgPermissionsController {
   constructor(private readonly service: OrgPermissionsService) {}
 
   /** The page/action matrix + configurable roles, for the admin UI. */
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('roles_permissions', 'view', ROLES)
   @Get('modules')
   catalog(@CurrentUser() actor: JwtPayload) {
     return this.service.getCatalog(actor.orgId as string);
@@ -43,21 +49,24 @@ export class OrgPermissionsController {
   }
 
   /** This org's own custom roles (created by its Admin). */
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('roles_permissions', 'view', ROLES)
   @Get('org-roles')
   listOrgRoles(@CurrentUser() actor: JwtPayload) {
     return this.service.listOrgRoles(actor.orgId as string);
   }
 
   /** Create a new custom role scoped to this org. */
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('roles_permissions', 'add', ROLES)
   @Post('org-roles')
   createOrgRole(@CurrentUser() actor: JwtPayload, @Body() dto: CreateOrgRoleDto) {
     return this.service.createOrgRole(actor.orgId as string, dto);
   }
 
   /** Rename/disable one of this org's custom roles. */
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('roles_permissions', 'edit', ROLES)
   @Patch('org-roles/:roleId')
   updateOrgRole(
     @CurrentUser() actor: JwtPayload,
@@ -68,28 +77,31 @@ export class OrgPermissionsController {
   }
 
   /** Delete one of this org's custom roles, if unused. */
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('roles_permissions', 'delete', ROLES)
   @Delete('org-roles/:roleId')
   removeOrgRole(@CurrentUser() actor: JwtPayload, @Param('roleId') roleId: string) {
     return this.service.removeOrgRole(actor.orgId as string, roleId);
   }
 
   /** Every configurable role's current permission rows for this org. */
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('roles_permissions', 'view', ROLES)
   @Get()
   listRoles(@CurrentUser() actor: JwtPayload) {
     return this.service.listRoles(actor.orgId as string);
   }
 
   /** Replace one role's page/action permissions for this org. */
-  @UseGuards(JwtAuthGuard, OrgAdminGuard, OrgApprovedGuard)
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
+  @RequirePermission('roles_permissions', 'edit', ROLES)
   @Put('roles/:roleKey')
   updateRole(
     @CurrentUser() actor: JwtPayload,
     @Param('roleKey') roleKey: string,
     @Body() dto: UpdateRolePermissionsDto,
   ) {
-    return this.service.updateRole(actor.orgId as string, roleKey, dto);
+    return this.service.updateRole(actor.orgId as string, actor, roleKey, dto);
   }
 
   /** A specific user's effective permissions (+ their overrides). */

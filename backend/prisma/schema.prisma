@@ -487,6 +487,9 @@ model RoleModulePermission {
   canEdit    Boolean @default(false) @map("can_edit")
   canDelete  Boolean @default(false) @map("can_delete")
   canApprove Boolean @default(false) @map("can_approve") // e.g. approving a landing-page publish
+  canActivate   Boolean @default(false) @map("can_activate") // Users module: activate / approve a member
+  canDeactivate Boolean @default(false) @map("can_deactivate") // Users module: deactivate / disapprove a member
+  canAddLead    Boolean @default(false) @map("can_add_lead") // Projects module: Add lead from a project
 
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
@@ -510,6 +513,9 @@ model UserModulePermission {
   canEdit    Boolean? @map("can_edit")
   canDelete  Boolean? @map("can_delete")
   canApprove Boolean? @map("can_approve")
+  canActivate   Boolean? @map("can_activate")
+  canDeactivate Boolean? @map("can_deactivate")
+  canAddLead    Boolean? @map("can_add_lead")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

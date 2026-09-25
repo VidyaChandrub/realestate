@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsOptional,
   IsNotEmpty,
   IsString,
   ValidateNested,
@@ -31,6 +32,20 @@ export class RolePermissionItemDto {
 
   @IsBoolean()
   canApprove: boolean;
+
+  // Users module only; optional so older clients keep working.
+  @IsOptional()
+  @IsBoolean()
+  canActivate?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  canDeactivate?: boolean;
+
+  // Projects module only (Add lead).
+  @IsOptional()
+  @IsBoolean()
+  canAddLead?: boolean;
 }
 
 /** Full-set replace of one role's permissions within the org. */

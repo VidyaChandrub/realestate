@@ -7,6 +7,10 @@ import { RequirePermission } from '../../common/decorators/require-permission.de
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { SalesAgentsService } from './sales-agents.service';
 
+// The Sales Agents screen is hidden (not in the org sidebar) and its module is
+// no longer offered in Organisation roles / Roles & Permissions. With no
+// `sales_agents` module in the catalog, members are always denied here and
+// only the org admin (who bypasses the guard) can reach these routes.
 @Controller('org/sales-agents')
 export class SalesAgentsController {
   constructor(private readonly service: SalesAgentsService) {}

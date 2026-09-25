@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { SUPPORT_ACTIONS } from "@/lib/permissions";
 import {
   addSupportMessage,
   createSupportUploadUrl,
@@ -63,7 +64,15 @@ async function uploadSupportFile(file: File): Promise<string> {
 export default function OrgSupportTicketPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
+  const router = useRouter();
+  // Support pills — enforced for the org admin too (set by Super Admin).
+  const canView = hasPermission("support", "view");
+  const canReply = hasPermission("support", SUPPORT_ACTIONS.reply);
+
+  useEffect(() => {
+    if (accessToken && !canView) router.replace("/org");
+  }, [accessToken, canView, router]);
 
   const [ticket, setTicket] = useState<SupportTicketDetail | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
@@ -271,6 +280,10 @@ export default function OrgSupportTicketPage() {
             {ticket.status === "resolved" ? (
               <div className="muted" style={{ fontSize: 13 }}>
                 This ticket is resolved — replies are disabled. Raise a new ticket from the Support &amp; Help page if you need further help.
+              </div>
+            ) : !canReply ? (
+              <div className="muted" style={{ fontSize: 13 }}>
+                You can view this conversation but don&apos;t have permission to reply.
               </div>
             ) : (
               <>

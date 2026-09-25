@@ -16,25 +16,95 @@ export const PERMISSION_ACTIONS = [
   'edit',
   'delete',
   'approve',
+  'activate',
+  'deactivate',
+  // Projects: create a lead from a project page (see PROJECT_LEAD_ACTION).
+  'add_lead',
 ] as const;
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
+
+/** Actions a module supports when its definition doesn't list its own. */
+export const DEFAULT_MODULE_ACTIONS: readonly PermissionAction[] = [
+  'view',
+  'add',
+  'edit',
+  'delete',
+  'approve',
+];
 
 export interface ModuleDefinition {
   key: string;
   label: string;
   description: string;
+  /** Actions this module actually supports. Omitted = DEFAULT_MODULE_ACTIONS. */
+  actions?: readonly PermissionAction[];
+  /**
+   * Pill text per action when it differs from the action name — matches the
+   * button it unlocks so admins can see exactly what they are granting
+   * (e.g. Landing Pages 'activate' is the "Publish" button).
+   */
+  actionLabels?: Partial<Record<PermissionAction, string>>;
 }
 
 // Label/description map for every gated page. `label` is shown in the admin
 // UI; `description` explains what granting it unlocks.
 export const PERMISSION_MODULES: ModuleDefinition[] = [
-  { key: 'dashboard', label: 'Dashboard', description: 'Org overview & analytics' },
-  { key: 'users', label: 'Users', description: 'Invite, manage and assign org members' },
-  { key: 'sales_agents', label: 'Sales Agents', description: 'Agent dashboards & team performance' },
+  // Read-only page — the only meaningful permission is whether it is visible.
+  { key: 'dashboard', label: 'Dashboard', description: 'Org overview & analytics', actions: ['view'] },
+  // Activate / Deactivate gate approving and disabling a member's login.
+  { key: 'users', label: 'Users', description: 'Invite, manage and assign org members', actions: ['view', 'add', 'edit', 'delete', 'activate', 'deactivate'] },
   { key: 'crm', label: 'Leads / CRM', description: 'Lead inbox, notes, stages and assignment' },
-  { key: 'forms', label: 'Lead Forms', description: 'Lead capture forms and the form builder' },
-  { key: 'projects', label: 'Projects', description: 'Projects, unit types and unit inventory' },
-  { key: 'websites', label: 'Websites', description: 'Landing pages, templates and publish' },
+  {
+    key: 'forms',
+    label: 'Lead Forms',
+    description: 'Lead capture forms and the form builder',
+    actions: ['view', 'add', 'edit', 'delete'],
+    actionLabels: { add: 'Create / Duplicate' },
+  },
+  // Units get their own pills (see PROJECT_UNIT_ACTIONS) so a role can book /
+  // hold units without being able to edit the project itself.
+  {
+    key: 'projects',
+    label: 'Projects',
+    description: 'Projects, unit types and unit inventory',
+    actions: ['view', 'add', 'edit', 'delete', 'approve', 'activate', 'deactivate', 'add_lead'],
+    actionLabels: {
+      add: 'New project',
+      add_lead: 'Add lead',
+      approve: 'Add unit',
+      activate: 'Edit unit',
+      deactivate: 'Delete unit',
+    },
+  },
+  // Landing pages the org builds. Publish / Pause reuse the activate /
+  // deactivate columns: putting a page live or taking it down.
+  {
+    key: 'landing_pages',
+    label: 'Landing Pages',
+    description: "Build, publish and pause the organisation's landing pages",
+    actions: ['view', 'add', 'edit', 'delete', 'activate', 'deactivate'],
+    actionLabels: {
+      add: 'Create / Duplicate',
+      activate: 'Publish',
+      deactivate: 'Pause / Unpublish',
+    },
+  },
+  // Templates the org has taken from its plan. Orgs never edit a template
+  // itself — "Use" creates a landing page (Landing Pages > Create).
+  {
+    key: 'templates',
+    label: 'Templates',
+    description: 'Templates added to the workspace from the plan',
+    actions: ['view', 'add', 'delete'],
+    actionLabels: {
+      view: 'View / Preview',
+      add: 'Add Template from Plan',
+      delete: 'Remove',
+    },
+  },
+  // Historical key: once covered landing pages and templates too, which now
+  // have their own modules above. Only the Media Library remains under it.
+  { key: 'websites', label: 'Media Library', description: 'Central media & assets library', actions: ['view'] },
   { key: 'domains', label: 'Domains', description: 'Subdomain & custom-domain management' },
   { key: 'calling', label: 'Calling', description: 'Calls, queues, numbers and automation' },
   { key: 'whatsapp', label: 'WhatsApp', description: 'WhatsApp inbox and broadcasts' },
@@ -42,9 +112,67 @@ export const PERMISSION_MODULES: ModuleDefinition[] = [
   { key: 'reports', label: 'Reports', description: 'Reports and analytics' },
   { key: 'integrations', label: 'Integrations', description: 'Connected apps and channels' },
   { key: 'billing', label: 'Billing', description: 'Plan, subscription and invoices' },
-  { key: 'settings', label: 'Settings', description: 'Organisation settings and profile' },
-  { key: 'support', label: 'Support & Help', description: 'Raise support tickets and chat with the iPixxel team' },
+  // Domain, Billing, CRM option lists and Project Catalogs sections follow
+  // their own modules; these pills cover the rest (see SETTINGS_ACTIONS).
+  {
+    key: 'settings',
+    label: 'Settings',
+    description: 'Organisation profile, branding, email and pipeline',
+    actions: ['view', 'edit', 'approve', 'activate'],
+    actionLabels: {
+      edit: 'Edit profile & branding',
+      approve: 'Edit email & SMTP',
+      activate: 'Edit pipeline',
+    },
+  },
+  // Orgs can't edit, close or delete tickets — the platform team resolves them.
+  {
+    key: 'support',
+    label: 'Support & Help',
+    description: 'Raise support tickets and chat with the iPixxel team',
+    actions: ['view', 'add', 'edit'],
+    actionLabels: { add: 'Raise ticket', edit: 'Reply' },
+  },
+  // Managing roles themselves. Per-user overrides stay org-admin only.
+  {
+    key: 'roles_permissions',
+    label: 'Roles & Permissions',
+    description: 'Create roles and set what each role can do',
+    actions: ['view', 'add', 'edit', 'delete'],
+    actionLabels: {
+      add: 'Create Role',
+      edit: 'Edit role permissions',
+      delete: 'Delete Role',
+    },
+  },
 ];
+
+/**
+ * Named aliases for pills stored in a spare action column, so call sites read
+ * as the button they gate (e.g. `PROJECT_UNIT_ACTIONS.add` = "Add unit").
+ */
+export const PROJECT_UNIT_ACTIONS = {
+  add: 'approve',
+  edit: 'activate',
+  delete: 'deactivate',
+} as const satisfies Record<string, PermissionAction>;
+
+/**
+ * Projects > Add lead: creating a lead tied to a project from the project
+ * pages. Leads / CRM > Add still allows any lead (see the leads controller).
+ */
+export const PROJECT_LEAD_ACTION = 'add_lead' satisfies PermissionAction;
+
+export const SETTINGS_ACTIONS = {
+  editProfile: 'edit',
+  editEmail: 'approve',
+  editPipeline: 'activate',
+} as const satisfies Record<string, PermissionAction>;
+
+export const SUPPORT_ACTIONS = {
+  raiseTicket: 'add',
+  reply: 'edit',
+} as const satisfies Record<string, PermissionAction>;
 
 export type PermissionModuleKey = (typeof PERMISSION_MODULES)[number]['key'];
 
@@ -87,6 +215,36 @@ export const PLATFORM_PERMISSION_MODULE_KEYS = PLATFORM_PERMISSION_MODULES.map(
   (m) => m.key,
 );
 
+const MODULE_ACTIONS = new Map<string, readonly PermissionAction[]>(
+  [...PERMISSION_MODULES, ...PLATFORM_PERMISSION_MODULES].map((def) => [
+    def.key,
+    def.actions ?? DEFAULT_MODULE_ACTIONS,
+  ]),
+);
+
+/** The actions a module supports (DEFAULT_MODULE_ACTIONS unless it lists its own). */
+export function moduleActions(
+  moduleKey: string,
+): readonly PermissionAction[] {
+  return MODULE_ACTIONS.get(moduleKey) ?? DEFAULT_MODULE_ACTIONS;
+}
+
+/**
+ * Forces every action a module does not support to `false`, so stale rows
+ * (e.g. a Dashboard "Add" saved before the module became view-only) can never
+ * grant anything and are never shown as enabled.
+ */
+export function clampToModuleActions<T extends ModulePermission>(row: T): T {
+  const supported = moduleActions(row.moduleKey);
+  const clamped: T = { ...row };
+  for (const action of PERMISSION_ACTIONS) {
+    if (!supported.includes(action)) {
+      (clamped as ModulePermission)[actionToColumn(action)] = false;
+    }
+  }
+  return clamped;
+}
+
 export const PLATFORM_ROUTE_MODULES: Array<{ prefix: string; module: string }> = [
   // Platform roles (the "Roles" tab) share the Platform Team module — see
   // the note on PLATFORM_PERMISSION_MODULES above.
@@ -127,15 +285,33 @@ export function actionFromHttpMethod(method: string): PermissionAction {
   return 'edit';
 }
 
+export type PermissionColumn =
+  | 'canView'
+  | 'canAdd'
+  | 'canEdit'
+  | 'canDelete'
+  | 'canApprove'
+  | 'canActivate'
+  | 'canDeactivate'
+  | 'canAddLead';
+
+/** Prisma `select` for every permission column (role and user rows). */
+export const PERMISSION_COLUMN_SELECT = {
+  canView: true,
+  canAdd: true,
+  canEdit: true,
+  canDelete: true,
+  canApprove: true,
+  canActivate: true,
+  canDeactivate: true,
+  canAddLead: true,
+} as const satisfies Record<PermissionColumn, true>;
+
 /** A single module's permission row as stored/returned by the API. */
-export interface ModulePermission {
-  moduleKey: string;
-  canView: boolean;
-  canAdd: boolean;
-  canEdit: boolean;
-  canDelete: boolean;
-  canApprove: boolean;
-}
+export type ModulePermission = { moduleKey: string } & Record<
+  PermissionColumn,
+  boolean
+>;
 
 /** Map of moduleKey -> { action -> boolean }, the shape the frontend's
  *  `Permissions` type consumes. */
@@ -159,9 +335,10 @@ const DEFAULT_BY_KEY: Record<
     dashboard: { view: true },
     crm: { view: true, add: true, edit: true },
     forms: { view: true, add: true, edit: true },
-    projects: { view: true, add: true, edit: true },
-    sales_agents: { view: true },
+    projects: { view: true, add: true, edit: true, approve: true, activate: true, add_lead: true },
     websites: { view: true },
+    landing_pages: { view: true },
+    templates: { view: true },
     calling: { view: true, add: true, edit: true },
     whatsapp: { view: true, add: true, edit: true },
     reports: { view: true },
@@ -198,6 +375,24 @@ export function emptyModulePermission(moduleKey: string): ModulePermission {
     canEdit: false,
     canDelete: false,
     canApprove: false,
+    canActivate: false,
+    canDeactivate: false,
+    canAddLead: false,
+  };
+}
+
+/** Every action granted — clamp with clampToModuleActions for real modules. */
+export function fullModulePermission(moduleKey: string): ModulePermission {
+  return {
+    moduleKey,
+    canView: true,
+    canAdd: true,
+    canEdit: true,
+    canDelete: true,
+    canApprove: true,
+    canActivate: true,
+    canDeactivate: true,
+    canAddLead: true,
   };
 }
 
@@ -205,47 +400,41 @@ export function emptyModulePermission(moduleKey: string): ModulePermission {
 export function dtoToModulePermission(
   moduleKey: string,
   source:
-    | { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canApprove: boolean }
+    | Partial<Record<PermissionColumn, boolean | null>>
     | Partial<Record<PermissionAction, boolean>>,
 ): ModulePermission {
   const isFull = 'canView' in source;
   const get = (action: PermissionAction) =>
     (isFull
-      ? (source as { canView: boolean; canAdd: boolean; canEdit: boolean; canDelete: boolean; canApprove: boolean })[
-          ('can' + action[0].toUpperCase() + action.slice(1)) as
-            | 'canView'
-            | 'canAdd'
-            | 'canEdit'
-            | 'canDelete'
-            | 'canApprove'
-        ]
-      : (source as Partial<Record<PermissionAction, boolean>>)[action]) ?? false;
-  return {
-    moduleKey,
-    canView: get('view'),
-    canAdd: get('add'),
-    canEdit: get('edit'),
-    canDelete: get('delete'),
-    canApprove: get('approve'),
-  };
+      ? source[actionToColumn(action)]
+      : (source as Partial<Record<PermissionAction, boolean>>)[action]) ??
+    false;
+  const row = emptyModulePermission(moduleKey);
+  for (const action of PERMISSION_ACTIONS) {
+    row[actionToColumn(action)] = get(action);
+  }
+  return row;
 }
 
-function actionToColumn(action: PermissionAction) {
-  return ('can' + action[0].toUpperCase() + action.slice(1)) as
-    | 'canView'
-    | 'canAdd'
-    | 'canEdit'
-    | 'canDelete'
-    | 'canApprove';
+export function actionToColumn(action: PermissionAction): PermissionColumn {
+  // snake_case actions map to camelCase columns (add_lead -> canAddLead).
+  const pascal = action
+    .split('_')
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join('');
+  return ('can' + pascal) as PermissionColumn;
 }
 
 /** The actions + which columns map to them, for building Prisma update data. */
-export const ACTION_TO_COLUMN: Record<PermissionAction, string> = {
+export const ACTION_TO_COLUMN: Record<PermissionAction, PermissionColumn> = {
   view: 'canView',
   add: 'canAdd',
   edit: 'canEdit',
   delete: 'canDelete',
   approve: 'canApprove',
+  activate: 'canActivate',
+  deactivate: 'canDeactivate',
+  add_lead: 'canAddLead',
 };
 
 // ---------------------------------------------------------------------------
@@ -254,27 +443,19 @@ export const ACTION_TO_COLUMN: Record<PermissionAction, string> = {
 //   - otherwise => role's configured rows for each module, overridden by any
 //     per-user override rows that set a non-null column for that module.
 //   - modules with no configured row fall back to DEFAULT_ROLE_PERMISSIONS.
+//   - actions a module doesn't support are always false.
 // ---------------------------------------------------------------------------
 
 export interface PermissionSource {
   roleKeys: string[];
-  rolePermissions: Array<{
-    role: { key: string };
-    moduleKey: string;
-    canView: boolean;
-    canAdd: boolean;
-    canEdit: boolean;
-    canDelete: boolean;
-    canApprove: boolean;
-  }>;
-  userOverrides: Array<{
-    moduleKey: string;
-    canView: boolean | null;
-    canAdd: boolean | null;
-    canEdit: boolean | null;
-    canDelete: boolean | null;
-    canApprove: boolean | null;
-  }>;
+  rolePermissions: Array<
+    { role: { key: string }; moduleKey: string } & Partial<
+      Record<PermissionColumn, boolean>
+    >
+  >;
+  userOverrides: Array<
+    { moduleKey: string } & Partial<Record<PermissionColumn, boolean | null>>
+  >;
 }
 
 export function isUnrestrictedRole(roleKeys: string[]): boolean {
@@ -294,7 +475,7 @@ export function computeEffectivePermissions(
   // Unrestricted roles get every module/action.
   if (isUnrestrictedRole(source.roleKeys)) {
     for (const def of PERMISSION_MODULES) {
-      byModule[def.key] = { ...emptyModulePermission(def.key), canView: true, canAdd: true, canEdit: true, canDelete: true, canApprove: true };
+      byModule[def.key] = clampToModuleActions(fullModulePermission(def.key));
     }
     const has = () => true;
     return { byModule, has };
@@ -305,14 +486,7 @@ export function computeEffectivePermissions(
 
   const roleByModule = new Map<string, ModulePermission>();
   for (const row of source.rolePermissions) {
-    roleByModule.set(row.moduleKey, {
-      moduleKey: row.moduleKey,
-      canView: row.canView,
-      canAdd: row.canAdd,
-      canEdit: row.canEdit,
-      canDelete: row.canDelete,
-      canApprove: row.canApprove,
-    });
+    roleByModule.set(row.moduleKey, dtoToModulePermission(row.moduleKey, row));
   }
 
   const overrideByModule = new Map<string, PermissionSource['userOverrides'][number]>();
@@ -321,50 +495,25 @@ export function computeEffectivePermissions(
   }
 
   for (const def of PERMISSION_MODULES) {
-    const roleRow = roleByModule.get(def.key) ?? (primaryRoleKey === 'admin'
-      ? {
-          moduleKey: def.key,
-          canView: true,
-          canAdd: true,
-          canEdit: true,
-          canDelete: true,
-          canApprove: true,
-        }
-      : undefined);
+    // Org admin with no configured row keeps full access to that module.
+    const roleRow =
+      roleByModule.get(def.key) ??
+      (primaryRoleKey === 'admin' ? fullModulePermission(def.key) : undefined);
     const overrideRow = overrideByModule.get(def.key);
-    if (roleRow && overrideRow) {
-      // Explicit override values (including false) win; null keeps the role grant.
-      byModule[def.key] = {
-        moduleKey: def.key,
-        canView: overrideRow.canView ?? roleRow.canView,
-        canAdd: overrideRow.canAdd ?? roleRow.canAdd,
-        canEdit: overrideRow.canEdit ?? roleRow.canEdit,
-        canDelete: overrideRow.canDelete ?? roleRow.canDelete,
-        canApprove: overrideRow.canApprove ?? roleRow.canApprove,
-      };
-    } else if (overrideRow) {
-      byModule[def.key] = {
-        moduleKey: def.key,
-        canView: overrideRow.canView ?? false,
-        canAdd: overrideRow.canAdd ?? false,
-        canEdit: overrideRow.canEdit ?? false,
-        canDelete: overrideRow.canDelete ?? false,
-        canApprove: overrideRow.canApprove ?? false,
-      };
-    } else if (roleRow) {
-      byModule[def.key] = roleRow;
-    } else {
-      // No configured rows — fall back to the role's baked-in default.
-      const defaults = defaultsForRole[def.key] ?? EMPTY;
-      byModule[def.key] = {
-        moduleKey: def.key,
-        canView: defaults.view ?? false,
-        canAdd: defaults.add ?? false,
-        canEdit: defaults.edit ?? false,
-        canDelete: defaults.delete ?? false,
-        canApprove: defaults.approve ?? false,
-      };
+    // Explicit override values (including false) win; null keeps the role
+    // grant (or, with no role row, the baked-in default).
+    const base =
+      roleRow ?? dtoToModulePermission(def.key, defaultsForRole[def.key] ?? EMPTY);
+    const merged = { ...base };
+    if (overrideRow) {
+      for (const action of PERMISSION_ACTIONS) {
+        const column = actionToColumn(action);
+        const value = overrideRow[column];
+        if (typeof value === 'boolean') merged[column] = value;
+        else if (!roleRow) merged[column] = false;
+      }
     }
+    byModule[def.key] = clampToModuleActions(merged);
   }
 
   const has = (module: string, action: PermissionAction): boolean =>
@@ -477,23 +626,18 @@ export async function loadRolePermissions(
     const unrestricted = UNRESTRICTED_ROLES.has(role.key);
     const permissions = PERMISSION_MODULES.map((def) => {
       if (unrestricted) {
-        return {
-          ...emptyModulePermission(def.key),
-          canView: true,
-          canAdd: true,
-          canEdit: true,
-          canDelete: true,
-          canApprove: true,
-        };
+        return clampToModuleActions(fullModulePermission(def.key));
       }
-      // 1. Org-specific customization
-      const orgPerm = orgMap.get(def.key);
-      if (orgPerm) return orgPerm;
-      // 2. Superadmin-configured system default
-      const systemPerm = systemMap.get(def.key);
-      if (systemPerm) return systemPerm;
-      // 3. Built-in hardcoded fallback
-      return dtoToModulePermission(def.key, defaultForRole(role.key, def.key));
+      // 1. Org-specific customization, 2. Superadmin-configured system
+      // default, 3. built-in hardcoded fallback — for the org admin that is
+      // full access, matching computeEffectivePermissions.
+      return clampToModuleActions(
+        orgMap.get(def.key)
+          ?? systemMap.get(def.key)
+          ?? (role.key === 'admin'
+            ? fullModulePermission(def.key)
+            : dtoToModulePermission(def.key, defaultForRole(role.key, def.key))),
+      );
     });
 
     return {
@@ -515,12 +659,16 @@ export function defaultForRole(
 }
 
 /** Builds the full row set of Prisma column updates for one module. */
-export function modulePermissionUpsertData(perm: ModulePermission) {
+export function modulePermissionUpsertData(input: ModulePermission) {
+  const perm = clampToModuleActions(input);
   return {
     canView: perm.canView,
     canAdd: perm.canAdd,
     canEdit: perm.canEdit,
     canDelete: perm.canDelete,
     canApprove: perm.canApprove,
+    canActivate: perm.canActivate,
+    canDeactivate: perm.canDeactivate,
+    canAddLead: perm.canAddLead,
   };
 }

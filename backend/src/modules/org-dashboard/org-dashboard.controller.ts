@@ -13,7 +13,9 @@ import { OrgDashboardQueryDto } from './dto/org-dashboard-query.dto';
 export class OrgDashboardController {
   constructor(private readonly service: OrgDashboardService) {}
 
-  @RequirePermission('dashboard', 'view')
+  // Enforced for the org Admin too, so Super Admin's Organisation roles
+  // setting for Dashboard > View matches what the sidebar shows.
+  @RequirePermission('dashboard', 'view', { enforceForOrgAdmin: true })
   @Get()
   getDashboard(
     @CurrentUser() actor: JwtPayload,

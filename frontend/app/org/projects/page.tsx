@@ -46,7 +46,9 @@ function getCoverGradient(id: string) {
 }
 
 export default function OrgProjectsPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
+  // Projects > New project — enforced for the org admin too.
+  const canCreate = hasPermission("projects", "add");
   const projectTypes = useProjectTypes(!!accessToken);
 
   const [searchInput, setSearchInput] = useState("");
@@ -174,7 +176,7 @@ export default function OrgProjectsPage() {
           </div>
         </div>
         <div className="actions">
-          {atProjectLimit ? (
+          {!canCreate ? null : atProjectLimit ? (
             <button
               className="btn btn-primary"
               type="button"
@@ -686,7 +688,7 @@ export default function OrgProjectsPage() {
                 >
                   Clear filters
                 </button>
-              ) : (
+              ) : canCreate ? (
                 <Link
                   href="/org/projects/add-new-project"
                   className="btn btn-primary"
@@ -703,7 +705,7 @@ export default function OrgProjectsPage() {
                 >
                   <Icon name="plus" size={14} /> Create your first project
                 </Link>
-              )}
+              ) : null}
             </div>
           ) : (
             <div className="pgrid">

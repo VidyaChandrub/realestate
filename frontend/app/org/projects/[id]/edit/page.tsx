@@ -144,7 +144,13 @@ export default function OrgProjectEditPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
   const router = useRouter();
-  const { accessToken } = useAuth();
+  const { accessToken, hasPermission } = useAuth();
+  // Projects > Edit opens this page; Delete needs Projects > Delete.
+  const canEdit = hasPermission("projects", "edit");
+  const canDelete = hasPermission("projects", "delete");
+  useEffect(() => {
+    if (accessToken && !canEdit) router.replace(`/org/projects/${id}`);
+  }, [accessToken, canEdit, id, router]);
 
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -1470,14 +1476,18 @@ export default function OrgProjectEditPage() {
           </div>
 
           <div className="row gap-10 mt-8 between">
-            <button
-              className="btn btn-ghost btn-sm text-rose"
-              type="button"
-              onClick={() => setDeleteOpen(true)}
-              disabled={saving || deleting}
-            >
-              Delete project
-            </button>
+            {canDelete ? (
+              <button
+                className="btn btn-ghost btn-sm text-rose"
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                disabled={saving || deleting}
+              >
+                Delete project
+              </button>
+            ) : (
+              <span />
+            )}
             <div className="row gap-10">
               <Link href={`/org/projects/${id}`} className="btn btn-ghost">Cancel</Link>
               {saveBtn}

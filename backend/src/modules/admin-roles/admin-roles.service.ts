@@ -12,11 +12,16 @@ import { UpdateRolePermissionsDto } from './dto/update-role-permissions.dto';
 import { CreatePlatformRoleDto } from './dto/create-platform-role.dto';
 import { UpdatePlatformRolePermissionsDto } from './dto/update-platform-role-permissions.dto';
 import {
+  clampToModuleActions,
   defaultForRole,
+  dtoToModulePermission,
+  fullModulePermission,
+  moduleActions,
   PERMISSION_MODULES,
   PLATFORM_PERMISSION_MODULES,
   SYSTEM_ORG_ID,
   type ModuleDefinition,
+  type PermissionColumn,
 } from '../../common/utils/permissions.util';
 
 const SYSTEM_ROLES = new Set(['super_admin', 'admin', 'manager', 'sales', 'telecaller']);
@@ -292,49 +297,31 @@ export class AdminRolesService {
       where: { orgId: SYSTEM_ORG_ID, roleId },
     });
 
-    const isUnrestricted = unrestrictedKeys.includes(role.key)
-      || (unrestrictedFallbackKeys.includes(role.key) && systemRows.length === 0);
+    const isUnrestricted = unrestrictedKeys.includes(role.key);
+    // Roles (org Admin) that have full access to any module Super Admin
+    // hasn't saved a row for — same rule computeEffectivePermissions applies.
+    const fullByDefault = unrestrictedFallbackKeys.includes(role.key);
     const rowMap = new Map(systemRows.map((r) => [r.moduleKey, r]));
 
     const permissions = catalog.map((def) => {
-      if (isUnrestricted) {
-        return {
-          moduleKey: def.key,
-          label: def.label,
-          description: def.description,
-          canView: true,
-          canAdd: true,
-          canEdit: true,
-          canDelete: true,
-          canApprove: true,
-        };
-      }
-
-      const existingRow = rowMap.get(def.key);
-      if (existingRow) {
-        return {
-          moduleKey: def.key,
-          label: def.label,
-          description: def.description,
-          canView: existingRow.canView,
-          canAdd: existingRow.canAdd,
-          canEdit: existingRow.canEdit,
-          canDelete: existingRow.canDelete,
-          canApprove: existingRow.canApprove,
-        };
-      }
-
-      const bakedIn = defaultForRole(role.key, def.key);
-      return {
-        moduleKey: def.key,
+      const meta = {
         label: def.label,
         description: def.description,
-        canView: bakedIn.view ?? false,
-        canAdd: bakedIn.add ?? false,
-        canEdit: bakedIn.edit ?? false,
-        canDelete: bakedIn.delete ?? false,
-        canApprove: bakedIn.approve ?? false,
+        actions: [...moduleActions(def.key)],
+        actionLabels: def.actionLabels ?? {},
       };
+
+      // Unrestricted role, else the Super Admin's saved row, else the
+      // built-in default — always limited to the actions the module supports.
+      const saved = rowMap.get(def.key);
+      const row =
+        isUnrestricted || (!saved && fullByDefault)
+          ? fullModulePermission(def.key)
+          : dtoToModulePermission(
+              def.key,
+              saved ?? defaultForRole(role.key, def.key),
+            );
+      return { ...meta, ...clampToModuleActions(row) };
     });
 
     return { role, modules: catalog, permissions };
@@ -344,14 +331,9 @@ export class AdminRolesService {
     roleId: string,
     allowed: RoleScope[],
     catalog: ModuleDefinition[],
-    permissions: Array<{
-      moduleKey: string;
-      canView: boolean;
-      canAdd: boolean;
-      canEdit: boolean;
-      canDelete: boolean;
-      canApprove: boolean;
-    }>,
+    permissions: Array<
+      { moduleKey: string } & Partial<Record<PermissionColumn, boolean>>
+    >,
     unrestrictedKeys: string[],
   ) {
     const role = await this.requireRole(roleId, allowed);
@@ -376,12 +358,7 @@ export class AdminRolesService {
           data: validPermissions.map((p) => ({
             orgId: SYSTEM_ORG_ID,
             roleId,
-            moduleKey: p.moduleKey,
-            canView: p.canView,
-            canAdd: p.canAdd,
-            canEdit: p.canEdit,
-            canDelete: p.canDelete,
-            canApprove: p.canApprove,
+            ...clampToModuleActions(dtoToModulePermission(p.moduleKey, p)),
           })),
         });
       }

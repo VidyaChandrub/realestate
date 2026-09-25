@@ -86,7 +86,19 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get("returnUrl") || searchParams.get("returnTo") || null;
   const router = useRouter();
-  const { user: authUser, logout } = useAuth();
+  const { user: authUser, logout, hasPermission } = useAuth();
+  // Org landing pages follow the Landing Pages pills; Super Admin templates
+  // are gated by the admin console, so every action stays available there.
+  const isOrgPage = resource === "landing-page";
+  const canEditPage = !isOrgPage || hasPermission("landing_pages", "edit");
+  const canPublishPage = !isOrgPage || hasPermission("landing_pages", "activate");
+  const canUnpublishPage = !isOrgPage || hasPermission("landing_pages", "deactivate");
+
+  // Editing (saving, uploads) needs Landing Pages > Edit — send anyone
+  // without it back to the list instead of into a builder that can't save.
+  useEffect(() => {
+    if (authUser && !canEditPage) router.replace("/org/landing-pages");
+  }, [authUser, canEditPage, router]);
   const [module, setModule] = useState<ModuleKey>("builder");
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -494,6 +506,8 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
         publishLabel={topNavPublish.label}
         onUnpublish={topNavUnpublish.run}
         unpublishLabel={topNavUnpublish.label}
+        canPublish={canPublishPage}
+        canUnpublish={canUnpublishPage}
         onNotify={() => setNotifOpen(true)}
         onActivity={() => setActivityOpen(true)}
         onHelp={() => setHelpOpen(true)}

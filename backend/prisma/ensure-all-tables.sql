@@ -350,6 +350,9 @@ CREATE TABLE IF NOT EXISTS "access"."role_module_permissions" (
     "can_edit" BOOLEAN NOT NULL DEFAULT false,
     "can_delete" BOOLEAN NOT NULL DEFAULT false,
     "can_approve" BOOLEAN NOT NULL DEFAULT false,
+    "can_activate" BOOLEAN NOT NULL DEFAULT false,
+    "can_deactivate" BOOLEAN NOT NULL DEFAULT false,
+    "can_add_lead" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "role_module_permissions_pkey" PRIMARY KEY ("org_id","role_id","module_key")
 
@@ -365,6 +368,9 @@ CREATE TABLE IF NOT EXISTS "access"."user_module_permissions" (
     "can_edit" BOOLEAN,
     "can_delete" BOOLEAN,
     "can_approve" BOOLEAN,
+    "can_activate" BOOLEAN,
+    "can_deactivate" BOOLEAN,
+    "can_add_lead" BOOLEAN,
 
     CONSTRAINT "user_module_permissions_pkey" PRIMARY KEY ("org_id","user_id","module_key")
 

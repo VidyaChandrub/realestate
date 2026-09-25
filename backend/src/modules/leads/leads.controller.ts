@@ -10,7 +10,12 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
-import { PermissionGuard } from '../../common/guards/permission.guard';
+import {
+  PermissionGuard,
+  assertOrgPermission,
+} from '../../common/guards/permission.guard';
+import { PrismaService } from '../../database/prisma.service';
+import { PROJECT_LEAD_ACTION } from '../../common/utils/permissions.util';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
@@ -26,7 +31,10 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 
 @Controller('org/leads')
 export class LeadsController {
-  constructor(private readonly service: LeadsService) {}
+  constructor(
+    private readonly service: LeadsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   /**
    * Public lead capture. Intentionally unguarded: the published form is filled
@@ -37,10 +45,18 @@ export class LeadsController {
     return this.service.createFromPublic(dto);
   }
 
-  @UseGuards(JwtAuthGuard, OrgApprovedGuard, PermissionGuard)
-  @RequirePermission('crm', 'add')
+  // Leads / CRM > Add allows any lead. Projects > Add lead (the project
+  // pages' "Add lead") allows a lead tied to a project — checked here because
+  // the needed permission depends on the body.
+  @UseGuards(JwtAuthGuard, OrgApprovedGuard)
   @Post('manual')
-  createManual(@CurrentUser() user: JwtPayload, @Body() dto: CreateManualLeadDto) {
+  async createManual(@CurrentUser() user: JwtPayload, @Body() dto: CreateManualLeadDto) {
+    try {
+      await assertOrgPermission(this.prisma, user, 'crm', 'add', false);
+    } catch (crmError) {
+      if (!dto.projectId) throw crmError;
+      await assertOrgPermission(this.prisma, user, 'projects', PROJECT_LEAD_ACTION, true);
+    }
     return this.service.createFromCrm(user.orgId as string, user, dto);
   }
 
