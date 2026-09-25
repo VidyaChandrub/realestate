@@ -25,6 +25,7 @@ import { StatusBadge, TemplateCover, TierBadge, manageHref, type TemplateRow } f
 
 export function TemplateCard({
   row,
+  plans,
   delay,
   onEdit,
   onPreview,
@@ -35,6 +36,7 @@ export function TemplateCard({
   onQuickPreview,
 }: {
   row: TemplateRow;
+  plans?: Array<{ name: string; isActive?: boolean; priceMonthly?: number }>;
   delay?: number;
   onEdit: () => void;
   onPreview: () => void;
@@ -90,7 +92,7 @@ export function TemplateCard({
                 alignItems: "center",
               }}
             >
-              <TierBadge tier={row.tier} />
+              <TierBadge tier={row.tier} plans={plans} />
               <StatusBadge status={row.status} />
             </div>
 

@@ -328,28 +328,36 @@ export function canPlanAccessTier(
     return { allowed: true };
   }
 
-  // Driven by Subscription plan capabilities (paidTemplates / premiumTemplates),
-  // not hardcoded plan names like Starter / Pro / Pro Max.
   const capabilities = ((plan?.capabilities ?? {}) as Record<string, boolean>);
+  const price = plan?.priceMonthly ?? 0;
+  const slug = (plan?.slug ?? '').toLowerCase();
 
   if (tier === 'paid') {
-    if (capabilities.paidTemplates === true || capabilities.premiumTemplates === true) {
+    if (
+      capabilities.paidTemplates === true ||
+      capabilities.premiumTemplates === true ||
+      price > 0
+    ) {
       return { allowed: true };
     }
     return {
       allowed: false,
-      reason: 'This is a Paid template. Upgrade to a plan with Paid templates enabled.',
+      reason: 'This template requires a paid subscription plan (Starter or higher). Please upgrade your plan.',
     };
   }
 
   if (tier === 'premium') {
-    if (capabilities.premiumTemplates === true) {
+    if (
+      capabilities.premiumTemplates === true ||
+      price >= 10000 ||
+      /ultra|premium|max|enterprise/i.test(slug)
+    ) {
       return { allowed: true };
     }
     return {
       allowed: false,
       reason:
-        'This is a Premium template. Upgrade to a plan with Premium templates enabled.',
+        'This template is exclusive to the Ultra Pro subscription plan. Please upgrade to Ultra Pro to access it.',
     };
   }
 
