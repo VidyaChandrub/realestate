@@ -1178,10 +1178,19 @@ export default function AddNewProjectPage() {
             const status = stepStatus(i, step, requiredByStep);
             const isActive = step === i;
             const isDone = status === "complete";
+            const isWarn = (jumpWarning && step === i) || status === "incomplete";
             return (
               <div
                 key={i}
+                role="button"
+                tabIndex={0}
                 onClick={() => goToStep(i)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    goToStep(i);
+                  }
+                }}
                 style={{
                   flex: 1,
                   display: "flex",
@@ -1191,6 +1200,12 @@ export default function AddNewProjectPage() {
                   position: "relative",
                   cursor: "pointer",
                   userSelect: "none",
+                  padding: "8px 6px",
+                  borderRadius: 12,
+                  background: isWarn ? "#fef9c3" : "transparent",
+                  border: isWarn ? "1.5px solid #facc15" : "1.5px solid transparent",
+                  boxShadow: isWarn ? "0 2px 10px rgba(234, 179, 8, 0.25)" : "none",
+                  transition: "all 0.2s ease",
                 }}
               >
                 {/* Horizontal line connector */}
@@ -1198,7 +1213,7 @@ export default function AddNewProjectPage() {
                   <div
                     style={{
                       position: "absolute",
-                      top: 14,
+                      top: 22,
                       left: "50%",
                       width: "100%",
                       height: 2,
@@ -1221,21 +1236,57 @@ export default function AddNewProjectPage() {
                     fontWeight: 700,
                     position: "relative",
                     zIndex: 2,
-                    background: isActive ? "#0066f5" : isDone ? "#eff6ff" : "#fff",
-                    color: isActive ? "#fff" : isDone ? "#0066f5" : "#64748b",
-                    border: isActive ? "2px solid #0066f5" : isDone ? "2px solid #0066f5" : "2px solid #cbd5e1",
-                    boxShadow: isActive ? "0 4px 12px rgba(0, 102, 245, 0.35)" : "none",
+                    background: isWarn
+                      ? "#f59e0b"
+                      : isActive
+                        ? "#0066f5"
+                        : isDone
+                          ? "#eff6ff"
+                          : "#fff",
+                    color: isWarn
+                      ? "#fff"
+                      : isActive
+                        ? "#fff"
+                        : isDone
+                          ? "#0066f5"
+                          : "#64748b",
+                    border: isWarn
+                      ? "2px solid #d97706"
+                      : isActive
+                        ? "2px solid #0066f5"
+                        : isDone
+                          ? "2px solid #0066f5"
+                          : "2px solid #cbd5e1",
+                    boxShadow: isWarn
+                      ? "0 4px 12px rgba(245, 158, 11, 0.4)"
+                      : isActive
+                        ? "0 4px 12px rgba(0, 102, 245, 0.35)"
+                        : "none",
                     transition: "all 0.2s",
                   }}
                 >
-                  {isDone && !isActive ? <Icon name="check" size={13} /> : i + 1}
+                  {isWarn ? <Icon name="alert" size={13} /> : isDone && !isActive ? <Icon name="check" size={13} /> : i + 1}
                 </div>
                 {/* Label text */}
                 <div style={{ marginTop: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: isActive ? 700 : 600, color: isActive ? "#0f172a" : "#475569", lineHeight: 1.25 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: isActive || isWarn ? 700 : 600,
+                      color: isWarn ? "#854d0e" : isActive ? "#0f172a" : "#475569",
+                      lineHeight: 1.25,
+                    }}
+                  >
                     {s.label}
                   </div>
-                  <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 2, lineHeight: 1.2 }}>
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      color: isWarn ? "#a16207" : "#94a3b8",
+                      marginTop: 2,
+                      lineHeight: 1.2,
+                    }}
+                  >
                     {s.sub}
                   </div>
                 </div>
@@ -1249,15 +1300,33 @@ export default function AddNewProjectPage() {
         <div className="wz" style={{ display: "flex", flexDirection: "column", minHeight: "calc(100vh - 310px)" }}>
           {/* Raised when a step click would jump ahead out of an incomplete step */}
           {jumpWarning && (
-            <div className="help err mb-20" style={{ background: "#fef2f2", border: "1px solid #fee2e2", borderRadius: 12, padding: 14 }}>
-              <b><Icon name="alert" size={13} /> {STEPS[step].label} isn&apos;t complete.</b>
-              <div style={{ marginTop: 4, fontSize: 13 }}>
-                Still needed here: {jumpWarning.missing.join(", ")}. You can fill it in now, or skip ahead to <b>{STEPS[jumpWarning.to].label}</b> and come back — the project can&apos;t be published until it&apos;s filled in.
+            <div
+              className="help err mb-20"
+              style={{
+                background: "#fffbeb",
+                border: "1.5px solid #fde68a",
+                borderRadius: 12,
+                padding: "16px 18px",
+                boxShadow: "0 2px 10px rgba(245, 158, 11, 0.08)",
+              }}
+            >
+              <b style={{ color: "#b45309", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13.5 }}>
+                <Icon name="alert" size={15} /> {STEPS[step].label} isn&apos;t complete.
+              </b>
+              <div style={{ marginTop: 6, fontSize: 13, color: "#92400e", lineHeight: 1.45 }}>
+                Still needed here: <b>{jumpWarning.missing.join(", ")}</b>. You can fill it in now, or skip ahead to <b>{STEPS[jumpWarning.to].label}</b> and come back — the project can&apos;t be published until it&apos;s filled in.
               </div>
-              <div className="row gap-10 mt-8" style={{ display: "flex", gap: 10 }}>
-                <button className="btn btn-primary btn-sm" style={{ background: "#0066f5" }} onClick={() => setJumpWarning(null)}>Stay and fill it in</button>
+              <div className="row gap-10 mt-12" style={{ display: "flex", gap: 10 }}>
+                <button
+                  className="btn btn-primary btn-sm"
+                  style={{ background: "#f59e0b", borderColor: "#d97706", color: "#fff", fontWeight: 600 }}
+                  onClick={() => setJumpWarning(null)}
+                >
+                  Stay and fill it in
+                </button>
                 <button
                   className="btn btn-ghost btn-sm"
+                  style={{ color: "#92400e", fontWeight: 600 }}
                   onClick={() => { const to = jumpWarning.to; setJumpWarning(null); setStep(to); }}
                 >
                   Go to {STEPS[jumpWarning.to].label} anyway →
@@ -1270,14 +1339,69 @@ export default function AddNewProjectPage() {
           {step === 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(320px, 1fr)", gap: 24, alignItems: "start" }}>
               {/* Left Column: Form Card */}
-              <div className="card pad-24" style={{ borderRadius: 14, border: "1px solid #e2e8f0", background: "#fff" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", color: "#0066f5", flexShrink: 0 }}>
-                    <Icon name="document" size={18} />
+              <div
+                className="card pad-24"
+                style={{
+                  borderRadius: 14,
+                  border: (jumpWarning && step === 0) ? "1.5px solid #fde047" : "1px solid #e2e8f0",
+                  background: "#fff",
+                  boxShadow: (jumpWarning && step === 0) ? "0 4px 16px rgba(245, 158, 11, 0.1)" : undefined,
+                  transition: "all 0.2s",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    marginBottom: 20,
+                    padding: (jumpWarning && step === 0) ? "10px 14px" : undefined,
+                    background: (jumpWarning && step === 0) ? "#fef9c3" : undefined,
+                    borderRadius: (jumpWarning && step === 0) ? 10 : undefined,
+                    border: (jumpWarning && step === 0) ? "1px solid #fde047" : undefined,
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      background: (jumpWarning && step === 0) ? "#fef08a" : "#eff6ff",
+                      border: (jumpWarning && step === 0) ? "1px solid #facc15" : "1px solid #bfdbfe",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: (jumpWarning && step === 0) ? "#b45309" : "#0066f5",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Icon name={jumpWarning && step === 0 ? "alert" : "document"} size={18} />
                   </div>
-                  <div>
-                    <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#0f172a" }}>Project Basics</h2>
-                    <div style={{ fontSize: 12.5, color: "#64748b", marginTop: 2 }}>Enter the basic information about your real estate project.</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: (jumpWarning && step === 0) ? "#854d0e" : "#0f172a" }}>
+                        Project Basics
+                      </h2>
+                      {jumpWarning && step === 0 && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            background: "#fef08a",
+                            color: "#854d0e",
+                            border: "1px solid #facc15",
+                          }}
+                        >
+                          Incomplete
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: (jumpWarning && step === 0) ? "#92400e" : "#64748b", marginTop: 2 }}>
+                      Enter the basic information about your real estate project.
+                    </div>
                   </div>
                 </div>
 

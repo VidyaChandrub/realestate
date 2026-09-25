@@ -49,6 +49,7 @@ import {
 import { GalleryUpload, MediaUpload } from "@/components/org/media-upload";
 import "@/app/org/org.css";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { Icon } from "@/components/icons";
 import type {
   Amenity,
   LandingPageRow,
@@ -896,35 +897,64 @@ export default function OrgProjectEditPage() {
         }}
       >
         <div className="tabs" style={{ marginBottom: 0 }}>
-          {NAV.map(([anchor, label]) => (
-            <a
-              key={anchor}
-              href={`#${anchor}`}
-              className={activeSection === anchor ? "active" : ""}
-              onClick={(event) => {
-                event.preventDefault();
-                jumpToSection(anchor, label);
-              }}
-              title={sectionMissingCount(anchor) > 0 ? `${label} is missing required fields` : undefined}
-            >
-              {label}
-              {sectionMissingCount(anchor) > 0 ? (
-                <span className="nav-warn" aria-label="missing required fields"> !</span>
-              ) : null}
-            </a>
-          ))}
+          {NAV.map(([anchor, label]) => {
+            const isWarn = jumpWarning ? activeSection === anchor : sectionMissingCount(anchor) > 0;
+            return (
+              <a
+                key={anchor}
+                href={`#${anchor}`}
+                className={activeSection === anchor ? "active" : ""}
+                style={isWarn && jumpWarning ? { background: "#fef9c3", borderColor: "#facc15", color: "#854d0e" } : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  jumpToSection(anchor, label);
+                }}
+                title={sectionMissingCount(anchor) > 0 ? `${label} is missing required fields` : undefined}
+              >
+                {label}
+                {sectionMissingCount(anchor) > 0 ? (
+                  <span className="nav-warn" aria-label="missing required fields"> !</span>
+                ) : null}
+              </a>
+            );
+          })}
         </div>
       </div>
 
       {jumpWarning ? (
-        <div className="help err mb-20">
-          <b>{activeSection === jumpWarning.to ? jumpWarning.label : "This section"} has missing required fields.</b>
-          <div style={{ marginTop: 4 }}>
-            Still needed here: {jumpWarning.missing.join(", ")}. You can fill them in now, or go to <b>{jumpWarning.label}</b> and come back before saving.
+        <div
+          className="help err mb-20"
+          style={{
+            background: "#fffbeb",
+            border: "1.5px solid #fde68a",
+            borderRadius: 12,
+            padding: "16px 18px",
+            boxShadow: "0 2px 10px rgba(245, 158, 11, 0.08)",
+          }}
+        >
+          <b style={{ color: "#b45309", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13.5 }}>
+            <Icon name="alert" size={15} /> {activeSection === jumpWarning.to ? jumpWarning.label : "This section"} has missing required fields.
+          </b>
+          <div style={{ marginTop: 6, fontSize: 13, color: "#92400e", lineHeight: 1.45 }}>
+            Still needed here: <b>{jumpWarning.missing.join(", ")}</b>. You can fill them in now, or go to <b>{jumpWarning.label}</b> and come back before saving.
           </div>
-          <div className="row gap-10 mt-8">
-            <button className="btn btn-primary btn-sm" type="button" onClick={() => setJumpWarning(null)}>Stay and fill it in</button>
-            <button className="btn btn-ghost btn-sm" type="button" onClick={confirmSectionJump}>Go to {jumpWarning.label} anyway →</button>
+          <div className="row gap-10 mt-12" style={{ display: "flex", gap: 10 }}>
+            <button
+              className="btn btn-primary btn-sm"
+              type="button"
+              style={{ background: "#f59e0b", borderColor: "#d97706", color: "#fff", fontWeight: 600 }}
+              onClick={() => setJumpWarning(null)}
+            >
+              Stay and fill it in
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              type="button"
+              style={{ color: "#92400e", fontWeight: 600 }}
+              onClick={confirmSectionJump}
+            >
+              Go to {jumpWarning.label} anyway →
+            </button>
           </div>
         </div>
       ) : null}

@@ -130,9 +130,16 @@ export function LeadStatusSelect({
         className="inp"
         style={{
           width: "auto",
+          height: 32,
           borderColor: currentColor,
           color: currentColor,
           fontWeight: 600,
+          borderRadius: 999,
+          padding: "0 28px 0 14px",
+          fontSize: 12.5,
+          background: `#ffffff url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 8 5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L4 4L7 1' stroke='${encodeURIComponent(currentColor)}' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center`,
+          appearance: "none",
+          cursor: "pointer",
         }}
         value={value}
         disabled={disabled}
