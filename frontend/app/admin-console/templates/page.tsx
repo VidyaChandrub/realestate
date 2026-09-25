@@ -34,6 +34,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import {
   ACCESS_TIERS,
   accessTierOptionLabel,
+  getTemplatePlanOptions,
   buildTemplateRows,
   deriveStats,
   matchesFilter,
@@ -390,7 +391,7 @@ export default function SuperAdminTemplatesPage() {
   const rows = useMemo(() => buildTemplateRows(pages), [pages]);
   const stats = useMemo(() => deriveStats(rows), [rows]);
 
-  // Tier counts
+  // Plan tier counts
   const tierCounts = useMemo(() => {
     let free = 0;
     let paid = 0;
@@ -403,6 +404,12 @@ export default function SuperAdminTemplatesPage() {
     }
     return { free, paid, premium };
   }, [rows]);
+
+  // Subscription plan tiers dynamically derived from active plans
+  const planOptions = useMemo(() => getTemplatePlanOptions(plans), [plans]);
+  const freeOption = planOptions.find((o) => o.tier === "free");
+  const paidOption = planOptions.find((o) => o.tier === "paid");
+  const premOption = planOptions.find((o) => o.tier === "premium");
 
   const filter = TEMPLATE_FILTERS[filterIndex] ?? "All";
 
@@ -615,7 +622,7 @@ export default function SuperAdminTemplatesPage() {
             </div>
           </div>
 
-          {/* Card: Free Tier */}
+          {/* Card: Free Tier / All Plans */}
           <div
             style={{
               background: "var(--surface)",
@@ -631,17 +638,19 @@ export default function SuperAdminTemplatesPage() {
             onClick={() => setTierFilter(tierFilter === "free" ? "all" : "free")}
           >
             <div>
-              <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>Free Tier</div>
+              <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
+                {freeOption?.badgeLabel || "All Plans"}
+              </div>
               <div style={{ fontSize: 22, fontWeight: 800, color: "var(--green)", marginTop: 2 }}>
                 <CountUp value={tierCounts.free} />
               </div>
             </div>
             <span className="badge b-green" style={{ fontWeight: 700 }}>
-              Free
+              {freeOption?.badgeLabel || "All Plans"}
             </span>
           </div>
 
-          {/* Card: Paid Tier */}
+          {/* Card: Paid Plans */}
           <div
             style={{
               background: "var(--surface)",
@@ -657,17 +666,19 @@ export default function SuperAdminTemplatesPage() {
             onClick={() => setTierFilter(tierFilter === "paid" ? "all" : "paid")}
           >
             <div>
-              <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>Paid Tier</div>
+              <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
+                {paidOption?.badgeLabel || "Paid Plans"}
+              </div>
               <div style={{ fontSize: 22, fontWeight: 800, color: "var(--brand)", marginTop: 2 }}>
                 <CountUp value={tierCounts.paid} />
               </div>
             </div>
             <span className="badge b-indigo" style={{ fontWeight: 700 }}>
-              Paid
+              {paidOption?.badgeLabel || "Paid"}
             </span>
           </div>
 
-          {/* Card: Premium Tier */}
+          {/* Card: Premium / Top Tier */}
           <div
             style={{
               background: "var(--surface)",
@@ -683,13 +694,15 @@ export default function SuperAdminTemplatesPage() {
             onClick={() => setTierFilter(tierFilter === "premium" ? "all" : "premium")}
           >
             <div>
-              <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>Premium Tier</div>
+              <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
+                {premOption?.badgeLabel || "Ultra Pro"}
+              </div>
               <div style={{ fontSize: 22, fontWeight: 800, color: "var(--violet)", marginTop: 2 }}>
                 <CountUp value={tierCounts.premium} />
               </div>
             </div>
             <span className="badge b-violet" style={{ fontWeight: 700 }}>
-              Premium
+              {premOption?.badgeLabel || "Ultra Pro"}
             </span>
           </div>
 
@@ -845,10 +858,16 @@ export default function SuperAdminTemplatesPage() {
                     alignItems: "center",
                     gap: 6,
                     transition: "all 0.15s ease",
-                    textTransform: "capitalize",
+                    textTransform: "none",
                   }}
                 >
-                  {t === "all" ? "All Tiers" : t}
+                  {t === "all"
+                    ? "All Plans"
+                    : t === "free"
+                      ? (freeOption?.badgeLabel || "All Plans")
+                      : t === "paid"
+                        ? (paidOption?.badgeLabel || "Paid")
+                        : (premOption?.badgeLabel || "Ultra Pro")}
                   <span
                     style={{
                       fontSize: 11,
@@ -1134,7 +1153,7 @@ export default function SuperAdminTemplatesPage() {
                   <th style={{ width: 64 }}>Preview</th>
                   <th>Template Name</th>
                   <th>Category</th>
-                  <th>Tier</th>
+                  <th>Plan Access</th>
                   <th>Status</th>
                   <th>Source</th>
                   <th style={{ textAlign: "right" }}>Actions</th>
@@ -1185,7 +1204,7 @@ export default function SuperAdminTemplatesPage() {
                       )}
                     </td>
                     <td>
-                      <TierBadge tier={r.tier} />
+                      <TierBadge tier={r.tier} plans={plans} />
                     </td>
                     <td>
                       <StatusBadge status={r.status} />
@@ -1238,6 +1257,7 @@ export default function SuperAdminTemplatesPage() {
             <TemplateCard
               key={r.key}
               row={r}
+              plans={plans}
               delay={i % 9}
               onEdit={() => {
                 if (r.pageId) {
@@ -1267,7 +1287,7 @@ export default function SuperAdminTemplatesPage() {
           title={previewRow.name}
           headerActions={
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <TierBadge tier={previewRow.tier} />
+              <TierBadge tier={previewRow.tier} plans={plans} />
               {previewRow.category && (
                 <span className="badge b-gray" style={{ fontWeight: 600 }}>
                   {previewRow.category}
@@ -1596,15 +1616,15 @@ export default function SuperAdminTemplatesPage() {
             </select>
           </div>
           <div className="field" style={{ marginBottom: 0 }}>
-            <label>Access Tier</label>
+            <label>Subscription Plan Access</label>
             <select
               className="inp"
               value={createTier}
               onChange={(e) => setCreateTier(e.target.value as any)}
             >
-              {ACCESS_TIERS.map((t) => (
-                <option key={t} value={t}>
-                  {accessTierOptionLabel(t, plans)}
+              {planOptions.map((opt) => (
+                <option key={opt.tier} value={opt.tier}>
+                  {opt.label}
                 </option>
               ))}
             </select>

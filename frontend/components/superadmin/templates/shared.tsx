@@ -128,22 +128,104 @@ export function buildTemplateRows(pages: LandingPageData[]): TemplateRow[] {
   return [...presets, ...orphanPresets, ...customs];
 }
 
-export function tierStyle(tier?: "free" | "paid" | "premium"): { cls: string; label: string } {
-  switch (tier) {
+export interface TemplatePlanOption {
+  tier: AccessTier;
+  label: string;
+  badgeLabel: string;
+  hint: string;
+}
+
+/** Compute dynamic plan-first options based on actual active subscription plans */
+export function getTemplatePlanOptions(
+  plans: Array<{
+    name: string;
+    slug?: string;
+    isActive?: boolean;
+    priceMonthly?: number;
+    capabilities?: Record<string, boolean> | null;
+  }> = [],
+): TemplatePlanOption[] {
+  const active = (plans || []).filter((p) => p.isActive !== false);
+  const sorted = [...active].sort((a, b) => (a.priceMonthly ?? 0) - (b.priceMonthly ?? 0));
+
+  const freePlan = sorted.find((p) => (p.priceMonthly ?? 0) === 0) || sorted[0];
+  const paidPlans = sorted.filter((p) => (p.priceMonthly ?? 0) > 0);
+  const topPlan = paidPlans.length > 1 ? paidPlans[paidPlans.length - 1] : null;
+  const midPaidPlans = topPlan ? paidPlans.slice(0, -1) : paidPlans;
+
+  const freeLabel = freePlan ? `All Plans (Default / ${freePlan.name})` : "All Plans (Free)";
+  const freeBadge = "All Plans";
+
+  const paidLabel =
+    midPaidPlans.length > 0
+      ? `${midPaidPlans.map((p) => p.name).join(", ")} & Above`
+      : "Paid Plans (Starter & Above)";
+  const paidBadge = midPaidPlans.length > 0 ? `${midPaidPlans[0].name}+` : "Paid Plans";
+
+  const premLabel = topPlan
+    ? `${topPlan.name} (Top Tier Exclusive)`
+    : "Ultra Pro (Premium Exclusive)";
+  const premBadge = topPlan ? topPlan.name : "Ultra Pro";
+
+  return [
+    {
+      tier: "free",
+      label: freeLabel,
+      badgeLabel: freeBadge,
+      hint: "Accessible to every workspace on any subscription plan.",
+    },
+    {
+      tier: "paid",
+      label: paidLabel,
+      badgeLabel: paidBadge,
+      hint: "Requires a paid plan subscription.",
+    },
+    {
+      tier: "premium",
+      label: premLabel,
+      badgeLabel: premBadge,
+      hint: "Exclusive to top-tier enterprise / pro plans.",
+    },
+  ];
+}
+
+export function tierStyle(
+  tier?: "free" | "paid" | "premium",
+  plans?: Array<{
+    name: string;
+    isActive?: boolean;
+    priceMonthly?: number;
+  }>,
+): { cls: string; label: string } {
+  const t = tier ?? "free";
+  const opts = getTemplatePlanOptions(plans || []);
+  const opt = opts.find((o) => o.tier === t);
+
+  switch (t) {
     case "premium":
-      return { cls: "b-violet", label: "Premium" };
+      return { cls: "b-violet", label: opt?.badgeLabel || "Premium" };
     case "paid":
-      return { cls: "b-indigo", label: "Paid" };
+      return { cls: "b-indigo", label: opt?.badgeLabel || "Paid" };
     case "free":
     default:
-      return { cls: "b-green", label: "Free" };
+      return { cls: "b-green", label: opt?.badgeLabel || "All Plans" };
   }
 }
 
-export function TierBadge({ tier }: { tier?: "free" | "paid" | "premium" }) {
-  const t = tierStyle(tier);
+export function TierBadge({
+  tier,
+  plans,
+}: {
+  tier?: "free" | "paid" | "premium";
+  plans?: Array<{
+    name: string;
+    isActive?: boolean;
+    priceMonthly?: number;
+  }>;
+}) {
+  const t = tierStyle(tier, plans);
   return (
-    <span className={`badge ${t.cls}`} style={{ textTransform: "capitalize", fontWeight: 600 }}>
+    <span className={`badge ${t.cls}`} style={{ textTransform: "none", fontWeight: 600 }}>
       {t.label}
     </span>
   );
@@ -162,7 +244,7 @@ export function plansForAccessTier(
   }>,
   tier: AccessTier,
 ): string[] {
-  const active = plans.filter((p) => p.isActive !== false);
+  const active = (plans || []).filter((p) => p.isActive !== false);
   if (tier === "free") {
     return active.map((p) => p.name);
   }
@@ -170,37 +252,29 @@ export function plansForAccessTier(
   return active
     .filter((p) => {
       const caps = p.capabilities ?? {};
+      const price = p.priceMonthly ?? 0;
       if (tier === "premium") {
-        return caps.premiumTemplates === true;
+        return caps.premiumTemplates === true || price >= 10000;
       }
       // paid
-      return caps.paidTemplates === true || caps.premiumTemplates === true;
+      return caps.paidTemplates === true || caps.premiumTemplates === true || price > 0;
     })
     .map((p) => p.name);
 }
 
-/** Dropdown label: tier name + live plan names from Subscriptions. */
+/** Dropdown label: uses subscription plans directly. */
 export function accessTierOptionLabel(
   tier: AccessTier,
   plans: Array<{
     name: string;
     isActive?: boolean;
+    priceMonthly?: number;
     capabilities?: Record<string, boolean> | null;
   }>,
 ): string {
-  const title = tier === "free" ? "Free" : tier === "paid" ? "Paid" : "Premium";
-  const names = plansForAccessTier(plans, tier);
-
-  if (tier === "free") {
-    return names.length > 0
-      ? `${title} (All plans: ${names.join(", ")})`
-      : `${title} (All plans)`;
-  }
-
-  if (names.length === 0) {
-    return `${title} (enable on a plan in Subscriptions)`;
-  }
-  return `${title} (${names.join(", ")})`;
+  const opts = getTemplatePlanOptions(plans);
+  const found = opts.find((o) => o.tier === tier);
+  return found?.label || (tier === "free" ? "All Plans" : tier === "paid" ? "Paid Plans" : "Premium");
 }
 
 export type TemplateStats = {

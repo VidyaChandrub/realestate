@@ -329,32 +329,26 @@ export async function loadTemplate(id: string, resource: Resource = "template"):
       const { TEMPLATES, BLANK_TEMPLATE, buildTemplateSections } = await import("./data");
       const { seedConfigFor } = await import("./site-config");
       const design = TEMPLATES.find((t) => t.id === id) || BLANK_TEMPLATE;
-      const config = seedConfigFor({
+      const now = new Date().toISOString();
+      const page: LandingPageData = {
         id,
         name: design.name,
         slug: design.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
         status: "draft",
         template: design.name,
         domain: "",
-        designId: design.id,
-        kind: "preset",
-        sections: [],
-      });
-      return {
-        id,
-        name: design.name,
-        slug: design.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-        status: "draft",
-        template: design.name,
-        domain: "",
+        views: "—",
+        conversions: design.conversions ?? "—",
+        updated: "just now",
+        thumbnail: design.thumbnail ?? "",
         designId: design.id,
         kind: "preset",
         tier: "free",
         sections: buildTemplateSections(id),
-        config,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       };
+      page.config = seedConfigFor(page);
+      return page;
     }
 
     if (resource === "landing-page") {
@@ -374,7 +368,7 @@ export async function loadTemplate(id: string, resource: Resource = "template"):
 export interface CreateTemplateInput {
   name: string;
   slug?: string;
-  designId: string;
+  designId?: string;
   template: string;
   status?: LandingPageData["status"];
   kind?: "preset" | "custom";
@@ -384,9 +378,9 @@ export interface CreateTemplateInput {
   tier?: "free" | "paid" | "premium";
   categoryId?: string | null;
   isPaid?: boolean;
-  category?: string;
+  category?: string | null;
   sections: SectionInstance[];
-  config: SiteConfig;
+  config?: SiteConfig;
   openPageSite?: LandingPageData["openPageSite"];
 }
 
@@ -396,7 +390,7 @@ export async function createTemplate(input: CreateTemplateInput): Promise<Landin
     body: JSON.stringify({
       name: input.name,
       slug: input.slug,
-      designId: input.designId,
+      designId: input.designId || "tpl-blank",
       template: input.template,
       status: input.status,
       kind: input.kind,

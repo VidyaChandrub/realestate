@@ -8,6 +8,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import {
   ACCESS_TIERS,
   accessTierOptionLabel,
+  getTemplatePlanOptions,
   StatusBadge,
   TemplateCover,
   TierBadge,
@@ -127,6 +128,7 @@ export default function SuperAdminTemplateDetailPage() {
 
     const payload = {
       ...template,
+      designId: template.designId || template.id,
       name: name.trim() || template.name,
       slug: cleanSlug,
       status,
@@ -138,7 +140,11 @@ export default function SuperAdminTemplateDetailPage() {
 
     let updated;
     if (template.id.startsWith("tpl-")) {
-      updated = await createTemplate(payload);
+      updated = await createTemplate({
+        ...payload,
+        designId: template.designId || template.id,
+        config: payload.config ?? ensureConfig(template),
+      });
     } else {
       updated = await saveTemplate(payload);
     }
@@ -229,8 +235,8 @@ export default function SuperAdminTemplateDetailPage() {
                 </div>
                 <div className="card-b" style={{ display: "grid", gap: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span className="muted" style={{ fontSize: 13 }}>Template tier</span>
-                    <TierBadge tier={template.tier} />
+                    <span className="muted" style={{ fontSize: 13 }}>Plan access</span>
+                    <TierBadge tier={template.tier} plans={plans} />
                   </div>
                   <MetaRow label="Category" value={template.category || "Unassigned"} />
                   <MetaRow label="Base design" value={template.template} />
@@ -320,20 +326,20 @@ export default function SuperAdminTemplateDetailPage() {
                     <div className="hint">Categorizes template in library for users.</div>
                   </div>
                   <div className="field">
-                    <label>Access Tier</label>
+                    <label>Subscription Plan Access</label>
                     <select
                       className="inp"
                       value={tier}
                       onChange={(e) => setTier(e.target.value as "free" | "paid" | "premium")}
                     >
-                      {ACCESS_TIERS.map((t) => (
-                        <option key={t} value={t}>
-                          {accessTierOptionLabel(t, plans)}
+                      {getTemplatePlanOptions(plans).map((opt) => (
+                        <option key={opt.tier} value={opt.tier}>
+                          {opt.label}
                         </option>
                       ))}
                     </select>
                     <div className="hint">
-                      Plans come from Subscriptions — enable Paid / Premium templates on each plan.
+                      Controls which subscription plans can access and build pages with this template.
                     </div>
                   </div>
                 </div>

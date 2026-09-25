@@ -200,13 +200,15 @@ const SEED: Record<string, Partial<{ primary: string; accent: string; brand: str
   },
 };
 
-export function seedConfigFor(page: LandingPageData): SiteConfig {
+export function seedConfigFor(
+  page: Pick<LandingPageData, "id" | "name" | "slug"> & Partial<LandingPageData>,
+): SiteConfig {
   const extra = SEED[page.id] ?? (page.parentPageId ? SEED[page.parentPageId] : undefined);
   const brandName = extra?.brand ?? (page.pageType === "thank-you" ? page.name.replace(/ — Thank You$/, "") : page.name);
   const base = defaultSiteConfig({
     name: brandName,
     slug: page.slug,
-    domain: page.domain,
+    domain: page.domain ?? "",
     primary: extra?.primary,
     accent: extra?.accent,
   });
@@ -216,7 +218,7 @@ export function seedConfigFor(page: LandingPageData): SiteConfig {
     ...base,
     seo: {
       ...base.seo,
-      metaTitle: `${extra.brand} | ${page.template}`.slice(0, 60),
+      metaTitle: `${extra.brand} | ${page.template ?? page.name}`.slice(0, 60),
       metaDescription: extra.tagline || base.seo.metaDescription,
       keywords: extra.keywords || base.seo.keywords,
       ogTitle: extra.brand || page.name,
