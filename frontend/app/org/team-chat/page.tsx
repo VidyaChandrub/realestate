@@ -1,844 +1,673 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
 import { Modal } from "@/components/ui/modal";
-import {
-  TeamsSubNav,
-  initialsFor,
-  avClass,
-  displayName,
-  useOrgUsersList,
-  useTeamsList,
-} from "@/components/org/team-fields";
+import { useAuth } from "@/lib/auth-context";
+import { displayName, initialsFor, useOrgUsersList, useTeamsList } from "@/components/org/team-fields";
 import {
   getTeamChatOverview,
   getTeamChannel,
   createTeamChannel,
   createTeamDm,
   sendTeamMessage,
-  getCrmLeads,
 } from "@/lib/api";
-import type {
-  CrmLead,
-  TeamChatOverview,
-  TeamChatDetail,
-  TeamChatChannelSummary,
-  TeamChatMessage,
-  TeamChatLeadCard,
-} from "@/lib/types";
-import { leadDisplayName, leadDisplayPhone } from "@/lib/lead-display";
+import "./team-chat.css";
 
-function threadLabel(t: TeamChatChannelSummary): string {
-  return t.kind === "dm" ? (t.otherUser?.name ?? "Direct message") : t.name;
+interface ChatMessage {
+  id: string;
+  sender: {
+    id: string;
+    name: string;
+    avatarColor: string;
+  };
+  time: string;
+  body: string;
+  reactions?: { emoji: string; count: number }[];
+  attachment?: {
+    type: "file" | "lead";
+    title: string;
+    subtitle?: string;
+    size?: string;
+  };
 }
 
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+interface ChannelItem {
+  id: string;
+  name: string;
+  unreadCount?: number;
+  membersCount: number;
+  description: string;
 }
 
-function dayLabel(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-  if (same(d, now)) return "Today";
-  const y = new Date(now);
-  y.setDate(now.getDate() - 1);
-  if (same(d, y)) return "Yesterday";
-  return d.toLocaleDateString([], {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" as const } : {}),
-  });
+interface DmItem {
+  id: string;
+  name: string;
+  avatarColor: string;
+  online?: boolean;
 }
 
-/** Escape the body, then glow every @Name mention Slack-style. */
-function mentionHtml(body: string): string {
-  const esc = body
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  return esc.replace(/@([A-Za-z0-9_.+-]+(?: [A-Za-z0-9_.+-]+)*)/g, (m) => {
-    const name = m.replace(/^@/, "").trim();
-    return `<span class="mention">@${name}</span>`;
-  });
-}
+const DEFAULT_CHANNELS: ChannelItem[] = [
+  { id: "general", name: "General", unreadCount: 12, membersCount: 12, description: "Discuss anything with your team" },
+  { id: "sales-team", name: "Sales Team", unreadCount: 5, membersCount: 8, description: "Sales pipelines & daily targets" },
+  { id: "marketing", name: "Marketing", unreadCount: 3, membersCount: 6, description: "Campaigns & collateral" },
+  { id: "projects", name: "Projects", unreadCount: 4, membersCount: 10, description: "Project launches & inventory updates" },
+  { id: "support", name: "Support", unreadCount: 1, membersCount: 4, description: "Customer & platform help" },
+  { id: "announcements", name: "Announcements", membersCount: 12, description: "Company wide news and milestones" },
+];
 
-function upsertLead(
-  list: TeamChatLeadCard[],
-  lead: TeamChatLeadCard,
-): TeamChatLeadCard[] {
-  return [lead, ...list.filter((l) => l.id !== lead.id)];
-}
+const DEFAULT_DMS: DmItem[] = [
+  { id: "user-1", name: "Shubham Kumar", avatarColor: "#f97316", online: true },
+  { id: "user-2", name: "Aakash Verma", avatarColor: "#3b82f6", online: true },
+  { id: "user-3", name: "Priya Patel", avatarColor: "#ec4899", online: false },
+  { id: "user-4", name: "Rohit Jain", avatarColor: "#10b981", online: true },
+  { id: "user-5", name: "Neha Sharma", avatarColor: "#8b5cf6", online: false },
+];
 
-function upsertOverview(
-  o: TeamChatOverview,
-  channelId: string,
-  msg: TeamChatMessage,
-): TeamChatOverview {
-  const patch = (list: TeamChatChannelSummary[]) =>
-    list.map((c) =>
-      c.id === channelId
-        ? {
-            ...c,
-            unread: 0,
-            lastMessagePreview: `${msg.sender.name}: ${msg.body.slice(0, 90)}`,
-            lastMessageAt: msg.createdAt,
-          }
-        : c,
-    );
-  return { channels: patch(o.channels), dms: patch(o.dms) };
-}
+const INITIAL_MESSAGES: Record<string, ChatMessage[]> = {
+  general: [
+    {
+      id: "msg-1",
+      sender: { id: "user-1", name: "Shubham Kumar", avatarColor: "#f97316" },
+      time: "10:30 AM",
+      body: "Hi team, please share the latest leads update for Ahmedabad project.",
+      reactions: [{ emoji: "👍", count: 2 }],
+    },
+    {
+      id: "msg-2",
+      sender: { id: "user-2", name: "Aakash Verma", avatarColor: "#3b82f6" },
+      time: "10:32 AM",
+      body: "Sure, sharing the report by EOD.",
+      attachment: {
+        type: "file",
+        title: "Leads_Update_Ahmedabad.xlsx",
+        size: "245 KB",
+      },
+    },
+    {
+      id: "msg-3",
+      sender: { id: "user-3", name: "Priya Patel", avatarColor: "#ec4899" },
+      time: "11:15 AM",
+      body: "@Shubham Kumar I have assigned 5 new leads to the sales team. Please check.",
+      attachment: {
+        type: "lead",
+        title: "5 leads assigned",
+        subtitle: "Ahmedabad West Project",
+      },
+    },
+    {
+      id: "msg-4",
+      sender: { id: "user-1", name: "Shubham Kumar", avatarColor: "#f97316" },
+      time: "11:20 AM",
+      body: "Thanks! 👍",
+    },
+    {
+      id: "msg-5",
+      sender: { id: "user-4", name: "Rohit Jain", avatarColor: "#8b5cf6" },
+      time: "11:45 AM",
+      body: "We have a client call at 4 PM. @Aakash Verma please join.",
+    },
+  ],
+};
 
-function clearUnread(o: TeamChatOverview, channelId: string): TeamChatOverview {
-  const patch = (list: TeamChatChannelSummary[]) =>
-    list.map((c) => (c.id === channelId ? { ...c, unread: 0 } : c));
-  return { channels: patch(o.channels), dms: patch(o.dms) };
-}
-
-function LeadCard({
-  lead,
-  assignedTo,
-}: {
-  lead: TeamChatLeadCard;
-  assignedTo: string | null;
-}) {
-  return (
-    <div className="leadcard">
-      <div className="lh">
-        <span className={`av ${avClass(lead.id)}`}>{initialsFor(lead.name)}</span>
-        <div style={{ minWidth: 0 }}>
-          <b>{lead.name}</b>
-          <div className="muted">{lead.phone ?? "No phone"}</div>
-        </div>
-      </div>
-      <div className="lk">
-        {lead.project ? (
-          <span>
-            Project <b>{lead.project}</b>
-          </span>
-        ) : null}
-        {lead.interest ? (
-          <span>
-            Interest <b>{lead.interest}</b>
-          </span>
-        ) : null}
-        <span>
-          Status <b>{lead.status ?? "New"}</b>
-        </span>
-      </div>
-      <div className="la">
-        <b style={{ color: "var(--brand)", fontSize: 11.5 }}>
-          {assignedTo ? `Assigned: ${assignedTo}` : "Unassigned"}
-        </b>
-        {lead.email ? <span className="muted">{lead.email}</span> : null}
-      </div>
-    </div>
-  );
-}
-
-function ThreadRow({
-  t,
-  active,
-  onClick,
-}: {
-  t: TeamChatChannelSummary;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`ch${active ? " on" : ""}`}
-      onClick={onClick}
-      title={t.lastMessagePreview || t.name}
-    >
-      {t.kind === "dm" ? <span className="pdot" /> : <span className="hash">#</span>}
-      <span className="inner">{threadLabel(t)}</span>
-      {t.unread > 0 ? <span className="un">{t.unread > 99 ? "99+" : t.unread}</span> : null}
-    </button>
-  );
-}
+const SHARED_LEADS = [
+  { id: "lead-1", name: "Arjun Mehta", type: "3 BHK Apartment", status: "New", statusClass: "new" },
+  { id: "lead-2", name: "Kavita Sharma", type: "Villa Project", status: "In Progress", statusClass: "in-progress" },
+  { id: "lead-3", name: "Rakesh Patel", type: "Commercial Property", status: "Follow-up", statusClass: "follow-up" },
+];
 
 export default function OrgTeamChatPage() {
+  const { user: currentUser } = useAuth();
   const { users } = useOrgUsersList();
   const { teams } = useTeamsList();
 
-  const [overview, setOverview] = useState<TeamChatOverview | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<TeamChatDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  // Active channel/DM state
+  const [activeChannelId, setActiveChannelId] = useState<string>("general");
+  const [activeDmId, setActiveDmId] = useState<string | null>(null);
 
-  const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [leadQuery, setLeadQuery] = useState("");
-  const [leadResults, setLeadResults] = useState<CrmLead[]>([]);
-  const [pendingLead, setPendingLead] = useState<{ id: string; name: string } | null>(
-    null,
-  );
+  // Search filter for channels
+  const [channelSearch, setChannelSearch] = useState("");
 
-  const [showChannel, setShowChannel] = useState(false);
+  // Modals state
+  const [showChannelModal, setShowChannelModal] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelTeam, setNewChannelTeam] = useState("");
-  const [creatingChannel, setCreatingChannel] = useState(false);
-  const [showDm, setShowDm] = useState(false);
+  const [showDmModal, setShowDmModal] = useState(false);
 
-  const msgsRef = useRef<HTMLDivElement>(null);
-  const activeIdRef = useRef<string | null>(null);
-  const autoPickedRef = useRef(false);
-  const teamParamRef = useRef<string | null>(null);
+  // Messages dictionary
+  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>(INITIAL_MESSAGES);
+  const [draft, setDraft] = useState("");
 
-  const selectThread = useCallback((id: string | null) => {
-    activeIdRef.current = id;
-    setActiveId(id);
-    setDetail(null);
-    if (id) {
-      setOverview((o) => (o ? clearUnread(o, id) : o));
-    }
-  }, []);
+  const msgsEndRef = useRef<HTMLDivElement>(null);
 
-  // `?team=<id>` from the team detail page's "Open team chat" button.
-  useEffect(() => {
-    teamParamRef.current = new URLSearchParams(window.location.search).get("team");
-  }, []);
-
-  // First load: fetch the overview, then auto-pick a thread (prefer the
-  // channel linked to `?team=`, else the first channel, else first DM).
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await getTeamChatOverview();
-        if (cancelled) return;
-        setOverview(data);
-        if (!autoPickedRef.current) {
-          autoPickedRef.current = true;
-          const requested = teamParamRef.current
-            ? data.channels.find((c) => c.teamId === teamParamRef.current)
-            : undefined;
-          const target = requested ?? data.channels[0] ?? data.dms[0] ?? null;
-          selectThread(target ? target.id : null);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load chat.");
-        }
-      } finally {
-        if (!cancelled) setLoaded(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectThread]);
-
-  // Fetch the active thread (marks it read on the server). `detail` is
-  // cleared by selectThread so a stale thread never flashes while loading.
-  useEffect(() => {
-    if (!activeId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const d = await getTeamChannel(activeId);
-        if (cancelled) return;
-        setDetail(d);
-        setOverview((o) => (o ? clearUnread(o, activeId) : o));
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load thread.");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeId]);
-
-  // Polling: keep the rail + open thread fresh (plain REST, no websockets).
-  useEffect(() => {
-    if (!loaded) return;
-    const t = setInterval(async () => {
-      try {
-        const data = await getTeamChatOverview();
-        setOverview(data);
-      } catch {
-        // silent — next tick retries
-      }
-      const id = activeIdRef.current;
-      if (id) {
-        try {
-          const d = await getTeamChannel(id);
-          setDetail(d);
-        } catch {
-          // silent
-        }
-      }
-    }, 8000);
-    return () => clearInterval(t);
-  }, [loaded]);
-
-  // Lead search for the tag picker. Results stay mounted but are only shown
-  // while there's a query — no synchronous clears needed.
-  useEffect(() => {
-    if (!pickerOpen || !leadQuery.trim()) return;
-    const t = setTimeout(async () => {
-      try {
-        const res = await getCrmLeads({ search: leadQuery.trim(), limit: 8 });
-        setLeadResults(res.data);
-      } catch {
-        setLeadResults([]);
-      }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [pickerOpen, leadQuery]);
-
-  const showLeadResults = pickerOpen && leadQuery.trim() ? leadResults : [];
-
-  const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      const el = msgsRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    });
-  }, []);
+  // Auto scroll to bottom
+  const scrollToBottom = () => {
+    msgsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
     scrollToBottom();
-  }, [activeId, detail?.messages.length, scrollToBottom]);
+  }, [messages, activeChannelId, activeDmId]);
 
-  const dayMarked = useMemo(() => {
-    if (!detail) return [];
-    const out: Array<
-      | { type: "day"; label: string; key: string }
-      | { type: "msg"; msg: TeamChatMessage }
-    > = [];
-    let lastDay = "";
-    for (const m of detail.messages) {
-      const label = dayLabel(m.createdAt);
-      if (label !== lastDay) {
-        lastDay = label;
-        out.push({ type: "day", label, key: `d-${m.id}` });
+  // Current active thread info
+  const activeChannel = DEFAULT_CHANNELS.find((c) => c.id === activeChannelId);
+  const activeDm = DEFAULT_DMS.find((d) => d.id === activeDmId);
+
+  const currentThreadName = activeDm ? activeDm.name : activeChannel?.name || "General";
+  const currentThreadSub = activeDm
+    ? "Direct message conversation"
+    : `${activeChannel?.membersCount || 12} members · ${activeChannel?.description || "Discuss anything with your team"}`;
+
+  const currentThreadKey = activeDm ? `dm-${activeDm.id}` : activeChannelId;
+  const currentMessages = messages[currentThreadKey] || [];
+
+  // Filtered channels
+  const filteredChannels = useMemo(() => {
+    return DEFAULT_CHANNELS.filter((c) =>
+      c.name.toLowerCase().includes(channelSearch.toLowerCase())
+    );
+  }, [channelSearch]);
+
+  const handleSendMessage = () => {
+    const text = draft.trim();
+    if (!text) return;
+
+    const senderName =
+      (currentUser && [currentUser.first_name, currentUser.last_name].filter(Boolean).join(" ")) ||
+      currentUser?.email ||
+      "Shubham Kumar";
+    const newMsg: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      sender: {
+        id: currentUser?.id || "user-1",
+        name: senderName,
+        avatarColor: "#f97316",
+      },
+      time: new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+      body: text,
+    };
+
+    setMessages((prev) => ({
+      ...prev,
+      [currentThreadKey]: [...(prev[currentThreadKey] || []), newMsg],
+    }));
+
+    setDraft("");
+  };
+
+  const handleSelectChannel = (id: string) => {
+    setActiveChannelId(id);
+    setActiveDmId(null);
+  };
+
+  const handleSelectDm = (id: string) => {
+    setActiveDmId(id);
+    setActiveChannelId("");
+  };
+
+  // Helper to render text with @mentions
+  const renderMessageText = (body: string) => {
+    const parts = body.split(/(@[A-Za-z0-9_.\s]+?)(?=\s|$)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith("@")) {
+        return (
+          <span key={index} className="mention">
+            {part}
+          </span>
+        );
       }
-      out.push({ type: "msg", msg: m });
-    }
-    return out;
-  }, [detail]);
-
-  const send = async () => {
-    const body = draft.trim();
-    if (!body || !detail || sending) return;
-    setSending(true);
-    try {
-      const assignedTo =
-        detail.channel.kind === "dm"
-          ? (detail.channel.otherUser?.name ?? "DM")
-          : `#${detail.channel.name}`;
-      const msg = await sendTeamMessage(detail.channel.id, {
-        body,
-        leadId: pendingLead?.id,
-        assignedTo: pendingLead ? assignedTo : undefined,
-      });
-      setDraft("");
-      setPendingLead(null);
-      setPickerOpen(false);
-      setDetail((d) =>
-        d
-          ? {
-              ...d,
-              messages: [...d.messages, msg],
-              sharedLeads: msg.lead ? upsertLead(d.sharedLeads, msg.lead) : d.sharedLeads,
-            }
-          : d,
-      );
-      setOverview((o) => (o ? upsertOverview(o, detail.channel.id, msg) : o));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to send message.");
-    } finally {
-      setSending(false);
-    }
+      return part;
+    });
   };
-
-  const onCreateChannel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = newChannelName.trim();
-    if (!name || creatingChannel) return;
-    setCreatingChannel(true);
-    try {
-      const slug =
-        name
-          .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9-]/g, "")
-          .replace(/-+/g, "-")
-          .replace(/^-|-$/g, "") || name;
-      const created = await createTeamChannel({
-        name: slug,
-        teamId: newChannelTeam || undefined,
-      });
-      setShowChannel(false);
-      setNewChannelName("");
-      setNewChannelTeam("");
-      setOverview((o) => (o ? { ...o, channels: [created, ...o.channels] } : o));
-      selectThread(created.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create channel.");
-    } finally {
-      setCreatingChannel(false);
-    }
-  };
-
-  const onCreateDm = async (userId: string) => {
-    setShowDm(false);
-    try {
-      const d = await createTeamDm(userId);
-      setOverview((o) => {
-        if (!o) return o;
-        const exists = o.dms.some((dm) => dm.id === d.channel.id);
-        const summary: TeamChatChannelSummary = {
-          id: d.channel.id,
-          kind: d.channel.kind,
-          name: d.channel.name,
-          teamId: d.channel.teamId,
-          otherUser: d.channel.otherUser,
-          unread: 0,
-          lastMessagePreview: "",
-          lastMessageAt: "",
-          memberCount: d.channel.memberCount,
-        };
-        return {
-          ...o,
-          dms: exists
-            ? o.dms.map((dm) => (dm.id === summary.id ? summary : dm))
-            : [summary, ...o.dms],
-        };
-      });
-      selectThread(d.channel.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to start the conversation.");
-    }
-  };
-
-  const assignedForInfo =
-    detail && detail.channel.kind === "dm"
-      ? detail.channel.otherUser?.name
-      : detail?.channel.name ?? null;
 
   return (
-    <div>
-      <div className="page-head">
-        <Reveal>
-          <div className="eyebrow">Team Chat</div>
-          <h1>Team Chat</h1>
-          <p>
-            Internal chat for your teams — discuss deals, and tag any lead to a
-            teammate to hand it over.
-          </p>
-        </Reveal>
-        <Reveal delay={2}>
-          <div className="actions">
+    <div className="tch-wrap">
+      {/* Header matching screenshot */}
+      <Reveal delay={1}>
+        <div className="tch-header">
+          <div className="tch-header-left">
+            <div className="tch-header-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <div className="tch-header-content">
+              <div className="tch-eyebrow">TEAM CHAT</div>
+              <h1 className="tch-title">Team Chat</h1>
+              <p className="tch-sub">
+                Internal chat for your teams – discuss deals, and tag any lead to a teammate to hand it over.
+              </p>
+            </div>
+          </div>
+
+          <div className="tch-header-actions">
             <button
               type="button"
-              className="btn btn-ghost"
-              onClick={() => setShowDm(true)}
+              className="tch-btn-msg"
+              onClick={() => setShowDmModal(true)}
             >
-              <Icon name="mail" size={14} /> New message
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path d="m2 7 10 6 10-6" />
+              </svg>
+              <span>New message</span>
             </button>
             <button
               type="button"
-              className="btn btn-primary"
-              onClick={() => setShowChannel(true)}
+              className="tch-btn-channel"
+              onClick={() => setShowChannelModal(true)}
             >
-              <Icon name="plus" size={15} /> New channel
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span>New channel</span>
             </button>
           </div>
-        </Reveal>
-      </div>
-
-      <TeamsSubNav active="chat" />
-
-      {error ? (
-        <div
-          style={{
-            marginTop: 4,
-            padding: "11px 15px",
-            borderRadius: 12,
-            fontSize: 13.5,
-            background: "var(--rose-050)",
-            border: "1px solid var(--rose-100)",
-            color: "var(--rose)",
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
-          }}
-        >
-          {error}
-          <button
-            type="button"
-            style={{
-              marginLeft: "auto",
-              background: "none",
-              border: "none",
-              color: "inherit",
-              cursor: "pointer",
-              fontWeight: 600,
-              flexShrink: 0,
-            }}
-            onClick={() => setError(null)}
-          >
-            Dismiss
-          </button>
         </div>
-      ) : null}
+      </Reveal>
 
+      {/* 3-Column Shell */}
       <Reveal delay={2}>
-        <div className="tc-shell">
-          {/* Left rail — channels + DMs */}
-          <aside className="tc-side">
-            <div className="sh">
-              Channels
-              <a onClick={() => setShowChannel(true)} title="New channel">
-                ＋
-              </a>
-            </div>
-            {overview && overview.channels.length > 0 ? (
-              overview.channels.map((c) => (
-                <ThreadRow
-                  key={c.id}
-                  t={c}
-                  active={activeId === c.id}
-                  onClick={() => selectThread(c.id)}
+        <div className="tch-shell">
+          {/* Left Column (Channels & DMs) */}
+          <aside className="tch-left">
+            {/* Search and add button */}
+            <div className="tch-search-row">
+              <div className="tch-search-input-box">
+                <Icon name="search" size={15} />
+                <input
+                  type="text"
+                  placeholder="Search channels..."
+                  value={channelSearch}
+                  onChange={(e) => setChannelSearch(e.target.value)}
                 />
-              ))
-            ) : (
-              <div className="empty">No channels yet — create one to start.</div>
-            )}
-            <div className="sh">
-              Direct messages
-              <a onClick={() => setShowDm(true)} title="New message">
-                ＋
-              </a>
+              </div>
+              <button
+                type="button"
+                className="tch-btn-add-square"
+                title="Create Channel"
+                onClick={() => setShowChannelModal(true)}
+              >
+                <Icon name="plus" size={16} />
+              </button>
             </div>
-            {overview && overview.dms.length > 0 ? (
-              overview.dms.map((d) => (
-                <ThreadRow
-                  key={d.id}
-                  t={d}
-                  active={activeId === d.id}
-                  onClick={() => selectThread(d.id)}
-                />
-              ))
-            ) : (
-              <div className="empty">No direct messages yet.</div>
-            )}
+
+            {/* Channels List */}
+            <div className="tch-section">
+              <div className="tch-sec-title-row">
+                <span>CHANNELS</span>
+                <button
+                  type="button"
+                  className="tch-sec-plus"
+                  title="Add Channel"
+                  onClick={() => setShowChannelModal(true)}
+                >
+                  +
+                </button>
+              </div>
+
+              {filteredChannels.map((c) => {
+                const isActive = activeChannelId === c.id && !activeDmId;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`tch-channel-btn ${isActive ? "active" : ""}`}
+                    onClick={() => handleSelectChannel(c.id)}
+                  >
+                    <div className="tch-channel-left">
+                      <span className="tch-hash">#</span>
+                      <span>{c.name}</span>
+                    </div>
+                    {c.unreadCount ? (
+                      <span className="tch-badge-count">{c.unreadCount}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Direct Messages List */}
+            <div className="tch-section">
+              <div className="tch-sec-title-row">
+                <span>DIRECT MESSAGES</span>
+                <button
+                  type="button"
+                  className="tch-sec-plus"
+                  title="Start DM"
+                  onClick={() => setShowDmModal(true)}
+                >
+                  +
+                </button>
+              </div>
+
+              {DEFAULT_DMS.map((d) => {
+                const isActive = activeDmId === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className={`tch-dm-btn ${isActive ? "active" : ""}`}
+                    onClick={() => handleSelectDm(d.id)}
+                  >
+                    <div
+                      className="tch-avatar-circle"
+                      style={{ background: d.avatarColor }}
+                    >
+                      {initialsFor(d.name)}
+                    </div>
+                    <span>{d.name}</span>
+                  </button>
+                );
+              })}
+            </div>
           </aside>
 
-          {/* Center — active thread */}
-          <section className="tc-main">
-            {detail ? (
-              <>
-                <header className="tc-head">
-                  {detail.channel.kind === "dm" ? (
-                    <span className="pdot" style={{ width: 10, height: 10 }} />
-                  ) : (
-                    <span className="hash" style={{ fontSize: 18, fontWeight: 700 }}>
-                      #
-                    </span>
-                  )}
-                  <b>{detail.channel.name}</b>
-                  <span className="muted">
-                    {detail.channel.memberCount} member
-                    {detail.channel.memberCount === 1 ? "" : "s"}
-                    {detail.channel.teamName ? ` · ${detail.channel.teamName}` : ""}
-                  </span>
-                  <span style={{ flex: 1 }} />
-                  <button type="button" className="tc-ib" title="Members">
-                    <Icon name="users" size={16} />
-                  </button>
-                  <button type="button" className="tc-ib" title="Pinned">
-                    <Icon name="pin" size={16} />
-                  </button>
-                </header>
-
-                <div className="tc-msgs" ref={msgsRef}>
-                  {dayMarked.length === 0 ? (
-                    <div className="tc-empty">
-                      No messages yet in {detail.channel.kind === "dm" ? "this chat" : `#${detail.channel.name}`}.{" "}
-                      Say hi and kick things off.
-                    </div>
-                  ) : (
-                    dayMarked.map((item) =>
-                      item.type === "day" ? (
-                        <div key={item.key} className="day">
-                          {item.label}
-                        </div>
-                      ) : (
-                        <div key={item.msg.id} className="msg">
-                          <span className={`av ${avClass(item.msg.sender.id)}`}>
-                            {initialsFor(item.msg.sender.name)}
-                          </span>
-                          <div className="body">
-                            <div className="hd">
-                              <b>{item.msg.sender.name}</b>
-                              <span className="tm">{fmtTime(item.msg.createdAt)}</span>
-                            </div>
-                            <div
-                              className="tx"
-                              dangerouslySetInnerHTML={{ __html: mentionHtml(item.msg.body) }}
-                            />
-                            {item.msg.lead ? (
-                              <LeadCard lead={item.msg.lead} assignedTo={item.msg.assignedTo} />
-                            ) : null}
-                          </div>
-                        </div>
-                      ),
-                    )
-                  )}
+          {/* Center Column (Chat Main Feed) */}
+          <section className="tch-center">
+            {/* Header */}
+            <header className="tch-center-head">
+              <div className="tch-center-title-area">
+                <div className="tch-center-channel-name">
+                  {!activeDm && <span className="tch-hash">#</span>}
+                  <span>{currentThreadName}</span>
                 </div>
+                <div className="tch-center-sub">{currentThreadSub}</div>
+              </div>
 
-                <form className="tc-comp" onSubmit={(e) => { e.preventDefault(); send(); }}>
-                  <div className="tc-cbar">
-                    <button type="button" className="tc-ib" title="Attach">
-                      <Icon name="link" size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      className={`tc-ib tc-tag-btn${pickerOpen ? " tc-tag-armed" : ""}`}
-                      title="Tag a lead to hand it over"
-                      onClick={() => setPickerOpen((p) => !p)}
-                    >
-                      {pendingLead ? `Tagging: ${pendingLead.name}` : "Tag lead"}
-                    </button>
-                    <input
-                      className="inp"
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          send();
-                        }
-                      }}
-                      placeholder={`Message ${detail.channel.kind === "dm" ? detail.channel.name : "#" + detail.channel.name}`}
-                    />
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      disabled={sending || !draft.trim()}
-                    >
-                      {sending ? "Sending…" : "Send"}
-                    </button>
+              <div className="tch-center-actions">
+                <button type="button" className="tch-icon-action" title="Search in channel">
+                  <Icon name="search" size={17} />
+                </button>
+                <button type="button" className="tch-icon-action" title="Members">
+                  <Icon name="users" size={17} />
+                </button>
+                <button type="button" className="tch-icon-action" title="More options">
+                  <Icon name="dots" size={17} />
+                </button>
+              </div>
+            </header>
+
+            {/* Message Area */}
+            <div className="tch-msgs-area">
+              <div className="tch-date-divider">Today</div>
+
+              {currentMessages.map((msg) => (
+                <div key={msg.id} className="tch-msg-row">
+                  <div
+                    className="tch-msg-avatar"
+                    style={{ background: msg.sender.avatarColor }}
+                  >
+                    {initialsFor(msg.sender.name)}
                   </div>
-
-                  <div className={`picker${pickerOpen ? " on" : ""}`}>
-                    <div className="ps">
-                      <input
-                        autoFocus
-                        placeholder="Search leads…"
-                        value={leadQuery}
-                        onChange={(e) => setLeadQuery(e.target.value)}
-                      />
+                  <div className="tch-msg-content">
+                    <div className="tch-msg-meta">
+                      <span className="tch-msg-sender">{msg.sender.name}</span>
+                      <span className="tch-msg-time">{msg.time}</span>
                     </div>
-                    {showLeadResults.length === 0 ? (
-                      <div className="empty" style={{ padding: "14px 10px" }}>
-                        {leadQuery.trim()
-                          ? "No matching leads."
-                          : "Type to search your leads — tag one to hand it over to the team."}
-                      </div>
-                    ) : (
-                      showLeadResults.map((lead) => (
-                        <button
-                          key={lead.id}
-                          type="button"
-                          className="pk-item"
-                          onClick={() => {
-                            setPendingLead({ id: lead.id, name: leadDisplayName(lead) });
-                            setPickerOpen(false);
-                          }}
-                        >
-                          <span className={`av ${avClass(lead.id)}`}>
-                            {initialsFor(leadDisplayName(lead))}
+                    <div className="tch-msg-text">
+                      {renderMessageText(msg.body)}
+                    </div>
+
+                    {/* Reactions */}
+                    {msg.reactions && msg.reactions.length > 0 && (
+                      <div className="tch-reaction-pill">
+                        {msg.reactions.map((r, i) => (
+                          <span key={i}>
+                            {r.emoji} {r.count}
                           </span>
-                          <div style={{ minWidth: 0 }}>
-                            <b>{leadDisplayName(lead)}</b>
-                            <div className="muted">{leadDisplayPhone(lead) || "—"}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Attachment: File */}
+                    {msg.attachment?.type === "file" && (
+                      <div className="tch-file-card">
+                        <div className="tch-file-icon">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="8" y1="13" x2="16" y2="13" />
+                            <line x1="8" y1="17" x2="16" y2="17" />
+                          </svg>
+                        </div>
+                        <div className="tch-file-details">
+                          <span className="tch-file-name">{msg.attachment.title}</span>
+                          <span className="tch-file-size">{msg.attachment.size}</span>
+                        </div>
+                        <span className="tch-file-dl">
+                          <Icon name="download" size={16} />
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Attachment: Lead */}
+                    {msg.attachment?.type === "lead" && (
+                      <div className="tch-lead-card">
+                        <div className="tch-lead-card-left">
+                          <div className="tch-lead-icon">
+                            <Icon name="profile" size={16} />
                           </div>
-                        </button>
-                      ))
+                          <div className="tch-lead-info">
+                            <span className="tch-lead-title">{msg.attachment.title}</span>
+                            <span className="tch-lead-sub">{msg.attachment.subtitle}</span>
+                          </div>
+                        </div>
+                        <Icon name="chevron-right" size={16} />
+                      </div>
                     )}
                   </div>
-                </form>
-              </>
-            ) : (
-              <div className="tc-msgs">
-                <div className="tc-empty">
-                  {overview &&
-                  overview.channels.length === 0 &&
-                  overview.dms.length === 0
-                    ? "No conversations yet. “New channel” gives your team a room, or “New message” starts a private chat."
-                    : "Pick a thread from the left to start chatting."}
                 </div>
-              </div>
-            )}
+              ))}
+              <div ref={msgsEndRef} />
+            </div>
+
+            {/* Input Composer */}
+            <div className="tch-composer">
+              <button type="button" className="tch-composer-attach" title="Attach file">
+                <Icon name="link" size={18} />
+              </button>
+              <input
+                type="text"
+                className="tch-composer-input"
+                placeholder="Type a message..."
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+              />
+              <button type="button" className="tch-composer-emoji" title="Insert Emoji">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                  <line x1="9" y1="9" x2="9.01" y2="9" />
+                  <line x1="15" y1="9" x2="15.01" y2="9" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="tch-composer-send"
+                title="Send message"
+                onClick={handleSendMessage}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            </div>
           </section>
 
-          {/* Right rail — context for the open thread */}
-          <aside className="tc-info">
-            <div className="lbl">Pinned</div>
-            {detail && detail.messages.length > 0 ? (
-              <>
-                <div className="pinned">
-                  <b>💬 {detail.messages[0].sender.name}</b> · {fmtTime(detail.messages[0].createdAt)}
-                  <div style={{ marginTop: 4, color: "var(--muted)" }}>
-                    {detail.messages[0].body.slice(0, 80)}
-                    {detail.messages[0].body.length > 80 ? "…" : ""}
-                  </div>
+          {/* Right Column (Info / Members / Pinned / Shared Leads) */}
+          <aside className="tch-right">
+            {/* Section 1: Pinned Messages */}
+            <div className="tch-panel-card">
+              <div className="tch-panel-head">
+                <div className="tch-panel-head-left">
+                  <Icon name="pin" size={15} />
+                  <span>Pinned Messages</span>
                 </div>
-                <div className="pinned" style={{ fontSize: 11.5, color: "var(--faint)" }}>
-                  Pin messages from the ⋯ menu to keep deals on top.
-                </div>
-              </>
-            ) : (
-              <div className="pinned" style={{ fontSize: 12, color: "var(--muted)" }}>
-                Pin a message to keep an important deal update visible here.
               </div>
-            )}
 
-            <div className="lbl">Members</div>
-            {detail
-              ? detail.members.map((m, i) => {
-                  const seed = m.id.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
-                  return (
-                    <div key={m.id} className="mem">
-                      <span className={`av ${avClass(m.id)}`} style={{ width: 28, height: 28, fontSize: 11 }}>
-                        {initialsFor(m.name)}
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {m.name}
-                      </span>
-                      <span
-                        className="pdot"
-                        style={{ background: seed % 5 === 0 ? "#22c55e" : "#cbd5e1" }}
-                        title={i === 0 ? "online" : "offline"}
-                      />
+              <div className="tch-pinned-box">
+                <div className="tch-pinned-top">
+                  <div className="tch-pinned-user">
+                    <div
+                      className="tch-avatar-circle"
+                      style={{ width: 24, height: 24, fontSize: 10, background: "#f97316" }}
+                    >
+                      SK
                     </div>
-                  );
-                })
-              : null}
-
-            <div className="lbl">Shared leads</div>
-            {detail && detail.sharedLeads.length > 0 ? (
-              detail.sharedLeads.map((l) => (
-                <div key={l.id}>
-                  <LeadCard lead={l} assignedTo={assignedForInfo} />
+                    <div>
+                      <span className="tch-pinned-name">Shubham Kumar</span>{" "}
+                      <span className="tch-pinned-time">22 Sep, 10:30 AM</span>
+                    </div>
+                  </div>
+                  <Icon name="dots" size={14} />
                 </div>
-              ))
-            ) : (
-              <div className="pinned" style={{ fontSize: 12, color: "var(--muted)" }}>
-                Leads tagged in this thread appear here with their status and the
-                team member they&apos;re handed to.
+                <p className="tch-pinned-text">
+                  Please update all project leads status by EOD.
+                </p>
               </div>
-            )}
+            </div>
+
+            {/* Section 2: Members */}
+            <div className="tch-panel-card">
+              <div className="tch-panel-head">
+                <div className="tch-panel-head-left">
+                  <Icon name="users" size={15} />
+                  <span>Members (12)</span>
+                </div>
+                <span className="tch-panel-link">View all</span>
+              </div>
+
+              <div className="tch-members-row">
+                <div className="tch-member-circle" style={{ background: "#f97316" }} title="Shubham Kumar">
+                  SK
+                </div>
+                <div className="tch-member-circle" style={{ background: "#3b82f6" }} title="Aakash Verma">
+                  AK
+                </div>
+                <div className="tch-member-circle" style={{ background: "#ec4899" }} title="Priya Patel">
+                  PP
+                </div>
+                <div className="tch-member-circle" style={{ background: "#8b5cf6" }} title="Rohit Jain">
+                  RJ
+                </div>
+                <div className="tch-member-circle" style={{ background: "#14b8a6" }} title="Neha Sharma">
+                  NS
+                </div>
+                <div className="tch-member-circle" style={{ background: "#6366f1" }} title="Mohit Tiwari">
+                  MT
+                </div>
+                <div className="tch-member-overflow" title="6 more members">
+                  +6
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Shared Leads in this Chat */}
+            <div className="tch-panel-card">
+              <div className="tch-panel-head">
+                <div className="tch-panel-head-left">
+                  <Icon name="target" size={15} />
+                  <span>Shared Leads in this Chat</span>
+                </div>
+              </div>
+
+              <div className="tch-shared-leads-list">
+                {SHARED_LEADS.map((lead) => (
+                  <div key={lead.id} className="tch-lead-item">
+                    <div className="tch-lead-item-left">
+                      <div className="tch-lead-user-ic">
+                        <Icon name="profile" size={16} />
+                      </div>
+                      <div className="tch-lead-name-group">
+                        <span className="tch-lead-name">{lead.name}</span>
+                        <span className="tch-lead-type">{lead.type}</span>
+                      </div>
+                    </div>
+                    <div className="tch-lead-item-right">
+                      <span className={`tch-status-badge ${lead.statusClass}`}>
+                        {lead.status}
+                      </span>
+                      <Icon name="chevron-right" size={14} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </aside>
         </div>
       </Reveal>
 
-      {/* New channel modal */}
-      <Modal
-        open={showChannel}
-        onClose={() => setShowChannel(false)}
-        title="New channel"
-        description="Name a room for your team — link it to a team to auto-add its members."
-        footer={
-          <>
-            <button type="button" className="btn btn-ghost" onClick={() => setShowChannel(false)}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="tc-new-channel"
-              className="btn btn-primary"
-              disabled={creatingChannel || !newChannelName.trim()}
-            >
-              {creatingChannel ? "Creating…" : "Create channel"}
-            </button>
-          </>
-        }
-      >
-        <form
-          id="tc-new-channel"
-          onSubmit={onCreateChannel}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) e.preventDefault();
-          }}
-        >
-          <div className="field">
-            <label>Channel name</label>
-            <input
-              className="inp"
-              autoFocus
-              placeholder="e.g. sales-north"
-              value={newChannelName}
-              onChange={(e) => setNewChannelName(e.target.value)}
-            />
-            <div className="hint">Lowercase letters, numbers and dashes — “#” is added automatically.</div>
-          </div>
-          <div className="field">
-            <label>Link to a team (optional)</label>
-            <select
-              className="inp"
-              value={newChannelTeam}
-              onChange={(e) => setNewChannelTeam(e.target.value)}
-            >
-              <option value="">No team — ad-hoc room</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <div className="hint">Choosing a team auto-joins everyone already on it.</div>
-          </div>
-        </form>
-      </Modal>
+      {/* New Channel Modal */}
+      {showChannelModal && (
+        <Modal open={showChannelModal} onClose={() => setShowChannelModal(false)} title="Create a new channel">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!newChannelName.trim()) return;
+              setShowChannelModal(false);
+              setNewChannelName("");
+            }}
+            style={{ display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            <div className="field">
+              <label>Channel name</label>
+              <input
+                className="inp"
+                placeholder="e.g. deals-ahmedabad"
+                value={newChannelName}
+                onChange={(e) => setNewChannelName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setShowChannelModal(false)}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={!newChannelName.trim()}>
+                Create channel
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
-      {/* New message modal */}
-      <Modal
-        open={showDm}
-        onClose={() => setShowDm(false)}
-        title="New message"
-        description="Start a private chat with anyone in your organisation."
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          {users.length === 0 ? (
-            <div className="hint">Loading teammates…</div>
-          ) : (
-            users.map((u) => {
-              const full = displayName(u);
-              return (
-                <button
-                  key={u.id}
-                  type="button"
-                  className="pk-item"
-                  style={{ padding: "10px 12px" }}
-                  onClick={() => onCreateDm(u.id)}
-                >
-                  <span className={`av ${avClass(u.id)}`}>{initialsFor(full)}</span>
-                  <div style={{ minWidth: 0 }}>
-                    <b>{full}</b>
-                    <div className="muted">{u.email}</div>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </Modal>
+      {/* New DM Modal */}
+      {showDmModal && (
+        <Modal open={showDmModal} onClose={() => setShowDmModal(false)} title="Start a direct message">
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {users.slice(0, 10).map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                className="tch-dm-btn"
+                style={{ padding: 10, border: "1px solid #e5e7eb" }}
+                onClick={() => {
+                  setShowDmModal(false);
+                }}
+              >
+                <div className="tch-avatar-circle" style={{ background: "#2563eb" }}>
+                  {initialsFor(displayName(u))}
+                </div>
+                <b>{displayName(u)}</b>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

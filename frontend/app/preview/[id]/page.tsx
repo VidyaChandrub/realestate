@@ -13,6 +13,7 @@ import { applyDocumentSeo } from "@/lib/openpage/seo";
 import { applyLandingPagePropertyFromConfig } from "@/lib/openpage/data";
 import { OpenPageTrackingScripts } from "@/components/openpage/tracking-scripts";
 import { bumpTracking } from "@/lib/openpage/tracking";
+import { defaultSiteConfig } from "@/lib/openpage/site-config";
 import "@/app/openpage.css";
 
 interface LandingPageDetail extends LandingPageRow {
@@ -59,7 +60,9 @@ export default function PreviewLandingPage() {
       updatedAt: data.updatedAt,
       thumbnail: data.thumbnail ?? "",
       sections: data.content?.sections ?? [],
-      config: data.content?.config ?? (defaultSiteConfig as SiteConfig),
+      config:
+        data.content?.config ??
+        defaultSiteConfig({ name: data.name ?? "Preview", slug: data.slug ?? "preview" }),
       kind: "custom",
       pageType: "landing",
     };
@@ -105,7 +108,9 @@ export default function PreviewLandingPage() {
     updated: "",
     thumbnail: data.thumbnail ?? "",
     sections: data.content?.sections ?? [],
-    config: data.content?.config ?? (defaultSiteConfig as SiteConfig),
+    config:
+      data.content?.config ??
+      defaultSiteConfig({ name: data.name ?? "Preview", slug: data.slug ?? "preview" }),
     openPageSite: data.content?.site ?? undefined,
     kind: "custom",
     pageType: "landing",

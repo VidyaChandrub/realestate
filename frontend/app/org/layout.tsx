@@ -4,6 +4,12 @@ import { Roboto } from "next/font/google";
 import { OrgAdminShell } from "@/components/org/shell";
 import "./org.css";
 import "./landing-pages/landing-pages.css";
+import "./templates/templates.css";
+import "./teams/teams.css";
+import "./teams/onboard/onboard.css";
+import "./team-chat/team-chat.css";
+import "./users/users.css";
+import "./settings/settings.css";
 
 const roboto = Roboto({
   weight: ["300", "400", "500", "700", "900"],

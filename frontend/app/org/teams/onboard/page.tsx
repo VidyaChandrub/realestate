@@ -3,30 +3,23 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
 import {
-  TeamsSubNav,
-  ToggleChips,
   displayName,
   useOrgRoleOptions,
   useOrgUsersList,
   useTeamsList,
 } from "@/components/org/team-fields";
-import { MODULE_DEFS, ONBOARDING_CHECKLIST, TEAM_MEMBER_ROLES, TEAM_MEMBER_ROLE_LABEL } from "@/lib/teams";
 import { createOrgUser, getTeam, setTeamMembers } from "@/lib/api";
 import type { TeamMemberRoleValue } from "@/lib/types";
+import "./onboard.css";
 
-// Mobile number: digits only, an optional single leading "+", at most 15
-// digits — the same rule the backend DTO enforces (see CreateOrgUserDto /
-// PHONE_NUMBER_REGEX). Sanitising on every keystroke means the field can
-// only ever hold an acceptable value.
 const PHONE_NUMBER_REGEX = /^\+?\d{1,15}$/;
 
 function sanitizePhone(raw: string): string {
-  const hasPlus = raw.trimStart().startsWith("+");
-  const digits = raw.replace(/\D/g, "").slice(0, 15);
-  if (!digits) return hasPlus ? "+" : "";
-  return `${hasPlus ? "+" : ""}${digits}`;
+  const digits = raw.replace(/\D/g, "").slice(0, 10);
+  return digits;
 }
 
 export default function OnboardMemberPage() {
@@ -38,50 +31,66 @@ export default function OnboardMemberPage() {
   const { teams, loading: teamsLoading, error: teamsError } = useTeamsList();
   const orgRoleOptions = useOrgRoleOptions();
 
+  // Step 1: Person Information
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
+
+  // Step 2: Role & Placement
+  const [orgRole, setOrgRole] = useState("");
   const [teamId, setTeamId] = useState(presetTeamId ?? "");
   const [reportsToId, setReportsToId] = useState("");
-  const [teamRole, setTeamRole] = useState<TeamMemberRoleValue>("sales_agent");
-  const [orgRole, setOrgRole] = useState("");
+  const [teamRole, setTeamRole] = useState<string>("Sales Agent");
+
+  // Step 3: Module Access
+  const [moduleAccess, setModuleAccess] = useState<Record<string, boolean>>({
+    crm: true,
+    calling: true,
+    whatsapp: true,
+    landing: false,
+    reports: true,
+  });
+
+  // Step 4: Additional Options (collapsible)
+  const [additionalOpen, setAdditionalOpen] = useState(false);
+  const [quickHelpOpen, setQuickHelpOpen] = useState(true);
+
+  // Stepper state
+  const [activeStep, setActiveStep] = useState<number>(1);
+
+  // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
-  // Preview only — TeamModuleAccess has no backend yet.
-  const [enabledModules, setEnabledModules] = useState<Set<string>>(
-    () => new Set(MODULE_DEFS.filter((m) => m.key !== "landing").map((m) => m.key)),
-  );
+  // Active steps completed calculation
+  const isStep1Done = firstName.trim() !== "" && lastName.trim() !== "" && email.trim() !== "" && mobile.trim() !== "";
+  const isStep2Done = orgRole !== "" && teamId !== "";
+  const isStep3Done = Object.values(moduleAccess).some(Boolean);
 
-  const [checklist, setChecklist] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    for (const item of ONBOARDING_CHECKLIST) initial[item.id] = item.doneByDefault;
-    return initial;
-  });
+  const completedStepsCount = [isStep1Done, isStep2Done, isStep3Done].filter(Boolean).length;
+  const progressPct = completedStepsCount === 0 ? 25 : Math.round((completedStepsCount / 4) * 100);
 
-  const doneCount = Object.values(checklist).filter(Boolean).length;
-  const totalCount = ONBOARDING_CHECKLIST.length;
-  const pct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+  const teamRoleList = ["Team Lead", "Sr. Agent", "Sales Agent", "Telecaller", "Viewer"];
 
-  const teamRoleOptions = useMemo(
-    () => TEAM_MEMBER_ROLES.map((r) => ({ id: r, label: TEAM_MEMBER_ROLE_LABEL[r] })),
-    [],
-  );
+  // Toggle module access
+  const toggleModule = (id: string) => {
+    setModuleAccess((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
-  function toggleModule(key: string) {
-    setEnabledModules((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
+  // Select all modules
+  const isAllModulesSelected = Object.values(moduleAccess).every(Boolean);
+  const toggleSelectAllModules = () => {
+    const nextState = !isAllModulesSelected;
+    setModuleAccess({
+      crm: nextState,
+      calling: nextState,
+      whatsapp: nextState,
+      landing: nextState,
+      reports: nextState,
     });
-  }
-
-  function toggleChecklistItem(id: string) {
-    setChecklist((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
+  };
 
   function validate(): string | null {
     if (!firstName.trim() || !lastName.trim()) {
@@ -94,12 +103,6 @@ export default function OnboardMemberPage() {
     const trimmedMobile = mobile.trim();
     if (!trimmedMobile) {
       return "Mobile number is required.";
-    }
-    if (!PHONE_NUMBER_REGEX.test(trimmedMobile)) {
-      return "Mobile number must contain digits only (max 15).";
-    }
-    if (trimmedMobile.replace(/\D/g, "").length < 7) {
-      return "Please enter a valid mobile number.";
     }
     if (!orgRole) {
       return "Choose an organisation role — it controls what this person can access.";
@@ -115,20 +118,30 @@ export default function OnboardMemberPage() {
     }
     setSubmitting(true);
     setSubmitError(null);
+
     try {
+      const fullPhone = `+91${mobile.trim()}`;
       const newUser = await createOrgUser({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
-        phoneNumber: mobile.trim(),
+        phoneNumber: fullPhone,
         role: orgRole,
       });
 
       if (teamId) {
         const team = await getTeam(teamId);
+        // Map team role string to backend enum
+        const mappedRole: TeamMemberRoleValue =
+          teamRole === "Team Lead"
+            ? "team_lead"
+            : teamRole === "Telecaller"
+            ? "telecaller"
+            : "sales_agent";
+
         await setTeamMembers(teamId, [
           ...team.members.map((m) => ({ userId: m.id, role: m.role })),
-          { userId: newUser.id, role: teamRole },
+          { userId: newUser.id, role: mappedRole },
         ]);
       }
 
@@ -143,222 +156,667 @@ export default function OnboardMemberPage() {
   }
 
   return (
-    <>
-      <div className="page-head reveal in">
-        <div>
-          <div className="eyebrow"><Icon name="users" size={14} /> Onboarding</div>
-          <h1>Onboard a team member</h1>
-          <div className="sub">
-            Add a person, place them in a team, set their role &amp; access, and run the onboarding checklist.
+    <div className="ob-wrap">
+      {/* Header */}
+      <Reveal delay={1}>
+        <div className="ob-header">
+          <div className="ob-header-left">
+            <div className="ob-header-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <line x1="19" y1="8" x2="19" y2="14" />
+                <line x1="22" y1="11" x2="16" y2="11" />
+              </svg>
+            </div>
+            <div className="ob-header-content">
+              <div className="ob-eyebrow">TEAMS</div>
+              <h1 className="ob-title">Create / Invite Team Member</h1>
+              <p className="ob-sub">
+                Add a new member to your organisation and give them the right access to tools and projects.
+              </p>
+            </div>
+          </div>
+
+          <div className="ob-header-actions">
+            <Link className="ob-btn-cancel" href="/org/teams">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+              <span>Cancel</span>
+            </Link>
+            <button
+              type="button"
+              className="ob-btn-submit"
+              disabled={submitting}
+              onClick={handleSubmit}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+              <span>{submitting ? "Adding…" : "Add & send invite"}</span>
+            </button>
           </div>
         </div>
-        <div className="actions">
-          <Link className="btn btn-ghost" href="/org/teams">✕ Cancel</Link>
-          <button type="button" className="btn btn-primary" disabled={submitting} onClick={handleSubmit}>
-            <Icon name="check" size={14} /> {submitting ? "Adding…" : "Add & send invite"}
-          </button>
+      </Reveal>
+
+      {/* Stepper Progress Bar */}
+      <Reveal delay={2}>
+        <div className="ob-stepper">
+          <div
+            className={`ob-step-item ${activeStep >= 1 ? "active" : ""}`}
+            onClick={() => setActiveStep(1)}
+          >
+            <div className="ob-step-circle">1</div>
+            <div className="ob-step-text">
+              <span className="ob-step-title">Person Details</span>
+              <span className="ob-step-sub">Basic information</span>
+            </div>
+          </div>
+
+          <div
+            className={`ob-step-item ${activeStep >= 2 ? "active" : ""}`}
+            onClick={() => setActiveStep(2)}
+          >
+            <div className="ob-step-circle">2</div>
+            <div className="ob-step-text">
+              <span className="ob-step-title">Role &amp; Placement</span>
+              <span className="ob-step-sub">Assign role and team</span>
+            </div>
+          </div>
+
+          <div
+            className={`ob-step-item ${activeStep >= 3 ? "active" : ""}`}
+            onClick={() => setActiveStep(3)}
+          >
+            <div className="ob-step-circle">3</div>
+            <div className="ob-step-text">
+              <span className="ob-step-title">Module Access</span>
+              <span className="ob-step-sub">Select tools and permissions</span>
+            </div>
+          </div>
+
+          <div
+            className={`ob-step-item ${activeStep >= 4 ? "active" : ""}`}
+            onClick={() => setActiveStep(4)}
+          >
+            <div className="ob-step-circle">4</div>
+            <div className="ob-step-text">
+              <span className="ob-step-title">Review &amp; Invite</span>
+              <span className="ob-step-sub">Confirm and send invite</span>
+            </div>
+          </div>
         </div>
-      </div>
+      </Reveal>
 
-      <TeamsSubNav active="onboarding" />
+      {submitError && (
+        <div
+          className="help"
+          style={{
+            background: "#fef2f2",
+            color: "#b91c1c",
+            border: "1px solid #fecaca",
+            borderRadius: "10px",
+            padding: "12px 16px",
+          }}
+        >
+          {submitError}
+        </div>
+      )}
 
-      <div className="cgrid">
-        <div className="card" style={{ padding: 26 }}>
-          <div className="sec">
-            <div className="lbl">👤 Person</div>
-            <div className="row2">
-              <div className="field">
-                <label>First name <span className="req">*</span></label>
-                <input className="inp" placeholder="e.g. Karan" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-              </div>
-              <div className="field">
-                <label>Last name <span className="req">*</span></label>
-                <input className="inp" placeholder="e.g. Pillai" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-              </div>
-            </div>
-            <div className="row2">
-              <div className="field">
-                <label>Work email <span className="req">*</span></label>
-                <input
-                  className="inp"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="name@skylinedev.in"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label>Mobile <span className="req">*</span></label>
-                <input
-                  className="inp inp-mono"
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={16}
-                  autoComplete="tel"
-                  placeholder="+919876543210"
-                  value={mobile}
-                  onChange={(e) => setMobile(sanitizePhone(e.target.value))}
-                />
-              </div>
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Organisation role <span className="req">*</span></label>
-              <select value={orgRole} onChange={(e) => setOrgRole(e.target.value)}>
-                <option value="">Select a role…</option>
-                {orgRoleOptions.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
-              <div className="hint">Controls what they can access — same roles as the Users page.</div>
-            </div>
-          </div>
+      {submitted && (
+        <div
+          className="help"
+          style={{
+            background: "#ecfdf5",
+            color: "#059669",
+            border: "1px solid #a7f3d0",
+            borderRadius: "10px",
+            padding: "12px 16px",
+          }}
+        >
+          ✓ {firstName.trim()} {lastName.trim()} was successfully invited!
+        </div>
+      )}
 
-          <div className="sec">
-            <div className="lbl">👥 Placement</div>
-            <div className="row2">
-              <div className="field">
-                <label>Team</label>
-                <select value={teamId} onChange={(e) => setTeamId(e.target.value)} disabled={teamsLoading || !!teamsError}>
-                  <option value="">
-                    {teamsLoading ? "Loading…" : teamsError ? "Couldn't load teams" : "No team yet"}
-                  </option>
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-                {teamsError ? (
-                  <div className="hint" style={{ color: "var(--rose)" }}>Couldn&apos;t load teams — {teamsError}</div>
-                ) : null}
-              </div>
-              <div className="field">
-                <label>Reports to</label>
-                <select value={reportsToId} onChange={(e) => setReportsToId(e.target.value)} disabled={usersLoading || !!usersError}>
-                  <option value="">{usersLoading ? "Loading…" : usersError ? "Couldn't load users" : "No one in particular"}</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>{displayName(u)}</option>
-                  ))}
-                </select>
-                <div className="hint">Preview only — there&apos;s no "reports to" field on the backend yet.</div>
-              </div>
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <label>Team role</label>
-              <ToggleChips
-                options={teamRoleOptions}
-                selected={new Set([teamRole])}
-                onToggle={(id) => setTeamRole(id as TeamMemberRoleValue)}
-                single
-              />
-              <div className="hint">Only applied if a team is selected above.</div>
-            </div>
-          </div>
-
-          <div className="sec">
-            <div className="lbl">🔐 Access (inherits team defaults)</div>
-            <div className="hint" style={{ marginBottom: 10 }}>
-              Preview only — module access isn&apos;t saved yet, these toggles have no effect.
-            </div>
-            <div className="field" style={{ marginBottom: 0 }}>
-              <ToggleChips
-                options={MODULE_DEFS.map((m) => ({ id: m.key, label: m.label }))}
-                selected={enabledModules}
-                onToggle={toggleModule}
-              />
-            </div>
-          </div>
-
-          <div className="sec">
-            <div className="lbl">✅ Onboarding checklist</div>
-            {ONBOARDING_CHECKLIST.map((item) => {
-              const done = !!checklist[item.id];
-              return (
-                <div
-                  key={item.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 11,
-                    padding: "12px 0",
-                    borderBottom: "1px solid var(--line)",
-                  }}
-                >
-                  <div
-                    onClick={() => toggleChecklistItem(item.id)}
-                    role="checkbox"
-                    aria-checked={done}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        toggleChecklistItem(item.id);
-                      }
-                    }}
-                    style={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: 7,
-                      border: `2px solid ${done ? "var(--green)" : "var(--line-2)"}`,
-                      background: done ? "var(--green)" : "transparent",
-                      flexShrink: 0,
-                      display: "grid",
-                      placeItems: "center",
-                      cursor: "pointer",
-                      fontSize: 13,
-                      color: "#fff",
-                      marginTop: 1,
-                    }}
-                  >
-                    {done ? "✓" : ""}
+      {/* 2-Column Content Grid */}
+      <div className="ob-grid">
+        {/* Left Form Stack */}
+        <div className="ob-form-stack">
+          {/* Section 1: Person Information */}
+          <Reveal delay={2}>
+            <div className="ob-card">
+              <div className="ob-card-head">
+                <div className="ob-card-head-left">
+                  <div className="ob-card-icon blue">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" />
+                    </svg>
                   </div>
-                  <div>
-                    <b style={{ fontSize: 13.5, textDecoration: done ? "line-through" : "none", color: done ? "var(--muted)" : "inherit" }}>
-                      {item.label}
-                    </b>
-                    <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>{item.description}</div>
+                  <div className="ob-card-title-group">
+                    <h3 className="ob-card-title">Person Information</h3>
+                    <p className="ob-card-desc">Enter the team member&apos;s basic details.</p>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+
+              <div className="ob-fields-row">
+                <div className="ob-field">
+                  <label className="ob-label">
+                    First name <span className="ob-req">*</span>
+                  </label>
+                  <div className="ob-input-box">
+                    <span className="ob-ic">
+                      <Icon name="profile" size={16} />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="e.g. Karan"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="ob-field">
+                  <label className="ob-label">
+                    Last name <span className="ob-req">*</span>
+                  </label>
+                  <div className="ob-input-box">
+                    <span className="ob-ic">
+                      <Icon name="profile" size={16} />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="e.g. Pillai"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="ob-fields-row">
+                <div className="ob-field">
+                  <label className="ob-label">
+                    Work email <span className="ob-req">*</span>
+                  </label>
+                  <div className="ob-input-box">
+                    <span className="ob-ic">
+                      <Icon name="mail" size={16} />
+                    </span>
+                    <input
+                      type="email"
+                      placeholder="name@yourcompany.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="ob-field">
+                  <label className="ob-label">
+                    Mobile number <span className="ob-req">*</span>
+                  </label>
+                  <div className="ob-input-box">
+                    <div className="ob-flag-badge">
+                      <span style={{ fontSize: 16 }}>🇮🇳</span>
+                      <Icon name="chevron-down" size={12} />
+                      <span>+91</span>
+                    </div>
+                    <input
+                      type="tel"
+                      placeholder="98765 43210"
+                      maxLength={10}
+                      value={mobile}
+                      onChange={(e) => setMobile(sanitizePhone(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+
+          {/* Section 2: Role & Placement */}
+          <Reveal delay={3}>
+            <div className="ob-card">
+              <div className="ob-card-head">
+                <div className="ob-card-head-left">
+                  <div className="ob-card-icon green">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  </div>
+                  <div className="ob-card-title-group">
+                    <h3 className="ob-card-title">Role &amp; Placement</h3>
+                    <p className="ob-card-desc">Assign a role, team and reporting structure.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="ob-fields-row">
+                <div className="ob-field">
+                  <label className="ob-label">
+                    Organisation role <span className="ob-req">*</span>
+                  </label>
+                  <div className="ob-input-box">
+                    <span className="ob-ic">
+                      <Icon name="shield" size={16} />
+                    </span>
+                    <select
+                      value={orgRole}
+                      onChange={(e) => setOrgRole(e.target.value)}
+                    >
+                      <option value="">Select a role...</option>
+                      {orgRoleOptions.map((r) => (
+                        <option key={r.value} value={r.value}>
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="ob-chevron">
+                      <Icon name="chevron-down" size={14} />
+                    </span>
+                  </div>
+                  <span className="ob-hint">
+                    Controls what they can access — same roles as the Users page.
+                  </span>
+                </div>
+
+                <div className="ob-field">
+                  <label className="ob-label">
+                    Team <span className="ob-req">*</span>
+                  </label>
+                  <div className="ob-input-box">
+                    <span className="ob-ic">
+                      <Icon name="team" size={16} />
+                    </span>
+                    <select
+                      value={teamId}
+                      onChange={(e) => setTeamId(e.target.value)}
+                      disabled={teamsLoading || !!teamsError}
+                    >
+                      <option value="">Select team...</option>
+                      {teams.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="ob-chevron">
+                      <Icon name="chevron-down" size={14} />
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="ob-fields-row">
+                <div className="ob-field">
+                  <label className="ob-label">Reports to</label>
+                  <div className="ob-input-box">
+                    <span className="ob-ic">
+                      <Icon name="profile" size={16} />
+                    </span>
+                    <select
+                      value={reportsToId}
+                      onChange={(e) => setReportsToId(e.target.value)}
+                      disabled={usersLoading || !!usersError}
+                    >
+                      <option value="">No one in particular</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {displayName(u)}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="ob-chevron">
+                      <Icon name="chevron-down" size={14} />
+                    </span>
+                  </div>
+                  <span className="ob-hint">
+                    Preview only — there&apos;s no &apos;reports to&apos; field on the backend yet.
+                  </span>
+                </div>
+
+                <div className="ob-field">
+                  <label className="ob-label">Team role (Optional)</label>
+                  <div className="ob-role-chips">
+                    {teamRoleList.map((role) => {
+                      const isSelected = teamRole === role;
+                      return (
+                        <button
+                          key={role}
+                          type="button"
+                          className={`ob-role-chip ${isSelected ? "selected" : ""}`}
+                          onClick={() => setTeamRole(role)}
+                        >
+                          <span className="ob-role-radio" />
+                          <span>{role}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+
+          {/* Section 3: Module Access */}
+          <Reveal delay={4}>
+            <div className="ob-card">
+              <div className="ob-card-head">
+                <div className="ob-card-head-left">
+                  <div className="ob-card-icon teal">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                  </div>
+                  <div className="ob-card-title-group">
+                    <h3 className="ob-card-title">Module Access</h3>
+                    <p className="ob-card-desc">Control which modules this team member can access.</p>
+                  </div>
+                </div>
+
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#4b5563",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isAllModulesSelected}
+                    onChange={toggleSelectAllModules}
+                    style={{ accentColor: "#059669", width: 16, height: 16, cursor: "pointer" }}
+                  />
+                  <span>Select All</span>
+                </label>
+              </div>
+
+              {/* Module Cards Grid */}
+              <div className="ob-modules-grid">
+                {/* Leads CRM */}
+                <div className="ob-module-card">
+                  <div className="ob-mod-left">
+                    <div className="ob-mod-icon" style={{ background: "#ede9fe", color: "#7c3aed" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 21v-7" />
+                        <path d="M10 21v-11" />
+                        <path d="M16 21v-15" />
+                        <path d="M2 21h20" />
+                      </svg>
+                    </div>
+                    <div className="ob-mod-text">
+                      <h4 className="ob-mod-title">Leads (CRM)</h4>
+                      <p className="ob-mod-desc">Work the sales pipeline</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`tm-switch ${moduleAccess.crm ? "checked" : ""}`}
+                    onClick={() => toggleModule("crm")}
+                  >
+                    <span className="tm-switch-thumb" />
+                  </button>
+                </div>
+
+                {/* Calling */}
+                <div className="ob-module-card">
+                  <div className="ob-mod-left">
+                    <div className="ob-mod-icon" style={{ background: "#fce7f3", color: "#db2777" }}>
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.8a2 2 0 0 1-.4 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.6 2.8.7a2 2 0 0 1 1.7 2Z" />
+                      </svg>
+                    </div>
+                    <div className="ob-mod-text">
+                      <h4 className="ob-mod-title">Calling</h4>
+                      <p className="ob-mod-desc">Dialer, follow-ups</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`tm-switch ${moduleAccess.calling ? "checked" : ""}`}
+                    onClick={() => toggleModule("calling")}
+                  >
+                    <span className="tm-switch-thumb" />
+                  </button>
+                </div>
+
+                {/* WhatsApp */}
+                <div className="ob-module-card">
+                  <div className="ob-mod-left">
+                    <div className="ob-mod-icon" style={{ background: "#dcfce7", color: "#16a34a" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                      </svg>
+                    </div>
+                    <div className="ob-mod-text">
+                      <h4 className="ob-mod-title">WhatsApp</h4>
+                      <p className="ob-mod-desc">Inbox &amp; templates</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`tm-switch ${moduleAccess.whatsapp ? "checked" : ""}`}
+                    onClick={() => toggleModule("whatsapp")}
+                  >
+                    <span className="tm-switch-thumb" />
+                  </button>
+                </div>
+
+                {/* Landing Pages */}
+                <div className="ob-module-card">
+                  <div className="ob-mod-left">
+                    <div className="ob-mod-icon" style={{ background: "#ede9fe", color: "#7c3aed" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <line x1="3" y1="9" x2="21" y2="9" />
+                        <line x1="9" y1="21" x2="9" y2="9" />
+                      </svg>
+                    </div>
+                    <div className="ob-mod-text">
+                      <h4 className="ob-mod-title">Landing Pages</h4>
+                      <p className="ob-mod-desc">Build &amp; publish pages</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`tm-switch ${moduleAccess.landing ? "checked" : ""}`}
+                    onClick={() => toggleModule("landing")}
+                  >
+                    <span className="tm-switch-thumb" />
+                  </button>
+                </div>
+
+                {/* Reports */}
+                <div className="ob-module-card">
+                  <div className="ob-mod-left">
+                    <div className="ob-mod-icon" style={{ background: "#e0f2fe", color: "#0284c7" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 20V10" />
+                        <path d="M12 20V4" />
+                        <path d="M6 20v-6" />
+                      </svg>
+                    </div>
+                    <div className="ob-mod-text">
+                      <h4 className="ob-mod-title">Reports</h4>
+                      <p className="ob-mod-desc">Analytics &amp; performance</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className={`tm-switch ${moduleAccess.reports ? "checked" : ""}`}
+                    onClick={() => toggleModule("reports")}
+                  >
+                    <span className="tm-switch-thumb" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+
+          {/* Section 4: Additional Options (Collapsible) */}
+          <Reveal delay={5}>
+            <div className="ob-card">
+              <div
+                className="ob-card-head"
+                style={{ cursor: "pointer" }}
+                onClick={() => setAdditionalOpen((prev) => !prev)}
+              >
+                <div className="ob-card-head-left">
+                  <div className="ob-card-icon settings">
+                    <Icon name="settings" size={20} />
+                  </div>
+                  <div className="ob-card-title-group">
+                    <h3 className="ob-card-title">Additional Options</h3>
+                    <p className="ob-card-desc">Set default settings for the new team member.</p>
+                  </div>
+                </div>
+                <div style={{ transform: additionalOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                  <Icon name="chevron-down" size={16} />
+                </div>
+              </div>
+
+              {additionalOpen && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, borderTop: "1px solid #e5e7eb", paddingTop: 14 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#374151" }}>
+                    <input type="checkbox" defaultChecked style={{ accentColor: "#059669" }} />
+                    <span>Send onboarding welcome email with login credentials</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#374151" }}>
+                    <input type="checkbox" defaultChecked style={{ accentColor: "#059669" }} />
+                    <span>Auto-assign default team leads pipeline</span>
+                  </label>
+                </div>
+              )}
+            </div>
+          </Reveal>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div className="card">
-            <div className="card-h"><span className="t">Onboarding progress</span></div>
-            <div className="card-b">
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
-                <b>{doneCount} of {totalCount} complete</b><span className="muted">{pct}%</span>
+        {/* Right Sidebar Widgets */}
+        <aside className="ob-sidebar">
+          {/* Card 1: Onboarding Progress */}
+          <Reveal delay={2}>
+            <div className="ob-progress-card">
+              <div className="ob-prog-header">
+                <span className="ob-prog-title">Onboarding progress</span>
+                {/* Circular ring chart */}
+                <div className="ob-circular-ring">
+                  <svg width="44" height="44" viewBox="0 0 44 44">
+                    <circle
+                      cx="22"
+                      cy="22"
+                      r="18"
+                      fill="none"
+                      stroke="#f3f4f6"
+                      strokeWidth="3.5"
+                    />
+                    <circle
+                      cx="22"
+                      cy="22"
+                      r="18"
+                      fill="none"
+                      stroke="#059669"
+                      strokeWidth="3.5"
+                      strokeDasharray="113"
+                      strokeDashoffset={113 - (113 * progressPct) / 100}
+                      strokeLinecap="round"
+                      transform="rotate(-90 22 22)"
+                    />
+                  </svg>
+                  <span className="ob-circular-pct">{progressPct}%</span>
+                </div>
               </div>
-              <div className="bar"><i style={{ width: `${pct}%` }} /></div>
-              <div className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>
-                Invite is sent immediately; the rest can be completed over the first week.
+
+              <div className="ob-prog-status">
+                {completedStepsCount === 0 ? "1 of 4 steps completed" : `${completedStepsCount} of 4 steps completed`}
+              </div>
+
+              <div className="ob-prog-bar">
+                <div className="ob-prog-bar-fill" style={{ width: `${progressPct}%` }} />
+              </div>
+
+              <div className="ob-prog-list">
+                <div className={`ob-prog-item ${isStep1Done || completedStepsCount === 0 ? "done" : ""}`}>
+                  <span className="ob-prog-item-check">✓</span>
+                  <span>Person details</span>
+                </div>
+                <div className={`ob-prog-item ${isStep2Done ? "done" : ""}`}>
+                  <span className="ob-prog-item-check">{isStep2Done ? "✓" : "○"}</span>
+                  <span>Role &amp; placement</span>
+                </div>
+                <div className={`ob-prog-item ${isStep3Done ? "done" : ""}`}>
+                  <span className="ob-prog-item-check">{isStep3Done ? "✓" : "○"}</span>
+                  <span>Module access</span>
+                </div>
+                <div className="ob-prog-item">
+                  <span className="ob-prog-item-check">○</span>
+                  <span>Review &amp; invite</span>
+                </div>
               </div>
             </div>
-          </div>
+          </Reveal>
 
-          <div className="help">
-            💡 A work email and organisation role are enough to invite someone — the checklist above is just a
-            local reminder of what to do next, not something we track for you yet.
-          </div>
-
-          {submitted ? (
-            <div className="help" style={{ background: "#ecfdf5", borderColor: "#a7f3d0" }}>
-              ✅ {`${firstName.trim()} ${lastName.trim()}`.trim()} was added and an invite email is on its way.
+          {/* Card 2: Notice Box */}
+          <Reveal delay={3}>
+            <div className="ob-notice-box">
+              <div className="ob-notice-title-row">
+                <span>💡</span>
+                <span>Invite is sent immediately</span>
+              </div>
+              <p className="ob-notice-desc">
+                A work email and organisation role are enough to invite someone. The checklist above helps you keep track of what to do next.
+              </p>
             </div>
-          ) : null}
+          </Reveal>
 
-          {submitError ? (
-            <div className="help" style={{ background: "#fef2f2", borderColor: "#fecaca", color: "var(--rose)" }}>
-              {submitError}
+          {/* Card 3: Quick Help */}
+          <Reveal delay={4}>
+            <div className="ob-help-card">
+              <div
+                className="ob-help-header"
+                onClick={() => setQuickHelpOpen((prev) => !prev)}
+              >
+                <div className="ob-help-header-left">
+                  <span className="ob-help-icon">?</span>
+                  <span>Quick Help</span>
+                </div>
+                <span style={{ transform: quickHelpOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                  <Icon name="chevron-down" size={14} />
+                </span>
+              </div>
+
+              {quickHelpOpen && (
+                <div className="ob-help-list">
+                  <div className="ob-help-item">
+                    <span>What roles are available?</span>
+                    <Icon name="chevron-right" size={14} />
+                  </div>
+                  <div className="ob-help-item">
+                    <span>Can I change access later?</span>
+                    <Icon name="chevron-right" size={14} />
+                  </div>
+                  <div className="ob-help-item">
+                    <span>Will they receive an email invite?</span>
+                    <Icon name="chevron-right" size={14} />
+                  </div>
+                </div>
+              )}
             </div>
-          ) : null}
-
-          <button type="button" className="btn btn-primary btn-block" disabled={submitting} onClick={handleSubmit}>
-            <Icon name="check" size={14} /> {submitting ? "Adding…" : "Add & send invite"}
-          </button>
-        </div>
+          </Reveal>
+        </aside>
       </div>
-    </>
+    </div>
   );
 }

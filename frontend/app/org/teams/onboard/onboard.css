@@ -1,0 +1,697 @@
+/* ============================================================
+   Onboard Member (.ob-*)
+   Pixel-perfect match for the Create / Invite Team Member mockup.
+   ============================================================ */
+
+.org .ob-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-bottom: 60px;
+}
+
+/* Header */
+.org .ob-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.org .ob-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.org .ob-header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);
+}
+
+.org .ob-header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.org .ob-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #059669;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.org .ob-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.org .ob-sub {
+  font-size: 13.5px;
+  color: #6b7280;
+  margin: 0;
+  font-weight: 400;
+}
+
+.org .ob-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.org .ob-btn-cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #374151;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.org .ob-btn-cancel:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.org .ob-btn-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #059669;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+  transition: all 0.15s;
+}
+
+.org .ob-btn-submit:hover:not(:disabled) {
+  background: #047857;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
+}
+
+.org .ob-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Stepper Progress Bar */
+.org .ob-stepper {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .org .ob-stepper {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.org .ob-step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  cursor: pointer;
+  padding-bottom: 6px;
+}
+
+.org .ob-step-item.active::after {
+  content: "";
+  position: absolute;
+  bottom: -16px;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background: #059669;
+  border-radius: 2px;
+}
+
+.org .ob-step-circle {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.org .ob-step-item.active .ob-step-circle {
+  background: #059669;
+  color: #ffffff;
+}
+
+.org .ob-step-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.org .ob-step-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.org .ob-step-sub {
+  font-size: 11.5px;
+  color: #6b7280;
+}
+
+/* 2-Column Grid Layout */
+.org .ob-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+@media (max-width: 1080px) {
+  .org .ob-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Left Form Stack */
+.org .ob-form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.org .ob-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.org .ob-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.org .ob-card-head-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.org .ob-card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.org .ob-card-icon.blue {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.org .ob-card-icon.green {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.org .ob-card-icon.teal {
+  background: #dcfce7;
+  color: #10b981;
+}
+
+.org .ob-card-icon.settings {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.org .ob-card-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.org .ob-card-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.org .ob-card-desc {
+  font-size: 12.5px;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Fields Grid */
+.org .ob-fields-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .org .ob-fields-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.org .ob-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.org .ob-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.org .ob-req {
+  color: #ef4444;
+}
+
+.org .ob-input-box {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  height: 42px;
+  padding: 0 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.org .ob-input-box:focus-within {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+.org .ob-input-box input,
+.org .ob-input-box select {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  font-size: 13.5px;
+  color: #111827;
+  font-family: inherit;
+}
+
+.org .ob-input-box select {
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.org .ob-input-box .ob-ic {
+  color: #9ca3af;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.org .ob-input-box .ob-chevron {
+  color: #9ca3af;
+  margin-left: auto;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.org .ob-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 3px;
+}
+
+/* Phone input flag badge */
+.org .ob-flag-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-right: 10px;
+  margin-right: 10px;
+  border-right: 1px solid #e5e7eb;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  flex-shrink: 0;
+}
+
+/* Team Role Pills */
+.org .ob-role-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.org .ob-role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.org .ob-role-chip:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.org .ob-role-chip.selected {
+  background: #ecfdf5;
+  border-color: #059669;
+  color: #059669;
+}
+
+.org .ob-role-radio {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.org .ob-role-chip.selected .ob-role-radio {
+  border-color: #059669;
+  background: #059669;
+  box-shadow: inset 0 0 0 2px #ffffff;
+}
+
+/* Module Cards in Onboarding */
+.org .ob-modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.org .ob-module-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  transition: all 0.15s;
+}
+
+.org .ob-module-card:hover {
+  border-color: #d1d5db;
+}
+
+.org .ob-mod-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.org .ob-mod-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.org .ob-mod-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.org .ob-mod-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.org .ob-mod-desc {
+  font-size: 11px;
+  color: #6b7280;
+  margin: 1px 0 0;
+}
+
+/* Right Sidebar */
+.org .ob-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Progress Widget */
+.org .ob-progress-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.org .ob-prog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.org .ob-prog-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.org .ob-circular-ring {
+  width: 44px;
+  height: 44px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.org .ob-circular-pct {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.org .ob-prog-status {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.org .ob-prog-bar {
+  width: 100%;
+  height: 6px;
+  background: #f3f4f6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.org .ob-prog-bar-fill {
+  height: 100%;
+  background: #059669;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.org .ob-prog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.org .ob-prog-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.org .ob-prog-item.done {
+  color: #111827;
+  font-weight: 600;
+}
+
+.org .ob-prog-item-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.org .ob-prog-item.done .ob-prog-item-check {
+  border-color: #059669;
+  background: #059669;
+  color: #ffffff;
+}
+
+/* Notice Box */
+.org .ob-notice-box {
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.org .ob-notice-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #854d0e;
+}
+
+.org .ob-notice-desc {
+  font-size: 12.5px;
+  color: #92400e;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Quick Help Widget */
+.org .ob-help-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.org .ob-help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  cursor: pointer;
+}
+
+.org .ob-help-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.org .ob-help-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #dbeafe;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.org .ob-help-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.org .ob-help-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: #374151;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s;
+}
+
+.org .ob-help-item:hover {
+  color: #059669;
+}
