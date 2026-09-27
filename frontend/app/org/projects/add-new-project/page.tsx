@@ -52,7 +52,7 @@ import {
 } from "@/lib/project-validation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Modal } from "@/components/ui/modal";
-import { Icon } from "@/components/icons";
+import { Icon, type IconName } from "@/components/icons";
 import { orgBuilderPath } from "@/lib/openpage/paths";
 import "@/app/org/org.css";
 import type {
@@ -1448,54 +1448,118 @@ export default function AddNewProjectPage() {
                     Project type <span className="req" style={{ color: "#ef4444" }}>*</span>
                   </label>
 
-                  {/* Visual Card Selector (Apartment, Plot, Villa, etc.) */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
-                    {[
-                      { label: "Apartment", icon: "building" as const },
-                      { label: "Plot", icon: "map" as const },
-                      { label: "Villa", icon: "home" as const },
-                      ...(projectTypes.options?.filter((o) => !["Apartment", "Plot", "Villa"].includes(o.label)).map((o) => ({ label: o.label, icon: "building" as const })) ?? [])
-                    ].map((item) => {
-                      const isSelected = projectType.toLowerCase() === item.label.toLowerCase();
-                      return (
-                        <div
-                          key={item.label}
-                          onClick={() => pickProjectType(item.label)}
-                          style={{
-                            border: isSelected ? "2px solid #0066f5" : "1px solid #e2e8f0",
-                            background: isSelected ? "rgba(0, 102, 245, 0.04)" : "#fff",
-                            borderRadius: 10,
-                            padding: "12px 14px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            cursor: "pointer",
-                            transition: "all 0.15s ease",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div style={{ color: isSelected ? "#0066f5" : "#64748b" }}>
-                              <Icon name={item.icon} size={18} />
+                  {/* Visual Card Selector */}
+                  {!projectTypes.loaded ? (
+                    <div style={{ fontSize: 13, color: "#64748b", padding: "12px 0" }}>
+                      Loading project types…
+                    </div>
+                  ) : (projectTypes.options?.length ?? 0) === 0 ? (
+                    <div
+                      style={{
+                        padding: "14px 16px",
+                        background: "#f8fafc",
+                        border: "1px dashed #cbd5e1",
+                        borderRadius: 10,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                      }}
+                    >
+                      <div style={{ fontSize: 13, color: "#64748b" }}>
+                        No project types found for your organisation.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void projectTypes.addCommon()}
+                        disabled={projectTypes.adding}
+                        className="btn btn-sm btn-primary"
+                        style={{ padding: "6px 12px", fontSize: 12 }}
+                      >
+                        {projectTypes.adding ? "Adding…" : "Add common types"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
+                      {(() => {
+                        const items = [...(projectTypes.options ?? [])];
+                        if (
+                          projectType &&
+                          !items.some((o) => o.label.toLowerCase() === projectType.toLowerCase())
+                        ) {
+                          items.push({
+                            id: "custom",
+                            orgId: "",
+                            category: "project_type",
+                            label: projectType,
+                            sortOrder: 999,
+                            createdAt: "",
+                            updatedAt: "",
+                          });
+                        }
+                        return items.map((item) => {
+                          const isSelected = projectType.toLowerCase() === item.label.toLowerCase();
+                          const iconName: IconName = (() => {
+                            const l = item.label.toLowerCase();
+                            if (l.includes("plot") || l.includes("land")) return "map";
+                            if (
+                              l.includes("villa") ||
+                              l.includes("bungalow") ||
+                              l.includes("house") ||
+                              l.includes("home")
+                            )
+                              return "home";
+                            return "building";
+                          })();
+                          return (
+                            <div
+                              key={item.label}
+                              onClick={() => pickProjectType(item.label)}
+                              style={{
+                                border: isSelected ? "2px solid #0066f5" : "1px solid #e2e8f0",
+                                background: isSelected ? "rgba(0, 102, 245, 0.04)" : "#fff",
+                                borderRadius: 10,
+                                padding: "12px 14px",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                cursor: "pointer",
+                                transition: "all 0.15s ease",
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ color: isSelected ? "#0066f5" : "#64748b" }}>
+                                  <Icon name={iconName} size={18} />
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: isSelected ? 700 : 500,
+                                    color: isSelected ? "#0f172a" : "#334155",
+                                  }}
+                                >
+                                  {item.label}
+                                </span>
+                              </div>
+                              <div
+                                style={{
+                                  width: 18,
+                                  height: 18,
+                                  borderRadius: "50%",
+                                  border: isSelected
+                                    ? "5px solid #0066f5"
+                                    : "1.5px solid #cbd5e1",
+                                  background: "#fff",
+                                  flexShrink: 0,
+                                  transition: "all 0.15s",
+                                }}
+                              />
                             </div>
-                            <span style={{ fontSize: 13, fontWeight: isSelected ? 700 : 500, color: isSelected ? "#0f172a" : "#334155" }}>
-                              {item.label}
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              width: 18,
-                              height: 18,
-                              borderRadius: "50%",
-                              border: isSelected ? "5px solid #0066f5" : "1.5px solid #cbd5e1",
-                              background: "#fff",
-                              flexShrink: 0,
-                              transition: "all 0.15s",
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
                   {invalid("projectType") && <div className="field-err">Pick a project type.</div>}
                 </div>
 

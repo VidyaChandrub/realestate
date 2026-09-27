@@ -54,6 +54,7 @@ export default function SuperAdminTemplateDetailPage() {
   const [status, setStatus] = useState<LandingPageData["status"]>("draft");
   const [domain, setDomain] = useState("");
   const [tier, setTier] = useState<"free" | "paid" | "premium">("free");
+  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState<string>("");
   const [categories, setCategories] = useState<TemplateCategory[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -85,8 +86,25 @@ export default function SuperAdminTemplateDetailPage() {
     setDomain(template.domain);
     setTier(template.tier ?? (template.isPaid ? "paid" : "free"));
     setCategoryId(template.categoryId ?? "");
+
+    const cfg = ensureConfig(template);
+    const existing: string[] | undefined = (cfg as any).allowedPlanIds;
+    if (existing && Array.isArray(existing) && existing.length > 0) {
+      setSelectedPlanIds(existing);
+    } else if (plans.length > 0) {
+      const currentTier = template.tier ?? (template.isPaid ? "paid" : "free");
+      if (currentTier === "premium") {
+        setSelectedPlanIds(
+          plans.filter((p) => (p.priceMonthly ?? 0) >= 10000 || /ultra|premium/i.test(p.slug)).map((p) => p.id)
+        );
+      } else if (currentTier === "paid") {
+        setSelectedPlanIds(plans.filter((p) => (p.priceMonthly ?? 0) > 0).map((p) => p.id));
+      } else {
+        setSelectedPlanIds(plans.map((p) => p.id));
+      }
+    }
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [template]);
+  }, [template, plans]);
 
   function notify(text: string) {
     setToast(text);
@@ -113,18 +131,42 @@ export default function SuperAdminTemplateDetailPage() {
   if (!template) return null;
 
   const cfg = ensureConfig(template);
+  const initialPlanIds: string[] = (cfg as any)?.allowedPlanIds ?? [];
+  const planIdsDirty = JSON.stringify([...selectedPlanIds].sort()) !== JSON.stringify([...initialPlanIds].sort());
   const dirty =
     name !== template.name ||
     slug !== template.slug ||
     status !== template.status ||
     domain !== template.domain ||
     tier !== (template.tier ?? (template.isPaid ? "paid" : "free")) ||
-    categoryId !== (template.categoryId ?? "");
+    categoryId !== (template.categoryId ?? "") ||
+    planIdsDirty;
+
+  function computeTierFromPlanIds(planIds: string[], allPlans: Plan[]): "free" | "paid" | "premium" {
+    if (planIds.length === 0) return "free";
+    const selected = allPlans.filter((p) => planIds.includes(p.id));
+    const hasFree = selected.some(
+      (p) => (p.priceMonthly ?? 0) === 0 || p.slug === "basic" || p.slug === "free"
+    );
+    if (hasFree) return "free";
+    const isOnlyTopTier = selected.every(
+      (p) => (p.priceMonthly ?? 0) >= 10000 || /ultra|premium|enterprise/i.test(p.slug)
+    );
+    if (isOnlyTopTier && selected.length > 0) return "premium";
+    return "paid";
+  }
 
   async function save() {
     if (!template) return;
     const cleanSlug =
       slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || template.slug;
+
+    const calculatedTier = computeTierFromPlanIds(selectedPlanIds, plans);
+    const currentCfg = ensureConfig(template);
+    const updatedConfig = {
+      ...currentCfg,
+      allowedPlanIds: selectedPlanIds,
+    };
 
     const payload = {
       ...template,
@@ -133,9 +175,10 @@ export default function SuperAdminTemplateDetailPage() {
       slug: cleanSlug,
       status,
       domain: domain.trim(),
-      tier,
+      tier: calculatedTier,
       categoryId: categoryId || null,
-      isPaid: tier !== "free",
+      isPaid: calculatedTier !== "free",
+      config: updatedConfig,
     };
 
     let updated;
@@ -306,41 +349,128 @@ export default function SuperAdminTemplateDetailPage() {
                     <input className="inp" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="e.g. homes.example.com" />
                   </div>
                 </div>
-                <div className="row2">
-                  <div className="field">
-                    <label>Template Category</label>
-                    <select
-                      className="inp"
-                      value={categoryId}
-                      onChange={(e) => {
-                        setCategoryId(e.target.value);
-                      }}
-                    >
-                      <option value="">Unassigned</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="hint">Categorizes template in library for users.</div>
-                  </div>
-                  <div className="field">
-                    <label>Subscription Plan Access</label>
-                    <select
-                      className="inp"
-                      value={tier}
-                      onChange={(e) => setTier(e.target.value as "free" | "paid" | "premium")}
-                    >
-                      {getTemplatePlanOptions(plans).map((opt) => (
-                        <option key={opt.tier} value={opt.tier}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="hint">
-                      Controls which subscription plans can access and build pages with this template.
+                <div className="field">
+                  <label>Template Category</label>
+                  <select
+                    className="inp"
+                    value={categoryId}
+                    onChange={(e) => {
+                      setCategoryId(e.target.value);
+                    }}
+                  >
+                    <option value="">Unassigned</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="hint">Categorizes template in library for users.</div>
+                </div>
+
+                <div className="field" style={{ marginTop: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <label style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
+                      Subscription Plan Access
+                    </label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--brand, #4f46e5)",
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                        onClick={() => setSelectedPlanIds(plans.map((p) => p.id))}
+                      >
+                        Select all
+                      </button>
+                      <span style={{ color: "var(--muted)", fontSize: 11 }}>•</span>
+                      <button
+                        type="button"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--muted)",
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                        onClick={() => setSelectedPlanIds([])}
+                      >
+                        Clear all
+                      </button>
                     </div>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 8 }}>
+                    Check each subscription plan that is granted access to use this template:
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                      gap: 8,
+                      padding: "2px 0",
+                    }}
+                  >
+                    {plans.map((p) => {
+                      const isChecked = selectedPlanIds.includes(p.id);
+                      return (
+                        <label
+                          key={p.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "8px 12px",
+                            borderRadius: 10,
+                            border: `1.5px solid ${isChecked ? "var(--brand, #4f46e5)" : "#e2e8f0"}`,
+                            background: isChecked ? "rgba(79, 70, 229, 0.05)" : "#fff",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedPlanIds((prev) => [...prev, p.id]);
+                              } else {
+                                setSelectedPlanIds((prev) => prev.filter((id) => id !== p.id));
+                              }
+                            }}
+                            style={{ width: 16, height: 16, accentColor: "var(--brand, #4f46e5)", cursor: "pointer" }}
+                          />
+                          <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                            <span
+                              style={{
+                                fontSize: 12.5,
+                                fontWeight: isChecked ? 700 : 500,
+                                color: isChecked ? "#0f172a" : "#334155",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {p.name}
+                            </span>
+                            <span style={{ fontSize: 11, color: "#64748b" }}>
+                              {p.priceMonthly ? `₹${p.priceMonthly.toLocaleString()}/mo` : "Free Plan"}
+                            </span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div className="hint" style={{ marginTop: 8 }}>
+                    Workspaces on selected plans will be able to browse and build landing pages with this template.
                   </div>
                 </div>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>

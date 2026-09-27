@@ -177,12 +177,14 @@ export class AdminOrgDomainService {
       this.dnsOptions(),
     ]);
 
+    const mappedRows = rows.map((r) => toView(r, dnsOpts));
     return {
       total,
       page,
       limit,
       pages: Math.ceil(total / limit) || 1,
-      rows: rows.map((r) => toView(r, dnsOpts)),
+      rows: mappedRows,
+      data: mappedRows,
       dnsInstructions: generateCustomDomainDnsInstructions('yourdomain.com', dnsOpts),
       dnsMode: dnsOpts.mode,
     };

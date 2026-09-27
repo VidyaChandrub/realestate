@@ -105,7 +105,7 @@ export default function OrgTemplatesPage() {
   const [tierFilter, setTierFilter] = useState<string>("all");
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("latest");
-  const [activeTab, setActiveTab] = useState<"all" | "free" | "paid" | "premium" | "my">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "free" | "paid" | "premium" | "my">("my");
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -457,7 +457,30 @@ export default function OrgTemplatesPage() {
 
       {/* 2. KPI Cards */}
       <div className="tpl-kpi-grid reveal in">
-        {/* Card 1: Total Templates */}
+        {/* Card 1: Your Templates (Assigned) */}
+        <div
+          className="tpl-kpi-card"
+          onClick={() => {
+            setActiveTab("my");
+          }}
+        >
+          <div className="tpl-kpi-top">
+            <div className="tpl-kpi-icon tpl-kpi-icon-blue">
+              <User size={18} />
+            </div>
+            <span className="tpl-kpi-label">Your Templates</span>
+          </div>
+          <div className="tpl-kpi-bottom">
+            <span className="tpl-kpi-val">{myTemplatesCount}</span>
+            <span className="tpl-kpi-trend" style={{ color: "#3b82f6" }}>Assigned to workspace</span>
+          </div>
+          <svg className="tpl-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
+            <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16V42H0V28Z" fill="#3b82f6" fillOpacity="0.15" />
+            <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16" stroke="#3b82f6" strokeWidth="2.5" fill="none" />
+          </svg>
+        </div>
+
+        {/* Card 2: Total Templates */}
         <div
           className="tpl-kpi-card"
           onClick={() => {
@@ -470,11 +493,11 @@ export default function OrgTemplatesPage() {
             <div className="tpl-kpi-icon tpl-kpi-icon-green">
               <Layers size={18} />
             </div>
-            <span className="tpl-kpi-label">Total Templates</span>
+            <span className="tpl-kpi-label">Browse All Catalog</span>
           </div>
           <div className="tpl-kpi-bottom">
             <span className="tpl-kpi-val">{totalTemplatesCount}</span>
-            <span className="tpl-kpi-trend">+6 this month</span>
+            <span className="tpl-kpi-trend">Full platform catalog</span>
           </div>
           <svg className="tpl-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
             <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16V42H0V28Z" fill="#10b981" fillOpacity="0.15" />
@@ -482,7 +505,7 @@ export default function OrgTemplatesPage() {
           </svg>
         </div>
 
-        {/* Card 2: Free Templates */}
+        {/* Card 3: Free Templates */}
         <div
           className="tpl-kpi-card"
           onClick={() => {
@@ -505,7 +528,7 @@ export default function OrgTemplatesPage() {
           </svg>
         </div>
 
-        {/* Card 3: Premium Templates */}
+        {/* Card 4: Premium Templates */}
         <div
           className="tpl-kpi-card"
           onClick={() => {
@@ -527,33 +550,20 @@ export default function OrgTemplatesPage() {
             <path d="M0 28C20 28 34 36 54 22C74 8 84 26 96 18" stroke="#f59e0b" strokeWidth="2.5" fill="none" />
           </svg>
         </div>
-
-        {/* Card 4: Your Templates */}
-        <div
-          className="tpl-kpi-card"
-          onClick={() => {
-            setActiveTab("my");
-          }}
-        >
-          <div className="tpl-kpi-top">
-            <div className="tpl-kpi-icon tpl-kpi-icon-blue">
-              <User size={18} />
-            </div>
-            <span className="tpl-kpi-label">Your Templates</span>
-          </div>
-          <div className="tpl-kpi-bottom">
-            <span className="tpl-kpi-val">{myTemplatesCount}</span>
-          </div>
-          <svg className="tpl-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
-            <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16V42H0V28Z" fill="#3b82f6" fillOpacity="0.15" />
-            <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16" stroke="#3b82f6" strokeWidth="2.5" fill="none" />
-          </svg>
-        </div>
       </div>
 
       {/* 3. Segmented Tabs & Action Button */}
       <div className="tpl-tabs-row">
         <div className="tpl-tab-pills">
+          <button
+            type="button"
+            className={`tpl-tab-pill ${activeTab === "my" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("my");
+            }}
+          >
+            My Templates
+          </button>
           <button
             type="button"
             className={`tpl-tab-pill ${activeTab === "all" ? "active" : ""}`}
@@ -562,7 +572,7 @@ export default function OrgTemplatesPage() {
               setTierFilter("all");
             }}
           >
-            All Templates
+            Browse All Catalog
           </button>
           <button
             type="button"
@@ -593,15 +603,6 @@ export default function OrgTemplatesPage() {
             }}
           >
             Premium Plans
-          </button>
-          <button
-            type="button"
-            className={`tpl-tab-pill ${activeTab === "my" ? "active" : ""}`}
-            onClick={() => {
-              setActiveTab("my");
-            }}
-          >
-            My Templates
           </button>
         </div>
 

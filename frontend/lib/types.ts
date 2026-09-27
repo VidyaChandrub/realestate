@@ -1875,10 +1875,12 @@ export interface AdminOrgDomainRequest extends OrgDomainRequest {
 }
 
 export interface AdminOrgDomainRequestListResponse {
-  data: AdminOrgDomainRequest[];
+  data?: AdminOrgDomainRequest[];
+  rows?: AdminOrgDomainRequest[];
   total: number;
   page: number;
   limit: number;
+  pages?: number;
   baseDomain?: string;
   dnsInstructions?: DnsRecordSpec[];
   dnsMode?: string;

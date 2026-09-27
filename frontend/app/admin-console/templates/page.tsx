@@ -179,6 +179,7 @@ export default function SuperAdminTemplatesPage() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [createBusy, setCreateBusy] = useState(false);
   const [createTier, setCreateTier] = useState<"free" | "paid" | "premium">("free");
+  const [createPlanIds, setCreatePlanIds] = useState<string[]>([]);
   const [createCategoryId, setCreateCategoryId] = useState<string>("");
 
   // Delete / Reset Confirm
@@ -208,7 +209,10 @@ export default function SuperAdminTemplatesPage() {
     reloadCategories();
     reloadTemplates();
     apiFetch<Plan[]>("/admin/plans")
-      .then(setPlans)
+      .then((p) => {
+        setPlans(p);
+        setCreatePlanIds(p.map((x) => x.id));
+      })
       .catch(() => setPlans([]));
     try {
       const flash = window.sessionStorage.getItem("template_flash");
@@ -282,6 +286,7 @@ export default function SuperAdminTemplatesPage() {
       name: string,
       tier: "free" | "paid" | "premium" = "free",
       categoryId?: string,
+      allowedPlanIds?: string[],
     ) => {
       const label = name?.trim();
       if (!label) {
@@ -304,6 +309,9 @@ export default function SuperAdminTemplatesPage() {
         designId: template.id,
         kind: "custom",
       });
+      if (allowedPlanIds && allowedPlanIds.length > 0) {
+        (config as any).allowedPlanIds = allowedPlanIds;
+      }
       const created = await createTemplate({
         name: label,
         slug,
@@ -474,11 +482,25 @@ export default function SuperAdminTemplatesPage() {
           thumbnail: thumbnailFor(meta.id),
         }
         : TEMPLATES.find((t) => t.id === designId) ?? blankBase;
-      await createFromDesign(base, trimmed, createTier, createCategoryId);
+      const computedTier = (() => {
+        if (createPlanIds.length === 0) return "free" as const;
+        const selected = plans.filter((p) => createPlanIds.includes(p.id));
+        const hasFree = selected.some(
+          (p) => (p.priceMonthly ?? 0) === 0 || p.slug === "basic" || p.slug === "free"
+        );
+        if (hasFree) return "free" as const;
+        const isOnlyTop = selected.every(
+          (p) => (p.priceMonthly ?? 0) >= 10000 || /ultra|premium|enterprise/i.test(p.slug)
+        );
+        if (isOnlyTop && selected.length > 0) return "premium" as const;
+        return "paid" as const;
+      })();
+      await createFromDesign(base, trimmed, computedTier, createCategoryId, createPlanIds);
       setCreateOpen(false);
       setNewName("");
       setDesignId("blank");
       setCreateTier("free");
+      setCreatePlanIds(plans.map((p) => p.id));
       setCreateCategoryId("");
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : "Failed to create template");
@@ -569,6 +591,7 @@ export default function SuperAdminTemplatesPage() {
               setCreateError(null);
               setDesignId("blank");
               setCreateTier("free");
+              setCreatePlanIds(plans.map((p) => p.id));
               setCreateCategoryId("");
               setCreateOpen(true);
             }}
@@ -1597,7 +1620,7 @@ export default function SuperAdminTemplatesPage() {
           />
         </div>
 
-        <div className="row2" style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 14 }}>
           <div className="field" style={{ marginBottom: 0 }}>
             <label>Category <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional)</span></label>
             <select
@@ -1615,19 +1638,110 @@ export default function SuperAdminTemplatesPage() {
               ))}
             </select>
           </div>
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Subscription Plan Access</label>
-            <select
-              className="inp"
-              value={createTier}
-              onChange={(e) => setCreateTier(e.target.value as any)}
-            >
-              {planOptions.map((opt) => (
-                <option key={opt.tier} value={opt.tier}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+        </div>
+
+        <div className="field" style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <label style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
+              Subscription Plan Access
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--brand, #4f46e5)",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+                onClick={() => setCreatePlanIds(plans.map((p) => p.id))}
+              >
+                Select all
+              </button>
+              <span style={{ color: "var(--muted)", fontSize: 11 }}>•</span>
+              <button
+                type="button"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--muted)",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+                onClick={() => setCreatePlanIds([])}
+              >
+                Clear all
+              </button>
+            </div>
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 8 }}>
+            Check each subscription plan that is granted access to use this template:
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
+              gap: 8,
+              maxHeight: 180,
+              overflowY: "auto",
+              padding: "2px 0",
+            }}
+          >
+            {plans.map((p) => {
+              const isChecked = createPlanIds.includes(p.id);
+              return (
+                <label
+                  key={p.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 12px",
+                    borderRadius: 10,
+                    border: `1.5px solid ${isChecked ? "var(--brand, #4f46e5)" : "#e2e8f0"}`,
+                    background: isChecked ? "rgba(79, 70, 229, 0.05)" : "#fff",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setCreatePlanIds((prev) => [...prev, p.id]);
+                      } else {
+                        setCreatePlanIds((prev) => prev.filter((id) => id !== p.id));
+                      }
+                    }}
+                    style={{ width: 16, height: 16, accentColor: "var(--brand, #4f46e5)", cursor: "pointer" }}
+                  />
+                  <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                    <span
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: isChecked ? 700 : 500,
+                        color: isChecked ? "#0f172a" : "#334155",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {p.name}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#64748b" }}>
+                      {p.priceMonthly ? `₹${p.priceMonthly.toLocaleString()}/mo` : "Free Plan"}
+                    </span>
+                  </div>
+                </label>
+              );
+            })}
           </div>
         </div>
       </Modal>
