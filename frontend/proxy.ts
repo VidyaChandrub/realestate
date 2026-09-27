@@ -5,7 +5,11 @@ const PLATFORM_HOSTS = new Set(
   [
     "localhost",
     "127.0.0.1",
+    "ipixxel.ae",
+    "www.ipixxel.ae",
     process.env.NEXT_PUBLIC_APP_HOST,
+    process.env.NEXT_PUBLIC_SUBDOMAIN_BASE_DOMAIN,
+    process.env.SUBDOMAIN_BASE_DOMAIN,
   ]
     .filter((host): host is string => Boolean(host))
     .map((host) => host.toLowerCase()),
@@ -33,7 +37,10 @@ export function proxy(request: NextRequest) {
     path.startsWith("/admin") ||
     path.startsWith("/change-password") ||
     path.startsWith("/forgot-password") ||
-    path.startsWith("/org-site")
+    path.startsWith("/org-site") ||
+    path.startsWith("/preview") ||
+    path.startsWith("/p/") ||
+    path.startsWith("/api")
   ) {
     return NextResponse.next();
   }

@@ -136,7 +136,15 @@ export function PageSettingsModule({ page, onPage }: { page: LandingPageData; on
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "var(--ps-ink)" }}>{active.label}</h2>
           <p style={{ margin: "4px 0 18px", fontSize: 12.5, color: "var(--ps-muted)" }}>{active.desc}</p>
 
-          {tab === "seo" && <SeoSection site={site} page={page} patchSeo={patchSeo} />}
+          {tab === "seo" && (
+            <SeoSection
+              site={site}
+              page={page}
+              patchSeo={patchSeo}
+              commit={commit}
+              onPatchPage={onPage}
+            />
+          )}
           {tab === "analytics" && <AnalyticsSection site={site} patchTracking={patchTracking} />}
           {tab === "branding" && (
             <BrandingSection settings={settings} patchTheme={patchTheme} patchPageBag={patchPageBag} />
@@ -311,12 +319,34 @@ function SeoSection({
   site,
   page,
   patchSeo,
+  commit,
+  onPatchPage,
 }: {
   site: SiteConfig;
   page: LandingPageData;
   patchSeo: (p: Partial<SiteSeo>) => void;
+  commit?: (r: (c: SiteConfig) => SiteConfig) => void;
+  onPatchPage?: (patch: Partial<LandingPageData>) => void;
 }) {
   const seo = site.seo ?? {};
+  const slug = (page.slug || page.id?.replace(/^page-/, ""))?.replace(/^\//, "");
+  const pathFor = (v: string) => {
+    const clean = (v || "").trim().replace(/^\/+/, "");
+    return clean ? `/${clean}` : "/";
+  };
+  const setSlug = (v: string) => {
+    const clean = (v || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-_]/g, "");
+    commit?.((c) => ({
+      ...c,
+      pages: c.pages?.map((p, i) => (i === 0 ? { ...p, path: pathFor(clean) } : p)) ?? c.pages,
+    }));
+    onPatchPage?.({ slug: clean });
+  };
+
   return (
     <>
       <PreviewGrid>
@@ -324,6 +354,12 @@ function SeoSection({
         <OgCard seo={seo} site={site} page={page} />
       </PreviewGrid>
       <Card title="Search engines">
+        <Row label="URL Slug" hint="The URL path on your domain. e.g. /my-property">
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--ps-muted)" }}>/</span>
+            <Input value={slug} on={setSlug} placeholder="villa-aurora" />
+          </div>
+        </Row>
         <Row label="Meta title" hint={`${(seo.metaTitle ?? "").length} / 60 chars — keep under 60 for a full result.`}>
           <Input value={seo.metaTitle ?? ""} on={(v) => patchSeo({ metaTitle: v })} />
         </Row>
@@ -400,7 +436,9 @@ function PreviewGrid({ children }: { children: React.ReactNode }) {
 }
 
 function GoogleSerpCard({ seo, site, page }: { seo: SiteSeo | undefined; site: SiteConfig; page: LandingPageData }) {
-  const domain = (seo?.canonical || page.domain || site.name || "your-site").replace(/^https?:\/\//, "").split("/")[0];
+  const rawDomain = (seo?.canonical || page.domain || "ipixxel.ae").replace(/^https?:\/\//, "").split("/")[0];
+  const domain = rawDomain.includes(".") ? rawDomain : "ipixxel.ae";
+  const slug = (page.slug || "").replace(/^\//, "");
   const badge =
     seo?.robots?.includes("noindex") || seo?.index === false ? (
       <span style={{ color: "#c5221f", fontSize: 10, fontWeight: 600 }}>Excluded by noindex</span>
@@ -414,7 +452,7 @@ function GoogleSerpCard({ seo, site, page }: { seo: SiteSeo | undefined; site: S
       </div>
       <div style={{ fontSize: 11, color: "#202124" }}>
         <div style={{ fontSize: 12, marginBottom: 2 }}>
-          {domain} {badge}
+          {domain}{slug ? ` › ${slug}` : ""} {badge}
         </div>
         <div style={{ color: "#1a0dab", fontSize: 15, fontWeight: 500, marginBottom: 4, lineHeight: 1.3 }}>
           {seo?.metaTitle || page.name || "Untitled page"}
@@ -770,7 +808,11 @@ function PageScopeSection({
     return clean ? `/${clean}` : "/";
   };
   const setSlug = (v: string) => {
-    const clean = (v || "").trim().replace(/^\/+/, "");
+    const clean = (v || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-_]/g, "");
     commit((c) => ({
       ...c,
       pages: c.pages?.map((p, i) => (i === 0 ? { ...p, path: pathFor(clean) } : p)) ?? c.pages,
