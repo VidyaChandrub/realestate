@@ -24,6 +24,175 @@ import {
   assertOrgLandingPageQuota,
 } from '../../common/utils/subscription-lifecycle.util';
 
+function defaultThankYouContent(pageName: string, slug: string) {
+  const brandName = pageName.replace(/\s*—\s*Thank You$/i, '').trim() || 'Property';
+  const thankYouTitle = "Thank You — You're All Set!";
+  const thankYouSubtitle = `We have received your enquiry for ${brandName}. Our property specialist will reach out to you within 15 minutes with exclusive details and brochure.`;
+
+  const site = {
+    name: `${brandName} — Thank You`,
+    theme: {
+      colors: {
+        primary: '#0f172a',
+        accent: '#c5a880',
+        background: '#ffffff',
+        text: '#0f172a',
+        muted: '#64748b',
+        border: '#e2e8f0',
+      },
+      fonts: {
+        heading: 'Outfit',
+        body: 'Inter',
+      },
+    },
+    header: {
+      enabled: true,
+      logoText: brandName,
+      links: [{ label: 'Back to Landing Page', url: `/${slug.replace(/-thank-you$/, '')}` }],
+    },
+    footer: {
+      enabled: true,
+      copyright: `© ${new Date().getFullYear()} ${brandName}. All rights reserved.`,
+    },
+    seo: {
+      metaTitle: `Thank You | ${brandName}`,
+      metaDescription: thankYouSubtitle,
+      robots: 'noindex, nofollow',
+    },
+    blocks: [
+      {
+        id: 'block-thank-you-hero',
+        type: 'hero',
+        props: {
+          title: thankYouTitle,
+          subtitle: thankYouSubtitle,
+          badge: 'Enquiry Received Successfully',
+          alignment: 'center',
+          buttons: [
+            {
+              id: 'btn-back-home',
+              label: 'Return to Landing Page',
+              href: `/${slug.replace(/-thank-you$/, '')}`,
+              variant: 'solid',
+            },
+          ],
+        },
+      },
+      {
+        id: 'block-thank-you-highlights',
+        type: 'highlights',
+        props: {
+          eyebrow: 'WHAT HAPPENS NEXT',
+          title: '3 Simple Steps to Your Dream Property',
+          items: [
+            {
+              title: '1. Instant Verification',
+              description: 'Our lead desk reviews your preferences and matches availability.',
+              icon: 'CheckCircle2',
+            },
+            {
+              title: '2. Dedicated Specialist Call',
+              description: 'A relationship manager will contact you with customized floor plans and pricing.',
+              icon: 'PhoneCall',
+            },
+            {
+              title: '3. Priority Site Visit',
+              description: 'Schedule a VIP private preview or virtual video walkthrough at your convenience.',
+              icon: 'Calendar',
+            },
+          ],
+        },
+      },
+      {
+        id: 'block-thank-you-cta',
+        type: 'cta',
+        props: {
+          title: 'Need Immediate Assistance?',
+          subtitle: 'Connect with our sales gallery team directly via WhatsApp or phone call.',
+          ctaLabel: 'Visit Main Page',
+          ctaLink: `/${slug.replace(/-thank-you$/, '')}`,
+        },
+      },
+    ],
+    pages: [
+      {
+        id: 'page-home',
+        name: 'Thank You',
+        path: `/${slug}`,
+        blocks: [],
+      },
+    ],
+  };
+
+  const sections = [
+    {
+      id: 'sec-heading-1',
+      type: 'heading',
+      name: 'Thank You',
+      icon: 'Type',
+      visible: true,
+      props: {
+        text: "Thank you — you're all set!",
+        tag: 'h2',
+        size: 36,
+        align: 'center',
+      },
+      styles: {
+        paddingTop: 80,
+        paddingBottom: 16,
+      },
+    },
+    {
+      id: 'sec-text-1',
+      type: 'text',
+      name: 'Thank You Text',
+      icon: 'AlignLeft',
+      visible: true,
+      props: {
+        text: `We have received your enquiry for ${brandName}. Our team will call you shortly and share the project brochure and price sheet.`,
+        html: '',
+      },
+      styles: {
+        paddingTop: 8,
+        paddingBottom: 32,
+        textAlign: 'center',
+      },
+    },
+    {
+      id: 'sec-button-1',
+      type: 'button',
+      name: 'Button',
+      icon: 'MousePointerClick',
+      visible: true,
+      props: {
+        text: 'Back to Landing Page',
+        action: 'link',
+        link: `/${slug.replace(/-thank-you$/, '')}`,
+        style: 'solid',
+        size: 'md',
+        popupId: '',
+      },
+      styles: {
+        paddingTop: 12,
+        paddingBottom: 80,
+      },
+    },
+  ];
+
+  return {
+    sections,
+    config: {
+      seo: {
+        metaTitle: `Thank You | ${brandName}`,
+        metaDescription: thankYouSubtitle,
+        index: false,
+      },
+    },
+    engine: 'openpage',
+    site,
+  };
+}
+
 @Injectable()
 export class OrgLandingPagesService {
   constructor(
@@ -76,16 +245,15 @@ export class OrgLandingPagesService {
       throw new NotFoundException('Template not found or not eligible for use');
     }
 
-    const slug = await generateUniqueLandingPageSlug(this.prisma, orgId, dto.name);
+    const slugSource = dto.slug ? dto.slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '') : dto.name;
+    const slug = await generateUniqueLandingPageSlug(this.prisma, orgId, slugSource);
     const companion = template.childPages[0] ?? null;
-    const companionSlug = companion
-      ? await generateUniqueLandingPageSlug(this.prisma, orgId, `${dto.name} thank you`)
-      : null;
+    const companionSlug = await generateUniqueLandingPageSlug(this.prisma, orgId, `${slugSource} thank you`);
 
     const bound = await this.bindContent(orgId, dto, template.content);
     const companionBound = companion
       ? await this.bindContent(orgId, dto, companion.content)
-      : null;
+      : defaultThankYouContent(dto.name, companionSlug);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const page = await tx.landingPage.create({
@@ -101,24 +269,21 @@ export class OrgLandingPagesService {
         },
       });
 
-      // Copy the thank-you companion too, linked to the *new* parent — not
-      // the source template's thank-you id. Ten orgs using the same
-      // template must never end up cross-linked to each other's pages.
-      if (companion && companionSlug) {
-        await tx.landingPage.create({
-          data: {
-            orgId,
-            sourceTemplateId: companion.id,
-            name: `${dto.name} — Thank You`,
-            slug: companionSlug,
-            status: 'draft',
-            content: (companionBound ?? companion.content) as Prisma.InputJsonValue,
-            thumbnail: companion.thumbnail,
-            pageType: 'thank_you',
-            parentId: page.id,
-          },
-        });
-      }
+      // Every landing page has its own dedicated thank-you page companion,
+      // linked to the new parent page and fully customizable in the builder.
+      await tx.landingPage.create({
+        data: {
+          orgId,
+          sourceTemplateId: companion?.id ?? null,
+          name: companion?.name ?? `${dto.name} — Thank You`,
+          slug: companionSlug,
+          status: 'draft',
+          content: (companionBound ?? companion?.content ?? defaultThankYouContent(dto.name, companionSlug)) as Prisma.InputJsonValue,
+          thumbnail: companion?.thumbnail ?? null,
+          pageType: 'thank_you',
+          parentId: page.id,
+        },
+      });
 
       await tx.auditLog.create({
         data: {
@@ -240,13 +405,16 @@ export class OrgLandingPagesService {
   // factories the Super Admin blank-template flow uses; the DTO already
   // guarantees it's present and well-formed when templateId is absent).
   private async createBlank(orgId: string, dto: CreateLandingPageDto) {
-    const slug = await generateUniqueLandingPageSlug(this.prisma, orgId, dto.name);
+    const slugSource = dto.slug ? dto.slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '') : dto.name;
+    const slug = await generateUniqueLandingPageSlug(this.prisma, orgId, slugSource);
+    const companionSlug = await generateUniqueLandingPageSlug(this.prisma, orgId, `${slugSource} thank you`);
     const bound = await this.bindContent(orgId, dto, {
       sections: dto.content!.sections,
       config: dto.content!.config as unknown as Record<string, unknown>,
       engine: dto.content!.engine,
       site: dto.content!.site,
     });
+    const thankYouContent = defaultThankYouContent(dto.name, companionSlug);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const page = await tx.landingPage.create({
@@ -258,6 +426,20 @@ export class OrgLandingPagesService {
           status: 'draft',
           content: bound as Prisma.InputJsonValue,
           pageType: 'landing',
+        },
+      });
+
+      await tx.landingPage.create({
+        data: {
+          orgId,
+          sourceTemplateId: null,
+          name: `${dto.name} — Thank You`,
+          slug: companionSlug,
+          status: 'draft',
+          content: thankYouContent as Prisma.InputJsonValue,
+          thumbnail: null,
+          pageType: 'thank_you',
+          parentId: page.id,
         },
       });
 
@@ -327,6 +509,14 @@ export class OrgLandingPagesService {
             where: { status: { in: ['approved', 'connected', 'pending'] } },
             select: { id: true, customDomain: true, status: true },
           },
+          children: {
+            where: { pageType: 'thank_you' },
+            select: { id: true, name: true, slug: true, status: true },
+            take: 1,
+          },
+          parent: {
+            select: { id: true, name: true, slug: true, status: true },
+          },
         },
       }),
       this.prisma.landingPage.count({ where }),
@@ -339,6 +529,10 @@ export class OrgLandingPagesService {
         null;
       return {
         ...r,
+        thankYouPage: r.children?.[0] ?? null,
+        parentLandingPage: r.parent ?? null,
+        children: undefined,
+        parent: undefined,
         orgDomainRequests: undefined,
         assignedDomain: activeDomain
           ? {
@@ -366,6 +560,14 @@ export class OrgLandingPagesService {
       const cleanSlug = dto.slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
       if (cleanSlug) {
         data.slug = cleanSlug;
+      }
+    } else if (dto.content && (dto.content as any).site) {
+      const sitePages = (dto.content as any).site?.pages;
+      if (Array.isArray(sitePages) && sitePages[0]?.path) {
+        const pathSlug = sitePages[0].path.replace(/^\/+/, '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+        if (pathSlug && pathSlug !== 'page-home') {
+          data.slug = pathSlug;
+        }
       }
     }
     if (dto.thumbnail !== undefined) data.thumbnail = dto.thumbnail;
@@ -416,6 +618,14 @@ export class OrgLandingPagesService {
       where: { id },
       data: { status: 'published', publishedAt: new Date() },
     });
+
+    if (page.pageType === 'landing') {
+      await this.prisma.landingPage.updateMany({
+        where: { parentId: page.id, orgId, pageType: 'thank_you' },
+        data: { status: 'published', publishedAt: new Date() },
+      });
+    }
+
     await this.prisma.auditLog.create({
       data: {
         orgId,
@@ -437,6 +647,14 @@ export class OrgLandingPagesService {
       where: { id },
       data: { status: 'unpublished' },
     });
+
+    if (page.pageType === 'landing') {
+      await this.prisma.landingPage.updateMany({
+        where: { parentId: page.id, orgId, pageType: 'thank_you' },
+        data: { status: 'unpublished' },
+      });
+    }
+
     await this.prisma.auditLog.create({
       data: {
         orgId,
@@ -450,7 +668,12 @@ export class OrgLandingPagesService {
   }
 
   async remove(orgId: string, id: string) {
-    await this.getOwned(orgId, id);
+    const page = await this.getOwned(orgId, id);
+    if (page.pageType === 'landing') {
+      await this.prisma.landingPage.deleteMany({
+        where: { parentId: page.id, orgId, pageType: 'thank_you' },
+      });
+    }
     await this.prisma.landingPage.delete({ where: { id } });
     return { success: true };
   }
@@ -476,6 +699,28 @@ export class OrgLandingPagesService {
         parentId: page.parentId,
       },
     });
+
+    // Also duplicate companion thank-you page if present
+    const companion = await this.prisma.landingPage.findFirst({
+      where: { orgId, parentId: page.id, pageType: 'thank_you' },
+    });
+    if (companion) {
+      const companionSlug = await generateUniqueLandingPageSlug(this.prisma, orgId, `${copy.slug} thank you`);
+      await this.prisma.landingPage.create({
+        data: {
+          orgId,
+          sourceTemplateId: companion.sourceTemplateId,
+          name: `${copy.name} — Thank You`,
+          slug: companionSlug,
+          status: 'draft',
+          content: companion.content as Prisma.InputJsonValue,
+          thumbnail: companion.thumbnail,
+          pageType: 'thank_you',
+          parentId: copy.id,
+        },
+      });
+    }
+
     await this.prisma.auditLog.create({ data: { orgId, action: 'landing_page_duplicated', entity: 'LandingPage', entityId: copy.id, metadata: { sourceId: id } as any } });
     return copy;
   }
@@ -507,10 +752,36 @@ export class OrgLandingPagesService {
     return `User-agent: *\nAllow: /\nDisallow: /admin/\nSitemap: ${sitemap}`;
   }
 
+  async getOrCreateThankYouPage(orgId: string, parentId: string) {
+    const parent = await this.getOwned(orgId, parentId);
+    let companion = await this.prisma.landingPage.findFirst({
+      where: { orgId, parentId: parent.id, pageType: 'thank_you' },
+    });
+    if (!companion) {
+      const companionSlug = await generateUniqueLandingPageSlug(this.prisma, orgId, `${parent.slug} thank you`);
+      const thankYouContent = defaultThankYouContent(parent.name, companionSlug);
+      companion = await this.prisma.landingPage.create({
+        data: {
+          orgId,
+          sourceTemplateId: null,
+          name: `${parent.name} — Thank You`,
+          slug: companionSlug,
+          status: parent.status === 'published' ? 'published' : 'draft',
+          publishedAt: parent.status === 'published' ? new Date() : null,
+          content: thankYouContent as Prisma.InputJsonValue,
+          thumbnail: parent.thumbnail,
+          pageType: 'thank_you',
+          parentId: parent.id,
+        },
+      });
+    }
+    return this.getOwned(orgId, companion.id);
+  }
+
   // Never leaks cross-tenant existence: a foreign org's page 404s exactly
   // the same as an id that doesn't exist at all.
-  private async getOwned(orgId: string, id: string) {
-    const page = await this.prisma.landingPage.findFirst({
+  async getOwned(orgId: string, id: string) {
+    let page = await this.prisma.landingPage.findFirst({
       where: { id, orgId },
       include: {
         sourceTemplate: { select: { id: true, name: true } },
@@ -518,17 +789,54 @@ export class OrgLandingPagesService {
           where: { status: { in: ['approved', 'connected', 'pending'] } },
           select: { id: true, customDomain: true, status: true },
         },
+        children: {
+          where: { pageType: 'thank_you' },
+          select: { id: true, name: true, slug: true, status: true },
+          take: 1,
+        },
+        parent: {
+          select: { id: true, name: true, slug: true, status: true },
+        },
       },
     });
     if (!page) {
       throw new NotFoundException('Landing page not found');
     }
+
+    // Auto-heal: If it is a landing page without a companion thank-you page, create one automatically
+    if (page.pageType === 'landing' && (!page.children || page.children.length === 0)) {
+      const companionSlug = await generateUniqueLandingPageSlug(this.prisma, orgId, `${page.slug} thank you`);
+      const thankYouContent = defaultThankYouContent(page.name, companionSlug);
+      const companion = await this.prisma.landingPage.create({
+        data: {
+          orgId,
+          sourceTemplateId: null,
+          name: `${page.name} — Thank You`,
+          slug: companionSlug,
+          status: page.status === 'published' ? 'published' : 'draft',
+          publishedAt: page.status === 'published' ? new Date() : null,
+          content: thankYouContent as Prisma.InputJsonValue,
+          thumbnail: page.thumbnail,
+          pageType: 'thank_you',
+          parentId: page.id,
+        },
+        select: { id: true, name: true, slug: true, status: true },
+      });
+      (page as any).children = [companion];
+    }
+
     const activeDomain =
       page.orgDomainRequests?.find((d) => d.status === 'connected' || d.status === 'approved') ??
       page.orgDomainRequests?.[0] ??
       null;
+
+    const thankYouPage = page.children?.[0] ?? null;
+    const parentLandingPage = page.parent ?? null;
+
     return {
       ...page,
+      thankYouPage,
+      parentLandingPage,
       assignedDomain: activeDomain
         ? {
             id: activeDomain.id,

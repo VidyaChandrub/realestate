@@ -64,6 +64,12 @@ export class OrgLandingPagesController {
     return this.service.getById(user.orgId as string, id);
   }
 
+  @RequirePermission('landing_pages', 'view', ENFORCE)
+  @Get(':id/thank-you')
+  getThankYou(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.service.getOrCreateThankYouPage(user.orgId as string, id);
+  }
+
   @RequirePermission('landing_pages', 'edit', ENFORCE)
   @Patch(':id')
   update(

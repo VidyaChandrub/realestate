@@ -15,6 +15,11 @@ export class CreateLandingPageDto {
   @MaxLength(160)
   name: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  slug?: string;
+
   // Required exactly when templateId is absent — a from-scratch page has no
   // source to copy content from, so the caller must provide the starting
   // { sections, config }. @ValidateNested() alone only validates a present

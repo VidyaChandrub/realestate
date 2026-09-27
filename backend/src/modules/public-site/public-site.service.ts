@@ -305,13 +305,27 @@ export class PublicSiteService {
 
   async resolveBySlug(slug: string) {
     const raw = (slug ?? '').trim().toLowerCase();
-    const hyphenated = raw.replace(/\s+/g, '-');
+    const hyphenated = raw.replace(/\s+/g, '-').replace(/\/thank-you$/, '-thank-you');
+    const isThankYou = raw.endsWith('/thank-you') || raw.endsWith('-thank-you');
+    const baseSlug = raw.replace(/(\/|-)?thank-you$/, '');
+
+    const whereOr: Prisma.LandingPageWhereInput[] = [
+      { slug: { equals: raw, mode: 'insensitive' } },
+      { slug: { equals: hyphenated, mode: 'insensitive' } },
+    ];
+    if (isThankYou) {
+      whereOr.push({
+        slug: { equals: `${baseSlug}-thank-you`, mode: 'insensitive' },
+      });
+      whereOr.push({
+        pageType: 'thank_you',
+        parent: { slug: { equals: baseSlug, mode: 'insensitive' } },
+      });
+    }
+
     const page = await this.prisma.landingPage.findFirst({
       where: {
-        OR: [
-          { slug: { equals: raw, mode: 'insensitive' } },
-          { slug: { equals: hyphenated, mode: 'insensitive' } },
-        ],
+        OR: whereOr,
         status: 'published',
       },
       include: {
@@ -333,10 +347,7 @@ export class PublicSiteService {
     if (!page) {
       const draft = await this.prisma.landingPage.findFirst({
         where: {
-          OR: [
-            { slug: { equals: raw, mode: 'insensitive' } },
-            { slug: { equals: hyphenated, mode: 'insensitive' } },
-          ],
+          OR: whereOr,
         },
         include: {
           organisation: {

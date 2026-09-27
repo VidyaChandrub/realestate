@@ -576,6 +576,10 @@ export interface LandingPageData {
   pageType?: "landing" | "thank-you";
   /** For thank-you pages: the landing page id they belong to. */
   parentPageId?: string;
+  /** Linked companion thank-you page for a landing page */
+  thankYouPage?: { id: string; name: string; slug: string; status: string } | null;
+  /** Linked parent landing page for a thank-you page */
+  parentLandingPage?: { id: string; name: string; slug: string; status: string } | null;
   /** Server-persisted fields (backend persistence layer). */
   tier?: "free" | "paid" | "premium";
   categoryId?: string | null;

@@ -290,11 +290,13 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
       .then((updated) => {
         setActivePage((cur) =>
           cur && cur.id === updated.id
-            ? { ...next, status: updated.status, updated: updated.updated, updatedAt: updated.updatedAt }
+            ? { ...next, status: updated.status, updated: updated.updated, updatedAt: updated.updatedAt, slug: updated.slug || cur.slug }
             : cur,
         );
         toast("Published");
-        window.open(`/preview/${encodeURIComponent(activePage.id)}`, "_blank", "noopener,noreferrer");
+        const targetSlug = updated.slug || next.slug || activePage.slug;
+        const liveUrl = targetSlug ? `/p/${encodeURIComponent(targetSlug)}` : `/preview/${encodeURIComponent(activePage.id)}`;
+        window.open(liveUrl, "_blank", "noopener,noreferrer");
       })
       .catch((err) => toast(err instanceof Error ? err.message : "Couldn't publish — try again"));
   }, [activePage, toast]);
@@ -335,6 +337,46 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
       router.refresh();
     });
   }, [logout, router]);
+
+  const [isSwitchingCompanion, setIsSwitchingCompanion] = useState(false);
+
+  const handleSwitchCompanion = useCallback(async () => {
+    if (!activePage || isSwitchingCompanion) return;
+    setIsSwitchingCompanion(true);
+    try {
+      const next = landingPageFromSite(activePage, useConfigStore.getState().config);
+      await saveTemplateNow(next, resource);
+
+      let targetId: string | null = null;
+      if (activePage.pageType === "thank-you") {
+        targetId = activePage.parentLandingPage?.id || activePage.parentPageId || null;
+      } else {
+        targetId = activePage.thankYouPage?.id || null;
+        if (!targetId && resource === "landing-page") {
+          try {
+            const companion = await apiFetch<any>(`/org/landing-pages/${encodeURIComponent(activePage.id)}/thank-you`);
+            if (companion && companion.id) {
+              targetId = companion.id;
+            }
+          } catch {
+            // failed to load/create companion
+          }
+        }
+      }
+
+      if (targetId) {
+        toast(`Switching to ${activePage.pageType === "thank-you" ? "Landing Page" : "Thank You Page"}…`);
+        const scopeParam = resource === "template" ? "&scope=template" : "";
+        window.location.href = `/org-builder?id=${encodeURIComponent(targetId)}${scopeParam}`;
+      } else {
+        toast("Companion page not found");
+        setIsSwitchingCompanion(false);
+      }
+    } catch {
+      toast("Couldn't switch page — please try again");
+      setIsSwitchingCompanion(false);
+    }
+  }, [activePage, isSwitchingCompanion, resource, toast]);
 
   const [inAppPreviewOpen, setInAppPreviewOpen] = useState(false);
 
@@ -516,6 +558,18 @@ export function OpenPageStudio({ resource = "template" }: { resource?: Resource 
         settingsHref={SETTINGS_PATH[resource]}
         homeHref={returnUrl || HOME_PATH[resource]}
         unsaved={hasUnsaved}
+        pageType={activePage?.pageType === "thank-you" ? "thank-you" : "landing"}
+        companionPage={
+          activePage?.pageType === "thank-you"
+            ? activePage?.parentLandingPage
+              ? { id: activePage.parentLandingPage.id, name: activePage.parentLandingPage.name, slug: activePage.parentLandingPage.slug, pageType: "landing" }
+              : { pageType: "landing" }
+            : activePage?.thankYouPage
+              ? { id: activePage.thankYouPage.id, name: activePage.thankYouPage.name, slug: activePage.thankYouPage.slug, pageType: "thank-you" }
+              : { pageType: "thank-you" }
+        }
+        onSwitchCompanion={handleSwitchCompanion}
+        isSwitchingCompanion={isSwitchingCompanion}
       />
 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>

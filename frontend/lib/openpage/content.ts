@@ -196,9 +196,12 @@ function sectionToBlock(section: SectionInstance, index: number): BlockConfig {
 export function landingPageFromSite(page: LandingPageData, site: SiteConfig): LandingPageData {
   const cfg = ensureConfig(page);
   const secured = ensureSiteForms(site);
+  const rawPath = secured.pages?.[0]?.path;
+  const siteSlug = rawPath ? rawPath.replace(/^\/+/, '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '') : undefined;
   return {
     ...page,
     name: secured.name || page.name,
+    slug: siteSlug || page.slug,
     config: {
       ...cfg,
       settings: secured.settings ?? cfg.settings,

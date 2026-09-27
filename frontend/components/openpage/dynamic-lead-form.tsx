@@ -241,6 +241,13 @@ export function DynamicLeadForm({
       window.location.href = redirect;
       return;
     }
+    if (typeof window !== "undefined" && (form.successAction === "thankyou" || form.redirectThankYou)) {
+      const pathname = window.location.pathname.replace(/\/+$/, "");
+      if (pathname && !pathname.endsWith("-thank-you") && !pathname.endsWith("/thank-you")) {
+        window.location.href = `${pathname}/thank-you`;
+        return;
+      }
+    }
     setDone(true);
     onSuccess?.();
   };
