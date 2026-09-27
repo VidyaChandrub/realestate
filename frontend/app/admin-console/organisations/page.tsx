@@ -189,7 +189,7 @@ export default function SuperAdminOrganisationsPage() {
   const [signupDrawer, setSignupDrawer] = useState<PendingSignupRow | null>(null);
   const [deletingSignupId, setDeletingSignupId] = useState<string | null>(null);
 
-  const notify = (m:string)=>{ setToast(m); setTimeout(()=>setToast(null),2500); };
+  const notify = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2500); };
 
   useEffect(() => {
     if (!authLoading && !accessToken) {
@@ -206,14 +206,14 @@ export default function SuperAdminOrganisationsPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const fetchSummary = useCallback(()=>{
+  const fetchSummary = useCallback(() => {
     if (!accessToken) return;
     apiFetch<OrganisationSummary>("/admin/organisations/summary", {
       headers: { Authorization: `Bearer ${accessToken}` },
     }).then(setSummary).catch(() => setSummary(null));
-  },[accessToken]);
+  }, [accessToken]);
 
-  const fetchList = useCallback(()=>{
+  const fetchList = useCallback(() => {
     // Pending signups aren't organisations — status isn't even a valid
     // value for this endpoint (see ORG_LIST_STATUS_VALUES) — fetchPendingSignups
     // below owns that dataset instead.
@@ -229,7 +229,7 @@ export default function SuperAdminOrganisationsPage() {
     apiFetch<OrganisationListResponse>(`/admin/organisations?${params.toString()}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     }).then(setResult).catch((err) => setError(err instanceof Error ? err.message : "Failed to load organisations.")).finally(() => setLoading(false));
-  },[accessToken, statusFilter, search, page]);
+  }, [accessToken, statusFilter, search, page]);
 
   const fetchPendingSignups = useCallback(() => {
     if (!accessToken || statusFilter !== PENDING_SIGNUPS_FILTER) return;
@@ -245,21 +245,21 @@ export default function SuperAdminOrganisationsPage() {
       .finally(() => setPendingSignupsLoading(false));
   }, [accessToken, statusFilter, search, page]);
 
-  useEffect(()=>{ fetchSummary(); },[fetchSummary]);
-  useEffect(()=>{ fetchList(); },[fetchList]);
-  useEffect(()=>{ fetchPendingSignups(); },[fetchPendingSignups]);
+  useEffect(() => { fetchSummary(); }, [fetchSummary]);
+  useEffect(() => { fetchList(); }, [fetchList]);
+  useEffect(() => { fetchPendingSignups(); }, [fetchPendingSignups]);
 
-  const handleApprove = async (id:string) => {
+  const handleApprove = async (id: string) => {
     if (!accessToken) return;
     setActionBusy(id);
-    try{
-      await apiFetch(`/admin/organisations/${id}/approve`, { method:"POST", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({}) });
+    try {
+      await apiFetch(`/admin/organisations/${id}/approve`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({}) });
       notify("Approved");
       fetchList(); fetchSummary();
-    } catch(e:any){ notify(e.message||"Approve failed"); }
-    finally{ setActionBusy(null); }
+    } catch (e: any) { notify(e.message || "Approve failed"); }
+    finally { setActionBusy(null); }
   };
-  const handleReject = (id:string, name:string) => {
+  const handleReject = (id: string, name: string) => {
     if (!accessToken) return;
     setRejectReason("");
     setRejectError(null);
@@ -280,54 +280,54 @@ export default function SuperAdminOrganisationsPage() {
     const { id } = rejectModal;
     setRejectSubmitting(true);
     setActionBusy(id);
-    try{
-      await apiFetch(`/admin/organisations/${id}/reject`, { method:"POST", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ reason }) });
+    try {
+      await apiFetch(`/admin/organisations/${id}/reject`, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ reason }) });
       notify("Rejected");
       setRejectModal(null);
       setRejectReason("");
       fetchList(); fetchSummary();
-    } catch(e:any){ notify(e.message||"Reject failed"); }
-    finally{ setRejectSubmitting(false); setActionBusy(null); }
+    } catch (e: any) { notify(e.message || "Reject failed"); }
+    finally { setRejectSubmitting(false); setActionBusy(null); }
   };
-  const handleActivate = async (id:string) => {
+  const handleActivate = async (id: string) => {
     if (!accessToken) return;
     setActionBusy(id);
-    try{
-      await apiFetch(`/admin/organisations/${id}/status`, { method:"PATCH", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ status:"active"}) });
+    try {
+      await apiFetch(`/admin/organisations/${id}/status`, { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ status: "active" }) });
       notify("Activated");
       fetchList(); fetchSummary();
-    } catch(e:any){ notify(e.message||"Activate failed");}
-    finally{ setActionBusy(null);}
+    } catch (e: any) { notify(e.message || "Activate failed"); }
+    finally { setActionBusy(null); }
   };
-  const handleDeactivate = (id:string) => {
+  const handleDeactivate = (id: string) => {
     if (!accessToken) return;
     setConfirmState({
       title: "Deactivate organisation?",
       message: "The organisation will be marked disabled. You can reactivate it later.",
       run: async () => {
         setActionBusy(id);
-        try{
-          await apiFetch(`/admin/organisations/${id}/status`, { method:"PATCH", headers:{ Authorization:`Bearer ${accessToken}` }, body: JSON.stringify({ status:"disabled"}) });
+        try {
+          await apiFetch(`/admin/organisations/${id}/status`, { method: "PATCH", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ status: "disabled" }) });
           notify("Deactivated");
           fetchList(); fetchSummary();
-        } catch(e:any){ notify(e.message||"Deactivate failed");}
-        finally{ setActionBusy(null);}
+        } catch (e: any) { notify(e.message || "Deactivate failed"); }
+        finally { setActionBusy(null); }
       },
     });
   };
-  const handleDelete = (id:string) => {
+  const handleDelete = (id: string) => {
     if (!accessToken) return;
     setConfirmState({
       title: "Delete organisation permanently?",
       message: "This cannot be undone.",
       run: async () => {
         setActionBusy(id);
-        try{
-          await apiFetch(`/admin/organisations/${id}`, { method:"DELETE", headers:{ Authorization:`Bearer ${accessToken}` } });
+        try {
+          await apiFetch(`/admin/organisations/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } });
           notify("Deleted");
           fetchList(); fetchSummary();
-        } catch(e:any){ notify(e.message||"Delete failed");}
-        finally{ setActionBusy(null);}
+        } catch (e: any) { notify(e.message || "Delete failed"); }
+        finally { setActionBusy(null); }
       },
     });
   };
@@ -374,9 +374,9 @@ export default function SuperAdminOrganisationsPage() {
     }
     const actions: RowAction[] = [];
     if (o.status === "active" && canDeactivateOrganisations) {
-        actions.push({ key: "deactivate", label: "Deactivate", onClick: () => handleDeactivate(o.id), disabled: rowBusy });
+      actions.push({ key: "deactivate", label: "Deactivate", onClick: () => handleDeactivate(o.id), disabled: rowBusy });
     } else if (o.status !== "active" && canActivateOrganisations) {
-        actions.push({ key: "activate", label: "Activate", onClick: () => handleActivate(o.id), disabled: rowBusy });
+      actions.push({ key: "activate", label: "Activate", onClick: () => handleActivate(o.id), disabled: rowBusy });
     }
     if (canViewOrganisations) {
       actions.push({ key: "view", label: "View", onClick: () => router.push(`/admin-console/organisation-detail/${o.id}`) });
@@ -562,15 +562,7 @@ export default function SuperAdminOrganisationsPage() {
           accent="#8b5cf6"
           sub="Abandoned mid-signup"
         />
-        <StatTile
-          icon="user-plus"
-          iconBg="#e0f2fe"
-          iconColor="#0284c7"
-          label="Pending Signups"
-          value={summary ? <CountUp value={summary.pendingSignups ?? 0} /> : "—"}
-          accent="#0ea5e9"
-          sub="Verified, no organisation yet"
-        />
+
       </div>
 
       {/* Filter + search toolbar */}
@@ -598,14 +590,14 @@ export default function SuperAdminOrganisationsPage() {
               p.value === "all"
                 ? summary?.total
                 : p.value === "active"
-                ? summary?.active
-                : p.value === "pending"
-                ? summary?.pending
-                : p.value === "disabled"
-                ? summary?.disabled
-                : p.value === "draft"
-                ? summary?.draft
-                : undefined;
+                  ? summary?.active
+                  : p.value === "pending"
+                    ? summary?.pending
+                    : p.value === "disabled"
+                      ? summary?.disabled
+                      : p.value === "draft"
+                        ? summary?.draft
+                        : undefined;
             return (
               <button
                 key={p.value}
@@ -743,381 +735,381 @@ export default function SuperAdminOrganisationsPage() {
 
       {/* Table */}
       {isPendingSignupsView ? (
-      <Reveal delay={3}>
-        <div className="card">
-          <div className="card-h">
-            <span className="t">Pending Signups</span>
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              {pendingSignupsLoading ? "Loading…" : `Showing ${signupFrom}–${signupTo} of ${signupTotal}`}
-            </span>
-          </div>
-          <div className="tbl-wrap">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Step 1</th>
-                  <th>Email verification</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Age</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingSignupsError ? (
-                  <tr>
-                    <td colSpan={9} className="muted">{pendingSignupsError}</td>
-                  </tr>
-                ) : !pendingSignupsLoading && signupRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="muted">No pending signups right now.</td>
-                  </tr>
-                ) : (
-                  signupRows.map((s) => {
-                    const name = [s.firstName, s.lastName].filter(Boolean).join(" ") || "—";
-                    return (
-                      <tr key={s.id}>
-                        <td>
-                          <button
-                            type="button"
-                            className="u"
-                            style={{ cursor: "pointer", background: "none", border: "none", padding: 0, textAlign: "left" }}
-                            onClick={() => setSignupDrawer(s)}
-                          >
-                            <span className="av">{initials(name === "—" ? s.email : name)}</span>
-                            <span>
-                              <span className="nm">{name}</span>
-                              <br />
-                              <span className="sm">Signup draft</span>
-                            </span>
-                          </button>
-                        </td>
-                        <td>{s.email}</td>
-                        <td>{s.phoneNumber ?? "—"}</td>
-                        <td><span className="badge b-green">Complete</span></td>
-                        <td><span className="badge b-green">Verified</span></td>
-                        <td><span className="badge b-gray">Active · No organisation</span></td>
-                        <td>{formatDate(s.createdAt)}</td>
-                        <td>{daysAgo(s.createdAt)}</td>
-                        <td>
-                          <RowActionsMenu
-                            actions={[
-                              { key: "view", label: "View", onClick: () => setSignupDrawer(s) },
-                              {
-                                key: "delete",
-                                label: "Delete",
-                                danger: true,
-                                onClick: () => handleDeleteSignup(s),
-                                disabled: deletingSignupId === s.id,
-                              },
-                            ]}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-          {signupTotalPages > 1 ? (
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 18px" }}>
-              <button
-                className="btn btn-ghost btn-sm"
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                ← Prev
-              </button>
-              <span className="muted" style={{ fontSize: 12.5, alignSelf: "center" }}>
-                Page {page} of {signupTotalPages}
+        <Reveal delay={3}>
+          <div className="card">
+            <div className="card-h">
+              <span className="t">Pending Signups</span>
+              <span className="muted" style={{ fontSize: 12.5 }}>
+                {pendingSignupsLoading ? "Loading…" : `Showing ${signupFrom}–${signupTo} of ${signupTotal}`}
               </span>
-              <button
-                className="btn btn-ghost btn-sm"
-                type="button"
-                disabled={page >= signupTotalPages}
-                onClick={() => setPage((p) => Math.min(signupTotalPages, p + 1))}
-              >
-                Next →
-              </button>
             </div>
-          ) : null}
-        </div>
-      </Reveal>
-      ) : (
-      <Reveal delay={3}>
-        <div style={{ background: "#ffffff", border: "1px solid #eef2f6", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.02)", overflow: "hidden" }}>
-          <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#e0e7ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}>
-                <Icon name="building" size={16} />
-              </div>
-              <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Organisation Catalogue</span>
-            </div>
-            <span style={{ fontSize: 12.5, color: "#64748b" }}>
-              {loading ? "Loading…" : `Showing ${from} – ${to} of ${total} organisations`}
-            </span>
-          </div>
-          <div className="tbl-wrap">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th style={{ width: 40, textAlign: "center" }}>#</th>
-                  <th>ORGANISATION</th>
-                  <th>DOMAIN</th>
-                  <th>ADMIN</th>
-                  <th>PLAN</th>
-                  <th>USERS</th>
-                  <th>TEMPLATES</th>
-                  <th>MRR</th>
-                  <th>STATUS</th>
-                  <th>JOINED</th>
-                  <th style={{ textAlign: "right", paddingRight: 24 }}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {error ? (
+            <div className="tbl-wrap">
+              <table className="tbl">
+                <thead>
                   <tr>
-                    <td colSpan={11} className="muted">
-                      {error}
-                    </td>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Step 1</th>
+                    <th>Email verification</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Age</th>
+                    <th>Actions</th>
                   </tr>
-                ) : !loading && rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={11} className="muted">
-                      No organisations match this filter.
-                    </td>
-                  </tr>
-                ) : (
-                  rows.map((o, idx) => {
-                    const avatarColors = ["#2563eb", "#0284c7", "#0d9488", "#059669", "#ea580c", "#7c3aed", "#db2777"];
-                    const avColor = avatarColors[idx % avatarColors.length];
-                    const rowNumber = (page - 1) * LIMIT + idx + 1;
-                    return (
-                      <tr key={o.id}>
-                        <td style={{ textAlign: "center", color: "#64748b", fontWeight: 600, fontSize: 12.5 }}>
-                          {rowNumber}
-                        </td>
-                        <td>
-                          {o.status === "draft" ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                              <div
-                                style={{
-                                  width: 38,
-                                  height: 38,
-                                  borderRadius: 10,
-                                  background: avColor,
-                                  color: "#ffffff",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontWeight: 700,
-                                  fontSize: 14,
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {initials(o.name)}
-                              </div>
-                              <div>
-                                <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>{o.name}</div>
-                                <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                                  <Icon name="pin" size={11} /> {o.city || "Bengaluru"}
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <Link href={`/admin-console/organisation-detail/${o.id}`} style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none" }}>
-                              <div
-                                style={{
-                                  width: 38,
-                                  height: 38,
-                                  borderRadius: 10,
-                                  background: avColor,
-                                  color: "#ffffff",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontWeight: 700,
-                                  fontSize: 14,
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {initials(o.name)}
-                              </div>
-                              <div>
-                                <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>{o.name}</div>
-                                <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                                  <Icon name="pin" size={11} /> {o.city || "Bengaluru"}
-                                </div>
-                              </div>
-                            </Link>
-                          )}
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#475569" }}>
-                              <Icon name="globe" size={12} style={{ color: "#94a3b8" }} />
-                              <span>{o.subdomainHost || o.subdomain || o.customDomain || "—"}</span>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
-                              <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>active</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                            <span style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>{o.adminName ?? "—"}</span>
-                            <span style={{ fontSize: 12, color: "#64748b" }}>{o.adminEmail ?? "—"}</span>
-                            {o.adminPhone ? <span style={{ fontSize: 11.5, color: "#94a3b8" }}>{o.adminPhone}</span> : null}
-                          </div>
-                        </td>
-                        <td>
-                          <span
-                            style={{
-                              display: "inline-block",
-                              padding: "4px 10px",
-                              borderRadius: 8,
-                              fontSize: 12,
-                              fontWeight: 600,
-                              background: "#eff6ff",
-                              color: "#2563eb",
-                              border: "1px solid #dbeafe",
-                            }}
-                          >
-                            {o.plan?.name || "Basic"}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>
-                            {o.teamCount || 1} team{(o.teamCount || 1) > 1 ? "s" : ""}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>
-                            {o.templatesCount ?? 0}
-                          </span>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>
-                            {o.mrr ? `₹${o.mrr.toLocaleString("en-IN")}` : "—"}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <span
-                              style={{
-                                width: 7,
-                                height: 7,
-                                borderRadius: "50%",
-                                background: o.status === "active" ? "#10b981" : o.status === "disabled" || o.status === "rejected" ? "#ef4444" : "#f59e0b",
-                              }}
+                </thead>
+                <tbody>
+                  {pendingSignupsError ? (
+                    <tr>
+                      <td colSpan={9} className="muted">{pendingSignupsError}</td>
+                    </tr>
+                  ) : !pendingSignupsLoading && signupRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="muted">No pending signups right now.</td>
+                    </tr>
+                  ) : (
+                    signupRows.map((s) => {
+                      const name = [s.firstName, s.lastName].filter(Boolean).join(" ") || "—";
+                      return (
+                        <tr key={s.id}>
+                          <td>
+                            <button
+                              type="button"
+                              className="u"
+                              style={{ cursor: "pointer", background: "none", border: "none", padding: 0, textAlign: "left" }}
+                              onClick={() => setSignupDrawer(s)}
+                            >
+                              <span className="av">{initials(name === "—" ? s.email : name)}</span>
+                              <span>
+                                <span className="nm">{name}</span>
+                                <br />
+                                <span className="sm">Signup draft</span>
+                              </span>
+                            </button>
+                          </td>
+                          <td>{s.email}</td>
+                          <td>{s.phoneNumber ?? "—"}</td>
+                          <td><span className="badge b-green">Complete</span></td>
+                          <td><span className="badge b-green">Verified</span></td>
+                          <td><span className="badge b-gray">Active · No organisation</span></td>
+                          <td>{formatDate(s.createdAt)}</td>
+                          <td>{daysAgo(s.createdAt)}</td>
+                          <td>
+                            <RowActionsMenu
+                              actions={[
+                                { key: "view", label: "View", onClick: () => setSignupDrawer(s) },
+                                {
+                                  key: "delete",
+                                  label: "Delete",
+                                  danger: true,
+                                  onClick: () => handleDeleteSignup(s),
+                                  disabled: deletingSignupId === s.id,
+                                },
+                              ]}
                             />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {signupTotalPages > 1 ? (
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 18px" }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  ← Prev
+                </button>
+                <span className="muted" style={{ fontSize: 12.5, alignSelf: "center" }}>
+                  Page {page} of {signupTotalPages}
+                </span>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  disabled={page >= signupTotalPages}
+                  onClick={() => setPage((p) => Math.min(signupTotalPages, p + 1))}
+                >
+                  Next →
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </Reveal>
+      ) : (
+        <Reveal delay={3}>
+          <div style={{ background: "#ffffff", border: "1px solid #eef2f6", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.02)", overflow: "hidden" }}>
+            <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#e0e7ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}>
+                  <Icon name="building" size={16} />
+                </div>
+                <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Organisation Catalogue</span>
+              </div>
+              <span style={{ fontSize: 12.5, color: "#64748b" }}>
+                {loading ? "Loading…" : `Showing ${from} – ${to} of ${total} organisations`}
+              </span>
+            </div>
+            <div className="tbl-wrap">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th style={{ width: 40, textAlign: "center" }}>#</th>
+                    <th>ORGANISATION</th>
+                    <th>DOMAIN</th>
+                    <th>ADMIN</th>
+                    <th>PLAN</th>
+                    <th>USERS</th>
+                    <th>TEMPLATES</th>
+                    <th>MRR</th>
+                    <th>STATUS</th>
+                    <th>JOINED</th>
+                    <th style={{ textAlign: "right", paddingRight: 24 }}>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {error ? (
+                    <tr>
+                      <td colSpan={11} className="muted">
+                        {error}
+                      </td>
+                    </tr>
+                  ) : !loading && rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="muted">
+                        No organisations match this filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((o, idx) => {
+                      const avatarColors = ["#2563eb", "#0284c7", "#0d9488", "#059669", "#ea580c", "#7c3aed", "#db2777"];
+                      const avColor = avatarColors[idx % avatarColors.length];
+                      const rowNumber = (page - 1) * LIMIT + idx + 1;
+                      return (
+                        <tr key={o.id}>
+                          <td style={{ textAlign: "center", color: "#64748b", fontWeight: 600, fontSize: 12.5 }}>
+                            {rowNumber}
+                          </td>
+                          <td>
+                            {o.status === "draft" ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                <div
+                                  style={{
+                                    width: 38,
+                                    height: 38,
+                                    borderRadius: 10,
+                                    background: avColor,
+                                    color: "#ffffff",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {initials(o.name)}
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>{o.name}</div>
+                                  <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                                    <Icon name="pin" size={11} /> {o.city || "Bengaluru"}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <Link href={`/admin-console/organisation-detail/${o.id}`} style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none" }}>
+                                <div
+                                  style={{
+                                    width: 38,
+                                    height: 38,
+                                    borderRadius: 10,
+                                    background: avColor,
+                                    color: "#ffffff",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {initials(o.name)}
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>{o.name}</div>
+                                  <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                                    <Icon name="pin" size={11} /> {o.city || "Bengaluru"}
+                                  </div>
+                                </div>
+                              </Link>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#475569" }}>
+                                <Icon name="globe" size={12} style={{ color: "#94a3b8" }} />
+                                <span>{o.subdomainHost || o.subdomain || o.customDomain || "—"}</span>
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
+                                <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>active</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                              <span style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>{o.adminName ?? "—"}</span>
+                              <span style={{ fontSize: 12, color: "#64748b" }}>{o.adminEmail ?? "—"}</span>
+                              {o.adminPhone ? <span style={{ fontSize: 11.5, color: "#94a3b8" }}>{o.adminPhone}</span> : null}
+                            </div>
+                          </td>
+                          <td>
                             <span
                               style={{
-                                fontSize: 12.5,
+                                display: "inline-block",
+                                padding: "4px 10px",
+                                borderRadius: 8,
+                                fontSize: 12,
                                 fontWeight: 600,
-                                color: o.status === "active" ? "#10b981" : o.status === "disabled" || o.status === "rejected" ? "#ef4444" : "#f59e0b",
-                                textTransform: "capitalize",
+                                background: "#eff6ff",
+                                color: "#2563eb",
+                                border: "1px solid #dbeafe",
                               }}
                             >
-                              {o.status === "disabled" ? "Disabled" : o.status === "rejected" ? "Rejected" : o.status === "active" ? "Active" : o.status === "draft" ? "Draft" : "Pending"}
+                              {o.plan?.name || "Basic"}
                             </span>
-                            {o.status === "rejected" && o.rejectionReason ? (
-                              <ReasonInfoPopover reason={o.rejectionReason} />
-                            ) : null}
-                          </div>
-                        </td>
-                        <td>
-                          <span style={{ fontSize: 12.5, color: "#475569" }}>
-                            {formatDate(o.createdAt)}
-                          </span>
-                        </td>
-                        <td style={{ textAlign: "right", paddingRight: 24 }}>
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                            {canViewOrganisations && (
-                              <Link
-                                href={`/admin-console/organisation-detail/${o.id}`}
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>
+                              {o.teamCount || 1} team{(o.teamCount || 1) > 1 ? "s" : ""}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>
+                              {o.templatesCount ?? 0}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>
+                              {o.mrr ? `₹${o.mrr.toLocaleString("en-IN")}` : "—"}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span
                                 style={{
-                                  width: 32,
-                                  height: 32,
-                                  borderRadius: 8,
-                                  border: "1px solid #e2e8f0",
-                                  background: "#ffffff",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  color: "#64748b",
-                                  textDecoration: "none",
-                                  cursor: "pointer",
+                                  width: 7,
+                                  height: 7,
+                                  borderRadius: "50%",
+                                  background: o.status === "active" ? "#10b981" : o.status === "disabled" || o.status === "rejected" ? "#ef4444" : "#f59e0b",
                                 }}
-                                title="View Details"
-                              >
-                                <Icon name="eye" size={15} />
-                              </Link>
-                            )}
-                            {canActivateOrganisations && (
-                              <Link
-                                href={`/admin-console/organisations/${o.id}/edit`}
+                              />
+                              <span
                                 style={{
-                                  width: 32,
-                                  height: 32,
-                                  borderRadius: 8,
-                                  border: "1px solid #e2e8f0",
-                                  background: "#ffffff",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  color: "#64748b",
-                                  textDecoration: "none",
-                                  cursor: "pointer",
+                                  fontSize: 12.5,
+                                  fontWeight: 600,
+                                  color: o.status === "active" ? "#10b981" : o.status === "disabled" || o.status === "rejected" ? "#ef4444" : "#f59e0b",
+                                  textTransform: "capitalize",
                                 }}
-                                title="Edit"
                               >
-                                <Icon name="edit" size={15} />
-                              </Link>
-                            )}
-                            <RowActionsMenu actions={rowActionsFor(o)} />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-          {totalPages > 1 ? (
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 18px", borderTop: "1px solid #f1f5f9" }}>
-              <button
-                className="btn btn-ghost btn-sm"
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                ← Prev
-              </button>
-              <span className="muted" style={{ fontSize: 12.5, alignSelf: "center" }}>
-                Page {page} of {totalPages}
-              </span>
-              <button
-                className="btn btn-ghost btn-sm"
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next →
-              </button>
+                                {o.status === "disabled" ? "Disabled" : o.status === "rejected" ? "Rejected" : o.status === "active" ? "Active" : o.status === "draft" ? "Draft" : "Pending"}
+                              </span>
+                              {o.status === "rejected" && o.rejectionReason ? (
+                                <ReasonInfoPopover reason={o.rejectionReason} />
+                              ) : null}
+                            </div>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 12.5, color: "#475569" }}>
+                              {formatDate(o.createdAt)}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: "right", paddingRight: 24 }}>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              {canViewOrganisations && (
+                                <Link
+                                  href={`/admin-console/organisation-detail/${o.id}`}
+                                  style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 8,
+                                    border: "1px solid #e2e8f0",
+                                    background: "#ffffff",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#64748b",
+                                    textDecoration: "none",
+                                    cursor: "pointer",
+                                  }}
+                                  title="View Details"
+                                >
+                                  <Icon name="eye" size={15} />
+                                </Link>
+                              )}
+                              {canActivateOrganisations && (
+                                <Link
+                                  href={`/admin-console/organisations/${o.id}/edit`}
+                                  style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 8,
+                                    border: "1px solid #e2e8f0",
+                                    background: "#ffffff",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#64748b",
+                                    textDecoration: "none",
+                                    cursor: "pointer",
+                                  }}
+                                  title="Edit"
+                                >
+                                  <Icon name="edit" size={15} />
+                                </Link>
+                              )}
+                              <RowActionsMenu actions={rowActionsFor(o)} />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
-          ) : null}
-        </div>
-      </Reveal>
+            {totalPages > 1 ? (
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 18px", borderTop: "1px solid #f1f5f9" }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  ← Prev
+                </button>
+                <span className="muted" style={{ fontSize: 12.5, alignSelf: "center" }}>
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next →
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </Reveal>
       )}
-      {toast ? <div style={{ position:"fixed", right:20, bottom:20, zIndex:500}}><div className="card" style={{ padding:"12px 16px", boxShadow:"var(--sh-lg)"}}>{toast}</div></div> : null}
+      {toast ? <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 500 }}><div className="card" style={{ padding: "12px 16px", boxShadow: "var(--sh-lg)" }}>{toast}</div></div> : null}
       <ConfirmModal
         open={confirmState !== null}
         title={confirmState?.title ?? ""}
@@ -1173,25 +1165,25 @@ export default function SuperAdminOrganisationsPage() {
           </>
         }
       >
-            <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6 }}>
-              Rejection reason <span style={{ color: "var(--rose)" }}>*</span>
-            </label>
-            <textarea
-              style={{ minHeight: 90, resize: "vertical", ...(rejectError ? { borderColor: "var(--rose)" } : {}) }}
-              placeholder="Why is this organisation being rejected?"
-              value={rejectReason}
-              onChange={(e) => {
-                setRejectReason(e.target.value);
-                if (rejectError) setRejectError(null);
-              }}
-              disabled={rejectSubmitting}
-              autoFocus
-              maxLength={500}
-              aria-invalid={rejectError ? true : undefined}
-            />
-            <div style={{ marginTop: 6, fontSize: 11.5, color: rejectError ? "var(--rose)" : "var(--faint)", fontWeight: rejectError ? 600 : 400 }}>
-              {rejectError ?? `${rejectReason.length}/500`}
-            </div>
+        <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6 }}>
+          Rejection reason <span style={{ color: "var(--rose)" }}>*</span>
+        </label>
+        <textarea
+          style={{ minHeight: 90, resize: "vertical", ...(rejectError ? { borderColor: "var(--rose)" } : {}) }}
+          placeholder="Why is this organisation being rejected?"
+          value={rejectReason}
+          onChange={(e) => {
+            setRejectReason(e.target.value);
+            if (rejectError) setRejectError(null);
+          }}
+          disabled={rejectSubmitting}
+          autoFocus
+          maxLength={500}
+          aria-invalid={rejectError ? true : undefined}
+        />
+        <div style={{ marginTop: 6, fontSize: 11.5, color: rejectError ? "var(--rose)" : "var(--faint)", fontWeight: rejectError ? 600 : 400 }}>
+          {rejectError ?? `${rejectReason.length}/500`}
+        </div>
       </Modal>
 
       {/* Pending signup detail drawer — account info + onboarding state

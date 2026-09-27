@@ -151,7 +151,20 @@ export class OrgTemplatesService {
 
     const data = allPublishedTemplates.map((t) => {
       const mapped = toLandingPageData(t);
-      const access = canPlanAccessTier(plan, t.tier);
+      const allowedPlanIds: string[] = (mapped as any).allowedPlanIds ?? [];
+      let access: { allowed: boolean; reason?: string };
+      if (allowedPlanIds && Array.isArray(allowedPlanIds) && allowedPlanIds.length > 0) {
+        if (plan?.id && allowedPlanIds.includes(plan.id)) {
+          access = { allowed: true };
+        } else {
+          access = {
+            allowed: false,
+            reason: `This template is not included in your ${plan?.name ?? 'current'} package.`,
+          };
+        }
+      } else {
+        access = canPlanAccessTier(plan, t.tier);
+      }
       return {
         id: mapped.id,
         name: mapped.name,
@@ -189,8 +202,22 @@ export class OrgTemplatesService {
     const activePlanInfo = await getOrgActivePlan(this.prisma, orgId);
     const plan = activePlanInfo?.plan;
 
-    // Check tier access
-    const access = canPlanAccessTier(plan, template.tier);
+    // Check plan/tier access
+    const mapped = toLandingPageData(template);
+    const allowedPlanIds: string[] = (mapped as any).allowedPlanIds ?? [];
+    let access: { allowed: boolean; reason?: string };
+    if (allowedPlanIds && Array.isArray(allowedPlanIds) && allowedPlanIds.length > 0) {
+      if (plan?.id && allowedPlanIds.includes(plan.id)) {
+        access = { allowed: true };
+      } else {
+        access = {
+          allowed: false,
+          reason: `This template is not included in your ${plan?.name ?? 'current'} package.`,
+        };
+      }
+    } else {
+      access = canPlanAccessTier(plan, template.tier);
+    }
     if (!access.allowed) {
       throw new ForbiddenException(access.reason);
     }

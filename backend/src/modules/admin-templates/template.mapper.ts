@@ -38,6 +38,7 @@ export function toLandingPageData(
     category: (template as any).templateCategory?.name ?? (template as any).category ?? null,
     templateCategory: (template as any).templateCategory ?? null,
     isPaid: template.tier !== 'free',
+    allowedPlanIds: ((content?.config as any)?.allowedPlanIds as string[]) ?? [],
     createdAt: template.createdAt.toISOString(),
     updatedAt: template.updatedAt.toISOString(),
   };

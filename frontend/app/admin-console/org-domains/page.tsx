@@ -143,7 +143,8 @@ export default function SuperAdminOrgDomainsPage() {
         getOrgDomainRequests({ limit: 100 }),
         getPlatformConfig(),
       ]);
-      setRows(res.data ?? []);
+      const items = res.rows ?? res.data ?? [];
+      setRows(items);
       setBaseDomain(res.baseDomain ?? "");
       setWildcard(res.dnsInstructions ?? []);
       setDnsMode(res.dnsMode ?? "");
