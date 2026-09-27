@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import {
   isValidDomain,
@@ -54,6 +59,32 @@ export class OrgDomainService {
       }),
     ]);
 
+    const approvedOrConnected = requests.filter(
+      (r) => r.kind === 'custom_domain' && (r.status === 'approved' || r.status === 'connected'),
+    );
+
+    const landingPagesWithDomain = landingPages.map((lp) => {
+      const match = approvedOrConnected.find((r) => r.landingPageId === lp.id);
+      return {
+        ...lp,
+        assignedDomain: match
+          ? {
+              id: match.id,
+              customDomain: match.customDomain,
+              status: match.status,
+            }
+          : null,
+      };
+    });
+
+    const approvedDomains = approvedOrConnected.map((r) => ({
+      id: r.id,
+      domain: r.customDomain,
+      status: r.status,
+      landingPageId: r.landingPageId ?? null,
+      landingPageName: r.landingPage?.name ?? null,
+    }));
+
     return {
       subdomain: org.subdomain,
       subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
@@ -61,16 +92,14 @@ export class OrgDomainService {
       customDomain: org.customDomain,
       customDomainStatus: org.customDomainStatus,
       customDomainLandingPageId: org.customDomainLandingPageId,
-      landingPages,
+      landingPages: landingPagesWithDomain,
+      approvedDomains,
       requests: requests.map(toView),
     };
   }
 
-  // Submit a custom-domain request for review by a Super Admin. The org's
-  // customDomain is staked as pending immediately so the Settings screen can
-  // display "Pending approval"; it only becomes connected once approved. The
-  // optional landingPageId selects which of the org's landing pages the custom
-  // domain maps to (defaults to the primary published page at approval).
+  // Submit a custom-domain request for review by a Super Admin.
+  // Each landing page can have its own distinct custom domain.
   async requestCustomDomain(
     orgId: string,
     userId: string,
@@ -90,18 +119,21 @@ export class OrgDomainService {
     if (targetPageId) {
       const page = await this.prisma.landingPage.findFirst({
         where: { id: targetPageId, orgId },
-        select: { id: true },
+        select: { id: true, name: true },
       });
       if (!page) {
         throw new BadRequestException('Landing page not found for this organisation');
       }
-    }
 
-    const existing = await this.prisma.orgDomainRequest.findFirst({
-      where: { orgId, kind: 'custom_domain', status: { in: ['pending', 'approved', 'connected'] } },
-    });
-    if (existing) {
-      throw new ConflictException('You already have a custom-domain request pending or connected');
+      // Check if this landing page already has an unreviewed pending request
+      const existingPending = await this.prisma.orgDomainRequest.findFirst({
+        where: { orgId, landingPageId: targetPageId, status: 'pending', kind: 'custom_domain' },
+      });
+      if (existingPending) {
+        throw new ConflictException(
+          `This landing page already has a pending domain request ("${existingPending.customDomain}"). Please wait for Super Admin approval or delete that request first.`,
+        );
+      }
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -116,10 +148,20 @@ export class OrgDomainService {
         },
         include: { landingPage: { select: { id: true, name: true, slug: true } } },
       });
-      await tx.organisation.update({
-        where: { id: orgId },
-        data: { customDomain: host, customDomainStatus: 'pending' },
-      });
+
+      // Update primary org domain identity if the org doesn't have an active custom domain yet
+      const currentOrg = await tx.organisation.findUnique({ where: { id: orgId } });
+      if (!currentOrg?.customDomain || currentOrg.customDomainStatus === 'none' || currentOrg.customDomainStatus === 'rejected') {
+        await tx.organisation.update({
+          where: { id: orgId },
+          data: {
+            customDomain: host,
+            customDomainStatus: 'pending',
+            customDomainLandingPageId: targetPageId,
+          },
+        });
+      }
+
       await tx.auditLog.create({
         data: {
           orgId,
@@ -127,9 +169,10 @@ export class OrgDomainService {
           action: 'custom_domain_requested',
           entity: 'OrgDomainRequest',
           entityId: row.id,
-          metadata: { domain: host } as any,
+          metadata: { domain: host, landingPageId: targetPageId } as any,
         },
       });
+
       await tx.notification.create({
         data: buildNotificationData({
           orgId,
@@ -140,10 +183,182 @@ export class OrgDomainService {
           entityId: row.id,
         }),
       });
+
       return row;
     });
 
     return toView(created);
+  }
+
+  // Assign or reassign an approved custom domain to a specific landing page (or unassign by passing null).
+  // This allows the organisation admin to configure and switch domains across landing pages after Super Admin approval.
+  async assignDomain(
+    orgId: string,
+    userId: string,
+    domainRequestId: string,
+    landingPageId?: string | null,
+  ) {
+    const req = await this.prisma.orgDomainRequest.findFirst({
+      where: { id: domainRequestId, orgId },
+      include: { landingPage: true },
+    });
+    if (!req) {
+      throw new NotFoundException('Domain request not found for your organisation');
+    }
+
+    if (req.status === 'pending') {
+      throw new BadRequestException(
+        'This domain is still pending approval from Super Admin. You can assign it once approved.',
+      );
+    }
+    if (req.status === 'rejected') {
+      throw new BadRequestException(
+        `This domain request was rejected (${req.rejectionReason ?? 'reason not specified'}).`,
+      );
+    }
+
+    const org = await this.prisma.organisation.findUnique({ where: { id: orgId } });
+    if (!org) throw new BadRequestException('Organisation not found');
+
+    const targetPageId = landingPageId?.trim() || null;
+
+    if (targetPageId) {
+      const page = await this.prisma.landingPage.findFirst({
+        where: { id: targetPageId, orgId },
+        select: { id: true, name: true },
+      });
+      if (!page) {
+        throw new NotFoundException('Landing page not found for this organisation');
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // If assigning to a landing page, unassign any OTHER domain request currently mapped to that landing page
+      if (targetPageId) {
+        await tx.orgDomainRequest.updateMany({
+          where: {
+            orgId,
+            landingPageId: targetPageId,
+            id: { not: domainRequestId },
+            status: { in: ['approved', 'connected'] },
+          },
+          data: {
+            landingPageId: null,
+            status: 'approved',
+          },
+        });
+      }
+
+      // Update the target domain request
+      const updatedReq = await tx.orgDomainRequest.update({
+        where: { id: domainRequestId },
+        data: {
+          landingPageId: targetPageId,
+          status: targetPageId ? 'connected' : 'approved',
+        },
+        include: { landingPage: { select: { id: true, name: true, slug: true } } },
+      });
+
+      // Synchronize Organisation table's primary custom domain if this was or is the primary
+      if (!org.customDomain || org.customDomain === req.customDomain) {
+        await tx.organisation.update({
+          where: { id: orgId },
+          data: {
+            customDomain: req.customDomain,
+            customDomainStatus: targetPageId ? 'connected' : 'approved',
+            customDomainLandingPageId: targetPageId,
+          },
+        });
+      } else if (org.customDomainLandingPageId === targetPageId && targetPageId) {
+        // If org had a previous domain linked to this landing page, update org's pointer
+        await tx.organisation.update({
+          where: { id: orgId },
+          data: {
+            customDomainLandingPageId: targetPageId,
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          actorId: userId,
+          action: targetPageId ? 'custom_domain_assigned' : 'custom_domain_unassigned',
+          entity: 'OrgDomainRequest',
+          entityId: domainRequestId,
+          metadata: {
+            domain: req.customDomain,
+            landingPageId: targetPageId,
+          } as any,
+        },
+      });
+
+      return updatedReq;
+    });
+
+    return toView(updated);
+  }
+
+  // Delete / cancel a domain request
+  async deleteCustomDomain(orgId: string, userId: string, domainRequestId: string) {
+    const req = await this.prisma.orgDomainRequest.findFirst({
+      where: { id: domainRequestId, orgId },
+    });
+    if (!req) {
+      throw new NotFoundException('Domain request not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.orgDomainRequest.delete({
+        where: { id: domainRequestId },
+      });
+
+      const org = await tx.organisation.findUnique({ where: { id: orgId } });
+      if (org?.customDomain === req.customDomain) {
+        // Fall back to another active domain request if present
+        const another = await tx.orgDomainRequest.findFirst({
+          where: {
+            orgId,
+            kind: 'custom_domain',
+            status: { in: ['connected', 'approved'] },
+          },
+          orderBy: { requestedAt: 'desc' },
+        });
+
+        if (another) {
+          await tx.organisation.update({
+            where: { id: orgId },
+            data: {
+              customDomain: another.customDomain,
+              customDomainStatus: another.status,
+              customDomainLandingPageId: another.landingPageId,
+            },
+          });
+        } else {
+          await tx.organisation.update({
+            where: { id: orgId },
+            data: {
+              customDomain: null,
+              customDomainStatus: 'none',
+              customDomainLandingPageId: null,
+            },
+          });
+        }
+      }
+
+      await tx.auditLog.create({
+        data: {
+          orgId,
+          actorId: userId,
+          action: 'custom_domain_deleted',
+          entity: 'OrgDomainRequest',
+          entityId: domainRequestId,
+          metadata: { domain: req.customDomain } as any,
+        },
+      });
+    });
+
+    return { success: true, id: domainRequestId };
   }
 
   private async assertDomainAvailable(host: string) {
@@ -162,7 +377,7 @@ export class OrgDomainService {
       select: { id: true },
     });
     if (req) {
-      throw new ConflictException(`Domain "${host}" is currently in use or pending.`);
+      throw new ConflictException(`Domain "${host}" is currently in use or pending review.`);
     }
   }
 }

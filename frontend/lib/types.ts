@@ -737,6 +737,11 @@ export interface LandingPageRow {
   createdAt: string;
   updatedAt: string;
   sourceTemplate: { id: string; name: string } | null;
+  assignedDomain?: {
+    id: string;
+    customDomain: string;
+    status: string;
+  } | null;
 }
 
 export interface OrgLandingPagesListResponse {
@@ -1814,6 +1819,19 @@ export interface OrgDomainLandingPage {
   status: string;
   pageType?: string;
   sourceTemplate?: { name: string } | null;
+  assignedDomain?: {
+    id: string;
+    customDomain: string;
+    status: string;
+  } | null;
+}
+
+export interface ApprovedDomainOption {
+  id: string;
+  domain: string;
+  status: string;
+  landingPageId: string | null;
+  landingPageName: string | null;
 }
 
 /** GET /org/domain — the organisation's own subdomain/custom-domain identity. */
@@ -1826,12 +1844,18 @@ export interface OrgDomainInfo {
   customDomainLandingPageId: string | null;
   landingPages: OrgDomainLandingPage[];
   requests: OrgDomainRequest[];
+  approvedDomains?: ApprovedDomainOption[];
 }
 
 export interface RequestCustomDomainInput {
   domain: string;
   /** Which landing page (template) the custom domain should serve. */
   landingPageId?: string;
+}
+
+export interface AssignCustomDomainInput {
+  domainRequestId: string;
+  landingPageId?: string | null;
 }
 
 /** A DNS record pair shown to the Super Admin (e.g. the wildcard A record). */

@@ -169,21 +169,13 @@ export class AdminOrgDomainService {
       }
     } else if (req.kind === 'custom_domain') {
       if (req.customDomain) {
-        orgUpdate.customDomain = req.customDomain;
-        orgUpdate.customDomainStatus = 'connected';
-        // Map the approved custom domain to the org's selected landing page.
-        // Falls back to the org's primary published page when none was chosen.
-        let targetPageId = req.landingPageId ?? null;
-        if (!targetPageId) {
-          const primary = await this.prisma.landingPage.findFirst({
-            where: { orgId: org.id, status: 'published' },
-            orderBy: { updatedAt: 'desc' },
-            select: { id: true },
-          });
-          targetPageId = primary?.id ?? null;
-        }
-        if (targetPageId) {
-          orgUpdate.customDomainLandingPageId = targetPageId;
+        const targetPageId = req.landingPageId ?? null;
+        if (!org.customDomain || org.customDomain === req.customDomain) {
+          orgUpdate.customDomain = req.customDomain;
+          orgUpdate.customDomainStatus = targetPageId ? 'connected' : 'approved';
+          if (targetPageId) {
+            orgUpdate.customDomainLandingPageId = targetPageId;
+          }
         }
       }
     }
@@ -192,7 +184,7 @@ export class AdminOrgDomainService {
       const reqRow = await tx.orgDomainRequest.update({
         where: { id },
         data: {
-          status: 'approved',
+          status: req.kind === 'custom_domain' && req.landingPageId ? 'connected' : 'approved',
           reviewedAt: new Date(),
           reviewedBy: adminId,
         },
@@ -213,6 +205,7 @@ export class AdminOrgDomainService {
           metadata: {
             kind: req.kind,
             domain: req.kind === 'subdomain' ? req.subdomain : req.customDomain,
+            landingPageId: req.landingPageId ?? null,
           } as any,
         },
       });
@@ -230,7 +223,7 @@ export class AdminOrgDomainService {
           body:
             req.kind === 'subdomain'
               ? `${org.name} is now live at ${subdomainHost(req.subdomain as string)}.`
-              : `${org.name} can now point ${req.customDomain} at its site.`,
+              : `${org.name} can now point ${req.customDomain} at its landing page.`,
           entity: 'OrgDomainRequest',
           entityId: id,
         }),
@@ -244,6 +237,9 @@ export class AdminOrgDomainService {
   async reject(id: string, adminId: string, reason?: string) {
     if (!reason) throw new BadRequestException('Rejection reason is required');
     const req = await this.getPending(id);
+    const org = await this.prisma.organisation.findUnique({
+      where: { id: req.orgId },
+    });
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const reqRow = await tx.orgDomainRequest.update({
@@ -255,11 +251,32 @@ export class AdminOrgDomainService {
           rejectionReason: reason,
         },
       });
-      if (req.kind === 'custom_domain') {
-        await tx.organisation.update({
-          where: { id: req.orgId },
-          data: { customDomain: null, customDomainStatus: 'rejected' },
+      if (req.kind === 'custom_domain' && org?.customDomain === req.customDomain) {
+        const another = await tx.orgDomainRequest.findFirst({
+          where: {
+            orgId: req.orgId,
+            id: { not: id },
+            kind: 'custom_domain',
+            status: { in: ['approved', 'connected'] },
+          },
+          orderBy: { requestedAt: 'desc' },
         });
+
+        if (another) {
+          await tx.organisation.update({
+            where: { id: req.orgId },
+            data: {
+              customDomain: another.customDomain,
+              customDomainStatus: another.status,
+              customDomainLandingPageId: another.landingPageId,
+            },
+          });
+        } else {
+          await tx.organisation.update({
+            where: { id: req.orgId },
+            data: { customDomain: null, customDomainStatus: 'rejected', customDomainLandingPageId: null },
+          });
+        }
       }
       await tx.auditLog.create({
         data: {

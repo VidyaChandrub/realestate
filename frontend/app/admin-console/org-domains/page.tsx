@@ -37,6 +37,7 @@ const EMPTY_CONFIG: PlatformConfig = {
 const STATUS_STYLES: Record<string, { label: string; cls: string; dot: string }> = {
   pending: { label: "Pending", cls: "b-amber", dot: "#f59e0b" },
   approved: { label: "Approved", cls: "b-green", dot: "#10b981" },
+  connected: { label: "Connected", cls: "b-green", dot: "#10b981" },
   rejected: { label: "Rejected", cls: "b-rose", dot: "#f43f5e" },
 };
 
@@ -263,7 +264,7 @@ export default function SuperAdminOrgDomainsPage() {
     const s = { total: rows.length, pending: 0, approved: 0, rejected: 0 };
     for (const r of rows) {
       if (r.status === "pending") s.pending++;
-      else if (r.status === "approved") s.approved++;
+      else if (r.status === "approved" || r.status === "connected") s.approved++;
       else if (r.status === "rejected") s.rejected++;
     }
     return s;
@@ -271,10 +272,15 @@ export default function SuperAdminOrgDomainsPage() {
 
   const visible = useMemo(
     () =>
-      rows.filter(
-        (r) =>
-          (!filter || r.status === filter) && (!kind || r.kind === kind),
-      ),
+      rows.filter((r) => {
+        const matchesStatus =
+          !filter ||
+          (filter === "approved"
+            ? r.status === "approved" || r.status === "connected"
+            : r.status === filter);
+        const matchesKind = !kind || r.kind === kind;
+        return matchesStatus && matchesKind;
+      }),
     [rows, filter, kind],
   );
 

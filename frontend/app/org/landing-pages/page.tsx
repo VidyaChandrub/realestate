@@ -38,7 +38,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, assignCustomDomain, getOrgDomainInfo, requestCustomDomain } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { TemplateCover, StatusBadge, TierBadge } from "@/components/superadmin/templates/shared";
 import { orgBuilderPath } from "@/lib/openpage/paths";
@@ -56,6 +56,8 @@ import type {
   OrgTemplateSummary,
   OrgTemplatesListResponse,
   AvailableTemplatesResponse,
+  OrgDomainInfo,
+  ApprovedDomainOption,
 } from "@/lib/types";
 import type { LandingPageData, SectionInstance, SiteConfig } from "@/lib/openpage/types";
 import {
@@ -207,6 +209,9 @@ export default function OrgLandingPagesPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Domain configuration modal state
+  const [domainConfigTarget, setDomainConfigTarget] = useState<LandingPageRow | null>(null);
 
   // Plan quota prompt
   const [packagePrompt, setPackagePrompt] = useState<{ title: string; body: string } | null>(null);
@@ -964,6 +969,7 @@ export default function OrgLandingPagesPage() {
               <thead>
                 <tr>
                   <th>Page Name</th>
+                  <th>Domain</th>
                   <th>Source Template</th>
                   <th>Status</th>
                   <th>Last Updated</th>
@@ -976,6 +982,31 @@ export default function OrgLandingPagesPage() {
                     <td>
                       <span style={{ fontWeight: 700, color: "var(--ink)" }}>{row.name}</span>
                       <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 2 }}>{row.slug}</div>
+                    </td>
+                    <td>
+                      {row.assignedDomain ? (
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <Globe size={13} style={{ color: "var(--brand)" }} />
+                          <span style={{ fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>
+                            {row.assignedDomain.customDomain}
+                          </span>
+                          <span
+                            className={`badge ${row.assignedDomain.status === "connected" ? "b-green" : "b-blue"}`}
+                            style={{ fontSize: 10, padding: "1px 6px" }}
+                          >
+                            {row.assignedDomain.status}
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          style={{ fontSize: 11, padding: "2px 8px", color: "var(--muted)" }}
+                          onClick={() => setDomainConfigTarget(row)}
+                        >
+                          + Assign Domain
+                        </button>
+                      )}
                     </td>
                     <td>
                       {row.sourceTemplate ? (
@@ -997,6 +1028,14 @@ export default function OrgLandingPagesPage() {
                     <td style={{ fontSize: 12.5, color: "var(--muted)" }}>{formatDate(row.updatedAt)}</td>
                     <td style={{ textAlign: "right" }}>
                       <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setDomainConfigTarget(row)}
+                          title="Configure Domain"
+                        >
+                          <Globe size={12} /> Domain
+                        </button>
                         {canEdit ? (
                           <button
                             type="button"
@@ -1079,6 +1118,7 @@ export default function OrgLandingPagesPage() {
               onUnpublish={canPause ? () => unpublishPage(row.id) : undefined}
               onDuplicate={canCreate ? () => duplicatePage(row.id) : undefined}
               onDelete={canDelete ? () => setDeleteTarget({ id: row.id, name: row.name }) : undefined}
+              onConfigureDomain={() => setDomainConfigTarget(row)}
             />
           ))}
         </div>
@@ -1496,6 +1536,18 @@ export default function OrgLandingPagesPage() {
           </div>
         </div>
       )}
+      {/* Landing Page Domain Modal */}
+      {domainConfigTarget && (
+        <LandingPageDomainModal
+          page={domainConfigTarget}
+          accessToken={accessToken}
+          onClose={() => setDomainConfigTarget(null)}
+          onSuccess={() => {
+            fetchList();
+            fetchAllPages();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1511,6 +1563,7 @@ function OrgLandingPageVisualCard({
   onUnpublish,
   onDuplicate,
   onDelete,
+  onConfigureDomain,
 }: {
   row: LandingPageRow;
   accessToken?: string | null;
@@ -1521,6 +1574,7 @@ function OrgLandingPageVisualCard({
   onUnpublish?: () => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
+  onConfigureDomain?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1621,6 +1675,68 @@ function OrgLandingPageVisualCard({
           </div>
         </div>
 
+        {/* Assigned Domain Row */}
+        {row.assignedDomain ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "var(--surface-2, #f8fafc)",
+              padding: "4px 8px",
+              borderRadius: 8,
+              fontSize: 11.5,
+              marginTop: 6,
+              marginBottom: 2,
+              border: "1px solid var(--line-2)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0, overflow: "hidden" }}>
+              <Globe size={12} style={{ color: "var(--brand)", flexShrink: 0 }} />
+              <span
+                style={{
+                  fontWeight: 700,
+                  color: "var(--ink)",
+                  fontFamily: "monospace",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={row.assignedDomain.customDomain}
+              >
+                {row.assignedDomain.customDomain}
+              </span>
+            </div>
+            <span
+              className={`badge ${row.assignedDomain.status === "connected" ? "b-green" : "b-blue"}`}
+              style={{ fontSize: 10, padding: "1px 6px", flexShrink: 0 }}
+            >
+              {row.assignedDomain.status}
+            </span>
+          </div>
+        ) : onConfigureDomain ? (
+          <div style={{ marginTop: 6, marginBottom: 2 }}>
+            <button
+              type="button"
+              onClick={onConfigureDomain}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                background: "none",
+                border: "1px dashed var(--line-2)",
+                borderRadius: 6,
+                padding: "2px 7px",
+                fontSize: 11,
+                color: "var(--muted)",
+                cursor: "pointer",
+              }}
+            >
+              <Globe size={11} /> + Assign Domain
+            </button>
+          </div>
+        ) : null}
+
         {/* Stats Row: Updated, Views, Leads */}
         <div className="lp-card-stats-row">
           <div>
@@ -1683,6 +1799,19 @@ function OrgLandingPageVisualCard({
                 gap: 2,
               }}
             >
+              {onConfigureDomain && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onConfigureDomain();
+                  }}
+                  style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
+                >
+                  <Globe size={13} /> Configure Domain
+                </button>
+              )}
               {onEdit && (
                 <button
                   type="button"
@@ -1771,5 +1900,337 @@ function OrgLandingPageVisualCard({
         </div>
       </div>
     </div>
+  );
+}
+
+/* Modal to assign or request custom domains for a landing page */
+function LandingPageDomainModal({
+  page,
+  accessToken,
+  onClose,
+  onSuccess,
+}: {
+  page: LandingPageRow | null;
+  accessToken?: string | null;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [domainInfo, setDomainInfo] = useState<OrgDomainInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedDomainId, setSelectedDomainId] = useState("");
+  const [newDomain, setNewDomain] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!accessToken) return;
+    setLoading(true);
+    try {
+      const info = await getOrgDomainInfo();
+      setDomainInfo(info);
+      const current = info.requests?.find(
+        (r) =>
+          r.kind === "custom_domain" &&
+          r.landingPageId === page?.id &&
+          (r.status === "approved" || r.status === "connected"),
+      );
+      if (current) setSelectedDomainId(current.id);
+    } catch (e: any) {
+      setActionError(e?.message ?? "Failed to load domain info");
+    } finally {
+      setLoading(false);
+    }
+  }, [accessToken, page?.id]);
+
+  useEffect(() => {
+    if (page) {
+      void load();
+      setActionError(null);
+      setActionSuccess(null);
+      setNewDomain("");
+    }
+  }, [page, load]);
+
+  if (!page) return null;
+
+  const approvedDomains = domainInfo?.approvedDomains ?? [];
+  const currentAssigned = page.assignedDomain;
+
+  async function handleAssignDomain() {
+    if (!selectedDomainId) return;
+    setSubmitting(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      await assignCustomDomain({
+        domainRequestId: selectedDomainId,
+        landingPageId: page!.id,
+      });
+      setActionSuccess("Domain assigned to this landing page successfully!");
+      onSuccess();
+      await load();
+    } catch (err: any) {
+      setActionError(err?.message ?? "Failed to assign domain");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleUnassignDomain() {
+    if (!currentAssigned) return;
+    setSubmitting(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      await assignCustomDomain({
+        domainRequestId: currentAssigned.id,
+        landingPageId: null,
+      });
+      setSelectedDomainId("");
+      setActionSuccess("Domain unassigned from this landing page.");
+      onSuccess();
+      await load();
+    } catch (err: any) {
+      setActionError(err?.message ?? "Failed to unassign domain");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRequestNewDomain(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newDomain.trim()) return;
+    setSubmitting(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      await requestCustomDomain({
+        domain: newDomain.trim(),
+        landingPageId: page!.id,
+      });
+      setNewDomain("");
+      setActionSuccess(
+        "New domain requested! Super Admin will review and approve it. Once approved, it will be mapped to this landing page.",
+      );
+      onSuccess();
+      await load();
+    } catch (err: any) {
+      setActionError(err?.message ?? "Failed to request custom domain");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={!!page}
+      onClose={onClose}
+      title="Domain Configuration"
+      description={`Manage custom domain for: "${page.name}"`}
+      size="md"
+      footer={
+        <button className="btn btn-ghost" type="button" onClick={onClose} disabled={submitting}>
+          Close
+        </button>
+      }
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {actionSuccess && (
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "var(--green-050, #ecfdf5)",
+              color: "var(--green, #059669)",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            ✓ {actionSuccess}
+          </div>
+        )}
+        {actionError && (
+          <div
+            style={{
+              padding: "10px 14px",
+              background: "var(--rose-050, #fff1f2)",
+              color: "var(--rose, #e11d48)",
+              borderRadius: 8,
+              fontSize: 13,
+            }}
+          >
+            ⚠️ {actionError}
+          </div>
+        )}
+
+        {/* Current Domain Status */}
+        <div
+          style={{
+            background: "var(--surface-2, #f8fafc)",
+            border: "1px solid var(--line-2)",
+            borderRadius: 12,
+            padding: 14,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--muted)",
+              marginBottom: 4,
+            }}
+          >
+            CURRENT DOMAIN STATUS
+          </div>
+          {currentAssigned ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Globe size={15} style={{ color: "var(--brand)" }} />
+                  <span
+                    style={{
+                      fontFamily: "monospace",
+                      fontWeight: 800,
+                      fontSize: 15,
+                      color: "var(--ink)",
+                    }}
+                  >
+                    {currentAssigned.customDomain}
+                  </span>
+                  <span
+                    className={`badge ${
+                      currentAssigned.status === "connected" ? "b-green" : "b-blue"
+                    }`}
+                  >
+                    {currentAssigned.status}
+                  </span>
+                </div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  Incoming web visits to this domain serve this landing page.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={handleUnassignDomain}
+                disabled={submitting}
+                style={{ color: "var(--rose)" }}
+              >
+                Unassign Domain
+              </button>
+            </div>
+          ) : (
+            <div className="muted" style={{ fontSize: 13 }}>
+              No custom domain currently assigned to this page. Default path:{" "}
+              <code style={{ fontSize: 12, color: "var(--brand)" }}>/{page.slug}</code>
+            </div>
+          )}
+        </div>
+
+        {/* Section 1: Assign an Approved Domain */}
+        <div style={{ border: "1px solid var(--line-2)", borderRadius: 12, padding: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)", marginBottom: 4 }}>
+            1. Assign an Approved Custom Domain
+          </div>
+          <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
+            Choose from your organisation&apos;s approved custom domains that have been approved by Super Admin.
+          </div>
+
+          {loading ? (
+            <div className="muted" style={{ fontSize: 12.5 }}>Loading approved domains…</div>
+          ) : approvedDomains.length === 0 ? (
+            <div className="muted" style={{ fontSize: 12.5, fontStyle: "italic" }}>
+              No approved domains available yet. Submit a new domain request below for Super Admin review.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <select
+                  className="inp"
+                  value={selectedDomainId}
+                  onChange={(e) => setSelectedDomainId(e.target.value)}
+                  disabled={submitting}
+                >
+                  <option value="">-- Select an approved domain --</option>
+                  {approvedDomains.map((d) => {
+                    const isHere = d.landingPageId === page.id;
+                    const otherLabel =
+                      d.landingPageName && !isHere
+                        ? ` (Currently: ${d.landingPageName})`
+                        : isHere
+                        ? " (Assigned to this page)"
+                        : " (Unassigned)";
+                    return (
+                      <option key={d.id} value={d.id}>
+                        {d.domain} · {d.status} {otherLabel}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={handleAssignDomain}
+                  disabled={
+                    submitting ||
+                    !selectedDomainId ||
+                    selectedDomainId === currentAssigned?.id
+                  }
+                  style={{ fontWeight: 700 }}
+                >
+                  {submitting ? "Assigning…" : "Assign Domain to this Page"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Section 2: Request New Domain */}
+        <div style={{ border: "1px solid var(--line-2)", borderRadius: 12, padding: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)", marginBottom: 4 }}>
+            2. Request a New Custom Domain
+          </div>
+          <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
+            Need a dedicated custom domain for this landing page? Submit it here for Super Admin approval.
+          </div>
+
+          <form
+            onSubmit={handleRequestNewDomain}
+            style={{ display: "flex", flexDirection: "column", gap: 10 }}
+          >
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                <input
+                  className="inp"
+                  placeholder="e.g. skyline-bay.com"
+                  value={newDomain}
+                  onChange={(e) => setNewDomain(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn btn-soft btn-sm"
+                disabled={submitting || !newDomain.trim()}
+                style={{ fontWeight: 700, height: 38 }}
+              >
+                {submitting ? "Submitting…" : "Request Domain"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Modal>
   );
 }

@@ -323,12 +323,34 @@ export class OrgLandingPagesService {
           createdAt: true,
           updatedAt: true,
           sourceTemplate: { select: { id: true, name: true } },
+          orgDomainRequests: {
+            where: { status: { in: ['approved', 'connected', 'pending'] } },
+            select: { id: true, customDomain: true, status: true },
+          },
         },
       }),
       this.prisma.landingPage.count({ where }),
     ]);
 
-    return { data: rows, total, page, limit };
+    const formattedRows = rows.map((r) => {
+      const activeDomain =
+        r.orgDomainRequests?.find((d) => d.status === 'connected' || d.status === 'approved') ??
+        r.orgDomainRequests?.[0] ??
+        null;
+      return {
+        ...r,
+        orgDomainRequests: undefined,
+        assignedDomain: activeDomain
+          ? {
+              id: activeDomain.id,
+              customDomain: activeDomain.customDomain,
+              status: activeDomain.status,
+            }
+          : null,
+      };
+    });
+
+    return { data: formattedRows, total, page, limit };
   }
 
   async getById(orgId: string, id: string) {
@@ -485,11 +507,30 @@ export class OrgLandingPagesService {
   private async getOwned(orgId: string, id: string) {
     const page = await this.prisma.landingPage.findFirst({
       where: { id, orgId },
-      include: { sourceTemplate: { select: { id: true, name: true } } },
+      include: {
+        sourceTemplate: { select: { id: true, name: true } },
+        orgDomainRequests: {
+          where: { status: { in: ['approved', 'connected', 'pending'] } },
+          select: { id: true, customDomain: true, status: true },
+        },
+      },
     });
     if (!page) {
       throw new NotFoundException('Landing page not found');
     }
-    return page;
+    const activeDomain =
+      page.orgDomainRequests?.find((d) => d.status === 'connected' || d.status === 'approved') ??
+      page.orgDomainRequests?.[0] ??
+      null;
+    return {
+      ...page,
+      assignedDomain: activeDomain
+        ? {
+            id: activeDomain.id,
+            customDomain: activeDomain.customDomain,
+            status: activeDomain.status,
+          }
+        : null,
+    };
   }
 }

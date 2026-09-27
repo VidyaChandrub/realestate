@@ -68,6 +68,7 @@ import type {
   Plan,
   PlanCapability,
   RequestCustomDomainInput,
+  AssignCustomDomainInput,
   ResolveDraftInput,
   ResumeSignupResponse,
   ReviewOrgDomainRequestInput,
@@ -737,6 +738,29 @@ export async function requestCustomDomain(
     {
       method: "POST",
       body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function assignCustomDomain(
+  input: AssignCustomDomainInput,
+): Promise<OrgDomainInfo["requests"][number]> {
+  return apiFetch<OrgDomainInfo["requests"][number]>(
+    "/org/domain/assign",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function deleteCustomDomain(
+  domainRequestId: string,
+): Promise<{ success: boolean; id: string }> {
+  return apiFetch<{ success: boolean; id: string }>(
+    `/org/domain/custom-domain/${encodeURIComponent(domainRequestId)}`,
+    {
+      method: "DELETE",
     },
   );
 }
