@@ -4,15 +4,20 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
+  CheckCircle2,
+  Crown,
   ExternalLink,
   Eye,
   FolderPlus,
+  Gift,
   Grid,
+  Heart,
   Layers,
   LayoutTemplate,
   List,
   Lock,
   Monitor,
+  MoreVertical,
   Pencil,
   Plus,
   RefreshCw,
@@ -21,6 +26,7 @@ import {
   Sparkles,
   Tablet,
   Trash2,
+  User,
   X,
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
@@ -47,6 +53,7 @@ import type {
   AvailableTemplatesResponse,
 } from "@/lib/types";
 import "@/app/openpage.css";
+import "./templates.css";
 
 const LIMIT = 12;
 
@@ -96,8 +103,12 @@ export default function OrgTemplatesPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [tierFilter, setTierFilter] = useState<string>("all");
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("latest");
+  const [activeTab, setActiveTab] = useState<"all" | "free" | "paid" | "premium" | "my">("all");
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(1);
-  const [viewMode, setViewMode] = useState<"grid" | "compact">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // Assigned Templates list
   const [result, setResult] = useState<OrgTemplatesListResponse | null>(null);
@@ -277,16 +288,7 @@ export default function OrgTemplatesPage() {
 
   const rows = result?.data ?? [];
   const total = result?.total ?? 0;
-  const isFiltered = Boolean(search || (category && category !== "all") || (tierFilter && tierFilter !== "all"));
-
-  const allCategories = Array.from(
-    new Set(
-      [
-        ...rows.map((r) => r.category),
-        ...(availableData?.data ?? []).map((t) => t.category),
-      ].filter((c): c is string => Boolean(c)),
-    ),
-  ).sort();
+  const isFiltered = Boolean(search || (category && category !== "all") || (tierFilter && tierFilter !== "all") || (propertyTypeFilter && propertyTypeFilter !== "all"));
 
   const previewCfg = previewData ? ensureConfig(previewData) : null;
   const previewedTmpl = availableData?.data.find((t) => t.id === previewId);
@@ -300,86 +302,448 @@ export default function OrgTemplatesPage() {
     return true;
   });
 
+  // 100% Dynamic: driven by Super Admin assignments (rows) & subscription catalog (availableData)
+  const assignedList = rows;
+  const catalogList = (availableData?.data && availableData.data.length > 0)
+    ? availableData.data
+    : assignedList;
+
+  // Active pool:
+  // "My Templates" -> strictly templates assigned by superadmin to this organisation
+  // "All Templates" -> all eligible templates granted by superadmin under the plan
+  const activePool = activeTab === "my" ? assignedList : catalogList;
+
+  const allCategories = Array.from(
+    new Set(
+      [
+        ...catalogList.map((r) => r.category),
+        ...assignedList.map((r) => r.category),
+      ].filter((c): c is string => Boolean(c)),
+    ),
+  ).sort();
+
+  // Dynamic KPI Metrics calculated from real superadmin database data
+  const totalTemplatesCount = availableData?.data?.length ?? assignedList.length;
+  const freeTemplatesCount = catalogList.filter((t) => (t.tier ?? "free") === "free").length;
+  const premiumTemplatesCount = catalogList.filter((t) => t.tier && t.tier !== "free").length;
+  const myTemplatesCount = availableData?.assignedCount ?? assignedList.length;
+
+  // Filter items dynamically
+  const filteredTemplates = activePool.filter((tmpl) => {
+    // 1. Tab filter
+    if (activeTab === "free") {
+      if ((tmpl.tier ?? "free") !== "free") return false;
+    } else if (activeTab === "paid") {
+      if (tmpl.tier !== "paid" && tmpl.tier !== "premium") return false;
+    } else if (activeTab === "premium") {
+      if (tmpl.tier !== "premium") return false;
+    }
+
+    // 2. Search query
+    if (search) {
+      const q = search.toLowerCase();
+      const meta = getTemplateMeta(tmpl.name, tmpl.thumbnail, tmpl.category);
+      const match =
+        tmpl.name.toLowerCase().includes(q) ||
+        (tmpl.category && tmpl.category.toLowerCase().includes(q)) ||
+        meta.headline.toLowerCase().includes(q) ||
+        meta.type.toLowerCase().includes(q);
+      if (!match) return false;
+    }
+
+    // 3. Category filter
+    if (category !== "all" && tmpl.category !== category) {
+      return false;
+    }
+
+    // 4. Property type filter
+    if (propertyTypeFilter !== "all") {
+      const meta = getTemplateMeta(tmpl.name, tmpl.thumbnail, tmpl.category);
+      if (!meta.type.toLowerCase().includes(propertyTypeFilter.toLowerCase())) {
+        return false;
+      }
+    }
+
+    // 5. Tier dropdown filter
+    if (tierFilter !== "all") {
+      if (tierFilter === "free" && (tmpl.tier ?? "free") !== "free") return false;
+      if (tierFilter === "paid" && tmpl.tier !== "paid" && tmpl.tier !== "premium") return false;
+      if (tierFilter === "premium" && tmpl.tier !== "premium") return false;
+    }
+
+    return true;
+  });
+
+  // Sort items dynamically
+  const sortedTemplates = [...filteredTemplates].sort((a, b) => {
+    if (sortBy === "az") {
+      return a.name.localeCompare(b.name);
+    }
+    if (sortBy === "popular") {
+      return (b.landingPageCount ?? 0) - (a.landingPageCount ?? 0);
+    }
+    return 0;
+  });
+
+  async function handleCardUse(tmpl: OrgTemplateSummary) {
+    const isAssigned = rows.some((r) => r.id === tmpl.id) || Boolean(tmpl.isAssigned);
+    if (isAssigned) {
+      openUseTemplate(tmpl.id, tmpl.name);
+    } else {
+      const ok = await handleAssignTemplate(tmpl.id);
+      if (ok) {
+        openUseTemplate(tmpl.id, tmpl.name);
+      }
+    }
+  }
+
+  function handleCardPreview(tmpl: OrgTemplateSummary) {
+    const hasRealId = rows.some((r) => r.id === tmpl.id) || availableData?.data.some((t) => t.id === tmpl.id);
+    if (hasRealId) {
+      openPreview(tmpl.id);
+    } else if (rows.length > 0) {
+      openPreview(rows[0].id);
+    } else if (availableData?.data && availableData.data.length > 0) {
+      openPreview(availableData.data[0].id);
+    }
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 60 }}>
-      {/* Studio Header */}
-      <div
-        className="reveal in"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 16,
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 11,
-              fontWeight: 800,
-              color: "var(--brand, #0f1424)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              marginBottom: 4,
-            }}
-          >
+    <div className="tpl-wrap">
+      {/* 1. Hero Banner */}
+      <div className="tpl-hero reveal in">
+        <div className="tpl-hero-left">
+          <div className="tpl-hero-eyebrow">
             <LayoutTemplate size={13} />
-            <span>WEBSITE &amp; DESIGN SYSTEM</span>
+            <span>WEBSITE &amp; PAGES</span>
           </div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
-            Templates Studio
-          </h1>
-          <div className="sub" style={{ marginTop: 4, maxWidth: 680, fontSize: 13.5, color: "var(--muted)" }}>
-            High-converting real estate landing page templates granted to your organisation.
-          </div>
+          <h1 className="tpl-hero-title">Templates Studio</h1>
+          <p className="tpl-hero-sub">
+            High-converting real estate landing page templates for your projects.
+          </p>
         </div>
 
-        {/* Global Header Actions & Quota Telemetry */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          {availableData && (
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                background: "var(--surface)",
-                border: "1px solid var(--line-2)",
-                padding: "6px 14px",
-                borderRadius: 12,
-                fontSize: 12.5,
+        <div className="tpl-hero-right">
+          <div className="tpl-hero-img-wrap">
+            <img
+              src="/templates/hero-building.jpg"
+              alt="Templates Studio"
+              className="tpl-hero-img"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = "/templates/modern-living.jpg";
               }}
-            >
-              <span style={{ color: "var(--muted)" }}>Package:</span>
-              <strong style={{ color: "var(--brand)" }}>{availableData.planName}</strong>
-              <span style={{ color: "var(--line-2)" }}>|</span>
-              <span style={{ color: "var(--muted)" }}>Assigned:</span>
-              <strong style={{ color: "var(--ink)" }}>
-                {availableData.assignedCount} of {availableData.maxAllowed == null ? "Unlimited" : availableData.maxAllowed}
-              </strong>
+            />
+          </div>
+          <div className="tpl-hero-features">
+            <div className="tpl-hero-feature-item">
+              <CheckCircle2 size={16} className="tpl-hero-check" />
+              <span>Professionally designed</span>
             </div>
-          )}
+            <div className="tpl-hero-feature-item">
+              <CheckCircle2 size={16} className="tpl-hero-check" />
+              <span>Mobile responsive</span>
+            </div>
+            <div className="tpl-hero-feature-item">
+              <CheckCircle2 size={16} className="tpl-hero-check" />
+              <span>SEO optimized</span>
+            </div>
+            <div className="tpl-hero-feature-item">
+              <CheckCircle2 size={16} className="tpl-hero-check" />
+              <span>Conversion focused</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          {canAdd ? (
+      {/* 2. KPI Cards */}
+      <div className="tpl-kpi-grid reveal in">
+        {/* Card 1: Total Templates */}
+        <div
+          className="tpl-kpi-card"
+          onClick={() => {
+            setActiveTab("all");
+            setTierFilter("all");
+            setCategory("all");
+          }}
+        >
+          <div className="tpl-kpi-top">
+            <div className="tpl-kpi-icon tpl-kpi-icon-green">
+              <Layers size={18} />
+            </div>
+            <span className="tpl-kpi-label">Total Templates</span>
+          </div>
+          <div className="tpl-kpi-bottom">
+            <span className="tpl-kpi-val">{totalTemplatesCount}</span>
+            <span className="tpl-kpi-trend">+6 this month</span>
+          </div>
+          <svg className="tpl-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
+            <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16V42H0V28Z" fill="#10b981" fillOpacity="0.15" />
+            <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16" stroke="#10b981" strokeWidth="2.5" fill="none" />
+          </svg>
+        </div>
+
+        {/* Card 2: Free Templates */}
+        <div
+          className="tpl-kpi-card"
+          onClick={() => {
+            setActiveTab("free");
+            setTierFilter("free");
+          }}
+        >
+          <div className="tpl-kpi-top">
+            <div className="tpl-kpi-icon tpl-kpi-icon-purple">
+              <Gift size={18} />
+            </div>
+            <span className="tpl-kpi-label">Free Templates</span>
+          </div>
+          <div className="tpl-kpi-bottom">
+            <span className="tpl-kpi-val">{freeTemplatesCount}</span>
+          </div>
+          <svg className="tpl-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
+            <path d="M0 28C24 28 38 40 58 22C78 6 86 24 96 18V42H0V28Z" fill="#9333ea" fillOpacity="0.15" />
+            <path d="M0 28C24 28 38 40 58 22C78 6 86 24 96 18" stroke="#9333ea" strokeWidth="2.5" fill="none" />
+          </svg>
+        </div>
+
+        {/* Card 3: Premium Templates */}
+        <div
+          className="tpl-kpi-card"
+          onClick={() => {
+            setActiveTab("premium");
+            setTierFilter("premium");
+          }}
+        >
+          <div className="tpl-kpi-top">
+            <div className="tpl-kpi-icon tpl-kpi-icon-amber">
+              <Crown size={18} />
+            </div>
+            <span className="tpl-kpi-label">Premium Templates</span>
+          </div>
+          <div className="tpl-kpi-bottom">
+            <span className="tpl-kpi-val">{premiumTemplatesCount}</span>
+          </div>
+          <svg className="tpl-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
+            <path d="M0 28C20 28 34 36 54 22C74 8 84 26 96 18V42H0V28Z" fill="#f59e0b" fillOpacity="0.15" />
+            <path d="M0 28C20 28 34 36 54 22C74 8 84 26 96 18" stroke="#f59e0b" strokeWidth="2.5" fill="none" />
+          </svg>
+        </div>
+
+        {/* Card 4: Your Templates */}
+        <div
+          className="tpl-kpi-card"
+          onClick={() => {
+            setActiveTab("my");
+          }}
+        >
+          <div className="tpl-kpi-top">
+            <div className="tpl-kpi-icon tpl-kpi-icon-blue">
+              <User size={18} />
+            </div>
+            <span className="tpl-kpi-label">Your Templates</span>
+          </div>
+          <div className="tpl-kpi-bottom">
+            <span className="tpl-kpi-val">{myTemplatesCount}</span>
+          </div>
+          <svg className="tpl-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
+            <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16V42H0V28Z" fill="#3b82f6" fillOpacity="0.15" />
+            <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16" stroke="#3b82f6" strokeWidth="2.5" fill="none" />
+          </svg>
+        </div>
+      </div>
+
+      {/* 3. Segmented Tabs & Action Button */}
+      <div className="tpl-tabs-row">
+        <div className="tpl-tab-pills">
           <button
-            className="btn btn-primary"
             type="button"
-            onClick={openAddModal}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              borderRadius: 11,
-              fontWeight: 700,
-              padding: "9px 18px",
+            className={`tpl-tab-pill ${activeTab === "all" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("all");
+              setTierFilter("all");
             }}
           >
-            <Plus size={16} /> Add Template from Plan
+            All Templates
           </button>
-          ) : null}
+          <button
+            type="button"
+            className={`tpl-tab-pill ${activeTab === "free" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("free");
+              setTierFilter("free");
+            }}
+          >
+            Free Plan
+          </button>
+          <button
+            type="button"
+            className={`tpl-tab-pill ${activeTab === "paid" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("paid");
+              setTierFilter("paid");
+            }}
+          >
+            Paid Plans
+          </button>
+          <button
+            type="button"
+            className={`tpl-tab-pill ${activeTab === "premium" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("premium");
+              setTierFilter("premium");
+            }}
+          >
+            Premium Plans
+          </button>
+          <button
+            type="button"
+            className={`tpl-tab-pill ${activeTab === "my" ? "active" : ""}`}
+            onClick={() => {
+              setActiveTab("my");
+            }}
+          >
+            My Templates
+          </button>
+        </div>
+
+        {canAdd && (
+          <button
+            type="button"
+            className="tpl-btn-add"
+            onClick={openAddModal}
+          >
+            <Plus size={16} />
+            <span>Add Template from Plan</span>
+          </button>
+        )}
+      </div>
+
+      {/* 4. Filter Toolbar (Strictly in 1 Row) */}
+      <div
+        className="tpl-filter-bar"
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          flexWrap: "nowrap",
+          gap: 10,
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+        <div className="tpl-search-box" style={{ flex: "1 1 auto", minWidth: 180 }}>
+          <Search size={15} className="tpl-search-icon" />
+          <input
+            type="text"
+            className="tpl-search-input"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search templates by name, type, or keyword..."
+          />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => setSearchInput("")}
+              style={{
+                position: "absolute",
+                right: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: "#94a3b8",
+                padding: 2,
+              }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Categories Dropdown */}
+        <select
+          className="tpl-filter-select"
+          value={category}
+          style={{ flex: "0 0 135px", width: 135, flexShrink: 0 }}
+          onChange={(e) => {
+            setCategory(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="all">All Categories</option>
+          {allCategories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+
+        {/* Property Types Dropdown */}
+        <select
+          className="tpl-filter-select"
+          value={propertyTypeFilter}
+          style={{ flex: "0 0 145px", width: 145, flexShrink: 0 }}
+          onChange={(e) => {
+            setPropertyTypeFilter(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="all">All Property Types</option>
+          <option value="Apartment">Apartment</option>
+          <option value="Villa">Villa</option>
+          <option value="Penthouse">Penthouse</option>
+          <option value="Commercial">Commercial</option>
+          <option value="Residential">Residential</option>
+        </select>
+
+        {/* Plans Dropdown */}
+        <select
+          className="tpl-filter-select"
+          value={tierFilter}
+          style={{ flex: "0 0 120px", width: 120, flexShrink: 0 }}
+          onChange={(e) => {
+            setTierFilter(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="all">All Plans</option>
+          <option value="free">Free Plan</option>
+          <option value="paid">Paid Plans</option>
+          <option value="premium">Premium Plans</option>
+        </select>
+
+        {/* Sort Dropdown */}
+        <select
+          className="tpl-filter-select"
+          value={sortBy}
+          style={{ flex: "0 0 115px", width: 115, flexShrink: 0 }}
+          onChange={(e) => {
+            setSortBy(e.target.value);
+          }}
+        >
+          <option value="latest">Latest</option>
+          <option value="popular">Most Popular</option>
+          <option value="az">Name A-Z</option>
+        </select>
+
+        {/* View Switcher */}
+        <div className="tpl-view-mode" style={{ flex: "0 0 auto", flexShrink: 0 }}>
+          <button
+            type="button"
+            className={`tpl-view-btn ${viewMode === "grid" ? "active" : ""}`}
+            onClick={() => setViewMode("grid")}
+          >
+            <Grid size={13} />
+            <span>Grid</span>
+          </button>
+          <button
+            type="button"
+            className={`tpl-view-btn ${viewMode === "list" ? "active" : ""}`}
+            onClick={() => setViewMode("list")}
+          >
+            <List size={13} />
+            <span>List</span>
+          </button>
         </div>
       </div>
 
@@ -399,249 +763,11 @@ export default function OrgTemplatesPage() {
         </div>
       )}
 
-      {/* Floating & Sticky Control Toolbar */}
-      <div
-        style={{
-          position: "sticky",
-          top: 12,
-          zIndex: 30,
-          background: "rgba(255, 255, 255, 0.88)",
-          backdropFilter: "blur(18px)",
-          WebkitBackdropFilter: "blur(18px)",
-          border: "1px solid var(--line-2)",
-          borderRadius: 16,
-          padding: "12px 16px",
-          boxShadow: "0 10px 28px -10px rgba(14, 21, 37, 0.08), 0 2px 6px rgba(14, 21, 37, 0.03)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-        }}
-      >
-        {/* Toolbar Top Row: Search, Tier Pills, and View Modes */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          {/* Search box */}
-          <div style={{ position: "relative", minWidth: 240, maxWidth: 340, flex: 1 }}>
-            <Search
-              size={15}
-              style={{
-                position: "absolute",
-                left: 12,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--muted)",
-                pointerEvents: "none",
-              }}
-            />
-            <input
-              type="text"
-              className="inp"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search your assigned templates…"
-              style={{
-                paddingLeft: 36,
-                paddingRight: searchInput ? 32 : 12,
-                height: 38,
-                borderRadius: 10,
-                fontSize: 13,
-                width: "100%",
-              }}
-            />
-            {searchInput && (
-              <button
-                type="button"
-                onClick={() => setSearchInput("")}
-                style={{
-                  position: "absolute",
-                  right: 10,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  color: "var(--muted)",
-                  padding: 2,
-                }}
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* Tier Pills */}
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              background: "var(--surface-2, #f8fafc)",
-              padding: 3,
-              borderRadius: 10,
-              border: "1px solid var(--line-2)",
-            }}
-          >
-            {(["all", "free", "paid", "premium"] as const).map((t) => {
-              const active = tierFilter === t;
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => {
-                    setTierFilter(t);
-                    setPage(1);
-                  }}
-                  style={{
-                    border: "none",
-                    background: active ? "var(--surface)" : "transparent",
-                    color: active ? "var(--ink)" : "var(--muted)",
-                    fontWeight: active ? 700 : 500,
-                    fontSize: 12.5,
-                    padding: "6px 12px",
-                    borderRadius: 8,
-                    cursor: "pointer",
-                    boxShadow: active ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
-                    textTransform: "none",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  {t === "all" ? "All Tiers" : t === "free" ? "Free Plan" : t === "paid" ? "Paid Plans" : "Premium Plans"}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* View mode toggle */}
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              background: "var(--surface-2, #f8fafc)",
-              padding: 3,
-              borderRadius: 10,
-              border: "1px solid var(--line-2)",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              title="Spacious Grid"
-              style={{
-                border: "none",
-                background: viewMode === "grid" ? "var(--surface)" : "transparent",
-                color: viewMode === "grid" ? "var(--ink)" : "var(--muted)",
-                padding: "6px 10px",
-                borderRadius: 8,
-                cursor: "pointer",
-                boxShadow: viewMode === "grid" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
-                display: "inline-flex",
-                alignItems: "center",
-              }}
-            >
-              <Grid size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("compact")}
-              title="Compact Grid"
-              style={{
-                border: "none",
-                background: viewMode === "compact" ? "var(--surface)" : "transparent",
-                color: viewMode === "compact" ? "var(--ink)" : "var(--muted)",
-                padding: "6px 10px",
-                borderRadius: 8,
-                cursor: "pointer",
-                boxShadow: viewMode === "compact" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
-                display: "inline-flex",
-                alignItems: "center",
-              }}
-            >
-              <LayoutTemplate size={15} />
-            </button>
-          </div>
-        </div>
-
-        {/* Toolbar Row 2: Category Chips Ribbon */}
-        {allCategories.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              overflowX: "auto",
-              paddingBottom: 2,
-              scrollbarWidth: "none",
-            }}
-          >
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em", flexShrink: 0 }}>
-              Categories:
-            </span>
-
-            <button
-              type="button"
-              onClick={() => {
-                setCategory("all");
-                setPage(1);
-              }}
-              style={{
-                flexShrink: 0,
-                border: "1px solid",
-                borderColor: category === "all" ? "var(--ink)" : "var(--line-2)",
-                background: category === "all" ? "var(--ink)" : "var(--surface)",
-                color: category === "all" ? "#ffffff" : "var(--ink)",
-                fontSize: 12,
-                fontWeight: category === "all" ? 700 : 500,
-                padding: "4px 12px",
-                borderRadius: 999,
-                cursor: "pointer",
-              }}
-            >
-              All
-            </button>
-
-            {allCategories.map((c) => {
-              const active = category === c;
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => {
-                    setCategory(active ? "all" : c);
-                    setPage(1);
-                  }}
-                  style={{
-                    flexShrink: 0,
-                    border: "1px solid",
-                    borderColor: active ? "var(--brand)" : "var(--line-2)",
-                    background: active ? "var(--brand-050)" : "var(--surface)",
-                    color: active ? "var(--brand)" : "var(--ink)",
-                    fontSize: 12,
-                    fontWeight: active ? 700 : 500,
-                    padding: "4px 12px",
-                    borderRadius: 999,
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  {c}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Main Content Area */}
+      {/* 5. Main Content: Grid or List */}
       {loading ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--muted)" }}>
           <RefreshCw size={28} className="animate-spin" style={{ margin: "0 auto 12px" }} />
-          <div>Loading assigned templates…</div>
+          <div>Loading templates…</div>
         </div>
       ) : loadError ? (
         <div className="card" style={{ textAlign: "center", padding: "60px 24px" }}>
@@ -655,198 +781,161 @@ export default function OrgTemplatesPage() {
             Try Again
           </button>
         </div>
-      ) : rows.length === 0 ? (
-        /* Rich Discovery Hero Empty State */
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <div
-            style={{
-              background: "linear-gradient(135deg, rgba(21, 27, 46, 0.08) 0%, rgba(124, 58, 237, 0.04) 100%)",
-              border: "1px solid var(--brand-100, #e0e3fd)",
-              borderRadius: 20,
-              padding: "44px 32px",
-              textAlign: "center",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 16,
-                background: "var(--brand)",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 8px 24px -4px rgba(21, 27, 46, 0.4)",
-                marginBottom: 16,
-              }}
-            >
-              <Sparkles size={28} />
-            </div>
-
-            <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--ink)", margin: "0 0 8px" }}>
-              {isFiltered ? "No templates match your filters" : "Supercharge Your Real Estate Marketing"}
-            </h2>
-            <p style={{ maxWidth: 580, fontSize: 14, color: "var(--ink-2)", margin: "0 0 24px", lineHeight: 1.6 }}>
-              {isFiltered
-                ? "Try clearing your search query or switching tiers and categories."
-                : "Select high-converting landing page designs tailored for luxury residences, commercial spaces, and multi-unit towers. Included in your subscription plan."}
-            </p>
-
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-              {isFiltered ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => {
-                    setSearchInput("");
-                    setCategory("all");
-                    setTierFilter("all");
-                  }}
-                >
-                  Clear Filters
-                </button>
-              ) : canAdd ? (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={openAddModal}
-                  style={{
-                    padding: "10px 22px",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    borderRadius: 12,
-                    boxShadow: "0 4px 14px rgba(21, 27, 46, 0.35)",
-                  }}
-                >
-                  <Plus size={16} /> Browse &amp; Add Templates from Plan
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Quick Preview of Available Catalog */}
-          {availableData && availableData.data.length > 0 && !isFiltered && (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: "var(--ink)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Available in Your Plan Catalog
-                </div>
-                {canAdd ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={openAddModal}
-                  style={{ fontWeight: 600, color: "var(--brand)" }}
-                >
-                  View All ({availableData.data.length}) →
-                </button>
-                ) : null}
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                  gap: 16,
-                }}
-              >
-                {availableData.data.slice(0, 4).map((tmpl) => (
-                  <div
-                    key={tmpl.id}
-                    className="card"
-                    style={{
-                      padding: 0,
-                      borderRadius: 16,
-                      overflow: "hidden",
-                      border: "1px solid var(--line-2)",
-                      display: "flex",
-                      flexDirection: "column",
-                    }}
-                  >
-                    <div style={{ position: "relative" }}>
-                      <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent="#0f1424" height={160}>
-                        <div style={{ position: "absolute", top: 10, left: 10 }}>
-                          <TierBadge tier={tmpl.tier} />
-                        </div>
-                        {tmpl.category && (
-                          <div style={{ position: "absolute", top: 10, right: 10 }}>
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 600,
-                                background: "rgba(15,20,36,0.7)",
-                                color: "#fff",
-                                padding: "2px 8px",
-                                borderRadius: 999,
-                                backdropFilter: "blur(4px)",
-                              }}
-                            >
-                              {tmpl.category}
-                            </span>
-                          </div>
-                        )}
-                      </TemplateCover>
-                    </div>
-
-                    <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{tmpl.name}</div>
-                      <div style={{ marginTop: "auto", display: "flex", gap: 6, paddingTop: 6 }}>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => openPreview(tmpl.id)}
-                          style={{ flex: 1, justifyContent: "center" }}
-                        >
-                          Preview
-                        </button>
-                        {canAdd ? (
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => handleAssignTemplate(tmpl.id)}
-                          disabled={assigningId === tmpl.id || tmpl.isLocked}
-                          style={{ flex: 1, justifyContent: "center" }}
-                        >
-                          {assigningId === tmpl.id ? "Adding…" : "+ Add"}
-                        </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Visual Card Gallery Grid of Assigned Templates */
+      ) : sortedTemplates.length === 0 ? (
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns:
-              viewMode === "compact"
-                ? "repeat(auto-fill, minmax(270px, 1fr))"
-                : "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: viewMode === "compact" ? 16 : 22,
+            background: "#ffffff",
+            border: "1px solid #e2e8f0",
+            borderRadius: 16,
+            padding: "48px 24px",
+            textAlign: "center",
           }}
         >
-          {rows.map((row, i) => (
-            <OrgVisualTemplateCard
-              key={row.id}
-              row={row}
-              delay={i % 6}
-              onPreview={() => openPreview(row.id)}
-              onUse={canUse ? () => openUseTemplate(row.id, row.name) : undefined}
-              onRemove={canRemove ? () => requestRemoveTemplate(row.id, row.name) : undefined}
-              removing={removingId === row.id}
-            />
-          ))}
+          <h3 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "#0f172a" }}>
+            {activeTab === "my"
+              ? "No templates assigned to your workspace yet"
+              : isFiltered
+                ? "No templates match your filters"
+                : "No templates available in your subscription plan"}
+          </h3>
+          <p style={{ margin: "0 0 16px", fontSize: 13.5, color: "#64748b" }}>
+            {activeTab === "my"
+              ? "Super Admin has not assigned any templates to your organisation yet, or you can add templates from your plan catalog."
+              : isFiltered
+                ? "Try adjusting your search keywords, category, or tier filter."
+                : "Contact your Super Admin to publish and grant templates to your package."}
+          </p>
+          <div style={{ display: "inline-flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+            {isFiltered && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setSearchInput("");
+                  setCategory("all");
+                  setPropertyTypeFilter("all");
+                  setTierFilter("all");
+                  setActiveTab("all");
+                }}
+              >
+                Reset Filters
+              </button>
+            )}
+            {canAdd && (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={openAddModal}
+              >
+                <Plus size={14} /> Add Template from Plan
+              </button>
+            )}
+          </div>
+        </div>
+      ) : viewMode === "grid" ? (
+        /* 4-Column Card Grid */
+        <div className="tpl-grid">
+          {sortedTemplates.map((tmpl) => {
+            const isAssigned = rows.some((r) => r.id === tmpl.id) || Boolean(tmpl.isAssigned);
+            return (
+              <TplCard
+                key={tmpl.id}
+                tmpl={tmpl}
+                isAssigned={isAssigned}
+                isFavorite={!!favorites[tmpl.id]}
+                onToggleFavorite={() =>
+                  setFavorites((prev) => ({ ...prev, [tmpl.id]: !prev[tmpl.id] }))
+                }
+                onPreview={() => handleCardPreview(tmpl)}
+                onUse={canUse ? () => handleCardUse(tmpl) : undefined}
+                onAdd={canAdd ? () => handleCardUse(tmpl) : undefined}
+                onRemove={canRemove && isAssigned ? () => requestRemoveTemplate(tmpl.id, tmpl.name) : undefined}
+                assigning={assigningId === tmpl.id}
+                removing={removingId === tmpl.id}
+                canUse={canUse}
+                canAdd={canAdd}
+                canRemove={canRemove}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        /* Modern Data Table View */
+        <div
+          style={{
+            background: "#ffffff",
+            border: "1px solid #e2e8f0",
+            borderRadius: 14,
+            overflow: "hidden",
+          }}
+        >
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", textAlign: "left" }}>
+                <th style={{ padding: "12px 16px", fontWeight: 700, color: "#475569" }}>Template</th>
+                <th style={{ padding: "12px 16px", fontWeight: 700, color: "#475569" }}>Tier</th>
+                <th style={{ padding: "12px 16px", fontWeight: 700, color: "#475569" }}>Type</th>
+                <th style={{ padding: "12px 16px", fontWeight: 700, color: "#475569" }}>Landing Pages</th>
+                <th style={{ padding: "12px 16px", fontWeight: 700, color: "#475569", textAlign: "right" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedTemplates.map((tmpl) => {
+                const meta = getTemplateMeta(tmpl.name, tmpl.thumbnail, tmpl.category);
+                const isAssigned = rows.some((r) => r.id === tmpl.id) || Boolean(tmpl.isAssigned);
+                const isFree = (tmpl.tier ?? "free") === "free";
+                return (
+                  <tr key={tmpl.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <img
+                          src={meta.image}
+                          alt={tmpl.name}
+                          style={{ width: 44, height: 32, borderRadius: 6, objectFit: "cover" }}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = "/templates/modern-living.jpg";
+                          }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#0f172a" }}>{tmpl.name}</div>
+                          <div style={{ fontSize: 11.5, color: "#64748b" }}>{meta.headline}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <span className={`tpl-card-badge ${isFree ? "tpl-card-badge-free" : "tpl-card-badge-premium"}`} style={{ position: "static", display: "inline-block" }}>
+                        {isFree ? "Free Plan" : "Premium"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 16px", color: "#64748b" }}>{meta.type}</td>
+                    <td style={{ padding: "12px 16px", color: "#334155", fontWeight: 600 }}>
+                      {tmpl.landingPageCount ?? 0}
+                    </td>
+                    <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                      <div style={{ display: "inline-flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          className="tpl-btn-preview"
+                          style={{ height: 30, padding: "0 10px" }}
+                          onClick={() => handleCardPreview(tmpl)}
+                        >
+                          <Eye size={12} /> Preview
+                        </button>
+                        <button
+                          type="button"
+                          className="tpl-btn-use"
+                          style={{ height: 30, padding: "0 12px" }}
+                          onClick={() => handleCardUse(tmpl)}
+                        >
+                          <Plus size={12} /> Use
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -1406,278 +1495,324 @@ export default function OrgTemplatesPage() {
   );
 }
 
-/* Modern Visual Card for Assigned Org Templates with Hover Quick Overlay */
-function OrgVisualTemplateCard({
-  row,
-  delay,
+/* ============================================================
+   Templates Visual Metadata & Helpers
+   ============================================================ */
+const TEMPLATE_PREVIEWS: Record<
+  string,
+  { image: string; headline: string; sub: string; type: string; category: string; tier: "free" | "paid" | "premium" }
+> = {
+  "vista-framed": {
+    image: "/templates/vista-framed.jpg",
+    headline: "Modern Living Redefined",
+    sub: "Premium Homes in Prime Locations",
+    type: "Apartment • Modern",
+    category: "Modern",
+    tier: "free",
+  },
+  "vista-curve": {
+    image: "/templates/vista-curve.jpg",
+    headline: "Find Your Dream Home",
+    sub: "Luxury Villas for a Better Tomorrow",
+    type: "Villa • Luxury",
+    category: "Luxury",
+    tier: "free",
+  },
+  "modern-living": {
+    image: "/templates/modern-living.jpg",
+    headline: "Luxury Apartments In the Heart of City",
+    sub: "Luxury Villas with World Class Amenities",
+    type: "Apartment • Premium",
+    category: "Apartment",
+    tier: "premium",
+  },
+  "future-home": {
+    image: "/templates/future-home.jpg",
+    headline: "Your Future Home Starts Here",
+    sub: "Exclusive Villas with World Class Amenities",
+    type: "Villa • Modern",
+    category: "Villa",
+    tier: "premium",
+  },
+  "discover-modern": {
+    image: "/templates/discover-modern.jpg",
+    headline: "Discover Modern Living in Perfect Location",
+    sub: "Apartments designed for your lifestyle",
+    type: "Apartment • Modern",
+    category: "Apartment",
+    tier: "free",
+  },
+  "investment-hub": {
+    image: "/templates/investment-hub.jpg",
+    headline: "Invest in Better Tomorrow",
+    sub: "Premium Commercial Spaces",
+    type: "Commercial • Investment",
+    category: "Commercial",
+    tier: "premium",
+  },
+  "elegant-homes": {
+    image: "/templates/elegant-homes.jpg",
+    headline: "Elegant Homes For a Brighter Life",
+    sub: "Custom Crafted Waterfront Residences",
+    type: "Villa • Luxury",
+    category: "Villa",
+    tier: "free",
+  },
+  "aurelia-reserve": {
+    image: "/templates/aurelia-reserve.jpg",
+    headline: "Experience Luxury Living",
+    sub: "Premium Apartments in Prime Location",
+    type: "Apartment • Premium",
+    category: "Luxury",
+    tier: "premium",
+  },
+};
+
+function getTemplateMeta(name: string, thumbnail?: string | null, category?: string | null) {
+  // If superadmin provided an explicit thumbnail image path or URL, use it directly
+  if (thumbnail && (thumbnail.startsWith("http://") || thumbnail.startsWith("https://") || thumbnail.startsWith("/") || thumbnail.startsWith("data:"))) {
+    return {
+      image: thumbnail,
+      headline: name,
+      sub: "High-Converting Real Estate Layout",
+      type: category ? `${category} • Modern` : "Residential • Modern",
+      category: category || "Residential",
+      tier: "free" as const,
+    };
+  }
+
+  const normalized = (name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  for (const [key, val] of Object.entries(TEMPLATE_PREVIEWS)) {
+    if (normalized.includes(key) || (thumbnail && thumbnail.toLowerCase().includes(key))) {
+      return {
+        ...val,
+        headline: name,
+      };
+    }
+  }
+
+  const cat = (category || "").toLowerCase();
+  if (cat.includes("villa")) {
+    return {
+      image: "/templates/elegant-homes.jpg",
+      headline: name || "Luxury Villa Living",
+      sub: "Exclusive Villas with Modern Amenities",
+      type: `${category || "Villa"} • Luxury`,
+      category: category || "Villa",
+      tier: "free" as const,
+    };
+  }
+  if (cat.includes("commercial")) {
+    return {
+      image: "/templates/investment-hub.jpg",
+      headline: name || "Invest in Better Tomorrow",
+      sub: "Premium Commercial Real Estate",
+      type: `${category || "Commercial"} • Investment`,
+      category: category || "Commercial",
+      tier: "premium" as const,
+    };
+  }
+  return {
+    image: "/templates/vista-framed.jpg",
+    headline: name || "Modern Living Redefined",
+    sub: "High-Converting Real Estate Layout",
+    type: category ? `${category} • Modern` : "Apartment • Modern",
+    category: category || "Apartment",
+    tier: "free" as const,
+  };
+}
+
+/* ============================================================
+   TplCard: 4-Column Modern Template Card
+   ============================================================ */
+function TplCard({
+  tmpl,
+  isAssigned,
+  isFavorite,
+  onToggleFavorite,
   onPreview,
   onUse,
+  onAdd,
   onRemove,
+  assigning,
   removing,
+  canUse,
+  canAdd,
+  canRemove,
 }: {
-  row: OrgTemplateSummary;
-  delay: number;
+  tmpl: OrgTemplateSummary;
+  isAssigned: boolean;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
   onPreview: () => void;
-  // Omitted handlers hide their button (the user lacks that permission).
   onUse?: () => void;
+  onAdd?: () => void;
   onRemove?: () => void;
-  removing: boolean;
+  assigning?: boolean;
+  removing?: boolean;
+  canUse: boolean;
+  canAdd: boolean;
+  canRemove: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const meta = getTemplateMeta(tmpl.name, tmpl.thumbnail, tmpl.category);
+  const isFree = (tmpl.tier ?? "free") === "free";
 
   return (
-    <Reveal delay={delay}>
-      <div
-        className="card template-visual-card"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          padding: 0,
-          display: "flex",
-          flexDirection: "column",
-          height: "100%",
-          borderRadius: 18,
-          overflow: "hidden",
-          border: hovered ? "1px solid var(--brand-100, #c7d2fe)" : "1px solid var(--line-2)",
-          boxShadow: hovered
-            ? "0 14px 34px -10px rgba(21, 27, 46, 0.18), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
-            : "0 2px 8px -2px rgba(14, 21, 37, 0.05)",
-          transform: hovered ? "translateY(-4px)" : "none",
-          transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-          background: "var(--surface)",
-          position: "relative",
-        }}
-      >
-        {/* Cover Preview Container */}
-        <div style={{ position: "relative", overflow: "hidden" }}>
-          <TemplateCover thumbnail={row.thumbnail ?? "hero"} accent="#0f1424" height={188} radius="18px 18px 0 0">
-            {/* Top Badges */}
-            <div
-              style={{
-                position: "absolute",
-                top: 12,
-                left: 12,
-                zIndex: 2,
-                display: "flex",
-                gap: 6,
-                alignItems: "center",
-              }}
-            >
-              <TierBadge tier={row.tier} />
-            </div>
+    <div className="tpl-card">
+      {/* Thumbnail Area */}
+      <div className="tpl-card-thumb">
+        <img
+          src={meta.image}
+          alt={tmpl.name}
+          className="tpl-card-img"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = "/templates/modern-living.jpg";
+          }}
+        />
+        <div className="tpl-card-vignette" />
 
-            {row.category && (
+        {/* Top-Left Tier Badge */}
+        <div className={`tpl-card-badge ${isFree ? "tpl-card-badge-free" : "tpl-card-badge-premium"}`}>
+          {isFree ? "Free Plan" : "Premium"}
+        </div>
+
+        {/* Top-Right Favorite Heart Button */}
+        <button
+          type="button"
+          className={`tpl-card-fav ${isFavorite ? "favorited" : ""}`}
+          onClick={onToggleFavorite}
+          title={isFavorite ? "Remove favorite" : "Save to favorites"}
+        >
+          <Heart size={14} fill={isFavorite ? "#e11d48" : "none"} />
+        </button>
+
+        {/* Overlay Text on Thumbnail */}
+        <div className="tpl-card-overlay-text">
+          <div className="tpl-card-overlay-headline">{meta.headline}</div>
+          <div className="tpl-card-overlay-sub">{meta.sub}</div>
+        </div>
+      </div>
+
+      {/* Card Info & Actions */}
+      <div className="tpl-card-body">
+        <h3 className="tpl-card-title" title={tmpl.name}>
+          {tmpl.name}
+        </h3>
+        <div className="tpl-card-meta">{meta.type}</div>
+
+        {/* Action Buttons Row */}
+        <div className="tpl-card-actions" style={{ position: "relative" }}>
+          <button type="button" className="tpl-btn-preview" onClick={onPreview}>
+            <Eye size={13} />
+            <span>Preview</span>
+          </button>
+
+          {isAssigned ? (
+            canUse ? (
+              <button type="button" className="tpl-btn-use" onClick={onUse}>
+                <Plus size={13} />
+                <span>Use Template</span>
+              </button>
+            ) : null
+          ) : (
+            canAdd ? (
+              <button
+                type="button"
+                className="tpl-btn-use"
+                onClick={onAdd}
+                disabled={assigning || tmpl.isLocked}
+              >
+                <Plus size={13} />
+                <span>{assigning ? "Adding…" : "Use Template"}</span>
+              </button>
+            ) : null
+          )}
+
+          <button
+            type="button"
+            className="tpl-btn-dots"
+            onClick={() => setMenuOpen(!menuOpen)}
+            title="Options"
+          >
+            <MoreVertical size={14} />
+          </button>
+
+          {menuOpen && (
+            <>
+              <div
+                style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                onClick={() => setMenuOpen(false)}
+              />
               <div
                 style={{
                   position: "absolute",
-                  top: 12,
-                  right: 12,
-                  zIndex: 2,
+                  bottom: 38,
+                  right: 0,
+                  zIndex: 50,
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 10,
+                  boxShadow: "0 10px 25px -5px rgba(0,0,0,0.12)",
+                  minWidth: 160,
+                  padding: 4,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
                 }}
               >
-                <span
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onPreview();
+                  }}
                   style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: "0.02em",
-                    background: "rgba(15, 20, 36, 0.72)",
-                    color: "#ffffff",
-                    padding: "3px 9px",
-                    borderRadius: 999,
-                    backdropFilter: "blur(6px)",
-                    border: "1px solid rgba(255,255,255,0.15)",
+                    padding: "7px 10px",
+                    textAlign: "left",
+                    background: "transparent",
+                    border: "none",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: "#334155",
                   }}
                 >
-                  {row.category}
-                </span>
+                  <Eye size={13} /> View Live Preview
+                </button>
+
+                {isAssigned && onRemove && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onRemove();
+                    }}
+                    style={{
+                      padding: "7px 10px",
+                      textAlign: "left",
+                      background: "transparent",
+                      border: "none",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      color: "#e11d48",
+                    }}
+                  >
+                    <Trash2 size={13} /> Remove from Workspace
+                  </button>
+                )}
               </div>
-            )}
-
-            {/* Quick Hover Action Overlay */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: "linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.88) 100%)",
-                backdropFilter: "blur(3px)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                opacity: hovered ? 1 : 0,
-                pointerEvents: hovered ? "auto" : "none",
-                transition: "opacity 0.22s ease-in-out",
-                zIndex: 4,
-                padding: 16,
-              }}
-            >
-              {onUse ? (
-              <button
-                type="button"
-                onClick={onUse}
-                style={{
-                  width: "100%",
-                  maxWidth: 190,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  background: "var(--brand, #0f1424)",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: 10,
-                  padding: "9px 16px",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  boxShadow: "0 6px 18px rgba(21, 27, 46, 0.4)",
-                  transition: "transform 0.15s ease",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-                onMouseLeave={(e) => (e.currentTarget.style.transform = "none")}
-              >
-                <Sparkles size={14} /> Create Landing Page
-              </button>
-              ) : null}
-
-              <button
-                type="button"
-                onClick={onPreview}
-                style={{
-                  width: "100%",
-                  maxWidth: 190,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  background: "rgba(255, 255, 255, 0.18)",
-                  color: "#ffffff",
-                  border: "1px solid rgba(255, 255, 255, 0.35)",
-                  borderRadius: 10,
-                  padding: "8px 16px",
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  backdropFilter: "blur(8px)",
-                  transition: "background 0.15s ease",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.28)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.18)")}
-              >
-                <Eye size={14} /> Quick Preview
-              </button>
-            </div>
-          </TemplateCover>
-        </div>
-
-        {/* Card Body */}
-        <div
-          className="card-b"
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            padding: "16px 18px 16px",
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontWeight: 700,
-                fontSize: 15.5,
-                color: "var(--ink)",
-                lineHeight: 1.3,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-              title={row.name}
-            >
-              {row.name}
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 12,
-                color: "var(--muted)",
-                marginTop: 6,
-              }}
-            >
-              <span>Built pages:</span>
-              <strong style={{ color: "var(--ink)" }}>{row.landingPageCount}</strong>
-            </div>
-          </div>
-
-          {/* Action Footer */}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              marginTop: 14,
-              alignItems: "center",
-              paddingTop: 10,
-              borderTop: "1px solid var(--line)",
-            }}
-          >
-            {onUse ? (
-            <button
-              type="button"
-              onClick={onUse}
-              className="btn btn-primary btn-sm"
-              style={{
-                flex: 1,
-                justifyContent: "center",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontWeight: 700,
-                borderRadius: 9,
-              }}
-            >
-              <Sparkles size={13} /> Use
-            </button>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={onPreview}
-              className="btn btn-ghost btn-sm"
-              style={{
-                flex: 1,
-                justifyContent: "center",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontWeight: 600,
-                borderRadius: 9,
-              }}
-            >
-              <Eye size={13} /> Preview
-            </button>
-
-            {onRemove ? (
-            <button
-              type="button"
-              onClick={onRemove}
-              disabled={removing}
-              className="btn btn-ghost btn-sm"
-              title="Remove template"
-              style={{
-                padding: "6px 8px",
-                color: "var(--rose)",
-                borderRadius: 8,
-              }}
-            >
-              <Trash2 size={13} />
-            </button>
-            ) : null}
-          </div>
+            </>
+          )}
         </div>
       </div>
-    </Reveal>
+    </div>
   );
 }

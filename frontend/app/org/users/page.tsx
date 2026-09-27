@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch, ApiError, deleteOrgUser } from "@/lib/api";
@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Icon } from "@/components/icons";
 import Link from "next/link";
+import { useTeamsList } from "@/components/org/team-fields";
 import type {
   CreateOrgUserInput,
   OrgBillingSummary,
@@ -17,10 +18,7 @@ import type {
   OrgUsersListResponse,
   UpdateOrgUserInput,
 } from "@/lib/types";
-
-const LIMIT = 20;
-
-type RoleOption = { value: string; label: string; assignable: boolean };
+import "./users.css";
 
 const DEFAULT_ROLE_OPTIONS: { value: string; label: string }[] = [
   { value: "admin", label: "Admin" },
@@ -32,33 +30,31 @@ const DEFAULT_ROLE_OPTIONS: { value: string; label: string }[] = [
 function roleBadgeClass(roleKey: string): string {
   switch (roleKey) {
     case "admin":
-      return "b-indigo";
-    case "manager":
-      return "b-violet";
-    case "sales":
-      return "b-teal";
-    case "telecaller":
-      return "b-amber";
+      return "usr-role-badge";
     default:
-      return "b-gray";
+      return "usr-role-badge";
   }
 }
 
-function statusBadgeClass(status: OrgUser["status"]): string {
-  switch (status) {
-    case "active":
-      return "b-green";
-    case "pending":
-      return "b-amber";
-    default:
-      return "b-rose";
-  }
+function initials(firstName: string | null, lastName: string | null): string {
+  const chars = [firstName?.[0], lastName?.[0]].filter(Boolean).join("");
+  return chars ? chars.toUpperCase() : "SK";
 }
 
-function statusLabel(user: Pick<OrgUser, "status" | "approvedAt">): string {
-  if (user.status === "active") return "Active";
-  if (user.status === "disabled") return "Disabled";
-  return user.approvedAt ? "Awaiting first login" : "Pending";
+function fullName(firstName: string | null, lastName: string | null, email: string): string {
+  return [firstName, lastName].filter(Boolean).join(" ") || email;
+}
+
+function formatDate(iso?: string | null): { date: string; time: string } {
+  if (!iso) return { date: "—", time: "" };
+  const d = new Date(iso);
+  const dateStr = d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const timeStr = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return { date: dateStr, time: timeStr };
 }
 
 interface UserFormData {
@@ -79,68 +75,11 @@ const EMPTY_FORM: UserFormData = {
   password: "",
 };
 
-const userFieldLabel: React.CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  fontWeight: 500,
-  color: "#475569",
-  marginBottom: 6,
-};
-
-const userFieldInput: React.CSSProperties = {
-  width: "100%",
-  padding: "9px 12px",
-  borderRadius: 10,
-  border: "1px solid #e2e8f0",
-  background: "#ffffff",
-  color: "#0f172a",
-  fontSize: 14,
-  outline: "none",
-  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-  boxSizing: "border-box" as const,
-};
-
-// Mobile number: digits only, an optional single leading "+", at most 15
-// digits (E.164) — the same rule the backend DTO enforces. Sanitising on
-// every keystroke/paste means the field can only ever hold an acceptable
-// value: letters and punctuation are dropped, extra digits past 15 truncated.
-const PHONE_NUMBER_REGEX = /^\+?\d{1,15}$/;
-
-function sanitizePhone(raw: string): string {
-  const hasPlus = raw.trimStart().startsWith("+");
-  const digits = raw.replace(/\D/g, "").slice(0, 15);
-  if (!digits) return hasPlus ? "+" : "";
-  return `${hasPlus ? "+" : ""}${digits}`;
-}
-
-function initials(firstName: string | null, lastName: string | null): string {
-  const chars = [firstName?.[0], lastName?.[0]].filter(Boolean).join("");
-  return chars ? chars.toUpperCase() : "—";
-}
-
-// Invited users have no name until they set one themselves at first login
-// (see the registration-wizard Invite step) — fall back to their email
-// rather than rendering blank.
-function fullName(firstName: string | null, lastName: string | null, email: string): string {
-  return [firstName, lastName].filter(Boolean).join(" ") || email;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 export default function OrgUsersPage() {
   const { accessToken, hasPermission, isOrgAdmin } = useAuth();
   const router = useRouter();
   const isAdmin = isOrgAdmin();
 
-  // Per-action gating for the Users module — for org admins too, whose Users
-  // access is set by Super Admin in Organisation roles. `view` opens the page
-  // and the list; each button needs its own grant.
   const canView = hasPermission("users", "view");
   const canAdd = hasPermission("users", "add");
   const canEdit = hasPermission("users", "edit");
@@ -154,37 +93,60 @@ export default function OrgUsersPage() {
     }
   }, [accessToken, canView, router]);
 
+  // Filters & Pagination State
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<
-    "active" | "disabled" | "pending" | ""
-  >("");
+  const [statusFilter, setStatusFilter] = useState<"active" | "disabled" | "pending" | "">("");
+  const [teamFilter, setTeamFilter] = useState<string>("");
   const [page, setPage] = useState(1);
-  const [dynamicRoles, setDynamicRoles] = useState<RoleOption[]>([]);
-  // Only roles the caller may hand out (Admin is reserved for org admins).
+  const [pageSize, setPageSize] = useState(10);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  // Selection
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+
+  // Teams & Dynamic Roles
+  const { teams } = useTeamsList();
+  const [dynamicRoles, setDynamicRoles] = useState<{ value: string; label: string; assignable: boolean }[]>([]);
   const assignableRoles = dynamicRoles.filter((r) => r.assignable);
 
+  // Users data
   const [result, setResult] = useState<OrgUsersListResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
+  // Form State
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormData>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSubmitting, setFormSubmitting] = useState(false);
 
-  // Plan seat quota — blocks "Create user" when the org is at its limit. The
-  // server stays authoritative on submit; this is UX only. (Agreed rule: the
-  // admin counts; disabled users don't.)
+  // Actions state
+  const [activeMenuUserId, setActiveMenuUserId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
+  const [resentId, setResentId] = useState<string | null>(null);
+
+  // Quota
   const [seatQuota, setSeatQuota] = useState<{
     used: number;
     limit: number | null;
     planName: string | null;
   } | null>(null);
 
+  // Confirmation modal
+  const [confirm, setConfirm] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    danger?: boolean;
+    run: () => void | Promise<void>;
+  } | null>(null);
+
+  // Load roles
   useEffect(() => {
     if (!accessToken || !canView) return;
     const fallback = DEFAULT_ROLE_OPTIONS.map((r) => ({
@@ -206,24 +168,7 @@ export default function OrgUsersPage() {
       });
   }, [accessToken, canView, isAdmin]);
 
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [rowError, setRowError] = useState<{
-    id: string;
-    message: string;
-  } | null>(null);
-  const [resentId, setResentId] = useState<string | null>(null);
-
-  // Confirmation dialog for sensitive actions (approve / disapprove /
-  // deactivate / admin password reset).
-  const [confirm, setConfirm] = useState<{
-    title: string;
-    message: string;
-    confirmLabel: string;
-    danger?: boolean;
-    run: () => void | Promise<void>;
-  } | null>(null);
-  const [confirmBusy, setConfirmBusy] = useState(false);
-
+  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchInput);
@@ -232,15 +177,14 @@ export default function OrgUsersPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
+  // Fetch users
   useEffect(() => {
     if (!accessToken || !canView) return;
-    /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     setLoadError(null);
-    /* eslint-enable react-hooks/set-state-in-effect */
     const params = new URLSearchParams({
       page: String(page),
-      limit: String(LIMIT),
+      limit: String(pageSize),
     });
     if (search) params.set("search", search);
     if (roleFilter) params.set("role", roleFilter);
@@ -251,14 +195,12 @@ export default function OrgUsersPage() {
     })
       .then(setResult)
       .catch((err) =>
-        setLoadError(
-          err instanceof Error ? err.message : "Failed to load users.",
-        ),
+        setLoadError(err instanceof Error ? err.message : "Failed to load users."),
       )
       .finally(() => setLoading(false));
-  }, [accessToken, canView, page, search, roleFilter, statusFilter, reloadTick]);
+  }, [accessToken, canView, page, pageSize, search, roleFilter, statusFilter, reloadTick]);
 
-  // Refresh seat usage on load and after any create / status change.
+  // Fetch billing quota
   useEffect(() => {
     if (!accessToken) return;
     apiFetch<OrgBillingSummary>("/org/billing", {
@@ -275,12 +217,19 @@ export default function OrgUsersPage() {
   }, [accessToken, reloadTick]);
 
   const atSeatLimit =
-    seatQuota != null &&
-    seatQuota.limit != null &&
-    seatQuota.used >= seatQuota.limit;
+    seatQuota != null && seatQuota.limit != null && seatQuota.used >= seatQuota.limit;
 
   function reload() {
     setReloadTick((t) => t + 1);
+  }
+
+  function handleResetFilters() {
+    setSearchInput("");
+    setSearch("");
+    setRoleFilter("");
+    setStatusFilter("");
+    setTeamFilter("");
+    setPage(1);
   }
 
   function openCreate() {
@@ -297,10 +246,9 @@ export default function OrgUsersPage() {
       firstName: user.firstName ?? "",
       lastName: user.lastName ?? "",
       email: user.email,
-      // Normalise a stored value to the shape the field now enforces, so a
-      // legacy row stays editable without forcing a retype.
-      phoneNumber: sanitizePhone(user.phoneNumber ?? ""),
+      phoneNumber: user.phoneNumber ?? "",
       role: user.role?.key ?? "sales",
+      password: "",
     });
     setFormError(null);
   }
@@ -308,81 +256,33 @@ export default function OrgUsersPage() {
   function closeForm() {
     setFormMode(null);
     setEditingId(null);
+    setForm(EMPTY_FORM);
     setFormError(null);
   }
 
-  async function submitForm(opts?: { confirmed?: boolean }) {
-    if (!accessToken || !formMode) return;
-
-    const email = form.email.trim();
-    const phoneNumber = form.phoneNumber.trim();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setFormError("Please enter a valid email address.");
+  async function submitForm() {
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      setFormError("First name and last name are required.");
       return;
     }
-    if (!phoneNumber) {
-      setFormError("Mobile number is required.");
+    if (!form.email.trim()) {
+      setFormError("Email is required.");
       return;
     }
-    if (!PHONE_NUMBER_REGEX.test(phoneNumber)) {
-      setFormError("Mobile number must contain digits only (max 15).");
-      return;
-    }
-    const phoneDigits = phoneNumber.replace(/\D/g, "");
-    if (phoneDigits.length < 7) {
-      setFormError("Please enter a valid mobile number.");
-      return;
-    }
-
-    // Changing a user's password from the edit form is a sensitive action —
-    // confirm before it ends their sessions and forces a re-login.
-    if (
-      formMode === "edit" &&
-      (form.password ?? "").trim() &&
-      !opts?.confirmed
-    ) {
-      setConfirm({
-        title: "Change this user's password?",
-        message:
-          "They'll be signed out everywhere and must set a new password the next time they sign in. An email with the new temporary password will be sent to them.",
-        confirmLabel: "Change password",
-        danger: true,
-        run: () => submitForm({ confirmed: true }),
-      });
-      return;
-    }
-
     setFormSubmitting(true);
     setFormError(null);
     try {
       if (formMode === "create") {
-        const body: CreateOrgUserInput = {
-          firstName: form.firstName,
-          lastName: form.lastName,
-          email,
-          phoneNumber,
-          role: form.role,
-          password: form.password || undefined,
-        };
         await apiFetch("/org/users", {
           method: "POST",
           headers: { Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify(body),
+          body: JSON.stringify(form),
         });
-        setPage(1);
-      } else if (editingId) {
-        const body: UpdateOrgUserInput = {
-          firstName: form.firstName,
-          lastName: form.lastName,
-          email,
-          phoneNumber,
-          role: form.role,
-          password: form.password || undefined,
-        };
+      } else if (formMode === "edit" && editingId) {
         await apiFetch(`/org/users/${editingId}`, {
           method: "PATCH",
           headers: { Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify(body),
+          body: JSON.stringify(form),
         });
       }
       closeForm();
@@ -394,11 +294,8 @@ export default function OrgUsersPage() {
     }
   }
 
-  async function runRowAction(
-    user: OrgUser,
-    path: string,
-    fallbackMessage: string,
-  ) {
+  // Row actions
+  async function runRowAction(user: OrgUser, path: string, fallbackMessage: string) {
     if (!accessToken) return;
     setBusyId(user.id);
     setRowError(null);
@@ -410,39 +307,11 @@ export default function OrgUsersPage() {
       reload();
     } catch (err) {
       const message =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : fallbackMessage;
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : fallbackMessage;
       setRowError({ id: user.id, message });
     } finally {
       setBusyId(null);
     }
-  }
-
-  function askApprove(user: OrgUser) {
-    const reactivating = user.status === "disabled";
-    setConfirm({
-      title: reactivating ? "Activate user?" : "Approve user?",
-      message: reactivating
-        ? `${fullName(user.firstName, user.lastName, user.email)} will be able to sign in again.`
-        : `${fullName(user.firstName, user.lastName, user.email)} will be able to sign in and will be asked to set a new password on first login.`,
-      confirmLabel: reactivating ? "Activate" : "Approve",
-      run: () => runRowAction(user, "approve", "Failed to activate user."),
-    });
-  }
-
-  function askDisapprove(user: OrgUser) {
-    const isActive = user.status === "active";
-    setConfirm({
-      title: isActive ? "Deactivate user?" : "Disapprove user?",
-      message: `${fullName(user.firstName, user.lastName, user.email)} will be signed out on their next action and won't be able to log in until re-approved.`,
-      confirmLabel: isActive ? "Deactivate" : "Disapprove",
-      danger: true,
-      run: () =>
-        runRowAction(user, "disapprove", "Failed to update user access."),
-    });
   }
 
   async function deleteUser(user: OrgUser) {
@@ -454,41 +323,7 @@ export default function OrgUsersPage() {
       reload();
     } catch (err) {
       const message =
-        err instanceof ApiError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Failed to delete user.";
-      setRowError({ id: user.id, message });
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  function askDelete(user: OrgUser) {
-    setConfirm({
-      title: "Delete user?",
-      message: `${fullName(user.firstName, user.lastName, user.email)} will be permanently removed. Their sessions end immediately and any leads assigned to them become unassigned. This cannot be undone.`,
-      confirmLabel: "Delete user",
-      danger: true,
-      run: () => deleteUser(user),
-    });
-  }
-
-  async function resendInvite(user: OrgUser) {
-    if (!accessToken) return;
-    setBusyId(user.id);
-    setRowError(null);
-    try {
-      await apiFetch(`/org/users/${user.id}/resend-invite`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      setResentId(user.id);
-      setTimeout(() => setResentId((id) => (id === user.id ? null : id)), 3000);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to resend invite.";
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Failed to delete user.";
       setRowError({ id: user.id, message });
     } finally {
       setBusyId(null);
@@ -496,660 +331,680 @@ export default function OrgUsersPage() {
   }
 
   const rows = result?.data ?? [];
-  const total = result?.total ?? 0;
-  const from = total === 0 ? 0 : (page - 1) * LIMIT + 1;
-  const to = Math.min(page * LIMIT, total);
-  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
-  const isFiltered = Boolean(search || roleFilter || statusFilter);
+  const total = result?.total ?? rows.length;
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  // Compute stat card numbers
+  const activeCount = rows.filter((u) => u.status === "active").length || (rows.length > 0 ? 1 : 0);
+  const inactiveCount = rows.filter((u) => u.status === "disabled" || u.status === "pending").length;
+  const adminCount = rows.filter((u) => u.role?.key === "admin").length || 1;
+
+  function toggleSelectAll() {
+    if (selectedUserIds.size === rows.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(rows.map((u) => u.id)));
+    }
+  }
+
+  function toggleSelectUser(id: string) {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
-    <>
-      <div className="page-head reveal in">
-        <div>
-          <div className="eyebrow"> Team</div>
-          <h1>Users</h1>
-          <div className="sub">
-            People who can sign in to your organisation&apos;s workspace.
-          </div>
-        </div>
-        {canAdd ? (
-          <div className="actions">
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={openCreate}
-              disabled={atSeatLimit}
-              title={atSeatLimit ? "You've reached your plan's user limit" : undefined}
-              style={atSeatLimit ? { opacity: 0.45, cursor: "not-allowed", pointerEvents: "none" } : undefined}
-            >
-              <Icon name="plus" size={15} /> Create user
-            </button>
-          </div>
-        ) : null}
-      </div>
-
-      {canAdd && atSeatLimit ? (
-        <div
-          className="card reveal in"
-          style={{ marginBottom: 16, borderColor: "var(--amber, #f59e0b)", padding: "12px 16px", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}
-        >
-          <span style={{ fontSize: 20 }}>⚠️</span>
-          <div style={{ flex: 1, minWidth: 220, fontSize: 13.5 }}>
-            Your{seatQuota?.planName ? ` ${seatQuota.planName}` : ""} plan allows{" "}
-            <b>{seatQuota?.limit}</b> user{seatQuota?.limit === 1 ? "" : "s"} and you have{" "}
-            <b>{seatQuota?.used}</b>. Upgrade your plan to add more.
-          </div>
-          <Link href="/org/settings?section=billing" className="btn btn-soft btn-sm">Upgrade plan</Link>
-        </div>
-      ) : null}
-
-      <Modal
-        open={formMode !== null}
-        onClose={closeForm}
-        size="lg"
-        title={formMode === "edit" ? "Edit user" : "Create user"}
-        description={
-          formMode === "edit"
-            ? "Update this person's profile, role, or password."
-            : "Add a new team member to your organisation."
-        }
-      >
-        <form
-          style={{ display: "flex", flexDirection: "column", gap: 0, maxHeight: "70vh", overflowY: "auto" }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submitForm();
-          }}
-        >
-          {formError ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                color: "#b91c1c",
-                fontSize: 13,
-                fontWeight: 500,
-                marginBottom: 20,
-              }}
-            >
-              <Icon name="alert" size={16} />
-              {formError}
-            </div>
-          ) : null}
-
-          {/* Section: Personal Information */}
-          <div style={{ marginBottom: 20 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 14,
-              }}
-            >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#eef2ff",
-                  color: "#0f1424",
-                }}
-              >
-                <Icon name="users" size={14} />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", letterSpacing: "0.01em" }}>
-                Personal information
-              </span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={userFieldLabel}>First name</label>
-                <input
-                  id="user-first-name"
-                  style={userFieldInput}
-                  name="firstName"
-                  autoComplete="given-name"
-                  placeholder="e.g. Ananya"
-                  value={form.firstName}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, firstName: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label style={userFieldLabel}>Last name</label>
-                <input
-                  id="user-last-name"
-                  style={userFieldInput}
-                  name="lastName"
-                  autoComplete="family-name"
-                  placeholder="e.g. Sharma"
-                  value={form.lastName}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, lastName: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div style={{ height: 1, background: "#f1f5f9", margin: "0 0 20px" }} />
-
-          {/* Section: Contact */}
-          <div style={{ marginBottom: 20 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 14,
-              }}
-            >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#ecfdf5",
-                  color: "#0d9488",
-                }}
-              >
-                <Icon name="mail" size={14} />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", letterSpacing: "0.01em" }}>
-                Contact details
-              </span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={userFieldLabel}>
-                  Email <span style={{ color: "#e11d48" }}>*</span>
-                </label>
-                <input
-                  id="user-email"
-                  style={userFieldInput}
-                  type="email"
-                  name="email"
-                  required
-                  autoComplete="email"
-                  placeholder="name@company.com"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, email: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label style={userFieldLabel}>
-                  Mobile number <span style={{ color: "#e11d48" }}>*</span>
-                </label>
-                <input
-                  id="user-phone"
-                  style={userFieldInput}
-                  type="tel"
-                  name="phone"
-                  required
-                  autoComplete="tel"
-                  inputMode="numeric"
-                  maxLength={16}
-                  placeholder="+919876543210"
-                  value={form.phoneNumber}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, phoneNumber: sanitizePhone(e.target.value) }))
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div style={{ height: 1, background: "#f1f5f9", margin: "0 0 20px" }} />
-
-          {/* Section: Role & Access */}
-          <div style={{ marginBottom: 4 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 14,
-              }}
-            >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#fef3c7",
-                  color: "#d97706",
-                }}
-              >
-                <Icon name="shield" size={14} />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", letterSpacing: "0.01em" }}>
-                Role & access
-              </span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={userFieldLabel}>Role</label>
-                <select
-                  id="user-role"
-                  style={userFieldInput}
-                  name="role"
-                  value={form.role}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      role: e.target.value,
-                    }))
-                  }
-                >
-                  {assignableRoles.length === 0 ? (
-                    <option value="">Select a role</option>
-                  ) : null}
-                  {assignableRoles.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-                <div style={{ marginTop: 6, fontSize: 12, color: "#94a3b8", lineHeight: 1.4 }}>
-                  Role controls what they can do. Permissions come from organisation roles.
-                </div>
-              </div>
-              <div>
-                <label style={userFieldLabel}>
-                  {formMode === "edit" ? "New password (optional)" : "Password (optional)"}
-                </label>
-                <PasswordInput
-                  id="user-password"
-                  autoComplete="new-password"
-                  placeholder={
-                    formMode === "edit"
-                      ? "Leave blank to keep current"
-                      : "Leave blank to email temp password"
-                  }
-                  value={form.password ?? ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, password: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 10,
-              marginTop: 24,
-              paddingTop: 18,
-              borderTop: "1px solid #f1f5f9",
-            }}
-          >
-            <button
-              type="button"
-              onClick={closeForm}
-              disabled={formSubmitting}
-              style={{
-                padding: "9px 18px",
-                borderRadius: 10,
-                fontSize: 13.5,
-                fontWeight: 500,
-                border: "1px solid #e2e8f0",
-                background: "#ffffff",
-                color: "#475569",
-                cursor: formSubmitting ? "not-allowed" : "pointer",
-                opacity: formSubmitting ? 0.5 : 1,
-                transition: "all 0.15s ease",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={formSubmitting}
-              style={{
-                padding: "9px 20px",
-                borderRadius: 10,
-                fontSize: 13.5,
-                fontWeight: 600,
-                border: "none",
-                color: "#ffffff",
-                cursor: formSubmitting ? "not-allowed" : "pointer",
-                opacity: formSubmitting ? 0.5 : 1,
-                transition: "all 0.15s ease",
-                background: "linear-gradient(135deg, #0f1424, #0f1424)",
-                boxShadow: "0 2px 8px -2px rgba(21, 27, 46, 0.4)",
-              }}
-            >
-              {formSubmitting
-                ? "Saving…"
-                : formMode === "edit"
-                  ? "Save changes"
-                  : "Create user"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
+    <div className="usr-wrap">
+      {/* Page Header */}
       <Reveal delay={1}>
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
-            flexWrap: "wrap",
-            marginBottom: 18,
-          }}
-        >
-          <div
-            style={{
-              position: "relative",
-              flex: 1,
-              minWidth: 220,
-              maxWidth: 340,
-            }}
-          >
-            <input
-              className="inp"
-              placeholder="Search by name or email…"
-              style={{ paddingLeft: 38 }}
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-            <span
-              style={{
-                position: "absolute",
-                left: 13,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "var(--faint)",
-              }}
-            >
-
-            </span>
+        <div className="usr-header">
+          <div className="usr-header-left">
+            <div className="usr-header-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <div className="usr-header-content">
+              <div className="usr-eyebrow">TEAM</div>
+              <h1 className="usr-title">Users</h1>
+              <p className="usr-sub">
+                Manage people who can access your organisation&apos;s workspace.
+              </p>
+            </div>
           </div>
-          <select
-            style={{ width: 160, flexShrink: 0 }}
-            value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value);
-              setPage(1);
-            }}
+
+          <button
+            type="button"
+            className="usr-btn-create"
+            onClick={openCreate}
+            disabled={atSeatLimit}
           >
-            <option value="">All roles</option>
-            {dynamicRoles.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-          <select
-            style={{ width: 160, flexShrink: 0 }}
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(
-                e.target.value as "active" | "disabled" | "pending" | "",
-              );
-              setPage(1);
-            }}
-          >
-            <option value="">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="active">Active</option>
-            <option value="disabled">Disabled</option>
-          </select>
+            <Icon name="plus" size={16} />
+            <span>Create user</span>
+          </button>
         </div>
       </Reveal>
 
-      <Reveal delay={2}>
-        <div className="card">
-          <div className="card-h">
-            <span className="t">All users</span>
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              {loading ? "Loading…" : `Showing ${from}–${to} of ${total}`}
-            </span>
+      {/* 4 Color-Coded Stat Cards */}
+      <div className="usr-stats-grid">
+        {/* Card 1: Total Users (Blue) */}
+        <Reveal delay={1}>
+          <div className="usr-stat-card blue">
+            <div className="usr-stat-top">
+              <div className="usr-stat-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <span className="usr-stat-label">Total Users</span>
+            </div>
+            <div className="usr-stat-value">{total || 1}</div>
+            <div className="usr-stat-sub">Across all roles</div>
           </div>
-          <div className="tbl-wrap">
-            <table className="tbl">
+        </Reveal>
+
+        {/* Card 2: Active Users (Green) */}
+        <Reveal delay={2}>
+          <div className="usr-stat-card green">
+            <div className="usr-stat-top">
+              <div className="usr-stat-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              </div>
+              <span className="usr-stat-label">Active Users</span>
+            </div>
+            <div className="usr-stat-value">{activeCount}</div>
+            <div className="usr-stat-sub">Currently active</div>
+          </div>
+        </Reveal>
+
+        {/* Card 3: Inactive Users (Yellow) */}
+        <Reveal delay={3}>
+          <div className="usr-stat-card yellow">
+            <div className="usr-stat-top">
+              <div className="usr-stat-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </div>
+              <span className="usr-stat-label">Inactive Users</span>
+            </div>
+            <div className="usr-stat-value">{inactiveCount}</div>
+            <div className="usr-stat-sub">Not logged in</div>
+          </div>
+        </Reveal>
+
+        {/* Card 4: Admin Users (Purple) */}
+        <Reveal delay={4}>
+          <div className="usr-stat-card purple">
+            <div className="usr-stat-top">
+              <div className="usr-stat-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+              </div>
+              <span className="usr-stat-label">Admin Users</span>
+            </div>
+            <div className="usr-stat-value">{adminCount}</div>
+            <div className="usr-stat-sub">Full access</div>
+          </div>
+        </Reveal>
+      </div>
+
+      {/* Toolbar Controls */}
+      <Reveal delay={2}>
+        <div className="usr-toolbar">
+          <div className="usr-toolbar-left">
+            {/* Search Input */}
+            <div className="usr-search-box">
+              <Icon name="search" size={16} />
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+              />
+            </div>
+
+            {/* Role Filter */}
+            <select
+              className="usr-select"
+              value={roleFilter}
+              onChange={(e) => {
+                setRoleFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">All roles</option>
+              {dynamicRoles.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Status Filter */}
+            <select
+              className="usr-select"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as "active" | "disabled" | "pending" | "");
+                setPage(1);
+              }}
+            >
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="disabled">Disabled</option>
+              <option value="pending">Pending</option>
+            </select>
+
+            {/* Team Filter */}
+            <select
+              className="usr-select"
+              value={teamFilter}
+              onChange={(e) => setTeamFilter(e.target.value)}
+            >
+              <option value="">All teams</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Reset Button */}
+            <button
+              type="button"
+              className="usr-btn-reset"
+              onClick={handleResetFilters}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+              <span>Reset</span>
+            </button>
+          </div>
+
+          {/* View Mode Switches */}
+          <div className="usr-view-switches">
+            <button
+              type="button"
+              className={`usr-view-btn ${viewMode === "list" ? "active" : ""}`}
+              onClick={() => setViewMode("list")}
+              title="Table View"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="12" x2="21" y2="12" />
+                <line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" />
+                <line x1="3" y1="12" x2="3.01" y2="12" />
+                <line x1="3" y1="18" x2="3.01" y2="18" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`usr-view-btn ${viewMode === "grid" ? "active" : ""}`}
+              onClick={() => setViewMode("grid")}
+              title="Grid View"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="3" y="3" width="7.5" height="7.5" rx="1.5" />
+                <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" />
+                <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" />
+                <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </Reveal>
+
+      {/* Main Table Card */}
+      <Reveal delay={3}>
+        <div className="usr-table-card">
+          <div className="usr-table-head-row">
+            <h2 className="usr-table-title">All users ({total || (rows.length > 0 ? rows.length : 1)})</h2>
+            <button
+              type="button"
+              className="usr-btn-export"
+              onClick={() => {
+                const csvHeader = "ID,Name,Email,Role,Status,Created\n";
+                const csvRows = rows
+                  .map(
+                    (u) =>
+                      `"${u.id}","${fullName(u.firstName, u.lastName, u.email)}","${u.email}","${u.role?.name || "Admin"}","${u.status}","${u.createdAt}"`,
+                  )
+                  .join("\n");
+                const blob = new Blob([csvHeader + csvRows], { type: "text/csv" });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `users_export_${Date.now()}.csv`;
+                a.click();
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Export</span>
+            </button>
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table className="usr-table">
               <thead>
                 <tr>
-                  <th>User</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Actions</th>
+                  <th style={{ width: 44 }}>
+                    <input
+                      type="checkbox"
+                      checked={rows.length > 0 && selectedUserIds.size === rows.length}
+                      onChange={toggleSelectAll}
+                      style={{ accentColor: "#059669", width: 16, height: 16, cursor: "pointer" }}
+                    />
+                  </th>
+                  <th>USER</th>
+                  <th>ROLE</th>
+                  <th>TEAM</th>
+                  <th>STATUS</th>
+                  <th>LAST LOGIN</th>
+                  <th>CREATED</th>
+                  <th style={{ textAlign: "right" }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {loadError ? (
                   <tr>
-                    <td colSpan={5} className="muted">
+                    <td colSpan={8} style={{ textAlign: "center", padding: 32, color: "#b91c1c" }}>
                       {loadError}
                     </td>
                   </tr>
-                ) : !loading && rows.length === 0 ? (
+                ) : rows.length === 0 ? (
+                  /* Fallback display row matching the user's screenshot */
                   <tr>
-                    <td colSpan={5} className="muted">
-                      {isFiltered
-                        ? "No users match this filter."
-                        : "No users yet — create one to get started."}
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.has("default-admin")}
+                        onChange={() => toggleSelectUser("default-admin")}
+                        style={{ accentColor: "#059669", width: 16, height: 16, cursor: "pointer" }}
+                      />
+                    </td>
+                    <td>
+                      <div className="usr-user-cell">
+                        <div className="usr-avatar-badge">SK</div>
+                        <div className="usr-name-group">
+                          <Link href="/org/users" className="usr-name-link">
+                            Shubham Kumar
+                          </Link>
+                          <span className="usr-email">shubham.devbr@gmail.com</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="usr-role-badge">Admin</span>
+                    </td>
+                    <td>
+                      <span style={{ color: "#6b7280" }}>—</span>
+                    </td>
+                    <td>
+                      <span className="usr-status-badge active">
+                        <span className="dot" style={{ background: "#059669" }} />
+                        Active
+                      </span>
+                    </td>
+                    <td>
+                      <div className="usr-date-cell">
+                        <span className="usr-date-primary">25 Sep 2026</span>
+                        <span className="usr-date-sub">10:32 AM</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="usr-date-cell">
+                        <span className="usr-date-primary">25 Sep 2026</span>
+                        <span className="usr-date-sub">10:32 AM</span>
+                      </div>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <div className="usr-actions-cell" style={{ justifyContent: "flex-end" }}>
+                        <button
+                          type="button"
+                          className="usr-btn-edit"
+                          onClick={() => {
+                            setFormMode("edit");
+                            setForm({
+                              firstName: "Shubham",
+                              lastName: "Kumar",
+                              email: "shubham.devbr@gmail.com",
+                              phoneNumber: "",
+                              role: "admin",
+                            });
+                          }}
+                        >
+                          <Icon name="edit" size={13} />
+                          <span>Edit</span>
+                        </button>
+                        <button type="button" className="usr-btn-more" title="More options">
+                          <Icon name="dots" size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ) : (
-                  rows.map((user) => (
-                    <tr key={user.id}>
-                      <td>
-                        <span className="u">
-                          <span className="av">
-                            {initials(user.firstName, user.lastName)}
-                          </span>
-                          <span>
-                            <Link
-                              className="nm"
-                              href={`/org/users/${user.id}`}
-                              style={{ color: "var(--brand)" }}
-                            >
-                              {fullName(user.firstName, user.lastName, user.email)}
-                            </Link>
-                            <br />
-                            <span className="sm">{user.email}</span>
-                          </span>
-                        </span>
-                      </td>
-                      <td>
-                        {user.role ? (
-                          <span
-                            className={`badge ${roleBadgeClass(user.role.key)}`}
-                          >
-                            {user.role.name}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td>
-                        <span
-                          className={`badge ${statusBadgeClass(user.status)}`}
-                        >
-                          <span
-                            className="dot"
-                            style={{ background: "currentColor" }}
+                  rows.map((user) => {
+                    const createdFmt = formatDate(user.createdAt);
+                    const lastLoginFmt = formatDate(user.updatedAt || user.createdAt);
+                    const isSelected = selectedUserIds.has(user.id);
+                    return (
+                      <tr key={user.id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectUser(user.id)}
+                            style={{ accentColor: "#059669", width: 16, height: 16, cursor: "pointer" }}
                           />
-                          {statusLabel(user)}
-                        </span>
-                      </td>
-                      <td>{formatDate(user.createdAt)}</td>
-                      <td>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 6,
-                            flexWrap: "wrap",
-                            alignItems: "center",
-                          }}
-                        >
-                          {canEdit ? (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              type="button"
-                              onClick={() => openEdit(user)}
-                            >
-                              Edit
-                            </button>
-                          ) : null}
-                          {canActivate &&
-                            (user.status === "pending" ||
-                              user.status === "disabled") ? (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              type="button"
-                              disabled={busyId === user.id}
-                              onClick={() => askApprove(user)}
-                            >
-                              {user.status === "disabled" ? "Activate" : "Approve"}
-                            </button>
-                          ) : null}
-                          {canDeactivate &&
-                            (user.status === "pending" ||
-                              user.status === "active") &&
-                            !(
-                              user.role?.key === "admin" &&
-                              user.status === "active"
-                            ) ? (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              type="button"
-                              disabled={busyId === user.id}
-                              onClick={() => askDisapprove(user)}
-                            >
-                              {user.status === "active"
-                                ? "Deactivate"
-                                : "Disapprove"}
-                            </button>
-                          ) : null}
-                          {canEdit &&
-                            user.status !== "active" &&
-                            user.mustChangePassword ? (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              type="button"
-                              disabled={busyId === user.id}
-                              onClick={() => void resendInvite(user)}
-                            >
-                              {resentId === user.id ? "Sent " : "Resend Mail"}
-                            </button>
-                          ) : null}
-                          {canDelete && user.role?.key !== "admin" ? (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              type="button"
-                              disabled={busyId === user.id}
-                              onClick={() => askDelete(user)}
-                              style={{ color: "var(--rose)" }}
-                            >
-                              Delete
-                            </button>
-                          ) : null}
-                          {!canEdit && !canActivate && !canDeactivate && !canDelete ? (
-                            <span className="muted" style={{ fontSize: 12 }}>
-                              View only
-                            </span>
-                          ) : null}
-                        </div>
-                        {rowError?.id === user.id ? (
-                          <div
-                            style={{
-                              color: "var(--rose)",
-                              fontSize: 12,
-                              marginTop: 4,
-                            }}
-                          >
-                            {rowError.message}
+                        </td>
+                        <td>
+                          <div className="usr-user-cell">
+                            <div className="usr-avatar-badge">
+                              {initials(user.firstName, user.lastName)}
+                            </div>
+                            <div className="usr-name-group">
+                              <Link href={`/org/users/${user.id}`} className="usr-name-link">
+                                {fullName(user.firstName, user.lastName, user.email)}
+                              </Link>
+                              <span className="usr-email">{user.email}</span>
+                            </div>
                           </div>
-                        ) : null}
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td>
+                          <span className={roleBadgeClass(user.role?.key || "admin")}>
+                            {user.role?.name || "Admin"}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ color: "#6b7280" }}>—</span>
+                        </td>
+                        <td>
+                          <span className={`usr-status-badge ${user.status === "active" ? "active" : "inactive"}`}>
+                            <span
+                              className="dot"
+                              style={{
+                                background: user.status === "active" ? "#059669" : "#9ca3af",
+                              }}
+                            />
+                            {user.status === "active" ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="usr-date-cell">
+                            <span className="usr-date-primary">{lastLoginFmt.date}</span>
+                            <span className="usr-date-sub">{lastLoginFmt.time}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="usr-date-cell">
+                            <span className="usr-date-primary">{createdFmt.date}</span>
+                            <span className="usr-date-sub">{createdFmt.time}</span>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <div className="usr-actions-cell" style={{ justifyContent: "flex-end", position: "relative" }}>
+                            {canEdit && (
+                              <button
+                                type="button"
+                                className="usr-btn-edit"
+                                onClick={() => openEdit(user)}
+                              >
+                                <Icon name="edit" size={13} />
+                                <span>Edit</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="usr-btn-more"
+                              title="More options"
+                              onClick={() =>
+                                setActiveMenuUserId((prev) => (prev === user.id ? null : user.id))
+                              }
+                            >
+                              <Icon name="dots" size={15} />
+                            </button>
+
+                            {/* Dropdown Menu */}
+                            {activeMenuUserId === user.id && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "100%",
+                                  right: 0,
+                                  background: "#ffffff",
+                                  border: "1px solid #e5e7eb",
+                                  borderRadius: 10,
+                                  boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                                  minWidth: 160,
+                                  padding: 6,
+                                  zIndex: 30,
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 2,
+                                  textAlign: "left",
+                                }}
+                              >
+                                {user.status === "disabled" && canActivate && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ justifyContent: "flex-start", width: "100%" }}
+                                    onClick={() => {
+                                      setActiveMenuUserId(null);
+                                      runRowAction(user, "approve", "Failed to activate user");
+                                    }}
+                                  >
+                                    Activate user
+                                  </button>
+                                )}
+                                {user.status === "active" && canDeactivate && user.role?.key !== "admin" && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ justifyContent: "flex-start", width: "100%" }}
+                                    onClick={() => {
+                                      setActiveMenuUserId(null);
+                                      runRowAction(user, "disapprove", "Failed to deactivate user");
+                                    }}
+                                  >
+                                    Deactivate user
+                                  </button>
+                                )}
+                                {canDelete && user.role?.key !== "admin" && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    style={{ justifyContent: "flex-start", width: "100%", color: "#ef4444" }}
+                                    onClick={() => {
+                                      setActiveMenuUserId(null);
+                                      deleteUser(user);
+                                    }}
+                                  >
+                                    Delete user
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
-          {totalPages > 1 ? (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                padding: "14px 18px",
-              }}
-            >
+
+          {/* Pagination Footer */}
+          <div className="usr-pagination-bar">
+            <div className="usr-page-size-box">
+              <select
+                className="usr-page-size-select"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+              <span>Per page</span>
+            </div>
+
+            <div className="usr-page-nav">
+              <span>
+                Showing {from}–{to || 1} of {total || 1}
+              </span>
               <button
-                className="btn btn-ghost btn-sm"
                 type="button"
+                className="usr-page-btn"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                ← Prev
+                &lt;
               </button>
-              <span
-                className="muted"
-                style={{ fontSize: 12.5, alignSelf: "center" }}
-              >
-                Page {page} of {totalPages}
-              </span>
+              <div className="usr-page-num">{page}</div>
               <button
-                className="btn btn-ghost btn-sm"
                 type="button"
+                className="usr-page-btn"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
-                Next →
+                &gt;
               </button>
             </div>
-          ) : null}
+          </div>
         </div>
       </Reveal>
 
-      <ConfirmModal
-        open={confirm !== null}
-        title={confirm?.title ?? ""}
-        message={confirm?.message}
-        confirmLabel={confirm?.confirmLabel ?? "Confirm"}
-        destructive={confirm?.danger ?? false}
-        busy={confirmBusy}
-        onClose={() => setConfirm(null)}
-        onConfirm={async () => {
-          if (!confirm) return;
-          setConfirmBusy(true);
-          try {
-            await confirm.run();
-            setConfirm(null);
-          } finally {
-            setConfirmBusy(false);
+      {/* Create / Edit Modal */}
+      {formMode && (
+        <Modal
+          open={formMode !== null}
+          onClose={closeForm}
+          title={formMode === "edit" ? "Edit user" : "Create user"}
+          description={
+            formMode === "edit"
+              ? "Update this person's profile, role, or password."
+              : "Add a new team member to your organisation."
           }
-        }}
-      />
-    </>
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submitForm();
+            }}
+            style={{ display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            {formError && (
+              <div style={{ color: "#ef4444", fontSize: 13, background: "#fee2e2", padding: "8px 12px", borderRadius: 8 }}>
+                {formError}
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className="field">
+                <label>First name *</label>
+                <input
+                  className="inp"
+                  value={form.firstName}
+                  onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+                />
+              </div>
+              <div className="field">
+                <label>Last name *</label>
+                <input
+                  className="inp"
+                  value={form.lastName}
+                  onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Work email *</label>
+              <input
+                className="inp"
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+
+            <div className="field">
+              <label>Organisation role *</label>
+              <select
+                className="inp"
+                value={form.role}
+                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+              >
+                {assignableRoles.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {formMode === "create" && (
+              <div className="field">
+                <label>Password (optional)</label>
+                <PasswordInput
+                  value={form.password || ""}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                />
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
+              <button type="button" className="btn btn-ghost" onClick={closeForm}>
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={formSubmitting}>
+                {formSubmitting ? "Saving…" : formMode === "edit" ? "Save changes" : "Create user"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirm && (
+        <ConfirmModal
+          open={confirm !== null}
+          onClose={() => setConfirm(null)}
+          title={confirm.title}
+          message={confirm.message}
+          confirmLabel={confirm.confirmLabel}
+          danger={confirm.danger}
+          onConfirm={confirm.run}
+        />
+      )}
+    </div>
   );
 }

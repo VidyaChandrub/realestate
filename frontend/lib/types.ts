@@ -577,6 +577,9 @@ export interface OrgTemplateSummary {
   // "Remove" up front instead of letting someone confirm an action the
   // backend guard (unassignTemplate) is just going to reject.
   landingPageCount: number;
+  isAssigned?: boolean;
+  isLocked?: boolean;
+  lockReason?: string | null;
 }
 
 export interface OrgTemplatesListResponse {

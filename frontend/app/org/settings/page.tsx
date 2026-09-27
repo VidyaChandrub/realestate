@@ -69,7 +69,6 @@ const PLAN_LIMIT_ROWS: { key: "templates" | "projects" | "users" | "landingPages
 const READ_ONLY_FIELDSET: CSSProperties = { border: 0, padding: 0, margin: 0, minWidth: 0 };
 
 const NAV_GROUPS = [
-  // TODO: static sections are commented out below — re-enable their nav entries when they are made dynamic.
   {
     grp: "ORGANISATION", items: [
       { s: "general", icon: "building" as IconName, t: "General" },
@@ -81,35 +80,26 @@ const NAV_GROUPS = [
   {
     grp: "SALES", items: [
       { s: "crm", icon: "crm" as IconName, t: "CRM & Leads" },
-      // { s: "fields", icon: "puzzle" as IconName, t: "Custom Attributes" },
       { s: "pipeline", icon: "modules" as IconName, t: "Pipeline & Sources" },
       { s: "catalogs", icon: "properties" as IconName, t: "Project Catalogs" },
-      // { s: "scoring", icon: "star" as IconName, t: "Scoring & Assignment" },
-      // { s: "automation", icon: "link" as IconName, t: "Automation & SLA" },
     ]
   },
   {
     grp: "COMMUNICATION", items: [
-      // { s: "comms", icon: "phone" as IconName, t: "Calling & WhatsApp" },
       { s: "email", icon: "mail" as IconName, t: "Email & SMTP" },
-      // { s: "notifications", icon: "bell" as IconName, t: "Notifications" },
+      { s: "whatsapp", icon: "phone" as IconName, t: "WhatsApp Settings" },
     ]
   },
-  // { grp: "PLATFORM", items: [
-  // { s: "data", icon: "document" as IconName, t: "Data & Import" },
-  // { s: "api", icon: "key" as IconName, t: "API & Webhooks" },
-  // { s: "audit", icon: "shield" as IconName, t: "Audit Log" },
-  // ] },
   {
     grp: "ACCOUNT", items: [
-      { s: "billing", icon: "billing" as IconName, t: "Billing" },
-      // { s: "security", icon: "lock" as IconName, t: "Security" },
+      { s: "billing", icon: "billing" as IconName, t: "Billing & Subscription" },
+      { s: "team-prefs", icon: "users" as IconName, t: "Team Preferences" },
     ]
   },
 ] as const;
 
 const SECTION_META: Record<string, { icon: IconName; title: string; sub: string }> = {
-  general: { icon: "building", title: "Organisation profile", sub: "Basic details, legal info and registered address" },
+  general: { icon: "building", title: "General Information", sub: "Update your organisation's basic details and contact information." },
   branding: { icon: "sparkles", title: "Logo & identity", sub: "Shown across the app, landing pages & emails" },
   localization: { icon: "globe", title: "Formats & language", sub: "Regional preferences for your workspace" },
   domain: { icon: "globe", title: "Domain & subdomain", sub: "Your organisation site URL and custom domain" },
@@ -120,20 +110,21 @@ const SECTION_META: Record<string, { icon: IconName; title: string; sub: string 
   scoring: { icon: "star", title: "Scoring & assignment", sub: "Lead scores and distribution rules" },
   automation: { icon: "link", title: "Automation & SLA", sub: "Trigger workflows and response targets" },
   comms: { icon: "phone", title: "Calling & WhatsApp", sub: "Dialler, AI voice and WhatsApp Business" },
+  whatsapp: { icon: "phone", title: "WhatsApp Settings", sub: "WhatsApp Business setup and automated messaging" },
   email: { icon: "mail", title: "Email & SMTP", sub: "Organisation mail server for invites, resets and notifications" },
   notifications: { icon: "bell", title: "Notifications", sub: "Channels per event type" },
   data: { icon: "document", title: "Data & import", sub: "Move data in and out of the platform" },
   api: { icon: "key", title: "API & webhooks", sub: "Programmatic access and event delivery" },
   audit: { icon: "shield", title: "Audit log", sub: "Recent admin & security events" },
-  billing: { icon: "billing", title: "Billing", sub: "Subscription, plans and invoices" },
+  billing: { icon: "billing", title: "Billing & Subscription", sub: "Subscription, plans and invoices" },
+  "team-prefs": { icon: "users", title: "Team Preferences", sub: "Default roles, invitations and team configuration" },
   security: { icon: "lock", title: "Security", sub: "Sign-in policy and danger zone" },
 };
 
-// TODO: only used by the commented-out static sections — re-enable with them.
-// function Toggle({ on = false }: { on?: boolean }) {
-//   const [s, setS] = useState(on);
-//   return <div className={`switch${s ? " on" : ""}`} onClick={() => setS((v) => !v)} />;
-// }
+function Toggle({ on = false }: { on?: boolean }) {
+  const [s, setS] = useState(on);
+  return <div className={`switch${s ? " on" : ""}`} onClick={() => setS((v) => !v)} />;
+}
 
 interface GeneralBrandingForm {
   name: string; legalName: string; industry: OrgIndustry | "";
@@ -1396,25 +1387,43 @@ export default function OrgSettingsPage() {
     : NAV_GROUPS.flatMap((g) => g.items.map((i) => i.s as string)).find(sectionAllowed) ?? section;
 
   const saveButton = !canEditProfile ? null : (
-    <div className="os-actions">
-      <button className="btn btn-ghost" onClick={handleDiscard} disabled={saving || !dirty}>Discard</button>
-      <button className="btn btn-primary" onClick={() => void handleSave()} disabled={saving}>
-        {saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      {dirty ? (
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ height: 38, padding: "0 14px", borderRadius: 9, fontSize: 13 }}
+          onClick={handleDiscard}
+          disabled={saving}
+        >
+          Discard
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="set-save-btn"
+        onClick={() => void handleSave()}
+        disabled={saving}
+      >
+        <Icon name="check" size={16} />
+        <span>{saving ? "Saving…" : saved ? "Saved ✓" : "Save changes"}</span>
       </button>
     </div>
   );
 
   return (
     <div className="os-page">
-      <div className="os-head reveal in">
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 14, minWidth: 0 }}>
-          <div className="h-text">
-            <div className="eyebrow">Workspace</div>
-            <h1>Settings</h1>
-            <div className="sub">Manage your profile, organisation, CRM &amp; custom attributes, pipeline, communication, automation, data, API and security.</div>
+      <div className="set-header reveal in">
+        <div className="set-header-left">
+          <div className="set-header-badge">
+            <Icon name="settings" size={26} />
+          </div>
+          <div className="set-header-htext">
+            <div className="set-header-eyebrow">ORGANISATION SETTINGS</div>
+            <h1 className="set-header-title">Organisation Settings</h1>
+            <div className="set-header-sub">Manage your organisation details, domain, localization, and system configurations.</div>
           </div>
         </div>
-        {saveButton}
       </div>
       {saveError ? <div className="form-alert">{saveError}</div> : null}
 
@@ -1443,6 +1452,7 @@ export default function OrgSettingsPage() {
                   >
                     <span className="os-nav-ic"><Icon name={it.icon} size={16} /></span>
                     <span className="os-nav-label">{it.t}</span>
+                    <span className="os-nav-arrow"><Icon name="chevron-right" size={14} /></span>
                   </button>
                 ))}
               </div>
@@ -1454,59 +1464,192 @@ export default function OrgSettingsPage() {
           <fieldset disabled={!canEditProfile} style={READ_ONLY_FIELDSET}>
           {/* GENERAL */}
           <div className={`os-section${activeSection === "general" ? " on" : ""}`}>
-            <SectionHead section="general" />
-            <Card icon="building" title="Organisation profile" sub="Basic details" >
-              <div className="row2">
-                <div className="field"><label>Organisation name</label><input className="inp" value={form.name} onChange={(e) => updateForm({ name: e.target.value })} /></div>
-                <div className="field"><label>Legal / registered name</label><input className="inp" value={form.legalName} onChange={(e) => updateForm({ legalName: e.target.value })} placeholder="Skyline Developers Pvt. Ltd." /></div>
-              </div>
-              <div className="row2">
-                <div className="field">
-                  <label>Subdomain</label>
-                  <input className="inp inp-mono" value={org.subdomain ?? ""} readOnly disabled placeholder="Not set yet" />
-                  <div className="hint">Set from the Domain section — changing it here would break existing links.</div>
-                </div>
-                <div className="field">
-                  <label>Industry</label>
-                  <select className="inp" value={form.industry} onChange={(e) => updateForm({ industry: e.target.value as OrgIndustry })}>
-                    <option value="">Select…</option>
-                    {INDUSTRY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="row2">
-                <div className="field"><label>Support email</label><input className="inp" type="email" value={form.supportEmail} onChange={(e) => updateForm({ supportEmail: e.target.value })} placeholder="care@skylinedev.in" /></div>
-                <div className="field"><label>Support phone</label><input className="inp inp-mono" value={form.supportPhone} onChange={(e) => updateForm({ supportPhone: e.target.value })} placeholder="+91 79000 12345" /></div>
-              </div>
-              <div className="row2">
-                <div className="field">
-                  <label>Country</label>
-                  <select className="inp" value={form.country} onChange={handleCountryChange}>
-                    <option value="">Select country…</option>
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                  {form.country && COUNTRY_META[form.country] ? (
-                    <div className="hint" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ color: "var(--green)", display: "inline-flex" }}><Icon name="check" size={13} /></span>
-                      <span>Auto-set from {form.country}: Currency <b>{COUNTRY_META[form.country].currency}</b> · Timezone <b>{COUNTRY_META[form.country].timezone}</b></span>
+            <Card
+              icon="building"
+              title="General Information"
+              sub="Update your organisation's basic details and contact information."
+              action={saveButton}
+            >
+              <div className="set-form-grid">
+                <div className="set-row-2">
+                  <div className="set-field">
+                    <label>Organisation name <span className="set-req">*</span></label>
+                    <div className="set-input-box">
+                      <span className="set-field-ic"><Icon name="building" size={16} /></span>
+                      <input
+                        className="inp"
+                        value={form.name}
+                        onChange={(e) => updateForm({ name: e.target.value })}
+                        placeholder="Miraclecare"
+                      />
                     </div>
-                  ) : null}
+                  </div>
+                  <div className="set-field">
+                    <label>Legal / registered name</label>
+                    <div className="set-input-box">
+                      <span className="set-field-ic"><Icon name="document" size={16} /></span>
+                      <input
+                        className="inp"
+                        value={form.legalName}
+                        onChange={(e) => updateForm({ legalName: e.target.value })}
+                        placeholder="Skyline Developers Pvt. Ltd."
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="field"><label>City</label><input className="inp" value={form.city} onChange={(e) => updateForm({ city: e.target.value })} /></div>
-              </div>
-              <div className="row2">
-                <div className="field"><label>State</label><input className="inp" value={form.state} onChange={(e) => updateForm({ state: e.target.value })} /></div>
-                <div className="field"><label>Postal code</label><input className="inp inp-mono" value={form.postalCode} onChange={(e) => updateForm({ postalCode: e.target.value })} /></div>
-              </div>
-              <div className="field">
-                <label>Registered address</label>
-                <textarea className="inp" rows={2} value={form.addressLine1} onChange={(e) => updateForm({ addressLine1: e.target.value })} placeholder="Address line 1" />
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label>Address line 2</label>
-                <input className="inp" value={form.addressLine2} onChange={(e) => updateForm({ addressLine2: e.target.value })} placeholder="Optional" />
+
+                <div className="set-row-2">
+                  <div className="set-field">
+                    <label>Subdomain <span className="set-req">*</span></label>
+                    <div className="set-input-box">
+                      <span className="set-field-ic"><Icon name="link" size={16} /></span>
+                      <input
+                        className="inp inp-mono"
+                        value={org.subdomain ?? ""}
+                        readOnly
+                        disabled
+                        placeholder="Not set yet"
+                      />
+                    </div>
+                    <div className="set-field-hint">
+                      Set from the Domain section — changing it here would break existing links.
+                    </div>
+                  </div>
+                  <div className="set-field">
+                    <label>Industry <span className="set-req">*</span></label>
+                    <div className="set-input-box">
+                      <span className="set-field-ic"><Icon name="tag" size={16} /></span>
+                      <select
+                        className="inp"
+                        value={form.industry}
+                        onChange={(e) => updateForm({ industry: e.target.value as OrgIndustry })}
+                      >
+                        <option value="">Select industry…</option>
+                        {INDUSTRY_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="set-row-2">
+                  <div className="set-field">
+                    <label>Support email <span className="set-req">*</span></label>
+                    <div className="set-input-box">
+                      <span className="set-field-ic"><Icon name="mail" size={16} /></span>
+                      <input
+                        className="inp"
+                        type="email"
+                        value={form.supportEmail}
+                        onChange={(e) => updateForm({ supportEmail: e.target.value })}
+                        placeholder="care@skylinedev.in"
+                      />
+                    </div>
+                  </div>
+                  <div className="set-field">
+                    <label>Support phone</label>
+                    <div className="set-phone-group">
+                      <span className="set-phone-ic"><Icon name="phone" size={15} /></span>
+                      <span className="set-phone-flag" title="India">
+                        🇮🇳 <Icon name="chevron-down" size={12} style={{ color: "#94a3b8" }} />
+                      </span>
+                      <input
+                        className="set-phone-input"
+                        value={form.supportPhone}
+                        onChange={(e) => updateForm({ supportPhone: e.target.value })}
+                        placeholder="+91 79000 12345"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="set-row-2">
+                  <div className="set-field">
+                    <label>Country <span className="set-req">*</span></label>
+                    <div className="set-input-box">
+                      <span className="set-field-ic"><Icon name="globe" size={16} /></span>
+                      <select className="inp" value={form.country} onChange={handleCountryChange}>
+                        <option value="">Select country…</option>
+                        {COUNTRIES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {form.country && COUNTRY_META[form.country] ? (
+                      <div className="set-country-hint">
+                        <span className="set-country-check"><Icon name="check" size={13} /></span>
+                        <span>Auto-set from {form.country}: Currency <b>{COUNTRY_META[form.country].currency}</b> · Timezone <b>{COUNTRY_META[form.country].timezone}</b></span>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="set-field">
+                    <label>City <span className="set-req">*</span></label>
+                    <div className="set-input-box">
+                      <span className="set-field-ic"><Icon name="pin" size={16} /></span>
+                      <input
+                        className="inp"
+                        value={form.city}
+                        onChange={(e) => updateForm({ city: e.target.value })}
+                        placeholder="Bengaluru"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="set-row-2">
+                  <div className="set-field">
+                    <label>State</label>
+                    <div className="set-input-box">
+                      <span className="set-field-ic"><Icon name="building" size={16} /></span>
+                      <input
+                        className="inp"
+                        value={form.state}
+                        onChange={(e) => updateForm({ state: e.target.value })}
+                        placeholder="Karnataka"
+                      />
+                    </div>
+                  </div>
+                  <div className="set-field">
+                    <label>Postal code</label>
+                    <div className="set-input-box">
+                      <span className="set-field-ic"><Icon name="mail" size={16} /></span>
+                      <input
+                        className="inp inp-mono"
+                        value={form.postalCode}
+                        onChange={(e) => updateForm({ postalCode: e.target.value })}
+                        placeholder="560001"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="set-field">
+                  <label>Registered address</label>
+                  <div className="set-input-box set-is-textarea">
+                    <span className="set-field-ic"><Icon name="pin" size={16} /></span>
+                    <textarea
+                      className="inp"
+                      rows={2}
+                      value={form.addressLine1}
+                      onChange={(e) => updateForm({ addressLine1: e.target.value })}
+                      placeholder="123, Prestige Tech Park, Outer Ring Road, Bengaluru, Karnataka – 560001, India"
+                    />
+                  </div>
+                </div>
+
+                <div className="set-field" style={{ marginBottom: 0 }}>
+                  <label>Address line 2</label>
+                  <div className="set-input-box">
+                    <span className="set-field-ic"><Icon name="pin" size={16} /></span>
+                    <input
+                      className="inp"
+                      value={form.addressLine2}
+                      onChange={(e) => updateForm({ addressLine2: e.target.value })}
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
               </div>
             </Card>
           </div>
@@ -1782,28 +1925,37 @@ export default function OrgSettingsPage() {
           </div>
           */}
 
-          {/* COMMS */}
-          {/* TODO: static Calling & WhatsApp — hardcoded toggles & sample number, not persisted.
-          <div className={`os-section${activeSection === "comms" ? " on" : ""}`}>
-            <SectionHead section="comms" />
-            <Card icon="phone" title="Calling" sub="Dialler & AI voice">
-              <div className="card-b" style={{ padding: 0 }}>
-                {[["Masked calling", "Hide lead numbers; route via bridge.", true], ["Record calls", "Store recordings for QA & training.", true], ["AI voice agent", "Enable automated qualifying calls.", true]].map(([t, d, on]) => (
-                  <div className="swrow" key={t as string}><div className="tx"><b>{t as string}</b><div className="muted">{d as string}</div></div><Toggle on={on as boolean} /></div>
-                ))}
-                <div className="swrow" style={{ borderBottom: 0 }}><div className="tx"><b>Monthly credits per agent</b></div><input className="inp" style={{ width: 100 }} defaultValue="1,000" /></div>
+          {/* WHATSAPP */}
+          <div className={`os-section${activeSection === "whatsapp" || activeSection === "comms" ? " on" : ""}`}>
+            <SectionHead section="whatsapp" />
+            <Card icon="phone" title="WhatsApp Business" sub="Shared business number, templates & automation">
+              <div className="set-row-2">
+                <div className="set-field">
+                  <label>Business WhatsApp number</label>
+                  <div className="set-phone-group">
+                    <span className="set-phone-ic"><Icon name="phone" size={15} /></span>
+                    <span className="set-phone-flag">🇮🇳 <Icon name="chevron-down" size={12} style={{ color: "#94a3b8" }} /></span>
+                    <input className="set-phone-input" defaultValue="+91 79000 12345" />
+                  </div>
+                </div>
+                <div className="set-field">
+                  <label>Display name</label>
+                  <div className="set-input-box">
+                    <span className="set-field-ic"><Icon name="building" size={16} /></span>
+                    <input className="inp" defaultValue={form.name || "Skyline Developers"} />
+                  </div>
+                </div>
               </div>
-            </Card>
-            <Card icon="phone" title="WhatsApp Business" sub="Shared number & templates">
-              <div className="row2">
-                <div className="field"><label>Business number</label><input className="inp inp-mono" defaultValue="+91 79000 12345" /></div>
-                <div className="field"><label>Display name</label><input className="inp" defaultValue="Skyline Developers" /></div>
+              <div className="swrow" style={{ marginTop: 16 }}>
+                <div className="tx"><b>Auto-assign chats to lead owner</b><div className="muted">Route incoming messages automatically to the assigned sales agent</div></div>
+                <Toggle on />
               </div>
-              <div className="swrow"><div className="tx"><b>Auto-assign chats to lead owner</b></div><Toggle on /></div>
-              <div className="swrow" style={{ borderBottom: 0 }}><div className="tx"><b>Send read receipts</b></div><Toggle on /></div>
+              <div className="swrow" style={{ borderBottom: 0 }}>
+                <div className="tx"><b>Send read receipts &amp; delivery status</b><div className="muted">Track whether leads read outbound WhatsApp campaigns</div></div>
+                <Toggle on />
+              </div>
             </Card>
           </div>
-          */}
 
           {/* EMAIL */}
           <div className={`os-section${activeSection === "email" ? " on" : ""}`}>
@@ -2345,6 +2497,44 @@ export default function OrgSettingsPage() {
                   ))}
                 </div>
               )}
+            </Card>
+          </div>
+
+          {/* TEAM PREFERENCES */}
+          <div className={`os-section${activeSection === "team-prefs" ? " on" : ""}`}>
+            <SectionHead section="team-prefs" />
+            <Card icon="users" title="Team Preferences" sub="Default member permissions, invitations & workspace collaboration">
+              <div className="set-row-2">
+                <div className="set-field">
+                  <label>Default role for invited members</label>
+                  <div className="set-input-box">
+                    <span className="set-field-ic"><Icon name="users" size={16} /></span>
+                    <select className="inp" defaultValue="agent">
+                      <option value="agent">Agent / Sales Executive</option>
+                      <option value="manager">Team Manager</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="set-field">
+                  <label>Default lead distribution mode</label>
+                  <div className="set-input-box">
+                    <span className="set-field-ic"><Icon name="modules" size={16} /></span>
+                    <select className="inp" defaultValue="round-robin">
+                      <option value="round-robin">Round-Robin Assignment</option>
+                      <option value="manual">Manual Manager Assignment</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="swrow" style={{ marginTop: 16 }}>
+                <div className="tx"><b>Allow agents to create landing pages</b><div className="muted">Permit sales agents to draft their own promotional landing pages</div></div>
+                <Toggle on />
+              </div>
+              <div className="swrow" style={{ borderBottom: 0 }}>
+                <div className="tx"><b>Team Chat notifications</b><div className="muted">Send in-app and email badges for team chat messages and mentions</div></div>
+                <Toggle on />
+              </div>
             </Card>
           </div>
 

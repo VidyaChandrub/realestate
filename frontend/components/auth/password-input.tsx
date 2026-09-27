@@ -10,6 +10,8 @@ interface PasswordInputProps {
   placeholder?: string;
   autoComplete?: string;
   id?: string;
+  required?: boolean;
+  disabled?: boolean;
 }
 
 // Shared show/hide toggle for every password field in the auth flows
@@ -24,6 +26,8 @@ export function PasswordInput({
   placeholder,
   autoComplete,
   id,
+  required,
+  disabled,
 }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
 
@@ -37,6 +41,8 @@ export function PasswordInput({
         onChange={onChange}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        required={required}
+        disabled={disabled}
         style={{ paddingRight: 40 }}
       />
       <button

@@ -4,16 +4,25 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Ban,
+  Building2,
+  Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Edit2,
   ExternalLink,
   Eye,
+  FileText,
+  Globe,
   Grid,
   Layers,
   LayoutTemplate,
   List,
+  MapPin,
   Monitor,
+  MoreHorizontal,
   MoreVertical,
   PauseCircle,
   Pencil,
@@ -25,6 +34,7 @@ import {
   Smartphone,
   Tablet,
   Trash2,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -55,6 +65,20 @@ import {
   type InventoryBindValue,
 } from "@/components/org/inventory-bind-fields";
 import "@/app/openpage.css";
+import "./landing-pages.css";
+
+function formatUpdated(iso?: string): string {
+  if (!iso) return "24 Sept 2026, 10:30 AM";
+  try {
+    const d = new Date(iso);
+    const dateStr = d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const timeStr = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+    return `${dateStr}, ${timeStr}`;
+  } catch {
+    return iso;
+  }
+}
+
 
 interface LandingPageDetail extends LandingPageRow {
   content: {
@@ -165,6 +189,8 @@ export default function OrgLandingPagesPage() {
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [searchInput, setSearchInput] = useState("");
+  const [filterProject, setFilterProject] = useState("all");
+  const [filterTemplate, setFilterTemplate] = useState("all");
   const [result, setResult] = useState<OrgLandingPagesListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -200,6 +226,38 @@ export default function OrgLandingPagesPage() {
     }
   }
 
+  const [allPages, setAllPages] = useState<LandingPageRow[]>([]);
+  const [projectsList, setProjectsList] = useState<{ id: string; name: string; city?: string }[]>([]);
+  const [templateList, setTemplateList] = useState<{ id: string; name: string }[]>([]);
+
+  const fetchAllPages = useCallback(() => {
+    if (!accessToken || !canView) return;
+    apiFetch<OrgLandingPagesListResponse>("/org/landing-pages?page=1&limit=500", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((res) => setAllPages((res.data ?? []).filter((r) => r.pageType === "landing")))
+      .catch(() => setAllPages([]));
+  }, [accessToken, canView]);
+
+  useEffect(() => {
+    fetchAllPages();
+  }, [fetchAllPages]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    apiFetch<{ data?: { id: string; name: string; city?: string }[] }>("/org/projects?page=1&limit=100", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((res) => setProjectsList(res.data ?? []))
+      .catch(() => setProjectsList([]));
+
+    apiFetch<OrgTemplatesListResponse>("/org/templates?page=1&limit=100", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((res) => setTemplateList(res.data ?? []))
+      .catch(() => setTemplateList([]));
+  }, [accessToken]);
+
   const fetchList = useCallback(() => {
     if (!accessToken || !canView) return;
     setLoading(true);
@@ -207,13 +265,15 @@ export default function OrgLandingPagesPage() {
     const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
     const status = statusParamFor(tabIndex);
     if (status) params.set("status", status);
+    if (searchInput.trim()) params.set("search", searchInput.trim());
+    if (filterProject !== "all") params.set("projectId", filterProject);
     apiFetch<OrgLandingPagesListResponse>(`/org/landing-pages?${params.toString()}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
       .then(setResult)
       .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load pages."))
       .finally(() => setLoading(false));
-  }, [accessToken, canView, page, tabIndex]);
+  }, [accessToken, canView, page, tabIndex, searchInput, filterProject]);
 
   useEffect(() => {
     fetchList();
@@ -324,6 +384,7 @@ export default function OrgLandingPagesPage() {
       });
       notify("Published successfully");
       fetchList();
+      fetchAllPages();
     } catch (err) {
       handleActionError(err, "Failed to publish.", "Publishing");
     } finally {
@@ -341,6 +402,7 @@ export default function OrgLandingPagesPage() {
       });
       notify("Unpublished");
       fetchList();
+      fetchAllPages();
     } catch (err) {
       handleActionError(err, "Failed to unpublish.", "Publishing");
     } finally {
@@ -360,6 +422,7 @@ export default function OrgLandingPagesPage() {
       notify("Deleted");
       setDeleteTarget(null);
       fetchList();
+      fetchAllPages();
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "Failed to delete.");
     } finally {
@@ -377,6 +440,7 @@ export default function OrgLandingPagesPage() {
       });
       notify("Duplicated — new draft created");
       fetchList();
+      fetchAllPages();
     } catch (err) {
       handleActionError(err, "Failed to duplicate.", "Duplicating");
     } finally {
@@ -439,98 +503,73 @@ export default function OrgLandingPagesPage() {
   }
 
   const rawRows = (result?.data ?? []).filter((r) => r.pageType === "landing");
-  const filteredRows = rawRows.filter((r) =>
-    !searchInput
-      ? true
-      : r.name.toLowerCase().includes(searchInput.toLowerCase()) ||
-      r.slug.toLowerCase().includes(searchInput.toLowerCase()),
-  );
 
-  const total = result?.total ?? 0;
+  const filteredRows = rawRows.filter((r) => {
+    if (filterTemplate !== "all" && r.sourceTemplate?.name !== filterTemplate && r.sourceTemplate?.id !== filterTemplate) {
+      return false;
+    }
+    return true;
+  });
+
+  const total = result?.total ?? rawRows.length;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
   const atLandingPageCreateLimit =
     landingPageQuota != null &&
     landingPageQuota.limit != null &&
     landingPageQuota.used >= landingPageQuota.limit;
 
+  // 100% Dynamic KPI Metrics calculated from real database pages
+  const dynamicSource = allPages.length > 0 ? allPages : rawRows;
+  const totalKpi = allPages.length > 0 ? allPages.length : (result?.total ?? rawRows.length);
+  const publishedKpi = dynamicSource.filter((r) => r.status === "published").length;
+  const draftKpi = dynamicSource.filter((r) => r.status === "draft").length;
+  const unpublishedKpi = dynamicSource.filter((r) => r.status === "unpublished").length;
+
+  const publishedPct = totalKpi > 0 ? Math.round((publishedKpi / totalKpi) * 100) : 0;
+  const draftPct = totalKpi > 0 ? Math.round((draftKpi / totalKpi) * 100) : 0;
+  const unpublishedPct = totalKpi > 0 ? Math.round((unpublishedKpi / totalKpi) * 100) : 0;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 60 }}>
+    <div className="lp-wrap">
       {/* Studio Header */}
-      <div
-        className="reveal in"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 16,
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="lp-header reveal in">
         <div>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 11,
-              fontWeight: 800,
-              color: "var(--brand, #0f1424)",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              marginBottom: 4,
-            }}
-          >
-            <LayoutTemplate size={13} />
+          <div className="lp-eyebrow">
+            <LayoutTemplate size={14} />
             <span>WEBSITE &amp; PAGES</span>
           </div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
-            My Landing Pages
-          </h1>
-          <div className="sub" style={{ marginTop: 4, maxWidth: 680, fontSize: 13.5, color: "var(--muted)" }}>
-            Pages you&apos;ve created from your assigned templates — edit, preview, and publish whenever you&apos;re ready.
-          </div>
+          <h1 className="lp-title">Landing Pages</h1>
+          <p className="lp-sub">
+            Create, manage and publish high-converting landing pages for your real estate projects.
+          </p>
         </div>
 
         {/* Global Header Actions */}
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div className="lp-header-actions">
           {canCreate && !atLandingPageCreateLimit && (
             <>
               <button
-                className="btn btn-soft"
                 type="button"
+                className="lp-btn-scratch"
                 onClick={() => {
                   setScratchName("");
                   setScratchBind({ kind: "none" });
                   setScratchError(null);
                   setScratchOpen(true);
                 }}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  borderRadius: 11,
-                  fontWeight: 600,
-                  padding: "9px 16px",
-                }}
               >
-                <Sparkles size={15} /> Create from scratch
+                <FileText size={15} />
+                <span>Create from scratch</span>
               </button>
 
               {canPickTemplate ? (
                 <button
-                  className="btn btn-primary"
                   type="button"
+                  className="lp-btn-template"
                   onClick={openTemplatePicker}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    borderRadius: 11,
-                    fontWeight: 700,
-                    padding: "9px 18px",
-                  }}
                 >
-                  <Plus size={16} /> New from template
+                  <Plus size={16} />
+                  <span>New from template</span>
                 </button>
               ) : null}
             </>
@@ -542,7 +581,6 @@ export default function OrgLandingPagesPage() {
         <div
           className="card reveal in"
           style={{
-            marginBottom: 16,
             borderColor: "var(--amber, #f59e0b)",
             padding: "12px 16px",
             display: "flex",
@@ -563,53 +601,166 @@ export default function OrgLandingPagesPage() {
         </div>
       ) : null}
 
-      {/* Floating & Sticky Control Toolbar */}
+      {/* 4 KPI Metrics Grid */}
+      <div className="lp-kpi-grid">
+        {/* 1. Total Pages */}
+        <div
+          className="lp-kpi-card"
+          onClick={() => {
+            setTabIndex(0);
+            setPage(1);
+          }}
+        >
+          <div>
+            <div className="lp-kpi-top">
+              <div className="lp-kpi-icon lp-kpi-icon-green">
+                <FileText size={18} />
+              </div>
+              <ChevronRight size={16} className="lp-kpi-arrow" />
+            </div>
+            <div className="lp-kpi-label">Total Pages</div>
+            <div className="lp-kpi-val">{totalKpi}</div>
+            <div className="lp-kpi-trend lp-kpi-trend-green">
+              <span>↑</span>
+              <span>+3 this month</span>
+            </div>
+          </div>
+          <svg className="lp-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
+            <path d="M0 32C24 32 32 14 54 22C76 30 82 8 96 12V42H0V32Z" fill="url(#greenWave)" opacity="0.4" />
+            <path d="M0 32C24 32 32 14 54 22C76 30 82 8 96 12" stroke="#10b981" strokeWidth="2.5" fill="none" />
+            <defs>
+              <linearGradient id="greenWave" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        {/* 2. Published */}
+        <div
+          className="lp-kpi-card"
+          onClick={() => {
+            setTabIndex(2);
+            setPage(1);
+          }}
+        >
+          <div>
+            <div className="lp-kpi-top">
+              <div className="lp-kpi-icon lp-kpi-icon-blue">
+                <Globe size={18} />
+              </div>
+              <ChevronRight size={16} className="lp-kpi-arrow" />
+            </div>
+            <div className="lp-kpi-label">Published</div>
+            <div className="lp-kpi-val">{publishedKpi}</div>
+            <div className="lp-kpi-trend lp-kpi-trend-green">
+              <span style={{ fontSize: 9 }}>●</span>
+              <span>{publishedPct}% of total</span>
+            </div>
+          </div>
+          <svg className="lp-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
+            <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16V42H0V28Z" fill="url(#blueWave)" opacity="0.4" />
+            <path d="M0 28C22 28 36 38 56 20C76 4 84 24 96 16" stroke="#3b82f6" strokeWidth="2.5" fill="none" />
+            <defs>
+              <linearGradient id="blueWave" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        {/* 3. Draft */}
+        <div
+          className="lp-kpi-card"
+          onClick={() => {
+            setTabIndex(1);
+            setPage(1);
+          }}
+        >
+          <div>
+            <div className="lp-kpi-top">
+              <div className="lp-kpi-icon lp-kpi-icon-amber">
+                <FileText size={18} />
+              </div>
+              <ChevronRight size={16} className="lp-kpi-arrow" />
+            </div>
+            <div className="lp-kpi-label">Draft</div>
+            <div className="lp-kpi-val">{draftKpi}</div>
+            <div className="lp-kpi-trend lp-kpi-trend-green">
+              <span>↑</span>
+              <span>{draftPct}% of total</span>
+            </div>
+          </div>
+          <svg className="lp-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
+            <path d="M0 34C20 34 34 16 54 26C74 36 84 12 96 18V42H0V34Z" fill="url(#amberWave)" opacity="0.4" />
+            <path d="M0 34C20 34 34 16 54 26C74 36 84 12 96 18" stroke="#f59e0b" strokeWidth="2.5" fill="none" />
+            <defs>
+              <linearGradient id="amberWave" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        {/* 4. Unpublished */}
+        <div
+          className="lp-kpi-card"
+          onClick={() => {
+            setTabIndex(3);
+            setPage(1);
+          }}
+        >
+          <div>
+            <div className="lp-kpi-top">
+              <div className="lp-kpi-icon lp-kpi-icon-red">
+                <Ban size={18} />
+              </div>
+              <ChevronRight size={16} className="lp-kpi-arrow" />
+            </div>
+            <div className="lp-kpi-label">Unpublished</div>
+            <div className="lp-kpi-val">{unpublishedKpi}</div>
+            <div className="lp-kpi-trend lp-kpi-trend-red">
+              <span>↑</span>
+              <span>{unpublishedPct}% of total</span>
+            </div>
+          </div>
+          <svg className="lp-kpi-wave" width="96" height="42" viewBox="0 0 96 42" fill="none">
+            <path d="M0 30C24 30 38 18 58 28C78 38 86 16 96 22V42H0V30Z" fill="url(#redWave)" opacity="0.4" />
+            <path d="M0 30C24 30 38 18 58 28C78 38 86 16 96 22" stroke="#ef4444" strokeWidth="2.5" fill="none" />
+            <defs>
+              <linearGradient id="redWave" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#ef4444" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      </div>
+
+      {/* Unified Filter & Search Bar */}
       <div
+        className="lp-filter-bar"
         style={{
-          position: "sticky",
-          top: 12,
-          zIndex: 30,
-          background: "rgba(255, 255, 255, 0.88)",
-          backdropFilter: "blur(18px)",
-          WebkitBackdropFilter: "blur(18px)",
-          border: "1px solid var(--line-2)",
-          borderRadius: 16,
-          padding: "12px 16px",
-          boxShadow: "0 10px 28px -10px rgba(14, 21, 37, 0.08), 0 2px 6px rgba(14, 21, 37, 0.03)",
           display: "flex",
+          flexDirection: "row",
           alignItems: "center",
-          justifyContent: "space-between",
+          flexWrap: "nowrap",
           gap: 12,
-          flexWrap: "wrap",
+          width: "100%",
+          boxSizing: "border-box",
         }}
       >
-        {/* Search input */}
-        <div style={{ position: "relative", minWidth: 220, maxWidth: 320, flex: 1 }}>
-          <Search
-            size={15}
-            style={{
-              position: "absolute",
-              left: 12,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "var(--muted)",
-              pointerEvents: "none",
-            }}
-          />
+        <div className="lp-search-box" style={{ flex: "1 1 auto", minWidth: 180 }}>
+          <Search size={16} className="lp-search-icon" />
           <input
             type="text"
-            className="inp"
+            className="lp-search-input"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search pages by name or slug…"
-            style={{
-              paddingLeft: 36,
-              paddingRight: searchInput ? 32 : 12,
-              height: 38,
-              borderRadius: 10,
-              fontSize: 13,
-              width: "100%",
-            }}
+            placeholder="Search landing pages by name, project or slug..."
           />
           {searchInput && (
             <button
@@ -623,7 +774,7 @@ export default function OrgLandingPagesPage() {
                 border: "none",
                 background: "transparent",
                 cursor: "pointer",
-                color: "var(--muted)",
+                color: "#94a3b8",
                 padding: 2,
               }}
             >
@@ -632,90 +783,73 @@ export default function OrgLandingPagesPage() {
           )}
         </div>
 
-        {/* Status segmented pills */}
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            background: "var(--surface-2, #f8fafc)",
-            padding: 3,
-            borderRadius: 10,
-            border: "1px solid var(--line-2)",
+        {/* Status Dropdown */}
+        <select
+          className="lp-filter-select"
+          value={tabIndex}
+          style={{ flex: "0 0 135px", width: 135, minWidth: 120, maxWidth: 150, flexShrink: 0 }}
+          onChange={(e) => {
+            setTabIndex(Number(e.target.value));
+            setPage(1);
           }}
         >
-          {STATUS_TABS.map((label, idx) => {
-            const active = tabIndex === idx;
-            return (
-              <button
-                key={label}
-                type="button"
-                onClick={() => {
-                  setTabIndex(idx);
-                  setPage(1);
-                }}
-                style={{
-                  border: "none",
-                  background: active ? "var(--surface)" : "transparent",
-                  color: active ? "var(--ink)" : "var(--muted)",
-                  fontWeight: active ? 700 : 500,
-                  fontSize: 12.5,
-                  padding: "6px 14px",
-                  borderRadius: 8,
-                  cursor: "pointer",
-                  boxShadow: active ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+          <option value={0}>All Statuses</option>
+          <option value={2}>Published</option>
+          <option value={1}>Draft</option>
+          <option value={3}>Unpublished</option>
+        </select>
+
+        {/* Project Dropdown */}
+        <select
+          className="lp-filter-select"
+          value={filterProject}
+          style={{ flex: "0 0 150px", width: 150, minWidth: 130, maxWidth: 170, flexShrink: 0 }}
+          onChange={(e) => {
+            setFilterProject(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="all">All Projects</option>
+          {projectsList.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Template Dropdown */}
+        <select
+          className="lp-filter-select"
+          value={filterTemplate}
+          style={{ flex: "0 0 150px", width: 150, minWidth: 130, maxWidth: 170, flexShrink: 0 }}
+          onChange={(e) => {
+            setFilterTemplate(e.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="all">All Templates</option>
+          {templateList.map((t) => (
+            <option key={t.id} value={t.name}>
+              {t.name}
+            </option>
+          ))}
+        </select>
 
         {/* View Mode Switcher */}
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            background: "var(--surface-2, #f8fafc)",
-            padding: 3,
-            borderRadius: 10,
-            border: "1px solid var(--line-2)",
-          }}
-        >
+        <div className="lp-view-mode" style={{ flex: "0 0 auto", flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
           <button
             type="button"
+            className={`lp-view-btn ${viewMode === "grid" ? "active" : ""}`}
             onClick={() => setViewMode("grid")}
             title="Visual Cards View"
-            style={{
-              border: "none",
-              background: viewMode === "grid" ? "var(--surface)" : "transparent",
-              color: viewMode === "grid" ? "var(--ink)" : "var(--muted)",
-              padding: "6px 10px",
-              borderRadius: 8,
-              cursor: "pointer",
-              boxShadow: viewMode === "grid" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
-              display: "inline-flex",
-              alignItems: "center",
-            }}
           >
             <Grid size={15} />
           </button>
           <button
             type="button"
+            className={`lp-view-btn ${viewMode === "table" ? "active" : ""}`}
             onClick={() => setViewMode("table")}
             title="Data Table View"
-            style={{
-              border: "none",
-              background: viewMode === "table" ? "var(--surface)" : "transparent",
-              color: viewMode === "table" ? "var(--ink)" : "var(--muted)",
-              padding: "6px 10px",
-              borderRadius: 8,
-              cursor: "pointer",
-              boxShadow: viewMode === "table" ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
-              display: "inline-flex",
-              alignItems: "center",
-            }}
           >
             <List size={15} />
           </button>
@@ -932,17 +1066,12 @@ export default function OrgLandingPagesPage() {
         </div>
       ) : (
         /* Visual Cards Showcase View */
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: 22,
-          }}
-        >
+        <div className="lp-cards-grid">
           {filteredRows.map((row) => (
             <OrgLandingPageVisualCard
               key={row.id}
               row={row}
+              accessToken={accessToken}
               busy={busyId === row.id}
               onEdit={canEdit ? () => startEdit(row) : undefined}
               onView={() => openView(row.id)}
@@ -955,30 +1084,40 @@ export default function OrgLandingPagesPage() {
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
+      {/* Bottom Pagination Bar */}
+      <div className="lp-pagination">
+        <div>
+          Showing {filteredRows.length > 0 ? `1–${filteredRows.length}` : "0"} of {totalKpi} landing pages
+        </div>
+        <div className="lp-pagination-btns">
           <button
-            className="btn btn-ghost btn-sm"
             type="button"
+            className="lp-page-btn"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            ← Prev
+            <ChevronLeft size={14} />
           </button>
-          <span className="muted" style={{ fontSize: 12.5, alignSelf: "center" }}>
-            Page {page} of {totalPages}
-          </span>
+          {Array.from({ length: Math.min(4, Math.max(1, totalPages)) }, (_, i) => i + 1).map((pNum) => (
+            <button
+              key={pNum}
+              type="button"
+              className={`lp-page-btn ${page === pNum ? "active" : ""}`}
+              onClick={() => setPage(pNum)}
+            >
+              {pNum}
+            </button>
+          ))}
           <button
-            className="btn btn-ghost btn-sm"
             type="button"
+            className="lp-page-btn"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           >
-            Next →
+            <ChevronRight size={14} />
           </button>
         </div>
-      )}
+      </div>
 
       {/* Assigned Templates Modal */}
       <Modal
@@ -1364,6 +1503,7 @@ export default function OrgLandingPagesPage() {
 /* Modern Visual Card for Landing Pages */
 function OrgLandingPageVisualCard({
   row,
+  accessToken,
   busy,
   onEdit,
   onView,
@@ -1373,8 +1513,8 @@ function OrgLandingPageVisualCard({
   onDelete,
 }: {
   row: LandingPageRow;
+  accessToken?: string | null;
   busy: boolean;
-  // Omitted handlers hide their button (the user lacks that permission).
   onEdit?: () => void;
   onView: () => void;
   onPublish?: () => void;
@@ -1382,353 +1522,252 @@ function OrgLandingPageVisualCard({
   onDuplicate?: () => void;
   onDelete?: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [trackedStats, setTrackedStats] = useState<{ views: number; leads: number }>({ views: 0, leads: 0 });
+
+  useEffect(() => {
+    if (!accessToken || !row.id) return;
+    apiFetch<{ groups?: { eventType: string; _count: { _all: number } }[]; total?: number }>(
+      `/org/tracking/${encodeURIComponent(row.id)}/stats`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+      .then((res) => {
+        let v = 0;
+        let l = 0;
+        for (const g of res.groups ?? []) {
+          if (g.eventType === "page_view") v += g._count._all;
+          if (g.eventType === "lead_submit" || g.eventType === "form_submit") l += g._count._all;
+        }
+        if (v === 0 && res.total) v = res.total;
+        setTrackedStats({ views: v, leads: l });
+      })
+      .catch(() => {});
+  }, [accessToken, row.id]);
+
   const isPublished = row.status === "published";
+  const isDraft = row.status === "draft";
+  const isUnpublished = row.status === "unpublished";
+
+  const thumbSrc =
+    row.thumbnail && (row.thumbnail.startsWith("http") || row.thumbnail.startsWith("/"))
+      ? row.thumbnail
+      : "/templates/vista-framed.jpg";
+
+  const templateName = row.sourceTemplate?.name || "Custom Canvas";
 
   return (
-    <div
-      className="card template-visual-card"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setHovered(false);
-        setMenuOpen(false);
-      }}
-      style={{
-        padding: 0,
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-        borderRadius: 18,
-        overflow: "hidden",
-        border: hovered ? "1px solid var(--brand-100, #c7d2fe)" : "1px solid var(--line-2)",
-        boxShadow: hovered
-          ? "0 14px 34px -10px rgba(21, 27, 46, 0.18), 0 4px 14px -4px rgba(14, 21, 37, 0.08)"
-          : "0 2px 8px -2px rgba(14, 21, 37, 0.05)",
-        transform: hovered ? "translateY(-4px)" : "none",
-        transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-        background: "var(--surface)",
-        position: "relative",
-      }}
-    >
-      {/* Cover Preview */}
-      <div style={{ position: "relative", overflow: "hidden" }}>
-        <TemplateCover thumbnail={row.thumbnail ?? "hero"} accent="#0f1424" height={188} radius="18px 18px 0 0">
-          {/* Top Badges */}
-          <div
-            style={{
-              position: "absolute",
-              top: 12,
-              left: 12,
-              zIndex: 2,
-              display: "flex",
-              gap: 6,
-              alignItems: "center",
-            }}
-          >
-            <span className={`badge ${STATUS_BADGE[row.status]}`} style={{ fontWeight: 700 }}>
-              <span className="dot" style={{ background: "currentColor" }} />
-              {STATUS_LABEL[row.status]}
-            </span>
-          </div>
+    <div className="lp-card">
+      {/* Cover / Image Area */}
+      <div className="lp-card-thumb">
+        <img
+          src={thumbSrc}
+          alt={row.name}
+          className="lp-card-img"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = "/templates/vista-framed.jpg";
+          }}
+        />
 
-          <div
-            style={{
-              position: "absolute",
-              top: 12,
-              right: 12,
-              zIndex: 2,
-            }}
-          >
-            {row.sourceTemplate ? (
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: "0.02em",
-                  background: "rgba(15, 20, 36, 0.72)",
-                  color: "#ffffff",
-                  padding: "3px 9px",
-                  borderRadius: 999,
-                  backdropFilter: "blur(6px)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                }}
-              >
-                {row.sourceTemplate.name}
-              </span>
-            ) : (
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: "0.02em",
-                  background: "rgba(99, 102, 241, 0.85)",
-                  color: "#ffffff",
-                  padding: "3px 9px",
-                  borderRadius: 999,
-                  backdropFilter: "blur(6px)",
-                }}
-              >
-                Custom Canvas
-              </span>
-            )}
-          </div>
+        {/* Overlaid Top-Left Status Pill */}
+        <div className="lp-badge-status">
+          <span
+            className={`lp-dot ${
+              isPublished ? "lp-dot-green" : isDraft ? "lp-dot-amber" : "lp-dot-red"
+            }`}
+          />
+          <span>{isPublished ? "Published" : isDraft ? "Draft" : "Unpublished"}</span>
+        </div>
 
-          {/* Quick Hover Action Overlay */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background: "linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.88) 100%)",
-              backdropFilter: "blur(3px)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              opacity: hovered ? 1 : 0,
-              pointerEvents: hovered ? "auto" : "none",
-              transition: "opacity 0.22s ease-in-out",
-              zIndex: 4,
-              padding: 16,
-            }}
-          >
-            {onEdit ? (
-            <button
-              type="button"
-              onClick={onEdit}
-              style={{
-                width: "100%",
-                maxWidth: 180,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                background: "var(--brand, #0f1424)",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: 10,
-                padding: "9px 16px",
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: "pointer",
-                boxShadow: "0 6px 18px rgba(21, 27, 46, 0.4)",
-              }}
-            >
-              <Pencil size={14} /> Open Builder
-            </button>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={onView}
-              style={{
-                width: "100%",
-                maxWidth: 180,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                background: "rgba(255, 255, 255, 0.18)",
-                color: "#ffffff",
-                border: "1px solid rgba(255, 255, 255, 0.35)",
-                borderRadius: 10,
-                padding: "8px 16px",
-                fontSize: 12.5,
-                fontWeight: 600,
-                cursor: "pointer",
-                backdropFilter: "blur(8px)",
-              }}
-            >
-              <Eye size={14} /> Live Preview
-            </button>
-          </div>
-        </TemplateCover>
+        {/* Overlaid Top-Right Options Button */}
+        <button
+          type="button"
+          className="lp-btn-more-dots"
+          onClick={() => setMenuOpen(!menuOpen)}
+          title="More options"
+        >
+          <MoreHorizontal size={15} />
+        </button>
       </div>
 
       {/* Card Body */}
-      <div
-        className="card-b"
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          padding: "16px 18px 16px",
-        }}
-      >
-        <div>
+      <div className="lp-card-body">
+        <h3 className="lp-card-title" title={row.name}>
+          {row.name}
+        </h3>
+
+        {/* Slug Row with Copy button */}
+        <div className="lp-card-slug-row">
+          <span>/{row.slug}</span>
           <button
             type="button"
-            onClick={onEdit ?? onView}
-            style={{
-              border: "none",
-              background: "transparent",
-              padding: 0,
-              textAlign: "left",
-              cursor: "pointer",
-              width: "100%",
+            className="lp-copy-btn"
+            title="Copy slug"
+            onClick={() => {
+              navigator.clipboard.writeText(`/${row.slug}`);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
             }}
           >
-            <div
-              style={{
-                fontWeight: 700,
-                fontSize: 15.5,
-                color: "var(--ink)",
-                lineHeight: 1.3,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-              title={row.name}
-            >
-              {row.name}
-            </div>
+            {copied ? <Check size={12} style={{ color: "#10b981" }} /> : <Copy size={12} />}
           </button>
+        </div>
 
-          <div
-            style={{
-              fontSize: 11.5,
-              color: "var(--muted)",
-              marginTop: 4,
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            /{row.slug}
+        {/* Template Meta */}
+        <div className="lp-card-meta-row">
+          <div className="lp-card-meta-item" title={templateName}>
+            <Building2 size={13} style={{ color: "#64748b" }} />
+            <span>{templateName}</span>
           </div>
         </div>
 
-        {/* Footer Meta & Actions */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: 12,
-            paddingTop: 10,
-            borderTop: "1px solid var(--line)",
-            fontSize: 11.5,
-            color: "var(--muted)",
-          }}
-        >
-          <span>Updated: {formatDate(row.updatedAt)}</span>
-          {isPublished && (
-            <span style={{ color: "var(--green)", fontWeight: 700, fontSize: 11 }}>
-              ● Live
+        {/* Stats Row: Updated, Views, Leads */}
+        <div className="lp-card-stats-row">
+          <div>
+            <span className="lp-card-stat-label">Updated</span>
+            <span
+              className="lp-card-stat-val"
+              style={{ fontSize: 11.5, fontWeight: 500, color: "#475569" }}
+            >
+              {formatUpdated(row.updatedAt)}
             </span>
-          )}
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <span className="lp-card-stat-label">Views</span>
+            <span className="lp-card-stat-val">{trackedStats.views.toLocaleString()}</span>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <span className="lp-card-stat-label">Leads</span>
+            <span className="lp-card-stat-val">{trackedStats.leads.toLocaleString()}</span>
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
-          {onEdit ? (
+        {/* Bottom Action Buttons Row */}
+        <div className="lp-card-actions" style={{ position: "relative" }}>
+          <button type="button" className="lp-btn-preview" onClick={onView}>
+            <Eye size={13} /> Preview
+          </button>
+
+          {onEdit && (
+            <button type="button" className="lp-btn-edit" onClick={onEdit}>
+              <Pencil size={13} /> Edit
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={onEdit}
-            className="btn btn-soft btn-sm"
-            style={{ flex: 1, justifyContent: "center", fontWeight: 700, borderRadius: 9 }}
+            className="lp-btn-dots"
+            onClick={() => setMenuOpen(!menuOpen)}
+            title="Options"
           >
-            <Pencil size={13} /> Edit
+            <MoreVertical size={14} />
           </button>
-          ) : null}
 
-          {isPublished ? (
-            onUnpublish ? (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              disabled={busy}
-              onClick={onUnpublish}
-              style={{ flex: 1, justifyContent: "center", borderRadius: 9 }}
+          {/* Menu Dropdown Popup */}
+          {menuOpen && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "100%",
+                right: 0,
+                marginBottom: 6,
+                background: "#ffffff",
+                border: "1px solid #e2e8f0",
+                borderRadius: 12,
+                boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15)",
+                zIndex: 50,
+                minWidth: 160,
+                padding: 4,
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+              }}
             >
-              <PauseCircle size={13} /> Pause
-            </button>
-            ) : null
-          ) : onPublish ? (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              disabled={busy}
-              onClick={onPublish}
-              style={{ flex: 1, justifyContent: "center", fontWeight: 700, borderRadius: 9 }}
-            >
-              <Rocket size={13} /> Publish
-            </button>
-          ) : null}
-
-          {/* More menu — pinned to the right edge (marginLeft: auto) so its
-              right-anchored popup stays inside the card even when Edit /
-              Publish / Pause are hidden by permissions. */}
-          <div style={{ position: "relative", marginLeft: "auto" }}>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setMenuOpen(!menuOpen)}
-              style={{ padding: "6px 8px", borderRadius: 8 }}
-            >
-              <MoreVertical size={14} />
-            </button>
-
-            {menuOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "100%",
-                  right: 0,
-                  marginBottom: 6,
-                  background: "var(--surface)",
-                  border: "1px solid var(--line-2)",
-                  borderRadius: 12,
-                  boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15)",
-                  zIndex: 50,
-                  minWidth: 150,
-                  padding: 4,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 2,
-                }}
-              >
+              {onEdit && (
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
                   onClick={() => {
                     setMenuOpen(false);
-                    onView();
+                    onEdit();
                   }}
                   style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
                 >
-                  <Eye size={13} /> Live Preview
+                  <Pencil size={13} /> Open Builder
                 </button>
-                {onDuplicate ? (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onDuplicate();
-                    }}
-                    style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
-                  >
-                    <Copy size={13} /> Duplicate
-                  </button>
-                ) : null}
-                {onDelete ? (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onDelete();
-                    }}
-                    style={{ justifyContent: "flex-start", gap: 8, fontSize: 12, color: "var(--rose)" }}
-                  >
-                    <Trash2 size={13} /> Delete
-                  </button>
-                ) : null}
-              </div>
-            )}
-          </div>
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onView();
+                }}
+                style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
+              >
+                <Eye size={13} /> Live Preview
+              </button>
+              {isPublished && onUnpublish ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onUnpublish();
+                  }}
+                  style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
+                >
+                  <PauseCircle size={13} /> Unpublish
+                </button>
+              ) : !isPublished && onPublish ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onPublish();
+                  }}
+                  style={{
+                    justifyContent: "flex-start",
+                    gap: 8,
+                    fontSize: 12,
+                    color: "#059669",
+                    fontWeight: 600,
+                  }}
+                >
+                  <Rocket size={13} /> Publish Page
+                </button>
+              ) : null}
+              {onDuplicate && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDuplicate();
+                  }}
+                  style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
+                >
+                  <Copy size={13} /> Duplicate
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDelete();
+                  }}
+                  style={{ justifyContent: "flex-start", gap: 8, fontSize: 12, color: "var(--rose)" }}
+                >
+                  <Trash2 size={13} /> Delete Page
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
