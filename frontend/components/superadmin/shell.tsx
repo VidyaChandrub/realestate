@@ -61,7 +61,7 @@ export const NAV_GROUPS: NavGroup[] = [
         tip: "Organisations",
         activeMatch: ["/admin-console/organisations", "/admin-console/organisation-detail"],
       },
-      { href: "/admin-console/org-domains", icon: "globe", label: "Domains", tip: "Organisation subdomains and custom domain requests", activeMatch: ["/admin-console/org-domains"] },
+      { href: "/admin-console/org-domains", icon: "globe", label: "Domains", tip: "Organisation custom domain requests", activeMatch: ["/admin-console/org-domains"] },
       { href: "/admin-console/roles", icon: "lock", label: "Organisation roles", tip: "Default roles and permissions for organisations", activeMatch: ["/admin-console/roles"] },
     ],
   },

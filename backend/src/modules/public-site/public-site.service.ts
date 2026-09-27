@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { extractSubdomainFromHost, subdomainHost } from '../../common/utils/domain.util';
 import { FieldDef, roleField } from '../../common/utils/field-template.util';
 
 function readTemplate(v: Prisma.JsonValue): FieldDef[] {
@@ -12,27 +11,19 @@ function readTemplate(v: Prisma.JsonValue): FieldDef[] {
 export class PublicSiteService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Resolve an incoming host to an organisation site. Supports:
-  //  - organisation subdomain: "<sub>.<base>" or "<sub>.localhost" (local dev)
-  //  - a custom domain that the org has verified/connected
+  // Resolve an incoming host to an organisation site.
+  // Supports a custom domain that the org has verified/connected.
   // Returns the org + its active, published landing page.
   async resolvePortal(host: string) {
     const normalized = (host ?? '').trim().toLowerCase().replace(/:\d+$/, '').replace(/^www\./, '');
-    const subdomain = extractSubdomainFromHost(normalized);
-    let org = subdomain
-      ? await this.prisma.organisation.findFirst({
-          where: { subdomain, subdomainStatus: 'active', status: 'active' },
-        })
-      : null;
+    let org: any = null;
 
-    if (!org) {
-      const domainReq = await this.prisma.orgDomainRequest.findFirst({
-        where: { customDomain: normalized, status: { in: ['connected', 'approved'] } },
-        include: { organisation: true },
-      });
-      if (domainReq?.organisation && domainReq.organisation.status === 'active') {
-        org = domainReq.organisation;
-      }
+    const domainReq = await this.prisma.orgDomainRequest.findFirst({
+      where: { customDomain: normalized, status: { in: ['connected', 'approved'] } },
+      include: { organisation: true },
+    });
+    if (domainReq?.organisation && domainReq.organisation.status === 'active') {
+      org = domainReq.organisation;
     }
 
     if (!org) {
@@ -48,8 +39,6 @@ export class PublicSiteService {
       slug: org.slug,
       logoUrl: org.logoUrl,
       brandColour: org.brandColour,
-      subdomain: org.subdomain,
-      subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
       customDomain: org.customDomain,
       loginPath: '/login',
       sitePath: '/site',
@@ -59,18 +48,7 @@ export class PublicSiteService {
   async resolveByHost(host: string) {
     const normalized = (host ?? '').trim().toLowerCase().replace(/:\d+$/, '').replace(/^www\./, '');
 
-    // 1) Organisation subdomain (platform wildcard / localhost).
-    const subdomain = extractSubdomainFromHost(normalized);
-    if (subdomain) {
-      const org = await this.prisma.organisation.findFirst({
-        where: { subdomain, subdomainStatus: 'active', status: 'active' },
-      });
-      if (org) {
-        return this.buildOrgSite(org, host);
-      }
-    }
-
-    // 2) Per-landing-page custom domain mapped via OrgDomainRequest
+    // 1) Per-landing-page custom domain mapped via OrgDomainRequest
     const domainReq = await this.prisma.orgDomainRequest.findFirst({
       where: {
         customDomain: normalized,
@@ -86,7 +64,7 @@ export class PublicSiteService {
       return this.buildSiteFromDomainRequest(domainReq, host);
     }
 
-    // 3) Custom domain mapped to an organisation (verified/connected legacy fallback).
+    // 2) Custom domain mapped to an organisation (verified/connected fallback).
     const custom = await this.prisma.organisation.findFirst({
       where: { customDomain: normalized, customDomainStatus: 'connected', status: 'active' },
     });
@@ -120,8 +98,6 @@ export class PublicSiteService {
         id: org.id,
         name: org.name,
         slug: org.slug,
-        subdomain: org.subdomain,
-        subdomainStatus: org.subdomainStatus,
         customDomain: domainReq.customDomain,
         customDomainStatus: domainReq.status,
         customDomainLandingPageId: landingPage?.id ?? null,
@@ -129,7 +105,6 @@ export class PublicSiteService {
         brandColour: org.brandColour,
         defaultLanguage: org.defaultLanguage,
       },
-      subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
       landingPage: landingPage
         ? {
             id: landingPage.id,
@@ -159,13 +134,11 @@ export class PublicSiteService {
       }) ?? null;
     }
     return {
-      type: org.customDomain && host.replace(/^www\./, '') === org.customDomain ? 'custom' : 'subdomain',
+      type: 'custom',
       organisation: {
         id: org.id,
         name: org.name,
         slug: org.slug,
-        subdomain: org.subdomain,
-        subdomainStatus: org.subdomainStatus,
         customDomain: org.customDomain,
         customDomainStatus: org.customDomainStatus,
         customDomainLandingPageId: org.customDomainLandingPageId,
@@ -173,7 +146,6 @@ export class PublicSiteService {
         brandColour: org.brandColour,
         defaultLanguage: org.defaultLanguage,
       },
-      subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
       landingPage: landingPage
         ? {
             id: landingPage.id,
@@ -350,7 +322,6 @@ export class PublicSiteService {
             slug: true,
             logoUrl: true,
             brandColour: true,
-            subdomain: true,
             customDomain: true,
           },
         },
@@ -375,7 +346,6 @@ export class PublicSiteService {
               slug: true,
               logoUrl: true,
               brandColour: true,
-              subdomain: true,
               customDomain: true,
             },
           },

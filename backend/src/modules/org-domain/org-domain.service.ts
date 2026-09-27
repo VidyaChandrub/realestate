@@ -8,7 +8,6 @@ import { PrismaService } from '../../database/prisma.service';
 import {
   isValidDomain,
   normalizeDomain,
-  subdomainHost,
 } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
 
@@ -16,7 +15,6 @@ function toView(req: any) {
   return {
     id: req.id,
     kind: req.kind,
-    subdomain: req.subdomain,
     customDomain: req.customDomain,
     landingPageId: req.landingPageId,
     landingPage: req.landingPage
@@ -33,7 +31,7 @@ function toView(req: any) {
 export class OrgDomainService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // The organisation's own subdomain / custom-domain identity plus the history
+  // The organisation's own custom-domain identity plus the history
   // of the org's own domain requests (org-scoped, single-tenant isolation).
   async getInfo(orgId: string) {
     const org = await this.prisma.organisation.findUnique({ where: { id: orgId } });
@@ -41,7 +39,7 @@ export class OrgDomainService {
 
     const [requests, landingPages] = await Promise.all([
       this.prisma.orgDomainRequest.findMany({
-        where: { orgId },
+        where: { orgId, kind: 'custom_domain' },
         orderBy: { requestedAt: 'desc' },
         include: { landingPage: { select: { id: true, name: true, slug: true } } },
       }),
@@ -60,7 +58,7 @@ export class OrgDomainService {
     ]);
 
     const approvedOrConnected = requests.filter(
-      (r) => r.kind === 'custom_domain' && (r.status === 'approved' || r.status === 'connected'),
+      (r) => r.status === 'approved' || r.status === 'connected',
     );
 
     const landingPagesWithDomain = landingPages.map((lp) => {
@@ -86,9 +84,6 @@ export class OrgDomainService {
     }));
 
     return {
-      subdomain: org.subdomain,
-      subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
-      subdomainStatus: org.subdomainStatus,
       customDomain: org.customDomain,
       customDomainStatus: org.customDomainStatus,
       customDomainLandingPageId: org.customDomainLandingPageId,

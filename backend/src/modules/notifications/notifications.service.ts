@@ -21,7 +21,7 @@ export class NotificationsService {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          organisation: { select: { id: true, name: true, slug: true, subdomain: true } },
+          organisation: { select: { id: true, name: true, slug: true } },
         },
       }),
       this.prisma.notification.count({ where }),

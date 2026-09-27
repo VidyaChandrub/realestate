@@ -12,14 +12,12 @@ export interface ResolvedOrgLandingPage {
 }
 
 export interface ResolveOrgResponse {
-  type: "subdomain" | "custom";
+  type: "custom";
   organisation?: {
     id: string;
     name: string;
     slug: string;
-    subdomain?: string | null;
   };
-  subdomainHost?: string | null;
   landingPage?: ResolvedOrgLandingPage | null;
 }
 

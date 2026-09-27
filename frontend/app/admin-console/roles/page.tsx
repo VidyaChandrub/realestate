@@ -60,53 +60,104 @@ function roleInUseMessage(roleName: string, users: number, action: string) {
   return `Role '${roleName}' is assigned to ${who}. Remove or reassign ${users === 1 ? "that user" : "those users"} first, then you can ${action}.`;
 }
 
-function StatTile({
+function StatCardWithSparkline({
+  icon,
+  iconBg,
+  iconColor,
   label,
   value,
-  sub,
-  accent,
+  sparkColor,
 }: {
+  icon: string;
+  iconBg: string;
+  iconColor: string;
   label: string;
-  value: string | number;
-  sub?: string;
-  accent?: string;
+  value: number | string;
+  sparkColor: string;
 }) {
   return (
     <div
       style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line-2)",
-        borderRadius: 14,
-        padding: "14px 16px",
-        minWidth: 0,
+        background: "#ffffff",
+        border: "1px solid #eef2f6",
+        borderRadius: 16,
+        padding: "18px 20px",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        minHeight: 100,
       }}
     >
-      <div
-        style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontSize: 20,
-          fontWeight: 800,
-          fontFamily: "monospace",
-          color: accent ?? "var(--ink)",
-          letterSpacing: "-0.02em",
-        }}
-      >
-        {value}
-      </div>
-      {sub ? (
+      <div>
         <div
-          className="muted"
-          style={{ fontSize: 11.5, marginTop: 4, wordBreak: "break-word" }}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            background: iconBg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: iconColor,
+            marginBottom: 12,
+          }}
         >
-          {sub}
+          <Icon name={icon as any} size={20} />
         </div>
-      ) : null}
+        <div style={{ fontSize: 13, fontWeight: 500, color: "#64748b", marginBottom: 4 }}>
+          {label}
+        </div>
+        <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.02em" }}>
+          {value}
+        </div>
+      </div>
+      <div style={{ width: 90, height: 44, opacity: 0.85, alignSelf: "flex-end", marginBottom: 4 }}>
+        <svg viewBox="0 0 100 40" width="100%" height="100%" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id={`spark-${sparkColor.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={sparkColor} stopOpacity="0.25" />
+              <stop offset="100%" stopColor={sparkColor} stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M 0 30 Q 25 12, 50 22 T 100 8"
+            fill="none"
+            stroke={sparkColor}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 0 30 Q 25 12, 50 22 T 100 8 L 100 40 L 0 40 Z"
+            fill={`url(#spark-${sparkColor.replace('#', '')})`}
+          />
+        </svg>
+      </div>
     </div>
   );
+}
+
+function getRoleBadgeInfo(key: string, name: string) {
+  const k = (key || "").toLowerCase();
+  const n = (name || "").toLowerCase();
+  if (k.includes("admin") || n.includes("admin")) {
+    return { icon: "crown", bg: "#f3e8ff", color: "#9333ea" };
+  }
+  if (k.includes("telecaller") || n.includes("telecaller")) {
+    return { icon: "phone", bg: "#e0f2fe", color: "#0284c7" };
+  }
+  if (k.includes("sales") || n.includes("sales")) {
+    return { icon: "reports", bg: "#fff7ed", color: "#ea580c" };
+  }
+  if (k.includes("test") || n.includes("test")) {
+    return { icon: "document", bg: "#fdf2f8", color: "#db2777" };
+  }
+  if (k.includes("manager") || n.includes("manager")) {
+    return { icon: "users", bg: "#e0e7ff", color: "#4f46e5" };
+  }
+  return { icon: "puzzle", bg: "#eff6ff", color: "#2563eb" };
 }
 
 export default function SuperAdminRolesPage() {
@@ -410,35 +461,140 @@ export default function SuperAdminRolesPage() {
 
   return (
     <>
-      <div className="page-head reveal in">
-        <div>
-          <div className="eyebrow"><Icon name="lock" size={14} /> Security & Access</div>
-          <h1>Organisation roles</h1>
-          <div className="sub">
-            Default roles and module permissions for organisation members. Super Admin console users and roles are managed under Platform Team.
+      {/* Breadcrumb */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          fontSize: 13,
+          color: "#64748b",
+          marginBottom: 16,
+        }}
+      >
+        <Icon name="home" size={14} />
+        <span>Platform</span>
+        <span style={{ color: "#94a3b8" }}>›</span>
+        <span style={{ color: "#0f172a", fontWeight: 600 }}>Organisation roles</span>
+      </div>
+
+      {/* Hero Header Banner */}
+      <div
+        style={{
+          background: "#ffffff",
+          border: "1px solid #eef2f6",
+          borderRadius: 18,
+          padding: "20px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 20,
+          marginBottom: 20,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 14,
+              background: "linear-gradient(135deg, #e0e7ff 0%, #ede9fe 100%)",
+              border: "1px solid #c7d2fe",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#4f46e5",
+              flexShrink: 0,
+            }}
+          >
+            <Icon name="settings" size={26} />
+          </div>
+          <div>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#2563eb",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                marginBottom: 2,
+              }}
+            >
+              SECURITY & ACCESS
+            </div>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 800,
+                color: "#0f172a",
+                margin: 0,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Organisation roles
+            </h1>
+            <p
+              style={{
+                margin: "4px 0 0",
+                color: "#64748b",
+                fontSize: 13.5,
+                maxWidth: 700,
+                lineHeight: 1.45,
+              }}
+            >
+              Default roles and module permissions for organisation members. Super Admin console users and roles are managed under Platform Team.
+            </p>
           </div>
         </div>
-        <div className="actions">
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <button
-            className="btn btn-ghost"
             type="button"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              padding: "9px 16px",
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: "#334155",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
             onClick={() => void fetchRoles()}
             disabled={loading}
-            title="Refresh"
           >
-            <Icon name="refresh" size={16} />
-            <span style={{ marginLeft: 6 }}>Refresh</span>
+            <Icon name="refresh" size={15} />
+            <span>Refresh</span>
           </button>
           <button
-            className="btn btn-primary"
             type="button"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+              border: "none",
+              borderRadius: 10,
+              padding: "10px 18px",
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: "#fff",
+              boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
+              cursor: "pointer",
+            }}
             onClick={() => {
               setCreateError(null);
               setCreateModalOpen(true);
             }}
           >
             <Icon name="plus" size={16} />
-            <span style={{ marginLeft: 6 }}>Create Role</span>
+            <span>Create Role</span>
           </button>
         </div>
       </div>
@@ -595,63 +751,104 @@ export default function SuperAdminRolesPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: 10,
-          marginBottom: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 16,
+          marginBottom: 20,
         }}
       >
-        <StatTile label="Total roles" value={stats.total} />
-        <StatTile label="System roles" value={stats.system} accent="#0f1424" />
-        <StatTile
+        <StatCardWithSparkline
+          icon="modules"
+          iconBg="#eff6ff"
+          iconColor="#2563eb"
+          label="Total roles"
+          value={stats.total}
+          sparkColor="#3b82f6"
+        />
+        <StatCardWithSparkline
+          icon="settings"
+          iconBg="#f0fdf4"
+          iconColor="#16a34a"
+          label="System roles"
+          value={stats.system}
+          sparkColor="#10b981"
+        />
+        <StatCardWithSparkline
+          icon="users"
+          iconBg="#fff7ed"
+          iconColor="#ea580c"
           label="Custom roles"
           value={stats.custom}
-          accent={stats.custom ? "#10b981" : "var(--ink)"}
+          sparkColor="#f97316"
         />
-        <StatTile label="Assigned users" value={stats.assigned} />
+        <StatCardWithSparkline
+          icon="team"
+          iconBg="#faf5ff"
+          iconColor="#9333ea"
+          label="Assigned users"
+          value={stats.assigned}
+          sparkColor="#a855f7"
+        />
       </div>
 
       <div
         style={{
           display: "flex",
-          gap: 8,
-          marginBottom: 12,
-          flexWrap: "wrap",
           alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 16,
+          gap: 12,
+          flexWrap: "wrap",
         }}
       >
-        <input
-          className="inp"
-          placeholder="Search roles…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ width: 240, height: 34, fontSize: 13 }}
-        />
-        <span
-          className="muted"
-          style={{ marginLeft: "auto", alignSelf: "center", fontSize: 12 }}
-        >
+        <div style={{ position: "relative", minWidth: 260, maxWidth: 360 }}>
+          <input
+            className="inp"
+            placeholder="Search roles..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              paddingLeft: 36,
+              paddingRight: 14,
+              height: 38,
+              fontSize: 13,
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
+              background: "#ffffff",
+              width: "100%",
+            }}
+          />
+          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }}>
+            <Icon name="search" size={15} />
+          </span>
+        </div>
+        <div style={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>
           {loading ? "Loading…" : `${visible.length} of ${roles.length} roles`}
-        </span>
+        </div>
       </div>
 
       <Reveal delay={1}>
-        <div className="card">
-          <div className="card-h">
-            <span className="t">Role Catalogue</span>
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              {loading ? "Loading…" : `${visible.length} roles`}
+        <div style={{ background: "#ffffff", border: "1px solid #eef2f6", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.02)", overflow: "hidden" }}>
+          <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#e0e7ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}>
+                <Icon name="shield" size={16} />
+              </div>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Role Catalogue</span>
+            </div>
+            <span style={{ fontSize: 12.5, color: "#64748b" }}>
+              {visible.length} of {roles.length} roles
             </span>
           </div>
           <div className="tbl-wrap">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Role Name</th>
-                  <th>Key / Slug</th>
-                  <th>Description</th>
-                  <th>Assigned Users</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th>ROLE NAME</th>
+                  <th>KEY / SLUG</th>
+                  <th>DESCRIPTION</th>
+                  <th>ASSIGNED USERS</th>
+                  <th>STATUS</th>
+                  <th style={{ textAlign: "right", paddingRight: 24 }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -668,102 +865,210 @@ export default function SuperAdminRolesPage() {
                     <td colSpan={6} className="muted">No organisation roles yet.</td>
                   </tr>
                 ) : (
-                  visible.map((r) => (
-                    <tr key={r.id}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{r.name}</div>
-                        {isSystemRole(r.key) ? (
-                          <span className="badge b-gray" style={{ fontSize: 11, marginTop: 2 }}>System Role</span>
-                        ) : (
-                          <span className="badge b-indigo" style={{ fontSize: 11, marginTop: 2 }}>Custom Role</span>
-                        )}
-                      </td>
-                      <td><code>{r.key}</code></td>
-                      <td style={{ maxWidth: 260, fontSize: 13, color: "var(--fg-subtle)" }}>
-                        {r.description || "—"}
-                      </td>
-                      <td>{r._count?.userRoles ?? 0} users</td>
-                      <td>
-                        <span className={`badge ${r.status === "active" ? "b-green" : "b-rose"}`}>
-                          {r.status === "active" ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          {r.key === "super_admin" ? (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              type="button"
-                              disabled
-                              title="Super Admin possesses full system access and permissions cannot be altered"
+                  visible.map((r) => {
+                    const roleInfo = getRoleBadgeInfo(r.key, r.name);
+                    return (
+                      <tr key={r.id}>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <div
                               style={{
-                                color: "var(--muted, #94a3b8)",
-                                cursor: "not-allowed",
-                                opacity: 0.65,
-                                fontWeight: 500,
-                                display: "inline-flex",
+                                width: 38,
+                                height: 38,
+                                borderRadius: 10,
+                                background: roleInfo.bg,
+                                color: roleInfo.color,
+                                display: "flex",
                                 alignItems: "center",
-                                gap: 4,
+                                justifyContent: "center",
+                                flexShrink: 0,
                               }}
                             >
-                              <Icon name="lock" size={13} /> Full Access (Locked)
-                            </button>
-                          ) : (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              type="button"
-                              style={{ color: "var(--indigo, #0f1424)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}
-                              onClick={() => openPermissionsModal(r)}
+                              <Icon name={roleInfo.icon as any} size={18} />
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>{r.name}</div>
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  marginTop: 3,
+                                  padding: "2px 8px",
+                                  borderRadius: 6,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  background: isSystemRole(r.key) ? "#f1f5f9" : "#ecfdf5",
+                                  color: isSystemRole(r.key) ? "#475569" : "#059669",
+                                  border: isSystemRole(r.key) ? "1px solid #e2e8f0" : "1px solid #a7f3d0",
+                                }}
+                              >
+                                {isSystemRole(r.key) ? "System Role" : "Custom Role"}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <code style={{ fontSize: 12.5, color: "#475569", background: "none", padding: 0 }}>
+                            {r.key}
+                          </code>
+                        </td>
+                        <td style={{ maxWidth: 280, fontSize: 13, color: "#64748b" }}>
+                          {r.description || "—"}
+                        </td>
+                        <td>
+                          <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>
+                            {r._count?.userRoles ?? 0} users
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: r.status === "active" ? "#10b981" : "#ef4444",
+                              }}
+                            />
+                            <span
+                              style={{
+                                fontSize: 12.5,
+                                fontWeight: 600,
+                                color: r.status === "active" ? "#10b981" : "#ef4444",
+                                textTransform: "capitalize",
+                              }}
                             >
-                              <Icon name="shield" size={13} /> Permissions
-                            </button>
-                          )}
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            type="button"
-                            onClick={() => {
-                              setEditingRole(r);
-                              setEditForm({
-                                name: r.name,
-                                key: r.key,
-                                description: r.description ?? "",
-                                scope: r.scope === "platform" ? "platform" : "organisation",
-                                status: r.status,
-                                sortOrder: r.sortOrder ?? 0,
-                              });
-                              setEditError(null);
-                            }}
-                          >
-                            Edit
-                          </button>
-                          {!isSystemRole(r.key) ? (
+                              {r.status === "active" ? "Active" : "Inactive"}
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: "right", paddingRight: 24 }}>
+                          <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+                            {r.key === "super_admin" ? (
+                              <button
+                                type="button"
+                                disabled
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  padding: "6px 12px",
+                                  borderRadius: 8,
+                                  border: "1px solid #e2e8f0",
+                                  background: "#f8fafc",
+                                  color: "#94a3b8",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "not-allowed",
+                                }}
+                              >
+                                <Icon name="lock" size={13} /> Full Access (Locked)
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  padding: "6px 12px",
+                                  borderRadius: 8,
+                                  border: "1px solid #e2e8f0",
+                                  background: "#ffffff",
+                                  color: "#334155",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  transition: "all 0.15s ease",
+                                }}
+                                onClick={() => openPermissionsModal(r)}
+                              >
+                                <Icon name="shield" size={13} style={{ color: "#4f46e5" }} /> Permissions
+                              </button>
+                            )}
+
                             <button
-                              className="btn btn-ghost btn-sm"
                               type="button"
-                              style={{ color: "var(--rose, #e11d48)", fontWeight: 500 }}
-                              onClick={() =>
-                                (r._count?.userRoles ?? 0) > 0
-                                  ? setRoleInUse({ role: r, action: "delete it" })
-                                  : setConfirmDeleteState(r)
-                              }
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                                padding: "6px 12px",
+                                borderRadius: 8,
+                                border: "1px solid #e2e8f0",
+                                background: "#ffffff",
+                                color: "#334155",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                transition: "all 0.15s ease",
+                              }}
+                              onClick={() => {
+                                setEditingRole(r);
+                                setEditForm({
+                                  name: r.name,
+                                  key: r.key,
+                                  description: r.description ?? "",
+                                  scope: r.scope === "platform" ? "platform" : "organisation",
+                                  status: r.status,
+                                  sortOrder: r.sortOrder ?? 0,
+                                });
+                                setEditError(null);
+                              }}
                             >
-                              Delete
+                              <Icon name="edit" size={13} style={{ color: "#64748b" }} /> Edit
                             </button>
-                          ) : (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              type="button"
-                              disabled
-                              title="System roles are core platform presets and cannot be deleted"
-                              style={{ color: "var(--muted, #94a3b8)", cursor: "not-allowed", opacity: 0.5 }}
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+
+                            {!isSystemRole(r.key) ? (
+                              <button
+                                type="button"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  padding: "6px 12px",
+                                  borderRadius: 8,
+                                  border: "1px solid #fee2e2",
+                                  background: "#ffffff",
+                                  color: "#ef4444",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                }}
+                                onClick={() =>
+                                  (r._count?.userRoles ?? 0) > 0
+                                    ? setRoleInUse({ role: r, action: "delete it" })
+                                    : setConfirmDeleteState(r)
+                                }
+                              >
+                                <Icon name="trash" size={13} style={{ color: "#ef4444" }} /> Delete
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  padding: "6px 12px",
+                                  borderRadius: 8,
+                                  border: "1px solid #f1f5f9",
+                                  background: "#f8fafc",
+                                  color: "#cbd5e1",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "not-allowed",
+                                }}
+                                title="System roles cannot be deleted"
+                              >
+                                <Icon name="trash" size={13} /> Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

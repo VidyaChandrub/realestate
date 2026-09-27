@@ -14,7 +14,7 @@ import { FieldRolesPanel, TypedFieldEditor } from "@/components/org/typed-field-
 import { FIELD_ROLES, fieldsToRows, groupNoun, roleBaselineOf, rowsToFields, templateTraits, validateFieldRows, type FieldRole, type FieldRow } from "@/lib/field-template";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { subdomainPreviewHost } from "@/lib/domain";
+
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
 import { ORG_THEME_CHANGE_EVENT } from "@/components/global-theme-provider";
 
@@ -102,7 +102,7 @@ const SECTION_META: Record<string, { icon: IconName; title: string; sub: string 
   general: { icon: "building", title: "General Information", sub: "Update your organisation's basic details and contact information." },
   branding: { icon: "sparkles", title: "Logo & identity", sub: "Shown across the app, landing pages & emails" },
   localization: { icon: "globe", title: "Formats & language", sub: "Regional preferences for your workspace" },
-  domain: { icon: "globe", title: "Domain & subdomain", sub: "Your organisation site URL and custom domain" },
+  domain: { icon: "globe", title: "Landing Page Domains", sub: "Configure custom domains for each landing page" },
   crm: { icon: "crm", title: "CRM & leads", sub: "How leads are captured and handled" },
   fields: { icon: "puzzle", title: "Custom attributes", sub: "Add your own fields to leads, contacts, projects & bookings" },
   pipeline: { icon: "modules", title: "Pipeline & sources", sub: "Stages, lost reasons and lead sources" },
@@ -467,7 +467,6 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
     <span className={`badge ${DOMAIN_STATUS_BADGE[status] ?? "b-gray"}`}>{DOMAIN_STATUS_LABEL[status] ?? status}</span>
   );
 
-  const host = info?.subdomainHost ?? subdomainPreviewHost(info?.subdomain);
   const customRequests = (info?.requests ?? []).filter((r) => r.kind === "custom_domain");
   const approvedOrConnected = customRequests.filter((r) => r.status === "approved" || r.status === "connected");
   const pendingRequests = customRequests.filter((r) => r.status === "pending");
@@ -475,40 +474,7 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
 
   return (
     <>
-      {/* 1. Subdomain Card */}
-      <Card icon="globe" title="Subdomain" sub="Your organisation default site & login address on this platform">
-        <div className="card-b" style={{ padding: 0 }}>
-          {loading ? (
-            <div className="muted" style={{ padding: 16 }}>Loading domain settings…</div>
-          ) : busy ? null : !info ? (
-            <div className="muted" style={{ padding: 16 }}>{error ?? "Domain settings unavailable."}</div>
-          ) : (
-            <div className="swrow">
-              <div className="tx">
-                <b>Subdomain Portal</b>
-                <div className="muted">
-                  {info.subdomain ? host : "No subdomain assigned yet."}
-                  {info.subdomainStatus === "active" ? " — active organisation portal" : ""}
-                </div>
-                {info.subdomainStatus === "active" && host ? (
-                  <div className="muted" style={{ marginTop: 6, fontSize: 12.5 }}>
-                    <a href={`${typeof window !== "undefined" ? window.location.protocol : "http:"}//${host}/login`} target="_blank" rel="noreferrer" style={{ color: "var(--brand)", fontWeight: 600 }}>
-                      Open Login Portal
-                    </a>
-                    {" · "}
-                    <a href={`${typeof window !== "undefined" ? window.location.protocol : "http:"}//${host}/site`} target="_blank" rel="noreferrer" style={{ color: "var(--brand)", fontWeight: 600 }}>
-                      Open Default Site
-                    </a>
-                  </div>
-                ) : null}
-              </div>
-              {badge(info.subdomainStatus)}
-            </div>
-          )}
-        </div>
-      </Card>
-
-      {/* 2. Custom Domains & Landing Page Mapping Card */}
+      {/* Landing Page Custom Domains Card */}
       <Card icon="globe" title="Landing Page Custom Domains" sub="Configure and assign distinct domains to each of your landing pages">
         <div className="card-b" style={{ padding: 16 }}>
           {loading ? (
@@ -812,7 +778,7 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
                       <button
                         className="btn btn-primary"
                         type="submit"
-                        disabled={sending || !customDomain.trim() || info.subdomainStatus !== "active"}
+                        disabled={sending || !customDomain.trim()}
                         style={{ fontWeight: 700 }}
                       >
                         {sending ? "Submitting…" : "Submit Domain Request"}
@@ -1780,38 +1746,20 @@ export default function OrgSettingsPage() {
                   </div>
                 </div>
 
-                <div className="set-row-2">
-                  <div className="set-field">
-                    <label>Subdomain <span className="set-req">*</span></label>
-                    <div className="set-input-box">
-                      <span className="set-field-ic"><Icon name="link" size={16} /></span>
-                      <input
-                        className="inp inp-mono"
-                        value={org.subdomain ?? ""}
-                        readOnly
-                        disabled
-                        placeholder="Not set yet"
-                      />
-                    </div>
-                    <div className="set-field-hint">
-                      Set from the Domain section — changing it here would break existing links.
-                    </div>
-                  </div>
-                  <div className="set-field">
-                    <label>Industry <span className="set-req">*</span></label>
-                    <div className="set-input-box">
-                      <span className="set-field-ic"><Icon name="tag" size={16} /></span>
-                      <select
-                        className="inp"
-                        value={form.industry}
-                        onChange={(e) => updateForm({ industry: e.target.value as OrgIndustry })}
-                      >
-                        <option value="">Select industry…</option>
-                        {INDUSTRY_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </div>
+                <div className="set-field">
+                  <label>Industry <span className="set-req">*</span></label>
+                  <div className="set-input-box">
+                    <span className="set-field-ic"><Icon name="tag" size={16} /></span>
+                    <select
+                      className="inp"
+                      value={form.industry}
+                      onChange={(e) => updateForm({ industry: e.target.value as OrgIndustry })}
+                    >
+                      <option value="">Select industry…</option>
+                      {INDUSTRY_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

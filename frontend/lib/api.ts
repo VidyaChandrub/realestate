@@ -76,7 +76,6 @@ import type {
   OrgUserDashboardResponse,
   SalesAgentsListResponse,
   SignupStep1Response,
-  SubdomainAvailability,
   UnreadNotificationsResponse,
   UpdateOrgCatalogOptionInput,
   UserProfile,
@@ -89,7 +88,7 @@ import type {
   PlatformConfig,
   UpdatePlatformConfigInput,
   PlatformTheme,
-  SubdomainVerifyResult,
+  DomainVerifyResult,
   PlatformTeamMember,
   PlatformTeamRole,
   DynamicRole,
@@ -718,14 +717,6 @@ export function deleteOrgUser(id: string): Promise<{ success: boolean }> {
 
 // --- Organisation domain identity (subdomain + custom domain) ---
 
-export async function checkSubdomainAvailability(
-  subdomain: string,
-): Promise<SubdomainAvailability> {
-  return apiFetch<SubdomainAvailability>(
-    `/auth/subdomain-availability?subdomain=${encodeURIComponent(subdomain)}`,
-  );
-}
-
 export async function getOrgDomainInfo(): Promise<OrgDomainInfo> {
   return apiFetch<OrgDomainInfo>("/org/domain");
 }
@@ -796,11 +787,11 @@ export async function reviewOrgDomainRequest(
   );
 }
 
-/** Live DNS + site check for an approved org subdomain. */
+/** Live DNS + site check for an approved org custom domain. */
 export async function verifyOrgDomainRequest(
   id: string,
-): Promise<SubdomainVerifyResult> {
-  return apiFetch<SubdomainVerifyResult>(
+): Promise<DomainVerifyResult> {
+  return apiFetch<DomainVerifyResult>(
     `/admin/org-domain-requests/${id}/verify`,
   );
 }

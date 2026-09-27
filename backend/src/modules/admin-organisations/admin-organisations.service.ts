@@ -8,11 +8,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
 import { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { generateUniqueOrgSlug } from '../../common/utils/slug.util';
-import {
-  generateUniqueSubdomain,
-  provisionOrgPortal,
-} from '../../common/utils/org-site.util';
-import { isValidSubdomain, normalizeSubdomain } from '../../common/utils/domain.util';
+import { provisionOrgPortal } from '../../common/utils/org-site.util';
 import { generateTempPassword } from '../../common/utils/tokens.util';
 import {
   buildOrganisationUpdateData,
@@ -38,7 +34,6 @@ import { StorageService } from '../../common/storage/storage.service';
 import { CreateOrgUserDto } from '../org-users/dto/create-org-user.dto';
 import { UpdateOrgUserStatusDto } from '../org-users/dto/update-org-user-status.dto';
 import { ListOrgUsersQueryDto } from '../org-users/dto/list-org-users-query.dto';
-import { subdomainHost } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
 import type { Prisma } from '@prisma/client';
 import { EmailService } from '../email/email.service';
@@ -93,7 +88,6 @@ export class AdminOrganisationsService {
     }
 
     const slug = await generateUniqueOrgSlug(this.prisma, dto.name);
-    const subdomain = await generateUniqueSubdomain(this.prisma, slug);
 
     const adminRole = await this.prisma.role.findFirstOrThrow({
       where: { orgId: null, key: 'admin' },
@@ -112,8 +106,6 @@ export class AdminOrganisationsService {
           slug,
           city: dto.city,
           status: orgStatus as any,
-          subdomain,
-          subdomainStatus: 'active',
         },
       });
 
@@ -299,11 +291,11 @@ export class AdminOrganisationsService {
 
       const portal = await provisionOrgPortal(
         tx,
-        { id: activated.id, name: activated.name, slug: activated.slug, subdomain: activated.subdomain },
+        { id: activated.id, name: activated.name, slug: activated.slug },
         actor.sub,
         dto.templateIds?.[0] ?? null,
       );
-      return { activated: { ...activated, subdomain: portal.subdomain }, subscription, portal };
+      return { activated, subscription, portal };
     });
 
     const tempPassword = this.pendingTempPasswords.get(organisation.id);
@@ -411,9 +403,9 @@ export class AdminOrganisationsService {
           name: org.name,
           slug: org.slug,
           city: org.city,
-          subdomain: org.subdomain,
-          subdomainHost: org.subdomain ? subdomainHost(org.subdomain) : null,
-          subdomainStatus: org.subdomainStatus,
+          subdomain: null,
+          subdomainHost: null,
+          subdomainStatus: 'none',
           customDomain: org.customDomain,
           customDomainStatus: org.customDomainStatus,
           adminName: admin ? [admin.firstName, admin.lastName].filter(Boolean).join(' ') : null,
@@ -586,9 +578,9 @@ export class AdminOrganisationsService {
       name: organisation.name,
       slug: organisation.slug,
       city: organisation.city,
-      subdomain: organisation.subdomain,
-      subdomainHost: organisation.subdomain ? subdomainHost(organisation.subdomain) : null,
-      subdomainStatus: organisation.subdomainStatus,
+      subdomain: null,
+      subdomainHost: null,
+      subdomainStatus: 'none',
       customDomain: organisation.customDomain,
       customDomainStatus: organisation.customDomainStatus,
       status: organisation.status,
@@ -697,29 +689,9 @@ export class AdminOrganisationsService {
       where: { id },
       data: {
         status: dto.status,
-        // Reactivating flips the subdomain back to active too — otherwise a
-        // rejected org (whose subdomain was rejected alongside it) stays
-        // stuck showing "rejected" in the domain column even after its
-        // status badge reads "Active" again.
-        ...(dto.status === 'active' &&
-        existing.subdomain &&
-        (existing.subdomainStatus === 'pending' || existing.subdomainStatus === 'rejected')
-          ? { subdomainStatus: 'active' }
-          : {}),
-        // Reactivating a previously-rejected org — the old reason no longer
-        // describes its current state, so drop it rather than leave stale
-        // data behind. dto.status is always 'active' | 'disabled' here
-        // (UpdateOrganisationStatusDto), never 'rejected' itself.
         ...(existing.status === 'rejected' ? { rejectionReason: null } : {}),
       },
     });
-
-    if (dto.status === 'active' && existing.subdomain) {
-      await this.prisma.orgDomainRequest.updateMany({
-        where: { orgId: id, kind: 'subdomain', status: 'pending' },
-        data: { status: 'approved', reviewedAt: new Date() },
-      });
-    }
 
     // Notify every organisation member when the workspace is suspended so
     // users who are not currently signed in also understand why access stops.
@@ -812,7 +784,6 @@ export class AdminOrganisationsService {
           id: updated.id,
           name: organisation.name,
           slug: organisation.slug,
-          subdomain: organisation.subdomain,
         },
         actor.sub,
         dto.templateIds?.[0] ?? null,
@@ -862,20 +833,9 @@ export class AdminOrganisationsService {
     if (!reason || !reason.trim()) {
       throw new BadRequestException('A rejection reason is required');
     }
-    // Mark the org rejected (distinct from a later admin-initiated disable),
-    // record why, and reject any pending subdomain requests.
     const updated = await this.prisma.organisation.update({
       where: { id: orgId },
-      data: { status: 'rejected', subdomainStatus: 'rejected', rejectionReason: reason },
-    });
-    await this.prisma.orgDomainRequest.updateMany({
-      where: { orgId, kind: 'subdomain', status: 'pending' },
-      data: {
-        status: 'rejected',
-        reviewedAt: new Date(),
-        reviewedBy: actor.sub,
-        rejectionReason: reason ?? 'Organisation was rejected',
-      },
+      data: { status: 'rejected', rejectionReason: reason },
     });
     await this.prisma.auditLog.create({
       data: { orgId: updated.id, actorId: actor.sub, action: 'org_rejected', entity: 'Organisation', entityId: updated.id, metadata: { reason } as any },
@@ -1035,52 +995,21 @@ export class AdminOrganisationsService {
       }),
     ]);
 
-    const host = org.subdomain ? subdomainHost(org.subdomain) : null;
-    const proto = process.env.SUBDOMAIN_MODE === 'localhost' ? 'http' : 'https';
     return {
-      subdomain: org.subdomain,
-      subdomainHost: host,
-      loginUrl: host ? `${proto}://${host}/login` : null,
-      siteUrl: host ? `${proto}://${host}/site` : null,
-      subdomainStatus: org.subdomainStatus,
       customDomain: org.customDomain,
       customDomainStatus: org.customDomainStatus,
       customDomainLandingPageId: org.customDomainLandingPageId,
-      orgDomainRequests: requests,
+      orgDomainRequests: requests.filter((r) => r.kind === 'custom_domain'),
       landingPages,
     };
   }
 
-  async assignSubdomain(id: string, actor: JwtPayload, requested?: string) {
-    const org = await this.getRealOrganisation(id);
-    let label = requested?.trim() ? normalizeSubdomain(requested) : '';
-    if (label) {
-      if (!isValidSubdomain(label)) {
-        throw new BadRequestException('Subdomain is invalid');
-      }
-      const clash = await this.prisma.organisation.findFirst({
-        where: { subdomain: label, id: { not: id } },
-        select: { id: true },
-      });
-      if (clash) throw new ConflictException('That subdomain is already in use');
-    } else {
-      label = await generateUniqueSubdomain(this.prisma, org.slug || org.name, id);
-    }
-
-    const portal = await this.prisma.$transaction((tx) =>
-      provisionOrgPortal(
-        tx,
-        { id: org.id, name: org.name, slug: org.slug, subdomain: label },
-        actor.sub,
-      ),
-    );
-
+  async assignSubdomain(_id: string, _actor: JwtPayload, _requested?: string) {
     return {
-      subdomain: portal.subdomain,
-      subdomainHost: portal.host,
-      loginUrl: `${process.env.SUBDOMAIN_MODE === 'localhost' ? 'http' : 'https'}://${portal.host}/login`,
-      siteUrl: `${process.env.SUBDOMAIN_MODE === 'localhost' ? 'http' : 'https'}://${portal.host}/site`,
-      subdomainStatus: 'active',
+      subdomain: '',
+      subdomainHost: '',
+      subdomainStatus: 'none',
+      message: 'Subdomains have been disabled.',
     };
   }
 
