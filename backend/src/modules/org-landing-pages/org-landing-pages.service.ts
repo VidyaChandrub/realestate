@@ -362,7 +362,12 @@ export class OrgLandingPagesService {
 
     const data: Prisma.LandingPageUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name;
-    if (dto.slug !== undefined) data.slug = dto.slug;
+    if (dto.slug !== undefined) {
+      const cleanSlug = dto.slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '');
+      if (cleanSlug) {
+        data.slug = cleanSlug;
+      }
+    }
     if (dto.thumbnail !== undefined) data.thumbnail = dto.thumbnail;
 
     if (dto.content !== undefined) {

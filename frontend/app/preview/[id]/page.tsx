@@ -23,26 +23,63 @@ interface LandingPageDetail extends LandingPageRow {
 export default function PreviewLandingPage() {
   const params = useParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
-  const { accessToken } = useAuth();
+  const { accessToken, isLoading: authLoading, user } = useAuth();
 
   const [data, setData] = useState<LandingPageDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id || !accessToken) return;
+    if (!id || authLoading) return;
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    apiFetch<LandingPageDetail>(`/org/landing-pages/${encodeURIComponent(id)}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-      .then((page) => {
-        applyLandingPagePropertyFromConfig(page.content?.config);
-        setData(page);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load page."))
-      .finally(() => setLoading(false));
-  }, [id, accessToken]);
+
+    const loadPage = async () => {
+      // 1. If authenticated, try the org or admin endpoint
+      if (accessToken) {
+        try {
+          const endpoint =
+            user?.role === "super_admin" || user?.platformUnrestricted
+              ? `/admin/landing-pages/${encodeURIComponent(id)}`
+              : `/org/landing-pages/${encodeURIComponent(id)}`;
+          const page = await apiFetch<LandingPageDetail>(endpoint, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (!cancelled) {
+            applyLandingPagePropertyFromConfig(page.content?.config);
+            setData(page);
+            setLoading(false);
+          }
+          return;
+        } catch {
+          // If auth call fails (e.g. 403 or cross-tenant), fall through to public check
+        }
+      }
+
+      // 2. Public / shared preview fallback
+      try {
+        const page = await apiFetch<LandingPageDetail>(
+          `/public/site/page-by-id/${encodeURIComponent(id)}`
+        );
+        if (!cancelled) {
+          applyLandingPagePropertyFromConfig(page.content?.config);
+          setData(page);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load page.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void loadPage();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, accessToken, authLoading, user?.role, user?.platformUnrestricted]);
 
   // Apply SEO per individual landing page — document title/meta/OG/canonical
   useEffect(() => {

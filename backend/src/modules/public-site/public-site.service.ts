@@ -360,4 +360,29 @@ export class PublicSiteService {
     }
     return page;
   }
+
+  async resolveById(id: string) {
+    const page = await this.prisma.landingPage.findUnique({
+      where: { id },
+      include: {
+        organisation: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            logoUrl: true,
+            brandColour: true,
+            customDomain: true,
+          },
+        },
+        sourceTemplate: {
+          select: { id: true, name: true, baseDesignName: true },
+        },
+      },
+    });
+    if (!page) {
+      throw new NotFoundException('Landing page not found');
+    }
+    return page;
+  }
 }

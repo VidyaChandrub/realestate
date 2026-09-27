@@ -47,4 +47,9 @@ export class PublicSiteController {
   resolvePage(@Param('slug') slug: string) {
     return this.service.resolveBySlug(slug);
   }
+
+  @Get('page-by-id/:id')
+  resolveById(@Param('id') id: string) {
+    return this.service.resolveById(id);
+  }
 }
