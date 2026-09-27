@@ -142,6 +142,10 @@ export function TopNav({
   settingsHref,
   homeHref,
   unsaved,
+  pageType = "landing",
+  companionPage,
+  onSwitchCompanion,
+  isSwitchingCompanion,
 }: {
   module: ModuleKey;
   setModule?: (m: ModuleKey) => void;
@@ -171,6 +175,10 @@ export function TopNav({
   settingsHref?: string;
   homeHref?: string;
   unsaved?: boolean;
+  pageType?: "landing" | "thank-you";
+  companionPage?: { id?: string; name?: string; slug?: string; pageType?: "landing" | "thank-you" } | null;
+  onSwitchCompanion?: () => void;
+  isSwitchingCompanion?: boolean;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [moduleMenuOpen, setModuleMenuOpen] = useState(false);
@@ -292,6 +300,69 @@ export function TopNav({
             </span>
           ) : null}
           {unsaved && !pageStatus ? <span className="ps-unsaved-pill">Unsaved</span> : null}
+
+          {onSwitchCompanion || companionPage ? (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                background: "rgba(255, 255, 255, 0.07)",
+                borderRadius: 8,
+                padding: 2,
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                marginLeft: 4,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  if (pageType === "thank-you") onSwitchCompanion?.();
+                }}
+                disabled={isSwitchingCompanion}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "4px 9px",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: "none",
+                  cursor: pageType === "thank-you" ? "pointer" : "default",
+                  background: pageType !== "thank-you" ? "var(--ps-primary, #6366f1)" : "transparent",
+                  color: pageType !== "thank-you" ? "#ffffff" : "var(--color-text-3, #94a3b8)",
+                  transition: "all 0.15s ease",
+                }}
+                title={pageType === "thank-you" ? "Switch to editing Landing Page" : "Currently editing Landing Page"}
+              >
+                📄 Landing Page
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (pageType !== "thank-you") onSwitchCompanion?.();
+                }}
+                disabled={isSwitchingCompanion}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "4px 9px",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  border: "none",
+                  cursor: pageType !== "thank-you" ? "pointer" : "default",
+                  background: pageType === "thank-you" ? "var(--ps-primary, #6366f1)" : "transparent",
+                  color: pageType === "thank-you" ? "#ffffff" : "var(--color-text-3, #94a3b8)",
+                  transition: "all 0.15s ease",
+                }}
+                title={pageType !== "thank-you" ? "Switch to editing Thank You Page" : "Currently editing Thank You Page"}
+              >
+                ✓ Thank You Page
+              </button>
+            </div>
+          ) : null}
 
           {setModule ? (
             <div style={{ position: "relative" }} data-module-menu>

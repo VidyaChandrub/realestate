@@ -499,12 +499,59 @@ export default function OrgLandingPagesPage() {
     }
   }
 
-  function openView(id: string) {
-    window.open(`/preview/${encodeURIComponent(id)}`, "_blank", "noopener,noreferrer");
+  function openView(idOrRow: string | LandingPageRow) {
+    if (typeof idOrRow === "object") {
+      if (idOrRow.status === "published" && idOrRow.slug) {
+        window.open(`/p/${encodeURIComponent(idOrRow.slug)}`, "_blank", "noopener,noreferrer");
+        return;
+      }
+      window.open(`/preview/${encodeURIComponent(idOrRow.id)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const row = rawRows.find((r) => r.id === idOrRow);
+    if (row?.status === "published" && row.slug) {
+      window.open(`/p/${encodeURIComponent(row.slug)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    window.open(`/preview/${encodeURIComponent(idOrRow)}`, "_blank", "noopener,noreferrer");
   }
 
   function startEdit(row: LandingPageRow) {
     router.push(orgBuilderPath(row.id));
+  }
+
+  function startEditThankYou(row: LandingPageRow) {
+    if (row.thankYouPage?.id) {
+      router.push(`/org-builder?id=${encodeURIComponent(row.thankYouPage.id)}`);
+      return;
+    }
+    apiFetch<any>(`/org/landing-pages/${encodeURIComponent(row.id)}/thank-you`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+      .then((comp) => {
+        if (comp?.id) {
+          router.push(`/org-builder?id=${encodeURIComponent(comp.id)}`);
+        } else {
+          notify("Could not open Thank You page");
+        }
+      })
+      .catch(() => notify("Could not open Thank You page"));
+  }
+
+  function openViewThankYou(row: LandingPageRow) {
+    if (row.thankYouPage?.slug && row.status === "published") {
+      window.open(`/p/${encodeURIComponent(row.thankYouPage.slug)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (row.thankYouPage?.id) {
+      window.open(`/preview/${encodeURIComponent(row.thankYouPage.id)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (row.slug && row.status === "published") {
+      window.open(`/p/${encodeURIComponent(row.slug)}/thank-you`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    window.open(`/preview/${encodeURIComponent(row.id)}`, "_blank", "noopener,noreferrer");
   }
 
   const rawRows = (result?.data ?? []).filter((r) => r.pageType === "landing");
@@ -1045,6 +1092,17 @@ export default function OrgLandingPagesPage() {
                             <Edit2 size={12} /> Edit
                           </button>
                         ) : null}
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => startEditThankYou(row)}
+                            title="Edit Companion Thank You Page in builder"
+                            style={{ color: "#6366f1", fontWeight: 600, fontSize: 11 }}
+                          >
+                            <CheckCircle2 size={12} /> Thank You
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
@@ -1113,7 +1171,9 @@ export default function OrgLandingPagesPage() {
               accessToken={accessToken}
               busy={busyId === row.id}
               onEdit={canEdit ? () => startEdit(row) : undefined}
+              onEditThankYou={canEdit ? () => startEditThankYou(row) : undefined}
               onView={() => openView(row.id)}
+              onViewThankYou={() => openViewThankYou(row)}
               onPublish={canPublish ? () => publishPage(row.id) : undefined}
               onUnpublish={canPause ? () => unpublishPage(row.id) : undefined}
               onDuplicate={canCreate ? () => duplicatePage(row.id) : undefined}
@@ -1558,7 +1618,9 @@ function OrgLandingPageVisualCard({
   accessToken,
   busy,
   onEdit,
+  onEditThankYou,
   onView,
+  onViewThankYou,
   onPublish,
   onUnpublish,
   onDuplicate,
@@ -1569,7 +1631,9 @@ function OrgLandingPageVisualCard({
   accessToken?: string | null;
   busy: boolean;
   onEdit?: () => void;
+  onEditThankYou?: () => void;
   onView: () => void;
+  onViewThankYou?: () => void;
   onPublish?: () => void;
   onUnpublish?: () => void;
   onDuplicate?: () => void;
@@ -1770,6 +1834,23 @@ function OrgLandingPageVisualCard({
             </button>
           )}
 
+          {onEditThankYou && (
+            <button
+              type="button"
+              className="lp-btn-edit"
+              style={{
+                background: "rgba(99, 102, 241, 0.08)",
+                color: "#6366f1",
+                border: "1px solid rgba(99, 102, 241, 0.22)",
+                fontWeight: 600,
+              }}
+              onClick={onEditThankYou}
+              title="Edit Thank You Page in builder"
+            >
+              <CheckCircle2 size={13} /> Thank You
+            </button>
+          )}
+
           <button
             type="button"
             className="lp-btn-dots"
@@ -1792,7 +1873,7 @@ function OrgLandingPageVisualCard({
                 borderRadius: 12,
                 boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.15)",
                 zIndex: 50,
-                minWidth: 160,
+                minWidth: 175,
                 padding: 4,
                 display: "flex",
                 flexDirection: "column",
@@ -1825,6 +1906,19 @@ function OrgLandingPageVisualCard({
                   <Pencil size={13} /> Open Builder
                 </button>
               )}
+              {onEditThankYou && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onEditThankYou();
+                  }}
+                  style={{ justifyContent: "flex-start", gap: 8, fontSize: 12, color: "#6366f1", fontWeight: 600 }}
+                >
+                  <CheckCircle2 size={13} /> Edit Thank You Page
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
@@ -1836,6 +1930,19 @@ function OrgLandingPageVisualCard({
               >
                 <Eye size={13} /> Live Preview
               </button>
+              {onViewThankYou && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onViewThankYou();
+                  }}
+                  style={{ justifyContent: "flex-start", gap: 8, fontSize: 12 }}
+                >
+                  <ExternalLink size={13} /> View Thank You Page
+                </button>
+              )}
               {isPublished && onUnpublish ? (
                 <button
                   type="button"

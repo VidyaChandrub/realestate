@@ -255,6 +255,8 @@ interface ApiLandingPage {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  thankYouPage?: { id: string; name: string; slug: string; status: string } | null;
+  parentLandingPage?: { id: string; name: string; slug: string; status: string } | null;
   content?: { sections: SectionInstance[]; config: SiteConfig; engine?: string; site?: LandingPageData["openPageSite"] };
 }
 
@@ -292,6 +294,8 @@ function fromApiLandingPage(raw: ApiLandingPage): LandingPageData {
     designId: inferDesignId(raw.sourceTemplate?.name ?? BLANK_TEMPLATE.name),
     pageType: raw.pageType === "thank_you" ? "thank-you" : "landing",
     parentPageId: raw.parentId ?? undefined,
+    thankYouPage: raw.thankYouPage ?? null,
+    parentLandingPage: raw.parentLandingPage ?? null,
     isPaid: false,
     category: null,
   };

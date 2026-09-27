@@ -742,6 +742,18 @@ export interface LandingPageRow {
     customDomain: string;
     status: string;
   } | null;
+  thankYouPage?: {
+    id: string;
+    name: string;
+    slug: string;
+    status: LandingPageStatus;
+  } | null;
+  parentLandingPage?: {
+    id: string;
+    name: string;
+    slug: string;
+    status: LandingPageStatus;
+  } | null;
 }
 
 export interface OrgLandingPagesListResponse {
