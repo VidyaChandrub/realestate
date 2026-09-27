@@ -1,128 +1,32 @@
-import { randomBytes } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '../../database/prisma.service';
 import { generateUniqueLandingPageSlug } from './slug.util';
-import {
-  generateSubdomainSuggestions,
-  isValidSubdomain,
-  normalizeSubdomain,
-  subdomainHost,
-} from './domain.util';
 
 type Tx = Prisma.TransactionClient;
 type SubdomainLookup = PrismaService | Prisma.TransactionClient;
 
 export async function generateUniqueSubdomain(
-  prisma: SubdomainLookup,
-  source: string,
-  excludeOrgId?: string,
+  _prisma: SubdomainLookup,
+  _source: string,
+  _excludeOrgId?: string,
 ): Promise<string> {
-  const cleaned = normalizeSubdomain(source.replace(/[^a-z0-9]+/gi, '')).slice(0, 40);
-  const base = isValidSubdomain(cleaned) ? cleaned : `org${randomBytes(3).toString('hex')}`;
-  const candidates = [base, ...generateSubdomainSuggestions(base, 8)];
-
-  for (const label of candidates) {
-    if (await isSubdomainAvailable(prisma, label, excludeOrgId)) return label;
-  }
-
-  for (let i = 1; i < 80; i += 1) {
-    const label = `${base}${i}`.slice(0, 63);
-    if (isValidSubdomain(label) && (await isSubdomainAvailable(prisma, label, excludeOrgId))) {
-      return label;
-    }
-  }
-
-  return `org${randomBytes(4).toString('hex')}`;
+  return '';
 }
 
-async function isSubdomainAvailable(
-  prisma: SubdomainLookup,
-  label: string,
-  excludeOrgId?: string,
-): Promise<boolean> {
-  if (!isValidSubdomain(label)) return false;
-  const org = await prisma.organisation.findFirst({
-    where: {
-      subdomain: label,
-      ...(excludeOrgId ? { id: { not: excludeOrgId } } : {}),
-    },
-    select: { id: true },
-  });
-  if (org) return false;
-  const pending = await prisma.orgDomainRequest.findFirst({
-    where: {
-      kind: 'subdomain',
-      subdomain: label,
-      status: { in: ['pending', 'approved'] },
-      ...(excludeOrgId ? { orgId: { not: excludeOrgId } } : {}),
-    },
-    select: { id: true },
-  });
-  return !pending;
-}
-
-/** Ensures an active unique subdomain and a published landing page from assigned templates. */
+/** Ensures a published landing page from assigned templates. */
 export async function provisionOrgPortal(
   tx: Tx,
   org: {
     id: string;
     name: string;
     slug: string;
-    subdomain: string | null;
+    subdomain?: string | null;
     customDomain?: string | null;
     customDomainLandingPageId?: string | null;
   },
-  actorId: string,
+  _actorId: string,
   preferredTemplateId?: string | null,
 ): Promise<{ subdomain: string; host: string; landingPageId: string | null }> {
-  let subdomain = org.subdomain && isValidSubdomain(org.subdomain) ? org.subdomain : null;
-  if (!subdomain) {
-    subdomain = await generateUniqueSubdomain(tx, org.slug || org.name, org.id);
-  }
-
-  await tx.organisation.update({
-    where: { id: org.id },
-    data: { subdomain, subdomainStatus: 'active' },
-  });
-
-  // Reuse an existing subdomain request (pending OR already-approved) rather
-  // than inserting a fresh row on every call — otherwise repeated approvals
-  // or subdomain reassigns accumulate duplicate history rows. Pending rows
-  // get upgraded to approved; approved rows keep their original review
-  // metadata and only have the subdomain label refreshed.
-  const existing = await tx.orgDomainRequest.findFirst({
-    where: {
-      orgId: org.id,
-      kind: 'subdomain',
-      status: { in: ['pending', 'approved'] },
-    },
-    orderBy: { requestedAt: 'desc' },
-  });
-  if (existing) {
-    await tx.orgDomainRequest.update({
-      where: { id: existing.id },
-      data: {
-        subdomain,
-        status: 'approved',
-        ...(existing.status === 'pending'
-          ? { reviewedAt: new Date(), reviewedBy: actorId }
-          : {}),
-      },
-    });
-  } else {
-    await tx.orgDomainRequest.create({
-      data: {
-        orgId: org.id,
-        kind: 'subdomain',
-        subdomain,
-        status: 'approved',
-        requestedBy: actorId,
-        reviewedAt: new Date(),
-        reviewedBy: actorId,
-      },
-    });
-  }
-
   const existingPrimary = await tx.landingPage.findFirst({
     where: { orgId: org.id, status: 'published' },
     select: { id: true },
@@ -177,8 +81,7 @@ export async function provisionOrgPortal(
       }
     }
   }
-  // If the org has an approved/connected custom domain but no explicit landing
-  // page selected yet, default it to the primary published page.
+
   if (
     org.customDomainLandingPageId == null &&
     org.customDomain &&
@@ -190,5 +93,5 @@ export async function provisionOrgPortal(
     });
   }
 
-  return { subdomain, host: subdomainHost(subdomain), landingPageId };
+  return { subdomain: '', host: org.customDomain || '', landingPageId };
 }

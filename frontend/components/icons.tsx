@@ -26,6 +26,7 @@ export type IconName =
   | "close"
   | "plus"
   | "dots"
+  | "more-vertical"
   | "logout"
   | "arrow-up"
   | "arrow-down"
@@ -66,7 +67,10 @@ export type IconName =
   | "crown"
   | "activity"
   | "pause"
-  | "tag";
+  | "tag"
+  | "clock"
+  | "user-plus"
+  | "server";
 
 interface IconProps extends SVGProps<SVGSVGElement> {
   name: IconName;
@@ -209,6 +213,13 @@ const paths: Record<IconName, React.ReactNode> = {
   close: <path d="M18 6 6 18M6 6l12 12" />,
   plus: <path d="M12 5v14M5 12h14" />,
   dots: (
+    <>
+      <circle cx="12" cy="5" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="12" cy="19" r="1" />
+    </>
+  ),
+  "more-vertical": (
     <>
       <circle cx="12" cy="5" r="1" />
       <circle cx="12" cy="12" r="1" />
@@ -433,6 +444,28 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
       <circle cx="7" cy="7" r="1.5" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </>
+  ),
+  "user-plus": (
+    <>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="19" y1="8" x2="19" y2="14" />
+      <line x1="22" y1="11" x2="16" y2="11" />
+    </>
+  ),
+  server: (
+    <>
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+      <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+      <line x1="6" y1="6" x2="6.01" y2="6" />
+      <line x1="6" y1="18" x2="6.01" y2="18" />
     </>
   ),
 };

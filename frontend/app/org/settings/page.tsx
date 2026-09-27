@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, type ChangeEvent, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiFetch, cancelPackageChangeRequest, changePlan, addCommonProjectTypes, createOrgCatalogOption, createOrgProjectType, deleteOrgCatalogOption, deleteOrgProjectType, getInvoices, getOrgCatalogOptions, getOrgProjectTypes, updateOrgProjectType, getOrgDomainInfo, getOrgLeadStageDisplays, getOrgPackageChangeRequest, getPlans, renewSubscription, requestCustomDomain, submitPackageChangeRequest, updateOrgLeadStageDisplay } from "@/lib/api";
+import { apiFetch, cancelPackageChangeRequest, changePlan, addCommonProjectTypes, createOrgCatalogOption, createOrgProjectType, deleteOrgCatalogOption, deleteOrgProjectType, getInvoices, getOrgCatalogOptions, getOrgProjectTypes, updateOrgProjectType, getOrgDomainInfo, getOrgLeadStageDisplays, getOrgPackageChangeRequest, getPlans, renewSubscription, requestCustomDomain, assignCustomDomain, deleteCustomDomain, submitPackageChangeRequest, updateOrgLeadStageDisplay } from "@/lib/api";
 import type { BillingRenewResult, ChangePlanResult, CrmLeadStatus, InvoiceRow, OrgBillingSummary, OrgCatalogCategory, OrgCatalogOption, OrgDomainInfo, OrgIndustry, OrgProjectType, PackageChangeRequestRow, Plan, SafeOrganisation, UpdateOrganisationSettingsInput } from "@/lib/types";
 import { DEFAULT_LEAD_STAGES, LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead-stages";
 import type { IconName } from "@/components/icons";
@@ -14,7 +14,7 @@ import { FieldRolesPanel, TypedFieldEditor } from "@/components/org/typed-field-
 import { FIELD_ROLES, fieldsToRows, groupNoun, roleBaselineOf, rowsToFields, templateTraits, validateFieldRows, type FieldRole, type FieldRow } from "@/lib/field-template";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { subdomainPreviewHost } from "@/lib/domain";
+
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
 import { ORG_THEME_CHANGE_EVENT } from "@/components/global-theme-provider";
 
@@ -102,7 +102,7 @@ const SECTION_META: Record<string, { icon: IconName; title: string; sub: string 
   general: { icon: "building", title: "General Information", sub: "Update your organisation's basic details and contact information." },
   branding: { icon: "sparkles", title: "Logo & identity", sub: "Shown across the app, landing pages & emails" },
   localization: { icon: "globe", title: "Formats & language", sub: "Regional preferences for your workspace" },
-  domain: { icon: "globe", title: "Domain & subdomain", sub: "Your organisation site URL and custom domain" },
+  domain: { icon: "globe", title: "Landing Page Domains", sub: "Configure custom domains for each landing page" },
   crm: { icon: "crm", title: "CRM & leads", sub: "How leads are captured and handled" },
   fields: { icon: "puzzle", title: "Custom attributes", sub: "Add your own fields to leads, contacts, projects & bookings" },
   pipeline: { icon: "modules", title: "Pipeline & sources", sub: "Stages, lost reasons and lead sources" },
@@ -376,12 +376,25 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
   const [sent, setSent] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
 
+  // Assignment & action states
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [assignSelection, setAssignSelection] = useState<Record<string, string>>({});
+  const [actionBusy, setActionBusy] = useState(false);
+
   async function load() {
     setBusy(true);
     try {
       const data = await getOrgDomainInfo();
       setInfo(data);
-      setLandingPageId((prev) => prev || data.customDomainLandingPageId || data.landingPages?.[0]?.id || "");
+      setLandingPageId((prev) => prev || data.landingPages?.[0]?.id || "");
+      // Prepopulate assign selection map with current assignments
+      const map: Record<string, string> = {};
+      for (const r of data.requests ?? []) {
+        if (r.kind === "custom_domain") {
+          map[r.id] = r.landingPageId ?? "";
+        }
+      }
+      setAssignSelection(map);
       setError(null);
     } catch (e: any) {
       setError(e?.message ?? "Could not load domain settings");
@@ -407,7 +420,7 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
         landingPageId: landingPageId || undefined,
       });
       setCustomDomain("");
-      setSent("Custom domain request submitted for review.");
+      setSent("Custom domain request submitted for review by Super Admin.");
       await load();
     } catch (err: any) {
       setError(err?.message ?? "Could not submit custom domain request");
@@ -416,137 +429,372 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
     }
   }
 
+  async function handleAssign(domainRequestId: string) {
+    const targetPageId = assignSelection[domainRequestId] || null;
+    setActionBusy(true);
+    setError(null);
+    try {
+      await assignCustomDomain({
+        domainRequestId,
+        landingPageId: targetPageId,
+      });
+      setSent("Domain assignment updated successfully.");
+      setAssigningId(null);
+      await load();
+    } catch (err: any) {
+      setError(err?.message ?? "Could not update domain assignment");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function handleDelete(domainRequestId: string) {
+    if (!confirm("Are you sure you want to remove this domain request?")) return;
+    setActionBusy(true);
+    setError(null);
+    try {
+      await deleteCustomDomain(domainRequestId);
+      setSent("Domain removed successfully.");
+      await load();
+    } catch (err: any) {
+      setError(err?.message ?? "Could not remove domain");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
   const badge = (status: string) => (
     <span className={`badge ${DOMAIN_STATUS_BADGE[status] ?? "b-gray"}`}>{DOMAIN_STATUS_LABEL[status] ?? status}</span>
   );
 
-  const host = info?.subdomainHost ?? subdomainPreviewHost(info?.subdomain);
+  const customRequests = (info?.requests ?? []).filter((r) => r.kind === "custom_domain");
+  const approvedOrConnected = customRequests.filter((r) => r.status === "approved" || r.status === "connected");
+  const pendingRequests = customRequests.filter((r) => r.status === "pending");
+  const rejectedRequests = customRequests.filter((r) => r.status === "rejected");
 
   return (
-    <Card icon="globe" title="Subdomain" sub="Your organisation site address on this platform">
-      <div className="card-b" style={{ padding: 0 }}>
-        {loading ? (
-          <div className="muted" style={{ padding: 16 }}>Loading domain settings…</div>
-        ) : busy ? null : !info ? (
-          <div className="muted" style={{ padding: 16 }}>{error ?? "Domain settings unavailable."}</div>
-        ) : (
-          <>
-            <div className="swrow">
-              <div className="tx">
-                <b>Subdomain</b>
-                <div className="muted">
-                  {info.subdomain ? host : "No subdomain assigned yet."}
-                  {info.subdomainStatus === "active" ? " — organisation login" : ""}
+    <>
+      {/* Landing Page Custom Domains Card */}
+      <Card icon="globe" title="Landing Page Custom Domains" sub="Configure and assign distinct domains to each of your landing pages">
+        <div className="card-b" style={{ padding: 16 }}>
+          {loading ? (
+            <div className="muted">Loading domains…</div>
+          ) : !info ? (
+            <div className="muted">{error ?? "Custom domain settings unavailable."}</div>
+          ) : (
+            <>
+              {/* Flow explanation banner */}
+              <div
+                style={{
+                  background: "var(--surface-2, #f8fafc)",
+                  border: "1px solid var(--line-2)",
+                  borderRadius: 12,
+                  padding: "12px 16px",
+                  marginBottom: 20,
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                  color: "var(--ink-2)",
+                }}
+              >
+                <div style={{ fontWeight: 700, color: "var(--ink)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>🌐</span> Domain Configuration Workflow
                 </div>
-                {info.subdomainStatus === "active" && host ? (
-                  <div className="muted" style={{ marginTop: 6, fontSize: 12.5 }}>
-                    <a href={`${typeof window !== "undefined" ? window.location.protocol : "http:"}//${host}/login`} style={{ color: "var(--brand)", fontWeight: 600 }}>
-                      Open login
-                    </a>
-                    {" · "}
-                    <a href={`${typeof window !== "undefined" ? window.location.protocol : "http:"}//${host}/site`} style={{ color: "var(--brand)", fontWeight: 600 }}>
-                      Open landing page
-                    </a>
-                  </div>
-                ) : null}
+                <span>
+                  <b>1. Request:</b> Enter your custom domain below (e.g. <code>homes.mybrand.com</code>) and select a landing page.
+                  <br />
+                  <b>2. Superadmin Approval:</b> The Super Admin approves the domain request.
+                  <br />
+                  <b>3. Assign &amp; Switch:</b> Once approved, you can freely assign, switch, or unassign this domain to any landing page.
+                </span>
               </div>
-              {badge(info.subdomainStatus)}
-            </div>
-            <div className="swrow">
-              <div className="tx">
-                <b>Custom domain</b>
-                <div className="muted">
-                  {info.customDomain ?? "No custom domain mapped yet."}
-                  {info.customDomainStatus === "connected" ? " — pointing to your site" : ""}
-                </div>
-                {info.landingPages.length > 0 ? (
-                  <div className="muted" style={{ marginTop: 4, fontSize: 12.5 }}>
-                    {info.customDomainLandingPageId
-                      ? `Serves: ${info.landingPages.find((p) => p.id === info.customDomainLandingPageId)?.name ?? "selected landing page"}`
-                      : info.customDomain
-                        ? "No landing page selected yet — will serve your primary published page."
-                        : null}
-                  </div>
-                ) : null}
-              </div>
-              {badge(info.customDomainStatus)}
-            </div>
 
-            <div style={{ padding: "4px 16px 16px" }}>
-              <div className="os-card-x" style={{ margin: "12px 0 8px", fontWeight: 600, color: "var(--fg)" }}>
-                Request a primary custom domain
-              </div>
-              <div className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
-                Bring your own domain (e.g. homes.skylinedev.com). Once a super admin approves it, it is
-                mapped to the landing page you pick below. Only available once your organisation is active.
-              </div>
-              <fieldset disabled={!canRequest} style={READ_ONLY_FIELDSET}>
-              <form onSubmit={handleRequest} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label>Landing page to serve</label>
-                  <select
-                    className="inp"
-                    value={landingPageId}
-                    onChange={(e) => setLandingPageId(e.target.value)}
-                    disabled={info.landingPages.length === 0}
-                  >
-                    {info.landingPages.length === 0 ? (
-                      <option value="">No landing pages yet</option>
-                    ) : (
-                      info.landingPages.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                          {p.pageType === "thank_you" ? " (thank-you)" : ""}
-                          {p.status === "published" ? "" : " — " + p.status}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                  <div className="hint">
-                    The custom domain will load this landing page (and its children) at your domain.
-                  </div>
+              {/* Approved & Connected Domains Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>Approved &amp; Active Domains</span>
+                  <span className="badge b-gray" style={{ fontSize: 11 }}>{approvedOrConnected.length}</span>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  <div className="field" style={{ flex: 1, marginBottom: 0 }}>
-                    <input
-                      className="inp"
-                      placeholder="example.com"
-                      value={customDomain}
-                      onChange={(e) => setCustomDomain(e.target.value)}
-                    />
+
+                {approvedOrConnected.length === 0 ? (
+                  <div className="muted" style={{ fontSize: 13, padding: "12px 0" }}>
+                    No approved custom domains yet. Submit a request below to get started.
                   </div>
-                  <button className="btn btn-primary" type="submit" disabled={sending || info.subdomainStatus !== "active" || info.landingPages.length === 0}>
-                    {sending ? "Submitting…" : "Request"}
-                  </button>
-                </div>
-              </form>
-              </fieldset>
-              {sent ? <div className="muted" style={{ color: "var(--green)", marginTop: 8 }}>{sent}</div> : null}
-              {error ? <div className="muted" style={{ color: "var(--rose)", marginTop: 8 }}>{error}</div> : null}
-              {info.requests?.length ? (
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Recent requests</div>
-                  {info.requests.slice(0, 5).map((req) => (
-                    <div key={req.id} className="swrow" style={{ padding: "8px 0" }}>
-                      <div className="tx">
-                        <b>{req.kind === "custom_domain" ? req.customDomain : req.subdomain}</b>
-                        <div className="muted">
-                          {new Date(req.requestedAt).toLocaleDateString()}
-                          {req.kind === "custom_domain" && req.landingPage?.name
-                            ? ` · ${req.landingPage.name}`
-                            : ""}
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {approvedOrConnected.map((req) => {
+                      const isEditing = assigningId === req.id;
+                      const assignedPage = info.landingPages.find((p) => p.id === req.landingPageId);
+
+                      return (
+                        <div
+                          key={req.id}
+                          style={{
+                            background: "var(--surface)",
+                            border: "1px solid var(--line-2)",
+                            borderRadius: 12,
+                            padding: "14px 16px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 10,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontWeight: 700, fontSize: 15, color: "var(--ink)", fontFamily: "monospace" }}>
+                                  {req.customDomain}
+                                </span>
+                                {badge(req.status)}
+                              </div>
+                              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                                Serves:{" "}
+                                {assignedPage ? (
+                                  <b style={{ color: "var(--brand)" }}>{assignedPage.name} (/{assignedPage.slug})</b>
+                                ) : (
+                                  <span style={{ color: "var(--amber, #f59e0b)" }}>Unassigned (Not pointing to any page)</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              <button
+                                type="button"
+                                className="btn btn-soft btn-sm"
+                                onClick={() => setAssigningId(isEditing ? null : req.id)}
+                                disabled={actionBusy}
+                              >
+                                {isEditing ? "Close" : "Assign / Switch Page"}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => handleDelete(req.id)}
+                                disabled={actionBusy}
+                                style={{ color: "var(--rose)" }}
+                                title="Remove domain"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Inline Assignment Form */}
+                          {isEditing && (
+                            <div
+                              style={{
+                                background: "var(--surface-2, #f8fafc)",
+                                border: "1px solid var(--line-2)",
+                                borderRadius: 8,
+                                padding: 12,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 10,
+                                marginTop: 4,
+                              }}
+                            >
+                              <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink)" }}>
+                                Select Landing Page for <code>{req.customDomain}</code>:
+                              </div>
+                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                                <select
+                                  className="inp"
+                                  style={{ flex: 1, minWidth: 200 }}
+                                  value={assignSelection[req.id] ?? ""}
+                                  onChange={(e) =>
+                                    setAssignSelection((prev) => ({
+                                      ...prev,
+                                      [req.id]: e.target.value,
+                                    }))
+                                  }
+                                >
+                                  <option value="">-- No Landing Page (Unassigned) --</option>
+                                  {info.landingPages.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name} (/{p.slug}) {p.status === "published" ? "✓ Published" : `— ${p.status}`}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  onClick={() => handleAssign(req.id)}
+                                  disabled={actionBusy}
+                                  style={{ fontWeight: 700 }}
+                                >
+                                  {actionBusy ? "Saving…" : "Save Assignment"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  onClick={() => setAssigningId(null)}
+                                  disabled={actionBusy}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Pending Superadmin Approval Requests */}
+              {pendingRequests.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>Pending Super Admin Review</span>
+                    <span className="badge b-amber" style={{ fontSize: 11 }}>{pendingRequests.length}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {pendingRequests.map((req) => (
+                      <div
+                        key={req.id}
+                        style={{
+                          background: "var(--surface)",
+                          border: "1px dashed var(--line-2)",
+                          borderRadius: 10,
+                          padding: "10px 14px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--ink)", fontSize: 14 }}>
+                            {req.customDomain}
+                          </div>
+                          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                            Requested {new Date(req.requestedAt).toLocaleDateString()}
+                            {req.landingPage?.name ? ` for page: ${req.landingPage.name}` : ""}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          {badge(req.status)}
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => handleDelete(req.id)}
+                            disabled={actionBusy}
+                            style={{ color: "var(--rose)", fontSize: 11.5 }}
+                          >
+                            Cancel
+                          </button>
                         </div>
                       </div>
-                      {badge(req.status)}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              ) : null}
-            </div>
-          </>
-        )}
-      </div>
-    </Card>
+              )}
+
+              {/* Rejected Requests */}
+              {rejectedRequests.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--rose)", marginBottom: 6 }}>
+                    Rejected Requests
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {rejectedRequests.map((req) => (
+                      <div
+                        key={req.id}
+                        style={{
+                          background: "var(--rose-050, #fff1f2)",
+                          border: "1px solid var(--rose)",
+                          borderRadius: 8,
+                          padding: "8px 12px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: 12.5,
+                        }}
+                      >
+                        <div>
+                          <b style={{ fontFamily: "monospace" }}>{req.customDomain}</b>: {req.rejectionReason ?? "Rejected by Super Admin"}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => handleDelete(req.id)}
+                          style={{ fontSize: 11.5 }}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Request New Domain Form */}
+              <div
+                style={{
+                  background: "var(--surface-2, #f8fafc)",
+                  border: "1px solid var(--line-2)",
+                  borderRadius: 14,
+                  padding: 16,
+                  marginTop: 10,
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)", marginBottom: 4 }}>
+                  Request a New Custom Domain
+                </div>
+                <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
+                  Submit a domain name for Super Admin approval. You can link it to a specific landing page now, or assign it anytime after approval.
+                </div>
+
+                <fieldset disabled={!canRequest} style={READ_ONLY_FIELDSET}>
+                  <form onSubmit={handleRequest} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+                      <div className="field" style={{ marginBottom: 0 }}>
+                        <label>Landing page to serve</label>
+                        <select
+                          className="inp"
+                          value={landingPageId}
+                          onChange={(e) => setLandingPageId(e.target.value)}
+                        >
+                          <option value="">-- Assign later (after approval) --</option>
+                          {info.landingPages.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} (/{p.slug}) {p.status === "published" ? "✓" : `— ${p.status}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="field" style={{ marginBottom: 0 }}>
+                        <label>Custom domain</label>
+                        <input
+                          className="inp"
+                          placeholder="e.g. luxuryvillas.ae"
+                          value={customDomain}
+                          onChange={(e) => setCustomDomain(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <button
+                        className="btn btn-primary"
+                        type="submit"
+                        disabled={sending || !customDomain.trim()}
+                        style={{ fontWeight: 700 }}
+                      >
+                        {sending ? "Submitting…" : "Submit Domain Request"}
+                      </button>
+                    </div>
+                  </form>
+                </fieldset>
+
+                {sent && <div className="muted" style={{ color: "var(--green)", marginTop: 10, fontWeight: 600 }}>{sent}</div>}
+                {error && <div className="muted" style={{ color: "var(--rose)", marginTop: 10 }}>{error}</div>}
+              </div>
+            </>
+          )}
+        </div>
+      </Card>
+    </>
   );
 }
 
@@ -1498,38 +1746,20 @@ export default function OrgSettingsPage() {
                   </div>
                 </div>
 
-                <div className="set-row-2">
-                  <div className="set-field">
-                    <label>Subdomain <span className="set-req">*</span></label>
-                    <div className="set-input-box">
-                      <span className="set-field-ic"><Icon name="link" size={16} /></span>
-                      <input
-                        className="inp inp-mono"
-                        value={org.subdomain ?? ""}
-                        readOnly
-                        disabled
-                        placeholder="Not set yet"
-                      />
-                    </div>
-                    <div className="set-field-hint">
-                      Set from the Domain section — changing it here would break existing links.
-                    </div>
-                  </div>
-                  <div className="set-field">
-                    <label>Industry <span className="set-req">*</span></label>
-                    <div className="set-input-box">
-                      <span className="set-field-ic"><Icon name="tag" size={16} /></span>
-                      <select
-                        className="inp"
-                        value={form.industry}
-                        onChange={(e) => updateForm({ industry: e.target.value as OrgIndustry })}
-                      >
-                        <option value="">Select industry…</option>
-                        {INDUSTRY_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </div>
+                <div className="set-field">
+                  <label>Industry <span className="set-req">*</span></label>
+                  <div className="set-input-box">
+                    <span className="set-field-ic"><Icon name="tag" size={16} /></span>
+                    <select
+                      className="inp"
+                      value={form.industry}
+                      onChange={(e) => updateForm({ industry: e.target.value as OrgIndustry })}
+                    >
+                      <option value="">Select industry…</option>
+                      {INDUSTRY_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

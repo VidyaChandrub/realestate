@@ -5,18 +5,76 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import {
-  generateSubdomainDnsInstructions,
-  generateSubdomainHostInstructions,
-  getSubdomainBaseDomain,
-  subdomainHost,
+  DnsRecordSpec,
 } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
 import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { promises as dns } from 'node:dns';
 
-// A single row returned to the Super Admin "Org Domains" list. Both subdomain
-// and custom-domain requests are surfaced together so the Super Admin sees ALL
-// organisations' requests in one place.
+function generateCustomDomainDnsInstructions(
+  domain: string,
+  opts: {
+    mode?: string;
+    ip?: string;
+    ipv6?: string | null;
+    cname?: string;
+    ns1?: string;
+    ns2?: string;
+  } = {},
+): DnsRecordSpec[] {
+  const mode = opts.mode ?? process.env.DNS_MODE ?? 'a';
+  const ip = opts.ip ?? process.env.INFRA_IP ?? '';
+  const ipv6 = opts.ipv6 !== undefined ? opts.ipv6 : (process.env.INFRA_IPV6 ?? null);
+  const cname = opts.cname ?? process.env.INFRA_CNAME_TARGET ?? 'cname.bigestate.io';
+  const ns1 = opts.ns1 ?? process.env.INFRA_NS1 ?? 'ns1.bigestate.io';
+  const ns2 = opts.ns2 ?? process.env.INFRA_NS2 ?? 'ns2.bigestate.io';
+  const records: DnsRecordSpec[] = [];
+
+  if (mode === 'ns') {
+    records.push({
+      type: 'NS',
+      host: '@',
+      value: ns1,
+      ttl: 'Auto',
+      purpose: 'Primary nameserver',
+    });
+    records.push({
+      type: 'NS',
+      host: '@',
+      value: ns2,
+      ttl: 'Auto',
+      purpose: 'Secondary nameserver',
+    });
+  } else if (mode === 'cname') {
+    records.push({
+      type: 'CNAME',
+      host: domain.startsWith('www.') ? 'www' : '@',
+      value: cname,
+      ttl: 'Auto',
+      purpose: 'Website origin',
+    });
+  } else {
+    records.push({
+      type: 'A',
+      host: '@',
+      value: ip || '76.76.21.21',
+      ttl: 'Auto',
+      purpose: 'Website origin (IPv4)',
+    });
+    if (ipv6) {
+      records.push({
+        type: 'AAAA',
+        host: '@',
+        value: ipv6,
+        ttl: 'Auto',
+        purpose: 'Website origin (IPv6)',
+      });
+    }
+  }
+  return records;
+}
+
+// A single row returned to the Super Admin "Org Domains" list.
 function toView(
   req: any,
   opts: {
@@ -30,8 +88,7 @@ function toView(
 ) {
   return {
     id: req.id,
-    kind: req.kind,
-    subdomain: req.subdomain,
+    kind: 'custom_domain',
     customDomain: req.customDomain,
     landingPageId: req.landingPageId ?? null,
     landingPage: req.landingPage
@@ -41,20 +98,14 @@ function toView(
     requestedAt: req.requestedAt,
     reviewedAt: req.reviewedAt,
     rejectionReason: req.rejectionReason,
-    subdomainHost:
-      req.kind === 'subdomain' && req.subdomain
-        ? subdomainHost(req.subdomain)
-        : null,
-    dnsInstructions:
-      req.kind === 'subdomain' && req.subdomain
-        ? generateSubdomainHostInstructions(req.subdomain, opts)
-        : null,
+    dnsInstructions: req.customDomain
+      ? generateCustomDomainDnsInstructions(req.customDomain, opts)
+      : null,
     organisation: req.organisation
       ? {
           id: req.organisation.id,
           name: req.organisation.name,
           slug: req.organisation.slug,
-          subdomain: req.organisation.subdomain,
           customDomain: req.organisation.customDomain,
         }
       : null,
@@ -68,8 +119,6 @@ export class AdminOrgDomainService {
     private readonly platformConfig: PlatformConfigService,
   ) {}
 
-  // DNS mode + origin targets taken from the Super Admin platform config (with
-  // env fallback) — used to compute per-row instructions and verification.
   private async dnsOptions() {
     const cfg = await this.platformConfig.getConfig();
     return {
@@ -82,8 +131,7 @@ export class AdminOrgDomainService {
     };
   }
 
-  // Lists EVERY organisation's subdomain / custom-domain requests (across all
-  // orgs) so the Super Admin can review them centrally.
+  // Lists EVERY organisation's custom-domain requests across all orgs
   async list(query: {
     status?: string;
     kind?: string;
@@ -93,67 +141,54 @@ export class AdminOrgDomainService {
   }) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const where: any = {};
-    if (query.status) where.status = query.status;
-    if (query.kind) where.kind = query.kind;
+    const where: any = { kind: 'custom_domain' };
+    if (query.status && query.status !== 'all') where.status = query.status;
     if (query.search) {
       where.AND = [
         {
           OR: [
-            { subdomain: { contains: query.search, mode: 'insensitive' } },
             { customDomain: { contains: query.search, mode: 'insensitive' } },
+            { organisation: { name: { contains: query.search, mode: 'insensitive' } } },
+            { organisation: { slug: { contains: query.search, mode: 'insensitive' } } },
           ],
         },
       ];
     }
 
-    const [rows, total] = await Promise.all([
+    const [total, rows, dnsOpts] = await Promise.all([
+      this.prisma.orgDomainRequest.count({ where }),
       this.prisma.orgDomainRequest.findMany({
         where,
         orderBy: { requestedAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          landingPage: {
-            select: { id: true, name: true, slug: true },
-          },
+          landingPage: { select: { id: true, name: true, slug: true } },
           organisation: {
             select: {
               id: true,
               name: true,
               slug: true,
-              subdomain: true,
               customDomain: true,
             },
           },
         },
       }),
-      this.prisma.orgDomainRequest.count({ where }),
+      this.dnsOptions(),
     ]);
 
-    const dnsOpts = await this.dnsOptions();
-    const baseDomain = getSubdomainBaseDomain();
-    const wildcard = generateSubdomainDnsInstructions('*', {
-      mode: dnsOpts.mode,
-      ip: dnsOpts.ip,
-      ipv6: dnsOpts.ipv6,
-      cname: dnsOpts.cname,
-      ns1: dnsOpts.ns1,
-      ns2: dnsOpts.ns2,
-    });
-
     return {
-      data: rows.map((r) => toView(r, dnsOpts)),
       total,
       page,
       limit,
-      baseDomain,
-      dnsInstructions: wildcard.records,
-      dnsMode: wildcard.mode,
+      pages: Math.ceil(total / limit) || 1,
+      rows: rows.map((r) => toView(r, dnsOpts)),
+      dnsInstructions: generateCustomDomainDnsInstructions('yourdomain.com', dnsOpts),
+      dnsMode: dnsOpts.mode,
     };
   }
 
-  // Approve activates the organisation's subdomain or maps its custom domain.
+  // Approve maps the custom domain to the organisation's landing page.
   async approve(id: string, adminId: string) {
     const req = await this.getPending(id);
     const org = await this.prisma.organisation.findUnique({
@@ -162,26 +197,11 @@ export class AdminOrgDomainService {
     if (!org) throw new NotFoundException('Organisation not found');
 
     const orgUpdate: any = {};
-    if (req.kind === 'subdomain') {
-      if (req.subdomain) {
-        orgUpdate.subdomain = req.subdomain;
-        orgUpdate.subdomainStatus = 'active';
-      }
-    } else if (req.kind === 'custom_domain') {
-      if (req.customDomain) {
+    if (req.customDomain) {
+      const targetPageId = req.landingPageId ?? null;
+      if (!org.customDomain || org.customDomain === req.customDomain) {
         orgUpdate.customDomain = req.customDomain;
-        orgUpdate.customDomainStatus = 'connected';
-        // Map the approved custom domain to the org's selected landing page.
-        // Falls back to the org's primary published page when none was chosen.
-        let targetPageId = req.landingPageId ?? null;
-        if (!targetPageId) {
-          const primary = await this.prisma.landingPage.findFirst({
-            where: { orgId: org.id, status: 'published' },
-            orderBy: { updatedAt: 'desc' },
-            select: { id: true },
-          });
-          targetPageId = primary?.id ?? null;
-        }
+        orgUpdate.customDomainStatus = targetPageId ? 'connected' : 'approved';
         if (targetPageId) {
           orgUpdate.customDomainLandingPageId = targetPageId;
         }
@@ -192,7 +212,7 @@ export class AdminOrgDomainService {
       const reqRow = await tx.orgDomainRequest.update({
         where: { id },
         data: {
-          status: 'approved',
+          status: req.landingPageId ? 'connected' : 'approved',
           reviewedAt: new Date(),
           reviewedBy: adminId,
         },
@@ -211,26 +231,18 @@ export class AdminOrgDomainService {
           entity: 'OrgDomainRequest',
           entityId: id,
           metadata: {
-            kind: req.kind,
-            domain: req.kind === 'subdomain' ? req.subdomain : req.customDomain,
+            kind: 'custom_domain',
+            domain: req.customDomain,
+            landingPageId: req.landingPageId ?? null,
           } as any,
         },
       });
       await tx.notification.create({
         data: buildNotificationData({
           orgId: req.orgId,
-          type:
-            req.kind === 'subdomain'
-              ? 'subdomain_request'
-              : 'custom_domain_request',
-          title:
-            req.kind === 'subdomain'
-              ? 'Subdomain approved'
-              : 'Custom domain approved',
-          body:
-            req.kind === 'subdomain'
-              ? `${org.name} is now live at ${subdomainHost(req.subdomain as string)}.`
-              : `${org.name} can now point ${req.customDomain} at its site.`,
+          type: 'custom_domain_request',
+          title: 'Custom domain approved',
+          body: `${org.name} can now point ${req.customDomain} at its landing page.`,
           entity: 'OrgDomainRequest',
           entityId: id,
         }),
@@ -244,6 +256,9 @@ export class AdminOrgDomainService {
   async reject(id: string, adminId: string, reason?: string) {
     if (!reason) throw new BadRequestException('Rejection reason is required');
     const req = await this.getPending(id);
+    const org = await this.prisma.organisation.findUnique({
+      where: { id: req.orgId },
+    });
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const reqRow = await tx.orgDomainRequest.update({
@@ -255,11 +270,32 @@ export class AdminOrgDomainService {
           rejectionReason: reason,
         },
       });
-      if (req.kind === 'custom_domain') {
-        await tx.organisation.update({
-          where: { id: req.orgId },
-          data: { customDomain: null, customDomainStatus: 'rejected' },
+      if (org?.customDomain === req.customDomain) {
+        const another = await tx.orgDomainRequest.findFirst({
+          where: {
+            orgId: req.orgId,
+            id: { not: id },
+            kind: 'custom_domain',
+            status: { in: ['approved', 'connected'] },
+          },
+          orderBy: { requestedAt: 'desc' },
         });
+
+        if (another) {
+          await tx.organisation.update({
+            where: { id: req.orgId },
+            data: {
+              customDomain: another.customDomain,
+              customDomainStatus: another.status,
+              customDomainLandingPageId: another.landingPageId,
+            },
+          });
+        } else {
+          await tx.organisation.update({
+            where: { id: req.orgId },
+            data: { customDomain: null, customDomainStatus: 'rejected', customDomainLandingPageId: null },
+          });
+        }
       }
       await tx.auditLog.create({
         data: {
@@ -269,8 +305,8 @@ export class AdminOrgDomainService {
           entity: 'OrgDomainRequest',
           entityId: id,
           metadata: {
-            kind: req.kind,
-            domain: req.kind === 'subdomain' ? req.subdomain : req.customDomain,
+            kind: 'custom_domain',
+            domain: req.customDomain,
             reason,
           } as any,
         },
@@ -278,15 +314,9 @@ export class AdminOrgDomainService {
       await tx.notification.create({
         data: buildNotificationData({
           orgId: req.orgId,
-          type:
-            req.kind === 'subdomain'
-              ? 'subdomain_request'
-              : 'custom_domain_request',
-          title:
-            req.kind === 'subdomain'
-              ? 'Subdomain request rejected'
-              : 'Custom domain request rejected',
-          body: `${req.kind === 'subdomain' ? req.subdomain : req.customDomain} was rejected${reason ? ` — ${reason}` : ''}.`,
+          type: 'custom_domain_request',
+          title: 'Custom domain request rejected',
+          body: `${req.customDomain} was rejected${reason ? ` — ${reason}` : ''}.`,
           entity: 'OrgDomainRequest',
           entityId: id,
         }),
@@ -297,44 +327,29 @@ export class AdminOrgDomainService {
     return toView(updated);
   }
 
-  // Verify an APPROVED subdomain request: resolves the live host against real
-  // DNS, checks it points at the configured AWS origin, and confirms the org
-  // has a published landing page to serve. This is exactly what surfaces why
-  // a subdomain "isn't working" (no wildcard record / wrong IP / no site).
+  // Verify an APPROVED custom domain request: resolves the live host against real
+  // DNS and checks it points at the configured origin.
   async verify(id: string) {
     const req = await this.prisma.orgDomainRequest.findUnique({
       where: { id },
       include: { organisation: true },
     });
     if (!req) throw new NotFoundException('Domain request not found');
-    if (req.kind !== 'subdomain') {
-      throw new BadRequestException('Only subdomain requests can be verified');
+    const domain = req.customDomain;
+    if (!domain) {
+      throw new BadRequestException('No custom domain found on this request');
     }
     const org = req.organisation;
-    const subdomain = org.subdomain || req.subdomain;
-    if (!subdomain || org.subdomainStatus !== 'active') {
-      throw new BadRequestException(
-        'Subdomain must be approved first — the organisation subdomain is not active.',
-      );
-    }
 
-    const host = subdomainHost(subdomain);
-    const baseDomain = getSubdomainBaseDomain();
     const cfg = await this.platformConfig.getConfig();
     const expectedIp = cfg.infraIp || process.env.INFRA_IP || null;
 
     let hostIps: string[] = [];
-    let baseIps: string[] = [];
     let dnsStatus: 'ok' | 'mismatch' | 'unresolved' = 'unresolved';
     try {
-      hostIps = await dns.resolve4(host);
+      hostIps = await dns.resolve4(domain);
     } catch {
       hostIps = [];
-    }
-    try {
-      baseIps = await dns.resolve4(baseDomain);
-    } catch {
-      baseIps = [];
     }
     if (hostIps.length > 0) {
       dnsStatus = expectedIp
@@ -344,17 +359,21 @@ export class AdminOrgDomainService {
         : 'ok';
     }
 
-    const landingPage = await this.prisma.landingPage.findFirst({
-      where: { orgId: org.id, status: 'published' },
-      orderBy: { updatedAt: 'desc' },
-      select: { id: true, slug: true, name: true, status: true },
-    });
+    const landingPage = req.landingPageId
+      ? await this.prisma.landingPage.findFirst({
+          where: { id: req.landingPageId, orgId: org.id },
+          select: { id: true, slug: true, name: true, status: true },
+        })
+      : await this.prisma.landingPage.findFirst({
+          where: { orgId: org.id, status: 'published' },
+          orderBy: { updatedAt: 'desc' },
+          select: { id: true, slug: true, name: true, status: true },
+        });
 
     return {
       id: req.id,
-      subdomain,
-      host,
-      baseDomain,
+      customDomain: domain,
+      host: domain,
       dnsMode: cfg.dnsMode,
       expectedIp,
       organisation: {
@@ -362,12 +381,10 @@ export class AdminOrgDomainService {
         name: org.name,
         slug: org.slug,
         status: org.status,
-        subdomainStatus: org.subdomainStatus,
       },
       dns: {
         status: dnsStatus,
         hostIps,
-        baseIps,
         expectedIp,
       },
       landingPage,

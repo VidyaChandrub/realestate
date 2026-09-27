@@ -1,26 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const MODE = process.env.NEXT_PUBLIC_SUBDOMAIN_MODE || "";
-const CONFIGURED_BASE =
-  process.env.NEXT_PUBLIC_SUBDOMAIN_BASE_DOMAIN ||
-  (MODE === "localhost" ? "localhost" : "ipixxel.ae");
-
-const PLATFORM_BASES = [
-  ...new Set(
-    [CONFIGURED_BASE, MODE === "localhost" ? "localhost" : ""]
-      .filter((host): host is string => Boolean(host))
-      .map((host) => host.toLowerCase().replace(/^www\./, "")),
-  ),
-];
-
 const PLATFORM_HOSTS = new Set(
   [
     "localhost",
     "127.0.0.1",
     process.env.NEXT_PUBLIC_APP_HOST,
-    ...PLATFORM_BASES,
-    ...PLATFORM_BASES.map((base) => `www.${base}`),
   ]
     .filter((host): host is string => Boolean(host))
     .map((host) => host.toLowerCase()),
@@ -30,29 +15,15 @@ function hostname(host: string): string {
   return host.trim().toLowerCase().replace(/:\d+$/, "").replace(/\.$/, "");
 }
 
-function subdomainLabel(host: string, base: string): string | null {
-  const h = hostname(host);
-  const suffix = `.${base}`;
-  if (!h.endsWith(suffix)) return null;
-  const label = h.slice(0, -suffix.length);
-  if (!label || label.includes(".") || label.includes("/")) return null;
-  return label;
-}
-
-function isPlatformSubdomain(host: string): boolean {
-  return PLATFORM_BASES.some((base) => Boolean(subdomainLabel(host, base)));
-}
-
-function isOrgSiteHost(host: string): boolean {
+function isCustomDomain(host: string): boolean {
   const h = hostname(host);
   if (!h || PLATFORM_HOSTS.has(h)) return false;
-  if (isPlatformSubdomain(host)) return true;
   return h.includes(".");
 }
 
 export function proxy(request: NextRequest) {
   const host = request.headers.get("host") ?? "";
-  if (!isOrgSiteHost(host)) return NextResponse.next();
+  if (!isCustomDomain(host)) return NextResponse.next();
 
   const path = request.nextUrl.pathname;
   if (
@@ -68,12 +39,7 @@ export function proxy(request: NextRequest) {
   }
 
   const url = request.nextUrl.clone();
-  // Platform subdomain is the org login portal. Public template site lives at /site.
-  if (isPlatformSubdomain(host) && (path === "/" || path === "")) {
-    url.pathname = "/login";
-    return NextResponse.rewrite(url);
-  }
-  if (path === "/site" || (!isPlatformSubdomain(host) && path === "/")) {
+  if (path === "/site" || path === "/" || path === "") {
     url.pathname = "/org-site";
     return NextResponse.rewrite(url);
   }

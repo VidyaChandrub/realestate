@@ -137,50 +137,201 @@ function formatActionLabel(action: string): string {
 }
 
 function StatTile({
+  icon,
+  iconBg = "#eff6ff",
+  iconColor = "#2563eb",
   label,
   value,
   sub,
-  accent,
+  trend,
+  sparkColor = "#3b82f6",
 }: {
+  icon?: string;
+  iconBg?: string;
+  iconColor?: string;
   label: string;
   value: ReactNode;
   sub?: ReactNode;
+  trend?: string;
+  sparkColor?: string;
   accent?: string;
 }) {
   return (
     <div
       style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line-2)",
-        borderRadius: 14,
-        padding: "14px 16px",
-        minWidth: 0,
+        background: "#ffffff",
+        border: "1px solid #eef2f6",
+        borderRadius: 16,
+        padding: "16px 18px",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        minHeight: 96,
       }}
     >
-      <div
-        style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}
-      >
-        {label}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, zIndex: 1 }}>
+        {icon ? (
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              background: iconBg,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: iconColor,
+              flexShrink: 0,
+            }}
+          >
+            <Icon name={icon as any} size={22} />
+          </div>
+        ) : null}
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: "#64748b" }}>{label}</span>
+            {trend ? (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "1px 6px",
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: "#ecfdf5",
+                  color: "#059669",
+                }}
+              >
+                {trend}
+              </span>
+            ) : null}
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.02em", marginTop: 2 }}>
+            {value}
+          </div>
+          {sub ? (
+            <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>
+              {sub}
+            </div>
+          ) : null}
+        </div>
       </div>
+      <div style={{ width: 85, height: 42, opacity: 0.85, alignSelf: "flex-end", marginBottom: 2 }}>
+        <svg viewBox="0 0 100 40" width="100%" height="100%" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id={`spark-${(sparkColor || '#3b82f6').replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={sparkColor || '#3b82f6'} stopOpacity="0.25" />
+              <stop offset="100%" stopColor={sparkColor || '#3b82f6'} stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M 0 30 Q 25 12, 50 22 T 100 8"
+            fill="none"
+            stroke={sparkColor || '#3b82f6'}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M 0 30 Q 25 12, 50 22 T 100 8 L 100 40 L 0 40 Z"
+            fill={`url(#spark-${(sparkColor || '#3b82f6').replace('#', '')})`}
+          />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function DetailRowItem({
+  icon,
+  iconBg,
+  iconColor,
+  label,
+  value,
+  sub,
+  copyable,
+  external,
+}: {
+  icon: string;
+  iconBg: string;
+  iconColor: string;
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  copyable?: string;
+  external?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
       <div
         style={{
-          fontSize: 20,
-          fontWeight: 800,
-          fontFamily: "monospace",
-          color: accent ?? "var(--ink)",
-          letterSpacing: "-0.02em",
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          background: iconBg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: iconColor,
+          flexShrink: 0,
+          marginTop: 2,
         }}
       >
-        {value}
+        <Icon name={icon as any} size={18} />
       </div>
-      {sub ? (
-        <div
-          className="muted"
-          style={{ fontSize: 11.5, marginTop: 4, wordBreak: "break-word" }}
-        >
-          {sub}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 500, color: "#64748b" }}>{label}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+          <span style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a", wordBreak: "break-word" }}>
+            {value}
+          </span>
+          {copyable ? (
+            <button
+              type="button"
+              onClick={() => handleCopy(copyable)}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                color: copied ? "#10b981" : "#94a3b8",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+              title={copied ? "Copied!" : "Copy"}
+            >
+              {copied ? <Icon name="check" size={13} /> : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                </svg>
+              )}
+            </button>
+          ) : null}
+          {external ? (
+            <a
+              href={external}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "#94a3b8", display: "inline-flex", alignItems: "center" }}
+              title="Open URL"
+            >
+              <Icon name="external" size={13} />
+            </a>
+          ) : null}
         </div>
-      ) : null}
+        {sub ? <div style={{ fontSize: 12, color: "#64748b", marginTop: 1 }}>{sub}</div> : null}
+      </div>
     </div>
   );
 }
@@ -270,6 +421,7 @@ export default function SuperAdminOrganisationDetailPage() {
   const [activity, setActivity] = useState<OrganisationActivityRow[] | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
 
   const [userFormOpen, setUserFormOpen] = useState(false);
   const [userForm, setUserForm] = useState<UserFormData>(EMPTY_USER_FORM);
@@ -358,9 +510,6 @@ export default function SuperAdminOrganisationDetailPage() {
 
   const [domainsData, setDomainsData] = useState<any | null>(null);
   const [domainsLoading, setDomainsLoading] = useState(false);
-  const [subdomainDraft, setSubdomainDraft] = useState("");
-  const [subdomainSaving, setSubdomainSaving] = useState(false);
-  const [subdomainMsg, setSubdomainMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accessToken || !params.id) return;
@@ -368,7 +517,6 @@ export default function SuperAdminOrganisationDetailPage() {
     apiFetch<any>(`/admin/organisations/${params.id}/domains`, { headers: { Authorization: `Bearer ${accessToken}` } })
       .then((data) => {
         setDomainsData(data);
-        setSubdomainDraft(data?.subdomain ?? "");
       })
       .catch(() => setDomainsData(null))
       .finally(() => setDomainsLoading(false));
@@ -595,92 +743,389 @@ export default function SuperAdminOrganisationDetailPage() {
 
   return (
     <>
-      <div className="page-head reveal in">
-        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-          <span className="av" style={{ width: 58, height: 58, borderRadius: 16, fontSize: 20 }}>
-            {initials(org.name)}
-          </span>
-          <div>
-            <h1 style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {org.name}{" "}
-              <span className={`badge ${orgStatusMeta(org.status).badge}`}>
-                <span className="dot" style={{ background: "currentColor" }} />
-                {orgStatusMeta(org.status).label}
-              </span>
-            </h1>
-            <div className="sub" style={{ marginTop: 4 }}>
-              {org.city} · <span className="mono">{org.slug}</span> · onboarded {formatDate(org.createdAt)}
-            </div>
-            {(org.subdomain || org.customDomain) ? (
-              <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
-                {org.subdomain ? (
-                  <span className="chip">
-                    <Icon name="globe" size={12} /> {org.subdomainHost ?? org.subdomain}
-                    <span style={{ textTransform: "capitalize", fontWeight: 700 }}> · {org.subdomainStatus}</span>
-                  </span>
-                ) : null}
-                {org.customDomain ? (
-                  <span className="chip">
-                    <Icon name="link" size={12} /> {org.customDomain}
-                    <span style={{ textTransform: "capitalize", fontWeight: 700 }}> · {org.customDomainStatus}</span>
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <div className="actions">
-          <span className={`badge ${orgStatusMeta(org.status).badge}`}>
-            {orgStatusMeta(org.status).label}
-          </span>
-        </div>
-      </div>
-
+      {/* Breadcrumb */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          fontSize: 13,
+          color: "#64748b",
           marginBottom: 16,
         }}
       >
+        <button
+          type="button"
+          onClick={() => router.push("/admin-console/organisations")}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            color: "#64748b",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 13,
+          }}
+        >
+          <span style={{ fontSize: 14 }}>←</span>
+          <span>Organisations</span>
+        </button>
+        <span style={{ color: "#94a3b8" }}>›</span>
+        <span style={{ color: "#0f172a", fontWeight: 600 }}>{org.name}</span>
+      </div>
+
+      {/* Hero Header Banner */}
+      <div
+        style={{
+          background: "#ffffff",
+          border: "1px solid #eef2f6",
+          borderRadius: 18,
+          padding: "20px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 20,
+          marginBottom: 20,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 16,
+              background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#ffffff",
+              fontWeight: 700,
+              fontSize: 20,
+              flexShrink: 0,
+              boxShadow: "0 4px 12px rgba(59,130,246,0.25)",
+            }}
+          >
+            {initials(org.name)}
+          </div>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <h1
+                style={{
+                  fontSize: 22,
+                  fontWeight: 800,
+                  color: "#0f172a",
+                  margin: 0,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {org.name}
+              </h1>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "3px 10px", borderRadius: 8 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#059669", textTransform: "capitalize" }}>
+                  {orgStatusMeta(org.status).label}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, color: "#64748b", fontSize: 13, marginTop: 6, flexWrap: "wrap" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <Icon name="pin" size={13} style={{ color: "#94a3b8" }} />
+                <span>{org.city || "Mumbai"}</span>
+              </span>
+              <span style={{ color: "#cbd5e1" }}>|</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <Icon name="profile" size={13} style={{ color: "#94a3b8" }} />
+                <span className="mono">{org.slug}</span>
+              </span>
+              <span style={{ color: "#cbd5e1" }}>|</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <Icon name="calendar" size={13} style={{ color: "#94a3b8" }} />
+                <span>Onboarded {formatDate(org.createdAt)}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          {/* Actions dropdown */}
+          <div style={{ position: "relative" }}>
+            <button
+              type="button"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "#ffffff",
+                border: "1px solid #e2e8f0",
+                borderRadius: 10,
+                padding: "9px 16px",
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: "#334155",
+                cursor: "pointer",
+              }}
+              onClick={() => setActionsMenuOpen(!actionsMenuOpen)}
+            >
+              <Icon name="settings" size={14} style={{ color: "#64748b" }} />
+              <span>Actions</span>
+              <Icon name="chevron-down" size={12} style={{ color: "#94a3b8" }} />
+            </button>
+            {actionsMenuOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  top: "calc(100% + 6px)",
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 12,
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+                  padding: 6,
+                  minWidth: 180,
+                  zIndex: 100,
+                }}
+              >
+                <button
+                  type="button"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "transparent",
+                    color: "#334155",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    setTab("Subscription");
+                  }}
+                >
+                  <Icon name="billing" size={14} />
+                  <span>Manage Plan</span>
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "transparent",
+                    color: "#334155",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    setTab("Domains");
+                  }}
+                >
+                  <Icon name="globe" size={14} />
+                  <span>Manage Domains</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* View Website */}
+          <a
+            href={domainsData?.siteUrl || org.website || "#"}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 10,
+              padding: "9px 16px",
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: "#334155",
+              textDecoration: "none",
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="globe" size={14} style={{ color: "#64748b" }} />
+            <span>View Website</span>
+            <Icon name="external" size={12} style={{ color: "#94a3b8" }} />
+          </a>
+
+          {/* Edit Organisation */}
+          {canEditOrganisation ? (
+            <button
+              type="button"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                border: "none",
+                borderRadius: 10,
+                padding: "10px 18px",
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: "#fff",
+                boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
+                cursor: "pointer",
+              }}
+              onClick={startEdit}
+            >
+              <Icon name="edit" size={15} />
+              <span>Edit Organisation</span>
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* 4 Stat Cards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 16,
+          marginBottom: 20,
+        }}
+      >
         <StatTile
+          icon="users"
+          iconBg="#eff6ff"
+          iconColor="#2563eb"
           label="Users"
           value={org.userCount != null ? <CountUp value={org.userCount} /> : "—"}
-          sub={`${org.teamCount} teams`}
+          sub={`${org.teamCount || 0} teams`}
+          trend="↑ 0%"
+          sparkColor="#3b82f6"
         />
-        <StatTile label="Sites" value="—" sub="—" />
-        <StatTile label="Leads captured" value="—" sub="—" accent="#10b981" />
         <StatTile
+          icon="modules"
+          iconBg="#faf5ff"
+          iconColor="#9333ea"
+          label="Sites"
+          value={domainsData?.landingPages?.length ?? 0}
+          sub={domainsData?.landingPages?.length ? `${domainsData.landingPages.length} published` : "No sites published"}
+          sparkColor="#a855f7"
+        />
+        <StatTile
+          icon="filter"
+          iconBg="#f0fdf4"
+          iconColor="#16a34a"
+          label="Leads captured"
+          value={0}
+          sub="No data yet"
+          sparkColor="#10b981"
+        />
+        <StatTile
+          icon="billing"
+          iconBg="#fff7ed"
+          iconColor="#ea580c"
           label="Plan value"
-          value={org.plan?.name ?? "—"}
-          accent={org.plan ? "#0f1424" : "var(--ink)"}
-          sub={org.planValue != null ? `₹${org.planValue.toLocaleString("en-IN")}` : "—"}
+          value={org.plan?.name ?? "Starter"}
+          sub={org.planValue != null ? `₹${org.planValue.toLocaleString("en-IN")}` : "₹999"}
+          sparkColor="#f97316"
         />
       </div>
 
-      <div className="tabs reveal in">
-        {TABS.map((t) => (
-          <a key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-            {t}
-          </a>
-        ))}
+      {/* Tabs */}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          borderBottom: "1px solid #e2e8f0",
+          marginBottom: 20,
+        }}
+      >
+        {TABS.map((t) => {
+          const active = tab === t;
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              style={{
+                background: "none",
+                border: "none",
+                borderBottom: active ? "2.5px solid #2563eb" : "2.5px solid transparent",
+                padding: "10px 14px",
+                fontSize: 14,
+                fontWeight: active ? 700 : 500,
+                color: active ? "#2563eb" : "#64748b",
+                cursor: "pointer",
+                marginBottom: -1,
+                transition: "all 0.15s ease",
+              }}
+            >
+              {t}
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid g-2-1">
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {tab === "Overview" ? (
             <Reveal delay={2}>
-              <div className="card">
-                <div className="card-h">
-                  <span className="t">Organisation details</span>
+              <div className="card" style={{ padding: 22 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: "#eff6ff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#2563eb",
+                      }}
+                    >
+                      <Icon name="building" size={17} />
+                    </div>
+                    <span style={{ fontSize: 16.5, fontWeight: 700, color: "#0f172a" }}>Organisation details</span>
+                  </div>
                   {!editing && canEditOrganisation ? (
-                    <button className="btn btn-ghost btn-sm" onClick={startEdit}>
-                      Edit
+                    <button
+                      type="button"
+                      onClick={startEdit}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "6px 14px",
+                        borderRadius: 8,
+                        border: "1px solid #e2e8f0",
+                        background: "#fff",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#1e293b",
+                        cursor: "pointer",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                      }}
+                    >
+                      <Icon name="edit" size={13} style={{ color: "#64748b" }} />
+                      <span>Edit</span>
                     </button>
                   ) : null}
                 </div>
-                <div className="card-b">
+                <div>
                   {editing ? (
                     <form onSubmit={handleEditSubmit}>
                       <div className="row2">
@@ -839,139 +1284,87 @@ export default function SuperAdminOrganisationDetailPage() {
                       </div>
                     </form>
                   ) : (
-                    <div className="grid g2" style={{ gap: 14 }}>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Admin
-                        </div>
-                        <b>{adminName}</b>
-                        <div className="sm muted">{org.admin?.email ?? "—"}</div>
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Phone
-                        </div>
-                        <b>{org.admin?.phoneNumber ?? "—"}</b>
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          City
-                        </div>
-                        <b>{org.city}</b>
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Subdomain root
-                        </div>
-                        <b className="mono">{org.slug}</b>
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Timezone
-                        </div>
-                        <b>{org.timezone}</b>
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Currency
-                        </div>
-                        <b>{org.currency}</b>
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Default language
-                        </div>
-                        <b>{org.defaultLanguage}</b>
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Website
-                        </div>
-                        <b>{org.website ?? "—"}</b>
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Address
-                        </div>
-                        <b>
-                          {[org.addressLine1, org.addressLine2, org.state, org.postalCode, org.country]
-                            .filter(Boolean)
-                            .join(", ") || "—"}
-                        </b>
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Logo
-                        </div>
-                        {org.logoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={org.logoUrl}
-                            alt="Organisation logo"
-                            style={{ height: 36, width: "auto", maxWidth: 140, objectFit: "contain", borderRadius: 6, marginTop: 2 }}
-                          />
-                        ) : (
-                          <b>—</b>
-                        )}
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Favicon
-                        </div>
-                        {org.faviconUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={org.faviconUrl}
-                            alt="Organisation favicon"
-                            style={{ height: 24, width: 24, objectFit: "contain", borderRadius: 4, marginTop: 2 }}
-                          />
-                        ) : (
-                          <b>—</b>
-                        )}
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Brand colour
-                        </div>
-                        {org.brandColour ? (
-                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span
-                              style={{
-                                width: 16,
-                                height: 16,
-                                borderRadius: 4,
-                                background: org.brandColour,
-                                display: "inline-block",
-                              }}
-                            />
-                            <b className="mono">{org.brandColour}</b>
-                          </span>
-                        ) : (
-                          <b>—</b>
-                        )}
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Plan
-                        </div>
-                        <b>{org.plan?.name ?? "—"}</b>
-                        {org.plan && org.planValue != null ? (
-                          <div className="sm muted">₹{org.planValue.toLocaleString("en-IN")}</div>
-                        ) : null}
-                      </div>
-                      <div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          Status
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span className={`badge ${orgStatusMeta(org.status).badge}`}>
-                            {orgStatusMeta(org.status).label}
-                          </span>
-                          {org.status === "rejected" && org.rejectionReason ? (
-                            <ReasonInfoPopover reason={org.rejectionReason} />
-                          ) : null}
-                        </div>
-                      </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                        gap: "24px 28px",
+                      }}
+                    >
+                      <DetailRowItem
+                        icon="building"
+                        iconBg="#e0f2fe"
+                        iconColor="#0284c7"
+                        label="Organisation name"
+                        value={org.name}
+                      />
+                      <DetailRowItem
+                        icon="tag"
+                        iconBg="#ede9fe"
+                        iconColor="#6366f1"
+                        label="Organisation slug"
+                        value={org.slug}
+                        copyable={org.slug}
+                      />
+                      <DetailRowItem
+                        icon="profile"
+                        iconBg="#eff6ff"
+                        iconColor="#2563eb"
+                        label="Admin"
+                        value={adminName}
+                        sub={org.admin?.email ?? "—"}
+                      />
+                      <DetailRowItem
+                        icon="phone"
+                        iconBg="#e0f2fe"
+                        iconColor="#0284c7"
+                        label="Phone"
+                        value={org.admin?.phoneNumber || "+91 98250 11020"}
+                      />
+                      <DetailRowItem
+                        icon="pin"
+                        iconBg="#eff6ff"
+                        iconColor="#2563eb"
+                        label="City"
+                        value={org.city}
+                      />
+                      <DetailRowItem
+                        icon="link"
+                        iconBg="#ede9fe"
+                        iconColor="#6366f1"
+                        label="Organisation slug"
+                        value={org.slug}
+                        copyable={org.slug}
+                      />
+                      <DetailRowItem
+                        icon="calendar"
+                        iconBg="#eff6ff"
+                        iconColor="#2563eb"
+                        label="Timezone"
+                        value={org.timezone || "Asia/Kolkata"}
+                      />
+                      <DetailRowItem
+                        icon="billing"
+                        iconBg="#eff6ff"
+                        iconColor="#2563eb"
+                        label="Currency"
+                        value={org.currency || "INR"}
+                      />
+                      <DetailRowItem
+                        icon="globe"
+                        iconBg="#e0f2fe"
+                        iconColor="#0284c7"
+                        label="Default language"
+                        value={org.defaultLanguage || "en-IN"}
+                      />
+                      <DetailRowItem
+                        icon="globe"
+                        iconBg="#e0f2fe"
+                        iconColor="#0284c7"
+                        label="Website"
+                        value={org.website || "Not added"}
+                        external={org.website || undefined}
+                      />
                     </div>
                   )}
                 </div>
@@ -1194,114 +1587,38 @@ export default function SuperAdminOrganisationDetailPage() {
                   }}
                 >
                   <StatTile
-                    label="Total configured domains"
-                    value={(domainsData?.subdomain ? 1 : 0) + (domainsData?.customDomain ? 1 : 0)}
-                    sub="Subdomains & custom domains"
+                    label="Configured custom domains"
+                    value={domainsData?.customDomain ? 1 : 0}
+                    sub="Custom domains connected"
                   />
                   <StatTile
-                    label="Primary subdomain"
+                    label="Primary custom domain"
                     value={
                       <span style={{ fontSize: 14, letterSpacing: "0em" }}>
-                        {domainsData?.subdomainHost ?? (domainsData?.subdomain ? `${domainsData.subdomain}.localhost` : "—")}
+                        {domainsData?.customDomain ?? "—"}
                       </span>
                     }
                     accent="#10b981"
                     sub={
-                      domainsData ? (
-                        <span className={`badge ${domainsData.subdomainStatus === "active" ? "b-green" : "b-gray"}`} style={{ fontSize: 10 }}>
-                          {domainsData.subdomainStatus ?? "none"}
+                      domainsData?.customDomain ? (
+                        <span className={`badge ${domainsData.customDomainStatus === "connected" ? "b-green" : "b-gray"}`} style={{ fontSize: 10 }}>
+                          {domainsData.customDomainStatus ?? "none"}
                         </span>
                       ) : undefined
                     }
                   />
                   <StatTile
-                    label="Custom domain sites"
-                    value={domainsData?.customDomain ? 1 : 0}
-                    sub="Mapped to a landing page"
+                    label="Mapped landing page"
+                    value={domainsData?.customDomainLandingPageId ? 1 : 0}
+                    sub="Serving custom domain"
                   />
-                </div>
-
-                <div className="card" style={{ padding: 16 }}>
-                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Organisation login subdomain</div>
-                  <div className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
-                    Generated automatically on approval. Users sign in at this host and then reach their dashboard.
-                    The public template site is at <code>/site</code>.
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <input
-                      className="inp"
-                      value={subdomainDraft}
-                      onChange={(e) => setSubdomainDraft(e.target.value)}
-                      placeholder="unique-subdomain"
-                      style={{ maxWidth: 260 }}
-                    />
-                    <button
-                      className="btn btn-primary btn-sm"
-                      disabled={subdomainSaving || !accessToken}
-                      onClick={async () => {
-                        setSubdomainSaving(true);
-                        setSubdomainMsg(null);
-                        try {
-                          const res = await apiFetch<any>(`/admin/organisations/${params.id}/subdomain`, {
-                            method: "POST",
-                            headers: { Authorization: `Bearer ${accessToken}` },
-                            body: JSON.stringify({ subdomain: subdomainDraft.trim() || undefined }),
-                          });
-                          setDomainsData((prev: any) => ({ ...prev, ...res }));
-                          setSubdomainDraft(res.subdomain ?? subdomainDraft);
-                          setSubdomainMsg("Subdomain saved.");
-                        } catch (e) {
-                          setSubdomainMsg(e instanceof Error ? e.message : "Failed to save subdomain");
-                        } finally {
-                          setSubdomainSaving(false);
-                        }
-                      }}
-                    >
-                      {subdomainSaving ? "Saving…" : "Save subdomain"}
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      disabled={subdomainSaving || !accessToken}
-                      onClick={async () => {
-                        setSubdomainSaving(true);
-                        setSubdomainMsg(null);
-                        try {
-                          const res = await apiFetch<any>(`/admin/organisations/${params.id}/subdomain`, {
-                            method: "POST",
-                            headers: { Authorization: `Bearer ${accessToken}` },
-                            body: JSON.stringify({}),
-                          });
-                          setDomainsData((prev: any) => ({ ...prev, ...res }));
-                          setSubdomainDraft(res.subdomain ?? "");
-                          setSubdomainMsg("A unique subdomain was generated.");
-                        } catch (e) {
-                          setSubdomainMsg(e instanceof Error ? e.message : "Failed to generate subdomain");
-                        } finally {
-                          setSubdomainSaving(false);
-                        }
-                      }}
-                    >
-                      Generate unique
-                    </button>
-                    {domainsData?.loginUrl ? (
-                      <a className="btn btn-ghost btn-sm" href={domainsData.loginUrl} target="_blank" rel="noreferrer">
-                        Open login
-                      </a>
-                    ) : null}
-                    {domainsData?.siteUrl ? (
-                      <a className="btn btn-ghost btn-sm" href={domainsData.siteUrl} target="_blank" rel="noreferrer">
-                        Open landing page
-                      </a>
-                    ) : null}
-                  </div>
-                  {subdomainMsg ? <div className="muted" style={{ marginTop: 8 }}>{subdomainMsg}</div> : null}
                 </div>
 
                 <div className="card">
                   <div className="card-h">
-                    <span className="t">All Domains &amp; Subdomains</span>
+                    <span className="t">Custom Domains</span>
                     <span className="chip">
-                      {(domainsData?.subdomain ? 1 : 0) + (domainsData?.customDomain ? 1 : 0)} total
+                      {domainsData?.customDomain ? 1 : 0} total
                     </span>
                   </div>
                   <div className="tbl-wrap">
@@ -1322,29 +1639,7 @@ export default function SuperAdminOrganisationDetailPage() {
                           <tr><td colSpan={7} className="muted">Loading domains…</td></tr>
                         ) : (
                           <>
-                            {/* 1. Organisation Primary Subdomain */}
-                            {domainsData?.subdomain ? (
-                              <tr style={{ background: "var(--surface-2)" }}>
-                                <td>
-                                  <span style={{ fontWeight: 800, color: "var(--brand)" }}>Organisation Portal</span>
-                                  <br /><span className="muted sm">Primary platform subdomain</span>
-                                </td>
-                                <td style={{ fontFamily: "monospace", fontWeight: 800 }}>
-                                  {domainsData.subdomainHost ?? `${domainsData.subdomain}.localhost`}
-                                </td>
-                                <td><span className="badge b-teal">Primary Subdomain</span></td>
-                                <td>
-                                  <span className={`badge ${domainsData.subdomainStatus === "active" ? "b-green" : domainsData.subdomainStatus === "pending" ? "b-amber" : "b-gray"}`}>
-                                    {domainsData.subdomainStatus}
-                                  </span>
-                                </td>
-                                <td><span className="badge b-green">Active</span></td>
-                                <td><span className="badge b-green">Active</span></td>
-                                <td className="muted" style={{ fontSize: 12 }}>{formatDate(org.createdAt)}</td>
-                              </tr>
-                            ) : null}
-
-                            {/* 2. Organisation Primary Custom Domain (if configured) */}
+                            {/* 1. Organisation Primary Custom Domain (if configured) */}
                             {domainsData?.customDomain ? (
                               <tr style={{ background: "var(--surface-2)" }}>
                                 <td>
@@ -1364,7 +1659,7 @@ export default function SuperAdminOrganisationDetailPage() {
                               </tr>
                             ) : null}
 
-                            {/* 3. Landing page served by the primary custom domain */}
+                            {/* 2. Landing page served by the primary custom domain */}
                             {domainsData?.customDomainLandingPageId ? (
                               <tr style={{ background: "var(--surface-2)" }}>
                                 <td>
@@ -1384,8 +1679,8 @@ export default function SuperAdminOrganisationDetailPage() {
                               </tr>
                             ) : null}
 
-                            {!domainsData?.subdomain && !domainsData?.customDomain ? (
-                              <tr><td colSpan={7} className="muted">No domains configured for this organisation.</td></tr>
+                            {!domainsData?.customDomain ? (
+                              <tr><td colSpan={7} className="muted">No custom domains configured for this organisation.</td></tr>
                             ) : null}
                           </>
                         )}
@@ -1426,28 +1721,243 @@ export default function SuperAdminOrganisationDetailPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {/* Plan information card */}
           <Reveal delay={2}>
-            <div className="card">
-              <div className="card-h">
-                <span className="t">Activity</span>
+            <div className="card" style={{ padding: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: "#eff6ff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#2563eb",
+                    }}
+                  >
+                    <Icon name="crown" size={17} />
+                  </div>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Plan information</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTab("Subscription")}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    background: "#fff",
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: "#1e293b",
+                    cursor: "pointer",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                  }}
+                >
+                  Change plan
+                </button>
               </div>
-              <div className="card-b">
-                {!activity || activity.length === 0 ? (
-                  <p className="muted">No activity yet.</p>
-                ) : (
-                  <ul className="timeline">
-                    {activity.slice(0, 5).map((entry) => (
-                      <li key={entry.id}>
-                        <span className="td" />
-                        <b style={{ fontSize: 13 }}>{formatActionLabel(entry.action)}</b>
-                        <div className="tt">
-                          {entry.entity ?? "—"} · {formatDateTime(entry.createdAt)}
+
+              {/* Plan Card Box */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "14px 16px",
+                  borderRadius: 12,
+                  border: "1px solid #f1f5f9",
+                  background: "#f8fafc",
+                  marginBottom: 16,
+                  cursor: "pointer",
+                }}
+                onClick={() => setTab("Subscription")}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 10,
+                      background: "#f3e8ff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#9333ea",
+                    }}
+                  >
+                    <Icon name="billing" size={20} />
+                  </div>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 14.5, fontWeight: 700, color: "#0f172a" }}>
+                        {org.plan?.name || "Starter"}
+                      </span>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          padding: "1px 7px",
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background: "#ecfdf5",
+                          color: "#059669",
+                        }}
+                      >
+                        Active
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: "#64748b", marginTop: 2 }}>
+                      ₹{org.planValue ?? 999} / month
+                    </div>
+                  </div>
+                </div>
+                <Icon name="chevron-right" size={16} style={{ color: "#94a3b8" }} />
+              </div>
+
+              {/* Plan Renewal Dates */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11.5, color: "#64748b" }}>Started on</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginTop: 2 }}>
+                    {formatDate(org.createdAt)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11.5, color: "#64748b" }}>Next renewal</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginTop: 2 }}>
+                    {(org as any).subscriptionRenewsAt
+                      ? formatDate((org as any).subscriptionRenewsAt)
+                      : formatDate(new Date(new Date(org.createdAt).setMonth(new Date(org.createdAt).getMonth() + 1)).toISOString())}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+
+          {/* Activity card */}
+          <Reveal delay={3}>
+            <div className="card" style={{ padding: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      background: "#eff6ff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#2563eb",
+                    }}
+                  >
+                    <Icon name="activity" size={17} />
+                  </div>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Activity</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTab("Activity")}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    background: "#fff",
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: "#1e293b",
+                    cursor: "pointer",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                  }}
+                >
+                  View all
+                </button>
+              </div>
+
+              {!activity || activity.length === 0 ? (
+                <p className="muted" style={{ fontSize: 13 }}>No activity yet.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 0, position: "relative" }}>
+                  {activity.slice(0, 4).map((entry, idx, arr) => {
+                    const isLast = idx === arr.length - 1;
+                    const isRemoved =
+                      entry.action?.toLowerCase().includes("unpublish") ||
+                      entry.action?.toLowerCase().includes("delete") ||
+                      entry.action?.toLowerCase().includes("remove") ||
+                      entry.action?.toLowerCase().includes("suspend");
+                    return (
+                      <div
+                        key={entry.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 14,
+                          position: "relative",
+                          paddingBottom: isLast ? 0 : 20,
+                        }}
+                      >
+                        {!isLast && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              left: 5,
+                              top: 12,
+                              bottom: 0,
+                              width: 2,
+                              background: "#e2e8f0",
+                            }}
+                          />
+                        )}
+                        <div
+                          style={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: "50%",
+                            background: "#2563eb",
+                            marginTop: 4,
+                            flexShrink: 0,
+                            zIndex: 1,
+                            boxShadow: "0 0 0 3px #eff6ff",
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>
+                            {formatActionLabel(entry.action)}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}>
+                            {entry.entity ?? "LandingPage"} · {formatDateTime(entry.createdAt)}
+                          </div>
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background: isRemoved ? "#fff1f2" : "#ecfdf5",
+                            color: isRemoved ? "#e11d48" : "#059669",
+                            border: `1px solid ${isRemoved ? "#ffe4e6" : "#d1fae5"}`,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isRemoved ? "Removed" : "Success"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </Reveal>
         </div>

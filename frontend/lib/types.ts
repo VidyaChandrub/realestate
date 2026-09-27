@@ -737,6 +737,11 @@ export interface LandingPageRow {
   createdAt: string;
   updatedAt: string;
   sourceTemplate: { id: string; name: string } | null;
+  assignedDomain?: {
+    id: string;
+    customDomain: string;
+    status: string;
+  } | null;
 }
 
 export interface OrgLandingPagesListResponse {
@@ -1787,16 +1792,15 @@ export interface SalesAgentDetailResponse {
 // member regardless of role.
 export type OrgUserDashboardResponse = SalesAgentDetailResponse;
 
-// --- Organisation domain identity (subdomain + custom domain) ---
+// --- Organisation domain identity (custom domain) ---
 
-export type OrgDomainKind = "subdomain" | "custom_domain";
+export type OrgDomainKind = "custom_domain";
 export type OrgDomainRequestStatus =
   "pending" | "approved" | "rejected" | "connected";
 
 export interface OrgDomainRequest {
   id: string;
   kind: OrgDomainKind;
-  subdomain: string | null;
   customDomain: string | null;
   landingPageId: string | null;
   landingPage?: { id: string; name: string; slug: string } | null;
@@ -1814,18 +1818,29 @@ export interface OrgDomainLandingPage {
   status: string;
   pageType?: string;
   sourceTemplate?: { name: string } | null;
+  assignedDomain?: {
+    id: string;
+    customDomain: string;
+    status: string;
+  } | null;
 }
 
-/** GET /org/domain — the organisation's own subdomain/custom-domain identity. */
+export interface ApprovedDomainOption {
+  id: string;
+  domain: string;
+  status: string;
+  landingPageId: string | null;
+  landingPageName: string | null;
+}
+
+/** GET /org/domain — the organisation's own custom-domain identity. */
 export interface OrgDomainInfo {
-  subdomain: string | null;
-  subdomainHost: string | null;
-  subdomainStatus: string;
   customDomain: string | null;
   customDomainStatus: string;
   customDomainLandingPageId: string | null;
   landingPages: OrgDomainLandingPage[];
   requests: OrgDomainRequest[];
+  approvedDomains?: ApprovedDomainOption[];
 }
 
 export interface RequestCustomDomainInput {
@@ -1834,7 +1849,12 @@ export interface RequestCustomDomainInput {
   landingPageId?: string;
 }
 
-/** A DNS record pair shown to the Super Admin (e.g. the wildcard A record). */
+export interface AssignCustomDomainInput {
+  domainRequestId: string;
+  landingPageId?: string | null;
+}
+
+/** A DNS record pair shown to the Super Admin (e.g. A record or CNAME). */
 export interface DnsRecordSpec {
   type: string;
   host: string;
@@ -1843,15 +1863,13 @@ export interface DnsRecordSpec {
   purpose: string;
 }
 
-/** GET /admin/org-domain-requests row (subdomain or custom-domain request). */
+/** GET /admin/org-domain-requests row (custom-domain request). */
 export interface AdminOrgDomainRequest extends OrgDomainRequest {
-  subdomainHost?: string | null;
   dnsInstructions?: DnsRecordSpec[] | null;
   organisation: {
     id: string;
     name: string;
     slug: string;
-    subdomain: string | null;
     customDomain: string | null;
   };
 }
@@ -2038,12 +2056,11 @@ export interface PlatformTheme {
   secondaryColor: string;
 }
 
-/** GET /admin/org-domain-requests/:id/verify — live DNS + site check for an org subdomain. */
-export interface SubdomainVerifyResult {
+/** GET /admin/org-domain-requests/:id/verify — live DNS + site check for an org custom domain. */
+export interface DomainVerifyResult {
   id: string;
-  subdomain: string;
+  customDomain: string;
   host: string;
-  baseDomain: string;
   dnsMode: string;
   expectedIp: string | null;
   organisation: {
@@ -2051,12 +2068,10 @@ export interface SubdomainVerifyResult {
     name: string;
     slug: string;
     status: string;
-    subdomainStatus: string;
   };
   dns: {
     status: "ok" | "mismatch" | "unresolved";
     hostIps: string[];
-    baseIps: string[];
     expectedIp: string | null;
   };
   landingPage: {
@@ -2072,7 +2087,6 @@ export interface SubdomainVerifyResult {
 
 export type NotificationType =
   | "organisation_registration"
-  | "subdomain_request"
   | "custom_domain_request"
   | "organisation_approved"
   | "organisation_rejected"
@@ -2270,15 +2284,6 @@ export interface ListSupportTicketsParams {
   search?: string;
   /** Support Management (admin) only. */
   orgId?: string;
-}
-
-/** GET /auth/subdomain-availability — live check for the signup form. */
-export interface SubdomainAvailability {
-  subdomain: string;
-  host: string;
-  available: boolean;
-  reasons: string[];
-  suggestions: string[];
 }
 
 // --- Super Admin SMTP Email Configuration & Logs ---

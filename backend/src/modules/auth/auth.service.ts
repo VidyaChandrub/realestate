@@ -41,16 +41,10 @@ import {
 import { assertTemplateQuota } from '../../common/utils/plan-quota.util';
 import { assertEligibleTemplateIds } from '../../common/utils/template-eligibility.util';
 import {
-  normalizeSubdomain,
-  isValidSubdomain,
-  subdomainHost,
   normalizeDomain,
   isValidDomain,
-  generateSubdomainSuggestions,
-  extractSubdomainFromHost,
 } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
-import { generateUniqueSubdomain } from '../../common/utils/org-site.util';
 import {
   PERMISSION_MODULES,
   computeEffectivePermissions,
@@ -181,14 +175,6 @@ export class AuthService {
     }
   }
 
-  private uniqueSubdomain(source: string, excludeOrgId?: string) {
-    return generateUniqueSubdomain(
-      this.prisma as unknown as Parameters<typeof generateUniqueSubdomain>[0],
-      source,
-      excludeOrgId,
-    );
-  }
-
   async signup(dto: SignupDto) {
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.work_email },
@@ -219,26 +205,8 @@ export class AuthService {
       where: { orgId: null, key: 'admin' },
     });
 
-    // --- Organisation domain identity (subdomain / custom domain) ---
-    // Every organisation is automatically assigned a unique platform
-    // subdomain (its default login URL, e.g. "<slug>.ipixxel.ae"). If the
-    // registrant typed one it's used instead and kept pending for Super Admin
-    // approval — but an auto-generated one is active immediately.
-    let subdomain: string | null = null;
-    let subdomainAuto = false;
-    if (dto.subdomain) {
-      if (!isValidSubdomain(dto.subdomain)) {
-        throw new ConflictException(
-          'Subdomain is invalid. Use 2-63 lowercase letters, digits or hyphens (e.g. skylinedev).',
-        );
-      }
-      subdomain = normalizeSubdomain(dto.subdomain);
-      await this.assertSubdomainAvailable(subdomain);
-    } else {
-      subdomain = await this.uniqueSubdomain(slug);
-      subdomainAuto = true;
-    }
-
+    // --- Organisation domain identity (custom domain) ---
+    // Every organisation can be assigned a custom domain
     let customDomain: string | null = null;
     if (dto.custom_domain) {
       if (!isValidDomain(dto.custom_domain)) {
@@ -261,12 +229,7 @@ export class AuthService {
             country: dto.country ?? null,
             currency: dto.currency ?? 'INR',
             timezone: dto.timezone ?? 'Asia/Kolkata',
-            // Auto-assigned subdomains are active immediately (they're the
-            // org's default login URL); user-requested ones stay pending until
-            // a Super Admin approves the label.
-            subdomain,
             customDomain,
-            subdomainStatus: subdomainAuto ? 'active' : 'pending',
             customDomainStatus: customDomain ? 'pending' : 'none',
           },
         });
@@ -287,19 +250,6 @@ export class AuthService {
           data: { userId: user.id, roleId: adminRole.id },
         });
 
-        if (subdomain) {
-          await tx.orgDomainRequest.create({
-            data: {
-              orgId: organisation.id,
-              kind: 'subdomain',
-              subdomain,
-              status: subdomainAuto ? 'approved' : 'pending',
-              requestedBy: user.id,
-              reviewedAt: subdomainAuto ? new Date() : undefined,
-              reviewedBy: subdomainAuto ? user.id : undefined,
-            },
-          });
-        }
         if (customDomain) {
           await tx.orgDomainRequest.create({
             data: {
@@ -352,20 +302,18 @@ export class AuthService {
               planId: dto.planId ?? null,
               templateIds: dto.templateIds ?? [],
               billingCycle: dto.billingCycle ?? null,
-              subdomain,
               customDomain,
             } as any,
           },
         });
 
-        // Notify Super Admin that an organisation registration (and any
-        // subdomain / custom-domain request) is awaiting approval.
+        // Notify Super Admin that an organisation registration is awaiting approval.
         await tx.notification.create({
           data: buildNotificationData({
             orgId: organisation.id,
             type: 'organisation_registration',
             title: `New organisation awaiting approval: ${organisation.name}`,
-            body: `${organisation.name} (${slug}) registered${subdomain ? ` and requested subdomain ${subdomainHost(subdomain)}` : ''}${customDomain ? ` and/or custom domain ${customDomain}` : ''}. Review and approve or reject from the admin console.`,
+            body: `${organisation.name} (${slug}) registered${customDomain ? ` and requested custom domain ${customDomain}` : ''}. Review and approve or reject from the admin console.`,
             entity: 'Organisation',
             entityId: organisation.id,
           }),
@@ -728,12 +676,6 @@ export class AuthService {
 
     const slug = await generateUniqueOrgSlug(this.prisma, dto.company_name);
 
-    // Every organisation gets a unique, auto-generated platform subdomain as
-    // its default login URL — the wizard no longer offers a custom one (see
-    // OnboardingOrganisationDto), so this is always the auto path, active
-    // immediately (no Super Admin approval needed for it).
-    const subdomain = await this.uniqueSubdomain(slug);
-
     let customDomain: string | null = null;
     if (dto.custom_domain) {
       if (!isValidDomain(dto.custom_domain)) {
@@ -763,27 +705,13 @@ export class AuthService {
           country: dto.country ?? null,
           currency: dto.currency ?? 'INR',
           timezone: dto.timezone ?? 'Asia/Kolkata',
-          subdomain,
           customDomain,
-          subdomainStatus: 'active',
           customDomainStatus: customDomain ? 'pending' : 'none',
         },
       });
 
       await tx.userRole.create({
         data: { userId: user.id, roleId: adminRole.id },
-      });
-
-      await tx.orgDomainRequest.create({
-        data: {
-          orgId: organisation.id,
-          kind: 'subdomain',
-          subdomain,
-          status: 'approved',
-          requestedBy: user.id,
-          reviewedAt: new Date(),
-          reviewedBy: user.id,
-        },
       });
       if (customDomain) {
         await tx.orgDomainRequest.create({
@@ -838,14 +766,6 @@ export class AuthService {
       where: { id: orgId },
     });
 
-    let subdomainUpdate: { subdomain: string; subdomainStatus: string } | null = null;
-    if (!current.subdomain) {
-      // Auto-assign a unique subdomain the first time (resumed/organisation
-      // step with no subdomain yet) — it becomes the org's default login URL.
-      const auto = await this.uniqueSubdomain(current.slug, orgId);
-      subdomainUpdate = { subdomain: auto, subdomainStatus: 'active' };
-    }
-
     const organisation = await this.prisma.organisation.update({
       where: { id: orgId },
       data: {
@@ -856,33 +776,8 @@ export class AuthService {
         country: dto.country ?? current.country,
         currency: dto.currency ?? current.currency,
         timezone: dto.timezone ?? current.timezone,
-        ...(subdomainUpdate ?? {}),
       },
     });
-
-    if (subdomainUpdate?.subdomain) {
-      const pendingSub = await this.prisma.orgDomainRequest.findFirst({
-        where: { orgId, kind: 'subdomain', status: { in: ['pending', 'approved'] } },
-      });
-      if (pendingSub) {
-        await this.prisma.orgDomainRequest.update({
-          where: { id: pendingSub.id },
-          data: { subdomain: subdomainUpdate.subdomain, status: 'approved', reviewedAt: new Date(), reviewedBy: userId },
-        });
-      } else {
-        await this.prisma.orgDomainRequest.create({
-          data: {
-            orgId,
-            kind: 'subdomain',
-            subdomain: subdomainUpdate.subdomain,
-            status: 'approved',
-            requestedBy: userId,
-            reviewedAt: new Date(),
-            reviewedBy: userId,
-          },
-        });
-      }
-    }
 
     await assignBasicPlanIfMissing(this.prisma, orgId);
 
@@ -996,7 +891,7 @@ export class AuthService {
         const portal = await this.resolveLoginHost(dto.host);
         if (portal && user.orgId !== portal.id) {
           throw new UnauthorizedException(
-            'This login page belongs to another organisation. Use your organisation subdomain.',
+            'This login page belongs to another organisation.',
           );
         }
       } catch (err) {
@@ -1483,95 +1378,18 @@ export class AuthService {
   // invalid/expired/missing token just means "treat as anonymous", never
   // a 401 here) and exclude that caller's own org from the "taken" check,
   // so their own unchanged subdomain doesn't falsely show as taken.
-  async checkSubdomainAvailability(subdomain: string, authHeader?: string) {
-    const label = normalizeSubdomain(subdomain);
-    if (!isValidSubdomain(label)) {
-      return { subdomain: label, available: false, reasons: ['invalid'], suggestions: [] };
-    }
-    const excludeOrgId = this.tryDecodeOrgId(authHeader);
-    const taken = await this.isSubdomainTaken(label, excludeOrgId);
-    const reasons: string[] = [];
-    if (taken === 'org') reasons.push('already_exists');
-    else if (taken === 'pending') reasons.push('pending');
+  async checkSubdomainAvailability(_subdomain: string, _authHeader?: string) {
     return {
-      subdomain: label,
-      host: subdomainHost(label),
-      available: taken === null,
-      reasons,
-      suggestions: taken ? generateSubdomainSuggestions(label) : [],
+      subdomain: '',
+      host: '',
+      available: true,
+      reasons: [],
+      suggestions: [],
     };
   }
 
-  // Best-effort, never throws — a missing/invalid/expired token here just
-  // means "treat this caller as anonymous", not an auth failure. Only used
-  // by the one endpoint above that's intentionally unauthenticated but
-  // still wants to recognise its own caller when possible.
-  private tryDecodeOrgId(authHeader?: string): string | null {
-    if (!authHeader?.startsWith('Bearer ')) return null;
-    try {
-      const payload = this.jwtService.verify<JwtPayload>(
-        authHeader.slice('Bearer '.length),
-        { secret: process.env.JWT_SECRET },
-      );
-      return payload.orgId ?? null;
-    } catch {
-      return null;
-    }
-  }
-
-  // Returns 'org' if an organisation already holds it, 'pending' if a pending
-  // subdomain request reserves it, else null when available. excludeOrgId
-  // (the caller's own org, if known) is never considered "taken" — see
-  // checkSubdomainAvailability above for why.
-  private async isSubdomainTaken(
-    label: string,
-    excludeOrgId?: string | null,
-  ): Promise<'org' | 'pending' | null> {
-    const org = await this.prisma.organisation.findFirst({
-      where: { subdomain: label, ...(excludeOrgId ? { id: { not: excludeOrgId } } : {}) },
-      select: { id: true },
-    });
-    if (org) return 'org';
-    const req = await this.prisma.orgDomainRequest.findFirst({
-      where: {
-        subdomain: label,
-        status: { in: ['pending', 'approved'] },
-        ...(excludeOrgId ? { orgId: { not: excludeOrgId } } : {}),
-      },
-      select: { id: true },
-    });
-    if (req) return 'pending';
-    return null;
-  }
-
-  // A subdomain is unavailable if another organisation is already using it
-  // (active, pending, or reserved in an approved/rejected-but-held request).
-  private async assertSubdomainAvailable(subdomain: string) {
-    const label = normalizeSubdomain(subdomain);
-    const taken = await this.isSubdomainTaken(label);
-    if (taken === 'org') {
-      throw new ConflictException(
-        `Subdomain "${label}" is already taken on ${subdomainHost(label)}. Please choose another.`,
-      );
-    }
-    if (taken === 'pending') {
-      throw new ConflictException(
-        `Subdomain "${label}" is currently pending or in use. Please choose another.`,
-      );
-    }
-  }
-
-  // A custom domain is unavailable if another organisation already owns it or
-  // has a connecting/connected domain for it (globally unique).
   private async resolveLoginHost(host: string) {
     const normalized = host.trim().toLowerCase().replace(/:\d+$/, '').replace(/^www\./, '');
-    const label = extractSubdomainFromHost(normalized);
-    if (label) {
-      return this.prisma.organisation.findFirst({
-        where: { subdomain: label, subdomainStatus: 'active', status: 'active' },
-        select: { id: true },
-      });
-    }
     return this.prisma.organisation.findFirst({
       where: { customDomain: normalized, customDomainStatus: 'connected', status: 'active' },
       select: { id: true },

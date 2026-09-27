@@ -16,7 +16,6 @@ const PAGE_SIZE = 25;
 
 const TYPE_LABEL: Record<string, string> = {
   organisation_registration: "New registration",
-  subdomain_request: "Subdomain",
   custom_domain_request: "Custom domain",
   organisation_approved: "Approval",
   organisation_rejected: "Rejection",
@@ -28,7 +27,6 @@ const TYPE_LABEL: Record<string, string> = {
 
 const TYPE_ICON: Record<string, string> = {
   organisation_registration: "building",
-  subdomain_request: "globe",
   custom_domain_request: "link",
   organisation_approved: "check",
   organisation_rejected: "close",
@@ -64,7 +62,7 @@ function getNotificationLink(n: AppNotification): string {
   if (n.type === "organisation_registration") {
     return n.entityId ? `/admin-console/organisation-detail/${n.entityId}` : "/admin-console/organisations";
   }
-  if (n.type === "custom_domain_request" || n.type === "subdomain_request") return "/admin-console/org-domains";
+  if (n.type === "custom_domain_request") return "/admin-console/org-domains";
   if (n.type === "organisation_approved" || n.type === "organisation_rejected") {
     return n.entityId ? `/admin-console/organisation-detail/${n.entityId}` : "/admin-console/organisations";
   }

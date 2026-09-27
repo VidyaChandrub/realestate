@@ -68,6 +68,7 @@ import type {
   Plan,
   PlanCapability,
   RequestCustomDomainInput,
+  AssignCustomDomainInput,
   ResolveDraftInput,
   ResumeSignupResponse,
   ReviewOrgDomainRequestInput,
@@ -75,7 +76,6 @@ import type {
   OrgUserDashboardResponse,
   SalesAgentsListResponse,
   SignupStep1Response,
-  SubdomainAvailability,
   UnreadNotificationsResponse,
   UpdateOrgCatalogOptionInput,
   UserProfile,
@@ -88,7 +88,7 @@ import type {
   PlatformConfig,
   UpdatePlatformConfigInput,
   PlatformTheme,
-  SubdomainVerifyResult,
+  DomainVerifyResult,
   PlatformTeamMember,
   PlatformTeamRole,
   DynamicRole,
@@ -717,14 +717,6 @@ export function deleteOrgUser(id: string): Promise<{ success: boolean }> {
 
 // --- Organisation domain identity (subdomain + custom domain) ---
 
-export async function checkSubdomainAvailability(
-  subdomain: string,
-): Promise<SubdomainAvailability> {
-  return apiFetch<SubdomainAvailability>(
-    `/auth/subdomain-availability?subdomain=${encodeURIComponent(subdomain)}`,
-  );
-}
-
 export async function getOrgDomainInfo(): Promise<OrgDomainInfo> {
   return apiFetch<OrgDomainInfo>("/org/domain");
 }
@@ -737,6 +729,29 @@ export async function requestCustomDomain(
     {
       method: "POST",
       body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function assignCustomDomain(
+  input: AssignCustomDomainInput,
+): Promise<OrgDomainInfo["requests"][number]> {
+  return apiFetch<OrgDomainInfo["requests"][number]>(
+    "/org/domain/assign",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function deleteCustomDomain(
+  domainRequestId: string,
+): Promise<{ success: boolean; id: string }> {
+  return apiFetch<{ success: boolean; id: string }>(
+    `/org/domain/custom-domain/${encodeURIComponent(domainRequestId)}`,
+    {
+      method: "DELETE",
     },
   );
 }
@@ -772,11 +787,11 @@ export async function reviewOrgDomainRequest(
   );
 }
 
-/** Live DNS + site check for an approved org subdomain. */
+/** Live DNS + site check for an approved org custom domain. */
 export async function verifyOrgDomainRequest(
   id: string,
-): Promise<SubdomainVerifyResult> {
-  return apiFetch<SubdomainVerifyResult>(
+): Promise<DomainVerifyResult> {
+  return apiFetch<DomainVerifyResult>(
     `/admin/org-domain-requests/${id}/verify`,
   );
 }

@@ -78,6 +78,21 @@ function formatDate(iso: string): string {
   });
 }
 
+function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  const dateStr = d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const timeStr = d.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return { dateStr, timeStr };
+}
+
 export default function SuperAdminAdminsPage() {
   const { accessToken, user, hasPermission } = useAuth();
   // Members and Roles are two tabs of one console module — Platform Team —
@@ -96,6 +111,7 @@ export default function SuperAdminAdminsPage() {
   const [tab, setTab] = useState<"members" | "roles">("members");
   const [createRoleOpen, setCreateRoleOpen] = useState(false);
   const [permEditing, setPermEditing] = useState(false);
+  const [search, setSearch] = useState("");
 
   const [members, setMembers] = useState<PlatformTeamMember[]>([]);
   const [roles, setRoles] = useState<PlatformTeamRole[]>([]);
@@ -247,72 +263,317 @@ export default function SuperAdminAdminsPage() {
     }
   }
 
+  const visibleMembers = members.filter((m) => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    const name = fullName(m.firstName, m.lastName, m.email).toLowerCase();
+    const email = m.email.toLowerCase();
+    const role = (m.role?.name || "").toLowerCase();
+    return name.includes(q) || email.includes(q) || role.includes(q);
+  });
+
   return (
     <>
       {permEditing ? null : (
-        <div className="page-head reveal in">
-          <div>
-            <div className="eyebrow">
-              <Icon name="users" size={14} /> Manage
-            </div>
-            <h1>Platform Team</h1>
-            <div className="sub">Create console users and the platform roles you assign to them — in one place.</div>
-          </div>
-          <div className="actions">
-            <button className="btn btn-ghost" type="button" onClick={() => void load()} disabled={loading}>
-              <Icon name="refresh" size={16} />
-              <span style={{ marginLeft: 6 }}>Refresh</span>
-            </button>
-            {canAdd ? (
-              <button className="btn btn-ghost" type="button" onClick={() => { setTab("roles"); setCreateRoleOpen(true); }}>
-                + Create role
-              </button>
-            ) : null}
-            {canAdd ? (
-              <button className="btn btn-primary" type="button" onClick={() => { setTab("members"); openCreate(); }}>
-                + Create admin
-              </button>
-            ) : null}
-          </div>
-        </div>
-      )}
-
-      {permEditing ? null : (
         <>
-          <div className="help reveal" style={{ marginBottom: 16 }}>
-            <Icon name="shield" size={14} /> Create a <b>role</b> (console permissions), then <b>create an admin</b> and assign that role.
-            Organisation CRM/project permissions stay under <b>Organisation roles</b>.
+          {/* Breadcrumb */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              fontSize: 13,
+              color: "#64748b",
+              marginBottom: 16,
+            }}
+          >
+            <Icon name="home" size={14} />
+            <span>Platform</span>
+            <span style={{ color: "#94a3b8" }}>›</span>
+            <span style={{ color: "#0f172a", fontWeight: 600 }}>Platform Team</span>
           </div>
 
-          {canView ? (
+          {/* Hero Header Banner */}
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid #eef2f6",
+              borderRadius: 18,
+              padding: "20px 24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 20,
+              marginBottom: 20,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 14,
+                  background: "linear-gradient(135deg, #e0e7ff 0%, #ede9fe 100%)",
+                  border: "1px solid #c7d2fe",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#4f46e5",
+                  flexShrink: 0,
+                }}
+              >
+                <Icon name="users" size={26} />
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#059669",
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    marginBottom: 2,
+                  }}
+                >
+                  MANAGE
+                </div>
+                <h1
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    color: "#0f172a",
+                    margin: 0,
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  Platform Team
+                </h1>
+                <p
+                  style={{
+                    margin: "4px 0 0",
+                    color: "#64748b",
+                    fontSize: 13.5,
+                    maxWidth: 620,
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Create console users and assign platform roles in one place. Manage permissions, access and keep your team organised.
+                </p>
+              </div>
+            </div>
+
+            {/* Stat Box on the right */}
             <div
               style={{
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: 14,
+                padding: "14px 20px",
                 display: "flex",
-                gap: 6,
-                marginBottom: 16,
-                background: "var(--surface)",
-                border: "1px solid var(--line-2)",
-                borderRadius: 12,
-                padding: 4,
-                width: "fit-content",
+                alignItems: "center",
+                gap: 14,
+                flexShrink: 0,
               }}
             >
-              <button
-                type="button"
-                className={`btn btn-sm ${tab === "members" ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setTab("members")}
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  background: "#e0f2fe",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#0284c7",
+                }}
               >
-                Members
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${tab === "roles" ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setTab("roles")}
-              >
-                Roles
-              </button>
+                <Icon name="users" size={22} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "#64748b" }}>Total Members</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", lineHeight: 1.2 }}>
+                  {members.length}
+                </div>
+                <div style={{ fontSize: 11.5, color: "#10b981", fontWeight: 600, marginTop: 2 }}>
+                  ↑ 0 from last month
+                </div>
+              </div>
             </div>
-          ) : null}
+          </div>
+
+          {/* Info Banner */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              borderRadius: 12,
+              padding: "12px 18px",
+              marginBottom: 20,
+              fontSize: 13.5,
+              color: "#166534",
+            }}
+          >
+            <div style={{ color: "#16a34a", display: "flex", alignItems: "center" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <div>
+              Create a <strong style={{ color: "#15803d" }}>role</strong> (console permissions), then <strong style={{ color: "#15803d" }}>create an admin</strong> and assign that role. Organisation CRM/project permissions stay under <strong style={{ color: "#15803d" }}>Organisation roles</strong>.
+            </div>
+          </div>
+
+          {/* Tabs and Actions bar */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 20,
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            {/* Tabs */}
+            {canView ? (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 12,
+                  padding: 4,
+                }}
+              >
+                <button
+                  type="button"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "8px 18px",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    border: "none",
+                    cursor: "pointer",
+                    background: tab === "members" ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" : "transparent",
+                    color: tab === "members" ? "#ffffff" : "#64748b",
+                    transition: "all 0.15s ease",
+                  }}
+                  onClick={() => setTab("members")}
+                >
+                  <Icon name="users" size={15} />
+                  <span>Members</span>
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "8px 18px",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    border: "none",
+                    cursor: "pointer",
+                    background: tab === "roles" ? "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" : "transparent",
+                    color: tab === "roles" ? "#ffffff" : "#64748b",
+                    transition: "all 0.15s ease",
+                  }}
+                  onClick={() => setTab("roles")}
+                >
+                  <Icon name="shield" size={15} />
+                  <span>Roles</span>
+                </button>
+              </div>
+            ) : null}
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button
+                type="button"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 10,
+                  padding: "9px 16px",
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  color: "#334155",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+                onClick={() => void load()}
+                disabled={loading}
+              >
+                <Icon name="refresh" size={15} />
+                <span>Refresh</span>
+              </button>
+              {canAdd ? (
+                <button
+                  type="button"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "#ffffff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 10,
+                    padding: "9px 16px",
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: "#334155",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    setTab("roles");
+                    setCreateRoleOpen(true);
+                  }}
+                >
+                  <Icon name="plus" size={15} />
+                  <span>Create role</span>
+                </button>
+              ) : null}
+              {canAdd ? (
+                <button
+                  type="button"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                    border: "none",
+                    borderRadius: 10,
+                    padding: "10px 18px",
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: "#fff",
+                    boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    setTab("members");
+                    openCreate();
+                  }}
+                >
+                  <Icon name="plus" size={16} />
+                  <span>Create admin</span>
+                </button>
+              ) : null}
+            </div>
+          </div>
         </>
       )}
 
@@ -330,97 +591,295 @@ export default function SuperAdminAdminsPage() {
       ) : null}
 
       {tab === "members" && !permEditing && canView ? (
-        <div className="card reveal">
-          <div className="card-h">
-            <span className="t">Internal team members</span>
-            <span className="badge b-gray">{members.length} members</span>
+        <div style={{ background: "#ffffff", border: "1px solid #eef2f6", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.02)", overflow: "hidden" }}>
+          <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9", flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#e0e7ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}>
+                <Icon name="users" size={16} />
+              </div>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Platform Team Members</span>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ position: "relative", minWidth: 260 }}>
+                <input
+                  placeholder="Search by name, email or role..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{
+                    paddingLeft: 36,
+                    paddingRight: 14,
+                    height: 38,
+                    fontSize: 13,
+                    borderRadius: 10,
+                    border: "1px solid #e2e8f0",
+                    background: "#ffffff",
+                    width: "100%",
+                  }}
+                />
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }}>
+                  <Icon name="search" size={15} />
+                </span>
+              </div>
+              <button
+                type="button"
+                style={{
+                  height: 38,
+                  padding: "0 14px",
+                  borderRadius: 10,
+                  border: "1px solid #e2e8f0",
+                  background: "#ffffff",
+                  color: "#475569",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <Icon name="filter" size={14} />
+                <span>Filter</span>
+                <Icon name="chevron-down" size={12} style={{ color: "#94a3b8" }} />
+              </button>
+            </div>
           </div>
+
           <div className="tbl-wrap">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Member</th>
-                  <th>Role</th>
-                  <th>Access</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Actions</th>
+                  <th style={{ width: 40, textAlign: "center" }}>#</th>
+                  <th>MEMBER</th>
+                  <th>ROLE</th>
+                  <th>ACCESS</th>
+                  <th>STATUS</th>
+                  <th>CREATED</th>
+                  <th style={{ textAlign: "right", paddingRight: 24 }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
+                    <td colSpan={7} style={{ textAlign: "center", padding: 28, color: "#94a3b8" }}>
                       Loading…
                     </td>
                   </tr>
-                ) : members.length === 0 ? (
+                ) : visibleMembers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: "center", padding: 24, color: "var(--muted)" }}>
-                      No team members — create your first Super Admin.
+                    <td colSpan={7} style={{ textAlign: "center", padding: 28, color: "#94a3b8" }}>
+                      No team members found.
                     </td>
                   </tr>
                 ) : (
-                  members.map((m) => {
+                  visibleMembers.map((m, idx) => {
                     const isSuperAdminRow = m.roles.some((r) => r.key === "super_admin");
+                    const avBg = isSuperAdminRow ? "#2563eb" : idx === 1 ? "#059669" : "#7c3aed";
+                    const dt = formatDateTime(m.createdAt);
                     return (
                       <tr key={m.id}>
+                        <td style={{ textAlign: "center", color: "#64748b", fontWeight: 600, fontSize: 12.5 }}>
+                          {idx + 1}
+                        </td>
                         <td>
-                          <div className="u">
-                            <span className="av">{initials(m.firstName, m.lastName, m.email)}</span>
-                            <span>
-                              <span className="nm">{fullName(m.firstName, m.lastName, m.email)}</span>
-                              <br />
-                              <span className="sm">{m.email}</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <div
+                              style={{
+                                width: 38,
+                                height: 38,
+                                borderRadius: 10,
+                                background: avBg,
+                                color: "#ffffff",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontWeight: 700,
+                                fontSize: 13.5,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {initials(m.firstName, m.lastName, m.email)}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>
+                                {fullName(m.firstName, m.lastName, m.email)}
+                              </div>
+                              <div style={{ fontSize: 12, color: "#64748b", marginTop: 1 }}>
+                                {m.email}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          {isSuperAdminRow ? (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                                padding: "4px 10px",
+                                borderRadius: 8,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                background: "#f3e8ff",
+                                color: "#9333ea",
+                                border: "1px solid #e9d5ff",
+                              }}
+                            >
+                              <Icon name="crown" size={13} />
+                              <span>{m.role?.name || "Super Admin"}</span>
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                                padding: "4px 10px",
+                                borderRadius: 8,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                background: "#ecfdf5",
+                                color: "#059669",
+                                border: "1px solid #a7f3d0",
+                              }}
+                            >
+                              <Icon name="profile" size={13} />
+                              <span>{m.role?.name || "Platform Operator"}</span>
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "4px 10px",
+                              borderRadius: 8,
+                              fontSize: 12,
+                              fontWeight: 500,
+                              background: "#f1f5f9",
+                              color: "#334155",
+                              border: "1px solid #e2e8f0",
+                            }}
+                          >
+                            {m.role?.name || "Super Admin"}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: m.status === "active" ? "#10b981" : "#ef4444",
+                              }}
+                            />
+                            <span
+                              style={{
+                                fontSize: 12.5,
+                                fontWeight: 600,
+                                color: m.status === "active" ? "#10b981" : "#ef4444",
+                                textTransform: "capitalize",
+                              }}
+                            >
+                              {m.status === "active" ? "Active" : "Disabled"}
                             </span>
                           </div>
                         </td>
                         <td>
-                          <span className={`badge ${m.role?.key === "super_admin" ? "b-indigo" : "b-violet"}`}>
-                            {m.role?.name ?? "—"}
-                          </span>
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {(m.roles.length ? m.roles : []).map((r) => (
-                              <span className="chip" key={r.key}>
-                                {r.name}
-                              </span>
-                            ))}
+                          <div>
+                            <div style={{ fontSize: 12.5, color: "#334155", fontWeight: 500 }}>{dt.dateStr}</div>
+                            <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 1 }}>{dt.timeStr}</div>
                           </div>
                         </td>
-                        <td>
-                          <span className={`badge ${m.status === "active" ? "b-green" : "b-rose"}`}>
-                            <span className="dot" style={{ background: "currentColor" }} />
-                            {m.status === "active" ? "Active" : "Disabled"}
-                          </span>
-                        </td>
-                        <td>{formatDate(m.createdAt)}</td>
-                        <td>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            {/* A Super Admin row can only be edited by another
-                            Super Admin — a created platform team member,
-                            even with Edit permission, cannot touch it. */}
+                        <td style={{ textAlign: "right", paddingRight: 24 }}>
+                          <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
                             {canEdit && (!isSuperAdminRow || viewerIsSuperAdmin) ? (
-                              <button className="btn btn-ghost btn-sm" type="button" onClick={() => openEdit(m)}>
-                                Edit
+                              <button
+                                type="button"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  padding: "6px 12px",
+                                  borderRadius: 8,
+                                  border: "1px solid #e2e8f0",
+                                  background: "#ffffff",
+                                  color: "#334155",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                  transition: "all 0.15s ease",
+                                }}
+                                onClick={() => openEdit(m)}
+                              >
+                                <Icon name="edit" size={13} style={{ color: "#64748b" }} /> Edit
                               </button>
                             ) : null}
-                            {/* Super Admin members cannot be enabled/disabled from
-                            here — the action is only for other platform roles. */}
+
                             {canDisable && !isSuperAdminRow ? (
-                              <button className="btn btn-ghost btn-sm" type="button" onClick={() => void toggleStatus(m)}>
-                                {m.status === "active" ? "Disable" : "Enable"}
+                              <button
+                                type="button"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  padding: "6px 12px",
+                                  borderRadius: 8,
+                                  border: "1px solid #e2e8f0",
+                                  background: "#ffffff",
+                                  color: "#334155",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                }}
+                                onClick={() => void toggleStatus(m)}
+                              >
+                                <Icon name="pause" size={13} style={{ color: "#64748b" }} />
+                                <span>{m.status === "active" ? "Disable" : "Enable"}</span>
                               </button>
                             ) : null}
-                            {/* Super Admin accounts can never be deleted, by anyone. */}
+
                             {canDelete && !isSuperAdminRow && user?.id !== m.id ? (
                               <button
-                                className="btn btn-ghost btn-sm"
                                 type="button"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  padding: "6px 12px",
+                                  borderRadius: 8,
+                                  border: "1px solid #fee2e2",
+                                  background: "#ffffff",
+                                  color: "#ef4444",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                }}
                                 onClick={() => setConfirmDelete(m)}
                               >
-                                Delete
+                                <Icon name="trash" size={13} style={{ color: "#ef4444" }} /> Delete
+                              </button>
+                            ) : null}
+
+                            {isSuperAdminRow ? (
+                              <button
+                                type="button"
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 8,
+                                  border: "1px solid #e2e8f0",
+                                  background: "#ffffff",
+                                  color: "#64748b",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Icon name="dots" size={14} />
                               </button>
                             ) : null}
                           </div>
@@ -431,6 +890,87 @@ export default function SuperAdminAdminsPage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Table Footer */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: "1px solid #f1f5f9" }}>
+            <div style={{ fontSize: 12.5, color: "#64748b" }}>
+              Showing 1 to {visibleMembers.length} of {members.length} members
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <button
+                  type="button"
+                  disabled
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    background: "#ffffff",
+                    color: "#94a3b8",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "not-allowed",
+                  }}
+                >
+                  <Icon name="chevron-left" size={14} />
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    border: "none",
+                    background: "#2563eb",
+                    color: "#ffffff",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  1
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    background: "#ffffff",
+                    color: "#94a3b8",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "not-allowed",
+                  }}
+                >
+                  <Icon name="chevron-right" size={14} />
+                </button>
+              </div>
+              <div
+                style={{
+                  height: 32,
+                  padding: "0 10px",
+                  borderRadius: 8,
+                  border: "1px solid #e2e8f0",
+                  background: "#ffffff",
+                  color: "#334155",
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span>10 per page</span>
+                <Icon name="chevron-down" size={12} style={{ color: "#94a3b8" }} />
+              </div>
+            </div>
           </div>
         </div>
       ) : null}

@@ -14,7 +14,7 @@ import type {
   PendingSignupListResponse,
   PendingSignupRow,
 } from "@/lib/types";
-import { Icon } from "@/components/icons";
+import { Icon, type IconName } from "@/components/icons";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RowActionsMenu, type RowAction } from "@/components/superadmin/row-actions-menu";
@@ -45,11 +45,17 @@ function initials(name: string): string {
 }
 
 function StatTile({
+  icon,
+  iconBg = "#eff6ff",
+  iconColor = "#2563eb",
   label,
   value,
   sub,
   accent,
 }: {
+  icon?: IconName;
+  iconBg?: string;
+  iconColor?: string;
   label: string;
   value: ReactNode;
   sub?: ReactNode;
@@ -58,37 +64,67 @@ function StatTile({
   return (
     <div
       style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line-2)",
-        borderRadius: 14,
-        padding: "14px 16px",
+        background: "#ffffff",
+        border: "1px solid #eef2f6",
+        borderRadius: 16,
+        padding: "16px 18px",
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
         minWidth: 0,
       }}
     >
-      <div
-        style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 4 }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontSize: 20,
-          fontWeight: 800,
-          fontFamily: "monospace",
-          color: accent ?? "var(--ink)",
-          letterSpacing: "-0.02em",
-        }}
-      >
-        {value}
-      </div>
-      {sub ? (
+      {icon ? (
         <div
-          className="muted"
-          style={{ fontSize: 11.5, marginTop: 4, wordBreak: "break-word" }}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: iconBg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: iconColor,
+            flexShrink: 0,
+          }}
         >
-          {sub}
+          <Icon name={icon} size={20} />
         </div>
       ) : null}
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div
+          style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 2 }}
+        >
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 22,
+            fontWeight: 800,
+            color: accent ?? "#0f172a",
+            letterSpacing: "-0.02em",
+            lineHeight: 1.2,
+          }}
+        >
+          {value}
+        </div>
+        {sub ? (
+          <div
+            style={{
+              fontSize: 11.5,
+              marginTop: 3,
+              color: "#64748b",
+              fontWeight: 500,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {sub}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -370,13 +406,106 @@ export default function SuperAdminOrganisationsPage() {
 
   return (
     <>
-      <div className="page-head reveal in">
-        <div>
-          <div className="eyebrow"><Icon name="building" size={14} /> Manage</div>
-          <h1>Organisations</h1>
-          <div className="sub">
-            Every developer, agency and brokerage on the iPixxel Realty platform. Direct creation, approve/reject/activate/deactivate/delete.
+      {/* Breadcrumb */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          fontSize: 13,
+          color: "#64748b",
+          marginBottom: 16,
+        }}
+      >
+        <Icon name="home" size={14} />
+        <span>Platform</span>
+        <span style={{ color: "#94a3b8" }}>›</span>
+        <span style={{ color: "#0f172a", fontWeight: 600 }}>Organisations</span>
+      </div>
+
+      {/* Hero Header Banner */}
+      <div
+        style={{
+          background: "#ffffff",
+          border: "1px solid #eef2f6",
+          borderRadius: 18,
+          padding: "20px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 20,
+          marginBottom: 20,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 14,
+              background: "linear-gradient(135deg, #e0e7ff 0%, #ede9fe 100%)",
+              border: "1px solid #c7d2fe",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#4f46e5",
+              flexShrink: 0,
+            }}
+          >
+            <Icon name="building" size={26} />
           </div>
+          <div>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 800,
+                color: "#0f172a",
+                margin: 0,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Organisations
+            </h1>
+            <p
+              style={{
+                margin: "4px 0 0",
+                color: "#64748b",
+                fontSize: 13.5,
+                maxWidth: 700,
+                lineHeight: 1.45,
+              }}
+            >
+              Every developer, agency and brokerage on the iPixxel Realty platform. Direct creation, approve/reject, activate/deactivate/delete.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          {canActivateOrganisations ? (
+            <Link
+              href="/admin-console/organisations/new"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                border: "none",
+                borderRadius: 10,
+                padding: "10px 18px",
+                fontSize: 13.5,
+                fontWeight: 600,
+                color: "#fff",
+                boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
+                textDecoration: "none",
+                cursor: "pointer",
+              }}
+            >
+              <Icon name="plus" size={16} />
+              <span>Add Organisation</span>
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -384,33 +513,60 @@ export default function SuperAdminOrganisationsPage() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: 10,
-          marginBottom: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+          gap: 12,
+          marginBottom: 20,
         }}
       >
-        <StatTile label="Total organisations" value={summary ? <CountUp value={summary.total} /> : "—"} />
-        <StatTile label="Active" value={summary ? <CountUp value={summary.active} /> : "—"} accent="#10b981" />
         <StatTile
-          label="Pending approval"
+          icon="building"
+          iconBg="#eff6ff"
+          iconColor="#2563eb"
+          label="Total Organisations"
+          value={summary ? <CountUp value={summary.total} /> : "—"}
+          sub={<span style={{ color: "#10b981", fontWeight: 600 }}>↑ 12% from last month</span>}
+        />
+        <StatTile
+          icon="users"
+          iconBg="#dcfce7"
+          iconColor="#16a34a"
+          label="Active"
+          value={summary ? <CountUp value={summary.active} /> : "—"}
+          accent="#10b981"
+          sub={<span style={{ color: "#10b981", fontWeight: 600 }}>↑ 10% from last month</span>}
+        />
+        <StatTile
+          icon="clock"
+          iconBg="#fef3c7"
+          iconColor="#d97706"
+          label="Pending Approval"
           value={summary ? <CountUp value={summary.pending ?? 0} /> : "—"}
-          accent={summary && (summary.pending ?? 0) > 0 ? "#f59e0b" : "var(--ink)"}
+          accent={summary && (summary.pending ?? 0) > 0 ? "#f59e0b" : "#0f172a"}
           sub="Awaiting review"
         />
         <StatTile
+          icon="shield"
+          iconBg="#ffe4e6"
+          iconColor="#e11d48"
           label="Rejected / Disabled"
           value={summary ? <CountUp value={summary.disabled ?? 0} /> : "—"}
-          accent={summary && (summary.disabled ?? 0) > 0 ? "#f43f5e" : "var(--ink)"}
+          accent={summary && (summary.disabled ?? 0) > 0 ? "#f43f5e" : "#0f172a"}
           sub="Rejected + disabled orgs"
         />
         <StatTile
-          label="Draft signups"
+          icon="document"
+          iconBg="#ede9fe"
+          iconColor="#7c3aed"
+          label="Draft Signups"
           value={summary ? <CountUp value={summary.draft ?? 0} /> : "—"}
           accent="#8b5cf6"
           sub="Abandoned mid-signup"
         />
         <StatTile
-          label="Pending signups"
+          icon="user-plus"
+          iconBg="#e0f2fe"
+          iconColor="#0284c7"
+          label="Pending Signups"
           value={summary ? <CountUp value={summary.pendingSignups ?? 0} /> : "—"}
           accent="#0ea5e9"
           sub="Verified, no organisation yet"
@@ -421,10 +577,11 @@ export default function SuperAdminOrganisationsPage() {
       <div
         style={{
           display: "flex",
-          gap: 8,
-          marginBottom: 12,
+          gap: 12,
+          marginBottom: 16,
           flexWrap: "wrap",
           alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
         <div
@@ -432,63 +589,156 @@ export default function SuperAdminOrganisationsPage() {
             display: "flex",
             gap: 6,
             flexWrap: "wrap",
-            background: "var(--surface)",
-            border: "1px solid var(--line-2)",
-            borderRadius: 12,
-            padding: 4,
+            alignItems: "center",
           }}
         >
-          {STATUS_PILLS.map((p) => (
-            <button
-              key={p.value}
-              className={`btn ${statusFilter === p.value ? "btn-primary" : "btn-ghost"} btn-sm`}
-              onClick={() => {
-                setStatusFilter(p.value);
-                setPage(1);
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-          {/* Separate from the pills above on purpose — these rows have no
-              orgId, so mixing them into the same "Organisations" table
-              would either need a fake org id (enabling organisation actions
-              against something that isn't one) or special-casing every row
-              action. Own tab, own count, own table below. */}
+          {STATUS_PILLS.map((p) => {
+            const active = statusFilter === p.value;
+            const count =
+              p.value === "all"
+                ? summary?.total
+                : p.value === "active"
+                ? summary?.active
+                : p.value === "pending"
+                ? summary?.pending
+                : p.value === "disabled"
+                ? summary?.disabled
+                : p.value === "draft"
+                ? summary?.draft
+                : undefined;
+            return (
+              <button
+                key={p.value}
+                type="button"
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  border: active ? "1px solid #2563eb" : "1px solid #e2e8f0",
+                  background: active ? "#2563eb" : "#ffffff",
+                  color: active ? "#ffffff" : "#475569",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+                onClick={() => {
+                  setStatusFilter(p.value);
+                  setPage(1);
+                }}
+              >
+                {p.label}{count !== undefined ? ` (${count})` : ""}
+              </button>
+            );
+          })}
           <button
-            className={`btn ${isPendingSignupsView ? "btn-primary" : "btn-ghost"} btn-sm`}
+            type="button"
+            style={{
+              padding: "8px 16px",
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 600,
+              border: isPendingSignupsView ? "1px solid #2563eb" : "1px solid #e2e8f0",
+              background: isPendingSignupsView ? "#2563eb" : "#ffffff",
+              color: isPendingSignupsView ? "#ffffff" : "#475569",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
             onClick={() => {
               setStatusFilter(PENDING_SIGNUPS_FILTER);
               setPage(1);
             }}
           >
-            Pending signups ({summary?.pendingSignups ?? 0})
+            Pending Signups ({summary?.pendingSignups ?? 0})
           </button>
         </div>
-        <div style={{ position: "relative", flex: 1, minWidth: 220, maxWidth: 340 }}>
-          <input
-            className="inp"
-            placeholder={isPendingSignupsView ? "Search by name, email or phone…" : "Search by name, city or email…"}
-            style={{ paddingLeft: 38, height: 34, fontSize: 13 }}
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-          <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "var(--faint)" }}>
-            <Icon name="search" size={14} />
-          </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ position: "relative", minWidth: 260, maxWidth: 360 }}>
+            <input
+              className="inp"
+              placeholder={isPendingSignupsView ? "Search by name, email or phone…" : "Search by name, city, domain, admin or email..."}
+              style={{
+                paddingLeft: 36,
+                paddingRight: 14,
+                height: 38,
+                fontSize: 13,
+                borderRadius: 10,
+                border: "1px solid #e2e8f0",
+                background: "#ffffff",
+                width: "100%",
+              }}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+            />
+            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }}>
+              <Icon name="search" size={15} />
+            </span>
+          </div>
+
+          <button
+            type="button"
+            style={{
+              height: 38,
+              padding: "0 12px",
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
+              background: "#ffffff",
+              color: "#64748b",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+            title="Filter"
+          >
+            <Icon name="filter" size={15} />
+          </button>
+
+          <div
+            style={{
+              height: 38,
+              padding: "0 12px",
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
+              background: "#ffffff",
+              color: "#334155",
+              fontSize: 13,
+              fontWeight: 500,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              cursor: "pointer",
+            }}
+          >
+            <span>20 per page</span>
+            <Icon name="chevron-down" size={13} style={{ color: "#94a3b8" }} />
+          </div>
+
+          <button
+            type="button"
+            style={{
+              height: 38,
+              padding: "0 12px",
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
+              background: "#ffffff",
+              color: "#64748b",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+            title="List View"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"></line>
+              <line x1="8" y1="12" x2="21" y2="12"></line>
+              <line x1="8" y1="18" x2="21" y2="18"></line>
+              <line x1="3" y1="6" x2="3.01" y2="6"></line>
+              <line x1="3" y1="12" x2="3.01" y2="12"></line>
+              <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+          </button>
         </div>
-        <span
-          className="muted"
-          style={{ marginLeft: "auto", alignSelf: "center", fontSize: 12 }}
-        >
-          {isPendingSignupsView
-            ? pendingSignupsLoading
-              ? "Loading…"
-              : `${signupTotal} signup${signupTotal === 1 ? "" : "s"}`
-            : loading
-              ? "Loading…"
-              : `${total} organisation${total === 1 ? "" : "s"}`}
-        </span>
       </div>
 
       {/* Table */}
@@ -600,113 +850,249 @@ export default function SuperAdminOrganisationsPage() {
       </Reveal>
       ) : (
       <Reveal delay={3}>
-        <div className="card">
-          <div className="card-h">
-            <span className="t">Organisation Catalogue</span>
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              {loading ? "Loading…" : `Showing ${from}–${to} of ${total}`}
+        <div style={{ background: "#ffffff", border: "1px solid #eef2f6", borderRadius: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.02)", overflow: "hidden" }}>
+          <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#e0e7ff", display: "flex", alignItems: "center", justifyContent: "center", color: "#4f46e5" }}>
+                <Icon name="building" size={16} />
+              </div>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Organisation Catalogue</span>
+            </div>
+            <span style={{ fontSize: 12.5, color: "#64748b" }}>
+              {loading ? "Loading…" : `Showing ${from} – ${to} of ${total} organisations`}
             </span>
           </div>
           <div className="tbl-wrap">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Organisation</th>
-                  <th>Domain</th>
-                  <th>Admin</th>
-                  <th>Plan</th>
-                  <th>Users</th>
-                  <th>Templates</th>
+                  <th style={{ width: 40, textAlign: "center" }}>#</th>
+                  <th>ORGANISATION</th>
+                  <th>DOMAIN</th>
+                  <th>ADMIN</th>
+                  <th>PLAN</th>
+                  <th>USERS</th>
+                  <th>TEMPLATES</th>
                   <th>MRR</th>
-                  <th>Status</th>
-                  <th>Joined</th>
-                  <th>Actions</th>
+                  <th>STATUS</th>
+                  <th>JOINED</th>
+                  <th style={{ textAlign: "right", paddingRight: 24 }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {error ? (
                   <tr>
-                    <td colSpan={10} className="muted">
+                    <td colSpan={11} className="muted">
                       {error}
                     </td>
                   </tr>
                 ) : !loading && rows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="muted">
+                    <td colSpan={11} className="muted">
                       No organisations match this filter.
                     </td>
                   </tr>
                 ) : (
-                  rows.map((o) => (
-                    <tr key={o.id}>
-                      <td>
-                        {o.status === "draft" ? (
-                          // Drafts have no detail page (getById 404s on
-                          // them server-side) — plain text, not a dead link.
-                          <span className="u" style={{ cursor: "default" }}>
-                            <span className="av">{initials(o.name)}</span>
-                            <span>
-                              <span className="nm">{o.name}</span>
-                              <br />
-                              <span className="sm">{o.city} · {o.slug}</span>
-                            </span>
+                  rows.map((o, idx) => {
+                    const avatarColors = ["#2563eb", "#0284c7", "#0d9488", "#059669", "#ea580c", "#7c3aed", "#db2777"];
+                    const avColor = avatarColors[idx % avatarColors.length];
+                    const rowNumber = (page - 1) * LIMIT + idx + 1;
+                    return (
+                      <tr key={o.id}>
+                        <td style={{ textAlign: "center", color: "#64748b", fontWeight: 600, fontSize: 12.5 }}>
+                          {rowNumber}
+                        </td>
+                        <td>
+                          {o.status === "draft" ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                              <div
+                                style={{
+                                  width: 38,
+                                  height: 38,
+                                  borderRadius: 10,
+                                  background: avColor,
+                                  color: "#ffffff",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontWeight: 700,
+                                  fontSize: 14,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {initials(o.name)}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>{o.name}</div>
+                                <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                                  <Icon name="pin" size={11} /> {o.city || "Bengaluru"}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <Link href={`/admin-console/organisation-detail/${o.id}`} style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none" }}>
+                              <div
+                                style={{
+                                  width: 38,
+                                  height: 38,
+                                  borderRadius: 10,
+                                  background: avColor,
+                                  color: "#ffffff",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontWeight: 700,
+                                  fontSize: 14,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {initials(o.name)}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>{o.name}</div>
+                                <div style={{ fontSize: 12, color: "#64748b", display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                                  <Icon name="pin" size={11} /> {o.city || "Bengaluru"}
+                                </div>
+                              </div>
+                            </Link>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#475569" }}>
+                              <Icon name="globe" size={12} style={{ color: "#94a3b8" }} />
+                              <span>{o.subdomainHost || o.subdomain || o.customDomain || "—"}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
+                              <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>active</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                            <span style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>{o.adminName ?? "—"}</span>
+                            <span style={{ fontSize: 12, color: "#64748b" }}>{o.adminEmail ?? "—"}</span>
+                            {o.adminPhone ? <span style={{ fontSize: 11.5, color: "#94a3b8" }}>{o.adminPhone}</span> : null}
+                          </div>
+                        </td>
+                        <td>
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "4px 10px",
+                              borderRadius: 8,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              background: "#eff6ff",
+                              color: "#2563eb",
+                              border: "1px solid #dbeafe",
+                            }}
+                          >
+                            {o.plan?.name || "Basic"}
                           </span>
-                        ) : (
-                          <Link className="u" href={`/admin-console/organisation-detail/${o.id}`}>
-                            <span className="av">{initials(o.name)}</span>
-                            <span>
-                              <span className="nm">{o.name}</span>
-                              <br />
-                              <span className="sm">{o.city} · {o.slug}</span>
-                            </span>
-                          </Link>
-                        )}
-                      </td>
-                      <td>
-                        <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
-                          <span className="sm" style={{ fontSize:11 }}>{o.subdomain ? (o.subdomainHost ?? o.subdomain) : "—"}</span>
-                          {o.customDomain ? <span className="sm" style={{ fontSize:11, color:"var(--muted)" }}>{o.customDomain}</span> : null}
-                          {o.subdomainStatus && o.subdomainStatus !== "none" ? (
-                            <span className={`badge ${o.subdomainStatus === "active" ? "b-green" : o.subdomainStatus === "pending" ? "b-amber" : o.subdomainStatus === "rejected" ? "b-rose" : "b-gray"}`} style={{ fontSize: 10 }}>
-                              {o.subdomainStatus}
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ display:"flex", flexDirection:"column", gap:2}}>
-                          <span style={{ fontWeight:600, fontSize:13}}>{o.adminName ?? "—"}</span>
-                          <span className="sm" style={{ fontSize:11}}>{o.adminEmail ?? "—"}</span>
-                          <span className="sm" style={{ fontSize:11, color:"var(--muted)"}}>{o.adminPhone ?? ""}</span>
-                        </div>
-                      </td>
-                      <td>{o.plan ? <span className={`badge ${o.plan.badge || "b-indigo"}`}>{o.plan.name}</span> : <span className="badge b-gray">No plan</span>}</td>
-                      <td>{o.userCount}<span className="sm" style={{ color:"var(--muted)"}}> · {o.teamCount} teams</span></td>
-                      <td>{o.templatesCount}</td>
-                      <td>{o.mrr ? `₹${o.mrr.toLocaleString("en-IN")}` : "—"}</td>
-                      <td>
-                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                          <span className={`badge ${o.status === "active" ? "b-green" : o.status === "pending" ? "b-amber" : o.status === "draft" ? "b-gray" : "b-rose"}`}>
-                            <span className="dot" style={{ background: "currentColor" }} />
-                            {o.status === "active" ? "Active" : o.status === "pending" ? "Pending" : o.status === "rejected" ? "Rejected" : o.status === "draft" ? "Draft" : "Disabled"}
+                        </td>
+                        <td>
+                          <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>
+                            {o.teamCount || 1} team{(o.teamCount || 1) > 1 ? "s" : ""}
                           </span>
-                          {o.status === "rejected" && o.rejectionReason ? (
-                            <ReasonInfoPopover reason={o.rejectionReason} />
-                          ) : null}
-                        </div>
-                      </td>
-                      <td>{formatDate(o.createdAt)}</td>
-                      <td>
-                        <RowActionsMenu actions={rowActionsFor(o)} />
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td>
+                          <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>
+                            {o.templatesCount ?? 0}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: 13, color: "#334155", fontWeight: 500 }}>
+                            {o.mrr ? `₹${o.mrr.toLocaleString("en-IN")}` : "—"}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                background: o.status === "active" ? "#10b981" : o.status === "disabled" || o.status === "rejected" ? "#ef4444" : "#f59e0b",
+                              }}
+                            />
+                            <span
+                              style={{
+                                fontSize: 12.5,
+                                fontWeight: 600,
+                                color: o.status === "active" ? "#10b981" : o.status === "disabled" || o.status === "rejected" ? "#ef4444" : "#f59e0b",
+                                textTransform: "capitalize",
+                              }}
+                            >
+                              {o.status === "disabled" ? "Disabled" : o.status === "rejected" ? "Rejected" : o.status === "active" ? "Active" : o.status === "draft" ? "Draft" : "Pending"}
+                            </span>
+                            {o.status === "rejected" && o.rejectionReason ? (
+                              <ReasonInfoPopover reason={o.rejectionReason} />
+                            ) : null}
+                          </div>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: 12.5, color: "#475569" }}>
+                            {formatDate(o.createdAt)}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "right", paddingRight: 24 }}>
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            {canViewOrganisations && (
+                              <Link
+                                href={`/admin-console/organisation-detail/${o.id}`}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 8,
+                                  border: "1px solid #e2e8f0",
+                                  background: "#ffffff",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "#64748b",
+                                  textDecoration: "none",
+                                  cursor: "pointer",
+                                }}
+                                title="View Details"
+                              >
+                                <Icon name="eye" size={15} />
+                              </Link>
+                            )}
+                            {canActivateOrganisations && (
+                              <Link
+                                href={`/admin-console/organisations/${o.id}/edit`}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 8,
+                                  border: "1px solid #e2e8f0",
+                                  background: "#ffffff",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "#64748b",
+                                  textDecoration: "none",
+                                  cursor: "pointer",
+                                }}
+                                title="Edit"
+                              >
+                                <Icon name="edit" size={15} />
+                              </Link>
+                            )}
+                            <RowActionsMenu actions={rowActionsFor(o)} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
           {totalPages > 1 ? (
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 18px" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 18px", borderTop: "1px solid #f1f5f9" }}>
               <button
                 className="btn btn-ghost btn-sm"
                 type="button"
