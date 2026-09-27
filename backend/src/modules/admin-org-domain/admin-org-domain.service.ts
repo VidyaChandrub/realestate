@@ -6,73 +6,11 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import {
   DnsRecordSpec,
+  generateCustomDomainDnsInstructions,
 } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
 import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { promises as dns } from 'node:dns';
-
-function generateCustomDomainDnsInstructions(
-  domain: string,
-  opts: {
-    mode?: string;
-    ip?: string;
-    ipv6?: string | null;
-    cname?: string;
-    ns1?: string;
-    ns2?: string;
-  } = {},
-): DnsRecordSpec[] {
-  const mode = opts.mode ?? process.env.DNS_MODE ?? 'a';
-  const ip = opts.ip ?? process.env.INFRA_IP ?? '';
-  const ipv6 = opts.ipv6 !== undefined ? opts.ipv6 : (process.env.INFRA_IPV6 ?? null);
-  const cname = opts.cname ?? process.env.INFRA_CNAME_TARGET ?? 'cname.bigestate.io';
-  const ns1 = opts.ns1 ?? process.env.INFRA_NS1 ?? 'ns1.bigestate.io';
-  const ns2 = opts.ns2 ?? process.env.INFRA_NS2 ?? 'ns2.bigestate.io';
-  const records: DnsRecordSpec[] = [];
-
-  if (mode === 'ns') {
-    records.push({
-      type: 'NS',
-      host: '@',
-      value: ns1,
-      ttl: 'Auto',
-      purpose: 'Primary nameserver',
-    });
-    records.push({
-      type: 'NS',
-      host: '@',
-      value: ns2,
-      ttl: 'Auto',
-      purpose: 'Secondary nameserver',
-    });
-  } else if (mode === 'cname') {
-    records.push({
-      type: 'CNAME',
-      host: domain.startsWith('www.') ? 'www' : '@',
-      value: cname,
-      ttl: 'Auto',
-      purpose: 'Website origin',
-    });
-  } else {
-    records.push({
-      type: 'A',
-      host: '@',
-      value: ip || '76.76.21.21',
-      ttl: 'Auto',
-      purpose: 'Website origin (IPv4)',
-    });
-    if (ipv6) {
-      records.push({
-        type: 'AAAA',
-        host: '@',
-        value: ipv6,
-        ttl: 'Auto',
-        purpose: 'Website origin (IPv6)',
-      });
-    }
-  }
-  return records;
-}
 
 // A single row returned to the Super Admin "Org Domains" list.
 function toView(

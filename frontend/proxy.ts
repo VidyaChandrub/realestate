@@ -39,11 +39,9 @@ export function proxy(request: NextRequest) {
   }
 
   const url = request.nextUrl.clone();
-  if (path === "/site" || path === "/" || path === "") {
-    url.pathname = "/org-site";
-    return NextResponse.rewrite(url);
-  }
-  return NextResponse.next();
+  // On custom domains, rewrite root or landing page subpaths to /org-site
+  url.pathname = "/org-site";
+  return NextResponse.rewrite(url);
 }
 
 export const config = {

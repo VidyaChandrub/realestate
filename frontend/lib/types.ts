@@ -1808,6 +1808,7 @@ export interface OrgDomainRequest {
   requestedAt: string;
   reviewedAt: string | null;
   rejectionReason: string | null;
+  dnsInstructions?: DnsRecordSpec[] | null;
 }
 
 /** A landing page the org can target with its primary custom domain. */
@@ -1838,6 +1839,8 @@ export interface OrgDomainInfo {
   customDomain: string | null;
   customDomainStatus: string;
   customDomainLandingPageId: string | null;
+  platformOrigin?: string | null;
+  dnsMode?: string;
   landingPages: OrgDomainLandingPage[];
   requests: OrgDomainRequest[];
   approvedDomains?: ApprovedDomainOption[];

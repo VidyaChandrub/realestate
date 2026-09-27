@@ -8,10 +8,12 @@ import { PrismaService } from '../../database/prisma.service';
 import {
   isValidDomain,
   normalizeDomain,
+  generateCustomDomainDnsInstructions,
 } from '../../common/utils/domain.util';
 import { buildNotificationData } from '../../common/utils/notifications.util';
+import { PlatformConfigService } from '../platform-config/platform-config.service';
 
-function toView(req: any) {
+function toView(req: any, opts: any = {}) {
   return {
     id: req.id,
     kind: req.kind,
@@ -24,12 +26,18 @@ function toView(req: any) {
     requestedAt: req.requestedAt,
     reviewedAt: req.reviewedAt,
     rejectionReason: req.rejectionReason,
+    dnsInstructions: req.customDomain
+      ? generateCustomDomainDnsInstructions(req.customDomain, opts)
+      : [],
   };
 }
 
 @Injectable()
 export class OrgDomainService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly platformConfig: PlatformConfigService,
+  ) {}
 
   // The organisation's own custom-domain identity plus the history
   // of the org's own domain requests (org-scoped, single-tenant isolation).
@@ -83,13 +91,25 @@ export class OrgDomainService {
       landingPageName: r.landingPage?.name ?? null,
     }));
 
+    const cfg = await this.platformConfig.getConfig();
+    const dnsOpts = {
+      mode: cfg.dnsMode,
+      ip: cfg.infraIp ?? undefined,
+      ipv6: cfg.infraIpv6 ?? null,
+      cname: cfg.infraCname ?? undefined,
+      ns1: cfg.infraNs1 ?? undefined,
+      ns2: cfg.infraNs2 ?? undefined,
+    };
+
     return {
       customDomain: org.customDomain,
       customDomainStatus: org.customDomainStatus,
       customDomainLandingPageId: org.customDomainLandingPageId,
+      platformOrigin: cfg.infraIp || cfg.infraCname || null,
+      dnsMode: cfg.dnsMode,
       landingPages: landingPagesWithDomain,
       approvedDomains,
-      requests: requests.map(toView),
+      requests: requests.map((r) => toView(r, dnsOpts)),
     };
   }
 

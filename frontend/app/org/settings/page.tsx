@@ -380,6 +380,16 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [assignSelection, setAssignSelection] = useState<Record<string, string>>({});
   const [actionBusy, setActionBusy] = useState(false);
+  const [showDnsId, setShowDnsId] = useState<string | null>(null);
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  function copyDns(val: string) {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(val);
+      setCopiedText(val);
+      setTimeout(() => setCopiedText(null), 2500);
+    }
+  }
 
   async function load() {
     setBusy(true);
@@ -560,6 +570,16 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
                               <button
                                 type="button"
                                 className="btn btn-soft btn-sm"
+                                onClick={() => setShowDnsId(showDnsId === req.id ? null : req.id)}
+                                title="View DNS records to point your domain"
+                                style={{ display: "flex", alignItems: "center", gap: 5 }}
+                              >
+                                <span>🌐</span>
+                                {showDnsId === req.id ? "Hide DNS" : "DNS Setup"}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-soft btn-sm"
                                 onClick={() => setAssigningId(isEditing ? null : req.id)}
                                 disabled={actionBusy}
                               >
@@ -634,6 +654,126 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
                               </div>
                             </div>
                           )}
+
+                          {/* DNS Instructions Panel */}
+                          {showDnsId === req.id && (() => {
+                            const platformOrigin = info.platformOrigin || "3.108.68.137";
+                            const dnsRecords = req.dnsInstructions && req.dnsInstructions.length > 0
+                              ? req.dnsInstructions
+                              : [
+                                  {
+                                    type: "A",
+                                    host: "@",
+                                    value: platformOrigin,
+                                    ttl: "Auto",
+                                    purpose: "Website origin (IPv4)",
+                                  },
+                                  {
+                                    type: "CNAME",
+                                    host: "www",
+                                    value: req.customDomain ?? "@",
+                                    ttl: "Auto",
+                                    purpose: "WWW alias redirect",
+                                  },
+                                ];
+
+                            return (
+                              <div
+                                style={{
+                                  background: "var(--surface-2, #f8fafc)",
+                                  border: "1px solid var(--line-2)",
+                                  borderRadius: 10,
+                                  padding: 14,
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 12,
+                                  marginTop: 4,
+                                }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                                  <div>
+                                    <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink)" }}>
+                                      DNS Configuration for <code style={{ color: "var(--brand)" }}>{req.customDomain}</code>
+                                    </div>
+                                    <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                                      Add the following records at your domain registrar (GoDaddy, Namecheap, Cloudflare, Route 53, etc.):
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: 11, background: "#dcfce7", color: "#15803d", padding: "3px 8px", borderRadius: 6, fontWeight: 600 }}>
+                                    Server IP: {platformOrigin}
+                                  </div>
+                                </div>
+
+                                <div style={{ overflowX: "auto" }}>
+                                  <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                                    <thead>
+                                      <tr style={{ borderBottom: "1px solid var(--line-2)", color: "var(--ink-2)", textAlign: "left" }}>
+                                        <th style={{ padding: "6px 8px" }}>Type</th>
+                                        <th style={{ padding: "6px 8px" }}>Host / Name</th>
+                                        <th style={{ padding: "6px 8px" }}>Points To / Value</th>
+                                        <th style={{ padding: "6px 8px" }}>TTL</th>
+                                        <th style={{ padding: "6px 8px" }}>Purpose</th>
+                                        <th style={{ padding: "6px 8px", textAlign: "right" }}>Action</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {dnsRecords.map((r, idx) => (
+                                        <tr key={idx} style={{ borderBottom: "1px solid var(--line-2)" }}>
+                                          <td style={{ padding: "8px" }}>
+                                            <span className="badge b-blue" style={{ fontWeight: 700, fontSize: 11 }}>
+                                              {r.type}
+                                            </span>
+                                          </td>
+                                          <td style={{ padding: "8px", fontFamily: "monospace", fontWeight: 600 }}>
+                                            {r.host}
+                                          </td>
+                                          <td style={{ padding: "8px", fontFamily: "monospace", color: "var(--brand)", fontWeight: 700 }}>
+                                            {r.value}
+                                          </td>
+                                          <td style={{ padding: "8px", color: "var(--ink-2)" }}>
+                                            {r.ttl || "Auto"}
+                                          </td>
+                                          <td style={{ padding: "8px", color: "var(--ink-2)" }}>
+                                            {r.purpose}
+                                          </td>
+                                          <td style={{ padding: "8px", textAlign: "right" }}>
+                                            <button
+                                              type="button"
+                                              className="btn btn-ghost btn-xs"
+                                              onClick={() => copyDns(r.value)}
+                                              style={{ fontSize: 11, padding: "2px 8px" }}
+                                            >
+                                              {copiedText === r.value ? "✓ Copied!" : "Copy Value"}
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+
+                                <div
+                                  style={{
+                                    fontSize: 11.5,
+                                    lineHeight: 1.5,
+                                    color: "var(--ink-2)",
+                                    background: "rgba(59, 130, 246, 0.05)",
+                                    border: "1px solid rgba(59, 130, 246, 0.15)",
+                                    borderRadius: 6,
+                                    padding: "8px 12px",
+                                  }}
+                                >
+                                  💡 <b>Next Steps:</b>
+                                  <ol style={{ margin: "4px 0 0 16px", padding: 0 }}>
+                                    <li>Add the <b>A record</b> (Host: <code>@</code>, Value: <code>{platformOrigin}</code>) at your domain registrar.</li>
+                                    <li>Add the <b>CNAME record</b> (Host: <code>www</code>, Value: <code>{req.customDomain}</code>) so www redirects properly.</li>
+                                    <li>DNS propagation typically takes <b>5 to 60 minutes</b> (up to 24 hours depending on TTL).</li>
+                                    <li>Ensure the landing page above is in <b>Published</b> status so visitors can view it immediately.</li>
+                                  </ol>
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
