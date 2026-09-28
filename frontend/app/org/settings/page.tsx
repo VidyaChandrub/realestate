@@ -101,7 +101,7 @@ const NAV_GROUPS = [
 const SECTION_META: Record<string, { icon: IconName; title: string; sub: string }> = {
   general: { icon: "building", title: "General Information", sub: "Update your organisation's basic details and contact information." },
   branding: { icon: "sparkles", title: "Logo & identity", sub: "Shown across the app, landing pages & emails" },
-  localization: { icon: "globe", title: "Formats & language", sub: "Regional preferences for your workspace" },
+  // localization: { icon: "globe", title: "Formats & language", sub: "Regional preferences for your workspace" },
   domain: { icon: "globe", title: "Landing Page Domains", sub: "Configure custom domains for each landing page" },
   crm: { icon: "crm", title: "CRM & leads", sub: "How leads are captured and handled" },
   fields: { icon: "puzzle", title: "Custom attributes", sub: "Add your own fields to leads, contacts, projects & bookings" },
@@ -110,14 +110,14 @@ const SECTION_META: Record<string, { icon: IconName; title: string; sub: string 
   scoring: { icon: "star", title: "Scoring & assignment", sub: "Lead scores and distribution rules" },
   automation: { icon: "link", title: "Automation & SLA", sub: "Trigger workflows and response targets" },
   comms: { icon: "phone", title: "Calling & WhatsApp", sub: "Dialler, AI voice and WhatsApp Business" },
-  whatsapp: { icon: "phone", title: "WhatsApp Settings", sub: "WhatsApp Business setup and automated messaging" },
+  // whatsapp: { icon: "phone", title: "WhatsApp Settings", sub: "WhatsApp Business setup and automated messaging" },
   email: { icon: "mail", title: "Email & SMTP", sub: "Organisation mail server for invites, resets and notifications" },
   notifications: { icon: "bell", title: "Notifications", sub: "Channels per event type" },
   data: { icon: "document", title: "Data & import", sub: "Move data in and out of the platform" },
   api: { icon: "key", title: "API & webhooks", sub: "Programmatic access and event delivery" },
   audit: { icon: "shield", title: "Audit log", sub: "Recent admin & security events" },
   billing: { icon: "billing", title: "Billing & Subscription", sub: "Subscription, plans and invoices" },
-  "team-prefs": { icon: "users", title: "Team Preferences", sub: "Default roles, invitations and team configuration" },
+  // "team-prefs": { icon: "users", title: "Team Preferences", sub: "Default roles, invitations and team configuration" },
   security: { icon: "lock", title: "Security", sub: "Sign-in policy and danger zone" },
 };
 
@@ -661,21 +661,21 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
                             const dnsRecords = req.dnsInstructions && req.dnsInstructions.length > 0
                               ? req.dnsInstructions
                               : [
-                                  {
-                                    type: "A",
-                                    host: "@",
-                                    value: platformOrigin,
-                                    ttl: "Auto",
-                                    purpose: "Website origin (IPv4)",
-                                  },
-                                  {
-                                    type: "CNAME",
-                                    host: "www",
-                                    value: req.customDomain ?? "@",
-                                    ttl: "Auto",
-                                    purpose: "WWW alias redirect",
-                                  },
-                                ];
+                                {
+                                  type: "A",
+                                  host: "@",
+                                  value: platformOrigin,
+                                  ttl: "Auto",
+                                  purpose: "Website origin (IPv4)",
+                                },
+                                {
+                                  type: "CNAME",
+                                  host: "www",
+                                  value: req.customDomain ?? "@",
+                                  ttl: "Auto",
+                                  purpose: "WWW alias redirect",
+                                },
+                              ];
 
                             return (
                               <div
@@ -1059,31 +1059,31 @@ function CatalogSection({
                     <span key={o.id} className="pill" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                       {o.label}
                       {canDelete ? (
-                      <span
-                        className="x"
-                        style={{ cursor: busy ? "wait" : "pointer", opacity: busy === o.id ? 0.4 : 1 }}
-                        onClick={() => { if (!busy) void removeOption(o.id); }}
-                      >×</span>
+                        <span
+                          className="x"
+                          style={{ cursor: busy ? "wait" : "pointer", opacity: busy === o.id ? 0.4 : 1 }}
+                          onClick={() => { if (!busy) void removeOption(o.id); }}
+                        >×</span>
                       ) : null}
                     </span>
                   ))}
                 </div>
                 {canAdd ? (
-                <form
-                  onSubmit={(e) => { e.preventDefault(); void addOption(g.category); }}
-                  style={{ display: "flex", gap: 8, marginTop: 12, maxWidth: 440 }}
-                >
-                  <input
-                    className="inp"
-                    placeholder={g.placeholder}
-                    value={draft}
-                    maxLength={120}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [g.category]: e.target.value }))}
-                  />
-                  <button className="btn btn-primary btn-sm" type="submit" disabled={busy === g.category || !draft.trim()}>
-                    {busy === g.category ? "Adding…" : "+ Add"}
-                  </button>
-                </form>
+                  <form
+                    onSubmit={(e) => { e.preventDefault(); void addOption(g.category); }}
+                    style={{ display: "flex", gap: 8, marginTop: 12, maxWidth: 440 }}
+                  >
+                    <input
+                      className="inp"
+                      placeholder={g.placeholder}
+                      value={draft}
+                      maxLength={120}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [g.category]: e.target.value }))}
+                    />
+                    <button className="btn btn-primary btn-sm" type="submit" disabled={busy === g.category || !draft.trim()}>
+                      {busy === g.category ? "Adding…" : "+ Add"}
+                    </button>
+                  </form>
                 ) : null}
               </>
             )}
@@ -1161,93 +1161,92 @@ function ProjectTypesSection({
 
   return (
     <>
-    <Card
-      icon="properties"
-      title="Project types"
-      sub="Each type sets how a project's inventory is structured and which extra fields it captures — e.g. Apartments, Villas, Plots, Farmhouses"
-      action={
-        <div style={{ display: "flex", gap: 8 }}>
-          {canAdd ? (
-            <>
-              <button className="btn btn-ghost btn-sm" type="button" disabled={busy === "common"} onClick={() => void addCommon()}>
-                {busy === "common" ? "Adding…" : "Add common types"}
-              </button>
-              <button className="btn btn-primary btn-sm" type="button" onClick={() => setEditing("new")} disabled={editing === "new"}>
-                + New type
-              </button>
-            </>
-          ) : null}
-        </div>
-      }
-    >
-      {loadError ? <div className="form-alert">{loadError}</div> : null}
-      {error ? <div className="form-alert">{error}</div> : null}
-      {types === null && !loadError ? <p className="muted" style={{ margin: 0 }}>Loading…</p> : null}
-      {types && types.length === 0 && editing !== "new" ? (
-        <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
-          No project types yet. Add the common ones with one click (Apartment, Plot, Villa), or create your own.
-        </div>
-      ) : null}
-      {editing === "new" ? (
-        <ProjectTypeEditor initial={null} onSaved={saved} onCancel={() => setEditing(null)} />
-      ) : null}
-      {(types ?? []).map((t) => {
-        const traits = templateTraits(t.unitFields);
-        const badges = [
-          traits.grouped ? groupNoun(t.unitFields) ?? "Grouped" : null,
-          traits.floors ? "Floors" : null,
-          traits.configurations ? "Configurations" : null,
-          traits.priced ? "Priced" : null,
-        ].filter((b): b is string => !!b);
-        return (
-          <div key={t.id} style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <b style={{ fontSize: 14 }}>{t.name}</b>
-              {badges.length ? badges.map((b) => <span key={b} className="badge b-blue">{b}</span>) : <span className="badge">Flat list</span>}
-              <span className="muted" style={{ fontSize: 12.5 }}>
-                {t.projectFields.length} project field{t.projectFields.length === 1 ? "" : "s"} · {t.unitFields.length} unit field{t.unitFields.length === 1 ? "" : "s"}
-                {t.inUse > 0 ? ` · used by ${t.inUse} project${t.inUse === 1 ? "" : "s"}` : ""}
-              </span>
-              <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                {canEdit ? (
-                  <button className="btn btn-ghost btn-sm" type="button" onClick={() => setEditing(editing === t.id ? null : t.id)}>
-                    {editing === t.id ? "Close" : "Edit"}
-                  </button>
-                ) : null}
-                {canDelete ? (
-                  <button className="btn btn-ghost btn-sm" type="button" disabled={busy === t.id} onClick={() => setPendingDelete(t)}>Delete</button>
-                ) : null}
-              </span>
-            </div>
-            {editing === t.id ? (
-              <ProjectTypeEditor initial={t} onSaved={saved} onCancel={() => setEditing(null)} />
+      <Card
+        icon="properties"
+        title="Project types"
+        sub="Each type sets how a project's inventory is structured and which extra fields it captures — e.g. Apartments, Villas, Plots, Farmhouses"
+        action={
+          <div style={{ display: "flex", gap: 8 }}>
+            {canAdd ? (
+              <>
+                <button className="btn btn-ghost btn-sm" type="button" disabled={busy === "common"} onClick={() => void addCommon()}>
+                  {busy === "common" ? "Adding…" : "Add common types"}
+                </button>
+                <button className="btn btn-primary btn-sm" type="button" onClick={() => setEditing("new")} disabled={editing === "new"}>
+                  + New type
+                </button>
+              </>
             ) : null}
           </div>
-        );
-      })}
-    </Card>
-    <ConfirmModal
-      open={!!pendingDelete}
-      title={`Delete "${pendingDelete?.name ?? ""}"?`}
-      message={
-        pendingDelete
-          ? `This project type will be permanently deleted. This can't be undone.${
-              pendingDelete.inUse > 0
-                ? ` The ${pendingDelete.inUse} project(s) already using it keep their own copy and are not affected.`
-                : ""
+        }
+      >
+        {loadError ? <div className="form-alert">{loadError}</div> : null}
+        {error ? <div className="form-alert">{error}</div> : null}
+        {types === null && !loadError ? <p className="muted" style={{ margin: 0 }}>Loading…</p> : null}
+        {types && types.length === 0 && editing !== "new" ? (
+          <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+            No project types yet. Add the common ones with one click (Apartment, Plot, Villa), or create your own.
+          </div>
+        ) : null}
+        {editing === "new" ? (
+          <ProjectTypeEditor initial={null} onSaved={saved} onCancel={() => setEditing(null)} />
+        ) : null}
+        {(types ?? []).map((t) => {
+          const traits = templateTraits(t.unitFields);
+          const badges = [
+            traits.grouped ? groupNoun(t.unitFields) ?? "Grouped" : null,
+            traits.floors ? "Floors" : null,
+            traits.configurations ? "Configurations" : null,
+            traits.priced ? "Priced" : null,
+          ].filter((b): b is string => !!b);
+          return (
+            <div key={t.id} style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <b style={{ fontSize: 14 }}>{t.name}</b>
+                {badges.length ? badges.map((b) => <span key={b} className="badge b-blue">{b}</span>) : <span className="badge">Flat list</span>}
+                <span className="muted" style={{ fontSize: 12.5 }}>
+                  {t.projectFields.length} project field{t.projectFields.length === 1 ? "" : "s"} · {t.unitFields.length} unit field{t.unitFields.length === 1 ? "" : "s"}
+                  {t.inUse > 0 ? ` · used by ${t.inUse} project${t.inUse === 1 ? "" : "s"}` : ""}
+                </span>
+                <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                  {canEdit ? (
+                    <button className="btn btn-ghost btn-sm" type="button" onClick={() => setEditing(editing === t.id ? null : t.id)}>
+                      {editing === t.id ? "Close" : "Edit"}
+                    </button>
+                  ) : null}
+                  {canDelete ? (
+                    <button className="btn btn-ghost btn-sm" type="button" disabled={busy === t.id} onClick={() => setPendingDelete(t)}>Delete</button>
+                  ) : null}
+                </span>
+              </div>
+              {editing === t.id ? (
+                <ProjectTypeEditor initial={t} onSaved={saved} onCancel={() => setEditing(null)} />
+              ) : null}
+            </div>
+          );
+        })}
+      </Card>
+      <ConfirmModal
+        open={!!pendingDelete}
+        title={`Delete "${pendingDelete?.name ?? ""}"?`}
+        message={
+          pendingDelete
+            ? `This project type will be permanently deleted. This can't be undone.${pendingDelete.inUse > 0
+              ? ` The ${pendingDelete.inUse} project(s) already using it keep their own copy and are not affected.`
+              : ""
             }`
-          : undefined
-      }
-      confirmLabel="Delete"
-      destructive
-      busy={busy === pendingDelete?.id}
-      onConfirm={async () => {
-        if (!pendingDelete) return;
-        await remove(pendingDelete);
-        setPendingDelete(null);
-      }}
-      onClose={() => setPendingDelete(null)}
-    />
+            : undefined
+        }
+        confirmLabel="Delete"
+        destructive
+        busy={busy === pendingDelete?.id}
+        onConfirm={async () => {
+          if (!pendingDelete) return;
+          await remove(pendingDelete);
+          setPendingDelete(null);
+        }}
+        onClose={() => setPendingDelete(null)}
+      />
     </>
   );
 }
@@ -1446,59 +1445,59 @@ function PipelineStagesCard({ canEdit }: { canEdit: boolean }) {
       sub="Rename a stage or change its colour. The seven stages are fixed — only the label and colour shown across the app change."
     >
       <fieldset disabled={!canEdit} style={READ_ONLY_FIELDSET}>
-      {loadError ? <div className="form-alert">{loadError}</div> : null}
-      {saveError ? <div className="form-alert">{saveError}</div> : null}
-      {drafts === null ? (
-        <p className="muted" style={{ margin: 0 }}>Loading…</p>
-      ) : (
-        <>
-          <div id="stageList">
-            {LEAD_STAGE_ORDER.map((status) => {
-              const isDefault =
-                drafts[status].label.trim() === DEFAULT_LEAD_STAGES[status].label &&
-                drafts[status].color === DEFAULT_LEAD_STAGES[status].color.toLowerCase();
-              return (
-                <div className="stage" key={status}>
-                  <span className="grip" aria-hidden>⠿</span>
-                  <input
-                    type="color"
-                    className="colorpick"
-                    value={drafts[status].color}
-                    onChange={(e) => edit(status, { color: e.target.value.toLowerCase() })}
-                    aria-label={`${DEFAULT_LEAD_STAGES[status].label} colour`}
-                  />
-                  <input
-                    value={drafts[status].label}
-                    maxLength={40}
-                    onChange={(e) => edit(status, { label: e.target.value })}
-                    aria-label={`${DEFAULT_LEAD_STAGES[status].label} label`}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    disabled={isDefault}
-                    onClick={() => resetRow(status)}
-                    title="Reset to default label and colour"
-                  >
-                    Reset
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
-            <button
-              className="btn btn-primary btn-sm"
-              type="button"
-              disabled={!dirty || saving || hasEmptyLabel}
-              onClick={() => void save()}
-            >
-              {saving ? "Saving…" : "Save changes"}
-            </button>
-            {savedAt ? <span className="hint" style={{ margin: 0 }}><b>Saved.</b></span> : null}
-          </div>
-        </>
-      )}
+        {loadError ? <div className="form-alert">{loadError}</div> : null}
+        {saveError ? <div className="form-alert">{saveError}</div> : null}
+        {drafts === null ? (
+          <p className="muted" style={{ margin: 0 }}>Loading…</p>
+        ) : (
+          <>
+            <div id="stageList">
+              {LEAD_STAGE_ORDER.map((status) => {
+                const isDefault =
+                  drafts[status].label.trim() === DEFAULT_LEAD_STAGES[status].label &&
+                  drafts[status].color === DEFAULT_LEAD_STAGES[status].color.toLowerCase();
+                return (
+                  <div className="stage" key={status}>
+                    <span className="grip" aria-hidden>⠿</span>
+                    <input
+                      type="color"
+                      className="colorpick"
+                      value={drafts[status].color}
+                      onChange={(e) => edit(status, { color: e.target.value.toLowerCase() })}
+                      aria-label={`${DEFAULT_LEAD_STAGES[status].label} colour`}
+                    />
+                    <input
+                      value={drafts[status].label}
+                      maxLength={40}
+                      onChange={(e) => edit(status, { label: e.target.value })}
+                      aria-label={`${DEFAULT_LEAD_STAGES[status].label} label`}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      disabled={isDefault}
+                      onClick={() => resetRow(status)}
+                      title="Reset to default label and colour"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
+              <button
+                className="btn btn-primary btn-sm"
+                type="button"
+                disabled={!dirty || saving || hasEmptyLabel}
+                onClick={() => void save()}
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+              {savedAt ? <span className="hint" style={{ margin: 0 }}><b>Saved.</b></span> : null}
+            </div>
+          </>
+        )}
       </fieldset>
     </Card>
   );
@@ -1850,283 +1849,283 @@ export default function OrgSettingsPage() {
 
         <div className="os-content">
           <fieldset disabled={!canEditProfile} style={READ_ONLY_FIELDSET}>
-          {/* GENERAL */}
-          <div className={`os-section${activeSection === "general" ? " on" : ""}`}>
-            <Card
-              icon="building"
-              title="General Information"
-              sub="Update your organisation's basic details and contact information."
-              action={saveButton}
-            >
-              <div className="set-form-grid">
-                <div className="set-row-2">
-                  <div className="set-field">
-                    <label>Organisation name <span className="set-req">*</span></label>
-                    <div className="set-input-box">
-                      <span className="set-field-ic"><Icon name="building" size={16} /></span>
-                      <input
-                        className="inp"
-                        value={form.name}
-                        onChange={(e) => updateForm({ name: e.target.value })}
-                        placeholder="Miraclecare"
-                      />
+            {/* GENERAL */}
+            <div className={`os-section${activeSection === "general" ? " on" : ""}`}>
+              <Card
+                icon="building"
+                title="General Information"
+                sub="Update your organisation's basic details and contact information."
+                action={saveButton}
+              >
+                <div className="set-form-grid">
+                  <div className="set-row-2">
+                    <div className="set-field">
+                      <label>Organisation name <span className="set-req">*</span></label>
+                      <div className="set-input-box">
+                        <span className="set-field-ic"><Icon name="building" size={16} /></span>
+                        <input
+                          className="inp"
+                          value={form.name}
+                          onChange={(e) => updateForm({ name: e.target.value })}
+                          placeholder="Miraclecare"
+                        />
+                      </div>
+                    </div>
+                    <div className="set-field">
+                      <label>Legal / registered name</label>
+                      <div className="set-input-box">
+                        <span className="set-field-ic"><Icon name="document" size={16} /></span>
+                        <input
+                          className="inp"
+                          value={form.legalName}
+                          onChange={(e) => updateForm({ legalName: e.target.value })}
+                          placeholder="Skyline Developers Pvt. Ltd."
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="set-field">
-                    <label>Legal / registered name</label>
-                    <div className="set-input-box">
-                      <span className="set-field-ic"><Icon name="document" size={16} /></span>
-                      <input
-                        className="inp"
-                        value={form.legalName}
-                        onChange={(e) => updateForm({ legalName: e.target.value })}
-                        placeholder="Skyline Developers Pvt. Ltd."
-                      />
-                    </div>
-                  </div>
-                </div>
 
-                <div className="set-field">
-                  <label>Industry <span className="set-req">*</span></label>
-                  <div className="set-input-box">
-                    <span className="set-field-ic"><Icon name="tag" size={16} /></span>
-                    <select
-                      className="inp"
-                      value={form.industry}
-                      onChange={(e) => updateForm({ industry: e.target.value as OrgIndustry })}
-                    >
-                      <option value="">Select industry…</option>
-                      {INDUSTRY_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="set-row-2">
                   <div className="set-field">
-                    <label>Support email <span className="set-req">*</span></label>
+                    <label>Industry <span className="set-req">*</span></label>
                     <div className="set-input-box">
-                      <span className="set-field-ic"><Icon name="mail" size={16} /></span>
-                      <input
+                      <span className="set-field-ic"><Icon name="tag" size={16} /></span>
+                      <select
                         className="inp"
-                        type="email"
-                        value={form.supportEmail}
-                        onChange={(e) => updateForm({ supportEmail: e.target.value })}
-                        placeholder="care@skylinedev.in"
-                      />
-                    </div>
-                  </div>
-                  <div className="set-field">
-                    <label>Support phone</label>
-                    <div className="set-phone-group">
-                      <span className="set-phone-ic"><Icon name="phone" size={15} /></span>
-                      <span className="set-phone-flag" title="India">
-                        🇮🇳 <Icon name="chevron-down" size={12} style={{ color: "#94a3b8" }} />
-                      </span>
-                      <input
-                        className="set-phone-input"
-                        value={form.supportPhone}
-                        onChange={(e) => updateForm({ supportPhone: e.target.value })}
-                        placeholder="+91 79000 12345"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="set-row-2">
-                  <div className="set-field">
-                    <label>Country <span className="set-req">*</span></label>
-                    <div className="set-input-box">
-                      <span className="set-field-ic"><Icon name="globe" size={16} /></span>
-                      <select className="inp" value={form.country} onChange={handleCountryChange}>
-                        <option value="">Select country…</option>
-                        {COUNTRIES.map((c) => (
-                          <option key={c} value={c}>{c}</option>
+                        value={form.industry}
+                        onChange={(e) => updateForm({ industry: e.target.value as OrgIndustry })}
+                      >
+                        <option value="">Select industry…</option>
+                        {INDUSTRY_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>
                     </div>
-                    {form.country && COUNTRY_META[form.country] ? (
-                      <div className="set-country-hint">
-                        <span className="set-country-check"><Icon name="check" size={13} /></span>
-                        <span>Auto-set from {form.country}: Currency <b>{COUNTRY_META[form.country].currency}</b> · Timezone <b>{COUNTRY_META[form.country].timezone}</b></span>
-                      </div>
-                    ) : null}
                   </div>
+
+                  <div className="set-row-2">
+                    <div className="set-field">
+                      <label>Support email <span className="set-req">*</span></label>
+                      <div className="set-input-box">
+                        <span className="set-field-ic"><Icon name="mail" size={16} /></span>
+                        <input
+                          className="inp"
+                          type="email"
+                          value={form.supportEmail}
+                          onChange={(e) => updateForm({ supportEmail: e.target.value })}
+                          placeholder="care@skylinedev.in"
+                        />
+                      </div>
+                    </div>
+                    <div className="set-field">
+                      <label>Support phone</label>
+                      <div className="set-phone-group">
+                        <span className="set-phone-ic"><Icon name="phone" size={15} /></span>
+                        <span className="set-phone-flag" title="India">
+                          🇮🇳 <Icon name="chevron-down" size={12} style={{ color: "#94a3b8" }} />
+                        </span>
+                        <input
+                          className="set-phone-input"
+                          value={form.supportPhone}
+                          onChange={(e) => updateForm({ supportPhone: e.target.value })}
+                          placeholder="+91 79000 12345"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="set-row-2">
+                    <div className="set-field">
+                      <label>Country <span className="set-req">*</span></label>
+                      <div className="set-input-box">
+                        <span className="set-field-ic"><Icon name="globe" size={16} /></span>
+                        <select className="inp" value={form.country} onChange={handleCountryChange}>
+                          <option value="">Select country…</option>
+                          {COUNTRIES.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {form.country && COUNTRY_META[form.country] ? (
+                        <div className="set-country-hint">
+                          <span className="set-country-check"><Icon name="check" size={13} /></span>
+                          <span>Auto-set from {form.country}: Currency <b>{COUNTRY_META[form.country].currency}</b> · Timezone <b>{COUNTRY_META[form.country].timezone}</b></span>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="set-field">
+                      <label>City <span className="set-req">*</span></label>
+                      <div className="set-input-box">
+                        <span className="set-field-ic"><Icon name="pin" size={16} /></span>
+                        <input
+                          className="inp"
+                          value={form.city}
+                          onChange={(e) => updateForm({ city: e.target.value })}
+                          placeholder="Bengaluru"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="set-row-2">
+                    <div className="set-field">
+                      <label>State</label>
+                      <div className="set-input-box">
+                        <span className="set-field-ic"><Icon name="building" size={16} /></span>
+                        <input
+                          className="inp"
+                          value={form.state}
+                          onChange={(e) => updateForm({ state: e.target.value })}
+                          placeholder="Karnataka"
+                        />
+                      </div>
+                    </div>
+                    <div className="set-field">
+                      <label>Postal code</label>
+                      <div className="set-input-box">
+                        <span className="set-field-ic"><Icon name="mail" size={16} /></span>
+                        <input
+                          className="inp inp-mono"
+                          value={form.postalCode}
+                          onChange={(e) => updateForm({ postalCode: e.target.value })}
+                          placeholder="560001"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="set-field">
-                    <label>City <span className="set-req">*</span></label>
+                    <label>Registered address</label>
+                    <div className="set-input-box set-is-textarea">
+                      <span className="set-field-ic"><Icon name="pin" size={16} /></span>
+                      <textarea
+                        className="inp"
+                        rows={2}
+                        value={form.addressLine1}
+                        onChange={(e) => updateForm({ addressLine1: e.target.value })}
+                        placeholder="123, Prestige Tech Park, Outer Ring Road, Bengaluru, Karnataka – 560001, India"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="set-field" style={{ marginBottom: 0 }}>
+                    <label>Address line 2</label>
                     <div className="set-input-box">
                       <span className="set-field-ic"><Icon name="pin" size={16} /></span>
                       <input
                         className="inp"
-                        value={form.city}
-                        onChange={(e) => updateForm({ city: e.target.value })}
-                        placeholder="Bengaluru"
+                        value={form.addressLine2}
+                        onChange={(e) => updateForm({ addressLine2: e.target.value })}
+                        placeholder="Optional"
                       />
                     </div>
                   </div>
                 </div>
+              </Card>
+            </div>
 
-                <div className="set-row-2">
-                  <div className="set-field">
-                    <label>State</label>
-                    <div className="set-input-box">
-                      <span className="set-field-ic"><Icon name="building" size={16} /></span>
-                      <input
-                        className="inp"
-                        value={form.state}
-                        onChange={(e) => updateForm({ state: e.target.value })}
-                        placeholder="Karnataka"
-                      />
-                    </div>
+            {/* BRANDING */}
+            <div className={`os-section${activeSection === "branding" ? " on" : ""}`}>
+              <SectionHead section="branding" />
+              <Card icon="sparkles" title="Logo & identity" sub="Shown across the app, landing pages & emails">
+                <div className="row2">
+                  <div className="field">
+                    <label>Logo</label>
+                    <AssetField
+                      value={form.logoUrl}
+                      uploading={logoUploading}
+                      accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+                      uploadedLabel="Logo uploaded"
+                      onPick={(file) => void handleAssetUpload("logo", file)}
+                      onRemove={() => updateForm({ logoUrl: "" })}
+                    />
                   </div>
-                  <div className="set-field">
-                    <label>Postal code</label>
-                    <div className="set-input-box">
-                      <span className="set-field-ic"><Icon name="mail" size={16} /></span>
-                      <input
-                        className="inp inp-mono"
-                        value={form.postalCode}
-                        onChange={(e) => updateForm({ postalCode: e.target.value })}
-                        placeholder="560001"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="set-field">
-                  <label>Registered address</label>
-                  <div className="set-input-box set-is-textarea">
-                    <span className="set-field-ic"><Icon name="pin" size={16} /></span>
-                    <textarea
-                      className="inp"
-                      rows={2}
-                      value={form.addressLine1}
-                      onChange={(e) => updateForm({ addressLine1: e.target.value })}
-                      placeholder="123, Prestige Tech Park, Outer Ring Road, Bengaluru, Karnataka – 560001, India"
+                  <div className="field">
+                    <label>Favicon</label>
+                    <AssetField
+                      value={form.faviconUrl}
+                      uploading={faviconUploading}
+                      accept="image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon,.ico"
+                      uploadedLabel="Favicon uploaded"
+                      onPick={(file) => void handleAssetUpload("favicon", file)}
+                      onRemove={() => updateForm({ faviconUrl: "" })}
                     />
                   </div>
                 </div>
-
-                <div className="set-field" style={{ marginBottom: 0 }}>
-                  <label>Address line 2</label>
-                  <div className="set-input-box">
-                    <span className="set-field-ic"><Icon name="pin" size={16} /></span>
+                <div className="field"><label>Brand colour</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <input
-                      className="inp"
-                      value={form.addressLine2}
-                      onChange={(e) => updateForm({ addressLine2: e.target.value })}
-                      placeholder="Optional"
-                    />
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* BRANDING */}
-          <div className={`os-section${activeSection === "branding" ? " on" : ""}`}>
-            <SectionHead section="branding" />
-            <Card icon="sparkles" title="Logo & identity" sub="Shown across the app, landing pages & emails">
-              <div className="row2">
-                <div className="field">
-                  <label>Logo</label>
-                  <AssetField
-                    value={form.logoUrl}
-                    uploading={logoUploading}
-                    accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
-                    uploadedLabel="Logo uploaded"
-                    onPick={(file) => void handleAssetUpload("logo", file)}
-                    onRemove={() => updateForm({ logoUrl: "" })}
-                  />
-                </div>
-                <div className="field">
-                  <label>Favicon</label>
-                  <AssetField
-                    value={form.faviconUrl}
-                    uploading={faviconUploading}
-                    accept="image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon,.ico"
-                    uploadedLabel="Favicon uploaded"
-                    onPick={(file) => void handleAssetUpload("favicon", file)}
-                    onRemove={() => updateForm({ faviconUrl: "" })}
-                  />
-                </div>
-              </div>
-              <div className="field"><label>Brand colour</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <input
-                    type="color"
-                    className="colorpick"
-                    value={/^#[0-9a-f]{6}$/i.test(form.brandColour) ? form.brandColour : "#0f1424"}
-                    onChange={(e) => {
-                      const color = e.target.value;
-                      updateForm({ brandColour: color });
-                      window.dispatchEvent(new CustomEvent(ORG_THEME_CHANGE_EVENT, { detail: { brandColour: color } }));
-                    }}
-                    aria-label="Pick a brand colour"
-                  />
-                  <input
-                    type="text"
-                    className="inp"
-                    style={{ width: 110, fontFamily: "monospace", textTransform: "uppercase", padding: "6px 10px" }}
-                    value={form.brandColour}
-                    onChange={(e) => {
-                      const color = e.target.value;
-                      updateForm({ brandColour: color });
-                      if (/^#[0-9a-fA-F]{3,8}$/.test(color)) {
+                      type="color"
+                      className="colorpick"
+                      value={/^#[0-9a-f]{6}$/i.test(form.brandColour) ? form.brandColour : "#0f1424"}
+                      onChange={(e) => {
+                        const color = e.target.value;
+                        updateForm({ brandColour: color });
                         window.dispatchEvent(new CustomEvent(ORG_THEME_CHANGE_EVENT, { detail: { brandColour: color } }));
-                      }
-                    }}
-                    placeholder="#0F1424"
-                  />
-                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginLeft: 4 }}>
-                    {ORG_COLOR_PRESETS.map((p) => {
-                      const isSel = form.brandColour.toLowerCase() === p.hex.toLowerCase();
-                      return (
-                        <button
-                          key={p.hex}
-                          type="button"
-                          onClick={() => {
-                            updateForm({ brandColour: p.hex });
-                            window.dispatchEvent(new CustomEvent(ORG_THEME_CHANGE_EVENT, { detail: { brandColour: p.hex } }));
-                          }}
-                          style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: "50%",
-                            background: p.hex,
-                            border: isSel ? "2px solid #fff" : "1px solid rgba(0,0,0,0.15)",
-                            outline: isSel ? `2px solid ${p.hex}` : "none",
-                            cursor: "pointer",
-                            padding: 0,
-                            boxShadow: isSel ? "0 2px 8px rgba(0,0,0,0.25)" : "none",
-                          }}
-                          title={p.label}
-                        />
-                      );
-                    })}
+                      }}
+                      aria-label="Pick a brand colour"
+                    />
+                    <input
+                      type="text"
+                      className="inp"
+                      style={{ width: 110, fontFamily: "monospace", textTransform: "uppercase", padding: "6px 10px" }}
+                      value={form.brandColour}
+                      onChange={(e) => {
+                        const color = e.target.value;
+                        updateForm({ brandColour: color });
+                        if (/^#[0-9a-fA-F]{3,8}$/.test(color)) {
+                          window.dispatchEvent(new CustomEvent(ORG_THEME_CHANGE_EVENT, { detail: { brandColour: color } }));
+                        }
+                      }}
+                      placeholder="#0F1424"
+                    />
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginLeft: 4 }}>
+                      {ORG_COLOR_PRESETS.map((p) => {
+                        const isSel = form.brandColour.toLowerCase() === p.hex.toLowerCase();
+                        return (
+                          <button
+                            key={p.hex}
+                            type="button"
+                            onClick={() => {
+                              updateForm({ brandColour: p.hex });
+                              window.dispatchEvent(new CustomEvent(ORG_THEME_CHANGE_EVENT, { detail: { brandColour: p.hex } }));
+                            }}
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: "50%",
+                              background: p.hex,
+                              border: isSel ? "2px solid #fff" : "1px solid rgba(0,0,0,0.15)",
+                              outline: isSel ? `2px solid ${p.hex}` : "none",
+                              cursor: "pointer",
+                              padding: 0,
+                              boxShadow: isSel ? "0 2px 8px rgba(0,0,0,0.25)" : "none",
+                            }}
+                            title={p.label}
+                          />
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
-              {/* TODO: Email sender name — disabled "coming soon" input.
+                {/* TODO: Email sender name — disabled "coming soon" input.
               <div className="field" style={{ marginBottom: 0 }}>
                 <label>Email sender name</label>
                 <input className="inp" value="" disabled placeholder="Coming soon — part of the Email module" />
               </div>
               */}
-            </Card>
-          </div>
+              </Card>
+            </div>
 
-          {/* LOCALIZATION */}
-          <div className={`os-section${activeSection === "localization" ? " on" : ""}`}>
-            <SectionHead section="localization" />
-            <Card icon="globe" title="Formats & language" sub="Regional preferences">
-              <div className="row3">
-                <div className="field"><label>Timezone</label><select className="inp" value={form.timezone} onChange={(e) => updateForm({ timezone: e.target.value })}>{!TIMEZONE_OPTIONS.some((t) => t.value === form.timezone) && form.timezone ? <option value={form.timezone}>{form.timezone}</option> : null}{TIMEZONE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
-                <div className="field"><label>Currency</label><select className="inp" value={form.currency} onChange={(e) => updateForm({ currency: e.target.value })}>{!CURRENCY_OPTIONS.some((c) => c.value === form.currency) && form.currency ? <option value={form.currency}>{form.currency}</option> : null}{CURRENCY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
-                <div className="field"><label>Language</label><select className="inp" value={form.defaultLanguage} onChange={(e) => updateForm({ defaultLanguage: e.target.value })}>{!LANGUAGES.some((l) => l.value === form.defaultLanguage) && form.defaultLanguage ? <option value={form.defaultLanguage}>{form.defaultLanguage}</option> : null}{LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}</select></div>
-              </div>
-              {/* TODO: Number/Date/Time format & Week starts — disabled "coming soon" selects.
+            {/* LOCALIZATION */}
+            <div className={`os-section${activeSection === "localization" ? " on" : ""}`}>
+              <SectionHead section="localization" />
+              <Card icon="globe" title="Formats & language" sub="Regional preferences">
+                <div className="row3">
+                  <div className="field"><label>Timezone</label><select className="inp" value={form.timezone} onChange={(e) => updateForm({ timezone: e.target.value })}>{!TIMEZONE_OPTIONS.some((t) => t.value === form.timezone) && form.timezone ? <option value={form.timezone}>{form.timezone}</option> : null}{TIMEZONE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
+                  <div className="field"><label>Currency</label><select className="inp" value={form.currency} onChange={(e) => updateForm({ currency: e.target.value })}>{!CURRENCY_OPTIONS.some((c) => c.value === form.currency) && form.currency ? <option value={form.currency}>{form.currency}</option> : null}{CURRENCY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
+                  <div className="field"><label>Language</label><select className="inp" value={form.defaultLanguage} onChange={(e) => updateForm({ defaultLanguage: e.target.value })}>{!LANGUAGES.some((l) => l.value === form.defaultLanguage) && form.defaultLanguage ? <option value={form.defaultLanguage}>{form.defaultLanguage}</option> : null}{LANGUAGES.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}</select></div>
+                </div>
+                {/* TODO: Number/Date/Time format & Week starts — disabled "coming soon" selects.
               <div className="row3">
                 <div className="field"><label>Number format</label><select className="inp" value="" disabled><option value="">Coming soon</option></select></div>
                 <div className="field"><label>Date format</label><select className="inp" value="" disabled><option value="">Coming soon</option></select></div>
@@ -2136,8 +2135,8 @@ export default function OrgSettingsPage() {
                 <label>Week starts</label><select className="inp" value="" disabled><option value="">Coming soon</option></select>
               </div>
               */}
-            </Card>
-          </div>
+              </Card>
+            </div>
 
           </fieldset>
 
@@ -2175,15 +2174,15 @@ export default function OrgSettingsPage() {
             </Card>
             */}
             {canViewProjects ? (
-            <CatalogSection
-              groups={LEAD_CATALOG_GROUPS}
-              canAdd={canAddProjectConfig}
-              canDelete={canDeleteProjectConfig}
-              heading={{
-                title: "Lead option lists",
-                sub: "Tags and the Requirement-section dropdown choices on the lead edit page. Each list starts empty — build it from your own options. (Configuration, Facing and Parking are shared lists — manage those under Project Catalogs.)",
-              }}
-            />
+              <CatalogSection
+                groups={LEAD_CATALOG_GROUPS}
+                canAdd={canAddProjectConfig}
+                canDelete={canDeleteProjectConfig}
+                heading={{
+                  title: "Lead option lists",
+                  sub: "Tags and the Requirement-section dropdown choices on the lead edit page. Each list starts empty — build it from your own options. (Configuration, Facing and Parking are shared lists — manage those under Project Catalogs.)",
+                }}
+              />
             ) : null}
           </div>
 
