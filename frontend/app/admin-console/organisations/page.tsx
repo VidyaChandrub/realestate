@@ -481,32 +481,6 @@ export default function SuperAdminOrganisationsPage() {
             </p>
           </div>
         </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          {canActivateOrganisations ? (
-            <Link
-              href="/admin-console/organisations/new"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
-                border: "none",
-                borderRadius: 10,
-                padding: "10px 18px",
-                fontSize: 13.5,
-                fontWeight: 600,
-                color: "#fff",
-                boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
-                textDecoration: "none",
-                cursor: "pointer",
-              }}
-            >
-              <Icon name="plus" size={16} />
-              <span>Add Organisation</span>
-            </Link>
-          ) : null}
-        </div>
       </div>
 
       {/* Summary strip */}
@@ -1031,48 +1005,6 @@ export default function SuperAdminOrganisationsPage() {
                           </td>
                           <td style={{ textAlign: "right", paddingRight: 24 }}>
                             <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                              {canViewOrganisations && (
-                                <Link
-                                  href={`/admin-console/organisation-detail/${o.id}`}
-                                  style={{
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: 8,
-                                    border: "1px solid #e2e8f0",
-                                    background: "#ffffff",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "#64748b",
-                                    textDecoration: "none",
-                                    cursor: "pointer",
-                                  }}
-                                  title="View Details"
-                                >
-                                  <Icon name="eye" size={15} />
-                                </Link>
-                              )}
-                              {canActivateOrganisations && (
-                                <Link
-                                  href={`/admin-console/organisations/${o.id}/edit`}
-                                  style={{
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: 8,
-                                    border: "1px solid #e2e8f0",
-                                    background: "#ffffff",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "#64748b",
-                                    textDecoration: "none",
-                                    cursor: "pointer",
-                                  }}
-                                  title="Edit"
-                                >
-                                  <Icon name="edit" size={15} />
-                                </Link>
-                              )}
                               <RowActionsMenu actions={rowActionsFor(o)} />
                             </div>
                           </td>

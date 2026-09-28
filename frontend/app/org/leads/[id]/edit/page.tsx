@@ -27,25 +27,14 @@ import type {
 import "@/app/org/org.css";
 import "./lead-edit.css";
 
-const SOURCES = [
-  "crm",
-  "CRM - 4 BHK",
-  "Meta Lead Ad",
-  "Google Ads",
-  "Website form",
-  "Portal (99acres)",
-  "Walk-in",
-  "Referral",
-];
+const SOURCES = ["Meta Lead Ad", "Google Ads", "Website form", "Portal (99acres)", "Walk-in", "Referral"];
 
-const DEFAULT_PURPOSES = ["Buy", "Rent", "Investment", "Lease", "Commercial"];
-const DEFAULT_FINANCINGS = ["Yes", "No", "Self-funded", "Bank loan required"];
-const DEFAULT_LOAN_STATUSES = ["Not started", "In progress", "Pre-approved", "Approved", "Rejected"];
-const DEFAULT_TIMELINES = ["Within 3 months", "Immediate", "1-3 months", "3-6 months", "> 6 months"];
-const DEFAULT_FLOORS = ["Any", "Ground floor", "Low floor (1-4)", "Mid floor (5-12)", "High floor (12+)", "Penthouse"];
-const DEFAULT_FACINGS = ["East", "West", "North", "South", "North-East", "North-West", "South-East", "South-West"];
-const DEFAULT_PARKINGS = ["Yes", "No", "1 Covered", "2 Covered", "Open", "Multi"];
-const AREA_UNITS = ["sq ft", "sq m", "sq yd", "acres", "hectares"];
+// Lead-only lists (tags + Purpose/Financing/Loan status/Timeline/Preferred
+// floor) are managed under Settings → CRM & Leads. Configuration, Facing and
+// Parking are shared org-wide lists managed under Project Catalogs.
+const LEAD_CATALOG_HREF = "/org/settings?section=crm";
+const PROJECT_CATALOG_HREF = "/org/settings?section=catalogs";
+
 
 const STATUS_OPTIONS: Array<{ value: CrmLeadStatus; label: string }> = [
   { value: "new", label: "New Lead" },
@@ -102,7 +91,6 @@ interface FormState {
   preferredFloor: string;
   facing: string;
   parking: string;
-  areaUnit: string;
   requirementNotes: string;
   projectId: string;
   source: string;
@@ -121,39 +109,142 @@ interface FormState {
 function toForm(lead: CrmLead): FormState {
   const data = lead.data as Record<string, unknown>;
   return {
-    fullName: dataField(data, "fullName", "Full Name", "Full name", "name", "Name") || lead.altName || "Vikram Rao",
-    phone: sanitizePhoneInput(dataField(data, "phone", "Phone", "phoneNumber", "Phone number", "Mobile")) || "98765 43102",
-    email: dataField(data, "email", "Email", "Email address") || "vikram.rao@example.com",
+    fullName: dataField(data, "fullName", "Full Name", "Full name", "name", "Name"),
+    phone: sanitizePhoneInput(dataField(data, "phone", "Phone", "phoneNumber", "Phone number", "Mobile")),
+    email: dataField(data, "email", "Email", "Email address"),
     altName: lead.altName ?? "",
     altPhone: sanitizePhoneInput(lead.altPhone ?? ""),
-    whatsapp: sanitizePhoneInput(lead.whatsapp ?? "98284 55127"),
-    city: lead.city || dataField(data, "city", "City", "location", "Location") || "Bangalore, Karnataka",
-    tags: lead.tags && lead.tags.length > 0 ? lead.tags : ["Hot Lead", "4 BHK"],
+    whatsapp: sanitizePhoneInput(lead.whatsapp ?? ""),
+    city: lead.city || dataField(data, "city", "City", "location", "Location"),
+    tags: lead.tags ?? [],
     configurations: lead.configurations ?? [],
-    budgetMin: lead.budgetMin != null ? String(lead.budgetMin) : "1400000",
-    budgetMax: lead.budgetMax != null ? String(lead.budgetMax) : "1800000",
-    purpose: lead.purpose || "Buy",
-    financing: lead.financing || "Yes",
-    loanStatus: lead.loanStatus || "Not started",
-    timelineToBuy: lead.timelineToBuy || "Within 3 months",
-    preferredFloor: lead.preferredFloor || "Any",
-    facing: lead.facing || "East",
-    parking: lead.parking || "Yes",
-    areaUnit: dataField(data, "areaUnit", "area_unit", "unit") || "sq ft",
+    budgetMin: lead.budgetMin != null ? String(lead.budgetMin) : "",
+    budgetMax: lead.budgetMax != null ? String(lead.budgetMax) : "",
+    purpose: lead.purpose ?? "",
+    financing: lead.financing ?? "",
+    loanStatus: lead.loanStatus ?? "",
+    timelineToBuy: lead.timelineToBuy ?? "",
+    preferredFloor: lead.preferredFloor ?? "",
+    facing: lead.facing ?? "",
+    parking: lead.parking ?? "",
     requirementNotes: lead.requirementNotes || dataField(data, "requirementNotes", "notes", "Notes") || "",
     projectId: lead.projectId ?? "",
-    source: lead.source || "crm",
+    source: lead.source ?? "",
     campaign: lead.campaign || dataField(data, "campaign", "Campaign") || "",
-    landingPageUrl: lead.landingPageId ? "https://example.com/landing-page" : (dataField(data, "landingPageUrl", "url") || "https://example.com/landing-page"),
+    landingPageUrl: dataField(data, "landingPageUrl", "url"),
     utmSource: lead.utmSource || dataField(data, "utmSource", "utm_source") || "",
     utmMedium: lead.utmMedium || dataField(data, "utmMedium", "utm_medium") || "",
     utmCampaign: lead.utmCampaign || dataField(data, "utmCampaign", "utm_campaign") || "",
-    temperature: lead.temperature || "hot",
+    temperature: lead.temperature ?? "",
     assignedToId: lead.assignedTo?.id ?? "",
     consentWhatsapp: lead.consentWhatsapp ?? false,
     consentCall: lead.consentCall ?? false,
     consentEmail: lead.consentEmail ?? false,
   };
+}
+
+/** Chip-style multi-select dropdown over an org catalog list (tags, configurations). */
+function CatalogMultiSelect({
+  values,
+  options,
+  disabled,
+  placeholder,
+  onToggle,
+}: {
+  values: string[];
+  options: string[];
+  disabled?: boolean;
+  placeholder: string;
+  onToggle: (value: string) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="led-tags-field" ref={ref}>
+      <div
+        className="led-tags-box"
+        style={disabled ? { cursor: "not-allowed", opacity: 0.7 } : undefined}
+        onClick={() => !disabled && options.length > 0 && setOpen(!open)}
+      >
+        {values.length === 0 ? (
+          <span style={{ color: "#94a3b8", fontSize: 13 }}>{placeholder}</span>
+        ) : (
+          values.map((v) => (
+            <span key={v} className="led-tag-chip led-tag-general">
+              {v}
+              <span
+                className="led-tag-x"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggle(v);
+                }}
+              >
+                ✕
+              </span>
+            </span>
+          ))
+        )}
+        <span style={{ marginLeft: "auto", color: "#64748b", display: "inline-flex" }}>
+          <Icon name="chevron-down" size={13} />
+        </span>
+      </div>
+
+      {open ? (
+        <div className="led-tags-dropdown">
+          {options.map((opt) => {
+            const isSelected = values.includes(opt);
+            return (
+              <div
+                key={opt}
+                className={`led-tags-dropdown-item ${isSelected ? "selected" : ""}`}
+                onClick={() => onToggle(opt)}
+              >
+                <span>{opt}</span>
+                {isSelected ? <Icon name="check" size={14} /> : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Load-error / empty-catalog hint under a catalog-backed field, linking to Settings. */
+function CatalogHint({
+  loaded,
+  error,
+  empty,
+  emptyText,
+  settingsHref,
+}: {
+  loaded: boolean;
+  error: string | null;
+  empty: boolean;
+  emptyText: string;
+  settingsHref: string;
+}) {
+  if (error) {
+    return <span style={{ fontSize: 11.5, color: "#ef4444" }}>{error}</span>;
+  }
+  if (!loaded || !empty) return null;
+  return (
+    <span style={{ fontSize: 11.5, color: "#64748b" }}>
+      {emptyText}{" "}
+      <Link className="brand-link" href={settingsHref}>
+        Add them in Settings →
+      </Link>
+    </span>
+  );
 }
 
 /** Rupee amount → integer; "" / unparseable → null. */
@@ -322,27 +413,10 @@ export default function OrgLeadEditPage() {
     setLead((current) => (current ? { ...current, status } : current));
   }
 
-  const tagsRef = useRef<HTMLDivElement>(null);
-  const [tagsOpen, setTagsOpen] = useState(false);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (tagsRef.current && !tagsRef.current.contains(e.target as Node)) {
-        setTagsOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const tagCatalog = useMemo(() => {
-    const fromCat = catOptions("lead_tag").map((o) => o.label);
-    const defaults = ["Hot Lead", "Warm Lead", "Cold Lead", "4 BHK", "3 BHK", "2 BHK", "Villa", "Plot", "High Budget", "NRI"];
-    return Array.from(new Set([...defaults, ...fromCat]));
-  }, [catOptions]);
+  const catalogLoaded = catalog !== null;
 
   const avatarInitials = useMemo(() => {
-    const name = form?.fullName || lead?.altName || "Vikram Rao";
+    const name = form?.fullName || lead?.altName || "";
     return (
       name
         .trim()
@@ -350,7 +424,7 @@ export default function OrgLeadEditPage() {
         .filter(Boolean)
         .slice(0, 2)
         .map((p) => p[0].toUpperCase())
-        .join("") || "VR"
+        .join("") || "?"
     );
   }, [form?.fullName, lead?.altName]);
 
@@ -384,7 +458,8 @@ export default function OrgLeadEditPage() {
     );
   }
 
-  const assignedUser = assignees.find((a) => a.id === form.assignedToId) ?? (lead.assignedTo ? { id: lead.assignedTo.id, name: lead.assignedTo.name } : { id: "default", name: "Rohan Shah" });
+  // Used only by the commented-out Owner / Agent field below.
+  // const assignedUser = assignees.find((a) => a.id === form.assignedToId) ?? (lead.assignedTo ? { id: lead.assignedTo.id, name: lead.assignedTo.name } : { id: "", name: "Unassigned" });
 
   const timelineItems = (lead.activities && lead.activities.length > 0)
     ? lead.activities.slice(0, 3).map((act) => ({
@@ -400,23 +475,22 @@ export default function OrgLeadEditPage() {
         }),
         color: act.type === "status_updated" ? "green" : act.type === "note_added" ? "amber" : "blue",
       }))
-    : [
-        { id: "1", text: "Status updated to Contacted", time: "24 Sept 2026, 8:09 pm", color: "green" },
-        { id: "2", text: "Lead created", time: "24 Sept 2026, 7:45 pm", color: "blue" },
-        { id: "3", text: "Note added", time: "24 Sept 2026, 7:30 pm", color: "amber" },
-      ];
+    : [];
 
   const renderDropdown = (
     label: string,
     key: "purpose" | "financing" | "loanStatus" | "timelineToBuy" | "preferredFloor" | "facing" | "parking",
     catName: OrgCatalogCategory,
-    defaults: string[],
     required = false,
   ) => {
-    const fromCat = catOptions(catName).map((o) => o.label);
-    const options = fromCat.length > 0 ? fromCat : defaults;
+    // Options come only from the org's catalog (Settings); a saved value that
+    // has since left the catalog is kept so an edit never silently drops it.
+    const options = catOptions(catName).map((o) => o.label);
     const currentVal = form[key];
     const allOptions = currentVal && !options.includes(currentVal) ? [currentVal, ...options] : options;
+    // Shared lists (facing / parking) live under Project Catalogs; the
+    // lead-only ones under CRM & Leads.
+    const settingsHref = catName.startsWith("lead_") ? LEAD_CATALOG_HREF : PROJECT_CATALOG_HREF;
 
     return (
       <div className="led-field">
@@ -426,15 +500,25 @@ export default function OrgLeadEditPage() {
         <select
           className="led-select"
           value={currentVal}
+          disabled={!catalogLoaded}
           onChange={(e) => set(key, e.target.value)}
         >
-          <option value="">Select {label.toLowerCase()}</option>
+          <option value="">
+            {!catalogLoaded ? "Loading…" : `Select ${label.toLowerCase()}`}
+          </option>
           {allOptions.map((opt) => (
             <option key={opt} value={opt}>
               {opt}
             </option>
           ))}
         </select>
+        <CatalogHint
+          loaded={catalogLoaded}
+          error={catalogError}
+          empty={options.length === 0}
+          emptyText={`No ${label.toLowerCase()} options yet.`}
+          settingsHref={settingsHref}
+        />
       </div>
     );
   };
@@ -615,58 +699,20 @@ export default function OrgLeadEditPage() {
 
               <div className="led-field">
                 <label className="led-label">Tags</label>
-                <div className="led-tags-field" ref={tagsRef}>
-                  <div className="led-tags-box" onClick={() => setTagsOpen(!tagsOpen)}>
-                    {form.tags.length === 0 ? (
-                      <span style={{ color: "#94a3b8", fontSize: 13 }}>Select tags…</span>
-                    ) : (
-                      form.tags.map((tag) => {
-                        const isHot = /hot/i.test(tag);
-                        const isBhk = /bhk|rk/i.test(tag);
-                        const chipClass = isHot
-                          ? "led-tag-hot"
-                          : isBhk
-                          ? "led-tag-bhk"
-                          : "led-tag-general";
-                        return (
-                          <span key={tag} className={`led-tag-chip ${chipClass}`}>
-                            {tag}
-                            <span
-                              className="led-tag-x"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleInList("tags", tag);
-                              }}
-                            >
-                              ✕
-                            </span>
-                          </span>
-                        );
-                      })
-                    )}
-                    <span style={{ marginLeft: "auto", color: "#64748b", display: "inline-flex" }}>
-                      <Icon name="chevron-down" size={13} />
-                    </span>
-                  </div>
-
-                  {tagsOpen ? (
-                    <div className="led-tags-dropdown">
-                      {tagCatalog.map((tag) => {
-                        const isSelected = form.tags.includes(tag);
-                        return (
-                          <div
-                            key={tag}
-                            className={`led-tags-dropdown-item ${isSelected ? "selected" : ""}`}
-                            onClick={() => toggleInList("tags", tag)}
-                          >
-                            <span>{tag}</span>
-                            {isSelected ? <Icon name="check" size={14} /> : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-                </div>
+                <CatalogMultiSelect
+                  values={form.tags}
+                  options={tagOptions}
+                  disabled={!catalogLoaded}
+                  placeholder={catalogLoaded ? "Select tags…" : "Loading tags…"}
+                  onToggle={(tag) => toggleInList("tags", tag)}
+                />
+                <CatalogHint
+                  loaded={catalogLoaded}
+                  error={catalogError}
+                  empty={catOptions("lead_tag").length === 0}
+                  emptyText="No lead tags yet."
+                  settingsHref={LEAD_CATALOG_HREF}
+                />
               </div>
             </div>
           </div>
@@ -681,6 +727,25 @@ export default function OrgLeadEditPage() {
                 <h3 className="led-card-title">Requirement Details</h3>
                 <div className="led-card-sub">Configuration and requirement information</div>
               </div>
+            </div>
+
+            {/* Configuration (org unit_type catalog, multi-select) */}
+            <div className="led-field" style={{ marginBottom: 16 }}>
+              <label className="led-label">Configuration</label>
+              <CatalogMultiSelect
+                values={form.configurations}
+                options={configLabels}
+                disabled={!catalogLoaded}
+                placeholder={catalogLoaded ? "Select configurations…" : "Loading configurations…"}
+                onToggle={(cfg) => toggleInList("configurations", cfg)}
+              />
+              <CatalogHint
+                loaded={catalogLoaded}
+                error={catalogError}
+                empty={catOptions("unit_type").length === 0}
+                emptyText="No configurations in your catalog."
+                settingsHref={PROJECT_CATALOG_HREF}
+              />
             </div>
 
             {/* Row 1: Budget Min, Budget Max, Purpose */}
@@ -717,51 +782,32 @@ export default function OrgLeadEditPage() {
                 </div>
               </div>
 
-              {renderDropdown("Purpose", "purpose", "lead_purpose", DEFAULT_PURPOSES)}
+              {renderDropdown("Purpose", "purpose", "lead_purpose")}
             </div>
 
             {/* Row 2: Financing, Loan status, Timeline */}
             <div className="led-grid-3">
-              {renderDropdown("Financing", "financing", "lead_financing", DEFAULT_FINANCINGS)}
-              {renderDropdown("Loan status", "loanStatus", "lead_loan_status", DEFAULT_LOAN_STATUSES)}
-              {renderDropdown("Timeline to buy", "timelineToBuy", "lead_timeline_to_buy", DEFAULT_TIMELINES)}
+              {renderDropdown("Financing", "financing", "lead_financing")}
+              {renderDropdown("Loan status", "loanStatus", "lead_loan_status")}
+              {renderDropdown("Timeline to buy", "timelineToBuy", "lead_timeline_to_buy")}
             </div>
 
             {/* Row 3: Preferred floor, Facing, Parking */}
             <div className="led-grid-3">
-              {renderDropdown("Preferred floor", "preferredFloor", "lead_preferred_floor", DEFAULT_FLOORS)}
-              {renderDropdown("Facing", "facing", "facing", DEFAULT_FACINGS)}
-              {renderDropdown("Parking", "parking", "parking", DEFAULT_PARKINGS)}
+              {renderDropdown("Preferred floor", "preferredFloor", "lead_preferred_floor")}
+              {renderDropdown("Facing", "facing", "facing")}
+              {renderDropdown("Parking", "parking", "parking")}
             </div>
 
-            {/* Row 4: Area unit & Requirement notes */}
-            <div className="led-grid-req-notes">
-              <div className="led-field">
-                <label className="led-label">
-                  Area unit <span className="led-req">*</span>
-                </label>
-                <select
-                  className="led-select"
-                  value={form.areaUnit}
-                  onChange={(e) => set("areaUnit", e.target.value)}
-                >
-                  {AREA_UNITS.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="led-field">
-                <label className="led-label">Requirement notes</label>
-                <input
-                  className="led-input"
-                  value={form.requirementNotes}
-                  placeholder="Enter any specific requirements, preferences, or additional notes..."
-                  onChange={(e) => set("requirementNotes", e.target.value)}
-                />
-              </div>
+            {/* Row 4: Requirement notes */}
+            <div className="led-field">
+              <label className="led-label">Requirement notes</label>
+              <input
+                className="led-input"
+                value={form.requirementNotes}
+                placeholder="Enter any specific requirements, preferences, or additional notes..."
+                onChange={(e) => set("requirementNotes", e.target.value)}
+              />
             </div>
           </div>
 
@@ -911,7 +957,7 @@ export default function OrgLeadEditPage() {
                 </select>
               </div>
 
-              {/* Lead score progress bar */}
+              {/* Lead score progress bar — hidden for now: the score is a hardcoded placeholder.
               <div>
                 <div className="led-score-row">
                   <span>Lead score</span>
@@ -921,6 +967,7 @@ export default function OrgLeadEditPage() {
                   <div className="led-progress-fill" style={{ width: "75%" }} />
                 </div>
               </div>
+              */}
 
               {/* Temperature */}
               <div className="led-field">
@@ -955,18 +1002,22 @@ export default function OrgLeadEditPage() {
                   value={form.source}
                   onChange={(e) => set("source", e.target.value)}
                 >
-                  <option value="CRM - 4 BHK">CRM - 4 BHK</option>
+                  <option value="">Select source</option>
                   {SOURCES.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>
                   ))}
+                  {form.source && !SOURCES.includes(form.source) ? (
+                    <option value={form.source}>{form.source}</option>
+                  ) : null}
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Assignment */}
+          {/* Card 2: Assignment — hidden for now. Owner / Agent is a read-only pill (the
+              assignee can't be changed here) and Team is on hold until team management ships.
           <div className="led-card">
             <div className="led-card-head">
               <div className="led-icon-bubble led-icon-blue">
@@ -978,7 +1029,6 @@ export default function OrgLeadEditPage() {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Owner / Agent */}
               <div className="led-field">
                 <label className="led-label">Owner / Agent</label>
                 <div className="led-agent-pill">
@@ -988,7 +1038,7 @@ export default function OrgLeadEditPage() {
                       .filter(Boolean)
                       .slice(0, 2)
                       .map((p) => p[0].toUpperCase())
-                      .join("") || "RS"}
+                      .join("") || "?"}
                   </div>
                   <span style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a", flex: 1 }}>
                     {assignedUser.name}
@@ -996,7 +1046,6 @@ export default function OrgLeadEditPage() {
                 </div>
               </div>
 
-              {/* Team */}
               <div className="led-field">
                 <label className="led-label">Team</label>
                 <select className="led-select" value="Sales Team" disabled>
@@ -1008,6 +1057,7 @@ export default function OrgLeadEditPage() {
               </div>
             </div>
           </div>
+          */}
 
           {/* Card 3: Activity & Timeline */}
           <div className="led-card">
@@ -1021,6 +1071,9 @@ export default function OrgLeadEditPage() {
             </div>
 
             <div className="led-timeline-list">
+              {timelineItems.length === 0 ? (
+                <span style={{ fontSize: 13, color: "#94a3b8" }}>No activity yet.</span>
+              ) : null}
               {timelineItems.map((item) => (
                 <div key={item.id} className="led-timeline-item">
                   <div className="led-timeline-left">

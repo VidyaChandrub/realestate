@@ -6,10 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
-import { Icon, type IconName } from "@/components/icons";
-import { Modal } from "@/components/ui/modal";
-import { PasswordInput } from "@/components/auth/password-input";
-import { getOrgUserDashboard, apiFetch, deleteOrgUser, ApiError } from "@/lib/api";
+import { getOrgUserDashboard } from "@/lib/api";
 import { leadDisplaySource } from "@/lib/lead-display";
 import { StageBadge, useLeadStages } from "@/lib/lead-stages";
 import type {
@@ -167,28 +164,7 @@ export default function OrgUserDashboardPage() {
   const [dashFrom, setDashFrom] = useState<string>("");
   const [dashTo, setDashTo] = useState<string>("");
 
-  // Modals state
-  const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phoneNumber: "",
-    role: "admin",
-  });
-  const [editSubmitting, setEditSubmitting] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
-
-  const [passwordOpen, setPasswordOpen] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [pwdSubmitting, setPwdSubmitting] = useState(false);
-  const [pwdMessage, setPwdMessage] = useState<string | null>(null);
-  const [pwdError, setPwdError] = useState<string | null>(null);
-
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const [reloadTick, setReloadTick] = useState(0);
-
-  const queryKey = `${id}|${dashFrom}|${dashTo}|${reloadTick}`;
+  const queryKey = `${id}|${dashFrom}|${dashTo}`;
 
   useEffect(() => {
     if (!id) return;
@@ -200,17 +176,6 @@ export default function OrgUserDashboardPage() {
       .then((res) => {
         if (mounted) {
           setState({ id: queryKey, response: res, error: false });
-          // Pre-populate edit form
-          if (res?.agent) {
-            const parts = (res.agent.name || "").split(" ");
-            setEditForm({
-              firstName: parts[0] || "",
-              lastName: parts.slice(1).join(" ") || "",
-              email: res.agent.email || "",
-              phoneNumber: res.agent.phoneNumber || "",
-              role: res.agent.role?.key || "admin",
-            });
-          }
         }
       })
       .catch(() => {
@@ -219,7 +184,7 @@ export default function OrgUserDashboardPage() {
     return () => {
       mounted = false;
     };
-  }, [id, dashFrom, dashTo, reloadTick, queryKey]);
+  }, [id, dashFrom, dashTo, queryKey]);
 
   const current = state && state.id === queryKey ? state : null;
   const detail = current?.response ?? null;
@@ -333,52 +298,6 @@ export default function OrgUserDashboardPage() {
     }
   }
 
-  // Edit user action
-  async function handleSaveUser() {
-    setEditSubmitting(true);
-    setEditError(null);
-    try {
-      await apiFetch(`/org/users/${id}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify(editForm),
-      });
-      setEditOpen(false);
-      setReloadTick((t) => t + 1);
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : "Failed to update user");
-    } finally {
-      setEditSubmitting(false);
-    }
-  }
-
-  // Reset password action
-  async function handleResetPassword() {
-    if (!newPassword || newPassword.length < 6) {
-      setPwdError("Password must be at least 6 characters.");
-      return;
-    }
-    setPwdSubmitting(true);
-    setPwdError(null);
-    try {
-      await apiFetch(`/org/users/${id}/password`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ password: newPassword }),
-      });
-      setPwdMessage("Password updated successfully!");
-      setTimeout(() => {
-        setPasswordOpen(false);
-        setNewPassword("");
-        setPwdMessage(null);
-      }, 1500);
-    } catch (err) {
-      setPwdError(err instanceof Error ? err.message : "Failed to reset password");
-    } finally {
-      setPwdSubmitting(false);
-    }
-  }
-
   // 14-day chart coordinates calculations
   const chartDays = DEFAULT_14_DAYS;
   const chartWidth = 720;
@@ -456,93 +375,6 @@ export default function OrgUserDashboardPage() {
                 <span className="ud-meta-dot">·</span>
                 <span>{displayPhone}</span>
               </div>
-            </div>
-          </div>
-
-          <div className="ud-header-actions">
-            <button
-              type="button"
-              className="ud-btn-action"
-              onClick={() => setEditOpen(true)}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-              <span>Edit User</span>
-            </button>
-
-            <button
-              type="button"
-              className="ud-btn-action"
-              onClick={() => setPasswordOpen(true)}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-              <span>Reset Password</span>
-            </button>
-
-            <div style={{ position: "relative" }}>
-              <button
-                type="button"
-                className="ud-btn-action"
-                onClick={() => setMoreMenuOpen((v) => !v)}
-              >
-                <Icon name="dots" size={15} />
-                <span>More</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </button>
-
-              {moreMenuOpen && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "100%",
-                    right: 0,
-                    marginTop: 6,
-                    background: "#ffffff",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 10,
-                    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
-                    minWidth: 160,
-                    padding: 6,
-                    zIndex: 30,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 2,
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ justifyContent: "flex-start", width: "100%" }}
-                    onClick={() => {
-                      setMoreMenuOpen(false);
-                      setEditOpen(true);
-                    }}
-                  >
-                    Edit profile
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ justifyContent: "flex-start", width: "100%", color: "#ef4444" }}
-                    onClick={async () => {
-                      setMoreMenuOpen(false);
-                      if (confirm("Are you sure you want to remove this user from organisation?")) {
-                        await deleteOrgUser(id);
-                        router.push("/org/users");
-                      }
-                    }}
-                  >
-                    Remove user
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -1417,145 +1249,6 @@ export default function OrgUserDashboardPage() {
             )}
           </div>
         </Reveal>
-      )}
-
-      {/* Edit User Modal */}
-      {editOpen && (
-        <Modal
-          open={editOpen}
-          onClose={() => setEditOpen(false)}
-          title="Edit user"
-          description="Update this person's profile, role, and contact details."
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleSaveUser();
-            }}
-            style={{ display: "flex", flexDirection: "column", gap: 14 }}
-          >
-            {editError && (
-              <div style={{ color: "#ef4444", fontSize: 13, background: "#fee2e2", padding: "8px 12px", borderRadius: 8 }}>
-                {editError}
-              </div>
-            )}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div className="field">
-                <label>First name *</label>
-                <input
-                  className="inp"
-                  value={editForm.firstName}
-                  onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="field">
-                <label>Last name *</label>
-                <input
-                  className="inp"
-                  value={editForm.lastName}
-                  onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="field">
-              <label>Work email *</label>
-              <input
-                className="inp"
-                type="email"
-                value={editForm.email}
-                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
-                required
-              />
-            </div>
-
-            <div className="field">
-              <label>Phone number</label>
-              <input
-                className="inp"
-                value={editForm.phoneNumber}
-                onChange={(e) => setEditForm((f) => ({ ...f, phoneNumber: e.target.value }))}
-              />
-            </div>
-
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setEditOpen(false)}
-                disabled={editSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={editSubmitting}
-              >
-                {editSubmitting ? "Saving..." : "Save changes"}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* Reset Password Modal */}
-      {passwordOpen && (
-        <Modal
-          open={passwordOpen}
-          onClose={() => setPasswordOpen(false)}
-          title="Reset user password"
-          description={`Set a new temporary or permanent password for ${displayName}.`}
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleResetPassword();
-            }}
-            style={{ display: "flex", flexDirection: "column", gap: 14 }}
-          >
-            {pwdError && (
-              <div style={{ color: "#ef4444", fontSize: 13, background: "#fee2e2", padding: "8px 12px", borderRadius: 8 }}>
-                {pwdError}
-              </div>
-            )}
-            {pwdMessage && (
-              <div style={{ color: "#16a34a", fontSize: 13, background: "#dcfce7", padding: "8px 12px", borderRadius: 8 }}>
-                {pwdMessage}
-              </div>
-            )}
-
-            <div className="field">
-              <label>New Password *</label>
-              <PasswordInput
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter at least 6 characters"
-                required
-              />
-            </div>
-
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setPasswordOpen(false)}
-                disabled={pwdSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={pwdSubmitting}
-              >
-                {pwdSubmitting ? "Updating..." : "Update Password"}
-              </button>
-            </div>
-          </form>
-        </Modal>
       )}
     </div>
   );

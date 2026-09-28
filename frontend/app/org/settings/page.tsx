@@ -73,7 +73,8 @@ const NAV_GROUPS = [
     grp: "ORGANISATION", items: [
       { s: "general", icon: "building" as IconName, t: "General" },
       { s: "branding", icon: "sparkles" as IconName, t: "Branding" },
-      { s: "localization", icon: "globe" as IconName, t: "Localization" },
+      // Hidden for now — uncomment to bring Localization back.
+      // { s: "localization", icon: "globe" as IconName, t: "Localization" },
       { s: "domain", icon: "globe" as IconName, t: "Domain" },
     ]
   },
@@ -87,16 +88,22 @@ const NAV_GROUPS = [
   {
     grp: "COMMUNICATION", items: [
       { s: "email", icon: "mail" as IconName, t: "Email & SMTP" },
-      { s: "whatsapp", icon: "phone" as IconName, t: "WhatsApp Settings" },
+      // Hidden for now — uncomment to bring WhatsApp Settings back.
+      // { s: "whatsapp", icon: "phone" as IconName, t: "WhatsApp Settings" },
     ]
   },
   {
     grp: "ACCOUNT", items: [
       { s: "billing", icon: "billing" as IconName, t: "Billing & Subscription" },
-      { s: "team-prefs", icon: "users" as IconName, t: "Team Preferences" },
+      // Hidden for now — uncomment to bring Team Preferences back.
+      // { s: "team-prefs", icon: "users" as IconName, t: "Team Preferences" },
     ]
   },
 ] as const;
+
+// Sections whose nav items are commented out above — a direct
+// `?section=` link to one falls back to the first visible section.
+const HIDDEN_SECTIONS: ReadonlySet<string> = new Set(["localization", "whatsapp", "comms", "team-prefs"]);
 
 const SECTION_META: Record<string, { icon: IconName; title: string; sub: string }> = {
   general: { icon: "building", title: "General Information", sub: "Update your organisation's basic details and contact information." },
@@ -1769,7 +1776,7 @@ export default function OrgSettingsPage() {
     items: g.items.filter((it) => sectionAllowed(it.s) && (q ? it.t.toLowerCase().includes(q) : true)),
   })).filter((g) => g.items.length > 0);
 
-  const activeSection = sectionAllowed(section)
+  const activeSection = sectionAllowed(section) && !HIDDEN_SECTIONS.has(section)
     ? section
     : NAV_GROUPS.flatMap((g) => g.items.map((i) => i.s as string)).find(sectionAllowed) ?? section;
 
