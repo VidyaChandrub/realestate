@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { HardDrive, Image as ImageIcon, Search, X, Check } from "lucide-react";
+import { Image as ImageIcon, Search, Check } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
 import { getOrgMedia } from "@/lib/api";
 import type { MediaFileItem } from "@/lib/types";
 
@@ -39,60 +40,36 @@ export function MediaPickerModal({
       .finally(() => setLoading(false));
   }, [isOpen, search, categoryFilter]);
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(15, 23, 42, 0.7)",
-        backdropFilter: "blur(4px)",
-        zIndex: 2000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "20px",
-      }}
-    >
-      <div
-        style={{
-          background: "#ffffff",
-          borderRadius: "20px",
-          maxWidth: "800px",
-          width: "100%",
-          maxHeight: "85vh",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-          boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            padding: "16px 24px",
-            borderBottom: "1px solid #e2e8f0",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <HardDrive size={20} style={{ color: "#2563eb" }} />
-            <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#0f172a", margin: 0 }}>
-              Select from Media Library
-            </h3>
-          </div>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Select from Media Library"
+      size="xl"
+      flush
+      // Opened from inside the page builder, which layers above the default z-50.
+      containerClassName="z-[2000]!"
+      footer={
+        <>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
           <button
             type="button"
-            onClick={onClose}
-            style={{ background: "transparent", border: "none", cursor: "pointer", color: "#64748b" }}
+            className="btn btn-primary"
+            disabled={!selectedUrl || !selectedItem}
+            onClick={() => {
+              if (selectedUrl && selectedItem) {
+                onSelect(selectedUrl, selectedItem);
+                onClose();
+              }
+            }}
           >
-            <X size={20} />
+            Select Asset
           </button>
-        </div>
-
+        </>
+      }
+    >
         {/* Search */}
         <div style={{ padding: "12px 24px", borderBottom: "1px solid #f1f5f9", background: "#f8fafc" }}>
           <div style={{ position: "relative" }}>
@@ -201,55 +178,6 @@ export function MediaPickerModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div
-          style={{
-            padding: "14px 24px",
-            borderTop: "1px solid #e2e8f0",
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: "10px",
-            background: "#f8fafc",
-          }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "8px",
-              border: "1px solid #cbd5e1",
-              background: "#fff",
-              fontSize: "13px",
-              cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={!selectedUrl || !selectedItem}
-            onClick={() => {
-              if (selectedUrl && selectedItem) {
-                onSelect(selectedUrl, selectedItem);
-                onClose();
-              }
-            }}
-            style={{
-              padding: "8px 20px",
-              borderRadius: "8px",
-              border: "none",
-              background: selectedUrl ? "#2563eb" : "#cbd5e1",
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: "13px",
-              cursor: selectedUrl ? "pointer" : "default",
-            }}
-          >
-            Select Asset
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

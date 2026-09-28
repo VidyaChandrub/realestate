@@ -389,6 +389,7 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
   const [actionBusy, setActionBusy] = useState(false);
   const [showDnsId, setShowDnsId] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   function copyDns(val: string) {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -465,8 +466,13 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
     }
   }
 
-  async function handleDelete(domainRequestId: string) {
-    if (!confirm("Are you sure you want to remove this domain request?")) return;
+  function handleDelete(domainRequestId: string) {
+    setDeleteTargetId(domainRequestId);
+  }
+
+  async function confirmDelete() {
+    const domainRequestId = deleteTargetId;
+    if (!domainRequestId) return;
     setActionBusy(true);
     setError(null);
     try {
@@ -477,6 +483,7 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
       setError(err?.message ?? "Could not remove domain");
     } finally {
       setActionBusy(false);
+      setDeleteTargetId(null);
     }
   }
 
@@ -941,6 +948,17 @@ function DomainSection({ canRequest }: { canRequest: boolean }) {
           )}
         </div>
       </Card>
+
+      <ConfirmModal
+        open={deleteTargetId !== null}
+        title="Remove domain request?"
+        message="This domain request will be removed. You can submit it again later."
+        confirmLabel="Remove"
+        destructive
+        busy={actionBusy}
+        onConfirm={() => void confirmDelete()}
+        onClose={() => setDeleteTargetId(null)}
+      />
     </>
   );
 }
