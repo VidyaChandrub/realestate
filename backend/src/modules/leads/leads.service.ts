@@ -262,6 +262,16 @@ export class LeadsService implements OnModuleInit {
     });
     const existing = await this.findRecentDuplicate(orgId, projectId, data);
     if (existing) {
+      if (resolvedLandingPageId) {
+        this.prisma.trackingEvent.create({
+          data: {
+            orgId,
+            landingPageId: resolvedLandingPageId,
+            eventType: 'lead_submit',
+            metadata: { leadId: existing.id, formName: dto.formName, source: dto.source } as Prisma.InputJsonValue,
+          },
+        }).catch(() => {});
+      }
       return this.prisma.lead.update({
         where: { id: existing.id },
         data: {
@@ -289,6 +299,17 @@ export class LeadsService implements OnModuleInit {
         ...(assignedToId ? { assignedToId } : {}),
       },
     });
+
+    if (resolvedLandingPageId) {
+      this.prisma.trackingEvent.create({
+        data: {
+          orgId,
+          landingPageId: resolvedLandingPageId,
+          eventType: 'lead_submit',
+          metadata: { leadId: lead.id, formName: dto.formName, source: dto.source } as Prisma.InputJsonValue,
+        },
+      }).catch(() => {});
+    }
 
     // Always record the capture on the timeline. It's an automated event, so
     // there is no actor — `agentId: null` renders as "System". (Previously this

@@ -736,6 +736,8 @@ export interface LandingPageRow {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  views?: number;
+  leads?: number;
   sourceTemplate: { id: string; name: string } | null;
   assignedDomain?: {
     id: string;

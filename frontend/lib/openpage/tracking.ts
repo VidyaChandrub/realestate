@@ -32,4 +32,16 @@ export function bumpTracking(pageId: string, key: keyof TrackingCounts) {
     /* quota */
   }
   window.dispatchEvent(new CustomEvent("prestate:track", { detail: { pageId, key } }));
+
+  // Asynchronously send to backend tracking endpoint
+  try {
+    const eventType = key === "view" ? "page_view" : key === "form" ? "lead_submit" : key;
+    fetch("/api/public/site/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ landingPageId: pageId, eventType }),
+    }).catch(() => {});
+  } catch {
+    /* ignore network issues */
+  }
 }

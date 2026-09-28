@@ -369,6 +369,15 @@ export class PublicSiteService {
 
       throw new NotFoundException('Landing page not found or not published');
     }
+
+    this.prisma.trackingEvent.create({
+      data: {
+        orgId: page.orgId,
+        landingPageId: page.id,
+        eventType: 'page_view',
+      },
+    }).catch(() => {});
+
     return page;
   }
 
@@ -394,6 +403,33 @@ export class PublicSiteService {
     if (!page) {
       throw new NotFoundException('Landing page not found');
     }
+
+    this.prisma.trackingEvent.create({
+      data: {
+        orgId: page.orgId,
+        landingPageId: page.id,
+        eventType: 'page_view',
+      },
+    }).catch(() => {});
+
     return page;
+  }
+
+  async recordPublicTrack(dto: { landingPageId: string; eventType?: string; metadata?: any }) {
+    if (!dto?.landingPageId) return { ok: false };
+    const page = await this.prisma.landingPage.findUnique({
+      where: { id: dto.landingPageId },
+      select: { id: true, orgId: true },
+    });
+    if (!page) return { ok: false };
+    await this.prisma.trackingEvent.create({
+      data: {
+        orgId: page.orgId,
+        landingPageId: page.id,
+        eventType: dto.eventType || 'page_view',
+        metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue,
+      },
+    }).catch(() => {});
+    return { ok: true };
   }
 }

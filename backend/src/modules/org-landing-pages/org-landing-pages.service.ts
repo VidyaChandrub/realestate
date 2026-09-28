@@ -522,6 +522,42 @@ export class OrgLandingPagesService {
       this.prisma.landingPage.count({ where }),
     ]);
 
+    const pageIds = rows.map((r) => r.id);
+    const [viewEvents, leadSubmits, leadCounts] = pageIds.length > 0
+      ? await Promise.all([
+          this.prisma.trackingEvent.groupBy({
+            by: ['landingPageId'],
+            where: { orgId, landingPageId: { in: pageIds }, eventType: 'page_view' },
+            _count: { _all: true },
+          }),
+          this.prisma.trackingEvent.groupBy({
+            by: ['landingPageId'],
+            where: { orgId, landingPageId: { in: pageIds }, eventType: { in: ['lead_submit', 'form_submit'] } },
+            _count: { _all: true },
+          }),
+          this.prisma.lead.groupBy({
+            by: ['landingPageId'],
+            where: { orgId, landingPageId: { in: pageIds } },
+            _count: { _all: true },
+          }),
+        ])
+      : [[], [], []];
+
+    const viewMap = new Map<string, number>();
+    for (const v of viewEvents) {
+      if (v.landingPageId) viewMap.set(v.landingPageId, v._count._all);
+    }
+    const leadMap = new Map<string, number>();
+    for (const l of leadCounts) {
+      if (l.landingPageId) leadMap.set(l.landingPageId, l._count._all);
+    }
+    for (const s of leadSubmits) {
+      if (s.landingPageId) {
+        const cur = leadMap.get(s.landingPageId) ?? 0;
+        leadMap.set(s.landingPageId, Math.max(cur, s._count._all));
+      }
+    }
+
     const formattedRows = rows.map((r) => {
       const activeDomain =
         r.orgDomainRequests?.find((d) => d.status === 'connected' || d.status === 'approved') ??
@@ -529,6 +565,8 @@ export class OrgLandingPagesService {
         null;
       return {
         ...r,
+        views: viewMap.get(r.id) ?? 0,
+        leads: leadMap.get(r.id) ?? 0,
         thankYouPage: r.children?.[0] ?? null,
         parentLandingPage: r.parent ?? null,
         children: undefined,
