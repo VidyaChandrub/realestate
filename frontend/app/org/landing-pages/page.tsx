@@ -206,6 +206,12 @@ export default function OrgLandingPagesPage() {
     limit: number | null;
     planName: string | null;
   } | null>(null);
+  // Published-pages quota — separate from the create quota above.
+  const [publishQuota, setPublishQuota] = useState<{
+    used: number;
+    limit: number | null;
+    planName: string | null;
+  } | null>(null);
 
   // Deletion
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -286,20 +292,30 @@ export default function OrgLandingPagesPage() {
     fetchList();
   }, [fetchList]);
 
+  // Re-read plan usage whenever the page list changes (create / duplicate /
+  // publish / unpublish / delete all refresh `allPages`).
   useEffect(() => {
     if (!accessToken) return;
     apiFetch<OrgBillingSummary>("/org/billing", {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-      .then((billing) =>
+      .then((billing) => {
         setLandingPageQuota({
           used: billing.usage.landingPagesCreateUsed ?? 0,
           limit: billing.usage.landingPagesCreateLimit ?? null,
           planName: billing.plan?.name ?? null,
-        }),
-      )
-      .catch(() => setLandingPageQuota(null));
-  }, [accessToken]);
+        });
+        setPublishQuota({
+          used: billing.usage.landingPagesUsed,
+          limit: billing.usage.landingPagesLimit,
+          planName: billing.plan?.name ?? null,
+        });
+      })
+      .catch(() => {
+        setLandingPageQuota(null);
+        setPublishQuota(null);
+      });
+  }, [accessToken, allPages]);
 
   async function openTemplatePicker() {
     setTemplatePickerOpen(true);
@@ -575,6 +591,14 @@ export default function OrgLandingPagesPage() {
     landingPageQuota != null &&
     landingPageQuota.limit != null &&
     landingPageQuota.used >= landingPageQuota.limit;
+  const atPublishLimit =
+    publishQuota != null && publishQuota.limit != null && publishQuota.used >= publishQuota.limit;
+  const createLimitReason = atLandingPageCreateLimit
+    ? "You've reached your plan's landing page limit"
+    : undefined;
+  const publishLimitReason = atPublishLimit
+    ? "You've reached your plan's published landing page limit"
+    : undefined;
 
   // 100% Dynamic KPI Metrics calculated from real database pages
   const dynamicSource = allPages.length > 0 ? allPages : rawRows;
@@ -604,11 +628,14 @@ export default function OrgLandingPagesPage() {
 
         {/* Global Header Actions */}
         <div className="lp-header-actions">
-          {canCreate && !atLandingPageCreateLimit && (
+          {canCreate && (
             <>
               <button
                 type="button"
                 className="lp-btn-scratch"
+                disabled={atLandingPageCreateLimit}
+                title={createLimitReason}
+                style={atLandingPageCreateLimit ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
                 onClick={() => {
                   setScratchName("");
                   setScratchSelectedLabel("");
@@ -625,6 +652,9 @@ export default function OrgLandingPagesPage() {
                 <button
                   type="button"
                   className="lp-btn-template"
+                  disabled={atLandingPageCreateLimit}
+                  title={createLimitReason}
+                  style={atLandingPageCreateLimit ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
                   onClick={openTemplatePicker}
                 >
                   <Plus size={16} />
@@ -653,6 +683,30 @@ export default function OrgLandingPagesPage() {
             Your{landingPageQuota?.planName ? ` ${landingPageQuota.planName}` : ""} plan allows creating up to{" "}
             <b>{landingPageQuota?.limit}</b> landing page{landingPageQuota?.limit === 1 ? "" : "s"} and you have{" "}
             <b>{landingPageQuota?.used}</b>. Upgrade your plan to create more.
+          </div>
+          <Link href="/org/settings?section=billing" className="btn btn-soft btn-sm">
+            Upgrade plan
+          </Link>
+        </div>
+      ) : null}
+
+      {canPublish && atPublishLimit ? (
+        <div
+          className="card reveal in"
+          style={{
+            borderColor: "var(--amber, #f59e0b)",
+            padding: "12px 16px",
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <span style={{ fontSize: 20 }}>⚠️</span>
+          <div style={{ flex: 1, minWidth: 220, fontSize: 13.5 }}>
+            Your{publishQuota?.planName ? ` ${publishQuota.planName}` : ""} plan allows up to{" "}
+            <b>{publishQuota?.limit}</b> published landing page{publishQuota?.limit === 1 ? "" : "s"} and you have{" "}
+            <b>{publishQuota?.used}</b>. Unpublish a page or upgrade your plan to publish more.
           </div>
           <Link href="/org/settings?section=billing" className="btn btn-soft btn-sm">
             Upgrade plan
@@ -1133,7 +1187,8 @@ export default function OrgLandingPagesPage() {
                           <button
                             type="button"
                             className="btn btn-primary btn-sm"
-                            disabled={busyId === row.id}
+                            disabled={busyId === row.id || atPublishLimit}
+                            title={publishLimitReason}
                             onClick={() => publishPage(row.id)}
                             style={{ fontWeight: 700 }}
                           >
@@ -1144,8 +1199,9 @@ export default function OrgLandingPagesPage() {
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
+                            disabled={atLandingPageCreateLimit}
                             onClick={() => duplicatePage(row.id)}
-                            title="Duplicate"
+                            title={createLimitReason ?? "Duplicate"}
                           >
                             <Copy size={12} />
                           </button>
@@ -1183,8 +1239,10 @@ export default function OrgLandingPagesPage() {
               onView={() => openView(row.id)}
               onViewThankYou={() => openViewThankYou(row)}
               onPublish={canPublish ? () => publishPage(row.id) : undefined}
+              publishDisabledReason={publishLimitReason}
               onUnpublish={canPause ? () => unpublishPage(row.id) : undefined}
               onDuplicate={canCreate ? () => duplicatePage(row.id) : undefined}
+              duplicateDisabledReason={createLimitReason}
               onDelete={canDelete ? () => setDeleteTarget({ id: row.id, name: row.name }) : undefined}
               onConfigureDomain={() => setDomainConfigTarget(row)}
             />
@@ -1647,8 +1705,10 @@ function OrgLandingPageVisualCard({
   onView,
   onViewThankYou,
   onPublish,
+  publishDisabledReason,
   onUnpublish,
   onDuplicate,
+  duplicateDisabledReason,
   onDelete,
   onConfigureDomain,
 }: {
@@ -1660,8 +1720,12 @@ function OrgLandingPageVisualCard({
   onView: () => void;
   onViewThankYou?: () => void;
   onPublish?: () => void;
+  /** When set, Publish is shown disabled with this explanation (plan limit). */
+  publishDisabledReason?: string;
   onUnpublish?: () => void;
   onDuplicate?: () => void;
+  /** When set, Duplicate is shown disabled with this explanation (plan limit). */
+  duplicateDisabledReason?: string;
   onDelete?: () => void;
   onConfigureDomain?: () => void;
 }) {
@@ -2012,7 +2076,8 @@ function OrgLandingPageVisualCard({
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
-                  disabled={busy}
+                  disabled={busy || Boolean(publishDisabledReason)}
+                  title={publishDisabledReason}
                   onClick={() => {
                     setMenuOpen(false);
                     onPublish();
@@ -2032,6 +2097,8 @@ function OrgLandingPageVisualCard({
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
+                  disabled={Boolean(duplicateDisabledReason)}
+                  title={duplicateDisabledReason}
                   onClick={() => {
                     setMenuOpen(false);
                     onDuplicate();

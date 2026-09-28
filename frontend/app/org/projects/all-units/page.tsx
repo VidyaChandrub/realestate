@@ -136,7 +136,7 @@ export default function AllUnitsPage() {
               href="/org/projects/all-units/create"
               className="btn btn-primary"
             >
-              ＋ Add unit
+              ＋ Add standalone unit
             </Link>
           ) : null}
         </div>

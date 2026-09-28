@@ -75,6 +75,19 @@ const EMPTY_FORM: UserFormData = {
   password: "",
 };
 
+// Mobile number: digits only, an optional single leading "+", at most 15
+// digits (E.164) — the same rule the backend DTO enforces. Sanitising on
+// every keystroke/paste means the field can only ever hold an acceptable
+// value: letters and punctuation are dropped, extra digits past 15 truncated.
+const PHONE_NUMBER_REGEX = /^\+?\d{1,15}$/;
+
+function sanitizePhone(raw: string): string {
+  const hasPlus = raw.trimStart().startsWith("+");
+  const digits = raw.replace(/\D/g, "").slice(0, 15);
+  if (!digits) return hasPlus ? "+" : "";
+  return `${hasPlus ? "+" : ""}${digits}`;
+}
+
 export default function OrgUsersPage() {
   const { accessToken, hasPermission, isOrgAdmin } = useAuth();
   const router = useRouter();
@@ -145,6 +158,7 @@ export default function OrgUsersPage() {
     danger?: boolean;
     run: () => void | Promise<void>;
   } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   // Load roles
   useEffect(() => {
@@ -246,7 +260,9 @@ export default function OrgUsersPage() {
       firstName: user.firstName ?? "",
       lastName: user.lastName ?? "",
       email: user.email,
-      phoneNumber: user.phoneNumber ?? "",
+      // Normalise a stored value to the shape the field now enforces, so a
+      // legacy row stays editable without forcing a retype.
+      phoneNumber: sanitizePhone(user.phoneNumber ?? ""),
       role: user.role?.key ?? "sales",
       password: "",
     });
@@ -260,29 +276,78 @@ export default function OrgUsersPage() {
     setFormError(null);
   }
 
-  async function submitForm() {
+  async function submitForm(opts?: { confirmed?: boolean }) {
+    if (!accessToken || !formMode) return;
+
     if (!form.firstName.trim() || !form.lastName.trim()) {
       setFormError("First name and last name are required.");
       return;
     }
-    if (!form.email.trim()) {
-      setFormError("Email is required.");
+    const email = form.email.trim();
+    const phoneNumber = form.phoneNumber.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setFormError("Please enter a valid email address.");
       return;
     }
+    if (!phoneNumber) {
+      setFormError("Mobile number is required.");
+      return;
+    }
+    if (!PHONE_NUMBER_REGEX.test(phoneNumber)) {
+      setFormError("Mobile number must contain digits only (max 15).");
+      return;
+    }
+    const phoneDigits = phoneNumber.replace(/\D/g, "");
+    if (phoneDigits.length < 7) {
+      setFormError("Please enter a valid mobile number.");
+      return;
+    }
+
+    // Changing a user's password from the edit form is a sensitive action —
+    // confirm before it ends their sessions and forces a re-login.
+    if (formMode === "edit" && (form.password ?? "").trim() && !opts?.confirmed) {
+      setConfirm({
+        title: "Change this user's password?",
+        message:
+          "They'll be signed out everywhere and must set a new password the next time they sign in. An email with the new temporary password will be sent to them.",
+        confirmLabel: "Change password",
+        danger: true,
+        run: () => submitForm({ confirmed: true }),
+      });
+      return;
+    }
+
     setFormSubmitting(true);
     setFormError(null);
     try {
       if (formMode === "create") {
+        const body: CreateOrgUserInput = {
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email,
+          phoneNumber,
+          role: form.role,
+          password: form.password || undefined,
+        };
         await apiFetch("/org/users", {
           method: "POST",
           headers: { Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify(form),
+          body: JSON.stringify(body),
         });
-      } else if (formMode === "edit" && editingId) {
+        setPage(1);
+      } else if (editingId) {
+        const body: UpdateOrgUserInput = {
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email,
+          phoneNumber,
+          role: form.role,
+          password: form.password || undefined,
+        };
         await apiFetch(`/org/users/${editingId}`, {
           method: "PATCH",
           headers: { Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify(form),
+          body: JSON.stringify(body),
         });
       }
       closeForm();
@@ -381,17 +446,36 @@ export default function OrgUsersPage() {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="usr-btn-create"
-            onClick={openCreate}
-            disabled={atSeatLimit}
-          >
-            <Icon name="plus" size={16} />
-            <span>Create user</span>
-          </button>
+          {canAdd ? (
+            <button
+              type="button"
+              className="usr-btn-create"
+              onClick={openCreate}
+              disabled={atSeatLimit}
+              title={atSeatLimit ? "You've reached your plan's user limit" : undefined}
+              style={atSeatLimit ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
+            >
+              <Icon name="plus" size={16} />
+              <span>Create user</span>
+            </button>
+          ) : null}
         </div>
       </Reveal>
+
+      {canAdd && atSeatLimit ? (
+        <div
+          className="card reveal in"
+          style={{ marginBottom: 16, borderColor: "var(--amber, #f59e0b)", padding: "12px 16px", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}
+        >
+          <Icon name="alert" size={20} />
+          <div style={{ flex: 1, minWidth: 220, fontSize: 13.5 }}>
+            Your{seatQuota?.planName ? ` ${seatQuota.planName}` : ""} plan allows{" "}
+            <b>{seatQuota?.limit}</b> user{seatQuota?.limit === 1 ? "" : "s"} and you have{" "}
+            <b>{seatQuota?.used}</b>. Upgrade your plan to add more.
+          </div>
+          <Link href="/org/settings?section=billing" className="btn btn-soft btn-sm">Upgrade plan</Link>
+        </div>
+      ) : null}
 
       {/* 4 Color-Coded Stat Cards */}
       <div className="usr-stats-grid">
@@ -957,6 +1041,22 @@ export default function OrgUsersPage() {
             </div>
 
             <div className="field">
+              <label>Mobile number *</label>
+              <input
+                className="inp"
+                type="tel"
+                name="phone"
+                required
+                autoComplete="tel"
+                inputMode="numeric"
+                maxLength={16}
+                placeholder="+919876543210"
+                value={form.phoneNumber}
+                onChange={(e) => setForm((f) => ({ ...f, phoneNumber: sanitizePhone(e.target.value) }))}
+              />
+            </div>
+
+            <div className="field">
               <label>Organisation role *</label>
               <select
                 className="inp"
@@ -971,15 +1071,19 @@ export default function OrgUsersPage() {
               </select>
             </div>
 
-            {formMode === "create" && (
-              <div className="field">
-                <label>Password (optional)</label>
-                <PasswordInput
-                  value={form.password || ""}
-                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                />
-              </div>
-            )}
+            <div className="field">
+              <label>{formMode === "edit" ? "New password (optional)" : "Password (optional)"}</label>
+              <PasswordInput
+                autoComplete="new-password"
+                placeholder={
+                  formMode === "edit"
+                    ? "Leave blank to keep current"
+                    : "Leave blank to email temp password"
+                }
+                value={form.password || ""}
+                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              />
+            </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 10 }}>
               <button type="button" className="btn btn-ghost" onClick={closeForm}>
@@ -1001,8 +1105,17 @@ export default function OrgUsersPage() {
           title={confirm.title}
           message={confirm.message}
           confirmLabel={confirm.confirmLabel}
-          danger={confirm.danger}
-          onConfirm={confirm.run}
+          destructive={confirm.danger ?? false}
+          busy={confirmBusy}
+          onConfirm={async () => {
+            setConfirmBusy(true);
+            try {
+              await confirm.run();
+              setConfirm(null);
+            } finally {
+              setConfirmBusy(false);
+            }
+          }}
         />
       )}
     </div>

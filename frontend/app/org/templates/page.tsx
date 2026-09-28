@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Check,
   CheckCircle2,
@@ -1183,6 +1184,33 @@ export default function OrgTemplatesPage() {
                 </span>
               </div>
 
+              {availableData.remainingQuota === 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    padding: "10px 14px",
+                    marginBottom: 16,
+                    borderRadius: 12,
+                    border: "1px solid var(--amber, #f59e0b)",
+                    fontSize: 13,
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>⚠️</span>
+                  <div style={{ flex: 1, minWidth: 220 }}>
+                    Your {availableData.planName} plan allows{" "}
+                    <b>{availableData.maxAllowed}</b> template{availableData.maxAllowed === 1 ? "" : "s"} in your
+                    workspace and you have <b>{availableData.assignedCount}</b>. Remove a template or upgrade your
+                    plan to add more.
+                  </div>
+                  <Link href="/org/settings?section=billing" className="btn btn-soft btn-sm">
+                    Upgrade plan
+                  </Link>
+                </div>
+              ) : null}
+
               {/* Filters in modal */}
               <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
                 <select
@@ -1337,6 +1365,7 @@ export default function OrgTemplatesPage() {
                               type="button"
                               onClick={() => handleAssignTemplate(tmpl.id)}
                               disabled={assigningId === tmpl.id || isQuotaFull}
+                              title={isQuotaFull ? "You've reached your plan's template limit" : undefined}
                               style={{ width: "100%", justifyContent: "center", fontWeight: 700 }}
                             >
                               {assigningId === tmpl.id

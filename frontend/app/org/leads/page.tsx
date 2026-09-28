@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
 import { AddLeadModal } from "@/components/org/add-lead-modal";
-import { ImportLeadsModal, downloadLeadImportSample } from "@/components/org/import-leads-modal";
+import { ImportLeadsModal } from "@/components/org/import-leads-modal";
 import { LeadStatusSelect } from "@/components/org/lead-status-select";
 import { LEAD_STAGE_ORDER, StageBadge, useLeadStages } from "@/lib/lead-stages";
 import "@/app/org/org.css";
@@ -58,16 +58,6 @@ export default function OrgLeadsPage() {
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [sampleBusy, setSampleBusy] = useState(false);
-
-  async function downloadSample() {
-    setSampleBusy(true);
-    try {
-      await downloadLeadImportSample();
-    } finally {
-      setSampleBusy(false);
-    }
-  }
 
   const load = useCallback(async () => {
     setError(null);
@@ -204,9 +194,6 @@ export default function OrgLeadsPage() {
 
         {admin || canAdd ? (
           <div className="lc-head-actions">
-            <button className="lc-btn-outline" type="button" onClick={() => void downloadSample()} disabled={sampleBusy}>
-              <Icon name="download" size={14} /> {sampleBusy ? "Preparing…" : "Sample CSV"}
-            </button>
             <button className="lc-btn-outline" type="button" onClick={() => setImportOpen(true)}>
               <Icon name="document" size={14} /> Import CSV
             </button>
