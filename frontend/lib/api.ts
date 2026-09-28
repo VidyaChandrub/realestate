@@ -565,10 +565,24 @@ export async function submitLead(input: LeadSubmission): Promise<void> {
       : undefined;
   const unitId =
     typeof input.unitId === "string" && input.unitId.trim() ? input.unitId.trim() : undefined;
+
+  let pathSlug = input.slug?.trim();
+  if (!pathSlug && typeof window !== "undefined") {
+    const rawPath = window.location.pathname
+      .replace(/^\/p\//, "")
+      .replace(/^\//, "")
+      .replace(/\/thank-you$/, "")
+      .replace(/-thank-you$/, "");
+    if (rawPath && !rawPath.startsWith("org") && !rawPath.startsWith("admin")) {
+      pathSlug = rawPath;
+    }
+  }
+
   await apiFetch("/org/leads", {
     method: "POST",
     body: JSON.stringify({
       landingPageId: input.landingPageId,
+      ...(pathSlug ? { slug: pathSlug } : {}),
       ...(projectId ? { projectId } : {}),
       ...(unitId ? { unitId } : {}),
       formName: input.formName,

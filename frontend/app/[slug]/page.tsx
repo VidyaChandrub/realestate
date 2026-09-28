@@ -22,5 +22,5 @@ export default async function DirectSlugPage({ params }: { params: Promise<{ slu
   if (RESERVED_SLUGS.has(slug.toLowerCase())) {
     notFound();
   }
-  return <LocalSitePreview slug={slug} />;
+  return <LocalSitePreview slug={slug} publicLive />;
 }

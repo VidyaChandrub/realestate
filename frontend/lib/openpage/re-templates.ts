@@ -356,6 +356,16 @@ export function buildRealEstateTemplate(id: RealEstateTemplateId | string, name:
       };
     case "premium":
       return buildPremiumRealEstateTemplate(name);
+    case "aurelia-reserve":
+    case "vista-framed":
+    case "future-home":
+    case "modern-living":
+    case "investment-hub":
+    case "vista-curve": {
+      const pdfTpl = buildPdfHomeTemplate(id, name);
+      if (pdfTpl) return pdfTpl;
+      return buildPremiumRealEstateTemplate(name);
+    }
     case "lead":
       return page(name, leadCaptureBlocks(name));
     case "commercial":

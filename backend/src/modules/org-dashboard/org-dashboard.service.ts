@@ -289,7 +289,26 @@ export class OrgDashboardService {
             : '';
         if (named) resolvedProjectId = nameToProject.get(named) ?? null;
       }
-      if (!resolvedProjectId) continue;
+      if (!resolvedProjectId && orgProjects.length === 1) {
+        resolvedProjectId = orgProjects[0].id;
+      }
+      if (!resolvedProjectId) {
+        const genKey = 'unassigned_general';
+        const existing = projectStatsMap.get(genKey) ?? {
+          projectId: genKey,
+          projectName: 'Website / General Enquiries',
+          leadsCount: 0,
+          wonCount: 0,
+          revenue: 0,
+        };
+        existing.leadsCount += 1;
+        if (l.status === 'won') {
+          existing.wonCount += 1;
+          existing.revenue += parseBudgetValue(l.data);
+        }
+        projectStatsMap.set(genKey, existing);
+        continue;
+      }
       const projName = projectMap.get(resolvedProjectId) ?? 'Unknown Project';
       const existing = projectStatsMap.get(resolvedProjectId) ?? {
         projectId: resolvedProjectId,
