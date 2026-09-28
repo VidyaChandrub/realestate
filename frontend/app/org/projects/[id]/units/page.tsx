@@ -1264,25 +1264,228 @@ export default function OrgProjectUnitsPage() {
         </div>
       </Modal>
 
-      {/* --- Unit create/edit design modal matching high-fidelity UI --- */}
+      {/* --- Unit create/edit — form driven by the project type's unit field template --- */}
       <UnitDesignModal
         open={unitMode !== null}
         onClose={closeUnitModal}
         mode={unitMode ?? "create"}
         project={project}
         unitForm={unitForm}
-        setUnitForm={setUnitForm}
         onSubmit={submitUnit}
         busy={unitBusy}
         error={unitError}
-        attempted={unitAttempted}
-        groupWord={groupWord}
-        facingOptions={facingOptions}
-        parkingOptions={parkingOptions}
-        variantOptions={variantOptions}
-        configurationOptions={projectConfigurationOptions}
-        areaUnit={project?.areaUnit ?? "sq.ft."}
-      />
+        submitLabel={traits.configurations ? "Add unit" : traits.grouped ? "Add plot" : "Add listing"}
+        preview={{
+          subtitle: [
+            traits.configurations ? unitForm.configuration || "Select a configuration" : project?.projectType || "Unit",
+            unitForm.variantLabel || null,
+            traits.grouped && unitForm.tower ? `${traits.configurations ? "" : `${groupWord} `}${unitForm.tower}` : null,
+            traits.floors && unitForm.floor ? `${roleField(unitTemplate, "floor")?.label ?? "Floor"} ${unitForm.floor}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          price: priceField && parseAmount(unitForm.price) != null
+            ? formatMoney(parseAmount(unitForm.price), project?.currency ?? "INR")
+            : null,
+          pricePerArea: modalPricePerArea || null,
+          area: areaField && unitForm.area
+            ? `${Number(unitForm.area).toLocaleString("en-IN")} ${project?.areaUnit ?? "sqft"}`
+            : null,
+        }}
+      >
+            {traits.grouped || traits.floors || traits.configurations ? (
+            <div className="sec">
+              <div className="lbl"><Icon name="map" size={15} /> Placement</div>
+              <div className="grid g3">
+                {traits.configurations ? (
+                <div className="field">
+                  <label>{roleField(unitTemplate, "configuration")?.label ?? "Configuration"} <span className="req">*</span></label>
+                  <ConfigurationSelect
+                    catalog={project ? projectConfigurationOptions : null}
+                    error={project ? null : unitTypeCatalogError}
+                    value={unitForm.configuration}
+                    onChange={applyConfiguration}
+                  />
+                  {unitAttempted && !unitForm.configuration ? <div className="field-err">Pick a configuration for this unit.</div> : null}
+                </div>
+                ) : null}
+                {traits.grouped ? (
+                <div className="field">
+                  <label>{groupWord}</label>
+                  <TowerCombobox
+                    value={unitForm.tower}
+                    onChange={(v) => setUnitForm((f) => ({ ...f, tower: v }))}
+                    otherTowers={otherTowers}
+                    noun={groupWord}
+                  />
+                </div>
+                ) : null}
+                {traits.floors ? (
+                <div className="field">
+                  <label>{roleField(unitTemplate, "floor")?.label ?? "Floor"}</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    placeholder="12"
+                    value={unitForm.floor}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, floor: e.target.value }))
+                    }
+                  />
+                </div>
+                ) : null}
+              </div>
+            </div>
+            ) : null}
+
+            <div className="sec">
+              <div className="lbl"><Icon name="home" size={15} /> {traits.configurations ? "Unit details" : traits.grouped ? "Plot details" : "Property details"}</div>
+              <div className="grid g3">
+                <div className={`field${unitAttempted && !unitForm.unitNo.trim() ? " field-invalid" : ""}`}>
+                  <label>{traits.configurations ? "Unit number" : traits.grouped ? "Plot number" : "Listing number"} <span className="req">*</span></label>
+                  <input
+                    className="inp"
+                    placeholder="B-1204"
+                    value={unitForm.unitNo}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({ ...f, unitNo: e.target.value }))
+                    }
+                  />
+                  {unitAttempted && !unitForm.unitNo.trim() ? <div className="field-err">Unit number is required.</div> : null}
+                </div>
+                <div className="field">
+                  <label>{traits.configurations ? "Unit variant" : "Plot variant"}</label>
+                  <UnitAttributeSelect
+                    options={variantOptions}
+                    loaded={unitAttributeCatalogLoaded}
+                    error={unitTypeCatalogError}
+                    value={unitForm.variantLabel}
+                    onChange={(v) => setUnitForm((f) => ({ ...f, variantLabel: v }))}
+                    placeholder="None"
+                    emptyHint="No unit variants configured yet."
+                  />
+                  <div className="hint">Optional — e.g. Type A, Corner.</div>
+                </div>
+                <div className="field">
+                  <label>Facing</label>
+                  <UnitAttributeSelect
+                    options={facingOptions}
+                    loaded={unitAttributeCatalogLoaded}
+                    error={unitTypeCatalogError}
+                    value={unitForm.facing}
+                    onChange={(v) => setUnitForm((f) => ({ ...f, facing: v }))}
+                    placeholder="Select…"
+                    emptyHint="No facing options configured yet."
+                  />
+                </div>
+              </div>
+              <div className="grid g3">
+                {areaField ? (
+                <div className="field">
+                  <label>{areaField.label} ({project?.areaUnit ?? "sqft"})</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    placeholder="2400"
+                    value={unitForm.area}
+                    onChange={(e) => {
+                      clearPrefill(areaField.key);
+                      setUnitForm((f) => ({ ...f, area: e.target.value }));
+                    }}
+                  />
+                  {prefilled.includes(areaField.key) ? <PrefillNote configuration={unitForm.configuration} /> : null}
+                </div>
+                ) : null}
+                <div className="field">
+                  <label>Parking</label>
+                  <UnitAttributeSelect
+                    options={parkingOptions}
+                    loaded={unitAttributeCatalogLoaded}
+                    error={unitTypeCatalogError}
+                    value={unitForm.parking}
+                    onChange={(v) => setUnitForm((f) => ({ ...f, parking: v }))}
+                    emptyHint="No parking options configured yet."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {unitTemplate.length > 0 ? (
+              <div className="sec">
+                <div className="lbl"><Icon name="properties" size={15} /> {project?.projectType ?? "Type"} details</div>
+                <SectionedFieldInputs
+                  template={unitTemplate}
+                  values={unitForm.customValues}
+                  onChange={(key, v) => setUnitForm((f) => ({ ...f, customValues: { ...f.customValues, [key]: v } }))}
+                />
+              </div>
+            ) : null}
+
+            <div className="sec">
+              <div className="lbl"><Icon name="billing" size={15} /> Pricing &amp; status</div>
+              <div className="grid g3">
+                {priceField ? (
+                <div className="field">
+                  <label>{priceField.label} ({currencyPrefix(project?.currency ?? "INR").trim()})</label>
+                  <input
+                    className="inp"
+                    type="number"
+                    min={0}
+                    placeholder="16500000"
+                    value={unitForm.price}
+                    onChange={(e) => {
+                      clearPrefill(priceField.key);
+                      setUnitForm((f) => ({ ...f, price: e.target.value }));
+                    }}
+                  />
+                  {prefilled.includes(priceField.key) ? <PrefillNote configuration={unitForm.configuration} /> : null}
+                </div>
+                ) : null}
+                {priceField && areaField ? (
+                <div className="field">
+                  <label>{priceField.label} / {project?.areaUnit ?? "sqft"}</label>
+                  <input className="inp" placeholder="Enter price and area" disabled value={modalPricePerArea} />
+                  {!modalPricePerArea ? <div className="hint">Calculated from price ÷ area.</div> : null}
+                </div>
+                ) : null}
+                <div className="field">
+                  <label>Status</label>
+                  <select
+                    className="inp"
+                    value={unitForm.status}
+                    onChange={(e) =>
+                      setUnitForm((f) => ({
+                        ...f,
+                        status: e.target.value as UnitStatus,
+                      }))
+                    }
+                  >
+                    <option value="available">Available</option>
+                    <option value="booked">Booked</option>
+                    <option value="held">Held / Blocked</option>
+                    <option value="sold">Sold</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="sec nb">
+              <div className="lbl"><Icon name="document" size={15} /> {traits.configurations ? "Media & documents" : "Media"}</div>
+              <UnitMediaFields
+                floorPlanUrl={unitForm.floorPlanUrl}
+                galleryUrls={unitForm.galleryUrls}
+                onFloorPlanChange={(v) =>
+                  setUnitForm((f) => ({ ...f, floorPlanUrl: v }))
+                }
+                onGalleryChange={(urls) =>
+                  setUnitForm((f) => ({ ...f, galleryUrls: urls }))
+                }
+                ctx={{ projectId: id }}
+                showFloorPlan={traits.configurations}
+              />
+            </div>
+      </UnitDesignModal>
 
       <ConfirmModal
         open={pendingDelete !== null}
