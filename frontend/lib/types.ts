@@ -1457,6 +1457,8 @@ export interface OrgUnitsListResponse {
 export interface LeadSubmission {
   /** Landing page id the form belongs to (used server-side to attribute the org). */
   landingPageId?: string;
+  /** Slug of the landing page or path the form was filled on. */
+  slug?: string;
   /** Project this enquiry is about — lead will be linked to it. */
   projectId?: string;
   /** Specific available unit selected in the project enquiry form. */

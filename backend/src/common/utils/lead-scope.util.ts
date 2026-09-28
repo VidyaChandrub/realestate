@@ -8,7 +8,14 @@ import type { PrismaService } from '../../database/prisma.service';
 // permissions.util.ts) instead of matching keys.
 export function canSeeAllLeads(roles: string[] | undefined): boolean {
   const keys = roles ?? [];
-  return keys.includes('super_admin') || keys.includes('admin');
+  return (
+    keys.includes('super_admin') ||
+    keys.includes('admin') ||
+    keys.includes('organisation_admin') ||
+    keys.includes('org_admin') ||
+    keys.includes('owner') ||
+    keys.includes('manager')
+  );
 }
 
 function landingPageIdOf(
@@ -71,7 +78,10 @@ export async function actorLeadOrClauses(
     .map((l) => l.project?.name)
     .filter((n): n is string => typeof n === 'string' && n.length > 0);
 
-  const orClauses: Prisma.LeadWhereInput[] = [{ assignedToId: actorId }];
+  const orClauses: Prisma.LeadWhereInput[] = [
+    { assignedToId: actorId },
+    { assignedToId: null },
+  ];
 
   // Managed projects — everything.
   if (managedProjectIds.length > 0) {

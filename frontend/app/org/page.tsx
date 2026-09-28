@@ -114,6 +114,13 @@ export default function OrgDashboardPage() {
 
   useEffect(() => {
     fetchDashboard();
+    const handleSuccess = () => fetchDashboard();
+    window.addEventListener("prestate:lead-success", handleSuccess);
+    const interval = setInterval(fetchDashboard, 30000);
+    return () => {
+      window.removeEventListener("prestate:lead-success", handleSuccess);
+      clearInterval(interval);
+    };
   }, [fetchDashboard]);
 
   const roleLabel = (r: string) => {

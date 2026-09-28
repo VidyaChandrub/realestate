@@ -94,6 +94,13 @@ export default function OrgLeadsPage() {
 
   useEffect(() => {
     load();
+    const handleSuccess = () => load();
+    window.addEventListener("prestate:lead-success", handleSuccess);
+    const interval = setInterval(load, 30000);
+    return () => {
+      window.removeEventListener("prestate:lead-success", handleSuccess);
+      clearInterval(interval);
+    };
   }, [load]);
 
   useEffect(() => {

@@ -9,8 +9,8 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "Local preview",
-  description: "Local landing page preview",
+  title: "Landing Page",
+  description: "Real estate project showcase and residences",
 };
 
 export default function LocalPreviewLayout({ children }: { children: React.ReactNode }) {

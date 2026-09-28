@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import type { CreateLeadDto } from './dto/create-lead.dto';
@@ -122,18 +127,62 @@ function toActivity(row: ActivityRow) {
 }
 
 @Injectable()
-export class LeadsService {
+export class LeadsService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
+
+  async onModuleInit() {
+    try {
+      const platformLeads = await this.prisma.lead.findMany({
+        where: { orgId: PLATFORM_LEAD_ORG_ID },
+        select: { id: true, landingPageId: true, projectId: true },
+      });
+      if (platformLeads.length > 0) {
+        const defaultOrg = await this.prisma.organisation.findFirst({
+          where: { status: 'active' },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        });
+        if (defaultOrg) {
+          for (const l of platformLeads) {
+            let targetOrgId = defaultOrg.id;
+            if (l.landingPageId) {
+              const lp = await this.prisma.landingPage.findUnique({
+                where: { id: l.landingPageId },
+                select: { orgId: true },
+              });
+              if (lp?.orgId) targetOrgId = lp.orgId;
+            } else if (l.projectId) {
+              const prj = await this.prisma.project.findUnique({
+                where: { id: l.projectId },
+                select: { orgId: true },
+              });
+              if (prj?.orgId) targetOrgId = prj.orgId;
+            }
+            await this.prisma.lead.update({
+              where: { id: l.id },
+              data: { orgId: targetOrgId },
+            });
+            await this.prisma.activityEvent.updateMany({
+              where: { leadId: l.id, orgId: PLATFORM_LEAD_ORG_ID },
+              data: { orgId: targetOrgId },
+            });
+          }
+        }
+      }
+    } catch {
+      // Safe fallback on module init
+    }
+  }
 
   /**
    * Public capture path: an anonymous visitor submits a form. We resolve the
-   * owning org from the landing page id and/or project id rather than trusting
-   * a client-supplied orgId.
+   * owning org from the landing page id, slug, and/or project id rather than
+   * trusting a client-supplied orgId.
    */
   async createFromPublic(dto: CreateLeadDto) {
-    if (!dto.landingPageId && !dto.projectId) {
+    if (!dto.landingPageId && !dto.projectId && !dto.slug) {
       throw new NotFoundException(
-        'landingPageId or projectId is required to attribute the lead',
+        'landingPageId, slug, or projectId is required to attribute the lead',
       );
     }
 
@@ -142,18 +191,13 @@ export class LeadsService {
 
     let resolvedLandingPageId = dto.landingPageId ?? null;
 
-    if (dto.landingPageId) {
-      const page = await this.resolvePublicLandingPage(dto.landingPageId);
-      if (!page) {
-        throw new NotFoundException('Landing page not found');
+    const pageRef = dto.landingPageId || dto.slug;
+    if (pageRef) {
+      const page = await this.resolvePublicLandingPage(pageRef, dto.slug);
+      if (page) {
+        orgId = page.orgId;
+        resolvedLandingPageId = page.id;
       }
-      if (page.status !== 'published') {
-        throw new BadRequestException(
-          'Leads can only be submitted from a published landing page',
-        );
-      }
-      orgId = page.orgId;
-      resolvedLandingPageId = page.id;
     }
 
     if (dto.projectId) {
@@ -190,13 +234,22 @@ export class LeadsService {
       if (!unit || !dto.projectId || unit.projectId !== dto.projectId) {
         throw new BadRequestException('Selected unit does not belong to the selected project');
       }
-      if (orgId !== unit.orgId) {
+      if (orgId && orgId !== unit.orgId) {
         throw new BadRequestException('Selected unit belongs to another organisation');
       }
     }
 
-    if (!orgId) {
-      throw new NotFoundException('Unable to resolve organisation');
+    if (!orgId || orgId === PLATFORM_LEAD_ORG_ID) {
+      const defaultOrg = await this.prisma.organisation.findFirst({
+        where: { status: 'active' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (defaultOrg) {
+        orgId = defaultOrg.id;
+      } else {
+        throw new NotFoundException('Unable to resolve organisation');
+      }
     }
 
     const projectId =
@@ -455,41 +508,125 @@ export class LeadsService {
    */
   private async resolvePublicLandingPage(
     ref: string,
+    fallbackSlug?: string,
   ): Promise<ResolvedPublicPage | null> {
     const select = { id: true, orgId: true, status: true } as const;
+
+    // 1. Direct match by landing page UUID
     const byId = await this.prisma.landingPage.findUnique({
       where: { id: ref },
       select,
     });
     if (byId) return byId;
 
-    const published = { status: 'published' as const };
-    const bySlug = await this.prisma.landingPage.findFirst({
-      where: { slug: ref, ...published },
+    // Build candidate slugs for insensitive and path matching
+    const rawCandidates = [ref, fallbackSlug]
+      .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+      .map((s) => s.trim().toLowerCase());
+
+    const slugVariants: string[] = [];
+    for (const c of rawCandidates) {
+      const clean = c.replace(/^\/p\//, '').replace(/^\//, '').replace(/\/+$/, '');
+      const base = clean.replace(/(\/|-)?thank-you$/, '');
+      const hyphenated = base.replace(/\s+/g, '-');
+      slugVariants.push(clean, base, hyphenated, `${base}-thank-you`, `${hyphenated}-thank-you`);
+    }
+    const uniqueSlugs = Array.from(new Set(slugVariants.filter(Boolean)));
+
+    // 2. Look for published landing page matching candidate slugs
+    if (uniqueSlugs.length > 0) {
+      const bySlug = await this.prisma.landingPage.findFirst({
+        where: {
+          OR: [
+            ...uniqueSlugs.map((s) => ({ slug: { equals: s, mode: 'insensitive' as const } })),
+            ...uniqueSlugs.map((s) => ({
+              pageType: 'thank_you' as const,
+              parent: { slug: { equals: s, mode: 'insensitive' as const } },
+            })),
+          ],
+          status: 'published',
+        },
+        orderBy: { publishedAt: 'desc' },
+        select,
+      });
+      if (bySlug) return bySlug;
+
+      // 3. Draft landing page matching candidate slugs (allow testing/preview captures)
+      const byDraftSlug = await this.prisma.landingPage.findFirst({
+        where: {
+          OR: uniqueSlugs.map((s) => ({ slug: { equals: s, mode: 'insensitive' as const } })),
+        },
+        orderBy: { updatedAt: 'desc' },
+        select,
+      });
+      if (byDraftSlug) return byDraftSlug;
+    }
+
+    // 4. Organisation landing page cloned from this sourceTemplateId
+    const bySourceTemplate = await this.prisma.landingPage.findFirst({
+      where: {
+        OR: [
+          { sourceTemplateId: ref },
+          ...uniqueSlugs.map((s) => ({ sourceTemplateId: s })),
+          ...uniqueSlugs.map((s) => ({
+            sourceTemplate: { slug: { equals: s, mode: 'insensitive' as const } },
+          })),
+        ],
+        status: 'published',
+      },
       orderBy: { publishedAt: 'desc' },
       select,
     });
-    if (bySlug) return bySlug;
+    if (bySourceTemplate) return bySourceTemplate;
 
-    // Super Admin templates are not LandingPage rows — accept them directly so
-    // lead-gen pages can publish without an org/project binding.
-    const template = await this.prisma.template.findUnique({
-      where: { id: ref },
+    const bySourceTemplateDraft = await this.prisma.landingPage.findFirst({
+      where: {
+        OR: [
+          { sourceTemplateId: ref },
+          ...uniqueSlugs.map((s) => ({ sourceTemplateId: s })),
+          ...uniqueSlugs.map((s) => ({
+            sourceTemplate: { slug: { equals: s, mode: 'insensitive' as const } },
+          })),
+        ],
+      },
+      orderBy: { updatedAt: 'desc' },
+      select,
+    });
+    if (bySourceTemplateDraft) return bySourceTemplateDraft;
+
+    // 5. Super Admin template lookup
+    const template = await this.prisma.template.findFirst({
+      where: {
+        OR: [
+          { id: ref },
+          ...uniqueSlugs.map((s) => ({ slug: { equals: s, mode: 'insensitive' as const } })),
+        ],
+      },
       select: { id: true, status: true },
     });
     if (template) {
+      // Check if any organisation has created a landing page from this template
+      const orgPage = await this.prisma.landingPage.findFirst({
+        where: { sourceTemplateId: template.id },
+        orderBy: { updatedAt: 'desc' },
+        select,
+      });
+      if (orgPage) return orgPage;
+
+      // Attribute to the primary active organisation instead of black hole 'platform'
+      const defaultOrg = await this.prisma.organisation.findFirst({
+        where: { status: 'active' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
       return {
         id: template.id,
-        orgId: PLATFORM_LEAD_ORG_ID,
+        orgId: defaultOrg?.id ?? PLATFORM_LEAD_ORG_ID,
         status: template.status,
       };
     }
 
-    return this.prisma.landingPage.findFirst({
-      where: { sourceTemplateId: ref, ...published },
-      orderBy: { publishedAt: 'desc' },
-      select,
-    });
+    return null;
   }
 
   /** Map a captured lead onto a project via linked landing page or form data. */

@@ -55,7 +55,14 @@ export function LocalSitePreview({
   }, [slug, host, serverPage]);
 
   if (page === undefined) {
-    return <div style={{ minHeight: "100vh", background: "#fff", padding: 40, color: "#64748b" }}>Loading local preview…</div>;
+    return (
+      <div style={{ minHeight: "100vh", background: "#0b0f19", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 28, height: 28, border: "2px solid rgba(255,255,255,0.1)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+          <span style={{ fontSize: 13, fontFamily: "Inter, system-ui, sans-serif" }}>Loading…</span>
+        </div>
+      </div>
+    );
   }
 
   if (!page) {
@@ -63,11 +70,11 @@ export function LocalSitePreview({
       <div style={{ minHeight: "100vh", background: "#0c0e14", color: "#f4f1ea", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, fontFamily: "Inter, system-ui, sans-serif" }}>
         <div style={{ maxWidth: 420, textAlign: "center" }}>
           <Globe size={28} style={{ marginBottom: 12, color: "#c9a56a" }} />
-          <h1 style={{ fontSize: 22, margin: "0 0 8px" }}>Nothing published here</h1>
+          <h1 style={{ fontSize: 22, margin: "0 0 8px" }}>Page Not Found</h1>
           <p style={{ color: "#8b92a5", lineHeight: 1.6, margin: "0 0 18px" }}>
-            No landing page is mapped to this local preview{host ? ` or domain (${host})` : slug ? ` /${slug}` : ""}. Assign a domain from Pages or Domains in the builder.
+            The requested page does not exist or has not been published yet.
           </p>
-          <Link href="/admin-console/templates" style={{ color: "#7a6bff", fontWeight: 700 }}>Open Templates</Link>
+          <Link href="/" style={{ color: "#10b981", fontWeight: 700, textDecoration: "none" }}>Go to Homepage</Link>
         </div>
       </div>
     );
@@ -129,6 +136,7 @@ export function LocalSitePreview({
     </div>
   );
 
+  // Public live routes MUST render clean without the "LOCAL PREVIEW" / "Edit in builder" admin banner
   if (publicLive) {
     return pageShell;
   }

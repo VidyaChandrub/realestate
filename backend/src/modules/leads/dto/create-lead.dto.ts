@@ -12,6 +12,11 @@ export class CreateLeadDto {
   @IsString()
   landingPageId?: string;
 
+  /** Optional slug of the landing page the lead was captured from. */
+  @IsOptional()
+  @IsString()
+  slug?: string;
+
   /** Project this enquiry is about — lead will be scoped to its org and visible to assigned sales. */
   @IsOptional()
   @Transform(({ value }) => emptyToUndefined(value))

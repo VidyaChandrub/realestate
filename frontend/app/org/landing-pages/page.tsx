@@ -134,7 +134,7 @@ function formatDate(iso: string): string {
 }
 
 export default function OrgLandingPagesPage() {
-  const { accessToken, hasPermission } = useAuth();
+  const { accessToken, hasPermission, user } = useAuth();
   const router = useRouter();
 
   // One flag per Landing Pages pill (named after the button it unlocks) —
