@@ -159,6 +159,7 @@ export default function OrgLandingPagesPage() {
   const [scratchHasInventory, setScratchHasInventory] = useState(false);
   const [scratchSubmitting, setScratchSubmitting] = useState(false);
   const [scratchError, setScratchError] = useState<string | null>(null);
+  const [scratchSelectedLabel, setScratchSelectedLabel] = useState("");
 
   // Assigned template picker state
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -172,6 +173,7 @@ export default function OrgLandingPagesPage() {
   const [useHasInventory, setUseHasInventory] = useState(false);
   const [useSubmitting, setUseSubmitting] = useState(false);
   const [useError, setUseError] = useState<string | null>(null);
+  const [useSelectedLabel, setUseSelectedLabel] = useState("");
 
   // Template preview state
   const [templatePreviewId, setTemplatePreviewId] = useState<string | null>(null);
@@ -331,9 +333,12 @@ export default function OrgLandingPagesPage() {
 
   async function confirmUseTemplate() {
     if (!useTemplate || !accessToken) return;
-    if (!useName.trim()) {
-      setUseError("Give the page a name");
-      return;
+    let pageName = useName.trim();
+    if (!pageName && useSelectedLabel) {
+      pageName = `${useSelectedLabel} — ${useTemplate.name}`;
+      setUseName(pageName);
+    } else if (!pageName) {
+      pageName = useTemplate.name;
     }
     const missing = needsInventorySelection(useBind, useHasInventory);
     if (missing) {
@@ -348,7 +353,7 @@ export default function OrgLandingPagesPage() {
         headers: { Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
           templateId: useTemplate.id,
-          name: useName.trim(),
+          name: pageName,
           ...inventoryBindPayload(useBind),
         }),
       });
@@ -455,7 +460,12 @@ export default function OrgLandingPagesPage() {
 
   async function confirmCreateFromScratch() {
     if (!accessToken) return;
-    if (!scratchName.trim()) {
+    let pageName = scratchName.trim();
+    if (!pageName && scratchSelectedLabel) {
+      pageName = scratchSelectedLabel;
+      setScratchName(scratchSelectedLabel);
+    }
+    if (!pageName) {
       setScratchError("Give the page a name");
       return;
     }
@@ -468,8 +478,7 @@ export default function OrgLandingPagesPage() {
     setScratchError(null);
     try {
       const slug =
-        scratchName
-          .trim()
+        pageName
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-+|-+$/g, "")
@@ -478,23 +487,20 @@ export default function OrgLandingPagesPage() {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
-          name: scratchName.trim(),
+          name: pageName,
           ...inventoryBindPayload(scratchBind),
           content: {
             engine: "openpage",
-            site: buildRealEstateTemplate("blank", scratchName.trim()),
+            site: buildRealEstateTemplate("blank", pageName),
             sections: [],
-            config: defaultSiteConfig({ name: scratchName.trim(), slug }),
+            config: defaultSiteConfig({ name: pageName, slug }),
           },
         }),
       });
       router.push(orgBuilderPath(created.id));
     } catch (err) {
       handleActionError(err, "Failed to create page.", "Creating");
-      if (!packagePrompt) {
-        setScratchError(err instanceof Error ? err.message : "Failed to create page.");
-      }
-      setScratchOpen(false);
+      setScratchError(err instanceof Error ? err.message : "Failed to create page.");
       setScratchSubmitting(false);
     }
   }
@@ -605,6 +611,7 @@ export default function OrgLandingPagesPage() {
                 className="lp-btn-scratch"
                 onClick={() => {
                   setScratchName("");
+                  setScratchSelectedLabel("");
                   setScratchBind({ kind: "none" });
                   setScratchError(null);
                   setScratchOpen(true);
@@ -995,6 +1002,7 @@ export default function OrgLandingPagesPage() {
                     className="btn btn-soft"
                     onClick={() => {
                       setScratchName("");
+                      setScratchSelectedLabel("");
                       setScratchBind({ kind: "none" });
                       setScratchError(null);
                       setScratchOpen(true);
@@ -1462,7 +1470,18 @@ export default function OrgLandingPagesPage() {
             <label>Landing Page Name</label>
             <input className="inp" placeholder="e.g. Skyline Residence Launch" value={useName} onChange={(e) => setUseName(e.target.value)} autoFocus />
           </div>
-          <InventoryBindFields accessToken={accessToken} value={useBind} onChange={setUseBind} onAvailabilityChange={setUseHasInventory} />
+          <InventoryBindFields
+            accessToken={accessToken}
+            value={useBind}
+            onChange={setUseBind}
+            onSelectOption={(opt) => {
+              setUseSelectedLabel(opt.label);
+              if (opt.label && !useName.trim()) {
+                setUseName(`${opt.label}${useTemplate?.name ? ` — ${useTemplate.name}` : ""}`);
+              }
+            }}
+            onAvailabilityChange={setUseHasInventory}
+          />
         </div>
       </Modal>
 
@@ -1525,6 +1544,12 @@ export default function OrgLandingPagesPage() {
             accessToken={accessToken}
             value={scratchBind}
             onChange={setScratchBind}
+            onSelectOption={(opt) => {
+              setScratchSelectedLabel(opt.label);
+              if (opt.label && !scratchName.trim()) {
+                setScratchName(opt.label);
+              }
+            }}
             onAvailabilityChange={setScratchHasInventory}
           />
         </div>

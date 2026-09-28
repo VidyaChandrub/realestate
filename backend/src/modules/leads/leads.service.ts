@@ -83,6 +83,7 @@ type ResolvedPublicPage = {
   id: string;
   orgId: string;
   status: string;
+  content?: unknown;
 };
 
 /** Fields needed to render an activity/call actor. */
@@ -197,6 +198,23 @@ export class LeadsService implements OnModuleInit {
       if (page) {
         orgId = page.orgId;
         resolvedLandingPageId = page.id;
+
+        // Auto-extract propertyBinding from the landing page if not explicitly supplied
+        const pageContent = page.content as {
+          config?: {
+            propertyBinding?: {
+              kind?: string;
+              projectId?: string;
+              unitId?: string;
+            };
+          };
+        } | null;
+        const binding = pageContent?.config?.propertyBinding;
+        if (binding?.kind === "project" && binding.projectId && !dto.projectId) {
+          dto.projectId = binding.projectId;
+        } else if (binding?.kind === "unit" && binding.unitId && !dto.unitId) {
+          dto.unitId = binding.unitId;
+        }
       }
     }
 
@@ -229,13 +247,28 @@ export class LeadsService implements OnModuleInit {
     if (dto.unitId) {
       const unit = await this.prisma.unit.findUnique({
         where: { id: dto.unitId },
-        select: { projectId: true, orgId: true },
+        select: { id: true, projectId: true, orgId: true, unitNo: true, configuration: true },
       });
-      if (!unit || !dto.projectId || unit.projectId !== dto.projectId) {
-        throw new BadRequestException('Selected unit does not belong to the selected project');
+      if (!unit) {
+        throw new BadRequestException('Selected unit not found');
+      }
+      if (unit.projectId) {
+        if (dto.projectId && unit.projectId !== dto.projectId) {
+          throw new BadRequestException('Selected unit does not belong to the selected project');
+        }
+        if (!dto.projectId) {
+          dto.projectId = unit.projectId;
+        }
+      } else {
+        if (dto.projectId) {
+          throw new BadRequestException('Selected standalone unit does not belong to a project');
+        }
       }
       if (orgId && orgId !== unit.orgId) {
         throw new BadRequestException('Selected unit belongs to another organisation');
+      }
+      if (!orgId) {
+        orgId = unit.orgId;
       }
     }
 
@@ -531,7 +564,7 @@ export class LeadsService implements OnModuleInit {
     ref: string,
     fallbackSlug?: string,
   ): Promise<ResolvedPublicPage | null> {
-    const select = { id: true, orgId: true, status: true } as const;
+    const select = { id: true, orgId: true, status: true, content: true } as const;
 
     // 1. Direct match by landing page UUID
     const byId = await this.prisma.landingPage.findUnique({

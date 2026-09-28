@@ -19,6 +19,7 @@ export function InventoryBindFields({
   accessToken,
   value,
   onChange,
+  onSelectOption,
   disabled,
   lockedProjectId,
   onAvailabilityChange,
@@ -28,6 +29,7 @@ export function InventoryBindFields({
   accessToken: string | null;
   value: InventoryBindValue;
   onChange: (next: InventoryBindValue) => void;
+  onSelectOption?: (option: { kind: "project" | "unit" | "none"; id?: string; label: string }) => void;
   disabled?: boolean;
   lockedProjectId?: string;
   onAvailabilityChange?: (hasInventory: boolean) => void;
@@ -94,13 +96,23 @@ export function InventoryBindFields({
           const raw = e.target.value;
           if (!raw) {
             onChange({ kind: "none" });
+            onSelectOption?.({ kind: "none", label: "" });
             return;
           }
           const [kind, ...rest] = raw.split(":");
           const id = rest.join(":");
-          if (kind === "project") onChange({ kind: "project", id });
-          else if (kind === "unit") onChange({ kind: "unit", id });
-          else onChange({ kind: "none" });
+          if (kind === "project") {
+            const found = projects.find((p) => p.id === id);
+            onChange({ kind: "project", id });
+            onSelectOption?.({ kind: "project", id, label: found?.name ?? "" });
+          } else if (kind === "unit") {
+            const found = units.find((u) => u.id === id);
+            onChange({ kind: "unit", id });
+            onSelectOption?.({ kind: "unit", id, label: found?.label ?? "" });
+          } else {
+            onChange({ kind: "none" });
+            onSelectOption?.({ kind: "none", label: "" });
+          }
         }}
       >
         <option value="">{loading ? "Loading inventory…" : "Select project or unit"}</option>
