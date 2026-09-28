@@ -1642,26 +1642,53 @@ function OrgLandingPageVisualCard({
 }) {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [trackedStats, setTrackedStats] = useState<{ views: number; leads: number }>({ views: 0, leads: 0 });
+  const [trackedStats, setTrackedStats] = useState<{ views: number; leads: number }>({
+    views: row.views ?? 0,
+    leads: row.leads ?? 0,
+  });
+
+  useEffect(() => {
+    if (row.views != null || row.leads != null) {
+      setTrackedStats({
+        views: row.views ?? 0,
+        leads: row.leads ?? 0,
+      });
+    }
+  }, [row.views, row.leads]);
 
   useEffect(() => {
     if (!accessToken || !row.id) return;
-    apiFetch<{ groups?: { eventType: string; _count: { _all: number } }[]; total?: number }>(
+    apiFetch<{
+      views?: number;
+      leads?: number;
+      groups?: { eventType: string; _count?: { _all: number }; count?: number }[];
+      byType?: { eventType: string; count: number }[];
+      total?: number;
+    }>(
       `/org/tracking/${encodeURIComponent(row.id)}/stats`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     )
       .then((res) => {
-        let v = 0;
-        let l = 0;
-        for (const g of res.groups ?? []) {
-          if (g.eventType === "page_view") v += g._count._all;
-          if (g.eventType === "lead_submit" || g.eventType === "form_submit") l += g._count._all;
+        let v = res.views ?? 0;
+        let l = res.leads ?? 0;
+
+        if (v === 0 && l === 0 && (res.groups || res.byType)) {
+          const list = res.groups || res.byType || [];
+          for (const g of list as any[]) {
+            const count = g._count?._all ?? g.count ?? 0;
+            if (g.eventType === "page_view") v += count;
+            if (g.eventType === "lead_submit" || g.eventType === "form_submit") l += count;
+          }
         }
-        if (v === 0 && res.total) v = res.total;
-        setTrackedStats({ views: v, leads: l });
+        if (v === 0 && res.total && l === 0) v = res.total;
+
+        setTrackedStats({
+          views: Math.max(v, row.views ?? 0),
+          leads: Math.max(l, row.leads ?? 0),
+        });
       })
       .catch(() => {});
-  }, [accessToken, row.id]);
+  }, [accessToken, row.id, row.views, row.leads]);
 
   const isPublished = row.status === "published";
   const isDraft = row.status === "draft";

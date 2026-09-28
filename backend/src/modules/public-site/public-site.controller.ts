@@ -1,10 +1,15 @@
-import { Controller, Get, Param, Header, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Header, Res } from '@nestjs/common';
 import { PublicSiteService } from './public-site.service';
 import type { Response } from 'express';
 
 @Controller('public/site')
 export class PublicSiteController {
   constructor(private readonly service: PublicSiteService) {}
+
+  @Post('track')
+  track(@Body() dto: { landingPageId: string; eventType?: string; metadata?: any }) {
+    return this.service.recordPublicTrack(dto);
+  }
 
   @Get('resolve/:domain')
   resolve(@Param('domain') domain: string) {

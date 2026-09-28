@@ -30,8 +30,36 @@ export class OrgTrackingService {
   async stats(orgId: string, landingPageId: string) {
     const page = await this.prisma.landingPage.findFirst({ where: { id: landingPageId, orgId } });
     if (!page) throw new NotFoundException('Page not found');
-    const groups = await this.prisma.trackingEvent.groupBy({ by: ['eventType'], where: { orgId, landingPageId }, _count: { _all: true } });
-    const total = await this.prisma.trackingEvent.count({ where: { orgId, landingPageId } });
-    return { total, byType: groups.map((g) => ({ eventType: g.eventType, count: g._count._all })) };
+
+    const [groups, totalEvents, leadCount] = await Promise.all([
+      this.prisma.trackingEvent.groupBy({
+        by: ['eventType'],
+        where: { orgId, landingPageId },
+        _count: { _all: true },
+      }),
+      this.prisma.trackingEvent.count({ where: { orgId, landingPageId } }),
+      this.prisma.lead.count({ where: { orgId, landingPageId } }),
+    ]);
+
+    let views = 0;
+    let leadSubmits = 0;
+    for (const g of groups) {
+      if (g.eventType === 'page_view') views += g._count._all;
+      if (g.eventType === 'lead_submit' || g.eventType === 'form_submit') leadSubmits += g._count._all;
+    }
+
+    const finalLeads = Math.max(leadCount, leadSubmits);
+
+    return {
+      total: totalEvents,
+      views,
+      leads: finalLeads,
+      byType: groups.map((g) => ({ eventType: g.eventType, count: g._count._all })),
+      groups: groups.map((g) => ({
+        eventType: g.eventType,
+        count: g._count._all,
+        _count: { _all: g._count._all },
+      })),
+    };
   }
 }
