@@ -266,16 +266,23 @@ export default function SuperAdminTemplatesPage() {
     }
   };
 
-  const handleDeleteCategory = async (cat: TemplateCategory) => {
-    if (!window.confirm(`Delete category "${cat.name}"? Templates in this category will become Unassigned.`)) {
-      return;
-    }
+  const [categoryToDelete, setCategoryToDelete] = useState<TemplateCategory | null>(null);
+  const [categoryDeleteBusy, setCategoryDeleteBusy] = useState(false);
+
+  const handleDeleteCategory = (cat: TemplateCategory) => setCategoryToDelete(cat);
+
+  const confirmDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    setCategoryDeleteBusy(true);
     try {
-      await deleteTemplateCategory(cat.id);
+      await deleteTemplateCategory(categoryToDelete.id);
       notify("Category deleted");
       reloadCategories();
     } catch (e) {
       notify(e instanceof Error ? e.message : "Failed to delete category");
+    } finally {
+      setCategoryDeleteBusy(false);
+      setCategoryToDelete(null);
     }
   };
 
@@ -1765,6 +1772,19 @@ export default function SuperAdminTemplatesPage() {
           }
         }}
         onClose={() => setDeleteFor(null)}
+      />
+
+      {/* Delete Category Confirmation — opened from inside the categories modal */}
+      <ConfirmModal
+        open={categoryToDelete !== null}
+        title="Delete category?"
+        message={`"${categoryToDelete?.name ?? ""}" will be deleted. Templates in this category will become Unassigned.`}
+        confirmLabel="Delete category"
+        destructive
+        busy={categoryDeleteBusy}
+        onConfirm={() => void confirmDeleteCategory()}
+        onClose={() => setCategoryToDelete(null)}
+        containerClassName="z-[60]!"
       />
 
       {/* Toast Notification */}

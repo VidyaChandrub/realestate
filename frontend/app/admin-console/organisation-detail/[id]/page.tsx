@@ -1359,12 +1359,33 @@ export default function SuperAdminOrganisationDetailPage() {
               </div>
 
               {addTemplateOpen ? (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 400, padding: 20 }} onClick={() => setAddTemplateOpen(false)}>
-                  <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, padding: 16, width: 720, maxWidth: "100%", maxHeight: "85vh", overflow: "auto" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                      <b>Add templates</b>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setAddTemplateOpen(false)}></button>
-                    </div>
+                <Modal
+                  open
+                  onClose={() => { setSelectedNewTemplateIds([]); setAddTemplateOpen(false); }}
+                  title="Add templates"
+                  size="lg"
+                  closeDisabled={templateSaving}
+                  footer={
+                    <>
+                      <button className="btn btn-ghost" disabled={templateSaving} onClick={() => { setSelectedNewTemplateIds([]); setAddTemplateOpen(false); }}>Cancel</button>
+                      <button className="btn btn-primary" disabled={templateSaving || selectedNewTemplateIds.length === 0} onClick={async () => {
+                        setTemplateSaving(true);
+                        try {
+                          const nextIds = [...assignedTemplates.map((a: any) => a.templateId), ...selectedNewTemplateIds];
+                          await apiFetch(`/admin/organisations/${org.id}/templates`, { method: "PUT", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ templateIds: nextIds }) });
+                          setAssignedTemplates(prev => [...prev, ...selectedNewTemplateIds.map(id => {
+                            const t = allTemplates.find((x: any) => x.id === id);
+                            return { templateId: id, template: { id: t.id, name: t.name, slug: t.slug, thumbnail: t.thumbnail, category: t.category } };
+                          })]);
+                          setSelectedNewTemplateIds([]); setAddTemplateOpen(false);
+                        } catch (e: any) { notify(e.message || "Failed to add"); }
+                        finally { setTemplateSaving(false); }
+                      }}>
+                        {templateSaving ? "Saving…" : `Add ${selectedNewTemplateIds.length} template(s)`}
+                      </button>
+                    </>
+                  }
+                >
                     <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
                       Current plan allows {(() => {
                         const plan = plans.find(p => p.id === ((org as any).plan?.id || (org.subscription as any)?.planId));
@@ -1394,39 +1415,22 @@ export default function SuperAdminOrganisationDetailPage() {
                         );
                       })}
                     </div>
-                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => { setSelectedNewTemplateIds([]); setAddTemplateOpen(false); }}>Cancel</button>
-                      <button className="btn btn-primary btn-sm" disabled={templateSaving || selectedNewTemplateIds.length === 0} onClick={async () => {
-                        setTemplateSaving(true);
-                        try {
-                          const nextIds = [...assignedTemplates.map((a: any) => a.templateId), ...selectedNewTemplateIds];
-                          await apiFetch(`/admin/organisations/${org.id}/templates`, { method: "PUT", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ templateIds: nextIds }) });
-                          setAssignedTemplates(prev => [...prev, ...selectedNewTemplateIds.map(id => {
-                            const t = allTemplates.find((x: any) => x.id === id);
-                            return { templateId: id, template: { id: t.id, name: t.name, slug: t.slug, thumbnail: t.thumbnail, category: t.category } };
-                          })]);
-                          setSelectedNewTemplateIds([]); setAddTemplateOpen(false);
-                        } catch (e: any) { notify(e.message || "Failed to add"); }
-                        finally { setTemplateSaving(false); }
-                      }}>
-                        {templateSaving ? "Saving…" : `Add ${selectedNewTemplateIds.length} template(s)`}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                </Modal>
               ) : null}
 
               {previewTpl ? (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500, padding: 20 }} onClick={() => setPreviewTpl(null)}>
-                  <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, overflow: "hidden", width: 720, maxWidth: "100%" }}>
-                    <div style={{ height: 260, background: previewTpl.thumbnail ? `url(${previewTpl.thumbnail}) center/cover` : "#eef1f6", position: "relative" }}>
-                      <button onClick={() => setPreviewTpl(null)} className="absolute right-3 top-3 rounded-full bg-black/60 p-2 text-white"><Icon name="close" size={14} /></button>
-                    </div>
-                    <div style={{ padding: 16 }}>
-                      <b>{previewTpl.name}</b><div className="muted" style={{ fontSize: 12 }}>{previewTpl.slug} · {previewTpl.category}</div>
-                    </div>
-                  </div>
-                </div>
+                <Modal
+                  open
+                  onClose={() => setPreviewTpl(null)}
+                  title={previewTpl.name}
+                  description={`${previewTpl.slug} · ${previewTpl.category}`}
+                  size="lg"
+                  flush
+                  // Opened from inside the "Add templates" modal.
+                  containerClassName="z-[60]!"
+                >
+                  <div style={{ height: 320, background: previewTpl.thumbnail ? `url(${previewTpl.thumbnail}) center/cover` : "#eef1f6" }} />
+                </Modal>
               ) : null}
             </Reveal>
           ) : null}

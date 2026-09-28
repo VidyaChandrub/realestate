@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Icon, type IconName } from "@/components/icons";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
+import { Modal } from "@/components/ui/modal";
 import { mapApiFieldErrors } from "@/lib/form-errors";
 import {
   createOrganisationStep,
@@ -970,55 +971,13 @@ export default function RegisterPage() {
       </AuthShell>
 
       {draftCollision ? (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15,23,42,.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 400,
-            padding: 20,
-          }}
-          onClick={() => {
-            if (!draftBusy) setDraftCollision(null);
-          }}
+        <Modal
+          open
+          onClose={() => setDraftCollision(null)}
+          title="Welcome back"
+          size="sm"
+          closeDisabled={!!draftBusy}
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "var(--surface)",
-              borderRadius: 20,
-              padding: 28,
-              width: 460,
-              maxWidth: "100%",
-              boxShadow: "var(--sh-lg)",
-              position: "relative",
-            }}
-          >
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={() => { if (!draftBusy) setDraftCollision(null); }}
-              disabled={!!draftBusy}
-              style={{
-                position: "absolute",
-                top: 18,
-                right: 18,
-                border: "none",
-                background: "none",
-                color: "var(--muted)",
-                fontSize: 15,
-                cursor: draftBusy ? "not-allowed" : "pointer",
-                lineHeight: 1,
-              }}
-            >
-              ✕
-            </button>
-            <h2 style={{ margin: "0 0 6px", fontSize: 19, fontWeight: 800, color: "var(--ink)" }}>
-              Welcome back
-            </h2>
             <p style={{ margin: "0 0 20px", color: "var(--ink-2)", fontSize: 13.5, lineHeight: 1.6 }}>
               Looks like {draftCollision.firstName ? <b>{draftCollision.firstName}</b> : "someone"} already
               started setting up a workspace with this email or mobile number — it got as far as{" "}
@@ -1048,8 +1007,7 @@ export default function RegisterPage() {
                 {draftBusy === "restart" ? "Starting fresh…" : "Start fresh instead"}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       ) : null}
     </>
   );

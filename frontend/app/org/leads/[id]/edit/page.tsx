@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@/components/icons";
 import { StatusNoteModal } from "@/components/org/lead-status-select";
+import { LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead-stages";
 import { useAuth } from "@/lib/auth-context";
 import { isOrgAdmin } from "@/lib/session";
 import { isValidLoosePhone, LOOSE_PHONE_MESSAGE } from "@/lib/phone";
@@ -34,17 +35,6 @@ const SOURCES = ["Meta Lead Ad", "Google Ads", "Website form", "Portal (99acres)
 // Parking are shared org-wide lists managed under Project Catalogs.
 const LEAD_CATALOG_HREF = "/org/settings?section=crm";
 const PROJECT_CATALOG_HREF = "/org/settings?section=catalogs";
-
-
-const STATUS_OPTIONS: Array<{ value: CrmLeadStatus; label: string }> = [
-  { value: "new", label: "New Lead" },
-  { value: "contacted", label: "Contacted" },
-  { value: "follow_up", label: "Follow-up" },
-  { value: "site_visit", label: "Site Visit" },
-  { value: "negotiation", label: "Negotiation" },
-  { value: "won", label: "Won / Deal Closed" },
-  { value: "lost", label: "Lost" },
-];
 
 function dataField(data: Record<string, unknown> | undefined, ...keys: string[]): string {
   if (!data) return "";
@@ -268,7 +258,9 @@ export default function OrgLeadEditPage() {
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [lostOpen, setLostOpen] = useState(false);
+  // Target of a pending pipeline status change — every change needs a note.
+  const [pendingStatus, setPendingStatus] = useState<CrmLeadStatus | null>(null);
+  const { label: stageLabel } = useLeadStages();
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [assignees, setAssignees] = useState<{ id: string; name: string }[]>([]);
   // Org option lists. Configuration reads `unit_type`, Facing/Parking read the
@@ -942,16 +934,12 @@ export default function OrgLeadEditPage() {
                   value={lead.status}
                   onChange={(e) => {
                     const st = e.target.value as CrmLeadStatus;
-                    if (st === "lost") {
-                      setLostOpen(true);
-                    } else {
-                      void confirmStatus(st, "");
-                    }
+                    if (st !== lead.status) setPendingStatus(st);
                   }}
                 >
-                  {STATUS_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                  {LEAD_STAGE_ORDER.map((st) => (
+                    <option key={st} value={st}>
+                      {stageLabel(st)}
                     </option>
                   ))}
                 </select>
@@ -1096,12 +1084,12 @@ export default function OrgLeadEditPage() {
         </div>
       </div>
 
-      {/* Status Note Modal for Lost Status */}
+      {/* Status Note Modal — a note is required for every pipeline status change */}
       <StatusNoteModal
-        open={lostOpen}
+        open={pendingStatus !== null}
         fromStatus={lead.status}
-        toStatus={lostOpen ? "lost" : null}
-        onClose={() => setLostOpen(false)}
+        toStatus={pendingStatus}
+        onClose={() => setPendingStatus(null)}
         onConfirm={confirmStatus}
       />
     </div>

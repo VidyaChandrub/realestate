@@ -22,7 +22,6 @@ import {
   Trash2,
   Upload,
   Video,
-  X,
   Eye,
   Building,
 } from "lucide-react";
@@ -43,6 +42,8 @@ import {
   updateOrgMedia,
 } from "@/lib/api";
 import type { MediaFileItem, MediaStatsResponse } from "@/lib/types";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 
 interface MediaLibraryViewProps {
@@ -209,8 +210,32 @@ export function MediaLibraryView({ mode }: MediaLibraryViewProps) {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this media file?")) return;
+  // Delete confirmation — one file or the current selection.
+  const [pendingDelete, setPendingDelete] = useState<
+    { kind: "one"; id: string } | { kind: "bulk" } | null
+  >(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const confirmPendingDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleteBusy(true);
+    try {
+      if (pendingDelete.kind === "one") await deleteOne(pendingDelete.id);
+      else await deleteSelected();
+    } finally {
+      setDeleteBusy(false);
+      setPendingDelete(null);
+    }
+  };
+
+  const handleDelete = (id: string) => setPendingDelete({ kind: "one", id });
+
+  const handleBulkDelete = () => {
+    if (selectedIds.length === 0) return;
+    setPendingDelete({ kind: "bulk" });
+  };
+
+  const deleteOne = async (id: string) => {
     try {
       if (mode === "org") {
         await deleteOrgMedia(id);
@@ -230,10 +255,7 @@ export function MediaLibraryView({ mode }: MediaLibraryViewProps) {
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (selectedIds.length === 0) return;
-    if (!confirm(`Delete ${selectedIds.length} selected items permanently?`)) return;
-
+  const deleteSelected = async () => {
     try {
       if (mode === "org") {
         await bulkDeleteOrgMedia(selectedIds);
@@ -1298,66 +1320,12 @@ export function MediaLibraryView({ mode }: MediaLibraryViewProps) {
 
       {/* --- Asset Detail Lightbox Modal --- */}
       {activeItem && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.75)",
-            backdropFilter: "blur(6px)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-          }}
-        >
-          <div
-            style={{
-              background: "#ffffff",
-              borderRadius: "20px",
-              maxWidth: "900px",
-              width: "100%",
-              maxHeight: "90vh",
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-            }}
-          >
-            {/* Modal Header */}
-            <div
-              style={{
-                padding: "16px 24px",
-                borderBottom: "1px solid #e2e8f0",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#0f172a", margin: 0 }}>
-                {activeItem.name}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setActiveItem(null)}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "#64748b",
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
+        <Modal open onClose={() => setActiveItem(null)} title={activeItem.name} size="xl" flush>
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 320px",
-                flex: 1,
-                overflow: "hidden",
+                minHeight: 0,
               }}
             >
               {/* Media Preview */}
@@ -1530,48 +1498,28 @@ export function MediaLibraryView({ mode }: MediaLibraryViewProps) {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* --- Edit Metadata Modal --- */}
       {editItem && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.6)",
-            backdropFilter: "blur(4px)",
-            zIndex: 1050,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-          }}
-        >
-          <div
-            style={{
-              background: "#ffffff",
-              borderRadius: "16px",
-              maxWidth: "480px",
-              width: "100%",
-              padding: "24px",
-              boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3 style={{ fontSize: "17px", fontWeight: "700", color: "#0f172a", margin: 0 }}>
-                Edit Asset Details
-              </h3>
-              <button
-                type="button"
-                onClick={closeEditModal}
-                style={{ background: "transparent", border: "none", cursor: "pointer", color: "#64748b" }}
-              >
-                <X size={20} />
+        <Modal
+          open
+          onClose={closeEditModal}
+          title="Edit Asset Details"
+          size="sm"
+          closeDisabled={savingEdit}
+          footer={
+            <>
+              <button type="button" className="btn btn-ghost" onClick={closeEditModal} disabled={savingEdit}>
+                Cancel
               </button>
-            </div>
-
+              <button type="button" className="btn btn-primary" disabled={savingEdit} onClick={handleSaveEdit}>
+                {savingEdit ? "Saving..." : "Save Changes"}
+              </button>
+            </>
+          }
+        >
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               <div>
                 <label style={{ fontSize: "12px", fontWeight: 700, color: "#64748b" }}>Asset Name</label>
@@ -1644,82 +1592,12 @@ export function MediaLibraryView({ mode }: MediaLibraryViewProps) {
                 />
               </div>
             </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "24px" }}>
-              <button
-                type="button"
-                onClick={closeEditModal}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  border: "1px solid #cbd5e1",
-                  background: "#fff",
-                  fontSize: "13px",
-                  cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={savingEdit}
-                onClick={handleSaveEdit}
-                style={{
-                  padding: "8px 18px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "#2563eb",
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: "13px",
-                  cursor: savingEdit ? "default" : "pointer",
-                }}
-              >
-                {savingEdit ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* --- Upload Modal / Drag and Drop Zone --- */}
       {showUploadModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.65)",
-            backdropFilter: "blur(4px)",
-            zIndex: 1050,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-          }}
-        >
-          <div
-            style={{
-              background: "#ffffff",
-              borderRadius: "20px",
-              maxWidth: "520px",
-              width: "100%",
-              padding: "28px",
-              boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#0f172a", margin: 0 }}>
-                Upload Assets to Media Library
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowUploadModal(false)}
-                style={{ background: "transparent", border: "none", cursor: "pointer", color: "#64748b" }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
+        <Modal open onClose={() => setShowUploadModal(false)} title="Upload Assets to Media Library" size="md">
             <div style={{ marginBottom: "16px" }}>
               <label style={{ fontSize: "12px", fontWeight: 700, color: "#64748b" }}>Folder Category</label>
               <input
@@ -1806,9 +1684,25 @@ export function MediaLibraryView({ mode }: MediaLibraryViewProps) {
                 e.target.value = "";
               }}
             />
-          </div>
-        </div>
+        </Modal>
       )}
+
+      <ConfirmModal
+        open={pendingDelete !== null}
+        title={pendingDelete?.kind === "bulk" ? "Delete selected files?" : "Delete this file?"}
+        message={
+          pendingDelete?.kind === "bulk"
+            ? `${selectedIds.length} selected file${selectedIds.length === 1 ? "" : "s"} will be permanently deleted. This cannot be undone.`
+            : "This media file will be permanently deleted. This cannot be undone."
+        }
+        confirmLabel="Delete"
+        destructive
+        busy={deleteBusy}
+        onConfirm={() => void confirmPendingDelete()}
+        onClose={() => setPendingDelete(null)}
+        // Sits above the asset detail modal, which can trigger a delete.
+        containerClassName="z-[60]!"
+      />
     </div>
   );
 }
