@@ -36,6 +36,8 @@ export type TemplateRow = {
   tier?: "free" | "paid" | "premium";
   category?: string | null;
   categoryId?: string | null;
+  /** Explicit subscription plan grants. Empty → access falls back to `tier`. */
+  allowedPlanIds?: string[];
 };
 
 export function findPreset(pages: LandingPageData[], designId: string) {
@@ -66,6 +68,7 @@ export function buildTemplateRows(pages: LandingPageData[]): TemplateRow[] {
       domain: page ? page.domain || localPreviewPath(page) : "Not created yet",
       designId: design.id,
       tier: page?.tier ?? "free",
+      allowedPlanIds: page?.allowedPlanIds ?? [],
       category: page?.category ?? design.category,
       categoryId: page?.categoryId ?? null,
     };
@@ -98,6 +101,7 @@ export function buildTemplateRows(pages: LandingPageData[]): TemplateRow[] {
         domain: p.domain || localPreviewPath(p),
         designId: p.designId ?? p.id,
         tier: p.tier ?? "free",
+        allowedPlanIds: p.allowedPlanIds ?? [],
         category: p.category ?? null,
         categoryId: p.categoryId ?? null,
       };
@@ -120,6 +124,7 @@ export function buildTemplateRows(pages: LandingPageData[]): TemplateRow[] {
         domain: p.domain || localPreviewPath(p),
         designId: p.designId ?? "tpl-blank",
         tier: p.tier ?? "free",
+        allowedPlanIds: p.allowedPlanIds ?? [],
         category: p.category ?? null,
         categoryId: p.categoryId ?? null,
       };
@@ -221,16 +226,37 @@ export function tierStyle(
   }
 }
 
+/** Badge text for the plans a template is actually available to, e.g.
+ *  "Prime", "Basic, Starter", "Basic, Starter +2" or "All Plans". */
+export function planAccessStyle(
+  template: { tier?: AccessTier; allowedPlanIds?: string[] },
+  plans: AccessPlan[],
+): { cls: string; label: string; title: string } {
+  const names = plans.filter((p) => templateAllowsPlan(template, p)).map((p) => p.name);
+  const title = names.length > 0 ? `Available to: ${names.join(", ")}` : "Not available to any plan";
+  if (names.length === 0) return { cls: "b-gray", label: "No plans", title };
+  if (names.length === plans.length) return { cls: "b-green", label: "All Plans", title };
+  const label = names.length <= 2 ? names.join(", ") : `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
+  return { cls: "b-indigo", label, title };
+}
+
 export function TierBadge({
   tier,
   plans,
+  allowedPlanIds,
 }: {
   tier?: "free" | "paid" | "premium";
-  plans?: TemplatePlan[];
+  plans?: (TemplatePlan & { id?: string })[];
+  /** When given with id-bearing plans, the badge names the plans granted access. */
+  allowedPlanIds?: string[];
 }) {
-  const t = tierStyle(tier, plans);
+  const withIds = (plans ?? []).filter((p): p is AccessPlan => typeof p.id === "string");
+  const t =
+    allowedPlanIds !== undefined && withIds.length > 0
+      ? planAccessStyle({ tier, allowedPlanIds }, withIds)
+      : { ...tierStyle(tier, plans), title: undefined };
   return (
-    <span className={`badge ${t.cls}`} style={{ textTransform: "none", fontWeight: 600 }}>
+    <span className={`badge ${t.cls}`} title={t.title} style={{ textTransform: "none", fontWeight: 600 }}>
       {t.label}
     </span>
   );
@@ -262,6 +288,42 @@ export function plansForAccessTier(
       return caps.paidTemplates === true || caps.premiumTemplates === true || price > 0;
     })
     .map((p) => p.name);
+}
+
+type AccessPlan = TemplatePlan & { id: string };
+
+/** Mirrors the backend's canPlanAccessTier (subscription-lifecycle.util.ts). */
+export function planCanAccessTier(plan: TemplatePlan, tier: AccessTier = "free"): boolean {
+  if (tier === "free") return true;
+  const caps = plan.capabilities ?? {};
+  const price = plan.priceMonthly ?? 0;
+  if (tier === "paid") {
+    return caps.paidTemplates === true || caps.premiumTemplates === true || price > 0;
+  }
+  return (
+    caps.premiumTemplates === true ||
+    price >= 10000 ||
+    /ultra|premium|max|enterprise/i.test(plan.slug ?? "")
+  );
+}
+
+/** Whether workspaces on `plan` can use a template — same rule the org
+ *  templates API applies: explicit plan grants win, otherwise the tier. */
+export function templateAllowsPlan(
+  template: { tier?: AccessTier; allowedPlanIds?: string[] },
+  plan: AccessPlan,
+): boolean {
+  const ids = template.allowedPlanIds ?? [];
+  if (ids.length > 0) return ids.includes(plan.id);
+  return planCanAccessTier(plan, template.tier ?? "free");
+}
+
+/** Plan ids a template is currently effectively available to. */
+export function effectivePlanIds(
+  template: { tier?: AccessTier; allowedPlanIds?: string[] },
+  plans: AccessPlan[],
+): string[] {
+  return plans.filter((p) => templateAllowsPlan(template, p)).map((p) => p.id);
 }
 
 /** Dropdown label: uses subscription plans directly. */

@@ -173,6 +173,7 @@ interface ApiTemplate {
   templateCategory?: { id: string; name: string; slug: string; tier: "free" | "paid" | "premium" } | null;
   category: string | null;
   isPaid: boolean;
+  allowedPlanIds?: string[];
   createdAt: string;
   updatedAt: string;
   sections?: SectionInstance[];
@@ -222,6 +223,7 @@ function fromApiTemplate(raw: ApiTemplate): LandingPageData {
     templateCategory: raw.templateCategory ?? null,
     isPaid: raw.isPaid,
     category: raw.category,
+    allowedPlanIds: Array.isArray(raw.allowedPlanIds) ? raw.allowedPlanIds : [],
   };
 }
 

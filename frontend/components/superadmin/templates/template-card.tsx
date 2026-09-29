@@ -36,7 +36,7 @@ export function TemplateCard({
   onQuickPreview,
 }: {
   row: TemplateRow;
-  plans?: TemplatePlan[];
+  plans?: (TemplatePlan & { id?: string })[];
   delay?: number;
   onEdit: () => void;
   onPreview: () => void;
@@ -92,7 +92,7 @@ export function TemplateCard({
                 alignItems: "center",
               }}
             >
-              <TierBadge tier={row.tier} plans={plans} />
+              <TierBadge tier={row.tier} plans={plans} allowedPlanIds={row.allowedPlanIds ?? []} />
               <StatusBadge status={row.status} />
             </div>
 

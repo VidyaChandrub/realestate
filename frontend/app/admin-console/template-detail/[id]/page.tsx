@@ -8,6 +8,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import {
   ACCESS_TIERS,
   accessTierOptionLabel,
+  effectivePlanIds,
   getTemplatePlanOptions,
   StatusBadge,
   TemplateCover,
@@ -87,22 +88,9 @@ export default function SuperAdminTemplateDetailPage() {
     setTier(template.tier ?? (template.isPaid ? "paid" : "free"));
     setCategoryId(template.categoryId ?? "");
 
-    const cfg = ensureConfig(template);
-    const existing: string[] | undefined = (cfg as any).allowedPlanIds;
-    if (existing && Array.isArray(existing) && existing.length > 0) {
-      setSelectedPlanIds(existing);
-    } else if (plans.length > 0) {
-      const currentTier = template.tier ?? (template.isPaid ? "paid" : "free");
-      if (currentTier === "premium") {
-        setSelectedPlanIds(
-          plans.filter((p) => (p.priceMonthly ?? 0) >= 10000 || /ultra|premium/i.test(p.slug)).map((p) => p.id)
-        );
-      } else if (currentTier === "paid") {
-        setSelectedPlanIds(plans.filter((p) => (p.priceMonthly ?? 0) > 0).map((p) => p.id));
-      } else {
-        setSelectedPlanIds(plans.map((p) => p.id));
-      }
-    }
+    // Seed with the plans that can use this template today — explicit grants,
+    // or (for templates never given any) whatever the tier unlocks.
+    setSelectedPlanIds(effectivePlanIds(templateAccess(template), plans));
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [template, plans]);
 
@@ -131,7 +119,8 @@ export default function SuperAdminTemplateDetailPage() {
   if (!template) return null;
 
   const cfg = ensureConfig(template);
-  const initialPlanIds: string[] = (cfg as any)?.allowedPlanIds ?? [];
+  const initialPlanIds = effectivePlanIds(templateAccess(template), plans);
+  const noPlanSelected = plans.length > 0 && selectedPlanIds.length === 0;
   const planIdsDirty = JSON.stringify([...selectedPlanIds].sort()) !== JSON.stringify([...initialPlanIds].sort());
   const dirty =
     name !== template.name ||
@@ -161,12 +150,13 @@ export default function SuperAdminTemplateDetailPage() {
     const cleanSlug =
       slug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || template.slug;
 
-    const calculatedTier = computeTierFromPlanIds(selectedPlanIds, plans);
+    // Only persist ids of plans that still exist. An empty list would fall back
+    // to tier access (i.e. everyone), so the Save button blocks that case. If
+    // plans failed to load, leave plan access untouched.
+    const planIds = selectedPlanIds.filter((id) => plans.some((p) => p.id === id));
+    const calculatedTier = plans.length > 0 ? computeTierFromPlanIds(planIds, plans) : tier;
     const currentCfg = ensureConfig(template);
-    const updatedConfig = {
-      ...currentCfg,
-      allowedPlanIds: selectedPlanIds,
-    };
+    const updatedConfig = plans.length > 0 ? { ...currentCfg, allowedPlanIds: planIds } : currentCfg;
 
     const payload = {
       ...template,
@@ -182,14 +172,19 @@ export default function SuperAdminTemplateDetailPage() {
     };
 
     let updated;
-    if (template.id.startsWith("tpl-")) {
-      updated = await createTemplate({
-        ...payload,
-        designId: template.designId || template.id,
-        config: payload.config ?? ensureConfig(template),
-      });
-    } else {
-      updated = await saveTemplate(payload);
+    try {
+      if (template.id.startsWith("tpl-")) {
+        updated = await createTemplate({
+          ...payload,
+          designId: template.designId || template.id,
+          config: payload.config ?? ensureConfig(template),
+        });
+      } else {
+        updated = await saveTemplate(payload);
+      }
+    } catch (err) {
+      notify(err instanceof Error && err.message ? `Could not save: ${err.message}` : "Could not save template settings");
+      return;
     }
 
     setTemplate(updated);
@@ -279,7 +274,7 @@ export default function SuperAdminTemplateDetailPage() {
                 <div className="card-b" style={{ display: "grid", gap: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span className="muted" style={{ fontSize: 13 }}>Plan access</span>
-                    <TierBadge tier={template.tier} plans={plans} />
+                    <TierBadge tier={template.tier} plans={plans} allowedPlanIds={templateAccess(template).allowedPlanIds} />
                   </div>
                   <MetaRow label="Category" value={template.category || "Unassigned"} />
                   <MetaRow label="Base design" value={template.template} />
@@ -469,9 +464,15 @@ export default function SuperAdminTemplateDetailPage() {
                       );
                     })}
                   </div>
-                  <div className="hint" style={{ marginTop: 8 }}>
-                    Workspaces on selected plans will be able to browse and build landing pages with this template.
-                  </div>
+                  {noPlanSelected ? (
+                    <div className="hint" style={{ marginTop: 8, color: "var(--red, #dc2626)" }}>
+                      Select at least one subscription plan.
+                    </div>
+                  ) : (
+                    <div className="hint" style={{ marginTop: 8 }}>
+                      Workspaces on selected plans will be able to browse and build landing pages with this template.
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
                   <button type="button" className="btn btn-ghost" disabled={!dirty} onClick={() => {
@@ -481,10 +482,11 @@ export default function SuperAdminTemplateDetailPage() {
                     setDomain(template.domain);
                     setTier(template.tier ?? (template.isPaid ? "paid" : "free"));
                     setCategoryId(template.categoryId ?? "");
+                    setSelectedPlanIds(initialPlanIds);
                   }}>
                     Reset
                   </button>
-                  <button type="button" className="btn btn-primary" disabled={!dirty} onClick={() => void save()}>
+                  <button type="button" className="btn btn-primary" disabled={!dirty || noPlanSelected} onClick={() => void save()}>
                     Save changes
                   </button>
                 </div>
@@ -546,6 +548,13 @@ export default function SuperAdminTemplateDetailPage() {
       ) : null}
     </>
   );
+}
+
+function templateAccess(t: LandingPageData) {
+  return {
+    tier: t.tier ?? (t.isPaid ? ("paid" as const) : ("free" as const)),
+    allowedPlanIds: t.allowedPlanIds?.length ? t.allowedPlanIds : (t.config?.allowedPlanIds ?? []),
+  };
 }
 
 function MetaRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {

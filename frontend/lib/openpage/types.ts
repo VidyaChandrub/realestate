@@ -554,6 +554,8 @@ export interface SiteConfig {
   designSystem?: DesignSystemState;
   /** Page-scoped configuration captured by Page Settings. */
   settings?: PageSettings;
+  /** Templates only: subscription plan ids granted access. Empty/absent → fall back to `tier`. */
+  allowedPlanIds?: string[];
 }
 
 export interface LandingPageData {
@@ -586,6 +588,8 @@ export interface LandingPageData {
   templateCategory?: { id: string; name: string; slug: string; tier: "free" | "paid" | "premium" } | null;
   isPaid?: boolean;
   category?: string | null;
+  /** Subscription plan ids granted access (mirrors config.allowedPlanIds). Empty → tier-based access. */
+  allowedPlanIds?: string[];
   /** ISO timestamp from the backend — `updated` is still the display string derived from this. */
   updatedAt?: string;
 }
