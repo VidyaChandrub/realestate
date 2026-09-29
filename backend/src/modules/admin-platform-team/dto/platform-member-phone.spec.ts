@@ -8,7 +8,7 @@ function createErrors(phoneNumber: unknown) {
     firstName: 'Plat',
     lastName: 'Member',
     email: 'member@ipixxel.test',
-    role: 'super_admin',
+    role: 'ops',
     phoneNumber,
   });
   return validateSync(dto).filter((e) => e.property === 'phoneNumber');
@@ -30,9 +30,12 @@ describe('Platform member DTO — mobile number validation', () => {
     expect(updateErrors(value)).toHaveLength(0);
   });
 
-  it('accepts an omitted or empty mobile number', () => {
-    expect(createErrors(undefined)).toHaveLength(0);
-    expect(createErrors('')).toHaveLength(0);
+  it('requires a mobile number on create', () => {
+    expect(createErrors(undefined).length).toBeGreaterThan(0);
+    expect(createErrors('').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the mobile number optional on update', () => {
     expect(updateErrors(undefined)).toHaveLength(0);
     expect(updateErrors('')).toHaveLength(0);
   });

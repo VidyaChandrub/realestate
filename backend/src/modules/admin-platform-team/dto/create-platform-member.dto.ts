@@ -8,8 +8,8 @@ import {
   MinLength,
 } from 'class-validator';
 import {
-  OPTIONAL_PHONE_NUMBER_REGEX,
   PHONE_NUMBER_MESSAGE,
+  PHONE_NUMBER_REGEX,
 } from '../../../common/utils/phone.util';
 
 export class CreatePlatformMemberDto {
@@ -23,15 +23,16 @@ export class CreatePlatformMemberDto {
   @MaxLength(100)
   lastName: string;
 
-  @IsEmail()
+  @IsEmail({}, { message: 'Enter a valid email address.' })
   @IsNotEmpty()
+  @MaxLength(254)
   email: string;
 
-  @IsOptional()
   @IsString()
+  @IsNotEmpty({ message: 'Mobile number is required.' })
   @MaxLength(16)
-  @Matches(OPTIONAL_PHONE_NUMBER_REGEX, { message: PHONE_NUMBER_MESSAGE })
-  phoneNumber?: string;
+  @Matches(PHONE_NUMBER_REGEX, { message: PHONE_NUMBER_MESSAGE })
+  phoneNumber: string;
 
   /** Platform-scoped role key (e.g. super_admin or a custom platform role). */
   @IsString()

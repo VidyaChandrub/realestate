@@ -27,7 +27,8 @@ export class UpdatePlatformMemberDto {
   lastName?: string;
 
   @IsOptional()
-  @IsEmail()
+  @IsEmail({}, { message: 'Enter a valid email address.' })
+  @MaxLength(254)
   email?: string;
 
   @IsOptional()
