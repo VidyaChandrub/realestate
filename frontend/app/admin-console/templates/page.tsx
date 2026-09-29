@@ -34,7 +34,6 @@ import { Reveal } from "@/components/superadmin/reveal";
 import {
   ACCESS_TIERS,
   accessTierOptionLabel,
-  getTemplatePlanOptions,
   buildTemplateRows,
   deriveStats,
   matchesFilter,
@@ -46,8 +45,10 @@ import {
   tierStyle,
   StatusBadge,
   manageHref,
+  templateAllowsPlan,
 } from "@/components/superadmin/templates/shared";
 import { TemplateCard } from "@/components/superadmin/templates/template-card";
+import { PlanFilterDropdown } from "@/components/superadmin/templates/plan-filter-dropdown";
 import { TEMPLATES, buildTemplateSections } from "@/lib/openpage/data";
 import {
   createTemplate,
@@ -148,6 +149,8 @@ function goToBuilder(pageId: string) {
   window.location.assign(builderPath(pageId));
 }
 
+const PLAN_BADGE_CLASSES = ["b-green", "b-indigo", "b-violet", "b-amber"];
+
 export default function SuperAdminTemplatesPage() {
   const [pages, setPages] = useState<LandingPageData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -158,7 +161,7 @@ export default function SuperAdminTemplatesPage() {
 
   // Filters
   const [filterIndex, setFilterIndex] = useState(0);
-  const [tierFilter, setTierFilter] = useState<"all" | "free" | "paid" | "premium">("all");
+  const [planFilter, setPlanFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -406,27 +409,27 @@ export default function SuperAdminTemplatesPage() {
   const rows = useMemo(() => buildTemplateRows(pages), [pages]);
   const stats = useMemo(() => deriveStats(rows), [rows]);
 
-  // Plan tier counts
-  const tierCounts = useMemo(() => {
-    let free = 0;
-    let paid = 0;
-    let premium = 0;
-    for (const r of rows) {
-      const t = r.tier ?? "free";
-      if (t === "free") free++;
-      else if (t === "paid") paid++;
-      else if (t === "premium") premium++;
-    }
-    return { free, paid, premium };
-  }, [rows]);
-
-  // Subscription plan tiers dynamically derived from active plans
-  const planOptions = useMemo(() => getTemplatePlanOptions(plans), [plans]);
-  const freeOption = planOptions.find((o) => o.tier === "free");
-  const paidOption = planOptions.find((o) => o.tier === "paid");
-  const premOption = planOptions.find((o) => o.tier === "premium");
+  // Subscription plans, cheapest first; inactive plans last.
+  const sortedPlans = useMemo(
+    () =>
+      [...plans].sort(
+        (a, b) =>
+          Number(b.isActive !== false) - Number(a.isActive !== false) ||
+          (a.priceMonthly ?? 0) - (b.priceMonthly ?? 0) ||
+          a.name.localeCompare(b.name),
+      ),
+    [plans],
+  );
 
   const filter = TEMPLATE_FILTERS[filterIndex] ?? "All";
+
+  // Templates available to each subscription plan (explicit grants, else tier).
+  const planCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const p of plans) map[p.id] = rows.filter((r) => templateAllowsPlan(r, p)).length;
+    return map;
+  }, [rows, plans]);
+  const selectedPlan = planFilter === "all" ? null : (plans.find((p) => p.id === planFilter) ?? null);
 
   // Visible rows after all filters
   const visible = useMemo(
@@ -434,14 +437,14 @@ export default function SuperAdminTemplatesPage() {
       rows.filter(
         (r) =>
           matchesFilter(r, filter) &&
-          (tierFilter === "all" || (r.tier ?? "free") === tierFilter) &&
+          (!selectedPlan || templateAllowsPlan(r, selectedPlan)) &&
           (categoryFilter === "all" || r.category === categoryFilter || r.categoryId === categoryFilter) &&
           (!search ||
             r.name.toLowerCase().includes(search) ||
             r.source.toLowerCase().includes(search) ||
             r.description.toLowerCase().includes(search)),
       ),
-    [rows, filter, tierFilter, categoryFilter, search],
+    [rows, filter, selectedPlan, categoryFilter, search],
   );
 
   // Category counts
@@ -652,89 +655,42 @@ export default function SuperAdminTemplatesPage() {
             </div>
           </div>
 
-          {/* Card: Free Plan / Fixed Tier */}
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--line-2)",
-              borderRadius: 14,
-              padding: "12px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              cursor: "pointer",
-              borderColor: tierFilter === "free" ? "var(--green)" : "var(--line-2)",
-            }}
-            onClick={() => setTierFilter(tierFilter === "free" ? "all" : "free")}
-          >
-            <div>
-              <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
-                {freeOption?.badgeLabel || "Free Plan"}
+          {/* Cards: one per subscription plan — templates available to it */}
+          {sortedPlans.map((p, i) => {
+            const active = planFilter === p.id;
+            return (
+              <div
+                key={p.id}
+                role="button"
+                title={`Show templates available on ${p.name}`}
+                style={{
+                  background: "var(--surface)",
+                  border: `1px solid ${active ? "var(--brand)" : "var(--line-2)"}`,
+                  borderRadius: 14,
+                  padding: "12px 16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  cursor: "pointer",
+                  opacity: p.isActive === false ? 0.7 : 1,
+                }}
+                onClick={() => setPlanFilter(active ? "all" : p.id)}
+              >
+                <div>
+                  <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
+                    {p.name}
+                    {p.isActive === false ? " (Inactive)" : ""}
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "var(--ink)", marginTop: 2 }}>
+                    <CountUp value={planCounts[p.id] ?? 0} />
+                  </div>
+                </div>
+                <span className={`badge ${PLAN_BADGE_CLASSES[i % PLAN_BADGE_CLASSES.length]}`} style={{ fontWeight: 700 }}>
+                  {p.priceMonthly ? `₹${p.priceMonthly.toLocaleString()}/mo` : "Free"}
+                </span>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "var(--green)", marginTop: 2 }}>
-                <CountUp value={tierCounts.free} />
-              </div>
-            </div>
-            <span className="badge b-green" style={{ fontWeight: 700 }}>
-              {freeOption?.badgeLabel || "Free Plan"}
-            </span>
-          </div>
-
-          {/* Card: Paid Plans */}
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--line-2)",
-              borderRadius: 14,
-              padding: "12px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              cursor: "pointer",
-              borderColor: tierFilter === "paid" ? "var(--indigo, #0f1424)" : "var(--line-2)",
-            }}
-            onClick={() => setTierFilter(tierFilter === "paid" ? "all" : "paid")}
-          >
-            <div>
-              <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
-                {paidOption?.badgeLabel || "Paid Plans"}
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "var(--brand)", marginTop: 2 }}>
-                <CountUp value={tierCounts.paid} />
-              </div>
-            </div>
-            <span className="badge b-indigo" style={{ fontWeight: 700 }}>
-              {paidOption?.badgeLabel || "Paid"}
-            </span>
-          </div>
-
-          {/* Card: Premium / Top Tier */}
-          <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid var(--line-2)",
-              borderRadius: 14,
-              padding: "12px 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              cursor: "pointer",
-              borderColor: tierFilter === "premium" ? "var(--violet)" : "var(--line-2)",
-            }}
-            onClick={() => setTierFilter(tierFilter === "premium" ? "all" : "premium")}
-          >
-            <div>
-              <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>
-                {premOption?.badgeLabel || "Ultra Pro"}
-              </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "var(--violet)", marginTop: 2 }}>
-                <CountUp value={tierCounts.premium} />
-              </div>
-            </div>
-            <span className="badge b-violet" style={{ fontWeight: 700 }}>
-              {premOption?.badgeLabel || "Ultra Pro"}
-            </span>
-          </div>
+            );
+          })}
 
           {/* Card: Categories */}
           <div
@@ -847,73 +803,14 @@ export default function SuperAdminTemplatesPage() {
             )}
           </div>
 
-          {/* Tier Filter Pills */}
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              background: "var(--surface-2, #f8fafc)",
-              padding: 3,
-              borderRadius: 10,
-              border: "1px solid var(--line-2)",
-            }}
-          >
-            {(["all", "free", "paid", "premium"] as const).map((t) => {
-              const active = tierFilter === t;
-              const count =
-                t === "all"
-                  ? stats.total
-                  : t === "free"
-                    ? tierCounts.free
-                    : t === "paid"
-                      ? tierCounts.paid
-                      : tierCounts.premium;
-
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTierFilter(t)}
-                  style={{
-                    border: "none",
-                    background: active ? "var(--surface)" : "transparent",
-                    color: active ? "var(--ink)" : "var(--muted)",
-                    fontWeight: active ? 700 : 500,
-                    fontSize: 12.5,
-                    padding: "6px 12px",
-                    borderRadius: 8,
-                    cursor: "pointer",
-                    boxShadow: active ? "0 2px 6px rgba(0,0,0,0.06)" : "none",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    transition: "all 0.15s ease",
-                    textTransform: "none",
-                  }}
-                >
-                  {t === "all"
-                    ? "All Tiers"
-                    : t === "free"
-                      ? (freeOption?.badgeLabel || "Free Plan")
-                      : t === "paid"
-                        ? (paidOption?.badgeLabel || "Paid")
-                        : (premOption?.badgeLabel || "Ultra Pro")}
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: "1px 6px",
-                      borderRadius: 999,
-                      background: active ? "var(--brand-050)" : "rgba(0,0,0,0.05)",
-                      color: active ? "var(--brand)" : "var(--muted)",
-                    }}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {/* Subscription Plan Filter — every plan created in Subscriptions */}
+          <PlanFilterDropdown
+            plans={plans}
+            value={selectedPlan ? planFilter : "all"}
+            onChange={setPlanFilter}
+            counts={planCounts}
+            totalCount={stats.total}
+          />
 
           {/* Kind Filter Pills */}
           <div
@@ -1149,7 +1046,7 @@ export default function SuperAdminTemplatesPage() {
           <LayoutTemplate size={40} style={{ color: "var(--muted)", margin: "0 auto 16px" }} />
           <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>No templates found</h3>
           <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 20 }}>
-            No templates match the selected tier, category, or search filters.
+            No templates match the selected plan, category, or search filters.
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
             <button
@@ -1157,7 +1054,7 @@ export default function SuperAdminTemplatesPage() {
               className="btn btn-ghost btn-sm"
               onClick={() => {
                 setSearchInput("");
-                setTierFilter("all");
+                setPlanFilter("all");
                 setCategoryFilter("all");
                 setFilterIndex(0);
               }}
@@ -1234,7 +1131,7 @@ export default function SuperAdminTemplatesPage() {
                       )}
                     </td>
                     <td>
-                      <TierBadge tier={r.tier} plans={plans} />
+                      <TierBadge tier={r.tier} plans={plans} allowedPlanIds={r.allowedPlanIds ?? []} />
                     </td>
                     <td>
                       <StatusBadge status={r.status} />
@@ -1317,7 +1214,7 @@ export default function SuperAdminTemplatesPage() {
           title={previewRow.name}
           headerActions={
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <TierBadge tier={previewRow.tier} plans={plans} />
+              <TierBadge tier={previewRow.tier} plans={plans} allowedPlanIds={previewRow.allowedPlanIds ?? []} />
               {previewRow.category && (
                 <span className="badge b-gray" style={{ fontWeight: 600 }}>
                   {previewRow.category}
@@ -1575,6 +1472,7 @@ export default function SuperAdminTemplatesPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         title="Create New Landing Page Template"
+        containerClassName="z-[200]!"
         footer={
           <>
             <button type="button" className="btn btn-ghost" onClick={() => setCreateOpen(false)} disabled={createBusy}>
@@ -1691,13 +1589,16 @@ export default function SuperAdminTemplatesPage() {
           </div>
 
           <div
+            className="visible-scrollbar"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
               gap: 8,
-              maxHeight: 180,
+              // ~1.5 rows: the half-visible second row plus the visible scrollbar
+              // signal that more plans are below.
+              maxHeight: 132,
               overflowY: "auto",
-              padding: "2px 0",
+              padding: "2px 6px 2px 0",
             }}
           >
             {plans.map((p) => {

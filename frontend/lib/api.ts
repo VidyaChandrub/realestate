@@ -1387,6 +1387,28 @@ export async function getPlatformTeam(): Promise<PlatformTeamMember[]> {
   return apiFetch<PlatformTeamMember[]>("/admin/platform-team");
 }
 
+export interface PlatformTeamPage {
+  data: PlatformTeamMember[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** Server-paginated member list for the Platform Team table. */
+export async function getPlatformTeamPage(params: {
+  page: number;
+  limit?: number;
+  search?: string;
+}): Promise<PlatformTeamPage> {
+  const qs = new URLSearchParams({ page: String(params.page), limit: String(params.limit ?? 10) });
+  if (params.search?.trim()) qs.set("search", params.search.trim());
+  return apiFetch<PlatformTeamPage>(`/admin/platform-team?${qs.toString()}`);
+}
+
+export async function getPlatformTeamMember(id: string): Promise<PlatformTeamMember> {
+  return apiFetch<PlatformTeamMember>(`/admin/platform-team/${encodeURIComponent(id)}`);
+}
+
 export async function getPlatformTeamRoles(): Promise<PlatformTeamRole[]> {
   return apiFetch<PlatformTeamRole[]>("/admin/platform-team/roles");
 }
@@ -1395,7 +1417,7 @@ export async function createPlatformTeamMember(input: {
   firstName: string;
   lastName: string;
   email: string;
-  phoneNumber?: string;
+  phoneNumber: string;
   role: string;
   password?: string;
 }): Promise<PlatformTeamMember> {

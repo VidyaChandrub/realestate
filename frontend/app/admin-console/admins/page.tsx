@@ -1,64 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
-  createPlatformTeamMember,
   deletePlatformTeamMember,
-  getPlatformTeam,
-  getPlatformTeamRoles,
+  getPlatformTeamPage,
   updatePlatformTeamMember,
 } from "@/lib/api";
 import { Icon } from "@/components/icons";
-import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { PasswordInput } from "@/components/auth/password-input";
-import type { PlatformTeamMember, PlatformTeamRole } from "@/lib/types";
+import type { PlatformTeamMember } from "@/lib/types";
 import { PlatformRolesPanel } from "./roles-panel";
+import { FLASH_KEY, LIST_PATH } from "./member-form";
 
-const fieldLabel: React.CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  fontWeight: 500,
-  color: "#475569",
-  marginBottom: 6,
-};
-
-const fieldInput: React.CSSProperties = {
-  width: "100%",
-  padding: "9px 12px",
-  borderRadius: 10,
-  border: "1px solid #e2e8f0",
-  background: "#ffffff",
-  color: "#0f172a",
-  fontSize: 14,
-  outline: "none",
-  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-  boxSizing: "border-box" as const,
-};
-
-const EMPTY_FORM = {
-  firstName: "",
-  lastName: "",
-  email: "",
-  phoneNumber: "",
-  role: "super_admin",
-  password: "",
-};
-
-// Mobile is optional, but when present it must be digits only (an optional
-// leading "+" is allowed) and at most 15 digits — E.164's ceiling, and what
-// the backend DTO enforces. Sanitising on every keystroke means the field can
-// only ever hold a value the API will accept: letters and symbols are dropped
-// and extra digits past 15 are truncated as the user types or pastes.
-const PLATFORM_PHONE_REGEX = /^\+?\d{1,15}$/;
-
-function sanitizePlatformPhone(raw: string): string {
-  const hasPlus = raw.trimStart().startsWith("+");
-  const digits = raw.replace(/\D/g, "").slice(0, 15);
-  if (!digits) return hasPlus ? "+" : "";
-  return `${hasPlus ? "+" : ""}${digits}`;
-}
+const PAGE_SIZE = 10;
 
 function initials(firstName: string | null, lastName: string | null, email: string): string {
   const chars = [firstName?.[0], lastName?.[0]].filter(Boolean).join("");
@@ -93,7 +49,63 @@ function formatDateTime(iso: string) {
   return { dateStr, timeStr };
 }
 
+/** Page numbers with ellipses, e.g. 1 … 4 5 6 … 12. */
+function pageList(current: number, totalPages: number): (number | "…")[] {
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+  const pages = new Set([1, totalPages, current - 1, current, current + 1]);
+  const sorted = [...pages].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push("…");
+    out.push(p);
+  });
+  return out;
+}
+
+function PagerButton({
+  children,
+  label,
+  active,
+  disabled,
+  onClick,
+}: {
+  children: React.ReactNode;
+  label: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        minWidth: 32,
+        height: 32,
+        padding: "0 6px",
+        borderRadius: 8,
+        border: active ? "none" : "1px solid #e2e8f0",
+        background: active ? "#2563eb" : "#ffffff",
+        color: active ? "#ffffff" : disabled ? "#94a3b8" : "#334155",
+        fontWeight: active ? 700 : 500,
+        fontSize: 13,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled && !active ? 0.6 : 1,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function SuperAdminAdminsPage() {
+  const router = useRouter();
   const { accessToken, user, hasPermission } = useAuth();
   // Members and Roles are two tabs of one console module — Platform Team —
   // not two separately permissioned modules, so a single set of pills
@@ -103,27 +115,20 @@ export default function SuperAdminAdminsPage() {
   const canEdit = hasPermission("admin_platform_team", "edit");
   const canDelete = hasPermission("admin_platform_team", "delete");
   const canDisable = hasPermission("admin_platform_team", "approve");
-  // A Super Admin account can only be edited by another Super Admin, and can
-  // never be deleted by anyone — mirrors the backend guard in
-  // AdminPlatformTeamService (edit/remove), which rejects this even if
-  // called directly, not just when the button is hidden.
-  const viewerIsSuperAdmin = !!(user?.platformUnrestricted || user?.roleKeys?.includes("super_admin"));
+  // Super Admin rows show no row actions (edit/disable/delete) for any viewer.
+  // The backend still guards edit/remove independently of the hidden buttons.
   const [tab, setTab] = useState<"members" | "roles">("members");
   const [createRoleOpen, setCreateRoleOpen] = useState(false);
   const [permEditing, setPermEditing] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const [members, setMembers] = useState<PlatformTeamMember[]>([]);
-  const [roles, setRoles] = useState<PlatformTeamRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<PlatformTeamMember | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   const [confirmDelete, setConfirmDelete] = useState<PlatformTeamMember | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -133,109 +138,65 @@ export default function SuperAdminAdminsPage() {
     setTimeout(() => setToast(null), 2500);
   };
 
+  // Guards against out-of-order responses when paging/searching quickly.
+  const requestSeq = useRef(0);
+
   const load = useCallback(async () => {
     if (!accessToken) {
       setLoading(false);
       return;
     }
+    const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
     try {
-      const [team, assignable] = await Promise.all([
-        getPlatformTeam(),
-        getPlatformTeamRoles(),
-      ]);
-      setMembers(team);
-      setRoles(assignable);
+      const result = await getPlatformTeamPage({ page, limit: PAGE_SIZE, search: debouncedSearch });
+      if (seq !== requestSeq.current) return;
+      // A delete (or narrower search) can leave us past the last page.
+      const lastPage = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
+      if (page > lastPage) {
+        setPage(lastPage);
+        return;
+      }
+      setMembers(result.data);
+      setTotal(result.total);
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       setError(err instanceof Error ? err.message : "Failed to load platform team");
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, page, debouncedSearch]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  function openCreate() {
-    setEditing(null);
-    setForm({
-      ...EMPTY_FORM,
-      role: roles.find((r) => r.key === "super_admin")?.key ?? roles[0]?.key ?? "super_admin",
-    });
-    setFormError(null);
-    setModalOpen(true);
-  }
-
-  function openEdit(member: PlatformTeamMember) {
-    setEditing(member);
-    setForm({
-      firstName: member.firstName ?? "",
-      lastName: member.lastName ?? "",
-      email: member.email,
-      // Normalise the stored value to the same shape the field enforces, so a
-      // legacy row can still be saved without forcing the admin to retype it.
-      phoneNumber: sanitizePlatformPhone(member.phoneNumber ?? ""),
-      role: member.role?.key ?? "super_admin",
-      password: "",
-    });
-    setFormError(null);
-    setModalOpen(true);
-  }
-
-  async function submitForm(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.firstName.trim() || !form.lastName.trim()) {
-      setFormError("First and last name are required");
-      return;
-    }
-    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      setFormError("Please enter a valid email address");
-      return;
-    }
-    if (!form.role) {
-      setFormError("Select a Super Admin / platform role");
-      return;
-    }
-    const phone = form.phoneNumber.trim();
-    if (phone && !PLATFORM_PHONE_REGEX.test(phone)) {
-      setFormError("Mobile number must contain digits only (max 15).");
-      return;
-    }
-
-    setSubmitting(true);
-    setFormError(null);
-    try {
-      if (editing) {
-        await updatePlatformTeamMember(editing.id, {
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          email: form.email.trim(),
-          phoneNumber: phone || undefined,
-          role: form.role,
-          ...(form.password.trim() ? { password: form.password.trim() } : {}),
-        });
-        notify("Platform team member updated");
-      } else {
-        await createPlatformTeamMember({
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          email: form.email.trim(),
-          phoneNumber: phone || undefined,
-          role: form.role,
-          ...(form.password.trim() ? { password: form.password.trim() } : {}),
-        });
-        notify("Platform team member created — credentials emailed");
+  // Success message left by the create / edit page before redirecting here.
+  // Read in a deferred callback (not the effect body) and cleared only when it
+  // fires, so a StrictMode double-mount can't consume it before it shows.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      let flash: string | null = null;
+      try {
+        flash = sessionStorage.getItem(FLASH_KEY);
+        if (flash) sessionStorage.removeItem(FLASH_KEY);
+      } catch {
+        // Storage unavailable — nothing to show.
       }
-      setModalOpen(false);
-      await load();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+      if (flash) notify(flash);
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Debounced server-side search; a new query starts from page 1.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
 
   async function toggleStatus(member: PlatformTeamMember) {
     const next = member.status === "active" ? "disabled" : "active";
@@ -263,14 +224,11 @@ export default function SuperAdminAdminsPage() {
     }
   }
 
-  const visibleMembers = members.filter((m) => {
-    if (!search.trim()) return true;
-    const q = search.trim().toLowerCase();
-    const name = fullName(m.firstName, m.lastName, m.email).toLowerCase();
-    const email = m.email.toLowerCase();
-    const role = (m.role?.name || "").toLowerCase();
-    return name.includes(q) || email.includes(q) || role.includes(q);
-  });
+  // Search and paging happen on the server; `members` is the current page.
+  const visibleMembers = members;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, total);
 
   return (
     <>
@@ -425,7 +383,7 @@ export default function SuperAdminAdminsPage() {
               </svg>
             </div>
             <div>
-              Create a <strong style={{ color: "#15803d" }}>role</strong> (console permissions), then <strong style={{ color: "#15803d" }}>create an admin</strong> and assign that role. Organisation CRM/project permissions stay under <strong style={{ color: "#15803d" }}>Organisation roles</strong>.
+              Create a <strong style={{ color: "#15803d" }}>role</strong> (console permissions), then <strong style={{ color: "#15803d" }}>create a user</strong> and assign that role. Organisation CRM/project permissions stay under <strong style={{ color: "#15803d" }}>Organisation roles</strong>.
             </div>
           </div>
 
@@ -564,12 +522,11 @@ export default function SuperAdminAdminsPage() {
                     cursor: "pointer",
                   }}
                   onClick={() => {
-                    setTab("members");
-                    openCreate();
+                    router.push(`${LIST_PATH}/new`);
                   }}
                 >
                   <Icon name="plus" size={16} />
-                  <span>Create admin</span>
+                  <span>Create user</span>
                 </button>
               ) : null}
             </div>
@@ -679,7 +636,7 @@ export default function SuperAdminAdminsPage() {
                     return (
                       <tr key={m.id}>
                         <td style={{ textAlign: "center", color: "#64748b", fontWeight: 600, fontSize: 12.5 }}>
-                          {idx + 1}
+                          {(page - 1) * PAGE_SIZE + idx + 1}
                         </td>
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -795,7 +752,8 @@ export default function SuperAdminAdminsPage() {
                         </td>
                         <td style={{ textAlign: "right", paddingRight: 24 }}>
                           <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
-                            {canEdit && (!isSuperAdminRow || viewerIsSuperAdmin) ? (
+                            {/* Super Admin rows get no row actions for any viewer. */}
+                            {canEdit && !isSuperAdminRow ? (
                               <button
                                 type="button"
                                 style={{
@@ -812,7 +770,7 @@ export default function SuperAdminAdminsPage() {
                                   cursor: "pointer",
                                   transition: "all 0.15s ease",
                                 }}
-                                onClick={() => openEdit(m)}
+                                onClick={() => router.push(`${LIST_PATH}/${encodeURIComponent(m.id)}/edit`)}
                               >
                                 <Icon name="edit" size={13} style={{ color: "#64748b" }} /> Edit
                               </button>
@@ -863,25 +821,6 @@ export default function SuperAdminAdminsPage() {
                               </button>
                             ) : null}
 
-                            {isSuperAdminRow ? (
-                              <button
-                                type="button"
-                                style={{
-                                  width: 32,
-                                  height: 32,
-                                  borderRadius: 8,
-                                  border: "1px solid #e2e8f0",
-                                  background: "#ffffff",
-                                  color: "#64748b",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                <Icon name="dots" size={14} />
-                              </button>
-                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -895,344 +834,46 @@ export default function SuperAdminAdminsPage() {
           {/* Table Footer */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: "1px solid #f1f5f9" }}>
             <div style={{ fontSize: 12.5, color: "#64748b" }}>
-              Showing 1 to {visibleMembers.length} of {members.length} members
+              {total === 0
+                ? "No members"
+                : `Showing ${rangeStart} to ${rangeEnd} of ${total} member${total === 1 ? "" : "s"}`}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <button
-                  type="button"
-                  disabled
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: "1px solid #e2e8f0",
-                    background: "#ffffff",
-                    color: "#94a3b8",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "not-allowed",
-                  }}
-                >
-                  <Icon name="chevron-left" size={14} />
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: "none",
-                    background: "#2563eb",
-                    color: "#ffffff",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                >
-                  1
-                </button>
-                <button
-                  type="button"
-                  disabled
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: "1px solid #e2e8f0",
-                    background: "#ffffff",
-                    color: "#94a3b8",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "not-allowed",
-                  }}
-                >
-                  <Icon name="chevron-right" size={14} />
-                </button>
-              </div>
-              <div
-                style={{
-                  height: 32,
-                  padding: "0 10px",
-                  borderRadius: 8,
-                  border: "1px solid #e2e8f0",
-                  background: "#ffffff",
-                  color: "#334155",
-                  fontSize: 12.5,
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <PagerButton
+                label="Previous page"
+                disabled={loading || page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                <span>10 per page</span>
-                <Icon name="chevron-down" size={12} style={{ color: "#94a3b8" }} />
-              </div>
+                <Icon name="chevron-left" size={14} />
+              </PagerButton>
+              {pageList(page, totalPages).map((p, i) =>
+                p === "…" ? (
+                  <span key={`gap-${i}`} style={{ width: 24, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                    …
+                  </span>
+                ) : (
+                  <PagerButton
+                    key={p}
+                    label={`Page ${p}`}
+                    active={p === page}
+                    disabled={loading}
+                    onClick={() => setPage(p)}
+                  >
+                    {p}
+                  </PagerButton>
+                ),
+              )}
+              <PagerButton
+                label="Next page"
+                disabled={loading || page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                <Icon name="chevron-right" size={14} />
+              </PagerButton>
             </div>
           </div>
         </div>
       ) : null}
-
-      <Modal
-        open={modalOpen}
-        onClose={() => !submitting && setModalOpen(false)}
-        title={editing ? "Edit platform admin" : "Create platform admin"}
-        description={editing ? "Update this team member's profile or role." : "Invite a new admin to the Super Admin console."}
-        size="md"
-      >
-        <form onSubmit={submitForm} style={{ display: "flex", flexDirection: "column", gap: 0, maxHeight: "70vh", overflowY: "auto" }}>
-          {formError ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                color: "#b91c1c",
-                fontSize: 13,
-                fontWeight: 500,
-                marginBottom: 20,
-              }}
-            >
-              <Icon name="alert" size={16} />
-              {formError}
-            </div>
-          ) : null}
-
-          {/* Section: Personal Information */}
-          <div style={{ marginBottom: 0 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 14,
-              }}
-            >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#eef2ff",
-                  color: "#0f1424",
-                }}
-              >
-                <Icon name="users" size={14} />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", letterSpacing: "0.01em" }}>
-                Personal information
-              </span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={fieldLabel}>First name *</label>
-                <input
-                  style={fieldInput}
-                  value={form.firstName}
-                  onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <label style={fieldLabel}>Last name *</label>
-                <input
-                  style={fieldInput}
-                  value={form.lastName}
-                  onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div style={{ height: 1, background: "#f1f5f9", margin: "0 0 20px" }} />
-
-          {/* Section: Contact */}
-          <div style={{ marginBottom: 20 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 14,
-              }}
-            >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#ecfdf5",
-                  color: "#0d9488",
-                }}
-              >
-                <Icon name="mail" size={14} />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", letterSpacing: "0.01em" }}>
-                Contact details
-              </span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={fieldLabel}>Email *</label>
-                <input
-                  style={fieldInput}
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <label style={fieldLabel}>Mobile</label>
-                <input
-                  style={fieldInput}
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  maxLength={16}
-                  value={form.phoneNumber}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, phoneNumber: sanitizePlatformPhone(e.target.value) }))
-                  }
-                  placeholder="Optional · digits only"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div style={{ height: 1, background: "#f1f5f9", margin: "0 0 20px" }} />
-
-          {/* Section: Access */}
-          <div style={{ marginBottom: 4 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 14,
-              }}
-            >
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  background: "#fef3c7",
-                  color: "#d97706",
-                }}
-              >
-                <Icon name="shield" size={14} />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155", letterSpacing: "0.01em" }}>
-                Role & access
-              </span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={fieldLabel}>Platform role *</label>
-                <select
-                  style={fieldInput}
-                  value={form.role}
-                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                  required
-                >
-                  {roles.length === 0 ? <option value="super_admin">Super Admin</option> : null}
-                  {roles.map((r) => (
-                    <option key={r.key} value={r.key}>
-                      {r.name}
-                      {r.key === "super_admin" ? " (full access)" : ""}
-                    </option>
-                  ))}
-                </select>
-                <div style={{ marginTop: 6, fontSize: 12, color: "#94a3b8", lineHeight: 1.4 }}>
-                  Create a role on the Roles tab first for a custom permission set.
-                </div>
-              </div>
-              <div>
-                <label style={fieldLabel}>
-                  {editing ? "New password" : "Temporary password"}
-                  <span style={{ fontWeight: 400, color: "#94a3b8" }}> (auto-generated if empty)</span>
-                </label>
-                <PasswordInput
-                  value={form.password}
-                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                  placeholder="Leave blank to generate"
-                  autoComplete="new-password"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 10,
-              marginTop: 24,
-              paddingTop: 18,
-              borderTop: "1px solid #f1f5f9",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setModalOpen(false)}
-              disabled={submitting}
-              style={{
-                padding: "9px 18px",
-                borderRadius: 10,
-                fontSize: 13.5,
-                fontWeight: 500,
-                border: "1px solid #e2e8f0",
-                background: "#ffffff",
-                color: "#475569",
-                cursor: submitting ? "not-allowed" : "pointer",
-                opacity: submitting ? 0.5 : 1,
-                transition: "all 0.15s ease",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              style={{
-                padding: "9px 20px",
-                borderRadius: 10,
-                fontSize: 13.5,
-                fontWeight: 600,
-                border: "none",
-                color: "#ffffff",
-                cursor: submitting ? "not-allowed" : "pointer",
-                opacity: submitting ? 0.5 : 1,
-                transition: "all 0.15s ease",
-                background: "linear-gradient(135deg, #0f1424, #0f1424)",
-                boxShadow: "0 2px 8px -2px rgba(21, 27, 46, 0.4)",
-              }}
-            >
-              {submitting ? "Saving…" : editing ? "Save changes" : "Create admin"}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       <ConfirmModal
         open={confirmDelete !== null}

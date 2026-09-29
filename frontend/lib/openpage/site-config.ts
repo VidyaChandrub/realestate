@@ -315,6 +315,8 @@ function hydrateConfig(raw: SiteConfig, page: LandingPageData): SiteConfig {
     ...(raw.vars ? { vars: raw.vars } : {}),
     ...(raw.property ? { property: raw.property } : {}),
     ...(raw.designSystem ? { designSystem: raw.designSystem } : {}),
+    // Template plan access lives in config — keep it so builder saves don't wipe it.
+    ...(Array.isArray(raw.allowedPlanIds) ? { allowedPlanIds: raw.allowedPlanIds } : {}),
   };
 }
 

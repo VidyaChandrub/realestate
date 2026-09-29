@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -15,6 +16,7 @@ import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { AdminPlatformTeamService } from './admin-platform-team.service';
 import { CreatePlatformMemberDto } from './dto/create-platform-member.dto';
 import { UpdatePlatformMemberDto } from './dto/update-platform-member.dto';
+import { ListPlatformMembersQueryDto } from './dto/list-platform-members-query.dto';
 
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 @Controller('admin/platform-team')
@@ -22,13 +24,19 @@ export class AdminPlatformTeamController {
   constructor(private readonly platformTeam: AdminPlatformTeamService) {}
 
   @Get()
-  list() {
-    return this.platformTeam.list();
+  list(@Query() query: ListPlatformMembersQueryDto) {
+    return this.platformTeam.list(query);
   }
 
   @Get('roles')
   listRoles() {
     return this.platformTeam.listAssignableRoles();
+  }
+
+  // Declared after `roles` so that literal path is never captured as an id.
+  @Get(':id')
+  get(@Param('id') id: string) {
+    return this.platformTeam.get(id);
   }
 
   @Post()

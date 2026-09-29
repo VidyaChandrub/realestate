@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { EmailService } from '../email/email.service';
 import { frontendBaseUrl } from '../../common/utils/app-url.util';
@@ -13,6 +14,7 @@ import { generateTempPassword } from '../../common/utils/tokens.util';
 import { normalizePhoneNumber } from '../../common/utils/phone.util';
 import { CreatePlatformMemberDto } from './dto/create-platform-member.dto';
 import { UpdatePlatformMemberDto } from './dto/update-platform-member.dto';
+import { ListPlatformMembersQueryDto } from './dto/list-platform-members-query.dto';
 
 const BCRYPT_COST = 12;
 
@@ -31,24 +33,95 @@ export class AdminPlatformTeamService {
     });
   }
 
-  async list() {
-    const users = await this.prisma.user.findMany({
-      where: {
-        orgId: null,
-        userRoles: { some: { role: { scope: 'platform' } } },
-      },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        userRoles: {
-          include: { role: { select: { key: true, name: true, scope: true } } },
-        },
-      },
-    });
+  /**
+   * Without `page`: the full member array (legacy shape — Support's assignee
+   * picker uses it). With `page`: `{ data, total, page, limit }`, searched and
+   * paginated in the database.
+   */
+  async list(query: ListPlatformMembersQueryDto = {}) {
+    const where: Prisma.UserWhereInput = {
+      orgId: null,
+      userRoles: { some: { role: { scope: 'platform' } } },
+    };
 
-    return users.map((user) => this.toMember(user));
+    const search = query.search?.trim();
+    if (search) {
+      const contains = { contains: search, mode: 'insensitive' as const };
+      const or: Prisma.UserWhereInput[] = [
+        { firstName: contains },
+        { lastName: contains },
+        { email: contains },
+        {
+          userRoles: { some: { role: { scope: 'platform', name: contains } } },
+        },
+      ];
+      // "shubham dev" → first name + last name.
+      const [first, ...rest] = search.split(/\s+/);
+      if (rest.length > 0) {
+        or.push({
+          firstName: { contains: first, mode: 'insensitive' },
+          lastName: { contains: rest.join(' '), mode: 'insensitive' },
+        });
+      }
+      where.AND = [{ OR: or }];
+    }
+
+    const include = {
+      userRoles: {
+        include: { role: { select: { key: true, name: true, scope: true } } },
+      },
+    } satisfies Prisma.UserInclude;
+    // `id` tiebreak keeps page boundaries stable for equal timestamps.
+    const orderBy: Prisma.UserOrderByWithRelationInput[] = [
+      { createdAt: 'asc' },
+      { id: 'asc' },
+    ];
+
+    if (query.page === undefined) {
+      const users = await this.prisma.user.findMany({
+        where,
+        orderBy,
+        include,
+      });
+      return users.map((user) => this.toMember(user));
+    }
+
+    const limit = query.limit ?? 10;
+    const page = query.page;
+    const [total, users] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        orderBy,
+        include,
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data: users.map((user) => this.toMember(user)),
+      total,
+      page,
+      limit,
+    };
+  }
+
+  /** One platform team member, for the edit page. 404s for org users. */
+  async get(id: string) {
+    await this.requireMember(id);
+    return this.getById(id);
   }
 
   async create(dto: CreatePlatformMemberDto, actorUserId?: string) {
+    // Members are created by a Super Admin and get one of the custom platform
+    // roles — the console never mints another Super Admin (the UI hides it too).
+    if (dto.role === 'super_admin') {
+      throw new BadRequestException(
+        'Super Admin accounts cannot be created from Platform Team. Choose another platform role.',
+      );
+    }
+
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {

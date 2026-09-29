@@ -30,6 +30,25 @@ function toContentJson(content: TemplateContentDto): Prisma.InputJsonValue {
   } as Prisma.InputJsonValue;
 }
 
+// Plan access (config.allowedPlanIds) is a Super Admin setting stored inside
+// content. A content save that omits the key (builder autosave, reset) keeps
+// the stored grants; sending the key (even as []) replaces them.
+function withPreservedPlanAccess(
+  content: TemplateContentDto,
+  existing: Prisma.JsonValue,
+): TemplateContentDto {
+  const config = content.config ?? {};
+  if (Object.prototype.hasOwnProperty.call(config, 'allowedPlanIds')) {
+    return content;
+  }
+  const stored = (existing as { config?: { allowedPlanIds?: unknown } } | null)
+    ?.config?.allowedPlanIds;
+  if (!Array.isArray(stored)) {
+    return content;
+  }
+  return { ...content, config: { ...config, allowedPlanIds: stored } };
+}
+
 @Injectable()
 export class AdminTemplatesService {
   constructor(
@@ -163,7 +182,9 @@ export class AdminTemplatesService {
         : { disconnect: true };
     }
     if (dto.content) {
-      data.content = toContentJson(dto.content);
+      data.content = toContentJson(
+        withPreservedPlanAccess(dto.content, template.content),
+      );
     }
 
     const updated = await this.prisma.template.update({
@@ -206,7 +227,9 @@ export class AdminTemplatesService {
       where: { id },
       data: {
         status: 'draft',
-        content: toContentJson(dto.content),
+        content: toContentJson(
+          withPreservedPlanAccess(dto.content, template.content),
+        ),
       },
       include: { templateCategory: true },
     });

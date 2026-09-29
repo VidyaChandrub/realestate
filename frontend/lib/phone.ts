@@ -1,5 +1,31 @@
-import { getCountryCallingCode, isValidPhoneNumber, type CountryCode } from "libphonenumber-js";
+import {
+  getCountryCallingCode,
+  isValidPhoneNumber,
+  parsePhoneNumberFromString,
+  type CountryCode,
+} from "libphonenumber-js";
 import { COUNTRY_META } from "./countries";
+
+/**
+ * Splits a stored "+<code><digits>" number back into the Country select value
+ * and the national digits, for forms that edit it with a country selector.
+ * Numbers that can't be parsed (legacy rows saved without a dial code, or a
+ * country missing from COUNTRY_META) come back with country "" and the bare
+ * digits, so the admin picks the country rather than having one guessed.
+ */
+export function splitStoredPhone(stored: string | null | undefined): {
+  country: string;
+  nationalNumber: string;
+} {
+  const raw = (stored ?? "").trim();
+  if (!raw) return { country: "", nationalNumber: "" };
+  const parsed = raw.startsWith("+") ? parsePhoneNumberFromString(raw) : undefined;
+  if (parsed?.country) {
+    const country = Object.keys(COUNTRY_META).find((name) => COUNTRY_META[name].iso === parsed.country);
+    if (country) return { country, nationalNumber: String(parsed.nationalNumber) };
+  }
+  return { country: "", nationalNumber: raw.replace(/\D/g, "").slice(0, 15) };
+}
 
 // Country selection now lives in Step 1 (see registration wizard), right
 // next to Mobile — these two helpers derive the dial-code prefix and

@@ -22,6 +22,7 @@ type Txn = {
   user: { create: jest.Mock; update: jest.Mock };
   userRole: { createMany: jest.Mock; deleteMany: jest.Mock };
   refreshToken: { updateMany: jest.Mock };
+  auditLog: { create: jest.Mock };
 };
 
 function makeService() {
@@ -35,6 +36,7 @@ function makeService() {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     refreshToken: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    auditLog: { create: jest.fn().mockResolvedValue({}) },
   };
 
   const prisma: any = {
@@ -72,13 +74,15 @@ beforeEach(() => jest.clearAllMocks());
 
 describe('AdminPlatformTeamService.create', () => {
   it('forces a first-login password change for the new member', async () => {
-    const { service, txn } = makeService();
+    const { service, prisma, txn } = makeService();
+    prisma.user.findFirst.mockResolvedValueOnce(null); // mobile number not taken
 
     await service.create({
       firstName: 'Plat',
       lastName: 'Member',
       email: 'New@ipixxel.test',
-      role: 'super_admin',
+      phoneNumber: '9825041200',
+      role: 'ops',
     } as any);
 
     expect(txn.user.create).toHaveBeenCalledTimes(1);
@@ -86,6 +90,68 @@ describe('AdminPlatformTeamService.create', () => {
     expect(data.mustChangePassword).toBe(true);
     expect(data.status).toBe('active');
     expect(String(data.passwordHash)).toContain('hashed:');
+  });
+
+  it('refuses to create a Super Admin', async () => {
+    const { service, txn } = makeService();
+
+    await expect(
+      service.create({
+        firstName: 'Plat',
+        lastName: 'Member',
+        email: 'new@ipixxel.test',
+        phoneNumber: '9825041200',
+        role: 'super_admin',
+      } as any),
+    ).rejects.toThrow('Super Admin accounts cannot be created');
+    expect(txn.user.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('AdminPlatformTeamService.get', () => {
+  it('404s for a user who is not a platform team member', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.findFirst.mockResolvedValueOnce(null);
+
+    await expect(service.get('org-user-1')).rejects.toThrow(
+      'Platform team member not found',
+    );
+  });
+
+  it('returns the member when they hold a platform role', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.findFirst
+      .mockResolvedValueOnce({ id: 'member-1' })
+      .mockResolvedValueOnce(memberRow());
+
+    const result = await service.get('member-1');
+
+    expect(result).toEqual(expect.objectContaining({ email: expect.any(String) }));
+  });
+});
+
+describe('AdminPlatformTeamService.list', () => {
+  it('returns the full array when no page is requested', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.findMany.mockResolvedValue([memberRow()]);
+
+    const result = await service.list();
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(prisma.user.findMany.mock.calls[0][0].skip).toBeUndefined();
+  });
+
+  it('paginates 10 per page by default when a page is requested', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.count.mockResolvedValue(23);
+    prisma.user.findMany.mockResolvedValue([memberRow()]);
+
+    const result = await service.list({ page: 3 });
+
+    const args = prisma.user.findMany.mock.calls[0][0];
+    expect(args.skip).toBe(20);
+    expect(args.take).toBe(10);
+    expect(result).toEqual(expect.objectContaining({ total: 23, page: 3, limit: 10 }));
   });
 });
 

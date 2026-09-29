@@ -94,3 +94,29 @@ body {
   height: 0;
   display: none;
 }
+
+/* Scrollable list with a clearly visible scrollbar (e.g. plan pickers in modals).
+   `html` prefix outranks the console-wide thin-scrollbar rules (.superadmin *, .org *). */
+html .visible-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #eef1f6;
+}
+
+html .visible-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html .visible-scrollbar::-webkit-scrollbar-track {
+  background: #eef1f6;
+  border-radius: 99px;
+}
+
+html .visible-scrollbar::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 99px;
+}
+
+html .visible-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
