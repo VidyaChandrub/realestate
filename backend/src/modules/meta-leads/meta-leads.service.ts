@@ -770,7 +770,7 @@ export class MetaLeadsService {
     const url = new URL(`${GRAPH_BASE}/${leadgenId}`);
     url.searchParams.set(
       'fields',
-      'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id,page_id,ad_name,adset_name,campaign_name',
+      'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id,ad_name,adset_name,campaign_name',
     );
     url.searchParams.set('access_token', pageToken);
     const res = await fetch(url);

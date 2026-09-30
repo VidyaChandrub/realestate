@@ -15,6 +15,7 @@ const RESERVED_SLUGS = new Set([
   "p",
   "embed",
   "api",
+  "privacy",
 ]);
 
 export default async function DirectSlugPage({ params }: { params: Promise<{ slug: string }> }) {
