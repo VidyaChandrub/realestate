@@ -80,6 +80,8 @@ function makePrisma() {
     organisation: {
       findUnique: jest.fn().mockResolvedValue({ name: 'Acme' }),
     },
+    // No subscription → the plan seat-limit check is skipped.
+    subscription: { findFirst: jest.fn().mockResolvedValue(null) },
     $transaction: jest.fn(async (cb: (tx: Txn) => unknown) => cb(txn)),
   };
   return { prisma, txn };
@@ -112,25 +114,44 @@ describe('provisionInvitedUser', () => {
 
   it('rejects a duplicate email', async () => {
     const { prisma } = makePrisma();
-    prisma.user.findUnique.mockResolvedValueOnce({ id: 'existing' });
+    prisma.user.findFirst.mockResolvedValueOnce({ id: 'existing' });
     await expect(
       provisionInvitedUser(prisma, 'org-1', {
         email: 'dupe@acme.test',
         role: 'sales',
       }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toThrow('This email is already assigned to another user.');
+  });
+
+  it('checks email duplicates case-insensitively and stores it lowercase', async () => {
+    const { prisma, txn } = makePrisma();
+
+    await provisionInvitedUser(prisma, 'org-1', {
+      email: '  New.Hire@Acme.TEST ',
+      phoneNumber: '+15551234567',
+      role: 'sales',
+    });
+
+    expect(prisma.user.findFirst.mock.calls[0][0].where).toEqual({
+      email: { equals: 'new.hire@acme.test', mode: 'insensitive' },
+    });
+    expect(txn.user.create.mock.calls[0][0].data.email).toBe(
+      'new.hire@acme.test',
+    );
   });
 
   it('rejects a duplicate mobile number', async () => {
     const { prisma } = makePrisma();
-    prisma.user.findFirst.mockResolvedValueOnce({ id: 'existing' });
+    prisma.user.findFirst
+      .mockResolvedValueOnce(null) // email free
+      .mockResolvedValueOnce({ id: 'existing' }); // mobile taken
     await expect(
       provisionInvitedUser(prisma, 'org-1', {
         email: 'ok@acme.test',
         phoneNumber: '+15550000000',
         role: 'sales',
       }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toThrow('This mobile number is already assigned to another user.');
   });
 });
 
@@ -257,6 +278,7 @@ describe('updateOrgUser', () => {
         orgId: 'org-1',
         email: 'm@acme.test',
         phoneNumber: null,
+        userRoles: [{ role: { key: 'sales' } }],
       })
       // getOrgUserById at the end
       .mockResolvedValueOnce({
@@ -292,6 +314,7 @@ describe('updateOrgUser', () => {
         orgId: 'org-1',
         email: 'm@acme.test',
         phoneNumber: null,
+        userRoles: [{ role: { key: 'sales' } }],
       })
       .mockResolvedValueOnce({
         id: 'm1',

@@ -23,8 +23,9 @@ export class CreateOrgUserDto {
   @MaxLength(100)
   lastName: string;
 
-  @IsEmail()
+  @IsEmail({}, { message: 'Enter a valid email address.' })
   @IsNotEmpty()
+  @MaxLength(254)
   email: string;
 
   @IsString()

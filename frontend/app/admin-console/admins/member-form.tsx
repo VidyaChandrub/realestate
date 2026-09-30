@@ -5,7 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPlatformTeamMember, getPlatformTeamRoles, updatePlatformTeamMember } from "@/lib/api";
 import { COUNTRIES } from "@/lib/countries";
-import { callingCodeForCountry, splitStoredPhone, validatePhoneForCountry } from "@/lib/phone";
+import { callingCodeForCountry, splitStoredPhone } from "@/lib/phone";
+import {
+  EMAIL_MAX,
+  MOBILE_MAX_DIGITS as PHONE_MAX_DIGITS,
+  sanitizeMobileDigits as sanitizeDigits,
+  validateEmail,
+  validateMobile,
+} from "@/lib/contact-validation";
 import { Icon, type IconName } from "@/components/icons";
 import { PasswordInput } from "@/components/auth/password-input";
 import type { PlatformTeamMember, PlatformTeamRole } from "@/lib/types";
@@ -21,12 +28,7 @@ export const LIST_PATH = "/admin-console/admins";
 // redirect back from this page.
 export const FLASH_KEY = "platformTeam.flash";
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
-const EMAIL_MAX = 254;
 const NAME_MAX = 100;
-// ITU E.164 ceiling. The number is also validated per country below, which
-// is what actually rejects a too-long / too-short number for that country.
-const PHONE_MAX_DIGITS = 15;
 const PASSWORD_MIN = 6;
 const DEFAULT_COUNTRY = "India";
 
@@ -73,10 +75,6 @@ const grid: React.CSSProperties = {
   gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
   gap: 16,
 };
-
-function sanitizeDigits(raw: string): string {
-  return raw.replace(/\D/g, "").slice(0, PHONE_MAX_DIGITS);
-}
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
@@ -131,24 +129,12 @@ function validate(form: FormState, isEdit: boolean): FieldErrors {
   if (!form.lastName.trim()) errors.lastName = "Last name is required.";
   else if (form.lastName.trim().length > NAME_MAX) errors.lastName = `Max ${NAME_MAX} characters.`;
 
-  const email = form.email.trim();
-  if (!email) errors.email = "Email is required.";
-  else if (email.length > EMAIL_MAX || !EMAIL_REGEX.test(email)) errors.email = "Enter a valid email address.";
+  const emailError = validateEmail(form.email);
+  if (emailError) errors.email = emailError;
 
   // Mobile is required on create; on edit it stays optional for legacy rows
   // saved without one, but anything entered must still be valid.
-  const phone = form.phoneNumber;
-  if (!isEdit || phone) {
-    if (!form.country) errors.country = "Select a country.";
-    if (!phone) {
-      errors.phoneNumber = "Mobile number is required.";
-    } else if (!/^\d+$/.test(phone) || phone.length > PHONE_MAX_DIGITS) {
-      errors.phoneNumber = `Digits only, up to ${PHONE_MAX_DIGITS}.`;
-    } else if (form.country) {
-      const phoneError = validatePhoneForCountry(phone, form.country);
-      if (phoneError) errors.phoneNumber = phoneError;
-    }
-  }
+  Object.assign(errors, validateMobile(form.country, form.phoneNumber, { required: !isEdit }));
 
   if (!form.role) errors.role = "Select a platform role.";
   if (form.password.trim() && form.password.trim().length < PASSWORD_MIN) {
