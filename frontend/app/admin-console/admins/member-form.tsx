@@ -27,6 +27,8 @@ export const LIST_PATH = "/admin-console/admins";
 // Read (and cleared) by the Platform Team list to show a toast after the
 // redirect back from this page.
 export const FLASH_KEY = "platformTeam.flash";
+// Tab ("members" | "roles") the list should open on after that redirect.
+export const FLASH_TAB_KEY = "platformTeam.flashTab";
 
 const NAME_MAX = 100;
 const PASSWORD_MIN = 6;
@@ -45,7 +47,7 @@ interface FormState {
   password: string;
 }
 
-const fieldLabel: React.CSSProperties = {
+export const fieldLabel: React.CSSProperties = {
   display: "block",
   fontSize: 13,
   fontWeight: 500,
@@ -53,7 +55,7 @@ const fieldLabel: React.CSSProperties = {
   marginBottom: 6,
 };
 
-function inputStyle(invalid: boolean): React.CSSProperties {
+export function inputStyle(invalid: boolean): React.CSSProperties {
   return {
     width: "100%",
     padding: "10px 12px",
@@ -70,13 +72,13 @@ function inputStyle(invalid: boolean): React.CSSProperties {
 }
 
 // Two columns on desktop, one on phones — no media query needed.
-const grid: React.CSSProperties = {
+export const grid: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
   gap: 16,
 };
 
-function FieldError({ message }: { message?: string }) {
+export function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return (
     <div role="alert" style={{ marginTop: 6, fontSize: 12, color: "#dc2626", lineHeight: 1.4 }}>
@@ -85,7 +87,7 @@ function FieldError({ message }: { message?: string }) {
   );
 }
 
-function Section({
+export function Section({
   icon,
   iconBg,
   iconColor,

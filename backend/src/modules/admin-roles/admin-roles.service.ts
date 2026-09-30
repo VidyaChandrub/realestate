@@ -60,7 +60,14 @@ export class AdminRolesService {
     return this.updateRole(id, dto, ORG_SCOPES);
   }
 
-  updatePlatformRole(id: string, dto: UpdateRoleDto) {
+  async updatePlatformRole(id: string, dto: UpdateRoleDto) {
+    // Super Admin is the built-in full-access role: its name, description and
+    // status are fixed (its key and permissions are already locked below).
+    // The console hides Edit for it; this stops a direct API call too.
+    const role = await this.requireRole(id, ['platform']);
+    if (role.key === 'super_admin') {
+      throw new BadRequestException(`${role.name} role cannot be edited`);
+    }
     return this.updateRole(id, dto, ['platform']);
   }
 

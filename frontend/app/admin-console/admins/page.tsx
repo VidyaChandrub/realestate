@@ -12,7 +12,7 @@ import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { PlatformTeamMember } from "@/lib/types";
 import { PlatformRolesPanel } from "./roles-panel";
-import { FLASH_KEY, LIST_PATH } from "./member-form";
+import { FLASH_KEY, FLASH_TAB_KEY, LIST_PATH } from "./member-form";
 
 const PAGE_SIZE = 10;
 
@@ -118,7 +118,6 @@ export default function SuperAdminAdminsPage() {
   // Super Admin rows show no row actions (edit/disable/delete) for any viewer.
   // The backend still guards edit/remove independently of the hidden buttons.
   const [tab, setTab] = useState<"members" | "roles">("members");
-  const [createRoleOpen, setCreateRoleOpen] = useState(false);
   const [permEditing, setPermEditing] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -178,12 +177,17 @@ export default function SuperAdminAdminsPage() {
   useEffect(() => {
     const t = window.setTimeout(() => {
       let flash: string | null = null;
+      let flashTab: string | null = null;
       try {
         flash = sessionStorage.getItem(FLASH_KEY);
-        if (flash) sessionStorage.removeItem(FLASH_KEY);
+        flashTab = sessionStorage.getItem(FLASH_TAB_KEY);
+        sessionStorage.removeItem(FLASH_KEY);
+        sessionStorage.removeItem(FLASH_TAB_KEY);
       } catch {
         // Storage unavailable — nothing to show.
       }
+      // Back from Create role → land on the Roles tab it was created from.
+      if (flashTab === "roles") setTab("roles");
       if (flash) notify(flash);
     }, 0);
     return () => window.clearTimeout(t);
@@ -495,10 +499,7 @@ export default function SuperAdminAdminsPage() {
                     color: "#334155",
                     cursor: "pointer",
                   }}
-                  onClick={() => {
-                    setTab("roles");
-                    setCreateRoleOpen(true);
-                  }}
+                  onClick={() => router.push(`${LIST_PATH}/roles/new`)}
                 >
                   <Icon name="plus" size={15} />
                   <span>Create role</span>
@@ -538,8 +539,6 @@ export default function SuperAdminAdminsPage() {
 
       {(tab === "roles" || permEditing) && canView ? (
         <PlatformRolesPanel
-          createOpen={createRoleOpen}
-          onCreateOpenChange={setCreateRoleOpen}
           onRolesChanged={() => void load()}
           onPermissionEditing={setPermEditing}
           canEdit={canEdit}
