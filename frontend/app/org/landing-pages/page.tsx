@@ -92,7 +92,7 @@ interface LandingPageDetail extends LandingPageRow {
   };
 }
 
-const LIMIT = 20;
+const LIMIT = 10;
 const STATUS_TABS = ["All", "Draft", "Published", "Unpublished"] as const;
 
 function statusParamFor(tabIndex: number): LandingPageStatus | undefined {
@@ -1508,7 +1508,7 @@ export default function OrgLandingPagesPage() {
       {/* Bottom Pagination Bar */}
       <div className="lp-pagination">
         <div>
-          Showing {filteredRows.length > 0 ? `1–${filteredRows.length}` : "0"} of {totalKpi} landing pages
+          Showing {filteredRows.length > 0 ? `${(page - 1) * LIMIT + 1}–${(page - 1) * LIMIT + filteredRows.length}` : "0"} of {total} landing pages
         </div>
         <div className="lp-pagination-btns">
           <button
@@ -1519,7 +1519,10 @@ export default function OrgLandingPagesPage() {
           >
             <ChevronLeft size={14} />
           </button>
-          {Array.from({ length: Math.min(4, Math.max(1, totalPages)) }, (_, i) => i + 1).map((pNum) => (
+          {Array.from(
+            { length: Math.min(4, Math.max(1, totalPages)) },
+            (_, i) => Math.max(1, Math.min(page - 1, totalPages - 3)) + i,
+          ).map((pNum) => (
             <button
               key={pNum}
               type="button"

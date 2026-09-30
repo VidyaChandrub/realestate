@@ -70,6 +70,7 @@ import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { SceneImage } from "@/components/openpage/art";
 import { apiFetch } from "@/lib/api";
+import { ListPager, usePagedRows } from "@/components/ui/list-pager";
 import type { Plan } from "@/lib/types";
 
 function TemplateThumb({
@@ -284,6 +285,8 @@ export default function SuperAdminTemplatesPage() {
       ),
     [rows, filter, selectedPlan, categoryFilter, search],
   );
+  // 10 per page; the counters, plan and category chips still use every row.
+  const paged = usePagedRows(visible, `${filterIndex}|${planFilter}|${categoryFilter}|${search}`);
 
   // Category counts
   const categoryCounts = useMemo(() => {
@@ -845,7 +848,7 @@ export default function SuperAdminTemplatesPage() {
                 </tr>
               </thead>
               <tbody>
-                {visible.map((r) => (
+                {paged.pageRows.map((r) => (
                   <tr key={r.key}>
                     <td>
                       <div
@@ -938,7 +941,7 @@ export default function SuperAdminTemplatesPage() {
             gap: viewMode === "compact" ? 16 : 22,
           }}
         >
-          {visible.map((r, i) => (
+          {paged.pageRows.map((r, i) => (
             <TemplateCard
               key={r.key}
               row={r}
@@ -963,6 +966,9 @@ export default function SuperAdminTemplatesPage() {
           ))}
         </div>
       )}
+      {!loading ? (
+        <ListPager page={paged.page} total={paged.total} onPageChange={paged.setPage} noun="templates" />
+      ) : null}
 
       {/* Interactive Responsive Device Preview Modal */}
       {previewRow && (

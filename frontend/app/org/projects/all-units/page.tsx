@@ -18,7 +18,7 @@ import type {
   UnitStatus,
 } from "@/lib/types";
 
-const LIMIT = 25;
+const LIMIT = 10;
 
 const STATUS_TABS: { label: string; value: UnitStatus | null }[] = [
   { label: "All", value: null },

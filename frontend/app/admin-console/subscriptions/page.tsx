@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback, useId } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, useId } from "react";
 import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
@@ -20,6 +20,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { useFlash } from "@/lib/flash";
+import { LIST_PAGE_SIZE, ListPager } from "@/components/ui/list-pager";
 import { SUBS_FLASH_KEY, SUBS_PATH } from "./subscriptions-shared";
 import type {
   Plan,
@@ -201,7 +202,7 @@ export default function SuperAdminSubscriptionsPage() {
     try {
       const params = new URLSearchParams();
       params.set("page", String(page));
-      params.set("limit", "20");
+      params.set("limit", String(LIST_PAGE_SIZE));
       if (searchQ) params.set("search", searchQ);
       if (filterVal === 1) params.set("cycle", "monthly");
       if (filterVal === 2) params.set("cycle", "yearly");
@@ -209,6 +210,7 @@ export default function SuperAdminSubscriptionsPage() {
       const res = await apiFetch<{ data: Subscription[]; total: number }>(`/admin/subscriptions?${params.toString()}`);
       setSubs(res.data || []);
       setSubsTotal(res.total || 0);
+      setSubsPage(page);
     } catch (e: any) {
       console.error("fetchSubs failed", e);
     }
@@ -226,9 +228,10 @@ export default function SuperAdminSubscriptionsPage() {
   async function fetchPackageChangeRequests(status = requestFilterStatus, page = 1) {
     setRequestsLoading(true);
     try {
-      const res = await getAdminPackageChangeRequests({ page, limit: 20, status: status === "all" ? undefined : status });
+      const res = await getAdminPackageChangeRequests({ page, limit: LIST_PAGE_SIZE, status: status === "all" ? undefined : status });
       setRequests(res.data || []);
       setRequestsTotal(res.total || 0);
+      setRequestsPage(page);
     } catch (e: any) {
       console.error("fetchPackageChangeRequests failed", e);
     } finally {
@@ -254,6 +257,18 @@ export default function SuperAdminSubscriptionsPage() {
     fetchPackageChangeRequests("pending", 1);
     loadExpiryPolicy();
   }, [canViewSubscriptions]);
+
+  const searchMounted = useRef(false);
+  useEffect(() => {
+    if (!searchMounted.current) {
+      searchMounted.current = true;
+      return;
+    }
+    if (!canViewSubscriptions) return;
+    const t = window.setTimeout(() => void fetchSubs(1, search.trim()), 300);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchSubs is a plain function re-created each render
+  }, [search]);
 
   const visibleTabs = [
     { index: 0, label: "Overview & Analytics" },
@@ -401,7 +416,7 @@ export default function SuperAdminSubscriptionsPage() {
             type="button"
             onClick={() => {
               fetchPlans();
-              fetchSubs();
+              fetchSubs(subsPage);
               fetchOverview();
               fetchPackageChangeRequests(requestFilterStatus, requestsPage);
             }}
@@ -1139,6 +1154,7 @@ export default function SuperAdminSubscriptionsPage() {
                 </table>
               </div>
             </div>
+            <ListPager page={subsPage} total={subsTotal} onPageChange={(p) => void fetchSubs(p)} noun="subscriptions" />
           </div>
         )}
 
@@ -1311,6 +1327,13 @@ export default function SuperAdminSubscriptionsPage() {
                 </table>
               </div>
             </div>
+            <ListPager
+              page={requestsPage}
+              total={requestsTotal}
+              loading={requestsLoading}
+              onPageChange={(p) => void fetchPackageChangeRequests(requestFilterStatus, p)}
+              noun="requests"
+            />
           </div>
         )}
 

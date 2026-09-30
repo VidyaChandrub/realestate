@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { CountUp } from "@/components/superadmin/count-up";
+import { ListPager, usePagedRows } from "@/components/ui/list-pager";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
@@ -122,6 +123,8 @@ export default function SuperAdminFormsPage() {
       return hay.includes(query);
     });
   }, [forms, q, filter, typeFilter]);
+  // 10 per page; the counters and tab counts still use every form.
+  const paged = usePagedRows(visible, `${q}|${filter}|${typeFilter}`);
 
   async function createForm() {
     setBusy(true);
@@ -662,7 +665,7 @@ export default function SuperAdminFormsPage() {
                 </tr>
               </thead>
               <tbody>
-                {visible.map((form) => (
+                {paged.pageRows.map((form) => (
                   <tr key={form.backendId}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -784,7 +787,7 @@ export default function SuperAdminFormsPage() {
             gap: 20,
           }}
         >
-          {visible.map((form) => (
+          {paged.pageRows.map((form) => (
             <VisualFormCard
               key={form.backendId}
               form={form}
@@ -796,6 +799,7 @@ export default function SuperAdminFormsPage() {
           ))}
         </div>
       )}
+      <ListPager page={paged.page} total={paged.total} onPageChange={paged.setPage} noun="forms" />
 
       {/* Embed Modal */}
       <Modal

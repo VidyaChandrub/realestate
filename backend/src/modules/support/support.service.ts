@@ -467,7 +467,10 @@ export class SupportService {
       ];
     }
 
-    const [rows, total] = await Promise.all([
+    // KPI counts over every ticket matching the current filters (not just the
+    // page) — the list pages at 10 rows, so counting on the client would only
+    // see one page.
+    const [rows, total, open, ongoing, highPriority] = await Promise.all([
       this.prisma.supportTicket.findMany({
         where,
         orderBy: { updatedAt: 'desc' },
@@ -476,6 +479,11 @@ export class SupportService {
         include: TICKET_INCLUDE,
       }),
       this.prisma.supportTicket.count({ where }),
+      this.prisma.supportTicket.count({ where: { AND: [where, { status: 'open' }] } }),
+      this.prisma.supportTicket.count({ where: { AND: [where, { status: 'ongoing' }] } }),
+      this.prisma.supportTicket.count({
+        where: { AND: [where, { priority: { in: ['high', 'urgent'] } }] },
+      }),
     ]);
 
     const unreadIds = await this.unreadTicketIds(
@@ -488,6 +496,7 @@ export class SupportService {
       total,
       page,
       limit,
+      stats: { open, ongoing, highPriority },
     };
   }
 

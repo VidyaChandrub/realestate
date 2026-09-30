@@ -7,6 +7,7 @@ import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
 import { getSalesAgents } from "@/lib/api";
 import type { SalesAgent } from "@/lib/types";
+import { ListPager, usePagedRows } from "@/components/ui/list-pager";
 
 type AgentRole = "Admin" | "Manager" | "Sales";
 
@@ -107,6 +108,8 @@ export default function OrgSalesAgentsPage() {
   const paused = rows.filter((r) => r.chip === "Paused").length;
   const missing = rows.filter((r) => r.bridgeMissing).length;
   const online = rows.filter((r) => r.online).length;
+  // 10 per page; the counters above still use every agent.
+  const paged = usePagedRows(rows, "");
 
   return (
     <>
@@ -249,7 +252,7 @@ export default function OrgSalesAgentsPage() {
                     </td>
                   </tr>
                 ) : (
-                  rows.map((agent) => (
+                  paged.pageRows.map((agent) => (
                     <tr key={agent.id}>
                       <td>
                         <div className="u">
@@ -300,6 +303,7 @@ export default function OrgSalesAgentsPage() {
               </tbody>
             </table>
           </div>
+          <ListPager page={paged.page} total={paged.total} onPageChange={paged.setPage} noun="agents" />
         </div>
       </Reveal>
     </>

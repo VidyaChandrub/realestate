@@ -26,6 +26,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { Seg } from "@/components/superadmin/seg";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { UnitDesignPage } from "@/components/org/unit-modal";
+import { ListPager, usePagedRows } from "@/components/ui/list-pager";
 import {
   Field,
   FormActions,
@@ -616,6 +617,12 @@ export default function OrgProjectUnitsPage() {
       setDeleteBusy(false);
     }
   }
+
+  const tableFilter = FILTERS[filterIndex];
+  const pagedUnits = usePagedRows(
+    tableFilter === "All" ? units : units.filter((u) => u.status === tableFilter.toLowerCase()),
+    String(filterIndex),
+  );
 
   if (notFound) {
     return (
@@ -1387,7 +1394,7 @@ export default function OrgProjectUnitsPage() {
                     </td>
                   </tr>
                 ) : (
-                  visibleUnits.map((row) => (
+                  pagedUnits.pageRows.map((row) => (
                     <tr key={row.id}>
                       <td className="">{row.unitNo}</td>
                       {traits.grouped ? <td>{row.tower ?? "—"}</td> : null}
@@ -1496,6 +1503,7 @@ export default function OrgProjectUnitsPage() {
               </tbody>
             </table>
           </div>
+          <ListPager page={pagedUnits.page} total={pagedUnits.total} onPageChange={pagedUnits.setPage} noun="units" />
         </div>
       </Reveal>
 

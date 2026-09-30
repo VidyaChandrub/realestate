@@ -12,7 +12,7 @@ import { Icon } from "@/components/icons";
 import "@/app/org/org.css";
 import type { OrgBillingSummary, ProjectsListResponse, ProjectStatus } from "@/lib/types";
 
-const LIMIT = 20;
+const LIMIT = 10;
 
 const STATUS_TABS = ["All", "Active", "Inactive"] as const;
 const STATUS_FOR_TAB: (ProjectStatus | undefined)[] = [
