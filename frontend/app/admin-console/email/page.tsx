@@ -124,7 +124,7 @@ export default function SuperAdminEmailPage() {
     try {
       const res = await getEmailLogs({
         page,
-        limit: 15,
+        limit: 10,
         status,
         search,
       });

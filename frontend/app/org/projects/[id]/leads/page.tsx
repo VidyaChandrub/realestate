@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
@@ -12,7 +12,10 @@ import { useAuth } from "@/lib/auth-context";
 import { PROJECT_LEAD_ACTION } from "@/lib/permissions";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
-import { AddLeadModal } from "@/components/org/add-lead-modal";
+import { LEADS_FLASH_KEY } from "@/components/org/add-lead-form";
+import { useFlash } from "@/lib/flash";
+import { useToast } from "@/components/ui/toast";
+import { LIST_PAGE_SIZE, ListPager } from "@/components/ui/list-pager";
 import { LeadStatusSelect } from "@/components/org/lead-status-select";
 import { LEAD_STAGE_ORDER, StageBadge, useLeadStages } from "@/lib/lead-stages";
 import "@/app/org/org.css";
@@ -49,9 +52,18 @@ export default function OrgProjectLeadsPage() {
   const [assignable, setAssignable] = useState<{ id: string; name: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+  // Success message from the Add lead page (the list reloads itself on mount).
+  useFlash(LEADS_FLASH_KEY, (flash) => toast({ title: flash.message, variant: "success" }));
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [listTotal, setListTotal] = useState(0);
+  // Page keyed to the filters: a new search / status lands back on page 1.
+  const filterKey = `${search}|${statusFilter}`;
+  const [pageFor, setPageFor] = useState({ key: filterKey, page: 1 });
+  const page = pageFor.key === filterKey ? pageFor.page : 1;
+  const setPage = useCallback((p: number) => setPageFor({ key: filterKey, page: p }), [filterKey]);
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -59,11 +71,17 @@ export default function OrgProjectLeadsPage() {
     try {
       const res = await getCrmLeads({
         projectId,
-        limit: 100,
+        page,
+        limit: LIST_PAGE_SIZE,
         search: search || undefined,
         status: (statusFilter || undefined) as CrmLeadStatus | undefined,
       });
+      if (res.data.length === 0 && page > 1 && res.total > 0) {
+        setPage(Math.ceil(res.total / LIST_PAGE_SIZE));
+        return;
+      }
       setLeads(res.data);
+      setListTotal(res.total);
       setKpi({
         total: res.stats?.total ?? res.total,
         new: res.stats?.new ?? res.data.filter((l) => l.status === "new").length,
@@ -73,7 +91,7 @@ export default function OrgProjectLeadsPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load leads.");
     }
-  }, [projectId, search, statusFilter]);
+  }, [projectId, search, statusFilter, page, setPage]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -119,13 +137,7 @@ export default function OrgProjectLeadsPage() {
 
   return (
     <>
-      <ProjectPageHead active="leads" actions={canAdd ? <button className="btn btn-primary" onClick={() => setAddOpen(true)}>＋ Add lead</button> : undefined} />
-      <AddLeadModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        projectId={projectId}
-        onCreated={(lead) => setLeads((prev) => (prev ? [lead, ...prev] : [lead]))}
-      />
+      <ProjectPageHead active="leads" actions={canAdd ? <button className="btn btn-primary" onClick={() => router.push(`/org/projects/${encodeURIComponent(projectId)}/leads/new`)}>＋ Add lead</button> : undefined} />
       <Reveal delay={1}>
         <div className="mb-20">
           <div className="seg-wrap"><div className="seg">
@@ -174,6 +186,7 @@ export default function OrgProjectLeadsPage() {
                   );
                 })}</tbody>
               </table>
+              <ListPager page={page} total={listTotal} onPageChange={setPage} noun="leads" />
             </div>
           )}
         </div>

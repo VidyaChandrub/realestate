@@ -25,6 +25,7 @@ export function InventoryBindFields({
   onAvailabilityChange,
   hint,
   required,
+  hideLabel,
 }: {
   accessToken: string | null;
   value: InventoryBindValue;
@@ -37,6 +38,8 @@ export function InventoryBindFields({
   hint?: string;
   /** Shows the required mark on the label. */
   required?: boolean;
+  /** Omit the built-in label when the caller renders its own. */
+  hideLabel?: boolean;
 }) {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [units, setUnits] = useState<{ id: string; label: string }[]>([]);
@@ -84,11 +87,14 @@ export function InventoryBindFields({
 
   return (
     <div style={{ marginBottom: 14 }}>
-      <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
-        Project or standalone unit
-        {required ? <span className="req" style={{ color: "#ef4444" }}> *</span> : null}
-      </label>
+      {hideLabel ? null : (
+        <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+          Project or standalone unit
+          {required ? <span className="req" style={{ color: "#ef4444" }}> *</span> : null}
+        </label>
+      )}
       <select
+        aria-label="Project or standalone unit"
         className="inp"
         disabled={disabled || loading}
         value={selectValue}

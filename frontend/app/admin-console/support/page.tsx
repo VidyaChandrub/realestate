@@ -7,6 +7,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 import { Icon } from "@/components/icons";
 import { useToast } from "@/components/ui/toast";
+import { LIST_PAGE_SIZE, ListPager } from "@/components/ui/list-pager";
 import {
   assignAdminSupportTicket,
   getAdminSupportTickets,
@@ -71,8 +72,14 @@ export default function AdminSupportPage() {
 
   const [statusTab, setStatusTab] = useState(0);
   const [search, setSearch] = useState("");
+  // Page keyed to the filters: a new tab / search lands back on page 1.
+  const filterKey = `${statusTab}|${search}`;
+  const [pageFor, setPageFor] = useState({ key: filterKey, page: 1 });
+  const page = pageFor.key === filterKey ? pageFor.page : 1;
+  const setPage = useCallback((p: number) => setPageFor({ key: filterKey, page: p }), [filterKey]);
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([]);
   const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState<{ open: number; ongoing: number; highPriority: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [platformTeam, setPlatformTeam] = useState<PlatformTeamMember[]>([]);
@@ -116,12 +123,18 @@ export default function AdminSupportPage() {
     getAdminSupportTickets({
       status: STATUS_TABS[statusTab].value ?? undefined,
       search: search.trim() || undefined,
-      limit: 50,
+      page,
+      limit: LIST_PAGE_SIZE,
     })
       .then((res) => {
         if (cancelled) return;
+        if (res.data.length === 0 && page > 1 && res.total > 0) {
+          setPage(Math.ceil(res.total / LIST_PAGE_SIZE));
+          return;
+        }
         setTickets(res.data);
         setTotal(res.total);
+        setStats(res.stats ?? null);
         setError(null);
       })
       .catch((err) => {
@@ -134,13 +147,13 @@ export default function AdminSupportPage() {
     return () => {
       cancelled = true;
     };
-  }, [statusTab, search]);
+  }, [statusTab, search, page, setPage]);
 
-  const openCount = tickets.filter((t) => t.status === "open").length;
-  const ongoingCount = tickets.filter((t) => t.status === "ongoing").length;
-  const highPriorityCount = tickets.filter(
-    (t) => t.priority === "high" || t.priority === "urgent",
-  ).length;
+  const openCount = stats?.open ?? tickets.filter((t) => t.status === "open").length;
+  const ongoingCount = stats?.ongoing ?? tickets.filter((t) => t.status === "ongoing").length;
+  const highPriorityCount =
+    stats?.highPriority ??
+    tickets.filter((t) => t.priority === "high" || t.priority === "urgent").length;
 
   return (
     <>
@@ -315,6 +328,7 @@ export default function AdminSupportPage() {
               </tbody>
             </table>
           </div>
+          <ListPager page={page} total={total} loading={loading} onPageChange={setPage} noun="tickets" />
         </div>
       </Reveal>
     </>

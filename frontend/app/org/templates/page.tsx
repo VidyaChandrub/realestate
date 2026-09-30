@@ -31,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
+import { Field, FormActions, FormAlert, FormPage, TextInput, formPageStyles } from "@/components/forms/form-page";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -56,7 +57,7 @@ import type {
 import "@/app/openpage.css";
 import "./templates.css";
 
-const LIMIT = 12;
+const LIMIT = 10;
 
 export default function OrgTemplatesPage() {
   const { accessToken, hasPermission } = useAuth();
@@ -409,8 +410,313 @@ export default function OrgTemplatesPage() {
     }
   }
 
+  // Create / add flows as full-width in-page views (were modals). The gallery
+  // stays mounted but hidden; preview / upgrade / in-use modals portal to
+  // <body>, so they still open on top of these views exactly as before.
+  const formView = useTemplate ? (
+    <FormPage
+      eyebrow="Website · Templates"
+      title="Create landing page"
+      subtitle={`Start a new landing page based on "${useTemplate.name}".`}
+      onBack={() => setUseTemplate(null)}
+      backLabel="Back to Templates"
+    >
+      <div className={formPageStyles.panel}>
+        <FormAlert message={useError} />
+        <Field htmlFor="tpl-use-name" label="Landing page name" icon="landing">
+          <TextInput
+            id="tpl-use-name"
+            icon="landing"
+            placeholder="e.g. Skyline Residence Launch"
+            value={useName}
+            onChange={(e) => setUseName(e.target.value)}
+            autoFocus
+          />
+        </Field>
+        <Field htmlFor="tpl-use-bind" label="Project or standalone unit" icon="building">
+          <InventoryBindFields
+            accessToken={accessToken}
+            value={useBind}
+            onChange={setUseBind}
+            onAvailabilityChange={setUseHasInventory}
+            hideLabel
+          />
+        </Field>
+        <FormActions
+          onCancel={() => setUseTemplate(null)}
+          busy={useSubmitting}
+          busyLabel="Creating…"
+          submitLabel="Create & Launch Builder"
+          submitIcon="plus"
+          onSubmit={() => void confirmUseTemplate()}
+        />
+      </div>
+    </FormPage>
+  ) : addModalOpen ? (
+    <FormPage
+      eyebrow="Website · Templates"
+      title="Add templates to workspace"
+      subtitle="Select templates granted under your subscription plan to build landing pages."
+      onBack={() => setAddModalOpen(false)}
+      backLabel="Back to Templates"
+    >
+      <div className={formPageStyles.panel}>
+            <div>
+              {availableLoading ? (
+                <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+                  <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
+                  <div>Loading available plan templates…</div>
+                </div>
+              ) : availableError ? (
+                <div style={{ padding: "16px 0", color: "var(--rose)", fontSize: 13 }}>{availableError}</div>
+              ) : availableData ? (
+                <div>
+                  {/* Quota Telemetry Banner */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 16px",
+                      background: "var(--surface-2, #f8fafc)",
+                      borderRadius: 12,
+                      border: "1px solid var(--line)",
+                      marginBottom: 16,
+                      flexWrap: "wrap",
+                      gap: 10,
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>
+                        {availableData.planName} Package
+                      </span>
+                      <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                        Template Allowance: {availableData.assignedCount} of{" "}
+                        {availableData.maxAllowed == null ? "Unlimited" : availableData.maxAllowed} Selected
+                      </div>
+                    </div>
+                    <span
+                      className={`badge ${availableData.remainingQuota === 0
+                          ? "b-amber"
+                          : availableData.remainingQuota != null
+                            ? "b-indigo"
+                            : "b-green"
+                        }`}
+                      style={{ fontWeight: 700 }}
+                    >
+                      {availableData.remainingQuota === 0
+                        ? "Quota Reached"
+                        : availableData.remainingQuota != null
+                          ? `${availableData.remainingQuota} remaining slots`
+                          : "Unlimited access"}
+                    </span>
+                  </div>
+
+                  {availableData.remainingQuota === 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 12,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        padding: "10px 14px",
+                        marginBottom: 16,
+                        borderRadius: 12,
+                        border: "1px solid var(--amber, #f59e0b)",
+                        fontSize: 13,
+                      }}
+                    >
+                      <span style={{ fontSize: 18 }}>⚠️</span>
+                      <div style={{ flex: 1, minWidth: 220 }}>
+                        Your {availableData.planName} plan allows{" "}
+                        <b>{availableData.maxAllowed}</b> template{availableData.maxAllowed === 1 ? "" : "s"} in your
+                        workspace and you have <b>{availableData.assignedCount}</b>. Remove a template or upgrade your
+                        plan to add more.
+                      </div>
+                      <Link href="/org/settings?section=billing" className="btn btn-soft btn-sm">
+                        Upgrade plan
+                      </Link>
+                    </div>
+                  ) : null}
+
+                  {/* Filters in modal */}
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+                    <select
+                      className="inp"
+                      style={{ width: 150, height: 36 }}
+                      value={addModalTierFilter}
+                      onChange={(e) => setAddModalTierFilter(e.target.value)}
+                    >
+                      <option value="all">All Tiers</option>
+                      <option value="free">Free Plan</option>
+                      <option value="paid">Paid Plans</option>
+                      <option value="premium">Premium Plans</option>
+                    </select>
+                    <select
+                      className="inp"
+                      style={{ width: 180, height: 36 }}
+                      value={addModalCategoryFilter}
+                      onChange={(e) => setAddModalCategoryFilter(e.target.value)}
+                    >
+                      <option value="all">All Categories</option>
+                      {allCategories.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="muted" style={{ fontSize: 12.5, marginLeft: "auto" }}>
+                      {filteredAvailable.length} templates
+                    </span>
+                  </div>
+
+                  {/* Template Cards Grid */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                      gap: 14,
+                    }}
+                  >
+                    {filteredAvailable.map((tmpl) => {
+                      const isAssigned = tmpl.isAssigned;
+                      const isQuotaFull = availableData.remainingQuota === 0 && !isAssigned;
+
+                      return (
+                        <div
+                          key={tmpl.id}
+                          style={{
+                            border: isAssigned ? "2px solid var(--brand, #0f1424)" : "1px solid var(--line-2)",
+                            borderRadius: 14,
+                            overflow: "hidden",
+                            background: "var(--surface)",
+                            display: "flex",
+                            flexDirection: "column",
+                            position: "relative",
+                          }}
+                        >
+                          <div style={{ position: "relative" }}>
+                            <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent={isAssigned ? "#0f1424" : "#94a3b8"} height={150}>
+                              <div style={{ position: "absolute", top: 8, left: 8 }}>
+                                <TierBadge tier={tmpl.tier} />
+                              </div>
+                              {tmpl.isLocked && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    top: 8,
+                                    right: 8,
+                                    background: "rgba(15, 23, 42, 0.8)",
+                                    color: "#f59e0b",
+                                    padding: "3px 8px",
+                                    borderRadius: 6,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    backdropFilter: "blur(4px)",
+                                    zIndex: 2,
+                                  }}
+                                >
+                                  <Lock size={12} /> Locked
+                                </div>
+                              )}
+                            </TemplateCover>
+                          </div>
+
+                          <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{tmpl.name}</div>
+                            {tmpl.category && (
+                              <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{tmpl.category}</div>
+                            )}
+
+                            <div style={{ marginTop: "auto", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                type="button"
+                                onClick={() => openPreview(tmpl.id)}
+                                style={{ width: "100%", justifyContent: "center" }}
+                              >
+                                Preview
+                              </button>
+                              {tmpl.isLocked ? (
+                                <button
+                                  className="btn btn-sm"
+                                  type="button"
+                                  onClick={() => {
+                                    setUpgradePrompt({
+                                      title: `${tmpl.tier === "premium" ? "Premium" : "Paid"} Template Locked`,
+                                      body:
+                                        tmpl.lockReason ??
+                                        "This template is not available on your current plan. Please upgrade your subscription to unlock it.",
+                                    });
+                                  }}
+                                  style={{
+                                    width: "100%",
+                                    justifyContent: "center",
+                                    background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                                    color: "#fff",
+                                    border: "none",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  <Lock size={13} /> Upgrade to Unlock
+                                </button>
+                              ) : isAssigned ? (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 4,
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    color: "var(--brand)",
+                                    background: "var(--brand-050)",
+                                    padding: "6px 12px",
+                                    borderRadius: 8,
+                                    width: "100%",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Check size={14} /> Added to Workspace
+                                </span>
+                              ) : (
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  type="button"
+                                  onClick={() => handleAssignTemplate(tmpl.id)}
+                                  disabled={assigningId === tmpl.id || isQuotaFull}
+                                  title={isQuotaFull ? "You've reached your plan's template limit" : undefined}
+                                  style={{ width: "100%", justifyContent: "center", fontWeight: 700 }}
+                                >
+                                  {assigningId === tmpl.id
+                                    ? "Adding…"
+                                    : isQuotaFull
+                                      ? "Quota Full"
+                                      : "+ Add to Workspace"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+      </div>
+    </FormPage>
+  ) : null;
+
   return (
-    <div className="tpl-wrap">
+    <>
+      {formView}
+    <div className="tpl-wrap" style={formView ? { display: "none" } : undefined}>
       {/* 1. Hero Banner */}
       <div className="tpl-hero reveal in">
         <div className="tpl-hero-left">
@@ -1125,324 +1431,6 @@ export default function OrgTemplatesPage() {
         </Modal>
       )}
 
-      {/* Add Template Modal */}
-      <Modal
-        open={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
-        title="Add Templates to Workspace"
-        description="Select templates granted under your subscription plan to build landing pages."
-        size="lg"
-      >
-        <div>
-          {availableLoading ? (
-            <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
-              <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
-              <div>Loading available plan templates…</div>
-            </div>
-          ) : availableError ? (
-            <div style={{ padding: "16px 0", color: "var(--rose)", fontSize: 13 }}>{availableError}</div>
-          ) : availableData ? (
-            <div>
-              {/* Quota Telemetry Banner */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 16px",
-                  background: "var(--surface-2, #f8fafc)",
-                  borderRadius: 12,
-                  border: "1px solid var(--line)",
-                  marginBottom: 16,
-                  flexWrap: "wrap",
-                  gap: 10,
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>
-                    {availableData.planName} Package
-                  </span>
-                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                    Template Allowance: {availableData.assignedCount} of{" "}
-                    {availableData.maxAllowed == null ? "Unlimited" : availableData.maxAllowed} Selected
-                  </div>
-                </div>
-                <span
-                  className={`badge ${availableData.remainingQuota === 0
-                      ? "b-amber"
-                      : availableData.remainingQuota != null
-                        ? "b-indigo"
-                        : "b-green"
-                    }`}
-                  style={{ fontWeight: 700 }}
-                >
-                  {availableData.remainingQuota === 0
-                    ? "Quota Reached"
-                    : availableData.remainingQuota != null
-                      ? `${availableData.remainingQuota} remaining slots`
-                      : "Unlimited access"}
-                </span>
-              </div>
-
-              {availableData.remainingQuota === 0 ? (
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    padding: "10px 14px",
-                    marginBottom: 16,
-                    borderRadius: 12,
-                    border: "1px solid var(--amber, #f59e0b)",
-                    fontSize: 13,
-                  }}
-                >
-                  <span style={{ fontSize: 18 }}>⚠️</span>
-                  <div style={{ flex: 1, minWidth: 220 }}>
-                    Your {availableData.planName} plan allows{" "}
-                    <b>{availableData.maxAllowed}</b> template{availableData.maxAllowed === 1 ? "" : "s"} in your
-                    workspace and you have <b>{availableData.assignedCount}</b>. Remove a template or upgrade your
-                    plan to add more.
-                  </div>
-                  <Link href="/org/settings?section=billing" className="btn btn-soft btn-sm">
-                    Upgrade plan
-                  </Link>
-                </div>
-              ) : null}
-
-              {/* Filters in modal */}
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
-                <select
-                  className="inp"
-                  style={{ width: 150, height: 36 }}
-                  value={addModalTierFilter}
-                  onChange={(e) => setAddModalTierFilter(e.target.value)}
-                >
-                  <option value="all">All Tiers</option>
-                  <option value="free">Free Plan</option>
-                  <option value="paid">Paid Plans</option>
-                  <option value="premium">Premium Plans</option>
-                </select>
-                <select
-                  className="inp"
-                  style={{ width: 180, height: 36 }}
-                  value={addModalCategoryFilter}
-                  onChange={(e) => setAddModalCategoryFilter(e.target.value)}
-                >
-                  <option value="all">All Categories</option>
-                  {allCategories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                <span className="muted" style={{ fontSize: 12.5, marginLeft: "auto" }}>
-                  {filteredAvailable.length} templates
-                </span>
-              </div>
-
-              {/* Template Cards Grid */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-                  gap: 14,
-                  maxHeight: 440,
-                  overflowY: "auto",
-                  paddingRight: 4,
-                }}
-              >
-                {filteredAvailable.map((tmpl) => {
-                  const isAssigned = tmpl.isAssigned;
-                  const isQuotaFull = availableData.remainingQuota === 0 && !isAssigned;
-
-                  return (
-                    <div
-                      key={tmpl.id}
-                      style={{
-                        border: isAssigned ? "2px solid var(--brand, #0f1424)" : "1px solid var(--line-2)",
-                        borderRadius: 14,
-                        overflow: "hidden",
-                        background: "var(--surface)",
-                        display: "flex",
-                        flexDirection: "column",
-                        position: "relative",
-                      }}
-                    >
-                      <div style={{ position: "relative" }}>
-                        <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent={isAssigned ? "#0f1424" : "#94a3b8"} height={150}>
-                          <div style={{ position: "absolute", top: 8, left: 8 }}>
-                            <TierBadge tier={tmpl.tier} />
-                          </div>
-                          {tmpl.isLocked && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: 8,
-                                right: 8,
-                                background: "rgba(15, 23, 42, 0.8)",
-                                color: "#f59e0b",
-                                padding: "3px 8px",
-                                borderRadius: 6,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 4,
-                                backdropFilter: "blur(4px)",
-                                zIndex: 2,
-                              }}
-                            >
-                              <Lock size={12} /> Locked
-                            </div>
-                          )}
-                        </TemplateCover>
-                      </div>
-
-                      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13.5, color: "var(--ink)" }}>{tmpl.name}</div>
-                        {tmpl.category && (
-                          <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{tmpl.category}</div>
-                        )}
-
-                        <div style={{ marginTop: "auto", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            type="button"
-                            onClick={() => openPreview(tmpl.id)}
-                            style={{ width: "100%", justifyContent: "center" }}
-                          >
-                            Preview
-                          </button>
-                          {tmpl.isLocked ? (
-                            <button
-                              className="btn btn-sm"
-                              type="button"
-                              onClick={() => {
-                                setUpgradePrompt({
-                                  title: `${tmpl.tier === "premium" ? "Premium" : "Paid"} Template Locked`,
-                                  body:
-                                    tmpl.lockReason ??
-                                    "This template is not available on your current plan. Please upgrade your subscription to unlock it.",
-                                });
-                              }}
-                              style={{
-                                width: "100%",
-                                justifyContent: "center",
-                                background: "linear-gradient(135deg, #f59e0b, #d97706)",
-                                color: "#fff",
-                                border: "none",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 6,
-                                fontWeight: 700,
-                              }}
-                            >
-                              <Lock size={13} /> Upgrade to Unlock
-                            </button>
-                          ) : isAssigned ? (
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 4,
-                                fontSize: 12,
-                                fontWeight: 700,
-                                color: "var(--brand)",
-                                background: "var(--brand-050)",
-                                padding: "6px 12px",
-                                borderRadius: 8,
-                                width: "100%",
-                                justifyContent: "center",
-                              }}
-                            >
-                              <Check size={14} /> Added to Workspace
-                            </span>
-                          ) : (
-                            <button
-                              className="btn btn-primary btn-sm"
-                              type="button"
-                              onClick={() => handleAssignTemplate(tmpl.id)}
-                              disabled={assigningId === tmpl.id || isQuotaFull}
-                              title={isQuotaFull ? "You've reached your plan's template limit" : undefined}
-                              style={{ width: "100%", justifyContent: "center", fontWeight: 700 }}
-                            >
-                              {assigningId === tmpl.id
-                                ? "Adding…"
-                                : isQuotaFull
-                                  ? "Quota Full"
-                                  : "+ Add to Workspace"}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </Modal>
-
-      {/* Use Template Modal */}
-      <Modal
-        open={!!useTemplate}
-        onClose={() => setUseTemplate(null)}
-        title="Create Landing Page"
-        description={useTemplate ? `Start a new landing page based on "${useTemplate.name}".` : undefined}
-        footer={
-          <>
-            <button className="btn btn-ghost" type="button" onClick={() => setUseTemplate(null)}>
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              type="button"
-              disabled={useSubmitting}
-              onClick={confirmUseTemplate}
-              style={{ fontWeight: 700 }}
-            >
-              {useSubmitting ? "Creating…" : "Create & Launch Builder"}
-            </button>
-          </>
-        }
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {useError && (
-            <div
-              style={{
-                padding: "8px 12px",
-                background: "var(--rose-050)",
-                color: "var(--rose)",
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            >
-              {useError}
-            </div>
-          )}
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Landing Page Name</label>
-            <input
-              className="inp"
-              placeholder="e.g. Skyline Residence Launch"
-              value={useName}
-              onChange={(e) => setUseName(e.target.value)}
-              autoFocus
-            />
-          </div>
-
-          <InventoryBindFields
-            accessToken={accessToken}
-            value={useBind}
-            onChange={setUseBind}
-            onAvailabilityChange={setUseHasInventory}
-          />
-        </div>
-      </Modal>
-
       {/* Remove Confirm Modal */}
       <ConfirmModal
         open={!!removeConfirm}
@@ -1522,6 +1510,7 @@ export default function OrgTemplatesPage() {
         </div>
       </Modal>
     </div>
+    </>
   );
 }
 

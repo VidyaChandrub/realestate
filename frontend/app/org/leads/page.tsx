@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
@@ -14,8 +14,10 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
-import { AddLeadModal } from "@/components/org/add-lead-modal";
-import { ImportLeadsModal } from "@/components/org/import-leads-modal";
+import { LEADS_FLASH_KEY } from "@/components/org/add-lead-form";
+import { useFlash } from "@/lib/flash";
+import { useToast } from "@/components/ui/toast";
+import { LIST_PAGE_SIZE, ListPager } from "@/components/ui/list-pager";
 import { LeadStatusSelect } from "@/components/org/lead-status-select";
 import { LEAD_STAGE_ORDER, StageBadge, useLeadStages } from "@/lib/lead-stages";
 import "@/app/org/org.css";
@@ -56,17 +58,31 @@ export default function OrgLeadsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState(() => searchParams.get("assignedTo") ?? "");
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
-  const [addOpen, setAddOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+  // Success message from the Add lead page (the list reloads itself on mount).
+  useFlash(LEADS_FLASH_KEY, (flash) => toast({ title: flash.message, variant: "success" }));
+
+  const filterKey = `${search}|${statusFilter}|${assigneeFilter}`;
+  const [pageFor, setPageFor] = useState({ key: filterKey, page: 1 });
+  const page = pageFor.key === filterKey ? pageFor.page : 1;
+  const setPage = useCallback((p: number) => setPageFor({ key: filterKey, page: p }), [filterKey]);
 
   const load = useCallback(async () => {
     setError(null);
     try {
       const res = await getCrmLeads({
+        page,
+        limit: LIST_PAGE_SIZE,
         search: search || undefined,
         status: (statusFilter || undefined) as CrmLeadStatus | undefined,
         assignedToId: assigneeFilter || undefined,
       });
+      // The last row on a later page was removed — step back to the last page.
+      if (res.data.length === 0 && page > 1 && res.total > 0) {
+        setPage(Math.ceil(res.total / LIST_PAGE_SIZE));
+        return;
+      }
       setLeads(res.data);
       setListTotal(res.total);
       setKpi({
@@ -80,7 +96,7 @@ export default function OrgLeadsPage() {
         e instanceof Error ? e.message : "Failed to load leads.",
       );
     }
-  }, [search, statusFilter, assigneeFilter]);
+  }, [search, statusFilter, assigneeFilter, page, setPage]);
 
   useEffect(() => {
     load();
@@ -194,38 +210,16 @@ export default function OrgLeadsPage() {
 
         {admin || canAdd ? (
           <div className="lc-head-actions">
-            <button className="lc-btn-outline" type="button" onClick={() => setImportOpen(true)}>
+            <button className="lc-btn-outline" type="button" onClick={() => router.push("/org/leads/import")}>
               <Icon name="document" size={14} /> Import CSV
             </button>
-            <button className="lc-btn-primary" type="button" onClick={() => setAddOpen(true)}>
+            <button className="lc-btn-primary" type="button" onClick={() => router.push("/org/leads/new")}>
               <Icon name="plus" size={14} /> Add lead
             </button>
           </div>
         ) : null}
       </div>
 
-      {importOpen ? (
-        <ImportLeadsModal
-          open
-          onClose={() => setImportOpen(false)}
-          onImported={() => void load()}
-        />
-      ) : null}
-      <AddLeadModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onCreated={(lead) => {
-          setLeads((prev) => (prev ? [lead, ...prev] : [lead]));
-          setListTotal((n) => n + 1);
-          setKpi((prev) => ({
-            ...prev,
-            total: prev.total + 1,
-            unassigned: lead.assignedTo ? prev.unassigned : prev.unassigned + 1,
-            new: lead.status === "new" ? prev.new + 1 : prev.new,
-            won: lead.status === "won" ? prev.won + 1 : prev.won,
-          }));
-        }}
-      />
 
       {/* Tabs Row matching Screenshot 1 */}
       <div className="lc-tabs-bar">
@@ -641,32 +635,7 @@ export default function OrgLeadsPage() {
                 </tbody>
               </table>
 
-              {/* Table Footer matching Screenshot 1 */}
-              <div className="lc-footer">
-                <div>
-                  Showing {leads.length > 0 ? `1–${leads.length}` : "0"} of {listTotal || leads.length} leads
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <button className="lc-page-btn" type="button" title="Previous page">
-                    <Icon name="chevron-left" size={13} />
-                  </button>
-                  <button className="lc-page-btn active" type="button">
-                    1
-                  </button>
-                  <button className="lc-page-btn" type="button" title="Next page">
-                    <Icon name="chevron-right" size={13} />
-                  </button>
-                  <select
-                    className="lc-select-pill"
-                    style={{ height: 32, padding: "0 28px 0 10px", fontSize: 12.5 }}
-                    defaultValue="10"
-                  >
-                    <option value="10">10 / page</option>
-                    <option value="25">25 / page</option>
-                    <option value="50">50 / page</option>
-                  </select>
-                </div>
-              </div>
+              <ListPager page={page} total={listTotal} onPageChange={setPage} noun="leads" />
             </div>
           )}
         </div>

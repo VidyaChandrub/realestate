@@ -47,6 +47,7 @@ import { SiteRenderer } from "@/components/openpage/renderer/SiteRenderer";
 import { siteFromLandingPage } from "@/lib/openpage/content";
 import { buildRealEstateTemplate } from "@/lib/openpage/re-templates";
 import { Modal } from "@/components/ui/modal";
+import { Field, FormActions, FormAlert, FormPage, TextInput, formPageStyles } from "@/components/forms/form-page";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type {
   LandingPageRow,
@@ -91,7 +92,7 @@ interface LandingPageDetail extends LandingPageRow {
   };
 }
 
-const LIMIT = 20;
+const LIMIT = 10;
 const STATUS_TABS = ["All", "Draft", "Published", "Unpublished"] as const;
 
 function statusParamFor(tabIndex: number): LandingPageStatus | undefined {
@@ -611,8 +612,262 @@ export default function OrgLandingPagesPage() {
   const draftPct = totalKpi > 0 ? Math.round((draftKpi / totalKpi) * 100) : 0;
   const unpublishedPct = totalKpi > 0 ? Math.round((unpublishedKpi / totalKpi) * 100) : 0;
 
+  // Create flows as full-width in-page views (were modals). The list stays
+  // mounted but hidden; the preview / plan-limit / domain modals portal to
+  // <body>, so they still open on top of these views exactly as before.
+  const formView = scratchOpen ? (
+    <FormPage
+      eyebrow="Website · Landing Pages"
+      title="Create a blank landing page"
+      subtitle="Starts with an empty canvas. Bind a project or standalone unit to auto-fill property tokens."
+      onBack={() => {
+        if (!scratchSubmitting) setScratchOpen(false);
+      }}
+      backDisabled={scratchSubmitting}
+      backLabel="Back to Landing Pages"
+    >
+      <div className={formPageStyles.panel}>
+        <FormAlert message={scratchError} />
+        <Field htmlFor="lp-scratch-name" label="Landing page name" icon="landing">
+          <TextInput
+            id="lp-scratch-name"
+            icon="landing"
+            placeholder="e.g. Waterfront Residences"
+            value={scratchName}
+            onChange={(e) => setScratchName(e.target.value)}
+            autoFocus
+          />
+        </Field>
+        <Field htmlFor="lp-scratch-bind" label="Project or standalone unit" icon="building">
+          <InventoryBindFields
+            accessToken={accessToken}
+            value={scratchBind}
+            onChange={setScratchBind}
+            onSelectOption={(opt) => {
+              setScratchSelectedLabel(opt.label);
+              if (opt.label && !scratchName.trim()) {
+                setScratchName(opt.label);
+              }
+            }}
+            onAvailabilityChange={setScratchHasInventory}
+            hideLabel
+          />
+        </Field>
+        <FormActions
+          onCancel={() => setScratchOpen(false)}
+          busy={scratchSubmitting}
+          busyLabel="Creating…"
+          submitLabel="Create & Launch Builder"
+          submitIcon="plus"
+          onSubmit={() => void confirmCreateFromScratch()}
+        />
+      </div>
+    </FormPage>
+  ) : useTemplate ? (
+    <FormPage
+      eyebrow="Website · Landing Pages"
+      title="Create landing page"
+      subtitle={`Start a new landing page based on "${useTemplate.name}".`}
+      onBack={() => {
+        if (!useSubmitting) setUseTemplate(null);
+      }}
+      backDisabled={useSubmitting}
+      backLabel="Back to Landing Pages"
+    >
+      <div className={formPageStyles.panel}>
+        <FormAlert message={useError} />
+        <Field htmlFor="lp-use-name" label="Landing page name" icon="landing">
+          <TextInput
+            id="lp-use-name"
+            icon="landing"
+            placeholder="e.g. Skyline Residence Launch"
+            value={useName}
+            onChange={(e) => setUseName(e.target.value)}
+            autoFocus
+          />
+        </Field>
+        <Field htmlFor="lp-use-bind" label="Project or standalone unit" icon="building">
+          <InventoryBindFields
+            accessToken={accessToken}
+            value={useBind}
+            onChange={setUseBind}
+            onSelectOption={(opt) => {
+              setUseSelectedLabel(opt.label);
+              if (opt.label && !useName.trim()) {
+                setUseName(`${opt.label}${useTemplate?.name ? ` — ${useTemplate.name}` : ""}`);
+              }
+            }}
+            onAvailabilityChange={setUseHasInventory}
+            hideLabel
+          />
+        </Field>
+        <FormActions
+          onCancel={() => setUseTemplate(null)}
+          busy={useSubmitting}
+          busyLabel="Creating…"
+          submitLabel="Create & Launch Builder"
+          submitIcon="plus"
+          onSubmit={() => void confirmUseTemplate()}
+        />
+      </div>
+    </FormPage>
+  ) : templatePickerOpen ? (
+    <FormPage
+      eyebrow="Website · Landing Pages"
+      title="Choose a landing page template"
+      subtitle="Use a template already added to your workspace, or preview it before you start."
+      onBack={() => setTemplatePickerOpen(false)}
+      backLabel="Back to Landing Pages"
+    >
+      <div className={formPageStyles.panel}>
+            {templatePickerLoading ? (
+              <div style={{ padding: 44, textAlign: "center", color: "var(--muted)" }}>
+                <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
+                <div>Loading workspace templates…</div>
+              </div>
+            ) : templatePickerError ? (
+              <div style={{ padding: "16px 0", color: "var(--rose)", fontSize: 13 }}>{templatePickerError}</div>
+            ) : (
+              <div>
+                {templateQuota && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 16px",
+                      background: "var(--surface-2, #f8fafc)",
+                      borderRadius: 12,
+                      border: "1px solid var(--line)",
+                      marginBottom: 16,
+                      flexWrap: "wrap",
+                      gap: 10,
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>
+                        {templateQuota.planName} Package
+                      </span>
+                      <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                        Template Allowance: {templateQuota.assignedCount} of{" "}
+                        {templateQuota.maxAllowed == null ? "Unlimited" : templateQuota.maxAllowed} Selected
+                      </div>
+                    </div>
+                    <span
+                      className={`badge ${templateQuota.remainingQuota === 0
+                          ? "b-amber"
+                          : templateQuota.remainingQuota != null
+                            ? "b-indigo"
+                            : "b-green"
+                        }`}
+                      style={{ fontWeight: 700 }}
+                    >
+                      {templateQuota.remainingQuota === 0
+                        ? "Quota Reached"
+                        : templateQuota.remainingQuota != null
+                          ? `${templateQuota.remainingQuota} remaining slots`
+                          : "Unlimited access"}
+                    </span>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
+                    {assignedTemplates.length} workspace template{assignedTemplates.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                {assignedTemplates.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "34px 20px",
+                      textAlign: "center",
+                      border: "1px dashed var(--line-2)",
+                      borderRadius: 12,
+                      color: "var(--muted)",
+                      fontSize: 13,
+                    }}
+                  >
+                    No templates have been added to this workspace yet. Add one from Templates Studio first.
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+                      gap: 14,
+                      padding: "2px 4px 4px 2px",
+                    }}
+                  >
+                    {assignedTemplates.map((template) => (
+                      <div
+                        key={template.id}
+                        style={{
+                          border: "1px solid var(--line-2)",
+                          borderRadius: 14,
+                          overflow: "hidden",
+                          background: "var(--surface)",
+                          display: "flex",
+                          flexDirection: "column",
+                        }}
+                      >
+                        <TemplateCover thumbnail={template.thumbnail ?? "hero"} accent="#0f1424" height={150}>
+                          <div style={{ position: "absolute", top: 8, left: 8 }}>
+                            <TierBadge tier={template.tier} />
+                          </div>
+                          {template.category && (
+                            <div style={{ position: "absolute", top: 8, right: 8 }}>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  background: "rgba(15,20,36,0.7)",
+                                  color: "#fff",
+                                  padding: "2px 8px",
+                                  borderRadius: 999,
+                                  backdropFilter: "blur(4px)",
+                                }}
+                              >
+                                {template.category}
+                              </span>
+                            </div>
+                          )}
+                        </TemplateCover>
+                        <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{template.name}</div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() => openTemplateUse(template.id, template.name)}
+                              style={{ flex: 1, justifyContent: "center", fontWeight: 700 }}
+                            >
+                              <Sparkles size={13} /> Use
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => openTemplatePreview(template.id)}
+                              style={{ flex: 1, justifyContent: "center", fontWeight: 600 }}
+                            >
+                              <Eye size={13} /> Preview
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+      </div>
+    </FormPage>
+  ) : null;
+
   return (
-    <div className="lp-wrap">
+    <>
+      {formView}
+    <div className="lp-wrap" style={formView ? { display: "none" } : undefined}>
       {/* Studio Header */}
       <div className="lp-header reveal in">
         <div>
@@ -1253,7 +1508,7 @@ export default function OrgLandingPagesPage() {
       {/* Bottom Pagination Bar */}
       <div className="lp-pagination">
         <div>
-          Showing {filteredRows.length > 0 ? `1–${filteredRows.length}` : "0"} of {totalKpi} landing pages
+          Showing {filteredRows.length > 0 ? `${(page - 1) * LIMIT + 1}–${(page - 1) * LIMIT + filteredRows.length}` : "0"} of {total} landing pages
         </div>
         <div className="lp-pagination-btns">
           <button
@@ -1264,7 +1519,10 @@ export default function OrgLandingPagesPage() {
           >
             <ChevronLeft size={14} />
           </button>
-          {Array.from({ length: Math.min(4, Math.max(1, totalPages)) }, (_, i) => i + 1).map((pNum) => (
+          {Array.from(
+            { length: Math.min(4, Math.max(1, totalPages)) },
+            (_, i) => Math.max(1, Math.min(page - 1, totalPages - 3)) + i,
+          ).map((pNum) => (
             <button
               key={pNum}
               type="button"
@@ -1284,158 +1542,6 @@ export default function OrgLandingPagesPage() {
           </button>
         </div>
       </div>
-
-      {/* Assigned Templates Modal */}
-      <Modal
-        open={templatePickerOpen}
-        onClose={() => setTemplatePickerOpen(false)}
-        title="Choose a Landing Page Template"
-        description="Use a template already added to your workspace, or preview it before you start."
-        size="xl"
-      >
-        {templatePickerLoading ? (
-          <div style={{ padding: 44, textAlign: "center", color: "var(--muted)" }}>
-            <RefreshCw size={24} className="animate-spin" style={{ margin: "0 auto 8px" }} />
-            <div>Loading workspace templates…</div>
-          </div>
-        ) : templatePickerError ? (
-          <div style={{ padding: "16px 0", color: "var(--rose)", fontSize: 13 }}>{templatePickerError}</div>
-        ) : (
-          <div>
-            {templateQuota && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "12px 16px",
-                  background: "var(--surface-2, #f8fafc)",
-                  borderRadius: 12,
-                  border: "1px solid var(--line)",
-                  marginBottom: 16,
-                  flexWrap: "wrap",
-                  gap: 10,
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>
-                    {templateQuota.planName} Package
-                  </span>
-                  <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                    Template Allowance: {templateQuota.assignedCount} of{" "}
-                    {templateQuota.maxAllowed == null ? "Unlimited" : templateQuota.maxAllowed} Selected
-                  </div>
-                </div>
-                <span
-                  className={`badge ${templateQuota.remainingQuota === 0
-                      ? "b-amber"
-                      : templateQuota.remainingQuota != null
-                        ? "b-indigo"
-                        : "b-green"
-                    }`}
-                  style={{ fontWeight: 700 }}
-                >
-                  {templateQuota.remainingQuota === 0
-                    ? "Quota Reached"
-                    : templateQuota.remainingQuota != null
-                      ? `${templateQuota.remainingQuota} remaining slots`
-                      : "Unlimited access"}
-                </span>
-              </div>
-            )}
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                {assignedTemplates.length} workspace template{assignedTemplates.length === 1 ? "" : "s"}
-              </span>
-            </div>
-
-            {assignedTemplates.length === 0 ? (
-              <div
-                style={{
-                  padding: "34px 20px",
-                  textAlign: "center",
-                  border: "1px dashed var(--line-2)",
-                  borderRadius: 12,
-                  color: "var(--muted)",
-                  fontSize: 13,
-                }}
-              >
-                No templates have been added to this workspace yet. Add one from Templates Studio first.
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-                  gap: 14,
-                  maxHeight: 500,
-                  overflowY: "auto",
-                  padding: "2px 4px 4px 2px",
-                }}
-              >
-                {assignedTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    style={{
-                      border: "1px solid var(--line-2)",
-                      borderRadius: 14,
-                      overflow: "hidden",
-                      background: "var(--surface)",
-                      display: "flex",
-                      flexDirection: "column",
-                    }}
-                  >
-                    <TemplateCover thumbnail={template.thumbnail ?? "hero"} accent="#0f1424" height={150}>
-                      <div style={{ position: "absolute", top: 8, left: 8 }}>
-                        <TierBadge tier={template.tier} />
-                      </div>
-                      {template.category && (
-                        <div style={{ position: "absolute", top: 8, right: 8 }}>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 600,
-                              background: "rgba(15,20,36,0.7)",
-                              color: "#fff",
-                              padding: "2px 8px",
-                              borderRadius: 999,
-                              backdropFilter: "blur(4px)",
-                            }}
-                          >
-                            {template.category}
-                          </span>
-                        </div>
-                      )}
-                    </TemplateCover>
-                    <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{template.name}</div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => openTemplateUse(template.id, template.name)}
-                          style={{ flex: 1, justifyContent: "center", fontWeight: 700 }}
-                        >
-                          <Sparkles size={13} /> Use
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => openTemplatePreview(template.id)}
-                          style={{ flex: 1, justifyContent: "center", fontWeight: 600 }}
-                        >
-                          <Eye size={13} /> Preview
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
 
       {/* Template Preview Modal */}
       {templatePreviewId && (
@@ -1502,116 +1608,6 @@ export default function OrgLandingPagesPage() {
           </div>
         </Modal>
       )}
-
-      {/* Use Template Modal */}
-      <Modal
-        open={!!useTemplate}
-        onClose={() => {
-          if (!useSubmitting) setUseTemplate(null);
-        }}
-        title="Create Landing Page"
-        description={useTemplate ? `Start a new landing page based on "${useTemplate.name}".` : undefined}
-        footer={
-          <>
-            <button className="btn btn-ghost" type="button" onClick={() => setUseTemplate(null)} disabled={useSubmitting}>
-              Cancel
-            </button>
-            <button className="btn btn-primary" type="button" disabled={useSubmitting} onClick={confirmUseTemplate} style={{ fontWeight: 700 }}>
-              {useSubmitting ? "Creating…" : "Create & Launch Builder"}
-            </button>
-          </>
-        }
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {useError && <div style={{ padding: "8px 12px", background: "var(--rose-050)", color: "var(--rose)", borderRadius: 8, fontSize: 13 }}>{useError}</div>}
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Landing Page Name</label>
-            <input className="inp" placeholder="e.g. Skyline Residence Launch" value={useName} onChange={(e) => setUseName(e.target.value)} autoFocus />
-          </div>
-          <InventoryBindFields
-            accessToken={accessToken}
-            value={useBind}
-            onChange={setUseBind}
-            onSelectOption={(opt) => {
-              setUseSelectedLabel(opt.label);
-              if (opt.label && !useName.trim()) {
-                setUseName(`${opt.label}${useTemplate?.name ? ` — ${useTemplate.name}` : ""}`);
-              }
-            }}
-            onAvailabilityChange={setUseHasInventory}
-          />
-        </div>
-      </Modal>
-
-      {/* Scratch Modal */}
-      <Modal
-        open={scratchOpen}
-        onClose={() => {
-          if (!scratchSubmitting) setScratchOpen(false);
-        }}
-        title="Create a Blank Landing Page"
-        description="Starts with an empty canvas. Bind a project or standalone unit to auto-fill property tokens."
-        footer={
-          <>
-            <button
-              className="btn btn-ghost"
-              type="button"
-              onClick={() => setScratchOpen(false)}
-              disabled={scratchSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={confirmCreateFromScratch}
-              disabled={scratchSubmitting}
-              style={{ fontWeight: 700 }}
-            >
-              {scratchSubmitting ? "Creating…" : "Create & Launch Builder"}
-            </button>
-          </>
-        }
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {scratchError && (
-            <div
-              style={{
-                padding: "8px 12px",
-                background: "var(--rose-050)",
-                color: "var(--rose)",
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            >
-              {scratchError}
-            </div>
-          )}
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Landing Page Name</label>
-            <input
-              className="inp"
-              placeholder="e.g. Waterfront Residences"
-              value={scratchName}
-              onChange={(e) => setScratchName(e.target.value)}
-              autoFocus
-            />
-          </div>
-
-          <InventoryBindFields
-            accessToken={accessToken}
-            value={scratchBind}
-            onChange={setScratchBind}
-            onSelectOption={(opt) => {
-              setScratchSelectedLabel(opt.label);
-              if (opt.label && !scratchName.trim()) {
-                setScratchName(opt.label);
-              }
-            }}
-            onAvailabilityChange={setScratchHasInventory}
-          />
-        </div>
-      </Modal>
 
       {/* Confirm Delete Modal */}
       <ConfirmModal
@@ -1692,6 +1688,7 @@ export default function OrgLandingPagesPage() {
         />
       )}
     </div>
+    </>
   );
 }
 

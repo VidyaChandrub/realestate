@@ -1,21 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
-import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { DynamicRole } from "@/lib/types";
-
-const ORG_PRESETS = [
-  { name: "Senior Telecaller", key: "senior_telecaller", desc: "Manages lead qualification, calling, and follow-ups" },
-  { name: "Sales Team Lead", key: "sales_team_lead", desc: "Oversees sales agent pipeline, assignment, and site visits" },
-  { name: "Site Visit Manager", key: "site_visit_manager", desc: "Coordinates property site tours and customer feedback" },
-  { name: "Project Admin", key: "project_admin", desc: "Manages real estate project listings, units, and inventory" },
-];
+import { useFlash } from "@/lib/flash";
+import { ListPager, usePagedRows } from "@/components/ui/list-pager";
+import { ROLES_FLASH_KEY, ROLES_PATH, roleInUseMessage } from "./role-shared";
 
 const PERMISSION_COLUMNS = [
   "canView",
@@ -52,12 +47,6 @@ function setColumns(row: { actions?: string[] }, enabled: (col: PermissionColumn
   const out = {} as Record<PermissionColumn, boolean>;
   for (const col of PERMISSION_COLUMNS) out[col] = supportsAction(row, col) && enabled(col);
   return out;
-}
-
-/** Same wording as the API's "role still has users" refusal. */
-function roleInUseMessage(roleName: string, users: number, action: string) {
-  const who = users === 1 ? "1 user" : `${users} users`;
-  return `Role '${roleName}' is assigned to ${who}. Remove or reassign ${users === 1 ? "that user" : "those users"} first, then you can ${action}.`;
 }
 
 function StatCardWithSparkline({
@@ -171,28 +160,6 @@ export default function SuperAdminRolesPage() {
 
   const [search, setSearch] = useState("");
 
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    name: "",
-    key: "",
-    description: "",
-    scope: "organisation" as "organisation" | "platform",
-  });
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [createSubmitting, setCreateSubmitting] = useState(false);
-
-  const [editingRole, setEditingRole] = useState<DynamicRole | null>(null);
-  const [editForm, setEditForm] = useState({
-    name: "",
-    key: "",
-    description: "",
-    scope: "organisation" as "organisation" | "platform",
-    status: "active" as "active" | "inactive",
-    sortOrder: 0,
-  });
-  const [editError, setEditError] = useState<string | null>(null);
-  const [editSubmitting, setEditSubmitting] = useState(false);
-
   const [confirmDeleteState, setConfirmDeleteState] = useState<DynamicRole | null>(null);
   // Shown instead of the delete confirmation when the role still has users.
   const [roleInUse, setRoleInUse] = useState<{ role: DynamicRole; action: string } | null>(null);
@@ -221,11 +188,22 @@ export default function SuperAdminRolesPage() {
   const [permSaving, setPermSaving] = useState(false);
   const [savingPermission, setSavingPermission] = useState<string | null>(null);
   const [permError, setPermError] = useState<string | null>(null);
+  // The permissions panel renders above the role catalogue; the Permissions
+  // buttons sit in the catalogue further down, so bring the panel into view
+  // when it opens (otherwise it opens off-screen and the click looks dead).
+  const permPanelRef = useRef<HTMLDivElement>(null);
+  const permPanelRoleId = permissionsModalRole?.id ?? null;
+  useEffect(() => {
+    if (!permPanelRoleId) return;
+    permPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [permPanelRoleId]);
 
   const notify = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2500);
   };
+
+  useFlash(ROLES_FLASH_KEY, (flash) => notify(flash.message));
 
   useEffect(() => {
     if (!authLoading && !accessToken) {
@@ -275,64 +253,8 @@ export default function SuperAdminRolesPage() {
       ),
     [roles, search],
   );
-
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!accessToken) return;
-    if (!createForm.name) {
-      setCreateError("Role name is required");
-      return;
-    }
-    setCreateSubmitting(true);
-    setCreateError(null);
-    try {
-      await apiFetch("/admin/roles", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({
-          name: createForm.name,
-          key: createForm.key || undefined,
-          description: createForm.description,
-        }),
-      });
-      notify("Role created successfully");
-      setCreateModalOpen(false);
-      setCreateForm({ name: "", key: "", description: "", scope: "organisation" });
-      fetchRoles();
-    } catch (err: any) {
-      setCreateError(err.message || "Failed to create role");
-    } finally {
-      setCreateSubmitting(false);
-    }
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!accessToken || !editingRole) return;
-    // A role still assigned to users can't be made inactive (server re-checks).
-    const assigned = editingRole._count?.userRoles ?? 0;
-    if (editForm.status === "inactive" && editingRole.status !== "inactive" && assigned > 0) {
-      setEditError(roleInUseMessage(editingRole.name, assigned, "make it inactive"));
-      return;
-    }
-    setEditSubmitting(true);
-    setEditError(null);
-    try {
-      const { scope: _scope, ...rest } = editForm;
-      await apiFetch(`/admin/roles/${editingRole.id}`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify(rest),
-      });
-      notify("Role updated successfully");
-      setEditingRole(null);
-      fetchRoles();
-    } catch (err: any) {
-      setEditError(err.message || "Failed to update role");
-    } finally {
-      setEditSubmitting(false);
-    }
-  };
+  // 10 per page; stats above still count every role.
+  const paged = usePagedRows(visible, search);
 
   const handleDeleteConfirm = async () => {
     if (!accessToken || !confirmDeleteState) return;
@@ -588,10 +510,7 @@ export default function SuperAdminRolesPage() {
               boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
               cursor: "pointer",
             }}
-            onClick={() => {
-              setCreateError(null);
-              setCreateModalOpen(true);
-            }}
+            onClick={() => router.push(`${ROLES_PATH}/new`)}
           >
             <Icon name="plus" size={16} />
             <span>Create Role</span>
@@ -600,6 +519,7 @@ export default function SuperAdminRolesPage() {
       </div>
 
       {permissionsModalRole ? (
+        <div ref={permPanelRef} style={{ scrollMarginTop: 96 }}>
         <Reveal delay={1}>
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
@@ -745,6 +665,7 @@ export default function SuperAdminRolesPage() {
             </div>
           ) : null}
         </Reveal>
+        </div>
       ) : null}
 
       {/* Summary strip */}
@@ -865,7 +786,7 @@ export default function SuperAdminRolesPage() {
                     <td colSpan={6} className="muted">No organisation roles yet.</td>
                   </tr>
                 ) : (
-                  visible.map((r) => {
+                  paged.pageRows.map((r) => {
                     const roleInfo = getRoleBadgeInfo(r.key, r.name);
                     return (
                       <tr key={r.id}>
@@ -1002,18 +923,7 @@ export default function SuperAdminRolesPage() {
                                 cursor: "pointer",
                                 transition: "all 0.15s ease",
                               }}
-                              onClick={() => {
-                                setEditingRole(r);
-                                setEditForm({
-                                  name: r.name,
-                                  key: r.key,
-                                  description: r.description ?? "",
-                                  scope: r.scope === "platform" ? "platform" : "organisation",
-                                  status: r.status,
-                                  sortOrder: r.sortOrder ?? 0,
-                                });
-                                setEditError(null);
-                              }}
+                              onClick={() => router.push(`${ROLES_PATH}/${encodeURIComponent(r.id)}/edit`)}
                             >
                               <Icon name="edit" size={13} style={{ color: "#64748b" }} /> Edit
                             </button>
@@ -1073,290 +983,9 @@ export default function SuperAdminRolesPage() {
               </tbody>
             </table>
           </div>
+          <ListPager page={paged.page} total={paged.total} onPageChange={paged.setPage} noun="roles" />
         </div>
       </Reveal>
-
-      {/* Create Modal */}
-      <Modal
-        open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        title="Create Custom Role"
-        description="Add an organisation role that customer workspaces can assign to their members."
-        size="lg"
-      >
-        <form onSubmit={handleCreateSubmit} style={{ display: "flex", flexDirection: "column", gap: 18, background: "#ffffff", padding: "4px 0" }}>
-          {createError ? <div className="form-alert">{createError}</div> : null}
-
-          {/* Quick Presets with fresh light styling */}
-          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-              <span>✨ Quick Presets</span>
-              <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>(Click to pre-fill)</span>
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {ORG_PRESETS.map((p) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    padding: "5px 12px",
-                    background: "#ffffff",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: "8px",
-                    color: "#334155",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "#6366f1";
-                    e.currentTarget.style.color = "#0f1424";
-                    e.currentTarget.style.background = "#eef2ff";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "#cbd5e1";
-                    e.currentTarget.style.color = "#334155";
-                    e.currentTarget.style.background = "#ffffff";
-                  }}
-                  onClick={() =>
-                    setCreateForm({
-                      name: p.name,
-                      key: p.key,
-                      scope: "organisation",
-                      description: p.desc,
-                    })
-                  }
-                >
-                  ＋ {p.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Grid layout for Name & Key */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <div className="field">
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Role Name *</label>
-              <input
-                className="inp"
-                style={{
-                  background: "#ffffff",
-                  borderColor: "#cbd5e1",
-                  color: "#0f172a",
-                }}
-                placeholder="e.g. Senior Property Specialist"
-                required
-                value={createForm.name}
-                onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-
-            <div className="field">
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>
-                Role Key / Slug{" "}
-                <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>
-                  (Auto-generated if empty)
-                </span>
-              </label>
-              <input
-                className="inp"
-                style={{
-                  background: "#ffffff",
-                  borderColor: "#cbd5e1",
-                  color: "#0f172a",
-                }}
-                placeholder="e.g. senior_property_specialist"
-                value={createForm.key}
-                onChange={(e) => setCreateForm((f) => ({ ...f, key: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          <div className="field">
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 8 }}>Scope</label>
-            <div
-              style={{
-                padding: "14px 16px",
-                borderRadius: "12px",
-                border: "2px solid #6366f1",
-                background: "#f5f7ff",
-                boxShadow: "0 2px 8px rgba(99, 102, 241, 0.12)",
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: 13.5, color: "#0f1424" }}>🏢 Organisation Scope</div>
-              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-                These roles apply inside customer organisations — not the Super Admin console.
-              </div>
-            </div>
-          </div>
-
-          <div className="field">
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Description</label>
-            <textarea
-              className="inp"
-              style={{
-                background: "#ffffff",
-                borderColor: "#cbd5e1",
-                color: "#0f172a",
-              }}
-              rows={3}
-              placeholder="Describe the responsibilities and access level of this role…"
-              value={createForm.description}
-              onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
-            />
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
-            <button className="btn btn-ghost" type="button" onClick={() => setCreateModalOpen(false)} disabled={createSubmitting}>
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              type="submit"
-              disabled={createSubmitting || !createForm.name.trim()}
-              style={{ padding: "8px 20px" }}
-            >
-              {createSubmitting ? "Creating…" : "Create Role"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Edit Modal */}
-      <Modal
-        open={editingRole !== null}
-        onClose={() => setEditingRole(null)}
-        title={`Edit Role: ${editingRole?.name ?? ""}`}
-        description="Update role settings and status — same fields as creation."
-        size="md"
-      >
-        <form onSubmit={handleEditSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {editError ? <div className="form-alert">{editError}</div> : null}
-
-          {/* Grid layout for Name & Key */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <div className="field">
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Role Name *</label>
-              <input
-                className="inp"
-                style={{
-                  background: "#ffffff",
-                  borderColor: "#cbd5e1",
-                  color: "#0f172a",
-                }}
-                placeholder="e.g. Senior Property Specialist"
-                required
-                value={editForm.name}
-                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-
-            <div className="field">
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>
-                Role Key / Slug
-                {editingRole && isSystemRole(editingRole.key) ? (
-                  <span style={{ fontSize: 11, color: "#f59e0b", fontWeight: 500, marginLeft: 4 }}>
-                    (locked for system roles)
-                  </span>
-                ) : (
-                  <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>(System-role keys are locked)</span>
-                )}
-              </label>
-              <input
-                className="inp"
-                style={{
-                  background: editingRole && isSystemRole(editingRole.key) ? "#f1f5f9" : "#ffffff",
-                  borderColor: "#cbd5e1",
-                  color: "#0f172a",
-                }}
-                placeholder="e.g. senior_property_specialist"
-                readOnly={editingRole ? isSystemRole(editingRole.key) : false}
-                value={editForm.key}
-                onChange={(e) => setEditForm((f) => ({ ...f, key: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          <div className="field">
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 8 }}>Scope</label>
-            <div
-              style={{
-                padding: "14px 16px",
-                borderRadius: "12px",
-                border: "2px solid #6366f1",
-                background: "#f5f7ff",
-                boxShadow: "0 2px 8px rgba(99, 102, 241, 0.12)",
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: 13.5, color: "#0f1424" }}>
-                {editingRole?.scope === "team" ? "👥 Team Scope" : "🏢 Organisation Scope"}
-              </div>
-              <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-                Organisation-role scope cannot be switched to the Super Admin console.
-              </div>
-            </div>
-          </div>
-
-          <div className="field">
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Description</label>
-            <textarea
-              className="inp"
-              style={{
-                background: "#ffffff",
-                borderColor: "#cbd5e1",
-                color: "#0f172a",
-              }}
-              rows={3}
-              placeholder="Describe the responsibilities and access level of this role…"
-              value={editForm.description}
-              onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
-            />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <div className="field">
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Status</label>
-              <select
-                style={{
-                  background: "#ffffff",
-                  borderColor: "#cbd5e1",
-                  color: "#0f172a",
-                }}
-                value={editForm.status}
-                onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as "active" | "inactive" }))}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-            <div className="field">
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Sort Order</label>
-              <input
-                className="inp"
-                style={{
-                  background: "#ffffff",
-                  borderColor: "#cbd5e1",
-                  color: "#0f172a",
-                }}
-                type="number"
-                value={editForm.sortOrder}
-                onChange={(e) => setEditForm((f) => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
-            <button className="btn btn-ghost" type="button" onClick={() => setEditingRole(null)} disabled={editSubmitting}>
-              Cancel
-            </button>
-            <button className="btn btn-primary" type="submit" disabled={editSubmitting}>
-              {editSubmitting ? "Saving…" : "Save Changes"}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Role still has users — explain instead of deleting */}
       <ConfirmModal

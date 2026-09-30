@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback, useId } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, useId } from "react";
 import Link from "next/link";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
@@ -18,12 +18,15 @@ import { Icon } from "@/components/icons";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
+import { useFlash } from "@/lib/flash";
+import { LIST_PAGE_SIZE, ListPager } from "@/components/ui/list-pager";
+import { SUBS_FLASH_KEY, SUBS_PATH } from "./subscriptions-shared";
 import type {
   Plan,
   PlanCapability,
   Subscription,
   BillingOverview,
-  OrganisationListResponse,
   PackageChangeRequestRow,
 } from "@/lib/types";
 
@@ -77,7 +80,6 @@ const LIMIT_ROWS: { key: "projects" | "users" | "templates" | "landingPages" | "
 
 
 
-type OrgOption = { id: string; name: string; city: string };
 
 function priceFor(plan: Plan, cycle: "Monthly" | "Yearly") {
   return cycle === "Monthly" ? plan.priceMonthly : plan.priceYearly;
@@ -102,7 +104,6 @@ export default function SuperAdminSubscriptionsPage() {
   const [subsTotal, setSubsTotal] = useState(0);
   const [subsPage, setSubsPage] = useState(1);
   const [overview, setOverview] = useState<BillingOverview | null>(null);
-  const [orgs, setOrgs] = useState<OrgOption[]>([]);
 
   const [billingCycle, setBillingCycle] = useState<"Monthly" | "Yearly">("Monthly");
   const [tab, setTab] = useState(0);
@@ -122,28 +123,6 @@ export default function SuperAdminSubscriptionsPage() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const [capabilities, setCapabilities] = useState<PlanCapability[]>([]);
-
-  const [planModalOpen, setPlanModalOpen] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [featureInput, setFeatureInput] = useState("");
-  const [planForm, setPlanForm] = useState<Partial<Plan> & { features?: string[] }>({
-    name: "",
-    priceMonthly: 3000,
-    priceYearly: 30000,
-    description: "",
-    features: [],
-    limits: { projects: null, users: null, templates: null, landingPages: null },
-    capabilities: {},
-  });
-  const [savingPlan, setSavingPlan] = useState(false);
-
-  const [upgradeTarget, setUpgradeTarget] = useState<Subscription | null>(null);
-  const [upgradePlanId, setUpgradePlanId] = useState<string>("");
-  const [upgradeCycle, setUpgradeCycle] = useState<"monthly" | "yearly">("monthly");
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [assignOrgId, setAssignOrgId] = useState("");
-  const [assignPlanId, setAssignPlanId] = useState("");
-  const [assignCycle, setAssignCycle] = useState<"monthly" | "yearly">("monthly");
 
   const [billingSettings, setBillingSettings] = useState({
     currency: "INR",
@@ -167,6 +146,13 @@ export default function SuperAdminSubscriptionsPage() {
     setToast(msg);
     setTimeout(() => setToast(null), 2800);
   };
+
+  const router = useRouter();
+  useFlash(SUBS_FLASH_KEY, (flash) => {
+    const t = Number(flash.tab);
+    if (Number.isInteger(t)) setTab(t);
+    notify(flash.message);
+  });
 
   async function loadExpiryPolicy() {
     try {
@@ -216,7 +202,7 @@ export default function SuperAdminSubscriptionsPage() {
     try {
       const params = new URLSearchParams();
       params.set("page", String(page));
-      params.set("limit", "20");
+      params.set("limit", String(LIST_PAGE_SIZE));
       if (searchQ) params.set("search", searchQ);
       if (filterVal === 1) params.set("cycle", "monthly");
       if (filterVal === 2) params.set("cycle", "yearly");
@@ -224,6 +210,7 @@ export default function SuperAdminSubscriptionsPage() {
       const res = await apiFetch<{ data: Subscription[]; total: number }>(`/admin/subscriptions?${params.toString()}`);
       setSubs(res.data || []);
       setSubsTotal(res.total || 0);
+      setSubsPage(page);
     } catch (e: any) {
       console.error("fetchSubs failed", e);
     }
@@ -238,21 +225,13 @@ export default function SuperAdminSubscriptionsPage() {
     }
   }
 
-  async function fetchOrgs() {
-    try {
-      const data = await apiFetch<OrganisationListResponse>("/admin/organisations?limit=100");
-      setOrgs((data.data || []).map((o) => ({ id: o.id, name: o.name, city: o.city || "" })));
-    } catch {
-      /* ignore */
-    }
-  }
-
   async function fetchPackageChangeRequests(status = requestFilterStatus, page = 1) {
     setRequestsLoading(true);
     try {
-      const res = await getAdminPackageChangeRequests({ page, limit: 20, status: status === "all" ? undefined : status });
+      const res = await getAdminPackageChangeRequests({ page, limit: LIST_PAGE_SIZE, status: status === "all" ? undefined : status });
       setRequests(res.data || []);
       setRequestsTotal(res.total || 0);
+      setRequestsPage(page);
     } catch (e: any) {
       console.error("fetchPackageChangeRequests failed", e);
     } finally {
@@ -274,11 +253,22 @@ export default function SuperAdminSubscriptionsPage() {
     fetchPlans();
     fetchCapabilities();
     fetchSubs(1, "", 0);
-    fetchOrgs();
     fetchOverview();
     fetchPackageChangeRequests("pending", 1);
     loadExpiryPolicy();
   }, [canViewSubscriptions]);
+
+  const searchMounted = useRef(false);
+  useEffect(() => {
+    if (!searchMounted.current) {
+      searchMounted.current = true;
+      return;
+    }
+    if (!canViewSubscriptions) return;
+    const t = window.setTimeout(() => void fetchSubs(1, search.trim()), 300);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchSubs is a plain function re-created each render
+  }, [search]);
 
   const visibleTabs = [
     { index: 0, label: "Overview & Analytics" },
@@ -363,144 +353,6 @@ export default function SuperAdminSubscriptionsPage() {
     });
   }, [subs, filter, search]);
 
-  const openCreate = () => {
-    setEditingPlan(null);
-    setPlanForm({
-      name: "",
-      priceMonthly: 3500,
-      priceYearly: 35000,
-      description: "",
-      features: ["Everything you need to get started"],
-      limits: { projects: 3, users: 2, templates: 20, landingPages: 5 },
-      capabilities: {},
-    });
-    setFeatureInput("");
-    setPlanModalOpen(true);
-  };
-
-  const openEdit = (p: Plan) => {
-    setEditingPlan(p);
-    setPlanForm({
-      ...p,
-      features: [...(p.features || [])],
-      limits: { ...(p.limits ?? { projects: null, users: null, templates: null, landingPages: null }) },
-      capabilities: { ...(p.capabilities ?? {}) },
-    });
-    setFeatureInput("");
-    setPlanModalOpen(true);
-  };
-
-  const formLimit = (key: "projects" | "users" | "templates" | "landingPages" | "landingPagesCreate"): number | null => {
-    const v = (planForm.limits as any)?.[key];
-    return v == null ? null : v;
-  };
-
-  const setFormLimit = (key: "projects" | "users" | "templates" | "landingPages" | "landingPagesCreate", value: number | null) => {
-    setPlanForm((p) => ({
-      ...p,
-      limits: { projects: null, users: null, templates: null, landingPages: null, landingPagesCreate: null, ...(p.limits ?? {}), [key]: value },
-    }));
-  };
-
-  const toggleCapability = (key: string, on: boolean) => {
-    setPlanForm((p) => ({ ...p, capabilities: { ...(p.capabilities ?? {}), [key]: on } }));
-  };
-
-  const addFeature = () => {
-    const text = featureInput.trim();
-    if (!text) return;
-    setPlanForm((p) => ({
-      ...p,
-      features: [...(p.features || []), text],
-    }));
-    setFeatureInput("");
-  };
-
-  const removeFeature = (index: number) => {
-    setPlanForm((p) => ({
-      ...p,
-      features: (p.features || []).filter((_, i) => i !== index),
-    }));
-  };
-
-  const setAllCapabilities = (enable: boolean) => {
-    const updated: Record<string, boolean> = {};
-    for (const cap of capabilities) {
-      updated[cap.key] = enable;
-    }
-    setPlanForm((p) => ({
-      ...p,
-      capabilities: updated,
-    }));
-  };
-
-  const savePlan = async () => {
-    const name = String(planForm.name || "").trim();
-    if (!name) {
-      notify("Plan name required");
-      return;
-    }
-    const limits = {
-      projects: formLimit("projects"),
-      users: formLimit("users"),
-      templates: formLimit("templates"),
-      landingPagesCreate: formLimit("landingPagesCreate"),
-      landingPages: formLimit("landingPages"),
-    };
-    const capMap: Record<string, boolean> = {};
-    for (const cap of capabilities) {
-      if (planForm.capabilities?.[cap.key]) capMap[cap.key] = true;
-    }
-    setSavingPlan(true);
-    try {
-      if (editingPlan) {
-        const updated = await apiFetch<Plan>(`/admin/plans/${editingPlan.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({
-            name,
-            slug: planForm.slug,
-            description: planForm.description,
-            priceMonthly: Number(planForm.priceMonthly || 0),
-            priceYearly: Number(planForm.priceYearly || 0),
-            features: planForm.features || [],
-            limits,
-            capabilities: capMap,
-            color: planForm.color,
-            badge: planForm.badge,
-            isPopular: (planForm as any).isPopular,
-          }),
-        });
-        setPlans((prev) => prev.map((pl) => (pl.id === editingPlan.id ? updated : pl)));
-        notify(`Plan “${name}” updated`);
-      } else {
-        const created = await apiFetch<Plan>("/admin/plans", {
-          method: "POST",
-          body: JSON.stringify({
-            name,
-            slug: planForm.slug,
-            description: planForm.description || "",
-            priceMonthly: Number(planForm.priceMonthly || 3000),
-            priceYearly: Number(planForm.priceYearly || 30000),
-            features: planForm.features || [],
-            limits,
-            capabilities: capMap,
-            color: planForm.color || "#eef0fe",
-            badge: planForm.badge || "b-indigo",
-            isPopular: (planForm as any).isPopular || false,
-          }),
-        });
-        setPlans((prev) => [...prev, created]);
-        notify(`Plan “${name}” created`);
-      }
-      setPlanModalOpen(false);
-      fetchOverview();
-    } catch (e: any) {
-      notify(e.message || "Save failed");
-    } finally {
-      setSavingPlan(false);
-    }
-  };
-
   // The default onboarding plan (isSystem) can never be deleted — the API
   // refuses too; the button is disabled so this is only a backstop.
   const deletePlan = (id: string) => {
@@ -524,66 +376,6 @@ export default function SuperAdminSubscriptionsPage() {
     }
   };
 
-
-  const confirmUpgrade = async () => {
-    if (!upgradeTarget) return;
-    if (!upgradePlanId) {
-      notify("Select a plan");
-      return;
-    }
-    try {
-      const updated = await apiFetch<Subscription>(`/admin/subscriptions/${upgradeTarget.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ planId: upgradePlanId, billingCycle: upgradeCycle }),
-      });
-      setSubs((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-      notify(`${upgradeTarget.organisation?.name || "Org"} → ${updated.plan?.name} ${upgradeCycle}`);
-      setUpgradeTarget(null);
-      fetchOverview();
-    } catch (e: any) {
-      notify(e.message || "Upgrade failed");
-    }
-  };
-
-  const confirmAssign = async () => {
-    if (!assignOrgId || !assignPlanId) {
-      notify("Select organisation and plan");
-      return;
-    }
-    try {
-      // An org can only ever have one non-cancelled subscription (enforced by
-      // the API). If it already has one, "Assign Plan" must behave exactly
-      // like "Change" — PATCH the existing row (same downgrade-guard
-      // validation) — instead of POSTing a create that the API would reject.
-      const existingRes = await apiFetch<{ data: Subscription[] }>(
-        `/admin/subscriptions?orgId=${encodeURIComponent(assignOrgId)}&limit=1`,
-      );
-      const existing = (existingRes.data || []).find((s) => s.status !== "cancelled");
-
-      if (existing) {
-        const updated = await apiFetch<Subscription>(`/admin/subscriptions/${existing.id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ planId: assignPlanId, billingCycle: assignCycle }),
-        });
-        setSubs((prev) => (prev.some((s) => s.id === updated.id) ? prev.map((s) => (s.id === updated.id ? updated : s)) : [updated, ...prev]));
-        notify(`${updated.organisation?.name || "Org"} → ${updated.plan?.name} ${assignCycle}`);
-      } else {
-        const created = await apiFetch<Subscription>("/admin/subscriptions", {
-          method: "POST",
-          body: JSON.stringify({ orgId: assignOrgId, planId: assignPlanId, billingCycle: assignCycle }),
-        });
-        setSubs((prev) => [created, ...prev]);
-        setSubsTotal((t) => t + 1);
-        notify(`Subscription created for ${created.organisation?.name}`);
-      }
-      setAssignOpen(false);
-      setAssignOrgId("");
-      setAssignPlanId("");
-      fetchOverview();
-    } catch (e: any) {
-      notify(e.message || "Assign failed");
-    }
-  };
 
   const mrrDisplay = overview ? overview.mrr : 0;
   const arrDisplay = overview ? overview.arr : 0;
@@ -624,7 +416,7 @@ export default function SuperAdminSubscriptionsPage() {
             type="button"
             onClick={() => {
               fetchPlans();
-              fetchSubs();
+              fetchSubs(subsPage);
               fetchOverview();
               fetchPackageChangeRequests(requestFilterStatus, requestsPage);
             }}
@@ -648,7 +440,7 @@ export default function SuperAdminSubscriptionsPage() {
           {canCreatePlan ? (
             <button
               type="button"
-              onClick={openCreate}
+              onClick={() => router.push(`${SUBS_PATH}/plans/create`)}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -1112,7 +904,7 @@ export default function SuperAdminSubscriptionsPage() {
                       <div style={{ display: "flex", gap: 8, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
                         {canEditPlan ? <button
                           type="button"
-                          onClick={() => openEdit(p)}
+                          onClick={() => router.push(`${SUBS_PATH}/plans/${encodeURIComponent(p.id)}/edit`)}
                           style={{
                             flex: 1,
                             padding: "8px 12px",
@@ -1231,7 +1023,7 @@ export default function SuperAdminSubscriptionsPage() {
                 </div>
                 {canAssignPlan ? <button
                   type="button"
-                  onClick={() => setAssignOpen(true)}
+                  onClick={() => router.push(`${SUBS_PATH}/assign`)}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -1320,11 +1112,7 @@ export default function SuperAdminSubscriptionsPage() {
                             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                               {canChangeSubscription ? <button
                                 type="button"
-                                onClick={() => {
-                                  setUpgradeTarget(s);
-                                  setUpgradePlanId(s.planId);
-                                  setUpgradeCycle(s.billingCycle);
-                                }}
+                                onClick={() => router.push(`${SUBS_PATH}/${encodeURIComponent(s.id)}/change`)}
                                 style={{
                                   padding: "5px 10px",
                                   borderRadius: 6,
@@ -1366,6 +1154,7 @@ export default function SuperAdminSubscriptionsPage() {
                 </table>
               </div>
             </div>
+            <ListPager page={subsPage} total={subsTotal} onPageChange={(p) => void fetchSubs(p)} noun="subscriptions" />
           </div>
         )}
 
@@ -1538,6 +1327,13 @@ export default function SuperAdminSubscriptionsPage() {
                 </table>
               </div>
             </div>
+            <ListPager
+              page={requestsPage}
+              total={requestsTotal}
+              loading={requestsLoading}
+              onPageChange={(p) => void fetchPackageChangeRequests(requestFilterStatus, p)}
+              noun="requests"
+            />
           </div>
         )}
 
@@ -1629,416 +1425,6 @@ export default function SuperAdminSubscriptionsPage() {
           </div>
         )}
       </div>
-
-      {/* Plan Modal */}
-      <Modal
-        open={planModalOpen}
-        onClose={() => setPlanModalOpen(false)}
-        title={editingPlan ? "Edit Platform Tier Plan" : "Create New Platform Tier Plan"}
-        description={<>Configure pricing, numeric quota limits and system capabilities. Endpoint: <code style={{ color: "#0f1424", fontWeight: 700 }}>/admin/plans</code></>}
-        size="lg"
-        footer={
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", width: "100%" }}>
-            <button
-              type="button"
-              onClick={() => setPlanModalOpen(false)}
-              style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", fontSize: 13, fontWeight: 600, color: "#475569", cursor: "pointer" }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={savePlan}
-              disabled={savingPlan}
-              style={{ padding: "9px 20px", borderRadius: 10, border: "none", background: "#0f1424", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px rgba(21, 27, 46, 0.25)" }}
-            >
-              {savingPlan ? "Saving…" : editingPlan ? "Save Plan Changes" : "＋ Create & Publish Plan"}
-            </button>
-          </div>
-        }
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingTop: 6 }}>
-          {/* Card 1: Basic Info & Pricing */}
-          <div style={{ background: "#f8fafc", borderRadius: 14, padding: 18, border: "1px solid #e2e8f0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(21, 27, 46, 0.08)", color: "#0f1424", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon name="billing" size={16} />
-              </div>
-              <span style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>Basic Information &amp; Pricing</span>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 4 }}>
-                  Plan Name <span style={{ color: "#ef4444" }}>*</span>
-                </label>
-                <input
-                  value={String(planForm.name || "")}
-                  onChange={(e) => setPlanForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="e.g. Professional"
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 4 }}>
-                  URL Slug
-                </label>
-                <input
-                  value={String((planForm as any).slug || "")}
-                  onChange={(e) => setPlanForm((p) => ({ ...p, slug: e.target.value }))}
-                  placeholder="professional"
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
-                />
-                {!editingPlan ? (
-                  <div style={{ marginTop: 5, fontSize: 11, color: "#64748b", lineHeight: 1.4 }}>
-                    Slug will be generated automatically if you leave this blank. You can also enter your own slug.
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
-              <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 4 }}>
-                  Price / Month (₹) <span style={{ color: "#ef4444" }}>*</span>
-                </label>
-                <div style={{ position: "relative" }}>
-                  <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontWeight: 700, color: "#64748b", fontSize: 13 }}>₹</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={String(planForm.priceMonthly ?? "")}
-                    onChange={(e) => setPlanForm((p) => ({ ...p, priceMonthly: Number(e.target.value || 0) }))}
-                    style={{ width: "100%", padding: "8px 12px 8px 24px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, fontWeight: 700 }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: "#334155", margin: 0 }}>
-                    Price / Year (₹) <span style={{ color: "#ef4444" }}>*</span>
-                  </label>
-                  <span style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "1px 6px", borderRadius: 999, fontSize: 10, fontWeight: 800 }}>
-                    Save ~15%
-                  </span>
-                </div>
-                <div style={{ position: "relative" }}>
-                  <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontWeight: 700, color: "#64748b", fontSize: 13 }}>₹</span>
-                  <input
-                    type="number"
-                    min={0}
-                    value={String(planForm.priceYearly ?? "")}
-                    onChange={(e) => setPlanForm((p) => ({ ...p, priceYearly: Number(e.target.value || 0) }))}
-                    style={{ width: "100%", padding: "8px 12px 8px 24px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, fontWeight: 700 }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 4 }}>Description</label>
-              <textarea
-                rows={2}
-                value={String(planForm.description || "")}
-                onChange={(e) => setPlanForm((p) => ({ ...p, description: e.target.value }))}
-                placeholder="Who is this plan designed for?"
-                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 12.5 }}
-              />
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, fontWeight: 600, color: "#d97706", cursor: "pointer", background: "rgba(245, 158, 11, 0.08)", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(245, 158, 11, 0.2)" }}>
-                <input type="checkbox" checked={!!(planForm as any).isPopular} onChange={(e) => setPlanForm((p) => ({ ...p, isPopular: e.target.checked } as any))} style={{ width: 16, height: 16, accentColor: "#0f1424" }} />
-                ★ Highlight as Popular Plan
-              </label>
-
-            </div>
-          </div>
-
-          {/* Card 3: Limits & Quotas */}
-          <div style={{ background: "#f8fafc", borderRadius: 14, padding: 18, border: "1px solid #e2e8f0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(16, 185, 129, 0.08)", color: "#10b981", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Icon name="reports" size={16} />
-              </div>
-              <span style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>Resource Quotas &amp; Limits</span>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {LIMIT_ROWS.map((row) => {
-                const v = formLimit(row.key);
-                const unlimited = v === null;
-                return (
-                  <div key={row.key} style={{ padding: 12, borderRadius: 10, background: "#fff", border: "1px solid #e2e8f0" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 6 }}>{row.label}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={unlimited ? "" : String(v)}
-                        disabled={unlimited}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          const n = raw === "" ? 0 : Math.max(0, Math.floor(Number(raw) || 0));
-                          setFormLimit(row.key, n);
-                        }}
-                        placeholder="Unlimited"
-                        style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid #cbd5e1", fontSize: 12.5 }}
-                      />
-                      <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "#64748b", cursor: "pointer" }}>
-                        <input type="checkbox" checked={unlimited} onChange={(e) => setFormLimit(row.key, e.target.checked ? null : 0)} />
-                        Unlimited
-                      </label>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Card: Dynamic Feature Highlights */}
-          <div style={{ background: "#f8fafc", borderRadius: 14, padding: 18, border: "1px solid #e2e8f0" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(99, 102, 241, 0.08)", color: "#6366f1", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Icon name="check" size={16} />
-                </div>
-                <span style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>Plan Feature Highlights ({planForm.features?.length || 0})</span>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              <input
-                type="text"
-                value={featureInput}
-                onChange={(e) => setFeatureInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addFeature();
-                  }
-                }}
-                placeholder="Add feature bullet point (e.g. 24/7 Dedicated Support) & press Enter"
-                style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
-              />
-              <button
-                type="button"
-                onClick={addFeature}
-                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0f1424", color: "#fff", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}
-              >
-                + Add Feature
-              </button>
-            </div>
-
-            {(planForm.features?.length ?? 0) === 0 ? (
-              <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic" }}>No feature bullet points added yet. Type above and click "+ Add Feature".</div>
-            ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {planForm.features?.map((ft, idx) => (
-                  <span
-                    key={idx}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      background: "#fff",
-                      border: "1px solid #cbd5e1",
-                      borderRadius: 20,
-                      padding: "5px 12px",
-                      fontSize: 12,
-                      color: "#334155",
-                      fontWeight: 600,
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                    }}
-                  >
-                    <span style={{ color: "#10b981" }}>✓</span> {ft}
-                    <button
-                      type="button"
-                      onClick={() => removeFeature(idx)}
-                      style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 14, fontWeight: 700, padding: "0 2px", marginLeft: 2 }}
-                      title="Remove feature"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Card 4: Module Capabilities & Access */}
-          <div style={{ background: "#f8fafc", borderRadius: 14, padding: 18, border: "1px solid #e2e8f0" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "rgba(14, 165, 233, 0.08)", color: "#0ea5e9", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <Icon name="key" size={16} />
-                </div>
-                <div>
-                  <span style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>Module Capabilities &amp; Access</span>
-                  <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, background: "rgba(14, 165, 233, 0.12)", color: "#0284c7", padding: "2px 8px", borderRadius: 10 }}>
-                    {Object.values(planForm.capabilities || {}).filter(Boolean).length} / {capabilities.length} Active
-                  </span>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 6 }}>
-                <button
-                  type="button"
-                  onClick={() => setAllCapabilities(true)}
-                  style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", fontSize: 11.5, fontWeight: 600, color: "#0284c7", cursor: "pointer" }}
-                >
-                  Enable All
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAllCapabilities(false)}
-                  style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", fontSize: 11.5, fontWeight: 600, color: "#64748b", cursor: "pointer" }}
-                >
-                  Disable All
-                </button>
-              </div>
-            </div>
-
-            {capabilities.length === 0 ? (
-              <div style={{ fontSize: 12, color: "#94a3b8" }}>Loading capability catalog from server...</div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {capabilities.map((cap) => {
-                  const enabled = !!planForm.capabilities?.[cap.key];
-                  return (
-                    <label
-                      key={cap.key}
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 10,
-                        fontSize: 12.5,
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        background: enabled ? "rgba(14, 165, 233, 0.05)" : "#fff",
-                        border: enabled ? "1px solid rgba(14, 165, 233, 0.3)" : "1px solid #e2e8f0",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        style={{ marginTop: 2, accentColor: "#0ea5e9", width: 16, height: 16 }}
-                        checked={enabled}
-                        onChange={(e) => toggleCapability(cap.key, e.target.checked)}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <span style={{ fontWeight: 700, color: enabled ? "#0284c7" : "#0f172a" }}>{cap.label}</span>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: enabled ? "#0284c7" : "#94a3b8" }}>
-                            {enabled ? "ACTIVE" : "OFF"}
-                          </span>
-                        </div>
-                        <span style={{ display: "block", color: "#64748b", fontSize: 11, marginTop: 2, lineHeight: 1.3 }}>{cap.description}</span>
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-        </div>
-      </Modal>
-
-      {/* Upgrade / Change Plan Modal */}
-      <Modal
-        open={!!upgradeTarget}
-        onClose={() => setUpgradeTarget(null)}
-        title="Upgrade / Change Subscription"
-        description={
-          upgradeTarget ? (
-            <>
-              Change subscription for <strong>{upgradeTarget.organisation?.name}</strong>
-            </>
-          ) : undefined
-        }
-        size="md"
-        footer={
-          <>
-            <button className="btn btn-ghost" onClick={() => setUpgradeTarget(null)}>
-              Cancel
-            </button>
-            <button className="btn btn-primary" onClick={confirmUpgrade}>
-              Confirm change
-            </button>
-          </>
-        }
-      >
-        <div className="field">
-          <label>Select Plan</label>
-          <select value={upgradePlanId} onChange={(e) => setUpgradePlanId(e.target.value)}>
-            {plans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} — ₹{p.priceMonthly}/mo / ₹{p.priceYearly}/yr
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Billing Cycle</label>
-          <select value={upgradeCycle} onChange={(e) => setUpgradeCycle(e.target.value as any)}>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
-          </select>
-        </div>
-      </Modal>
-
-      {/* Assign Plan Modal */}
-      <Modal
-        open={assignOpen}
-        onClose={() => setAssignOpen(false)}
-        title="Assign Subscription"
-        description="Link an organisation to a platform plan."
-        size="md"
-        footer={
-          <>
-            <button className="btn btn-ghost" onClick={() => setAssignOpen(false)}>
-              Cancel
-            </button>
-            <button className="btn btn-primary" onClick={confirmAssign}>
-              Assign Plan
-            </button>
-          </>
-        }
-      >
-        <div className="field">
-          <label>Organisation</label>
-          <select value={assignOrgId} onChange={(e) => setAssignOrgId(e.target.value)}>
-            <option value="">Select organisation</option>
-            {orgs.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name} — {o.city}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Plan</label>
-          <select value={assignPlanId} onChange={(e) => setAssignPlanId(e.target.value)}>
-            <option value="">Select plan</option>
-            {plans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} — ₹{p.priceMonthly}/mo
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label>Billing Cycle</label>
-          <select value={assignCycle} onChange={(e) => setAssignCycle(e.target.value as any)}>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
-          </select>
-        </div>
-      </Modal>
 
       {/* Reject Request Modal */}
       <Modal

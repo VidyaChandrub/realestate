@@ -2251,6 +2251,8 @@ export interface SupportTicketsListResponse {
   total: number;
   page: number;
   limit: number;
+  /** Counts over every ticket matching the filters (all pages). */
+  stats?: { open: number; ongoing: number; highPriority: number };
 }
 
 export interface SupportMessage {

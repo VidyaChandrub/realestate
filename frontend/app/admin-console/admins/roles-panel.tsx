@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
-import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { DynamicRole } from "@/lib/types";
+import { ListPager, usePagedRows } from "@/components/ui/list-pager";
 
 type PermissionColumn = "canView" | "canAdd" | "canEdit" | "canDelete" | "canApprove";
 // `moduleKey` lets a pill shown under one row read/write a *different*
@@ -103,27 +104,6 @@ const HIDDEN_MODULE_KEYS = new Set<string>([
   "admin_org_templates_remove",
 ]);
 
-const roleFieldLabel: React.CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  fontWeight: 500,
-  color: "#475569",
-  marginBottom: 6,
-};
-
-const roleFieldInput: React.CSSProperties = {
-  width: "100%",
-  padding: "9px 12px",
-  borderRadius: 10,
-  border: "1px solid #e2e8f0",
-  background: "#ffffff",
-  color: "#0f172a",
-  fontSize: 14,
-  outline: "none",
-  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-  boxSizing: "border-box" as const,
-};
-
 export function PlatformRolesPanel({
   onRolesChanged,
   onPermissionEditing,
@@ -138,17 +118,13 @@ export function PlatformRolesPanel({
   canEdit: boolean;
   canDelete: boolean;
 }) {
+  const router = useRouter();
   const { accessToken } = useAuth();
   const [roles, setRoles] = useState<DynamicRole[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-
-  const [editing, setEditing] = useState<DynamicRole | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", key: "", description: "", status: "active" as "active" | "inactive" });
-  const [editError, setEditError] = useState<string | null>(null);
-  const [editBusy, setEditBusy] = useState(false);
 
   const [confirmDelete, setConfirmDelete] = useState<DynamicRole | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -197,27 +173,7 @@ export function PlatformRolesPanel({
       ),
     [roles, search],
   );
-
-  async function saveEdit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editing) return;
-    setEditBusy(true);
-    setEditError(null);
-    try {
-      await apiFetch(`/admin/platform-roles/${editing.id}`, {
-        method: "PATCH",
-        body: JSON.stringify(editForm),
-      });
-      notify("Platform role updated");
-      setEditing(null);
-      load();
-      onRolesChanged?.();
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : "Failed to update role");
-    } finally {
-      setEditBusy(false);
-    }
-  }
+  const paged = usePagedRows(visible, search);
 
   async function openPerms(role: DynamicRole) {
     setPermRole(role);
@@ -471,7 +427,7 @@ export function PlatformRolesPanel({
                       No platform roles yet.
                     </td>
                   </tr>
-                ) : visible.map((r) => {
+                ) : paged.pageRows.map((r) => {
                   // Super Admin is the built-in full-access role: its details
                   // and permissions are fixed (the backend enforces this too),
                   // so it gets no row actions.
@@ -501,16 +457,7 @@ export function PlatformRolesPanel({
                           <button
                             className="btn btn-ghost btn-sm"
                             type="button"
-                            onClick={() => {
-                              setEditing(r);
-                              setEditForm({
-                                name: r.name,
-                                key: r.key,
-                                description: r.description ?? "",
-                                status: r.status,
-                              });
-                              setEditError(null);
-                            }}
+                            onClick={() => router.push(`/admin-console/admins/roles/${encodeURIComponent(r.id)}/edit`)}
                           >
                             Edit
                           </button>
@@ -528,125 +475,9 @@ export function PlatformRolesPanel({
               </tbody>
             </table>
           </div>
+          <ListPager page={paged.page} total={paged.total} onPageChange={paged.setPage} noun="roles" />
         </div>
       </Reveal>
-
-      <Modal open={editing !== null} onClose={() => setEditing(null)} title={`Edit: ${editing?.name ?? ""}`} size="md">
-        <form onSubmit={saveEdit} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {editError ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                color: "#b91c1c",
-                fontSize: 13,
-                fontWeight: 500,
-                marginBottom: 20,
-              }}
-            >
-              {editError}
-            </div>
-          ) : null}
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div>
-              <label style={roleFieldLabel}>Role name *</label>
-              <input
-                style={roleFieldInput}
-                required
-                value={editForm.name}
-                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={roleFieldLabel}>Key</label>
-                <input
-                  style={roleFieldInput}
-                  readOnly={editing?.key === "super_admin"}
-                  value={editForm.key}
-                  onChange={(e) => setEditForm((f) => ({ ...f, key: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label style={roleFieldLabel}>Status</label>
-                <select
-                  style={roleFieldInput}
-                  value={editForm.status}
-                  onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as "active" | "inactive" }))}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label style={roleFieldLabel}>Description</label>
-              <textarea
-                style={{ ...roleFieldInput, minHeight: 72, resize: "vertical" as const }}
-                rows={3}
-                value={editForm.description}
-                onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 10,
-              marginTop: 24,
-              paddingTop: 18,
-              borderTop: "1px solid #f1f5f9",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setEditing(null)}
-              disabled={editBusy}
-              style={{
-                padding: "9px 18px",
-                borderRadius: 10,
-                fontSize: 13.5,
-                fontWeight: 500,
-                border: "1px solid #e2e8f0",
-                background: "#ffffff",
-                color: "#475569",
-                cursor: editBusy ? "not-allowed" : "pointer",
-                opacity: editBusy ? 0.5 : 1,
-                transition: "all 0.15s ease",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={editBusy}
-              style={{
-                padding: "9px 20px",
-                borderRadius: 10,
-                fontSize: 13.5,
-                fontWeight: 600,
-                border: "none",
-                color: "#ffffff",
-                cursor: editBusy ? "not-allowed" : "pointer",
-                opacity: editBusy ? 0.5 : 1,
-                transition: "all 0.15s ease",
-                background: "linear-gradient(135deg, #0f1424, #0f1424)",
-                boxShadow: "0 2px 8px -2px rgba(21, 27, 46, 0.4)",
-              }}
-            >
-              {editBusy ? "Saving…" : "Save changes"}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       <ConfirmModal
         open={confirmDelete !== null}

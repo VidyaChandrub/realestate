@@ -25,7 +25,7 @@ import type {
   CrmLeadStatus,
 } from "@/lib/types";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 function formatDateTime(value: string): string {
   const d = new Date(value);

@@ -13,7 +13,7 @@ import { MetaLeadAdsCard } from "@/components/org/meta-lead-ads-card";
 import { SETTINGS_ACTIONS } from "@/lib/permissions";
 import { FieldRolesPanel, TypedFieldEditor } from "@/components/org/typed-field-editor";
 import { FIELD_ROLES, fieldsToRows, groupNoun, roleBaselineOf, rowsToFields, templateTraits, validateFieldRows, type FieldRole, type FieldRow } from "@/lib/field-template";
-import { Modal } from "@/components/ui/modal";
+import { FormActions, FormAlert, FormPage, FormSection, formPageStyles } from "@/components/forms/form-page";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 import { COUNTRY_META, COUNTRIES, CURRENCY_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/countries";
@@ -1834,7 +1834,81 @@ export default function OrgSettingsPage() {
   );
 
   return (
-    <div className="os-page">
+    <>
+      {requestModalPlan ? (
+        <FormPage
+          eyebrow="Settings · Billing"
+          title="Request package change"
+          subtitle="Review package change details before submitting for Super Admin approval."
+          onBack={() => setRequestModalPlan(null)}
+          backDisabled={submittingRequest}
+          backLabel="Back to Billing"
+        >
+          <div className={formPageStyles.panel}>
+            <FormAlert message={changeError} />
+
+            <FormSection title="Summary" />
+            <div style={{ padding: 16, background: "var(--surface-2, #f8fafc)", borderRadius: 12, fontSize: 14, marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+                <span className="muted">Current Package:</span>
+                <strong>{billing?.plan?.name ?? "Current Plan"}</strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+                <span className="muted">New Requested Package:</span>
+                <strong style={{ color: "var(--brand)" }}>{requestModalPlan.name} ({plansCycle})</strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <span className="muted">Price Difference:</span>
+                <strong>
+                  {formatMoney(
+                    (plansCycle === "yearly" ? requestModalPlan.priceYearly : requestModalPlan.priceMonthly) -
+                    (billing?.plan ? (plansCycle === "yearly" ? billing.plan.priceYearly : billing.plan.priceMonthly) : 0),
+                    billing?.subscription?.currency ?? "INR"
+                  )} / {plansCycle === "yearly" ? "year" : "month"}
+                </strong>
+              </div>
+            </div>
+
+            <FormSection title="Key feature & limit changes" />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12, marginBottom: 20 }}>
+              <div style={{ border: "1px solid var(--line-2, #e2e8f0)", borderRadius: 12, padding: 16 }}>
+                <span className="muted" style={{ fontSize: 11.5, textTransform: "uppercase", fontWeight: 600 }}>Current ({billing?.plan?.name}):</span>
+                <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>
+                  <li>Projects: {billing?.plan?.limits?.projects ?? "Unlimited"}</li>
+                  <li>Users: {billing?.plan?.limits?.users ?? "Unlimited"}</li>
+                  <li>Templates: {billing?.plan?.limits?.templates ?? "Unlimited"}</li>
+                  <li>Published Landing Pages: {billing?.plan?.limits?.landingPages ?? "Unlimited"}</li>
+                  <li>Created Landing Pages: {billing?.plan?.limits?.landingPagesCreate ?? "Unlimited"}</li>
+                </ul>
+              </div>
+              <div style={{ border: "1px solid var(--line-2, #e2e8f0)", borderRadius: 12, padding: 16 }}>
+                <span className="muted" style={{ fontSize: 11.5, textTransform: "uppercase", fontWeight: 600 }}>New ({requestModalPlan.name}):</span>
+                <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.7, color: "var(--brand)" }}>
+                  <li>Projects: {requestModalPlan.limits?.projects ?? "Unlimited"}</li>
+                  <li>Users: {requestModalPlan.limits?.users ?? "Unlimited"}</li>
+                  <li>Templates: {requestModalPlan.limits?.templates ?? "Unlimited"}</li>
+                  <li>Published Landing Pages: {requestModalPlan.limits?.landingPages ?? "Unlimited"}</li>
+                  <li>Created Landing Pages: {requestModalPlan.limits?.landingPagesCreate ?? "Unlimited"}</li>
+                </ul>
+              </div>
+            </div>
+
+            <div style={{ padding: "12px 16px", background: "rgba(21, 27, 46, 0.06)", border: "1px solid rgba(21, 27, 46, 0.2)", borderRadius: 10, fontSize: 13, color: "var(--ink)", marginBottom: 8 }}>
+              <Icon name="info" size={14} style={{ verticalAlign: "-2px", marginRight: 6, color: "var(--brand)" }} />
+              This request will be submitted for <strong>Super Admin approval</strong>. Your organisation will continue using your current active package until approved.
+            </div>
+
+            <FormActions
+              onCancel={() => setRequestModalPlan(null)}
+              busy={submittingRequest}
+              busyLabel="Submitting Request…"
+              submitLabel="Confirm Change Request"
+              onSubmit={() => void handleSubmitPackageChangeRequest()}
+            />
+          </div>
+        </FormPage>
+      ) : null}
+    <div className="os-page" style={requestModalPlan ? { display: "none" } : undefined}>
       <div className="set-header reveal in">
         <div className="set-header-left">
           <div className="set-header-badge">
@@ -2854,84 +2928,6 @@ export default function OrgSettingsPage() {
               )}
             </Card>
 
-            <Modal
-              open={!!requestModalPlan}
-              onClose={() => setRequestModalPlan(null)}
-              title="Request Package Change"
-              description="Review package change details before submitting for Super Admin approval."
-              size="md"
-              footer={
-                <>
-                  <button className="btn btn-ghost" onClick={() => setRequestModalPlan(null)}>
-                    Cancel
-                  </button>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => void handleSubmitPackageChangeRequest()}
-                    disabled={submittingRequest}
-                  >
-                    {submittingRequest ? "Submitting Request…" : "Confirm Change Request"}
-                  </button>
-                </>
-              }
-            >
-              {requestModalPlan ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div style={{ padding: 12, background: "var(--surface-2)", borderRadius: 10, fontSize: 13 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                      <span className="muted">Current Package:</span>
-                      <strong>{billing?.plan?.name ?? "Current Plan"}</strong>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                      <span className="muted">New Requested Package:</span>
-                      <strong style={{ color: "var(--brand)" }}>{requestModalPlan.name} ({plansCycle})</strong>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span className="muted">Price Difference:</span>
-                      <strong>
-                        {formatMoney(
-                          (plansCycle === "yearly" ? requestModalPlan.priceYearly : requestModalPlan.priceMonthly) -
-                          (billing?.plan ? (plansCycle === "yearly" ? billing.plan.priceYearly : billing.plan.priceMonthly) : 0),
-                          billing?.subscription?.currency ?? "INR"
-                        )} / {plansCycle === "yearly" ? "year" : "month"}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: 13 }}>
-                    <b style={{ display: "block", marginBottom: 8 }}>Key Feature & Limit Changes:</b>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, background: "var(--surface)", border: "1px solid var(--line-2)", borderRadius: 8, padding: 12 }}>
-                      <div>
-                        <span className="muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 600 }}>Current ({billing?.plan?.name}):</span>
-                        <ul style={{ margin: "6px 0 0", paddingLeft: 16, fontSize: 12, lineHeight: 1.6 }}>
-                          <li>Projects: {billing?.plan?.limits?.projects ?? "Unlimited"}</li>
-                          <li>Users: {billing?.plan?.limits?.users ?? "Unlimited"}</li>
-                          <li>Templates: {billing?.plan?.limits?.templates ?? "Unlimited"}</li>
-                          <li>Published Landing Pages: {billing?.plan?.limits?.landingPages ?? "Unlimited"}</li>
-                          <li>Created Landing Pages: {billing?.plan?.limits?.landingPagesCreate ?? "Unlimited"}</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <span className="muted" style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 600 }}>New ({requestModalPlan.name}):</span>
-                        <ul style={{ margin: "6px 0 0", paddingLeft: 16, fontSize: 12, lineHeight: 1.6, color: "var(--brand)" }}>
-                          <li>Projects: {requestModalPlan.limits?.projects ?? "Unlimited"}</li>
-                          <li>Users: {requestModalPlan.limits?.users ?? "Unlimited"}</li>
-                          <li>Templates: {requestModalPlan.limits?.templates ?? "Unlimited"}</li>
-                          <li>Published Landing Pages: {requestModalPlan.limits?.landingPages ?? "Unlimited"}</li>
-                          <li>Created Landing Pages: {requestModalPlan.limits?.landingPagesCreate ?? "Unlimited"}</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ padding: "10px 14px", background: "rgba(21, 27, 46, 0.06)", border: "1px solid rgba(21, 27, 46, 0.2)", borderRadius: 8, fontSize: 12.5, color: "var(--ink)" }}>
-                    <Icon name="info" size={14} style={{ verticalAlign: "-2px", marginRight: 6, color: "var(--brand)" }} />
-                    This request will be submitted for <strong>Super Admin approval</strong>. Your organisation will continue using your current active package until approved.
-                  </div>
-                </div>
-              ) : null}
-            </Modal>
-
             {/* Invoices Card */}
             <Card
               icon="document"
@@ -3029,5 +3025,6 @@ export default function OrgSettingsPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
