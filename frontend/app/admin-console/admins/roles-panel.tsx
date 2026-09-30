@@ -103,11 +103,6 @@ const HIDDEN_MODULE_KEYS = new Set<string>([
   "admin_org_templates_remove",
 ]);
 
-const PRESETS = [
-  { name: "Platform Operator", key: "platform_operator", desc: "Day-to-day Super Admin console: organisations, domains, support" },
-  { name: "Platform Support", key: "platform_support", desc: "Helps organisations with onboarding, billing, and access issues" },
-];
-
 const roleFieldLabel: React.CSSProperties = {
   display: "block",
   fontSize: 13,
@@ -130,15 +125,11 @@ const roleFieldInput: React.CSSProperties = {
 };
 
 export function PlatformRolesPanel({
-  createOpen,
-  onCreateOpenChange,
   onRolesChanged,
   onPermissionEditing,
   canEdit: canEditRoles,
   canDelete: canDeleteRoles,
 }: {
-  createOpen: boolean;
-  onCreateOpenChange: (open: boolean) => void;
   onRolesChanged?: () => void;
   onPermissionEditing?: (active: boolean) => void;
   // Roles is a tab of the Platform Team module, not its own permission
@@ -153,10 +144,6 @@ export function PlatformRolesPanel({
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-
-  const [createForm, setCreateForm] = useState({ name: "", key: "", description: "" });
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [createBusy, setCreateBusy] = useState(false);
 
   const [editing, setEditing] = useState<DynamicRole | null>(null);
   const [editForm, setEditForm] = useState({ name: "", key: "", description: "", status: "active" as "active" | "inactive" });
@@ -200,10 +187,6 @@ export function PlatformRolesPanel({
     load();
   }, [load]);
 
-  useEffect(() => {
-    if (createOpen) setCreateError(null);
-  }, [createOpen]);
-
   const visible = useMemo(
     () =>
       roles.filter(
@@ -214,31 +197,6 @@ export function PlatformRolesPanel({
       ),
     [roles, search],
   );
-
-  async function createRole(e: React.FormEvent) {
-    e.preventDefault();
-    setCreateBusy(true);
-    setCreateError(null);
-    try {
-      await apiFetch("/admin/platform-roles", {
-        method: "POST",
-        body: JSON.stringify({
-          name: createForm.name,
-          key: createForm.key || undefined,
-          description: createForm.description,
-        }),
-      });
-      notify("Platform role created");
-      onCreateOpenChange(false);
-      setCreateForm({ name: "", key: "", description: "" });
-      load();
-      onRolesChanged?.();
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Failed to create role");
-    } finally {
-      setCreateBusy(false);
-    }
-  }
 
   async function saveEdit(e: React.FormEvent) {
     e.preventDefault();
@@ -513,7 +471,12 @@ export function PlatformRolesPanel({
                       No platform roles yet.
                     </td>
                   </tr>
-                ) : visible.map((r) => (
+                ) : visible.map((r) => {
+                  // Super Admin is the built-in full-access role: its details
+                  // and permissions are fixed (the backend enforces this too),
+                  // so it gets no row actions.
+                  const isSuperAdmin = r.key === "super_admin";
+                  return (
                   <tr key={r.id}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{r.name}</div>
@@ -524,12 +487,17 @@ export function PlatformRolesPanel({
                     <td>{r._count?.userRoles ?? 0}</td>
                     <td>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {canEditRoles ? (
+                        {isSuperAdmin ? (
+                          <span className="muted" style={{ fontSize: 12 }} title="Built-in role with full access">
+                            —
+                          </span>
+                        ) : null}
+                        {canEditRoles && !isSuperAdmin ? (
                           <button className="btn btn-ghost btn-sm" type="button" onClick={() => void openPerms(r)}>
                             Permissions
                           </button>
                         ) : null}
-                        {canEditRoles ? (
+                        {canEditRoles && !isSuperAdmin ? (
                           <button
                             className="btn btn-ghost btn-sm"
                             type="button"
@@ -547,7 +515,7 @@ export function PlatformRolesPanel({
                             Edit
                           </button>
                         ) : null}
-                        {canDeleteRoles && r.key !== "super_admin" ? (
+                        {canDeleteRoles && !isSuperAdmin ? (
                           <button className="btn btn-ghost btn-sm" type="button" onClick={() => setConfirmDelete(r)}>
                             Delete
                           </button>
@@ -555,177 +523,13 @@ export function PlatformRolesPanel({
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       </Reveal>
-
-      <Modal open={createOpen} onClose={() => onCreateOpenChange(false)} title="Create platform role" description="Define a new role that can be assigned to platform admins." size="md">
-        <form onSubmit={createRole} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {createError ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                color: "#b91c1c",
-                fontSize: 13,
-                fontWeight: 500,
-                marginBottom: 20,
-              }}
-            >
-              {createError}
-            </div>
-          ) : null}
-
-          {/* Quick presets */}
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              Quick start
-            </label>
-            <div style={{ display: "flex", gap: 8 }}>
-              {PRESETS.map((p) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  onClick={() => setCreateForm({ name: p.name, key: p.key, description: p.desc })}
-                  style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: createForm.key === p.key ? "1.5px solid #0f1424" : "1px solid #e2e8f0",
-                    background: createForm.key === p.key ? "#eef2ff" : "#ffffff",
-                    color: createForm.key === p.key ? "#0f1424" : "#475569",
-                    fontSize: 12.5,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                    textAlign: "left" as const,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  <div style={{ fontWeight: 600, marginBottom: 2 }}>{p.name}</div>
-                  <div style={{ fontSize: 11, color: createForm.key === p.key ? "#6366f1" : "#94a3b8" }}>
-                    {p.desc}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ height: 1, background: "#f1f5f9", margin: "0 0 20px" }} />
-
-          {/* Fields */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div>
-              <label style={roleFieldLabel}>Role name *</label>
-              <input
-                style={roleFieldInput}
-                required
-                value={createForm.name}
-                onChange={(e) => setCreateForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Platform Operator"
-              />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={roleFieldLabel}>Key / slug</label>
-                <input
-                  style={roleFieldInput}
-                  value={createForm.key}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, key: e.target.value }))}
-                  placeholder="Auto-generated if empty"
-                />
-              </div>
-              <div style={{ display: "flex", alignItems: "flex-end", paddingBottom: 2 }}>
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "6px 10px",
-                    borderRadius: 8,
-                    background: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                    fontSize: 12,
-                    color: "#64748b",
-                  }}
-                >
-                  <span style={{ fontSize: 14 }}>🌐</span>
-                  Platform scope
-                </div>
-              </div>
-            </div>
-            <div>
-              <label style={roleFieldLabel}>Description</label>
-              <textarea
-                style={{ ...roleFieldInput, minHeight: 72, resize: "vertical" as const }}
-                rows={3}
-                value={createForm.description}
-                onChange={(e) => setCreateForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="What does this role do?"
-              />
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 10,
-              marginTop: 24,
-              paddingTop: 18,
-              borderTop: "1px solid #f1f5f9",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => onCreateOpenChange(false)}
-              disabled={createBusy}
-              style={{
-                padding: "9px 18px",
-                borderRadius: 10,
-                fontSize: 13.5,
-                fontWeight: 500,
-                border: "1px solid #e2e8f0",
-                background: "#ffffff",
-                color: "#475569",
-                cursor: createBusy ? "not-allowed" : "pointer",
-                opacity: createBusy ? 0.5 : 1,
-                transition: "all 0.15s ease",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={createBusy || !createForm.name.trim()}
-              style={{
-                padding: "9px 20px",
-                borderRadius: 10,
-                fontSize: 13.5,
-                fontWeight: 600,
-                border: "none",
-                color: "#ffffff",
-                cursor: createBusy || !createForm.name.trim() ? "not-allowed" : "pointer",
-                opacity: createBusy || !createForm.name.trim() ? 0.5 : 1,
-                transition: "all 0.15s ease",
-                background: "linear-gradient(135deg, #0f1424, #0f1424)",
-                boxShadow: "0 2px 8px -2px rgba(21, 27, 46, 0.4)",
-              }}
-            >
-              {createBusy ? "Creating…" : "Create role"}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title={`Edit: ${editing?.name ?? ""}`} size="md">
         <form onSubmit={saveEdit} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
