@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -187,6 +187,15 @@ export default function SuperAdminRolesPage() {
   const [permSaving, setPermSaving] = useState(false);
   const [savingPermission, setSavingPermission] = useState<string | null>(null);
   const [permError, setPermError] = useState<string | null>(null);
+  // The permissions panel renders above the role catalogue; the Permissions
+  // buttons sit in the catalogue further down, so bring the panel into view
+  // when it opens (otherwise it opens off-screen and the click looks dead).
+  const permPanelRef = useRef<HTMLDivElement>(null);
+  const permPanelRoleId = permissionsModalRole?.id ?? null;
+  useEffect(() => {
+    if (!permPanelRoleId) return;
+    permPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [permPanelRoleId]);
 
   const notify = (msg: string) => {
     setToast(msg);
@@ -507,6 +516,7 @@ export default function SuperAdminRolesPage() {
       </div>
 
       {permissionsModalRole ? (
+        <div ref={permPanelRef} style={{ scrollMarginTop: 96 }}>
         <Reveal delay={1}>
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-h" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
@@ -652,6 +662,7 @@ export default function SuperAdminRolesPage() {
             </div>
           ) : null}
         </Reveal>
+        </div>
       ) : null}
 
       {/* Summary strip */}
