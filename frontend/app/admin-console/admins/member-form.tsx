@@ -15,6 +15,7 @@ import {
 } from "@/lib/contact-validation";
 import { Icon, type IconName } from "@/components/icons";
 import { PasswordInput } from "@/components/auth/password-input";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { PlatformTeamMember, PlatformTeamRole } from "@/lib/types";
 
 // Shared by /admin-console/admins/new and /admin-console/admins/[id]/edit.
@@ -185,6 +186,7 @@ export function PlatformMemberForm({ member }: { member?: PlatformTeamMember }) 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState(false);
   const [roles, setRoles] = useState<PlatformTeamRole[]>([]);
   const [rolesLoading, setRolesLoading] = useState(true);
 
@@ -222,8 +224,8 @@ export function PlatformMemberForm({ member }: { member?: PlatformTeamMember }) 
     setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(e?: React.FormEvent, passwordConfirmed = false) {
+    e?.preventDefault();
     if (submitting) return;
     setFormError(null);
 
@@ -231,6 +233,13 @@ export function PlatformMemberForm({ member }: { member?: PlatformTeamMember }) 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       setFormError("Please fix the highlighted fields.");
+      return;
+    }
+
+    // Setting a new password from the edit form signs the member out and
+    // forces a change at next login — confirm first (same as org Users).
+    if (isEdit && form.password.trim() && !passwordConfirmed) {
+      setConfirmPassword(true);
       return;
     }
 
@@ -255,7 +264,11 @@ export function PlatformMemberForm({ member }: { member?: PlatformTeamMember }) 
       try {
         sessionStorage.setItem(
           FLASH_KEY,
-          member ? "Platform team member updated" : "Platform team member created — credentials emailed",
+          member
+            ? password
+              ? "Platform team member updated — new password emailed"
+              : "Platform team member updated"
+            : "Platform team member created — credentials emailed",
         );
       } catch {
         // Storage unavailable — the redirect still happens, just without a toast.
@@ -536,13 +549,15 @@ export function PlatformMemberForm({ member }: { member?: PlatformTeamMember }) 
             <div>
               <label htmlFor="pm-password" style={fieldLabel}>
                 {isEdit ? "New password" : "Temporary password"}
-                <span style={{ fontWeight: 400, color: "#94a3b8" }}> (auto-generated if empty)</span>
+                <span style={{ fontWeight: 400, color: "#94a3b8" }}>
+                  {isEdit ? " (optional)" : " (auto-generated if empty)"}
+                </span>
               </label>
               <PasswordInput
                 id="pm-password"
                 value={form.password}
                 onChange={(e) => setField("password", e.target.value)}
-                placeholder="Leave blank to generate"
+                placeholder={isEdit ? "Leave blank to keep current" : "Leave blank to generate"}
                 autoComplete="new-password"
               />
               <FieldError message={errors.password} />
@@ -606,6 +621,20 @@ export function PlatformMemberForm({ member }: { member?: PlatformTeamMember }) 
           </button>
         </div>
       </form>
+
+      <ConfirmModal
+        open={confirmPassword}
+        title="Change this member's password?"
+        message="They'll be signed out everywhere and must set a new password the next time they sign in. An email with the new temporary password will be sent to them."
+        confirmLabel="Change password"
+        destructive
+        busy={submitting}
+        onClose={() => setConfirmPassword(false)}
+        onConfirm={() => {
+          setConfirmPassword(false);
+          void handleSubmit(undefined, true);
+        }}
+      />
     </div>
   );
 }

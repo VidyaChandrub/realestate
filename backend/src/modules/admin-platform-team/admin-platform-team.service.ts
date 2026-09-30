@@ -285,7 +285,11 @@ export class AdminPlatformTeamService {
           ...(dto.email ? { email: dto.email.trim().toLowerCase() } : {}),
           ...(dto.phoneNumber !== undefined ? { phoneNumber: phoneNumber ?? null } : {}),
           ...(dto.status ? { status: dto.status } : {}),
-          ...(passwordHash ? { passwordHash } : {}),
+          // An admin-set password is temporary, exactly like the one sent at
+          // creation: the member must choose their own at next login
+          // (enforced in SuperAdminGuard; cleared by AuthService.changePassword).
+          // Mirrors updateOrgUser for org users.
+          ...(passwordHash ? { passwordHash, mustChangePassword: true } : {}),
           ...(passwordHash || disabling ? { tokenInvalidBefore: now } : {}),
         },
       });
@@ -329,7 +333,33 @@ export class AdminPlatformTeamService {
         });
     }
 
-    return this.getById(id);
+    const updated = await this.getById(id);
+
+    // Email the new temporary password to the member — same template and
+    // channel as the creation invite (and as the org Users edit flow). Sent to
+    // the saved (possibly just-changed) address, only ever with the value the
+    // admin typed. Fire-and-forget: a delivery failure must not fail the save.
+    if (dto.password) {
+      const recipientName =
+        [updated.firstName, updated.lastName].filter(Boolean).join(' ') || updated.email;
+      void this.email
+        .sendInviteEmail({
+          to: updated.email,
+          recipientName,
+          orgName: 'iPixxel Realty',
+          role: updated.role?.name ?? 'Platform Team',
+          tempPassword: dto.password,
+          loginUrl: `${frontendBaseUrl()}/admin-login`,
+        })
+        .catch((err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(
+            `[Platform Team] Password-change email failed for ${updated.email}: ${message}`,
+          );
+        });
+    }
+
+    return updated;
   }
 
   async remove(id: string, actorUserId: string) {
