@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { CountUp } from "@/components/superadmin/count-up";
+import { ListPager, usePagedRows } from "@/components/ui/list-pager";
 import { Reveal } from "@/components/superadmin/reveal";
 import { useAuth } from "@/lib/auth-context";
 import { Modal } from "@/components/ui/modal";
@@ -137,6 +138,8 @@ export default function OrgFormsPage() {
       return hay.includes(query);
     });
   }, [forms, q, filter, typeFilter]);
+  // 10 per page; the counters and tab counts still use every form.
+  const paged = usePagedRows(visible, `${q}|${filter}|${typeFilter}`);
 
   async function createForm() {
     setBusy(true);
@@ -683,7 +686,7 @@ export default function OrgFormsPage() {
                 </tr>
               </thead>
               <tbody>
-                {visible.map((form) => (
+                {paged.pageRows.map((form) => (
                   <tr key={form.backendId}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -811,7 +814,7 @@ export default function OrgFormsPage() {
             gap: 20,
           }}
         >
-          {visible.map((form) => (
+          {paged.pageRows.map((form) => (
             <OrgVisualFormCard
               key={form.backendId}
               form={form}
@@ -824,6 +827,7 @@ export default function OrgFormsPage() {
           ))}
         </div>
       )}
+      <ListPager page={paged.page} total={paged.total} onPageChange={paged.setPage} noun="forms" />
 
       {/* Embed Modal */}
       <Modal

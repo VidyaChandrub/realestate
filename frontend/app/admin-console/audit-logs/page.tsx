@@ -15,7 +15,7 @@ import type {
   AdminAuditLogsParams,
 } from "@/lib/types";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 const AV_TONES = [
   "linear-gradient(135deg, #6366f1 0%, #0f1424 100%)",

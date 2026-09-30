@@ -9,6 +9,7 @@ import { Icon } from "@/components/icons";
 import { AvatarStack } from "@/components/org/team-fields";
 import { listTeams } from "@/lib/api";
 import type { Team } from "@/lib/types";
+import { ListPager, usePagedRows } from "@/components/ui/list-pager";
 import "./teams.css";
 
 export default function OrgTeamsPage() {
@@ -77,6 +78,8 @@ export default function OrgTeamsPage() {
       return matchesSearch && matchesStatus;
     });
   }, [teams, searchQuery, statusFilter]);
+  // 10 per page; the KPI cards above still total every team.
+  const paged = usePagedRows(filteredTeams, `${searchQuery}|${statusFilter}`);
 
   return (
     <div className="tm-wrap">
@@ -687,7 +690,7 @@ export default function OrgTeamsPage() {
       ) : viewMode === "grid" ? (
         /* Grid View with Cards */
         <div className="tm-cards-grid">
-          {filteredTeams.map((team, i) => (
+          {paged.pageRows.map((team, i) => (
             <Reveal delay={i + 1} key={team.id}>
               <div
                 className="tm-team-card"
@@ -791,7 +794,7 @@ export default function OrgTeamsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTeams.map((team) => (
+                {paged.pageRows.map((team) => (
                   <tr key={team.id}>
                     <td>
                       <Link
@@ -848,6 +851,9 @@ export default function OrgTeamsPage() {
           </div>
         </Reveal>
       )}
+      {!loading ? (
+        <ListPager page={paged.page} total={paged.total} onPageChange={paged.setPage} noun="teams" />
+      ) : null}
     </div>
   );
 }

@@ -57,7 +57,7 @@ import type {
 import "@/app/openpage.css";
 import "./templates.css";
 
-const LIMIT = 12;
+const LIMIT = 10;
 
 export default function OrgTemplatesPage() {
   const { accessToken, hasPermission } = useAuth();

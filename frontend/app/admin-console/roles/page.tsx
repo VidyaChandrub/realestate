@@ -9,6 +9,7 @@ import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { DynamicRole } from "@/lib/types";
 import { useFlash } from "@/lib/flash";
+import { ListPager, usePagedRows } from "@/components/ui/list-pager";
 import { ROLES_FLASH_KEY, ROLES_PATH, roleInUseMessage } from "./role-shared";
 
 const PERMISSION_COLUMNS = [
@@ -252,6 +253,8 @@ export default function SuperAdminRolesPage() {
       ),
     [roles, search],
   );
+  // 10 per page; stats above still count every role.
+  const paged = usePagedRows(visible, search);
 
   const handleDeleteConfirm = async () => {
     if (!accessToken || !confirmDeleteState) return;
@@ -783,7 +786,7 @@ export default function SuperAdminRolesPage() {
                     <td colSpan={6} className="muted">No organisation roles yet.</td>
                   </tr>
                 ) : (
-                  visible.map((r) => {
+                  paged.pageRows.map((r) => {
                     const roleInfo = getRoleBadgeInfo(r.key, r.name);
                     return (
                       <tr key={r.id}>
@@ -980,6 +983,7 @@ export default function SuperAdminRolesPage() {
               </tbody>
             </table>
           </div>
+          <ListPager page={paged.page} total={paged.total} onPageChange={paged.setPage} noun="roles" />
         </div>
       </Reveal>
 

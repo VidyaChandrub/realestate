@@ -13,6 +13,7 @@ import {
 import { Reveal } from "@/components/superadmin/reveal";
 import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 import { Icon } from "@/components/icons";
+import { LIST_PAGE_SIZE, ListPager } from "@/components/ui/list-pager";
 import type {
   SupportTicketCategory,
   SupportTicketPriority,
@@ -109,6 +110,8 @@ export default function OrgSupportPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState<SupportTicketCategory>("Billing");
@@ -125,16 +128,21 @@ export default function OrgSupportPage() {
     /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     /* eslint-enable react-hooks/set-state-in-effect */
-    getSupportTickets({ limit: 8 })
+    getSupportTickets({ page, limit: LIST_PAGE_SIZE })
       .then((res) => {
+        if (res.data.length === 0 && page > 1 && res.total > 0) {
+          setPage(Math.ceil(res.total / LIST_PAGE_SIZE));
+          return;
+        }
         setTickets(res.data);
+        setTotal(res.total);
         setLoadError(null);
       })
       .catch((err) =>
         setLoadError(err instanceof Error ? err.message : "Couldn't load tickets."),
       )
       .finally(() => setLoading(false));
-  }, [accessToken, reloadTick]);
+  }, [accessToken, reloadTick, page]);
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -183,6 +191,7 @@ export default function OrgSupportPage() {
       setMessage("");
       setAttachmentUrls([]);
       setAttachmentNames([]);
+      setPage(1);
       setReloadTick((t) => t + 1);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to submit ticket.");
@@ -397,6 +406,7 @@ export default function OrgSupportPage() {
                   </tbody>
                 </table>
               </div>
+              <ListPager page={page} total={total} loading={loading} onPageChange={setPage} noun="tickets" />
             </div>
           </Reveal>
         </div>

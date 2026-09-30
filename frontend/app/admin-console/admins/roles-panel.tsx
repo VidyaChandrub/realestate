@@ -8,6 +8,7 @@ import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { DynamicRole } from "@/lib/types";
+import { ListPager, usePagedRows } from "@/components/ui/list-pager";
 
 type PermissionColumn = "canView" | "canAdd" | "canEdit" | "canDelete" | "canApprove";
 // `moduleKey` lets a pill shown under one row read/write a *different*
@@ -172,6 +173,7 @@ export function PlatformRolesPanel({
       ),
     [roles, search],
   );
+  const paged = usePagedRows(visible, search);
 
   async function openPerms(role: DynamicRole) {
     setPermRole(role);
@@ -425,7 +427,7 @@ export function PlatformRolesPanel({
                       No platform roles yet.
                     </td>
                   </tr>
-                ) : visible.map((r) => {
+                ) : paged.pageRows.map((r) => {
                   // Super Admin is the built-in full-access role: its details
                   // and permissions are fixed (the backend enforces this too),
                   // so it gets no row actions.
@@ -473,6 +475,7 @@ export function PlatformRolesPanel({
               </tbody>
             </table>
           </div>
+          <ListPager page={paged.page} total={paged.total} onPageChange={paged.setPage} noun="roles" />
         </div>
       </Reveal>
 

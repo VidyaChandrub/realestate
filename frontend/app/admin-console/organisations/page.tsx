@@ -25,7 +25,7 @@ import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 // "Draft" is a separate bucket for abandoned self-serve signups and any
 // Super-Admin-precreated org never assigned an admin. Drafts also appear in
 // "All" so incomplete onboarding attempts remain visible to Super Admin.
-const LIMIT = 20;
+const LIMIT = 10;
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -675,7 +675,7 @@ export default function SuperAdminOrganisationsPage() {
               cursor: "pointer",
             }}
           >
-            <span>20 per page</span>
+            <span>{LIMIT} per page</span>
             <Icon name="chevron-down" size={13} style={{ color: "#94a3b8" }} />
           </div>
 
