@@ -132,8 +132,12 @@ export async function provisionInvitedUser(
   orgId: string,
   dto: ProvisionUserInput,
 ) {
-  const existing = await prisma.user.findUnique({
-    where: { email: dto.email },
+  // Stored lowercase and checked case-insensitively: login matches email
+  // case-insensitively, so "Foo@x.com" and "foo@x.com" must never be two users.
+  const email = dto.email.trim().toLowerCase();
+  const existing = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: 'insensitive' } },
+    select: { id: true },
   });
   if (existing) {
     throw new ConflictException(
@@ -193,7 +197,7 @@ export async function provisionInvitedUser(
         orgId,
         firstName: dto.firstName,
         lastName: dto.lastName,
-        email: dto.email,
+        email,
         phoneNumber,
         passwordHash,
         // Starts life awaiting Org Admin approval — cannot authenticate until
@@ -499,9 +503,15 @@ export async function updateOrgUser(
     throw new ForbiddenException('Organisation admins cannot be edited.');
   }
 
-  if (dto.email && dto.email !== existing.email) {
-    const emailTaken = await prisma.user.findUnique({
-      where: { email: dto.email },
+  // Same case-insensitive rule as provisionInvitedUser.
+  const email = dto.email ? dto.email.trim().toLowerCase() : undefined;
+  if (email && email !== existing.email.toLowerCase()) {
+    const emailTaken = await prisma.user.findFirst({
+      where: {
+        email: { equals: email, mode: 'insensitive' },
+        id: { not: id },
+      },
+      select: { id: true },
     });
     if (emailTaken) {
       throw new ConflictException(
@@ -531,7 +541,7 @@ export async function updateOrgUser(
     const dataToUpdate: Prisma.UserUpdateInput = {
       firstName: dto.firstName,
       lastName: dto.lastName,
-      email: dto.email,
+      email,
       phoneNumber,
     };
 

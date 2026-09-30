@@ -628,3 +628,110 @@
   font-weight: 700;
   font-size: 13px;
 }
+
+/* ---------- Create / Edit user page (.usr-form-*) ---------- */
+.org .usr-form-back {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1px solid var(--line-2, #e5e7eb);
+  background: var(--surface, #ffffff);
+  color: var(--ink, #111827);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.org .usr-form-card {
+  width: 100%;
+  max-width: 880px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line-2, #e5e7eb);
+  border-radius: 16px;
+  padding: 24px clamp(16px, 4vw, 28px);
+  box-sizing: border-box;
+}
+
+/* Two columns on desktop, one on phones. */
+.org .usr-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  column-gap: 16px;
+}
+
+.org .usr-form-card .inp.invalid,
+.org .usr-form-card select.invalid,
+.org .usr-phone.invalid {
+  border-color: #fca5a5;
+}
+
+/* Mobile input with a fixed, country-derived dial-code prefix. */
+.org .usr-phone {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line-2, #e5e7eb);
+  border-radius: 11px;
+  background: var(--surface, #ffffff);
+  overflow: hidden;
+  transition: 0.18s;
+}
+
+.org .usr-phone:focus-within {
+  border-color: var(--brand, #059669);
+  box-shadow: 0 0 0 4px var(--brand-050, rgba(5, 150, 105, 0.1));
+}
+
+.org .usr-phone-cc {
+  display: flex;
+  align-items: center;
+  padding: 0 10px 0 13px;
+  border-right: 1px solid var(--line-2, #e5e7eb);
+  color: var(--muted, #6b7280);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.org .usr-phone input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  padding: 11px 13px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--ink, #111827);
+  background: transparent;
+}
+
+.org .usr-form-actions {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-2, #e5e7eb);
+}
+
+@media (max-width: 640px) {
+  .org .usr-form-actions .btn {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
+}
+
+.org .usr-toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 500;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line-2, #e5e7eb);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  font-size: 13.5px;
+}
