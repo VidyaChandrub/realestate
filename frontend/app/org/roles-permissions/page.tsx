@@ -7,7 +7,8 @@ import { apiFetch } from "@/lib/api";
 import { Reveal } from "@/components/superadmin/reveal";
 import { Icon } from "@/components/icons";
 import { Seg } from "@/components/superadmin/seg";
-import { Modal } from "@/components/ui/modal";
+import { useFlash } from "@/lib/flash";
+import { ORG_ROLES_FLASH_KEY, ORG_ROLES_PATH } from "./roles-shared";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { OrgUsersListResponse, OrgUser } from "@/lib/types";
 
@@ -187,12 +188,6 @@ export default function OrgRolesPermissionsPage() {
   // disabled until it lands so rapid clicks can't race each other.
   const [savingModule, setSavingModule] = useState<string | null>(null);
 
-  const [showNewRoleModal, setShowNewRoleModal] = useState(false);
-  const [newRoleName, setNewRoleName] = useState("");
-  const [newRoleDescription, setNewRoleDescription] = useState("");
-  const [creatingRole, setCreatingRole] = useState(false);
-  const [createRoleError, setCreateRoleError] = useState<string | null>(null);
-
   const [confirmDeleteRole, setConfirmDeleteRole] = useState<RoleDef | null>(null);
   // Shown instead of the delete confirmation when the role still has members.
   const [roleInUse, setRoleInUse] = useState<RoleDef | null>(null);
@@ -204,6 +199,8 @@ export default function OrgRolesPermissionsPage() {
     // Errors stay a little longer so they can be read.
     flashTimer.current = setTimeout(() => setFlash(null), variant === "error" ? 5000 : 3000);
   };
+
+  useFlash(ORG_ROLES_FLASH_KEY, (flash) => notify(flash.message));
 
   const loadCatalogAndRoles = useCallback(async () => {
     if (!accessToken) return;
@@ -402,28 +399,6 @@ export default function OrgRolesPermissionsPage() {
     );
   };
 
-  const handleCreateOrgRole = async () => {
-    if (!accessToken || !newRoleName.trim()) return;
-    setCreatingRole(true);
-    setCreateRoleError(null);
-    try {
-      await apiFetch("/org/permissions/org-roles", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ name: newRoleName.trim(), description: newRoleDescription.trim() || undefined }),
-      });
-      notify(`Role '${newRoleName.trim()}' created`);
-      setShowNewRoleModal(false);
-      setNewRoleName("");
-      setNewRoleDescription("");
-      await loadCatalogAndRoles();
-    } catch (err: any) {
-      setCreateRoleError(err.message || "Failed to create role.");
-    } finally {
-      setCreatingRole(false);
-    }
-  };
-
   const handleDeleteOrgRole = async () => {
     if (!accessToken || !confirmDeleteRole?.id) return;
     setDeletingRole(true);
@@ -565,7 +540,7 @@ export default function OrgRolesPermissionsPage() {
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
-                    onClick={() => setShowNewRoleModal(true)}
+                    onClick={() => router.push(`${ORG_ROLES_PATH}/new`)}
                   >
                     <Icon name="plus" size={13} /> Create Role
                   </button>
@@ -788,127 +763,6 @@ export default function OrgRolesPermissionsPage() {
             ×
           </button>
         </div>
-      ) : null}
-
-      {showNewRoleModal ? (
-        <Modal
-          open={showNewRoleModal}
-          onClose={() => !creatingRole && setShowNewRoleModal(false)}
-          title="Create Custom Role"
-          description={`Add a role specific to your organisation. You can then configure its module permissions in the matrix.`}
-          size="md"
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleCreateOrgRole();
-            }}
-            style={{ display: "flex", flexDirection: "column", gap: 18, background: "#ffffff", padding: "4px 0" }}
-          >
-            {createRoleError ? <div className="form-alert">{createRoleError}</div> : null}
-
-            {/* Quick Presets */}
-            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                <span>✨ Quick Presets</span>
-                <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400 }}>(Click to pre-fill)</span>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {[
-                  { name: "Senior Telecaller", desc: "Manages lead qualification, calling, and follow-ups" },
-                  { name: "Sales Team Lead", desc: "Oversees sales agent pipeline, assignment, and site visits" },
-                  { name: "Site Visit Executive", desc: "Coordinates property site tours and customer feedback" },
-                  { name: "Accounts & Billing", desc: "Handles customer payment schedules and invoices" },
-                ].map((preset) => (
-                  <button
-                    key={preset.name}
-                    type="button"
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 500,
-                      padding: "5px 12px",
-                      background: "#ffffff",
-                      border: "1px solid #cbd5e1",
-                      borderRadius: "8px",
-                      color: "#334155",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = "#6366f1";
-                      e.currentTarget.style.color = "#0f1424";
-                      e.currentTarget.style.background = "#eef2ff";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = "#cbd5e1";
-                      e.currentTarget.style.color = "#334155";
-                      e.currentTarget.style.background = "#ffffff";
-                    }}
-                    onClick={() => {
-                      setNewRoleName(preset.name);
-                      setNewRoleDescription(preset.desc);
-                    }}
-                  >
-                    ＋ {preset.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="field">
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Role Name *</label>
-              <input
-                className="inp"
-                style={{
-                  background: "#ffffff",
-                  borderColor: "#cbd5e1",
-                  color: "#0f172a",
-                }}
-                placeholder="e.g. Senior Sales Executive"
-                required
-                autoFocus
-                value={newRoleName}
-                onChange={(e) => setNewRoleName(e.target.value)}
-              />
-            </div>
-
-            <div className="field">
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", marginBottom: 6 }}>Description</label>
-              <textarea
-                className="inp"
-                style={{
-                  background: "#ffffff",
-                  borderColor: "#cbd5e1",
-                  color: "#0f172a",
-                }}
-                rows={3}
-                placeholder="Describe the responsibilities and scope of this custom role…"
-                value={newRoleDescription}
-                onChange={(e) => setNewRoleDescription(e.target.value)}
-              />
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9" }}>
-              <button
-                className="btn btn-ghost"
-                type="button"
-                onClick={() => setShowNewRoleModal(false)}
-                disabled={creatingRole}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                type="submit"
-                disabled={creatingRole || !newRoleName.trim()}
-                style={{ padding: "8px 20px" }}
-              >
-                {creatingRole ? "Creating…" : "Create Role"}
-              </button>
-            </div>
-          </form>
-        </Modal>
       ) : null}
 
       <ConfirmModal

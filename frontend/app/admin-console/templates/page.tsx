@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   BarChart3,
   CheckCircle2,
@@ -49,9 +50,8 @@ import {
 } from "@/components/superadmin/templates/shared";
 import { TemplateCard } from "@/components/superadmin/templates/template-card";
 import { PlanFilterDropdown } from "@/components/superadmin/templates/plan-filter-dropdown";
-import { TEMPLATES, buildTemplateSections } from "@/lib/openpage/data";
+import { buildTemplateSections } from "@/lib/openpage/data";
 import {
-  createTemplate,
   deleteTemplate,
   duplicateTemplate,
   ensurePresetTemplates,
@@ -59,66 +59,18 @@ import {
   resetTemplate,
   saveTemplate,
   loadTemplateCategories,
-  createTemplateCategory,
-  updateTemplateCategory,
-  deleteTemplateCategory,
   type TemplateCategory,
 } from "@/lib/openpage/persist";
 import { builderPath, templatePreviewPath } from "@/lib/openpage/paths";
 import { defaultSiteConfig, seedConfigFor } from "@/lib/openpage/site-config";
 import { inferDesignId } from "@/lib/openpage/page-templates";
-import {
-  buildRealEstateTemplate,
-  openPageTemplateIdForDesign,
-  realEstateTemplateMeta,
-} from "@/lib/openpage/re-templates";
-import type { LandingPageData, TemplateData } from "@/lib/openpage/types";
+import { buildRealEstateTemplate, openPageTemplateIdForDesign } from "@/lib/openpage/re-templates";
+import type { LandingPageData } from "@/lib/openpage/types";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { SceneImage } from "@/components/openpage/art";
 import { apiFetch } from "@/lib/api";
 import type { Plan } from "@/lib/types";
-
-function thumbnailFor(id: string): string {
-  switch (id) {
-    case "premium":
-      return "hero";
-    case "aurelia-reserve":
-      return "/templates/aurelia-reserve.jpg";
-    case "vista-framed":
-      return "/templates/vista-framed.jpg";
-    case "future-home":
-      return "/templates/future-home.jpg";
-    case "modern-living":
-      return "/templates/modern-living.jpg";
-    case "investment-hub":
-      return "/templates/investment-hub.jpg";
-    case "vista-curve":
-      return "/templates/vista-curve.jpg";
-    case "residential":
-      return "tower";
-    case "commercial":
-      return "commercial";
-    case "luxury":
-      return "interior";
-    case "villa":
-      return "villa";
-    case "plot":
-      return "plots";
-    case "launch":
-      return "overview";
-    case "enquiry":
-      return "lobby";
-    case "site-visit":
-      return "tour";
-    case "brochure":
-      return "pool";
-    case "lead":
-      return "garden";
-    default:
-      return "tower";
-  }
-}
 
 function TemplateThumb({
   thumbnail,
@@ -151,7 +103,10 @@ function goToBuilder(pageId: string) {
 
 const PLAN_BADGE_CLASSES = ["b-green", "b-indigo", "b-violet", "b-amber"];
 
+const TEMPLATES_PATH = "/admin-console/templates";
+
 export default function SuperAdminTemplatesPage() {
+  const router = useRouter();
   const [pages, setPages] = useState<LandingPageData[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
@@ -169,22 +124,6 @@ export default function SuperAdminTemplatesPage() {
   // Categories
   const [categories, setCategories] = useState<TemplateCategory[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [catModalOpen, setCatModalOpen] = useState(false);
-  const [catName, setCatName] = useState("");
-  const [catBusy, setCatBusy] = useState(false);
-  const [catError, setCatError] = useState<string | null>(null);
-  const [editingCat, setEditingCat] = useState<TemplateCategory | null>(null);
-
-  // Create Template Modal
-  const [createOpen, setCreateOpen] = useState(false);
-  const [designId, setDesignId] = useState("blank");
-  const [newName, setNewName] = useState("");
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [createBusy, setCreateBusy] = useState(false);
-  const [createTier, setCreateTier] = useState<"free" | "paid" | "premium">("free");
-  const [createPlanIds, setCreatePlanIds] = useState<string[]>([]);
-  const [createCategoryId, setCreateCategoryId] = useState<string>("");
-
   // Delete / Reset Confirm
   const [deleteFor, setDeleteFor] = useState<TemplateRow | null>(null);
 
@@ -214,7 +153,6 @@ export default function SuperAdminTemplatesPage() {
     apiFetch<Plan[]>("/admin/plans")
       .then((p) => {
         setPlans(p);
-        setCreatePlanIds(p.map((x) => x.id));
       })
       .catch(() => setPlans([]));
     try {
@@ -240,107 +178,7 @@ export default function SuperAdminTemplatesPage() {
     window.setTimeout(() => setToast(null), 3200);
   }, []);
 
-  const handleSaveCategory = async () => {
-    if (!catName.trim()) {
-      setCatError("Category name is required");
-      return;
-    }
-    setCatBusy(true);
-    setCatError(null);
-    try {
-      if (editingCat) {
-        await updateTemplateCategory(editingCat.id, {
-          name: catName.trim(),
-        });
-        notify("Category updated");
-      } else {
-        await createTemplateCategory({
-          name: catName.trim(),
-        });
-        notify("Category created");
-      }
-      setCatName("");
-      setEditingCat(null);
-      reloadCategories();
-    } catch (e) {
-      setCatError(e instanceof Error ? e.message : "Failed to save category");
-    } finally {
-      setCatBusy(false);
-    }
-  };
-
-  const [categoryToDelete, setCategoryToDelete] = useState<TemplateCategory | null>(null);
-  const [categoryDeleteBusy, setCategoryDeleteBusy] = useState(false);
-
-  const handleDeleteCategory = (cat: TemplateCategory) => setCategoryToDelete(cat);
-
-  const confirmDeleteCategory = async () => {
-    if (!categoryToDelete) return;
-    setCategoryDeleteBusy(true);
-    try {
-      await deleteTemplateCategory(categoryToDelete.id);
-      notify("Category deleted");
-      reloadCategories();
-    } catch (e) {
-      notify(e instanceof Error ? e.message : "Failed to delete category");
-    } finally {
-      setCategoryDeleteBusy(false);
-      setCategoryToDelete(null);
-    }
-  };
-
   // Template CRUD actions
-  const createFromDesign = useCallback(
-    async (
-      template: TemplateData,
-      name: string,
-      tier: "free" | "paid" | "premium" = "free",
-      categoryId?: string,
-      allowedPlanIds?: string[],
-    ) => {
-      const label = name?.trim();
-      if (!label) {
-        throw new Error("Template name is required");
-      }
-      const slug =
-        label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "new-template";
-      const config = seedConfigFor({
-        id: "",
-        name: label,
-        slug,
-        status: "draft",
-        template: template.name,
-        domain: "",
-        views: "—",
-        conversions: "—",
-        updated: "",
-        thumbnail: template.thumbnail,
-        sections: [],
-        designId: template.id,
-        kind: "custom",
-      });
-      if (allowedPlanIds && allowedPlanIds.length > 0) {
-        (config as any).allowedPlanIds = allowedPlanIds;
-      }
-      const created = await createTemplate({
-        name: label,
-        slug,
-        designId: template.id,
-        template: template.name,
-        kind: "custom",
-        tier,
-        categoryId: categoryId || undefined,
-        sections: buildTemplateSections(template.id),
-        config,
-        openPageSite: buildRealEstateTemplate(openPageTemplateIdForDesign(template.id), label),
-      });
-      setPages((prev) => [created, ...prev]);
-      notify(`Created "${label}"`);
-      goToBuilder(created.id);
-    },
-    [notify],
-  );
-
   const duplicateRow = useCallback(
     async (row: TemplateRow) => {
       if (!row.pageId) return;
@@ -457,68 +295,6 @@ export default function SuperAdminTemplatesPage() {
     return map;
   }, [rows]);
 
-  const blankBase: TemplateData = useMemo(
-    () => ({
-      id: "blank",
-      name: "Blank canvas",
-      category: "Real Estate",
-      icon: "LayoutTemplate",
-      pages: 1,
-      conversions: "—",
-      accent: "#6D5DFC",
-      accent2: "#1e293b",
-      thumbnail: "hero",
-      description: "Empty page — add sections in the builder",
-    }),
-    [],
-  );
-
-  const submitCreate = async () => {
-    const trimmed = newName.trim();
-    if (!trimmed) {
-      setCreateError("Template name is required");
-      return;
-    }
-    setCreateBusy(true);
-    setCreateError(null);
-    try {
-      const meta = realEstateTemplateMeta.find((t) => t.id === designId);
-      const base: TemplateData = meta
-        ? {
-          ...blankBase,
-          id: meta.id,
-          name: meta.name,
-          description: meta.description,
-          thumbnail: thumbnailFor(meta.id),
-        }
-        : TEMPLATES.find((t) => t.id === designId) ?? blankBase;
-      const computedTier = (() => {
-        if (createPlanIds.length === 0) return "free" as const;
-        const selected = plans.filter((p) => createPlanIds.includes(p.id));
-        const hasFree = selected.some(
-          (p) => (p.priceMonthly ?? 0) === 0 || p.slug === "basic" || p.slug === "free"
-        );
-        if (hasFree) return "free" as const;
-        const isOnlyTop = selected.every(
-          (p) => (p.priceMonthly ?? 0) >= 10000 || /ultra|premium|enterprise/i.test(p.slug)
-        );
-        if (isOnlyTop && selected.length > 0) return "premium" as const;
-        return "paid" as const;
-      })();
-      await createFromDesign(base, trimmed, computedTier, createCategoryId, createPlanIds);
-      setCreateOpen(false);
-      setNewName("");
-      setDesignId("blank");
-      setCreateTier("free");
-      setCreatePlanIds(plans.map((p) => p.id));
-      setCreateCategoryId("");
-    } catch (e) {
-      setCreateError(e instanceof Error ? e.message : "Failed to create template");
-    } finally {
-      setCreateBusy(false);
-    }
-  };
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, paddingBottom: 60 }}>
       {/* Studio Header */}
@@ -582,12 +358,7 @@ export default function SuperAdminTemplatesPage() {
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => {
-              setEditingCat(null);
-              setCatName("");
-              setCatError(null);
-              setCatModalOpen(true);
-            }}
+            onClick={() => router.push(`${TEMPLATES_PATH}/categories`)}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 10 }}
           >
             <Settings2 size={14} /> Categories ({categories.length})
@@ -596,15 +367,7 @@ export default function SuperAdminTemplatesPage() {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => {
-              setNewName("");
-              setCreateError(null);
-              setDesignId("blank");
-              setCreateTier("free");
-              setCreatePlanIds(plans.map((p) => p.id));
-              setCreateCategoryId("");
-              setCreateOpen(true);
-            }}
+            onClick={() => router.push(`${TEMPLATES_PATH}/new`)}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 10, fontWeight: 700 }}
           >
             <Plus size={16} /> Create Template
@@ -704,7 +467,7 @@ export default function SuperAdminTemplatesPage() {
               justifyContent: "space-between",
               cursor: "pointer",
             }}
-            onClick={() => setCatModalOpen(true)}
+            onClick={() => router.push(`${TEMPLATES_PATH}/categories`)}
           >
             <div>
               <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600 }}>Taxonomy</div>
@@ -999,12 +762,7 @@ export default function SuperAdminTemplatesPage() {
 
           <button
             type="button"
-            onClick={() => {
-              setEditingCat(null);
-              setCatName("");
-              setCatError(null);
-              setCatModalOpen(true);
-            }}
+            onClick={() => router.push(`${TEMPLATES_PATH}/categories`)}
             style={{
               flexShrink: 0,
               border: "1px dashed var(--line-2)",
@@ -1064,7 +822,7 @@ export default function SuperAdminTemplatesPage() {
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              onClick={() => setCreateOpen(true)}
+              onClick={() => router.push(`${TEMPLATES_PATH}/new`)}
             >
               <Plus size={14} /> Create template
             </button>
@@ -1190,9 +948,9 @@ export default function SuperAdminTemplatesPage() {
                 if (r.pageId) {
                   goToBuilder(r.pageId);
                 } else {
-                  setDesignId(r.designId);
-                  setNewName(r.name);
-                  setCreateOpen(true);
+                  // Unsaved predefined design — create it first, pre-filled.
+                  const qs = new URLSearchParams({ design: r.designId, name: r.name });
+                  router.push(`${TEMPLATES_PATH}/new?${qs.toString()}`);
                 }
               }}
               onPreview={() => window.open(templatePreviewPath(r.pageId || r.designId), "_blank")}
@@ -1347,313 +1105,6 @@ export default function SuperAdminTemplatesPage() {
         </Modal>
       )}
 
-      {/* Category Management Modal */}
-      <Modal
-        open={catModalOpen}
-        onClose={() => setCatModalOpen(false)}
-        title="Manage Template Categories & Taxonomy"
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Create / Edit Form */}
-          <div
-            style={{
-              background: "var(--surface-2, #f8fafc)",
-              border: "1px solid var(--line-2)",
-              borderRadius: 12,
-              padding: 16,
-            }}
-          >
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
-              {editingCat ? `Edit Category: "${editingCat.name}"` : "Add New Template Category"}
-            </div>
-            {catError && (
-              <div style={{ color: "var(--rose)", fontSize: 12, marginBottom: 10 }}>
-                {catError}
-              </div>
-            )}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "flex-end" }}>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: 12 }}>Category Name</label>
-                <input
-                  type="text"
-                  className="inp"
-                  value={catName}
-                  onChange={(e) => setCatName(e.target.value)}
-                  placeholder="e.g. Commercial, Luxury Villas…"
-                  style={{ height: 38 }}
-                />
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleSaveCategory}
-                  disabled={catBusy}
-                  style={{ height: 38 }}
-                >
-                  {editingCat ? "Update" : "Add"}
-                </button>
-                {editingCat && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={() => {
-                      setEditingCat(null);
-                      setCatName("");
-                    }}
-                    style={{ height: 38 }}
-                  >
-                    Cancel
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Categories List Table */}
-          <div style={{ border: "1px solid var(--line-2)", borderRadius: 12, overflow: "hidden" }}>
-            <table className="tbl" style={{ width: "100%" }}>
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th>Templates Count</th>
-                  <th style={{ textAlign: "right" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categories.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: "center", color: "var(--muted)", padding: 24 }}>
-                      No categories created yet.
-                    </td>
-                  </tr>
-                ) : (
-                  categories.map((c) => (
-                    <tr key={c.id}>
-                      <td style={{ fontWeight: 600 }}>{c.name}</td>
-                      <td>
-                        <span style={{ fontSize: 12.5, fontWeight: 700 }}>
-                          {categoryCounts[c.name] ?? 0} templates
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "right" }}>
-                        <div style={{ display: "inline-flex", gap: 6 }}>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => {
-                              setEditingCat(c);
-                              setCatName(c.name);
-                            }}
-                          >
-                            <Edit2 size={12} /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => handleDeleteCategory(c)}
-                            style={{ color: "var(--rose)" }}
-                          >
-                            <Trash2 size={12} /> Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Create Template Modal */}
-      <Modal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        title="Create New Landing Page Template"
-        containerClassName="z-[200]!"
-        footer={
-          <>
-            <button type="button" className="btn btn-ghost" onClick={() => setCreateOpen(false)} disabled={createBusy}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={submitCreate}
-              disabled={createBusy || !newName.trim()}
-            >
-              {createBusy ? "Creating…" : "Create & Open Builder"}
-            </button>
-          </>
-        }
-      >
-        {createError && (
-          <div
-            style={{
-              color: "var(--rose)",
-              background: "rgba(244,63,94,0.08)",
-              border: "1px solid rgba(244,63,94,0.2)",
-              padding: "8px 12px",
-              borderRadius: 8,
-              fontSize: 12.5,
-              marginBottom: 14,
-            }}
-          >
-            {createError}
-          </div>
-        )}
-
-        <div className="field">
-          <label>
-            Template name <span style={{ color: "var(--rose)", fontWeight: 700 }}>*</span>
-          </label>
-          <input
-            autoFocus
-            className="inp"
-            value={newName}
-            onChange={(e) => {
-              setNewName(e.target.value);
-              if (createError) setCreateError(null);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submitCreate();
-            }}
-            placeholder="e.g. Luxury Penthouse Showcase"
-            required
-          />
-        </div>
-
-        <div style={{ marginBottom: 14 }}>
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>Category <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional)</span></label>
-            <select
-              className="inp"
-              value={createCategoryId}
-              onChange={(e) => {
-                setCreateCategoryId(e.target.value);
-              }}
-            >
-              <option value="">Unassigned</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="field" style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <label style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
-              Subscription Plan Access
-            </label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--brand, #4f46e5)",
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-                onClick={() => setCreatePlanIds(plans.map((p) => p.id))}
-              >
-                Select all
-              </button>
-              <span style={{ color: "var(--muted)", fontSize: 11 }}>•</span>
-              <button
-                type="button"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--muted)",
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-                onClick={() => setCreatePlanIds([])}
-              >
-                Clear all
-              </button>
-            </div>
-          </div>
-          <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 8 }}>
-            Check each subscription plan that is granted access to use this template:
-          </div>
-
-          <div
-            className="visible-scrollbar"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
-              gap: 8,
-              // ~1.5 rows: the half-visible second row plus the visible scrollbar
-              // signal that more plans are below.
-              maxHeight: 132,
-              overflowY: "auto",
-              padding: "2px 6px 2px 0",
-            }}
-          >
-            {plans.map((p) => {
-              const isChecked = createPlanIds.includes(p.id);
-              return (
-                <label
-                  key={p.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "8px 12px",
-                    borderRadius: 10,
-                    border: `1.5px solid ${isChecked ? "var(--brand, #4f46e5)" : "#e2e8f0"}`,
-                    background: isChecked ? "rgba(79, 70, 229, 0.05)" : "#fff",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setCreatePlanIds((prev) => [...prev, p.id]);
-                      } else {
-                        setCreatePlanIds((prev) => prev.filter((id) => id !== p.id));
-                      }
-                    }}
-                    style={{ width: 16, height: 16, accentColor: "var(--brand, #4f46e5)", cursor: "pointer" }}
-                  />
-                  <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                    <span
-                      style={{
-                        fontSize: 12.5,
-                        fontWeight: isChecked ? 700 : 500,
-                        color: isChecked ? "#0f172a" : "#334155",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {p.name}
-                    </span>
-                    <span style={{ fontSize: 11, color: "#64748b" }}>
-                      {p.priceMonthly ? `₹${p.priceMonthly.toLocaleString()}/mo` : "Free Plan"}
-                    </span>
-                  </div>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      </Modal>
-
       {/* Delete / Reset Confirmation Modal */}
       <ConfirmModal
         open={!!deleteFor}
@@ -1673,19 +1124,6 @@ export default function SuperAdminTemplatesPage() {
           }
         }}
         onClose={() => setDeleteFor(null)}
-      />
-
-      {/* Delete Category Confirmation — opened from inside the categories modal */}
-      <ConfirmModal
-        open={categoryToDelete !== null}
-        title="Delete category?"
-        message={`"${categoryToDelete?.name ?? ""}" will be deleted. Templates in this category will become Unassigned.`}
-        confirmLabel="Delete category"
-        destructive
-        busy={categoryDeleteBusy}
-        onConfirm={() => void confirmDeleteCategory()}
-        onClose={() => setCategoryToDelete(null)}
-        containerClassName="z-[60]!"
       />
 
       {/* Toast Notification */}

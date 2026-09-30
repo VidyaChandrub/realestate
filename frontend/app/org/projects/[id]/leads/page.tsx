@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
@@ -12,7 +12,9 @@ import { useAuth } from "@/lib/auth-context";
 import { PROJECT_LEAD_ACTION } from "@/lib/permissions";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
-import { AddLeadModal } from "@/components/org/add-lead-modal";
+import { LEADS_FLASH_KEY } from "@/components/org/add-lead-form";
+import { useFlash } from "@/lib/flash";
+import { useToast } from "@/components/ui/toast";
 import { LeadStatusSelect } from "@/components/org/lead-status-select";
 import { LEAD_STAGE_ORDER, StageBadge, useLeadStages } from "@/lib/lead-stages";
 import "@/app/org/org.css";
@@ -49,7 +51,10 @@ export default function OrgProjectLeadsPage() {
   const [assignable, setAssignable] = useState<{ id: string; name: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [addOpen, setAddOpen] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+  // Success message from the Add lead page (the list reloads itself on mount).
+  useFlash(LEADS_FLASH_KEY, (flash) => toast({ title: flash.message, variant: "success" }));
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
@@ -119,13 +124,7 @@ export default function OrgProjectLeadsPage() {
 
   return (
     <>
-      <ProjectPageHead active="leads" actions={canAdd ? <button className="btn btn-primary" onClick={() => setAddOpen(true)}>＋ Add lead</button> : undefined} />
-      <AddLeadModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        projectId={projectId}
-        onCreated={(lead) => setLeads((prev) => (prev ? [lead, ...prev] : [lead]))}
-      />
+      <ProjectPageHead active="leads" actions={canAdd ? <button className="btn btn-primary" onClick={() => router.push(`/org/projects/${encodeURIComponent(projectId)}/leads/new`)}>＋ Add lead</button> : undefined} />
       <Reveal delay={1}>
         <div className="mb-20">
           <div className="seg-wrap"><div className="seg">

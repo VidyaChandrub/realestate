@@ -269,6 +269,228 @@
   height: 100%;
 }
 
+/* ---------- Section header with actions ---------- */
+.page .sectionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.page .sectionActions {
+  display: inline-flex;
+  gap: 6px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.page .mini {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--fp-line);
+  background: #ffffff;
+  color: var(--fp-text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.page .mini:hover {
+  background: var(--fp-soft);
+}
+
+/* ---------- Card grid / check cards / tiles ---------- */
+.page .cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.page .checkCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--fp-line);
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.page .checkCard:hover {
+  border-color: #cbd5e1;
+}
+
+.page .checkCard[data-checked="true"] {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.page .checkCard input {
+  margin: 2px 0 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--fp-brand);
+  flex-shrink: 0;
+}
+
+.page .checkBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.page .checkHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.page .checkTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fp-ink);
+}
+
+.page .checkStatus {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--fp-faint);
+}
+
+.page .checkCard[data-checked="true"] .checkStatus {
+  color: var(--fp-brand);
+}
+
+.page .checkDesc {
+  font-size: 12.5px;
+  color: var(--fp-muted);
+  line-height: 1.4;
+}
+
+.page .tile {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--fp-line);
+  background: #ffffff;
+}
+
+.page .tileLabel {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--fp-ink);
+  margin-bottom: 10px;
+}
+
+.page .tileRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page .tileRow .control {
+  flex: 1;
+  min-height: 42px;
+}
+
+.page .inlineCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fp-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.page .inlineCheck input {
+  accent-color: var(--fp-brand);
+}
+
+/* ---------- Tags ---------- */
+.page .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.page .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--fp-line);
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fp-text);
+}
+
+.page .tagTick {
+  color: var(--fp-accent);
+}
+
+.page .tagRemove {
+  border: none;
+  background: none;
+  color: #ef4444;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.page .emptyNote {
+  margin-bottom: 20px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--fp-faint);
+}
+
+/* Input + button on one row (e.g. "Add feature"). */
+.page .inlineRow {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.page .inlineRow > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- Read-only info card ---------- */
+.page .note {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #c7d2fe;
+  background: #f5f7ff;
+}
+
+.page .noteTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fp-ink);
+}
+
+.page .noteBody {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--fp-muted);
+  line-height: 1.5;
+}
+
 /* ---------- Quick-start preset cards (role page) ---------- */
 .page .presets {
   display: grid;
@@ -391,7 +613,9 @@
 }
 
 .page .btnPrimary:disabled,
-.page .btn[aria-disabled="true"] {
+.page .btn[aria-disabled="true"],
+.page .btn:disabled,
+.page .back:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }

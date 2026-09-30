@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import {
   Camera,
@@ -11,9 +11,9 @@ import {
   Eye,
   Maximize2,
   Tag,
-  X,
 } from "lucide-react";
 import type { ProjectDetail, UnitStatus } from "@/lib/types";
+import { FormActions, FormAlert, FormPage } from "@/components/forms/form-page";
 
 export interface UnitFormState {
   configuration: string;
@@ -51,12 +51,13 @@ export interface UnitPreview {
 }
 
 /**
- * Add / edit unit dialog. The form itself is supplied by the page as
- * `children` and is driven entirely by the project type's unit field
- * template (role fields, custom fields, labels) — this component is only the
- * frame: header, live preview card and footer.
+ * Add / edit unit — full-width in-page view (was a modal dialog). The form
+ * itself is supplied by the page as `children` and is driven entirely by the
+ * project type's unit field template (role fields, custom fields, labels) —
+ * this component is only the frame: header, live preview card and actions.
+ * The Units page renders it in place of the list while `open`.
  */
-export function UnitDesignModal({
+export function UnitDesignPage({
   open,
   onClose,
   mode,
@@ -84,20 +85,6 @@ export function UnitDesignModal({
   children: ReactNode;
 }) {
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
-
-  // Escape key closes modal
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onClose();
-    };
-    window.addEventListener("keydown", handleKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", handleKey);
-      document.body.style.overflow = "";
-    };
-  }, [open, onClose, busy]);
 
   if (!open) return null;
 
@@ -146,150 +133,20 @@ export function UnitDesignModal({
   const iconStyle = { color: "#334155", marginTop: 2, flexShrink: 0 };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "16px",
-      }}
+    <FormPage
+      eyebrow={project?.name ? `Projects · ${project.name} · Units` : "Projects · Units"}
+      title={mode === "create" ? "Add unit" : "Edit unit"}
+      subtitle={mode === "create" ? "Add a new unit to this project" : "Update unit details"}
+      onBack={onClose}
+      backDisabled={busy}
+      backLabel="Back to units"
     >
-      {/* Backdrop */}
-      <div
-        onClick={() => {
-          if (!busy) onClose();
-        }}
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: "rgba(15, 23, 42, 0.6)",
-          backdropFilter: "blur(6px)",
-          WebkitBackdropFilter: "blur(6px)",
-        }}
-      />
-
-      {/* Modal Dialog Card */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        style={{
-          position: "relative",
-          width: "100%",
-          maxWidth: "1140px",
-          maxHeight: "92vh",
-          display: "flex",
-          flexDirection: "column",
-          background: "#ffffff",
-          borderRadius: "20px",
-          boxShadow: "0 25px 60px -15px rgba(15, 23, 42, 0.3), 0 0 0 1px rgba(226, 232, 240, 0.8)",
-          overflow: "hidden",
-          color: "#0f172a",
-        }}
-      >
         <style>{`
           @media (max-width: 980px) {
             .unit-modal-grid { grid-template-columns: 1fr !important; }
           }
         `}</style>
-
-        {/* --- Header --- */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "20px 28px",
-            borderBottom: "1px solid #f1f5f9",
-            background: "#ffffff",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {project?.coverImageUrl || project?.galleryUrls?.[0] ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={project.coverImageUrl || project.galleryUrls?.[0]}
-                alt={project.name}
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: 14,
-                  objectFit: "cover",
-                  border: "1px solid #e2e8f0",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-                }}
-              />
-            ) : null}
-            <div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>
-                {mode === "create" ? "Add unit" : "Edit unit"}
-              </h2>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  fontSize: 13,
-                  color: "#64748b",
-                  marginTop: 3,
-                  flexWrap: "wrap",
-                }}
-              >
-                {project?.name ? (
-                  <>
-                    <span>
-                      Project: <strong style={{ color: "#1e293b", fontWeight: 600 }}>{project.name}</strong>
-                    </span>
-                    <span style={{ color: "#cbd5e1" }}>|</span>
-                  </>
-                ) : null}
-                <span>{mode === "create" ? "Add a new unit to this project" : "Update unit details"}</span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            aria-label="Close modal"
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              background: "#ffffff",
-              color: "#64748b",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: busy ? "not-allowed" : "pointer",
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* --- Scrollable Body (2 columns) --- */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px", background: "#fafbfc" }}>
-          {error ? (
-            <div
-              style={{
-                padding: "12px 16px",
-                borderRadius: 12,
-                background: "#fef2f2",
-                border: "1px solid #fecaca",
-                color: "#b91c1c",
-                fontSize: 13,
-                marginBottom: 20,
-              }}
-            >
-              {error}
-            </div>
-          ) : null}
-
+        <FormAlert message={error} />
           <div
             className="unit-modal-grid"
             style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 24, alignItems: "start" }}
@@ -435,28 +292,14 @@ export function UnitDesignModal({
               </div>
             </div>
           </div>
-        </div>
 
-        {/* --- Footer --- */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: 12,
-            padding: "16px 28px",
-            background: "#ffffff",
-            borderTop: "1px solid #f1f5f9",
-          }}
-        >
-          <button className="btn btn-ghost" type="button" onClick={onClose} disabled={busy}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" type="button" onClick={() => void onSubmit()} disabled={busy}>
-            {busy ? "Saving…" : mode === "create" ? submitLabel : "Save changes"}
-          </button>
-        </div>
-      </div>
-    </div>
+      <FormActions
+        onCancel={onClose}
+        busy={busy}
+        busyLabel="Saving…"
+        submitLabel={mode === "create" ? submitLabel : "Save changes"}
+        onSubmit={() => void onSubmit()}
+      />
+    </FormPage>
   );
 }

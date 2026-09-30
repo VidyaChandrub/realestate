@@ -10,6 +10,8 @@ import { Icon } from "@/components/icons";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { Modal } from "@/components/ui/modal";
 import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
+import { useFlash } from "@/lib/flash";
+import { ORG_DETAIL_FLASH_KEY } from "../org-detail-shared";
 import type {
   CreateOrgUserInput,
   OrganisationActivityRow,
@@ -451,12 +453,9 @@ export default function SuperAdminOrganisationDetailPage() {
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [assignedTemplates, setAssignedTemplates] = useState<any[]>([]);
-  const [allTemplates, setAllTemplates] = useState<any[]>([]);
   const [upgradePlanId, setUpgradePlanId] = useState<string>("");
   const [upgradeBillingCycle, setUpgradeBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [upgrading, setUpgrading] = useState(false);
-  const [addTemplateOpen, setAddTemplateOpen] = useState(false);
-  const [selectedNewTemplateIds, setSelectedNewTemplateIds] = useState<string[]>([]);
   const [templateSaving, setTemplateSaving] = useState(false);
   const [templateRemoveTarget, setTemplateRemoveTarget] = useState<any | null>(null);
   const [templateRemoveBlocked, setTemplateRemoveBlocked] = useState<{ name: string; count: number } | null>(null);
@@ -467,6 +466,19 @@ export default function SuperAdminOrganisationDetailPage() {
       router.replace("/login");
     }
   }, [authLoading, accessToken, router]);
+
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    const match = TABS.find((t) => t === requested);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the URL on mount
+    if (match) setTab(match);
+  }, []);
+
+  useFlash(ORG_DETAIL_FLASH_KEY, (flash) => {
+    const match = TABS.find((t) => t === flash.tab);
+    if (match) setTab(match);
+    if (flash.message) notify(flash.message);
+  });
 
   useEffect(() => {
     if (!accessToken || !params.id) return;
@@ -504,7 +516,6 @@ export default function SuperAdminOrganisationDetailPage() {
   useEffect(() => {
     if (!accessToken) return;
     apiFetch<Plan[]>("/admin/plans", { headers: { Authorization: `Bearer ${accessToken}` } }).then(setPlans).catch(() => { });
-    apiFetch<any[]>("/admin/templates", { headers: { Authorization: `Bearer ${accessToken}` } }).then(d => setAllTemplates(Array.isArray(d) ? d : (d as any).data ?? [])).catch(() => { });
   }, [accessToken]);
 
   const [domainsData, setDomainsData] = useState<any | null>(null);
@@ -1317,7 +1328,7 @@ export default function SuperAdminOrganisationDetailPage() {
                   <span className="t">Assigned templates</span>
                   <span className="chip">{assignedTemplates.length} selected</span>
                   {canAddOrgTemplates ? (
-                    <button className="btn btn-primary btn-sm" onClick={() => setAddTemplateOpen(true)}>+ Add template</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => router.push(`/admin-console/organisation-detail/${encodeURIComponent(org.id)}/templates/add`)}>+ Add template</button>
                   ) : null}
                 </div>
                 <div className="card-b">
@@ -1358,66 +1369,6 @@ export default function SuperAdminOrganisationDetailPage() {
                 </div>
               </div>
 
-              {addTemplateOpen ? (
-                <Modal
-                  open
-                  onClose={() => { setSelectedNewTemplateIds([]); setAddTemplateOpen(false); }}
-                  title="Add templates"
-                  size="lg"
-                  closeDisabled={templateSaving}
-                  footer={
-                    <>
-                      <button className="btn btn-ghost" disabled={templateSaving} onClick={() => { setSelectedNewTemplateIds([]); setAddTemplateOpen(false); }}>Cancel</button>
-                      <button className="btn btn-primary" disabled={templateSaving || selectedNewTemplateIds.length === 0} onClick={async () => {
-                        setTemplateSaving(true);
-                        try {
-                          const nextIds = [...assignedTemplates.map((a: any) => a.templateId), ...selectedNewTemplateIds];
-                          await apiFetch(`/admin/organisations/${org.id}/templates`, { method: "PUT", headers: { Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ templateIds: nextIds }) });
-                          setAssignedTemplates(prev => [...prev, ...selectedNewTemplateIds.map(id => {
-                            const t = allTemplates.find((x: any) => x.id === id);
-                            return { templateId: id, template: { id: t.id, name: t.name, slug: t.slug, thumbnail: t.thumbnail, category: t.category } };
-                          })]);
-                          setSelectedNewTemplateIds([]); setAddTemplateOpen(false);
-                        } catch (e: any) { notify(e.message || "Failed to add"); }
-                        finally { setTemplateSaving(false); }
-                      }}>
-                        {templateSaving ? "Saving…" : `Add ${selectedNewTemplateIds.length} template(s)`}
-                      </button>
-                    </>
-                  }
-                >
-                    <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10 }}>
-                      Current plan allows {(() => {
-                        const plan = plans.find(p => p.id === ((org as any).plan?.id || (org.subscription as any)?.planId));
-                        const raw = (plan?.limits as any)?.templates;
-                        if (!raw || raw === "All") return "All";
-                        return raw;
-                      })()} templates — {assignedTemplates.length} already assigned.
-                    </div>
-                    <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 10, maxHeight: 360, overflow: "auto" }}>
-                      {allTemplates.filter((t: any) => (t.status === "published" && (t.pageType === "landing" || !t.pageType)) && !assignedTemplates.some((a: any) => a.templateId === t.id)).map((tpl: any) => {
-                        const sel = selectedNewTemplateIds.includes(tpl.id);
-                        const plan = plans.find(p => p.id === ((org as any).plan?.id || (org.subscription as any)?.planId));
-                        const raw = (plan?.limits as any)?.templates;
-                        const max = !raw || raw === "All" || raw === "Unlimited" ? Infinity : parseInt(String(raw), 10);
-                        const dis = !sel && (assignedTemplates.length + selectedNewTemplateIds.length) >= max;
-                        return (
-                          <div key={tpl.id} onClick={() => !dis && setSelectedNewTemplateIds(prev => sel ? prev.filter(x => x !== tpl.id) : [...prev, tpl.id])} style={{ border: "1px solid", borderColor: sel ? "var(--brand)" : "var(--line)", borderRadius: 12, overflow: "hidden", cursor: dis ? "not-allowed" : "pointer", opacity: dis ? 0.5 : 1 }}>
-                            <div style={{ height: 90, background: tpl.thumbnail ? `url(${tpl.thumbnail}) center/cover` : "#eef1f6", position: "relative" }}>
-                              <span className={`m-1 inline-block rounded-full px-2 py-1 text-[10px] font-bold text-white ${sel ? "bg-indigo-600" : "bg-black/60"}`}>{sel ? "" : "Select"}</span>
-                              <button type="button" onClick={(e) => { e.stopPropagation(); setPreviewTpl(tpl); }} className="absolute right-1 top-1 rounded-full bg-white/90 p-1"><Icon name="eye" size={12} /></button>
-                            </div>
-                            <div style={{ padding: 8 }}>
-                              <div style={{ fontWeight: 700, fontSize: 12 }}>{tpl.name}</div>
-                              <div style={{ fontSize: 11, color: "var(--muted)" }}>{tpl.slug}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                </Modal>
-              ) : null}
-
               {previewTpl ? (
                 <Modal
                   open
@@ -1426,8 +1377,6 @@ export default function SuperAdminOrganisationDetailPage() {
                   description={`${previewTpl.slug} · ${previewTpl.category}`}
                   size="lg"
                   flush
-                  // Opened from inside the "Add templates" modal.
-                  containerClassName="z-[60]!"
                 >
                   <div style={{ height: 320, background: previewTpl.thumbnail ? `url(${previewTpl.thumbnail}) center/cover` : "#eef1f6" }} />
                 </Modal>

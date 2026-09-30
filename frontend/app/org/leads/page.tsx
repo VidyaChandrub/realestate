@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Reveal } from "@/components/superadmin/reveal";
 import { CountUp } from "@/components/superadmin/count-up";
 import { Icon } from "@/components/icons";
@@ -14,8 +14,9 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadDisplayName, leadDisplayPhone, leadDisplaySource } from "@/lib/lead-display";
-import { AddLeadModal } from "@/components/org/add-lead-modal";
-import { ImportLeadsModal } from "@/components/org/import-leads-modal";
+import { LEADS_FLASH_KEY } from "@/components/org/add-lead-form";
+import { useFlash } from "@/lib/flash";
+import { useToast } from "@/components/ui/toast";
 import { LeadStatusSelect } from "@/components/org/lead-status-select";
 import { LEAD_STAGE_ORDER, StageBadge, useLeadStages } from "@/lib/lead-stages";
 import "@/app/org/org.css";
@@ -56,8 +57,10 @@ export default function OrgLeadsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState(() => searchParams.get("assignedTo") ?? "");
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
-  const [addOpen, setAddOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+  // Success message from the Add lead page (the list reloads itself on mount).
+  useFlash(LEADS_FLASH_KEY, (flash) => toast({ title: flash.message, variant: "success" }));
 
   const load = useCallback(async () => {
     setError(null);
@@ -194,38 +197,16 @@ export default function OrgLeadsPage() {
 
         {admin || canAdd ? (
           <div className="lc-head-actions">
-            <button className="lc-btn-outline" type="button" onClick={() => setImportOpen(true)}>
+            <button className="lc-btn-outline" type="button" onClick={() => router.push("/org/leads/import")}>
               <Icon name="document" size={14} /> Import CSV
             </button>
-            <button className="lc-btn-primary" type="button" onClick={() => setAddOpen(true)}>
+            <button className="lc-btn-primary" type="button" onClick={() => router.push("/org/leads/new")}>
               <Icon name="plus" size={14} /> Add lead
             </button>
           </div>
         ) : null}
       </div>
 
-      {importOpen ? (
-        <ImportLeadsModal
-          open
-          onClose={() => setImportOpen(false)}
-          onImported={() => void load()}
-        />
-      ) : null}
-      <AddLeadModal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onCreated={(lead) => {
-          setLeads((prev) => (prev ? [lead, ...prev] : [lead]));
-          setListTotal((n) => n + 1);
-          setKpi((prev) => ({
-            ...prev,
-            total: prev.total + 1,
-            unassigned: lead.assignedTo ? prev.unassigned : prev.unassigned + 1,
-            new: lead.status === "new" ? prev.new + 1 : prev.new,
-            won: lead.status === "won" ? prev.won + 1 : prev.won,
-          }));
-        }}
-      />
 
       {/* Tabs Row matching Screenshot 1 */}
       <div className="lc-tabs-bar">

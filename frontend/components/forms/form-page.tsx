@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { Icon, type IconName } from "@/components/icons";
 import { PasswordInput } from "@/components/auth/password-input";
@@ -16,23 +17,47 @@ export function FormPage({
   title,
   subtitle,
   backHref,
+  onBack,
+  backDisabled,
   backLabel,
   children,
 }: {
   eyebrow: string;
   title: string;
-  subtitle: string;
-  backHref: string;
+  subtitle: React.ReactNode;
+  /** Route to go back to. Use `onBack` instead for an in-page form view. */
+  backHref?: string;
+  onBack?: () => void;
+  backDisabled?: boolean;
   backLabel: string;
   children: React.ReactNode;
 }) {
+  // A form shown in place of a list (same route) should start at the top,
+  // like a freshly opened page.
+  useEffect(() => {
+    if (onBack) window.scrollTo({ top: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
+  }, []);
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
         <div className={styles.headerMain}>
-          <Link href={backHref} className={styles.back} aria-label={backLabel}>
-            <Icon name="chevron-left" size={18} />
-          </Link>
+          {onBack ? (
+            <button
+              type="button"
+              className={styles.back}
+              aria-label={backLabel}
+              onClick={onBack}
+              disabled={backDisabled}
+            >
+              <Icon name="chevron-left" size={18} />
+            </button>
+          ) : (
+            <Link href={backHref ?? "/"} className={styles.back} aria-label={backLabel}>
+              <Icon name="chevron-left" size={18} />
+            </Link>
+          )}
           <div>
             <p className={styles.eyebrow}>{eyebrow}</p>
             <h1 className={styles.title}>{title}</h1>
@@ -59,8 +84,95 @@ export function FormGrid({ children }: { children: React.ReactNode }) {
   return <div className={styles.grid}>{children}</div>;
 }
 
-export function FormSection({ title }: { title: string }) {
-  return <div className={styles.section}>{title}</div>;
+export function FormSection({ title, actions }: { title: React.ReactNode; actions?: React.ReactNode }) {
+  if (!actions) return <div className={styles.section}>{title}</div>;
+  return (
+    <div className={`${styles.section} ${styles.sectionRow}`}>
+      <span>{title}</span>
+      <span className={styles.sectionActions}>{actions}</span>
+    </div>
+  );
+}
+
+/** Small secondary button for section-level actions (e.g. "Enable all"). */
+export function MiniButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button type="button" className={styles.mini} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+/** Grid wrapper for CheckCards / tiles — 2+ columns on desktop, 1 on phones. */
+export function CardGrid({ children }: { children: React.ReactNode }) {
+  return <div className={styles.cardGrid}>{children}</div>;
+}
+
+/** Checkbox rendered as a selectable card with a title and description. */
+export function CheckCard({
+  checked,
+  onChange,
+  title,
+  description,
+  status,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  /** Optional right-aligned state text, e.g. ACTIVE / OFF. */
+  status?: [on: string, off: string];
+}) {
+  return (
+    <label className={styles.checkCard} data-checked={checked || undefined}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span className={styles.checkBody}>
+        <span className={styles.checkHead}>
+          <span className={styles.checkTitle}>{title}</span>
+          {status ? <span className={styles.checkStatus}>{checked ? status[0] : status[1]}</span> : null}
+        </span>
+        {description ? <span className={styles.checkDesc}>{description}</span> : null}
+      </span>
+    </label>
+  );
+}
+
+/** Removable pill list (e.g. plan feature bullets). */
+export function TagList({
+  items,
+  onRemove,
+  empty,
+}: {
+  items: string[];
+  onRemove: (index: number) => void;
+  empty: React.ReactNode;
+}) {
+  if (items.length === 0) return <div className={styles.emptyNote}>{empty}</div>;
+  return (
+    <div className={styles.tags}>
+      {items.map((item, idx) => (
+        <span key={`${idx}-${item}`} className={styles.tag}>
+          <span className={styles.tagTick} aria-hidden="true">
+            ✓
+          </span>
+          {item}
+          <button type="button" className={styles.tagRemove} onClick={() => onRemove(idx)} aria-label={`Remove ${item}`}>
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Read-only highlighted info card (e.g. a fixed "Organisation scope"). */
+export function FormNote({ title, children }: { title: React.ReactNode; children?: React.ReactNode }) {
+  return (
+    <div className={styles.note}>
+      <div className={styles.noteTitle}>{title}</div>
+      {children ? <div className={styles.noteBody}>{children}</div> : null}
+    </div>
+  );
 }
 
 export function Field({
@@ -117,7 +229,11 @@ type InputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "className">
 
 export function TextInput({ icon, invalid, ...props }: InputProps) {
   return (
-    <div className={styles.control} data-invalid={invalid || undefined}>
+    <div
+      className={styles.control}
+      data-invalid={invalid || undefined}
+      data-disabled={props.readOnly || props.disabled || undefined}
+    >
       {icon ? (
         <span className={styles.lead} aria-hidden="true">
           <Icon name={icon} size={17} />
@@ -209,32 +325,49 @@ export function PasswordField({
 
 export function FormActions({
   cancelHref,
+  onCancel,
   busy,
   submitDisabled,
   submitLabel,
   busyLabel,
   submitIcon = "check",
+  onSubmit,
 }: {
-  cancelHref: string;
+  /** Route Cancel goes to. Use `onCancel` instead for an in-page form view. */
+  cancelHref?: string;
+  onCancel?: () => void;
   busy: boolean;
   submitDisabled?: boolean;
   submitLabel: string;
   busyLabel: string;
   submitIcon?: IconName;
+  /** Click handler for forms that don't submit through a <form>. */
+  onSubmit?: () => void;
 }) {
   return (
     <div className={styles.actions}>
-      <Link
-        href={cancelHref}
-        className={styles.btn}
-        aria-disabled={busy || undefined}
-        onClick={(e) => {
-          if (busy) e.preventDefault();
-        }}
+      {onCancel ? (
+        <button type="button" className={styles.btn} onClick={onCancel} disabled={busy}>
+          Cancel
+        </button>
+      ) : (
+        <Link
+          href={cancelHref ?? "/"}
+          className={styles.btn}
+          aria-disabled={busy || undefined}
+          onClick={(e) => {
+            if (busy) e.preventDefault();
+          }}
+        >
+          Cancel
+        </Link>
+      )}
+      <button
+        type={onSubmit ? "button" : "submit"}
+        onClick={onSubmit}
+        className={styles.btnPrimary}
+        disabled={busy || submitDisabled}
       >
-        Cancel
-      </Link>
-      <button type="submit" className={styles.btnPrimary} disabled={busy || submitDisabled}>
         <Icon name={submitIcon} size={16} />
         {busy ? busyLabel : submitLabel}
       </button>
