@@ -1,0 +1,404 @@
+/* Shared full-width create / edit form layout (org Users, Platform Team
+   members and roles). Every rule is scoped under .page so its specificity
+   (2 classes) beats the consoles' global element rules such as
+   `.org select` / `.superadmin textarea` (1 class + 1 element). */
+
+.page {
+  --fp-ink: #0f172a;
+  --fp-text: #334155;
+  --fp-muted: #64748b;
+  --fp-faint: #94a3b8;
+  --fp-line: #e2e8f0;
+  --fp-soft: #f8fafc;
+  --fp-brand: #2563eb;
+  --fp-brand-dark: #1d4ed8;
+  --fp-brand-ring: rgba(37, 99, 235, 0.14);
+  --fp-accent: #10b981;
+  --fp-danger: #dc2626;
+  --fp-danger-line: #fca5a5;
+
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 1px solid #eef2f6;
+  border-radius: 20px;
+  padding: clamp(16px, 3vw, 28px);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+  color: var(--fp-ink);
+}
+
+/* ---------- Header ---------- */
+.page .header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.page .headerMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+
+.page .back {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1px solid var(--fp-line);
+  background: #ffffff;
+  color: var(--fp-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.page .back:hover {
+  border-color: #cbd5e1;
+  background: var(--fp-soft);
+}
+
+.page .eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fp-accent);
+  margin: 0 0 4px;
+}
+
+.page .title {
+  margin: 0;
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--fp-ink);
+}
+
+.page .subtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--fp-muted);
+}
+
+/* ---------- Form panel ---------- */
+.page .panel {
+  border: 1px solid #eef2f6;
+  border-radius: 16px;
+  padding: clamp(16px, 3vw, 28px);
+  background: #ffffff;
+}
+
+.page .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  column-gap: 24px;
+}
+
+.page .section {
+  margin: 4px 0 14px;
+  padding-top: 18px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fp-muted);
+}
+
+.page .section:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.page .field {
+  margin-bottom: 20px;
+  min-width: 0;
+}
+
+.page .label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fp-ink);
+}
+
+.page .labelIcon {
+  color: var(--fp-text);
+  display: inline-flex;
+}
+
+.page .labelNote {
+  font-weight: 400;
+  color: var(--fp-faint);
+}
+
+.page .hint,
+.page .error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--fp-muted);
+}
+
+.page .error {
+  color: var(--fp-danger);
+}
+
+/* ---------- Controls ---------- */
+.page .control {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-height: 48px;
+  border: 1px solid var(--fp-line);
+  border-radius: 12px;
+  background: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.page .control:focus-within {
+  border-color: var(--fp-brand);
+  box-shadow: 0 0 0 4px var(--fp-brand-ring);
+}
+
+.page .control[data-invalid="true"] {
+  border-color: var(--fp-danger-line);
+}
+
+.page .control[data-disabled="true"] {
+  background: var(--fp-soft);
+}
+
+.page .lead {
+  display: flex;
+  align-items: center;
+  padding-left: 14px;
+  color: var(--fp-faint);
+  pointer-events: none;
+}
+
+.page .input,
+.page .select,
+.page .textarea {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--fp-ink);
+}
+
+.page .input::placeholder,
+.page .textarea::placeholder {
+  color: var(--fp-faint);
+}
+
+.page .select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+.page .select:disabled {
+  cursor: not-allowed;
+  color: var(--fp-muted);
+}
+
+.page .chevron {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--fp-muted);
+  pointer-events: none;
+  display: flex;
+}
+
+.page .textarea {
+  min-height: 104px;
+  resize: vertical;
+}
+
+/* Dial-code prefix on the mobile field. */
+.page .prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  background: #f1f5f9;
+  border-right: 1px solid var(--fp-line);
+  border-radius: 11px 0 0 11px;
+  color: var(--fp-text);
+  font-size: 14.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* PasswordInput renders its own wrapper div + eye toggle; let it fill. */
+.page .passwordSlot {
+  flex: 1;
+  min-width: 0;
+}
+
+.page .passwordSlot > div {
+  height: 100%;
+}
+
+.page .passwordSlot .input {
+  height: 100%;
+}
+
+/* ---------- Quick-start preset cards (role page) ---------- */
+.page .presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.page .preset {
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--fp-line);
+  background: #ffffff;
+  color: var(--fp-text);
+  font: inherit;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.page .preset:hover {
+  border-color: #cbd5e1;
+}
+
+.page .preset[aria-pressed="true"] {
+  border-color: var(--fp-brand);
+  background: #eff6ff;
+  color: var(--fp-ink);
+}
+
+.page .presetTitle {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.page .presetDesc {
+  font-size: 12.5px;
+  color: var(--fp-muted);
+}
+
+.page .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--fp-line);
+  background: var(--fp-soft);
+  color: var(--fp-muted);
+  font-size: 13.5px;
+  box-sizing: border-box;
+}
+
+/* ---------- Alert + actions ---------- */
+.page .alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.page .actions {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.page .btn,
+.page .btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  min-width: 120px;
+  padding: 0 22px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  box-sizing: border-box;
+}
+
+.page .btn {
+  border: 1px solid var(--fp-line);
+  background: #ffffff;
+  color: var(--fp-text);
+}
+
+.page .btn:hover {
+  background: var(--fp-soft);
+}
+
+.page .btnPrimary {
+  border: none;
+  background: var(--fp-brand);
+  color: #ffffff;
+  box-shadow: 0 6px 16px -6px rgba(37, 99, 235, 0.55);
+}
+
+.page .btnPrimary:hover:not(:disabled) {
+  background: var(--fp-brand-dark);
+}
+
+.page .btnPrimary:disabled,
+.page .btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  .page .btn,
+  .page .btnPrimary {
+    flex: 1 1 140px;
+  }
+}
