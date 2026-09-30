@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api";
@@ -15,9 +14,19 @@ import {
   validateEmail,
   validateMobile,
 } from "@/lib/contact-validation";
-import { PasswordInput } from "@/components/auth/password-input";
+import {
+  Field,
+  FormActions,
+  FormAlert,
+  FormGrid,
+  FormPage,
+  PasswordField,
+  PhoneInput,
+  SelectInput,
+  TextInput,
+  formPageStyles,
+} from "@/components/forms/form-page";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { Icon } from "@/components/icons";
 import type { CreateOrgUserInput, OrgUser, UpdateOrgUserInput } from "@/lib/types";
 
 // Shared by /org/users/new and /org/users/[id]/edit. A full page rather than
@@ -77,14 +86,6 @@ function validate(form: FormState): FieldErrors {
     errors.password = `Password must be at least ${PASSWORD_MIN} characters.`;
   }
   return errors;
-}
-
-function FieldError({ message }: { message?: string }) {
-  return message ? (
-    <div className="error" role="alert">
-      {message}
-    </div>
-  ) : null;
 }
 
 export function OrgUserForm({ user }: { user?: OrgUser }) {
@@ -243,62 +244,47 @@ export function OrgUserForm({ user }: { user?: OrgUser }) {
   }
 
   return (
-    <div className="usr-wrap">
-      <div className="usr-header">
-        <div className="usr-header-left">
-          <Link href={USERS_PATH} className="usr-form-back" aria-label="Back to Users">
-            <Icon name="chevron-left" size={18} />
-          </Link>
-          <div className="usr-header-content">
-            <div className="usr-eyebrow">TEAM · USERS</div>
-            <h1 className="usr-title">{isEdit ? "Edit user" : "Create user"}</h1>
-            <p className="usr-sub">
-              {isEdit ? "Update this person's profile, role, or password." : "Add a new team member to your organisation."}
-            </p>
-          </div>
-        </div>
-      </div>
+    <FormPage
+      eyebrow="Team · Users"
+      title={isEdit ? "Edit user" : "Create user"}
+      subtitle={isEdit ? "Update this person's profile, role, or password." : "Add a new team member to your organisation."}
+      backHref={USERS_PATH}
+      backLabel="Back to Users"
+    >
+      <form className={formPageStyles.panel} onSubmit={handleSubmit} noValidate>
+        <FormAlert message={formError} />
 
-      <form className="usr-form-card" onSubmit={handleSubmit} noValidate>
-        {formError ? (
-          <div className="form-alert" role="alert">
-            {formError}
-          </div>
-        ) : null}
-
-        <div className="usr-form-grid">
-          <div className="field">
-            <label htmlFor="ou-first">First name *</label>
-            <input
+        <FormGrid>
+          <Field htmlFor="ou-first" label="First name *" icon="profile" error={errors.firstName}>
+            <TextInput
               id="ou-first"
-              className={`inp${errors.firstName ? " invalid" : ""}`}
+              icon="profile"
+              placeholder="Enter first name"
               value={form.firstName}
               maxLength={NAME_MAX}
               autoComplete="given-name"
-              aria-invalid={!!errors.firstName}
+              invalid={!!errors.firstName}
               onChange={(e) => setField("firstName", e.target.value)}
             />
-            <FieldError message={errors.firstName} />
-          </div>
-          <div className="field">
-            <label htmlFor="ou-last">Last name *</label>
-            <input
+          </Field>
+          <Field htmlFor="ou-last" label="Last name *" icon="profile" error={errors.lastName}>
+            <TextInput
               id="ou-last"
-              className={`inp${errors.lastName ? " invalid" : ""}`}
+              icon="profile"
+              placeholder="Enter last name"
               value={form.lastName}
               maxLength={NAME_MAX}
               autoComplete="family-name"
-              aria-invalid={!!errors.lastName}
+              invalid={!!errors.lastName}
               onChange={(e) => setField("lastName", e.target.value)}
             />
-            <FieldError message={errors.lastName} />
-          </div>
-        </div>
+          </Field>
+        </FormGrid>
 
-        <div className="field">
-          <label htmlFor="ou-email">Work email *</label>
-          <input
+        <Field htmlFor="ou-email" label="Work email *" icon="mail" error={errors.email}>
+          <TextInput
             id="ou-email"
+            icon="mail"
             type="email"
             inputMode="email"
             autoComplete="email"
@@ -306,22 +292,18 @@ export function OrgUserForm({ user }: { user?: OrgUser }) {
             spellCheck={false}
             maxLength={EMAIL_MAX}
             placeholder="name@company.com"
-            className={`inp${errors.email ? " invalid" : ""}`}
             value={form.email}
-            aria-invalid={!!errors.email}
+            invalid={!!errors.email}
             onChange={(e) => setField("email", e.target.value.replace(/\s/g, ""))}
           />
-          <FieldError message={errors.email} />
-        </div>
+        </Field>
 
-        <div className="usr-form-grid">
-          <div className="field">
-            <label htmlFor="ou-country">Country *</label>
-            <select
+        <FormGrid>
+          <Field htmlFor="ou-country" label="Country *" icon="globe" error={errors.country}>
+            <SelectInput
               id="ou-country"
-              className={errors.country ? "invalid" : undefined}
               value={form.country}
-              aria-invalid={!!errors.country}
+              invalid={!!errors.country}
               onChange={(e) => {
                 setField("country", e.target.value);
                 // A number valid for one country is rarely valid for another;
@@ -335,47 +317,39 @@ export function OrgUserForm({ user }: { user?: OrgUser }) {
                   {c} ({callingCodeForCountry(c) ?? "—"})
                 </option>
               ))}
-            </select>
-            <FieldError message={errors.country} />
-          </div>
-          <div className="field">
-            <label htmlFor="ou-phone">Mobile number *</label>
-            <div className={`usr-phone${errors.phoneNumber ? " invalid" : ""}`}>
-              <span className="usr-phone-cc" aria-hidden="true">
-                {callingCode ?? "+--"}
-              </span>
-              <input
-                id="ou-phone"
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel-national"
-                maxLength={MOBILE_MAX_DIGITS}
-                placeholder="9876543210"
-                value={form.phoneNumber}
-                aria-invalid={!!errors.phoneNumber}
-                aria-describedby="ou-phone-hint"
-                onChange={(e) => setField("phoneNumber", sanitizeMobileDigits(e.target.value))}
-              />
-            </div>
-            {errors.phoneNumber ? (
-              <FieldError message={errors.phoneNumber} />
-            ) : (
-              <div className="hint" id="ou-phone-hint">
-                Digits only, up to {MOBILE_MAX_DIGITS}. The country code is added automatically.
-              </div>
-            )}
-          </div>
-        </div>
+            </SelectInput>
+          </Field>
+          <Field
+            htmlFor="ou-phone"
+            label="Mobile number *"
+            icon="phone"
+            error={errors.phoneNumber}
+            hintId="ou-phone-hint"
+            hint={`Digits only, up to ${MOBILE_MAX_DIGITS}. The country code is added automatically.`}
+          >
+            <PhoneInput
+              id="ou-phone"
+              prefix={callingCode ?? "+--"}
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel-national"
+              maxLength={MOBILE_MAX_DIGITS}
+              placeholder="9876543210"
+              value={form.phoneNumber}
+              invalid={!!errors.phoneNumber}
+              aria-describedby="ou-phone-hint"
+              onChange={(e) => setField("phoneNumber", sanitizeMobileDigits(e.target.value))}
+            />
+          </Field>
+        </FormGrid>
 
-        <div className="usr-form-grid">
-          <div className="field">
-            <label htmlFor="ou-role">Organisation role *</label>
-            <select
+        <FormGrid>
+          <Field htmlFor="ou-role" label="Organisation role *" icon="shield" error={errors.role}>
+            <SelectInput
               id="ou-role"
-              className={errors.role ? "invalid" : undefined}
               value={form.role}
               disabled={rolesLoading}
-              aria-invalid={!!errors.role}
+              invalid={!!errors.role}
               onChange={(e) => setField("role", e.target.value)}
             >
               {rolesLoading ? <option value="">Loading roles…</option> : null}
@@ -384,37 +358,33 @@ export function OrgUserForm({ user }: { user?: OrgUser }) {
                   {r.label}
                 </option>
               ))}
-            </select>
-            <FieldError message={errors.role} />
-          </div>
-          <div className="field">
-            <label htmlFor="ou-password">{isEdit ? "New password (optional)" : "Password (optional)"}</label>
-            <PasswordInput
-              id="ou-password"
-              autoComplete="new-password"
-              placeholder={isEdit ? "Leave blank to keep current" : "Leave blank to email temp password"}
-              value={form.password}
-              onChange={(e) => setField("password", e.target.value)}
-            />
-            <FieldError message={errors.password} />
-          </div>
-        </div>
-
-        <div className="usr-form-actions">
-          <Link
-            href={USERS_PATH}
-            className="btn btn-ghost"
-            aria-disabled={submitting}
-            onClick={(e) => {
-              if (submitting) e.preventDefault();
-            }}
+            </SelectInput>
+          </Field>
+          <Field
+            htmlFor="ou-password"
+            label={isEdit ? "New password" : "Password"}
+            note="(optional)"
+            icon="lock"
+            error={errors.password}
           >
-            Cancel
-          </Link>
-          <button type="submit" className="btn btn-primary" disabled={submitting || rolesLoading}>
-            {submitting ? "Saving…" : isEdit ? "Save changes" : "Create user"}
-          </button>
-        </div>
+            <PasswordField
+              id="ou-password"
+              value={form.password}
+              invalid={!!errors.password}
+              onChange={(e) => setField("password", e.target.value)}
+              placeholder={isEdit ? "Leave blank to keep current" : "Leave blank to email temp password"}
+            />
+          </Field>
+        </FormGrid>
+
+        <FormActions
+          cancelHref={USERS_PATH}
+          busy={submitting}
+          submitDisabled={rolesLoading}
+          busyLabel="Saving…"
+          submitLabel={isEdit ? "Save changes" : "Create user"}
+          submitIcon={isEdit ? "check" : "user-plus"}
+        />
       </form>
 
       <ConfirmModal
@@ -430,6 +400,6 @@ export function OrgUserForm({ user }: { user?: OrgUser }) {
           void save();
         }}
       />
-    </div>
+    </FormPage>
   );
 }

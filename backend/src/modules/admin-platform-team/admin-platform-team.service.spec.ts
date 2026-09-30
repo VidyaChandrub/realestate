@@ -202,8 +202,31 @@ describe('AdminPlatformTeamService.update — disable / re-enable', () => {
 
     const data = txn.user.update.mock.calls[0][0].data;
     expect(data.tokenInvalidBefore).toBeUndefined();
+    expect(data.passwordHash).toBeUndefined();
+    expect(data.mustChangePassword).toBeUndefined();
     expect(txn.refreshToken.updateMany).not.toHaveBeenCalled();
     expect(email.sendUserAccountStatusEmail).not.toHaveBeenCalled();
+    expect(email.sendInviteEmail).not.toHaveBeenCalled();
+  });
+
+  it('on a password change: forces a change at next login, ends sessions and emails the new password', async () => {
+    const { service, prisma, txn, email } = makeService();
+    prisma.user.findFirst.mockResolvedValue(
+      memberRow({ userRoles: [{ role: { key: 'ops', name: 'Ops', scope: 'platform' } }] }),
+    );
+
+    await service.update('m1', 'actor-1', { password: 'NewTemp#123' } as any);
+
+    const data = txn.user.update.mock.calls[0][0].data;
+    expect(String(data.passwordHash)).toContain('hashed:');
+    expect(data.mustChangePassword).toBe(true);
+    expect(data.tokenInvalidBefore).toBeInstanceOf(Date);
+    expect(txn.refreshToken.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 'm1', revokedAt: null } }),
+    );
+    expect(email.sendInviteEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'member@ipixxel.test', tempPassword: 'NewTemp#123' }),
+    );
   });
 
   it('does not email when the status is unchanged', async () => {
