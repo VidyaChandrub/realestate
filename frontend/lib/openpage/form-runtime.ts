@@ -11,7 +11,42 @@ export function collectUtmParams(search = typeof window !== "undefined" ? window
     const v = params.get(key);
     if (v) out[key] = v;
   }
+  if (typeof window !== "undefined") {
+    try {
+      const stored = window.sessionStorage.getItem("crm.attribution.v1");
+      const prev = stored ? (JSON.parse(stored) as Record<string, string>) : {};
+      const merged = { ...prev, ...out };
+      if (document.referrer && !merged.referrer) {
+        merged.referrer = document.referrer;
+      }
+      if (window.location.href) {
+        merged.landing_page_url = merged.landing_page_url || window.location.href;
+      }
+      window.sessionStorage.setItem("crm.attribution.v1", JSON.stringify(merged));
+      return merged;
+    } catch {
+      /* ignore quota */
+    }
+  }
   return out;
+}
+
+/** Read persisted attribution for form submit (UTM + referrer). */
+export function getStoredAttribution(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const stored = window.sessionStorage.getItem("crm.attribution.v1");
+    const prev = stored ? (JSON.parse(stored) as Record<string, string>) : {};
+    const live = collectUtmParams(window.location.search);
+    return {
+      ...prev,
+      ...live,
+      ...(document.referrer ? { referrer: document.referrer } : {}),
+      landing_page_url: window.location.href,
+    };
+  } catch {
+    return collectUtmParams();
+  }
 }
 
 export function queryFillValues(fields: FormLeadField[], search = typeof window !== "undefined" ? window.location.search : ""): Record<string, string> {

@@ -1,5 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import {
+  DEFAULT_ATTRIBUTION_LABELS,
+  DEFAULT_MARKETING_PLATFORMS,
+} from '../src/common/utils/lead-attribution.util';
 
 // Place this at: prisma/seed.ts
 // Run with: npx prisma db seed
@@ -9,7 +13,8 @@ import * as bcrypt from 'bcrypt';
 //   2. Super Admin account (from env, optional)
 //   3. A demo organisation + org admin (no extra sales/users roster)
 //   4. Demo landing pages (empty until published content is added)
-//   5. Two demo CRM leads for Lead Center
+//   5. Demo CRM leads for Lead Center (website + Meta + Google attributed)
+//   6. Marketing hub dummy data (connections, campaigns, sync logs, metrics)
 //
 // No demo Project is seeded — project types are fully dynamic now (see
 // ProjectTypeDef), so a hardcoded project has no template to match. Create
@@ -18,6 +23,9 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 const SEED_USER_PASSWORD = process.env.SEED_USER_PASSWORD ?? 'Welcome@123';
+const DEMO_META_PAGE_ID = 'demo_page_skylinedev';
+const DEMO_GOOGLE_ACCOUNT_ID = 'demo_google_ads_skylinedev';
+const DEMO_TOKEN = 'demo_seed_token_not_for_production';
 
 interface AgentSeed {
   firstName: string;
@@ -308,6 +316,697 @@ async function seedDemoOrg() {
   console.log(
     `Lead Center seeded: ${demoLeads.length} demo leads for ${org.name} (${createdLeads} new).`,
   );
+
+  return { orgId: org.id, managerId, pageIds };
+}
+
+/** Attribution labels + Connected Apps + campaigns + Meta/Google demo leads. */
+async function seedMarketingDemo(ctx?: {
+  orgId: string;
+  managerId: string;
+  pageIds: Record<string, string>;
+}) {
+  const org =
+    ctx ??
+    (await (async () => {
+      const o = await prisma.organisation.findUnique({
+        where: { slug: 'skylinedev' },
+      });
+      if (!o) return null;
+      const admin = await prisma.user.findUnique({
+        where: { email: 'rohan@skylinedev.in' },
+      });
+      const pages = await prisma.landingPage.findMany({
+        where: { orgId: o.id },
+        select: { id: true, slug: true },
+      });
+      return {
+        orgId: o.id,
+        managerId: admin?.id ?? '',
+        pageIds: Object.fromEntries(pages.map((p) => [p.slug, p.id])),
+      };
+    })());
+  if (!org) {
+    console.warn('Marketing demo seed skipped — demo org not found.');
+    return;
+  }
+
+  const { orgId, managerId, pageIds } = org;
+  const now = new Date();
+
+  for (const row of DEFAULT_ATTRIBUTION_LABELS) {
+    await prisma.platformAttributionLabel.upsert({
+      where: { key: row.key },
+      create: {
+        key: row.key,
+        label: row.label,
+        sortOrder: row.sortOrder,
+        enabled: row.enabled,
+      },
+      update: {
+        label: row.label,
+        sortOrder: row.sortOrder,
+        enabled: row.enabled,
+      },
+    });
+  }
+
+  for (const row of DEFAULT_MARKETING_PLATFORMS) {
+    await prisma.marketingPlatform.upsert({
+      where: { key: row.key },
+      create: {
+        key: row.key,
+        name: row.name,
+        description: row.description,
+        sortOrder: row.sortOrder,
+        enabled: row.enabled,
+        supportsOAuth: row.supportsOAuth,
+        supportsWebhook: row.supportsWebhook,
+      },
+      update: {
+        name: row.name,
+        description: row.description,
+        sortOrder: row.sortOrder,
+        enabled: row.enabled,
+        supportsOAuth: row.supportsOAuth,
+        supportsWebhook: row.supportsWebhook,
+      },
+    });
+  }
+
+  await prisma.metaPageConnection.upsert({
+    where: {
+      orgId_pageId: { orgId, pageId: DEMO_META_PAGE_ID },
+    },
+    create: {
+      orgId,
+      pageId: DEMO_META_PAGE_ID,
+      pageName: 'Skyline Developers (Demo Page)',
+      accessToken: DEMO_TOKEN,
+      connectedBy: managerId || null,
+    },
+    update: {
+      pageName: 'Skyline Developers (Demo Page)',
+      accessToken: DEMO_TOKEN,
+      connectedBy: managerId || null,
+    },
+  });
+
+  const metaConn = await prisma.marketingConnection.upsert({
+    where: {
+      orgId_platformKey_externalAccountId: {
+        orgId,
+        platformKey: 'meta',
+        externalAccountId: DEMO_META_PAGE_ID,
+      },
+    },
+    create: {
+      orgId,
+      platformKey: 'meta',
+      status: 'connected',
+      externalAccountId: DEMO_META_PAGE_ID,
+      externalAccountName: 'Skyline Developers (Demo Page)',
+      accessToken: DEMO_TOKEN,
+      connectedBy: managerId || null,
+      lastSyncAt: now,
+      metadata: { demo: true, seed: true, via: 'prisma_seed' },
+    },
+    update: {
+      status: 'connected',
+      externalAccountName: 'Skyline Developers (Demo Page)',
+      accessToken: DEMO_TOKEN,
+      lastSyncAt: now,
+      lastError: null,
+      metadata: { demo: true, seed: true, via: 'prisma_seed' },
+    },
+  });
+
+  for (const platformKey of ['instagram', 'whatsapp'] as const) {
+    await prisma.marketingConnection.upsert({
+      where: {
+        orgId_platformKey_externalAccountId: {
+          orgId,
+          platformKey,
+          externalAccountId: DEMO_META_PAGE_ID,
+        },
+      },
+      create: {
+        orgId,
+        platformKey,
+        status: 'connected',
+        externalAccountId: DEMO_META_PAGE_ID,
+        externalAccountName:
+          platformKey === 'instagram'
+            ? 'Skyline Instagram (Demo)'
+            : 'Skyline WhatsApp Ads (Demo)',
+        accessToken: DEMO_TOKEN,
+        connectedBy: managerId || null,
+        lastSyncAt: now,
+        metadata: { demo: true, seed: true, via: 'prisma_seed', mirroredFrom: 'meta' },
+      },
+      update: {
+        status: 'connected',
+        lastSyncAt: now,
+        lastError: null,
+        metadata: { demo: true, seed: true, via: 'prisma_seed', mirroredFrom: 'meta' },
+      },
+    });
+  }
+
+  const googleConn = await prisma.marketingConnection.upsert({
+    where: {
+      orgId_platformKey_externalAccountId: {
+        orgId,
+        platformKey: 'google_ads',
+        externalAccountId: DEMO_GOOGLE_ACCOUNT_ID,
+      },
+    },
+    create: {
+      orgId,
+      platformKey: 'google_ads',
+      status: 'connected',
+      externalAccountId: DEMO_GOOGLE_ACCOUNT_ID,
+      externalAccountName: 'Skyline Google Ads (Demo)',
+      accessToken: DEMO_TOKEN,
+      connectedBy: managerId || null,
+      lastSyncAt: now,
+      metadata: { demo: true, seed: true, via: 'prisma_seed' },
+    },
+    update: {
+      status: 'connected',
+      lastSyncAt: now,
+      lastError: null,
+      metadata: { demo: true, seed: true, via: 'prisma_seed' },
+    },
+  });
+
+  const fbCampaign = await prisma.marketingCampaign.upsert({
+    where: {
+      orgId_platformKey_externalId: {
+        orgId,
+        platformKey: 'meta',
+        externalId: 'demo_fb_campaign_palm',
+      },
+    },
+    create: {
+      orgId,
+      connectionId: metaConn.id,
+      platformKey: 'meta',
+      externalId: 'demo_fb_campaign_palm',
+      name: 'Palm Residency — Lead Ads',
+      status: 'ACTIVE',
+      spend: new Prisma.Decimal('42850.00'),
+      impressions: BigInt(312400),
+      clicks: BigInt(8420),
+      leadsCount: 3,
+      syncedAt: now,
+      metadata: { demo: true },
+    },
+    update: {
+      connectionId: metaConn.id,
+      name: 'Palm Residency — Lead Ads',
+      status: 'ACTIVE',
+      spend: new Prisma.Decimal('42850.00'),
+      impressions: BigInt(312400),
+      clicks: BigInt(8420),
+      leadsCount: 3,
+      syncedAt: now,
+      metadata: { demo: true },
+    },
+  });
+
+  const fbAdSet = await prisma.marketingAdSet.upsert({
+    where: {
+      campaignId_externalId: {
+        campaignId: fbCampaign.id,
+        externalId: 'demo_fb_adset_mumbai',
+      },
+    },
+    create: {
+      orgId,
+      campaignId: fbCampaign.id,
+      externalId: 'demo_fb_adset_mumbai',
+      name: 'Mumbai · 25–45 · Home intent',
+      status: 'ACTIVE',
+      spend: new Prisma.Decimal('28100.00'),
+      impressions: BigInt(198200),
+      clicks: BigInt(5210),
+      metadata: { demo: true },
+    },
+    update: {
+      name: 'Mumbai · 25–45 · Home intent',
+      status: 'ACTIVE',
+      spend: new Prisma.Decimal('28100.00'),
+      impressions: BigInt(198200),
+      clicks: BigInt(5210),
+      metadata: { demo: true },
+    },
+  });
+
+  await prisma.marketingAd.upsert({
+    where: {
+      adSetId_externalId: {
+        adSetId: fbAdSet.id,
+        externalId: 'demo_fb_ad_carousel',
+      },
+    },
+    create: {
+      orgId,
+      adSetId: fbAdSet.id,
+      externalId: 'demo_fb_ad_carousel',
+      name: '3 BHK carousel — Instant Form',
+      status: 'ACTIVE',
+      spend: new Prisma.Decimal('15420.00'),
+      impressions: BigInt(112300),
+      clicks: BigInt(2980),
+      metadata: { demo: true },
+    },
+    update: {
+      name: '3 BHK carousel — Instant Form',
+      status: 'ACTIVE',
+      spend: new Prisma.Decimal('15420.00'),
+      impressions: BigInt(112300),
+      clicks: BigInt(2980),
+      metadata: { demo: true },
+    },
+  });
+
+  const gCampaign = await prisma.marketingCampaign.upsert({
+    where: {
+      orgId_platformKey_externalId: {
+        orgId,
+        platformKey: 'google_ads',
+        externalId: 'demo_gads_campaign_search',
+      },
+    },
+    create: {
+      orgId,
+      connectionId: googleConn.id,
+      platformKey: 'google_ads',
+      externalId: 'demo_gads_campaign_search',
+      name: 'Green Vista — Search',
+      status: 'ENABLED',
+      spend: new Prisma.Decimal('18640.50'),
+      impressions: BigInt(89400),
+      clicks: BigInt(3120),
+      leadsCount: 2,
+      syncedAt: now,
+      metadata: { demo: true },
+    },
+    update: {
+      connectionId: googleConn.id,
+      name: 'Green Vista — Search',
+      status: 'ENABLED',
+      spend: new Prisma.Decimal('18640.50'),
+      impressions: BigInt(89400),
+      clicks: BigInt(3120),
+      leadsCount: 2,
+      syncedAt: now,
+      metadata: { demo: true },
+    },
+  });
+
+  await prisma.marketingAdSet.upsert({
+    where: {
+      campaignId_externalId: {
+        campaignId: gCampaign.id,
+        externalId: 'demo_gads_adgroup_brand',
+      },
+    },
+    create: {
+      orgId,
+      campaignId: gCampaign.id,
+      externalId: 'demo_gads_adgroup_brand',
+      name: 'Brand + Project keywords',
+      status: 'ENABLED',
+      spend: new Prisma.Decimal('18640.50'),
+      impressions: BigInt(89400),
+      clicks: BigInt(3120),
+      metadata: { demo: true },
+    },
+    update: {
+      name: 'Brand + Project keywords',
+      status: 'ENABLED',
+      spend: new Prisma.Decimal('18640.50'),
+      impressions: BigInt(89400),
+      clicks: BigInt(3120),
+      metadata: { demo: true },
+    },
+  });
+
+  for (let i = 0; i < 7; i++) {
+    const day = new Date();
+    day.setUTCHours(0, 0, 0, 0);
+    day.setUTCDate(day.getUTCDate() - i);
+    const spend = 4200 + i * 380;
+    const clicks = 180 + i * 22;
+    const impressions = 12000 + i * 900;
+    const leads = i % 3 === 0 ? 1 : 0;
+    await prisma.marketingMetricSnapshot.upsert({
+      where: {
+        orgId_platformKey_date: {
+          orgId,
+          platformKey: 'meta',
+          date: day,
+        },
+      },
+      create: {
+        orgId,
+        platformKey: 'meta',
+        date: day,
+        spend: new Prisma.Decimal(spend.toFixed(2)),
+        impressions: BigInt(impressions),
+        clicks: BigInt(clicks),
+        leadsCount: leads,
+        metadata: { demo: true },
+      },
+      update: {
+        spend: new Prisma.Decimal(spend.toFixed(2)),
+        impressions: BigInt(impressions),
+        clicks: BigInt(clicks),
+        leadsCount: leads,
+        metadata: { demo: true },
+      },
+    });
+    await prisma.marketingMetricSnapshot.upsert({
+      where: {
+        orgId_platformKey_date: {
+          orgId,
+          platformKey: 'google_ads',
+          date: day,
+        },
+      },
+      create: {
+        orgId,
+        platformKey: 'google_ads',
+        date: day,
+        spend: new Prisma.Decimal((spend * 0.45).toFixed(2)),
+        impressions: BigInt(Math.round(impressions * 0.35)),
+        clicks: BigInt(Math.round(clicks * 0.4)),
+        leadsCount: i % 4 === 0 ? 1 : 0,
+        metadata: { demo: true },
+      },
+      update: {
+        spend: new Prisma.Decimal((spend * 0.45).toFixed(2)),
+        impressions: BigInt(Math.round(impressions * 0.35)),
+        clicks: BigInt(Math.round(clicks * 0.4)),
+        leadsCount: i % 4 === 0 ? 1 : 0,
+        metadata: { demo: true },
+      },
+    });
+  }
+
+  const existingLogs = await prisma.marketingSyncLog.count({
+    where: { orgId, message: { contains: '[demo seed]' } },
+  });
+  if (existingLogs === 0) {
+    await prisma.marketingSyncLog.createMany({
+      data: [
+        {
+          orgId,
+          connectionId: metaConn.id,
+          platformKey: 'meta',
+          direction: 'inbound',
+          status: 'success',
+          message: '[demo seed] Connected Facebook Page via seed',
+          detail: { demo: true },
+        },
+        {
+          orgId,
+          connectionId: metaConn.id,
+          platformKey: 'meta',
+          direction: 'inbound',
+          status: 'success',
+          message: '[demo seed] Imported 3 Meta Lead Ad submissions',
+          detail: { demo: true, imported: 3 },
+        },
+        {
+          orgId,
+          connectionId: googleConn.id,
+          platformKey: 'google_ads',
+          direction: 'inbound',
+          status: 'success',
+          message: '[demo seed] Google Ads account linked (demo)',
+          detail: { demo: true },
+        },
+        {
+          orgId,
+          connectionId: metaConn.id,
+          platformKey: 'instagram',
+          direction: 'inbound',
+          status: 'success',
+          message: '[demo seed] Instagram connected via Meta Page mirror',
+          detail: { demo: true },
+        },
+      ],
+    });
+  }
+
+  const attributedLeads: Array<{
+    email: string;
+    status: 'new' | 'contacted' | 'follow_up';
+    formName: string;
+    landingPageId: string | null;
+    source: string;
+    platform: string;
+    medium: string;
+    campaign: string;
+    campaignId: string;
+    adSet: string;
+    adSetId: string;
+    ad: string;
+    adId: string;
+    utmSource: string;
+    utmMedium: string;
+    utmCampaign: string;
+    firstTouchSource: string;
+    lastTouchSource: string;
+    metaLeadgenId?: string;
+    metaFormId?: string;
+    metaPageId?: string;
+    fbclid?: string;
+    gclid?: string;
+    landingPageUrl?: string;
+    data: Record<string, string>;
+  }> = [
+    {
+      email: 'priya.nair.demo@example.com',
+      status: 'new',
+      formName: 'Meta Lead Form demo_form_palm',
+      landingPageId: pageIds['palm-residency'] ?? null,
+      source: 'Facebook',
+      platform: 'meta',
+      medium: 'Paid Social',
+      campaign: 'Palm Residency — Lead Ads',
+      campaignId: 'demo_fb_campaign_palm',
+      adSet: 'Mumbai · 25–45 · Home intent',
+      adSetId: 'demo_fb_adset_mumbai',
+      ad: '3 BHK carousel — Instant Form',
+      adId: 'demo_fb_ad_carousel',
+      utmSource: 'Facebook',
+      utmMedium: 'Paid',
+      utmCampaign: 'Palm Residency — Lead Ads',
+      firstTouchSource: 'Facebook',
+      lastTouchSource: 'Facebook',
+      metaLeadgenId: 'demo_leadgen_priya_001',
+      metaFormId: 'demo_form_palm',
+      metaPageId: DEMO_META_PAGE_ID,
+      fbclid: 'demo_fbclid_priya',
+      data: {
+        fullName: 'Priya Nair',
+        name: 'Priya Nair',
+        phone: '+91 98765 44001',
+        phoneNumber: '+91 98765 44001',
+        email: 'priya.nair.demo@example.com',
+        city: 'Mumbai',
+      },
+    },
+    {
+      email: 'arjun.kapoor.demo@example.com',
+      status: 'contacted',
+      formName: 'Meta Lead Form demo_form_palm',
+      landingPageId: pageIds['palm-residency'] ?? null,
+      source: 'Facebook',
+      platform: 'meta',
+      medium: 'Paid Social',
+      campaign: 'Palm Residency — Lead Ads',
+      campaignId: 'demo_fb_campaign_palm',
+      adSet: 'Mumbai · 25–45 · Home intent',
+      adSetId: 'demo_fb_adset_mumbai',
+      ad: '3 BHK carousel — Instant Form',
+      adId: 'demo_fb_ad_carousel',
+      utmSource: 'Facebook',
+      utmMedium: 'Paid',
+      utmCampaign: 'Palm Residency — Lead Ads',
+      firstTouchSource: 'Facebook',
+      lastTouchSource: 'Facebook',
+      metaLeadgenId: 'demo_leadgen_arjun_002',
+      metaFormId: 'demo_form_palm',
+      metaPageId: DEMO_META_PAGE_ID,
+      data: {
+        fullName: 'Arjun Kapoor',
+        name: 'Arjun Kapoor',
+        phone: '+91 98765 44002',
+        phoneNumber: '+91 98765 44002',
+        email: 'arjun.kapoor.demo@example.com',
+        city: 'Thane',
+      },
+    },
+    {
+      email: 'meera.joshi.demo@example.com',
+      status: 'follow_up',
+      formName: 'Meta Lead Form demo_form_palm',
+      landingPageId: pageIds['palm-residency'] ?? null,
+      source: 'Facebook',
+      platform: 'meta',
+      medium: 'Paid Social',
+      campaign: 'Palm Residency — Lead Ads',
+      campaignId: 'demo_fb_campaign_palm',
+      adSet: 'Mumbai · 25–45 · Home intent',
+      adSetId: 'demo_fb_adset_mumbai',
+      ad: '3 BHK carousel — Instant Form',
+      adId: 'demo_fb_ad_carousel',
+      utmSource: 'Facebook',
+      utmMedium: 'Paid',
+      utmCampaign: 'Palm Residency — Lead Ads',
+      firstTouchSource: 'Facebook',
+      lastTouchSource: 'Facebook',
+      metaLeadgenId: 'demo_leadgen_meera_003',
+      metaFormId: 'demo_form_palm',
+      metaPageId: DEMO_META_PAGE_ID,
+      data: {
+        fullName: 'Meera Joshi',
+        name: 'Meera Joshi',
+        phone: '+91 98765 44003',
+        phoneNumber: '+91 98765 44003',
+        email: 'meera.joshi.demo@example.com',
+        city: 'Navi Mumbai',
+      },
+    },
+    {
+      email: 'sahil.khan.demo@example.com',
+      status: 'new',
+      formName: 'Green Vista enquiry',
+      landingPageId: pageIds['green-vista'] ?? null,
+      source: 'Google Ads',
+      platform: 'google_ads',
+      medium: 'Paid Search',
+      campaign: 'Green Vista — Search',
+      campaignId: 'demo_gads_campaign_search',
+      adSet: 'Brand + Project keywords',
+      adSetId: 'demo_gads_adgroup_brand',
+      ad: 'Search ad — 2 & 3 BHK',
+      adId: 'demo_gads_ad_rsa',
+      utmSource: 'google',
+      utmMedium: 'cpc',
+      utmCampaign: 'green-vista-search',
+      firstTouchSource: 'Google Ads',
+      lastTouchSource: 'Google Ads',
+      gclid: 'demo_gclid_sahil',
+      landingPageUrl: 'https://skylinedev.example/green-vista?utm_source=google',
+      data: {
+        fullName: 'Sahil Khan',
+        name: 'Sahil Khan',
+        phone: '+91 98765 44004',
+        phoneNumber: '+91 98765 44004',
+        email: 'sahil.khan.demo@example.com',
+        city: 'Pune',
+      },
+    },
+    {
+      email: 'neha.shah.demo@example.com',
+      status: 'contacted',
+      formName: 'Website form',
+      landingPageId: pageIds['green-vista'] ?? null,
+      source: 'Website',
+      platform: 'website',
+      medium: 'Organic',
+      campaign: 'Direct / organic',
+      campaignId: '',
+      adSet: '',
+      adSetId: '',
+      ad: '',
+      adId: '',
+      utmSource: 'newsletter',
+      utmMedium: 'email',
+      utmCampaign: 'march-launch',
+      firstTouchSource: 'Website',
+      lastTouchSource: 'Website',
+      landingPageUrl: 'https://skylinedev.example/green-vista',
+      data: {
+        fullName: 'Neha Shah',
+        name: 'Neha Shah',
+        phone: '+91 98765 44005',
+        phoneNumber: '+91 98765 44005',
+        email: 'neha.shah.demo@example.com',
+        city: 'Mumbai',
+      },
+    },
+  ];
+
+  let createdAttributed = 0;
+  for (const demo of attributedLeads) {
+    const existing = demo.metaLeadgenId
+      ? await prisma.lead.findUnique({
+          where: { metaLeadgenId: demo.metaLeadgenId },
+          select: { id: true },
+        })
+      : await prisma.lead.findFirst({
+          where: {
+            orgId,
+            data: { path: ['email'], equals: demo.email },
+          },
+          select: { id: true },
+        });
+    if (existing) continue;
+
+    const lead = await prisma.lead.create({
+      data: {
+        orgId,
+        landingPageId: demo.landingPageId,
+        formName: demo.formName,
+        source: demo.source,
+        platform: demo.platform,
+        medium: demo.medium,
+        campaign: demo.campaign || null,
+        campaignId: demo.campaignId || null,
+        adSet: demo.adSet || null,
+        adSetId: demo.adSetId || null,
+        ad: demo.ad || null,
+        adId: demo.adId || null,
+        utmSource: demo.utmSource || null,
+        utmMedium: demo.utmMedium || null,
+        utmCampaign: demo.utmCampaign || null,
+        firstTouchSource: demo.firstTouchSource || null,
+        lastTouchSource: demo.lastTouchSource || null,
+        landingPageUrl: demo.landingPageUrl ?? null,
+        fbclid: demo.fbclid ?? null,
+        gclid: demo.gclid ?? null,
+        metaLeadgenId: demo.metaLeadgenId ?? null,
+        metaFormId: demo.metaFormId ?? null,
+        metaPageId: demo.metaPageId ?? null,
+        status: demo.status,
+        assignedToId: managerId || null,
+        data: demo.data,
+        configurations: [],
+        tags: ['demo', 'marketing-seed'],
+      },
+    });
+    await prisma.activityEvent.create({
+      data: {
+        orgId,
+        agentId: managerId || null,
+        leadId: lead.id,
+        type: 'status_updated',
+        text: `Demo ${demo.platform} lead seeded for ${demo.data.fullName}`,
+      },
+    });
+    createdAttributed += 1;
+  }
+
+  console.log(
+    `Marketing hub seeded for demo org: connections, campaigns, metrics, sync logs, ${createdAttributed} attributed leads.`,
+  );
 }
 
 async function seedEmailTables() {
@@ -462,7 +1161,8 @@ async function seedBasicPlan() {
 async function main() {
   await seedRoles();
   await seedSuperAdmin();
-  await seedDemoOrg();
+  const demo = await seedDemoOrg();
+  await seedMarketingDemo(demo);
   await seedEmailTables();
   await seedDemoPlanAndSubscription();
   await seedBasicPlan();

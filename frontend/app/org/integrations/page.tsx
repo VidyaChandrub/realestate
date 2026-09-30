@@ -1,11 +1,5 @@
-import { ComingSoon } from "@/components/org/coming-soon";
+import { redirect } from "next/navigation";
 
 export default function OrgIntegrationsPage() {
-  return (
-    <ComingSoon
-      title="Integrations"
-      icon="link"
-      description="Connect ad accounts, CRMs, and other tools."
-    />
-  );
+  redirect("/org/marketing/apps");
 }

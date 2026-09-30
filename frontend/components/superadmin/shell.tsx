@@ -37,6 +37,8 @@ export const NAV_MODULE: Record<string, string> = {
   "/admin-console/org-domains": "admin_domains",
   "/admin-console/subscriptions": "admin_subscriptions",
   "/admin-console/email": "admin_email",
+  "/admin-console/marketing": "admin_settings",
+  "/admin-console/attribution": "admin_settings",
   "/admin-console/audit-logs": "admin_audit_logs",
   "/admin-console/settings": "admin_settings",
   "/admin-console/support": "admin_support",
@@ -113,6 +115,25 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    grp: "Marketing",
+    items: [
+      {
+        href: "/admin-console/marketing",
+        icon: "trending",
+        label: "Marketing Platforms",
+        tip: "Enable ad platforms, Meta App & sync logs",
+        activeMatch: ["/admin-console/marketing"],
+      },
+      {
+        href: "/admin-console/attribution",
+        icon: "target",
+        label: "Lead Attribution",
+        tip: "Organisation Labels for lead Source column",
+        activeMatch: ["/admin-console/attribution"],
+      },
+    ],
+  },
+  {
     grp: "System",
     items: [
       { href: "/admin-console/email", icon: "mail", label: "Email & SMTP", tip: "Email & SMTP Management", activeMatch: ["/admin-console/email"] },
@@ -184,6 +205,8 @@ const CRUMB_MAP: Record<string, string> = {
   "/admin-console/org-domains": "Domains",
   "/admin-console/subscriptions": "Subscriptions",
   "/admin-console/email": "Email & SMTP",
+  "/admin-console/marketing": "Marketing",
+  "/admin-console/attribution": "Lead Attribution",
   "/admin-console/audit-logs": "Audit Logs",
   "/admin-console/settings": "Settings",
   "/admin-console/reports": "Reports & Analytics",

@@ -45,6 +45,9 @@ import { FormsModule } from './modules/forms/forms.module';
 import { PackageChangeRequestsModule } from './modules/package-change-requests/package-change-requests.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { OrgReportsModule } from './modules/org-reports/org-reports.module';
+import { AttributionLabelsModule } from './modules/attribution-labels/attribution-labels.module';
+import { MetaLeadsModule } from './modules/meta-leads/meta-leads.module';
+import { MarketingModule } from './modules/marketing/marketing.module';
 
 @Module({
   imports: [
@@ -92,6 +95,9 @@ import { OrgReportsModule } from './modules/org-reports/org-reports.module';
     TeamChatModule,
     FormsModule,
     PackageChangeRequestsModule,
+    AttributionLabelsModule,
+    MetaLeadsModule,
+    MarketingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

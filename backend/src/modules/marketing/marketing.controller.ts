@@ -1,0 +1,219 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import type { Response } from 'express';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
+import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { JwtPayload } from '../../common/types/jwt-payload.interface';
+import { MarketingService } from './marketing.service';
+import {
+  ConnectMarketingCredentialsDto,
+  CreateMarketingPlatformDto,
+  UpdateMarketingConnectionDto,
+  UpdateMarketingPlatformDto,
+  UpdateOrgPlatformAccessDto,
+} from './dto/marketing.dto';
+
+@UseGuards(JwtAuthGuard, SuperAdminGuard)
+@Controller('admin/marketing')
+export class AdminMarketingController {
+  constructor(private readonly service: MarketingService) {}
+
+  @Get('platforms')
+  listPlatforms() {
+    return this.service.listPlatformsAdmin();
+  }
+
+  @Post('platforms')
+  createPlatform(@Body() dto: CreateMarketingPlatformDto) {
+    return this.service.createPlatform(dto);
+  }
+
+  @Patch('platforms/:id')
+  updatePlatform(
+    @Param('id') id: string,
+    @Body() dto: UpdateMarketingPlatformDto,
+  ) {
+    return this.service.updatePlatform(id, dto);
+  }
+
+  @Delete('platforms/:id')
+  deletePlatform(@Param('id') id: string) {
+    return this.service.deletePlatform(id);
+  }
+
+  @Get('org-access')
+  listOrgAccess() {
+    return this.service.listOrgAccess();
+  }
+
+  @Post('org-access')
+  upsertOrgAccess(@Body() dto: UpdateOrgPlatformAccessDto) {
+    return this.service.upsertOrgAccess(dto);
+  }
+
+  @Get('sync-logs')
+  syncLogs(
+    @Query('status') status?: string,
+    @Query('platformKey') platformKey?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.listSyncLogs({
+      status,
+      platformKey,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+}
+
+@UseGuards(JwtAuthGuard, OrgApprovedGuard)
+@Controller('org/marketing')
+export class OrgMarketingController {
+  constructor(private readonly service: MarketingService) {}
+
+  @Get('dashboard')
+  dashboard(@CurrentUser() user: JwtPayload) {
+    return this.service.dashboard(user.orgId as string);
+  }
+
+  @Get('apps-overview')
+  appsOverview(@CurrentUser() user: JwtPayload) {
+    return this.service.appsOverview(user.orgId as string);
+  }
+
+  @Get('platforms')
+  platforms(@CurrentUser() user: JwtPayload) {
+    return this.service.listPlatformsForOrg(user.orgId as string);
+  }
+
+  @Get('platforms/:key')
+  platformDetail(
+    @CurrentUser() user: JwtPayload,
+    @Param('key') key: string,
+  ) {
+    return this.service.getPlatformDetail(user.orgId as string, key);
+  }
+
+  @Get('platforms/:key/connect')
+  connect(
+    @CurrentUser() user: JwtPayload,
+    @Param('key') key: string,
+  ) {
+    return this.service.getConnectUrl(
+      user.orgId as string,
+      user.sub,
+      key,
+    );
+  }
+
+  @Post('platforms/:key/connect-credentials')
+  connectCredentials(
+    @CurrentUser() user: JwtPayload,
+    @Param('key') key: string,
+    @Body() dto: ConnectMarketingCredentialsDto,
+  ) {
+    return this.service.connectWithCredentials(
+      user.orgId as string,
+      user.sub,
+      key,
+      dto,
+    );
+  }
+
+  @Post('platforms/:key/sync')
+  syncPlatform(
+    @CurrentUser() user: JwtPayload,
+    @Param('key') key: string,
+  ) {
+    return this.service.syncPlatform(user.orgId as string, key);
+  }
+
+  @Post('connections/:id/sync')
+  syncConnection(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+  ) {
+    return this.service.syncConnection(user.orgId as string, id);
+  }
+
+  @Get('sync-logs')
+  orgSyncLogs(
+    @CurrentUser() user: JwtPayload,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.listOrgSyncLogs(
+      user.orgId as string,
+      limit ? Number(limit) : 50,
+    );
+  }
+
+  @Get('connections')
+  connections(
+    @CurrentUser() user: JwtPayload,
+    @Query('platformKey') platformKey?: string,
+  ) {
+    return this.service.listConnections(user.orgId as string, platformKey);
+  }
+
+  @Patch('connections/:id')
+  updateConnection(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: UpdateMarketingConnectionDto,
+  ) {
+    return this.service.updateConnection(user.orgId as string, id, dto);
+  }
+
+  @Delete('connections/:id')
+  disconnect(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.service.disconnect(user.orgId as string, id);
+  }
+}
+
+/** Public OAuth callbacks (no JWT — state carries org context). */
+@Controller('org/marketing/oauth')
+export class MarketingOAuthController {
+  constructor(private readonly service: MarketingService) {}
+
+  @Get('google/callback')
+  async googleCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Query('error') error: string | undefined,
+    @Res() res: Response,
+  ) {
+    if (error || !code || !state) {
+      const fe = (process.env.FRONTEND_URL ?? 'http://localhost:3001').replace(
+        /\/$/,
+        '',
+      );
+      return res.redirect(
+        `${fe}/org/marketing/apps/google_ads?connected=0&message=${encodeURIComponent(error || 'OAuth cancelled')}`,
+      );
+    }
+    try {
+      const result = await this.service.handleGoogleOAuthCallback(code, state);
+      return res.redirect(result.redirectTo);
+    } catch (err: unknown) {
+      const fe = (process.env.FRONTEND_URL ?? 'http://localhost:3001').replace(
+        /\/$/,
+        '',
+      );
+      const message = err instanceof Error ? err.message : 'Google connect failed';
+      return res.redirect(
+        `${fe}/org/marketing/apps/google_ads?connected=0&message=${encodeURIComponent(message)}`,
+      );
+    }
+  }
+}

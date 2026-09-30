@@ -41,11 +41,26 @@ const INTEREST_KEYS = [
   "Configuration",
 ];
 
+const PLATFORM_LABEL: Record<string, string> = {
+  meta: "Facebook",
+  facebook: "Facebook",
+  Instagram: "Instagram",
+  instagram: "Instagram",
+  google_ads: "Google Ads",
+  linkedin: "LinkedIn",
+  tiktok: "TikTok",
+  whatsapp: "WhatsApp Ads",
+  ga: "Google Analytics",
+  website: "Website",
+  webhook: "Webhook",
+  crm: "CRM",
+};
+
 const SOURCE_PLACE: Record<string, string> = {
   "project-widget": "Project widget",
   "Project widget": "Project widget",
-  website: "Page form",
-  "Page form": "Page form",
+  website: "Website",
+  "Page form": "Website",
   brochure_gate: "Brochure gate",
   "Brochure gate": "Brochure gate",
   floorplan: "Floor plan",
@@ -56,6 +71,12 @@ const SOURCE_PLACE: Record<string, string> = {
   CRM: "CRM",
   hero: "Hero section",
   "Hero section": "Hero section",
+  Facebook: "Facebook",
+  facebook: "Facebook",
+  "Meta Lead Ad": "Facebook",
+  "meta lead ad": "Facebook",
+  "CSV import": "CSV import",
+  Landing: "Landing Page",
 };
 
 export function composeLeadSource(parts: {
@@ -68,17 +89,56 @@ export function composeLeadSource(parts: {
     .join(" · ");
 }
 
+/**
+ * Lead Center SOURCE column — prefer marketing platform so agents see where
+ * the lead came from (Facebook, Google Ads, Website, …).
+ */
 export function leadDisplaySource(
-  lead: Pick<CrmLead, "source" | "data"> & { project?: { name: string } | null },
+  lead: Pick<CrmLead, "source" | "data"> & {
+    platform?: string | null;
+    project?: { name: string } | null;
+  },
 ): string {
+  const platformKey = (lead.platform ?? "").trim().toLowerCase();
+  if (platformKey && PLATFORM_LABEL[platformKey]) {
+    return PLATFORM_LABEL[platformKey];
+  }
+
   const raw = (lead.source ?? "").trim();
-  const [first, ...rest] = raw ? raw.split(" · ").map((p) => p.trim()).filter(Boolean) : [];
-  const place = SOURCE_PLACE[first ?? ""] ?? SOURCE_PLACE[raw] ?? first ?? "Website";
-  const fromRestProject = rest.find((p) => !/bhk|villa|plot|penthouse|interest/i.test(p));
-  const fromRestInterest = rest.find((p) => /bhk|villa|plot|penthouse|interest/i.test(p));
+  if (/csv/i.test(raw)) return "CSV import";
+  if (/landing/i.test(raw) && !/page form/i.test(raw)) return "Landing Page";
+
+  const mappedPlatform = PLATFORM_LABEL[raw.toLowerCase()];
+  if (mappedPlatform) return mappedPlatform;
+
+  const [first, ...rest] = raw
+    ? raw.split(" · ").map((p) => p.trim()).filter(Boolean)
+    : [];
+  const place =
+    SOURCE_PLACE[first ?? ""] ?? SOURCE_PLACE[raw] ?? first ?? "Website";
+
+  // Marketing-origin sources: show the channel only (no project·interest clutter).
+  if (
+    ["Facebook", "Instagram", "Google Ads", "LinkedIn", "TikTok", "Webhook", "CRM", "Website", "Landing Page", "CSV import"].includes(
+      place,
+    )
+  ) {
+    return place;
+  }
+
+  const fromRestProject = rest.find(
+    (p) => !/bhk|villa|plot|penthouse|interest/i.test(p),
+  );
+  const fromRestInterest = rest.find((p) =>
+    /bhk|villa|plot|penthouse|interest/i.test(p),
+  );
   const project =
-    lead.project?.name || firstString(lead.data, PROJECT_KEYS) || fromRestProject || "";
-  const interest = firstString(lead.data, INTEREST_KEYS) || fromRestInterest || "";
+    lead.project?.name ||
+    firstString(lead.data, PROJECT_KEYS) ||
+    fromRestProject ||
+    "";
+  const interest =
+    firstString(lead.data, INTEREST_KEYS) || fromRestInterest || "";
   return composeLeadSource({ place, project, interest });
 }
 
