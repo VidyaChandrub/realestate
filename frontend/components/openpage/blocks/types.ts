@@ -66,13 +66,42 @@ export interface BlockTypography {
   fontFamily?: string;
   fontSize?: string;
   fontWeight?: string;
+  fontStyle?: string;
   lineHeight?: string;
   letterSpacing?: string;
+  wordSpacing?: string;
   textTransform?: string;
   textDecoration?: string;
   color?: string;
   textAlign?: string;
 }
+
+/**
+ * Interaction states. Kept deliberately small and flat so it can be edited by
+ * the shared colour/typography controls and serialised into a JSON column.
+ */
+export interface BlockInteractionState {
+  color?: string;
+  backgroundColor?: string;
+  borderColor?: string;
+  boxShadow?: string;
+  opacity?: string;
+  transform?: string;
+  textDecoration?: string;
+}
+
+/**
+ * Element-level identity. Every individually editable node inside a section
+ * (a heading, a paragraph, Button 1, a card, a tab, a footer column, a menu
+ * item) is addressed by a stable key so its styles survive reordering,
+ * duplication and deletion of its siblings.
+ */
+export type ElementId = string;
+
+export type ElementStyleMap = Record<ElementId, BlockStyle>;
+
+/** Reserved key on list items that carries their stable identity. */
+export const ITEM_ID_KEY = "_id";
 
 export interface BlockStyle {
   marginTop?: string;
@@ -111,6 +140,58 @@ export interface BlockStyle {
   sectionBorderWidth?: string;
   sectionBorderColor?: string;
   sectionBorderRadius?: string;
+
+  /* ---------------------------------------------------------------------
+   * Additive fields below power per-element styling (see ElementStyleMap).
+   * All optional so previously persisted documents keep working untouched.
+   * ------------------------------------------------------------------ */
+
+  /* Flexbox / layout */
+  display?: string;
+  flexDirection?: string;
+  flexWrap?: string;
+  flex?: string;
+  justifyContent?: string;
+  alignItems?: string;
+  alignSelf?: string;
+  alignContent?: string;
+  gap?: string;
+  rowGap?: string;
+  columnGap?: string;
+
+  /* Sizing */
+  height?: string;
+  minWidth?: string;
+  maxHeight?: string;
+
+  /* Positioned layout */
+  position?: string;
+  top?: string;
+  right?: string;
+  bottom?: string;
+  left?: string;
+
+  /* Media */
+  objectFit?: string;
+  objectPosition?: string;
+  aspectRatio?: string;
+
+  /* Effects */
+  transform?: string;
+  filter?: string;
+  transition?: string;
+  cursor?: string;
+
+  /* Overlay painted by the owning block (hero / full-bleed sections). */
+  overlayColor?: string;
+  overlayOpacity?: string;
+
+  /* Master visibility switch, used by elements inside dynamic lists. */
+  hidden?: boolean;
+
+  hover?: BlockInteractionState;
+  active?: BlockInteractionState;
+
   typography?: BlockTypography;
   /**
    * Per-device value overrides. `desktop` values live on the style root;
@@ -143,6 +224,11 @@ export interface BlockConfig {
   variant: BlockVariant;
   props: Record<string, unknown>;
   style?: BlockStyle;
+  /**
+   * Per-element styles keyed by stable {@link ElementId}. Lets a single block
+   * style its heading, each paragraph, Button 1 and Button 2 independently.
+   */
+  elementStyles?: ElementStyleMap;
   children?: BlockConfig[];
   columnId?: string;
   sectionId?: string;

@@ -28,7 +28,8 @@ import { resolveTheme, themeToCSS } from "@/lib/openpage/theme-presets";
 import { useGoogleFonts } from "@/lib/openpage/useGoogleFonts";
 import { createBlockFromType, createBlockFromPresetId } from "@/lib/openpage/block-factory";
 import { findBlock } from "@/lib/openpage/block-tree";
-import type { BlockConfig } from "@/components/openpage/blocks/types";
+import type { BlockConfig, BlockStyle } from "@/components/openpage/blocks/types";
+import { ElementEditorContext } from "@/components/openpage/blocks/El";
 import { DeviceProvider } from "@/components/openpage/runtime/device";
 
 const VIEWPORT_WIDTHS = { desktop: 880, tablet: 768, mobile: 375 } as const;
@@ -141,11 +142,18 @@ export function Canvas() {
 
   const blockFonts = useMemo(() => {
     const fonts = new Set<string>();
+    function scanStyles(style: BlockStyle | undefined) {
+      if (style?.typography?.fontFamily) fonts.add(style.typography.fontFamily);
+      if (style?.responsive?.tablet?.typography?.fontFamily) fonts.add(style.responsive.tablet.typography.fontFamily);
+      if (style?.responsive?.mobile?.typography?.fontFamily) fonts.add(style.responsive.mobile.typography.fontFamily);
+    }
     function scan(list: BlockConfig[]) {
       for (const b of list) {
-        if (b.style?.typography?.fontFamily) fonts.add(b.style.typography.fontFamily);
-        if (b.style?.responsive?.tablet?.typography?.fontFamily) fonts.add(b.style.responsive.tablet.typography.fontFamily);
-        if (b.style?.responsive?.mobile?.typography?.fontFamily) fonts.add(b.style.responsive.mobile.typography.fontFamily);
+        scanStyles(b.style);
+        // Element-level styles can introduce fonts the block style never used.
+        if (b.elementStyles) {
+          for (const style of Object.values(b.elementStyles)) scanStyles(style);
+        }
         if (b.type === "columns") {
           const cols = b.props.columns as Array<{ blocks?: BlockConfig[] }> | undefined;
           cols?.forEach((c) => c.blocks && scan(c.blocks));
@@ -308,7 +316,9 @@ export function Canvas() {
                 isSelected={selectedBlockId === block.id}
                 onSelect={() => selectBlock(block.id)}
               >
-                <RenderBlock block={block} />
+                <ElementEditorContext.Provider value={{ blockId: block.id, isEditing: true }}>
+                  <RenderBlock block={block} />
+                </ElementEditorContext.Provider>
               </SortableBlock>
               <CanvasDropZone index={idx + 1} isLast={idx === blocks.length - 1} />
             </div>
@@ -322,7 +332,9 @@ export function Canvas() {
                 <span>Moving section: {activeBlock.type}</span>
               </div>
               <div className="pointer-events-none opacity-80 max-h-[260px] overflow-hidden">
-                <RenderBlock block={activeBlock} />
+                <ElementEditorContext.Provider value={{ blockId: activeBlock.id, isEditing: false }}>
+                  <RenderBlock block={activeBlock} />
+                </ElementEditorContext.Provider>
               </div>
             </div>
           ) : null}

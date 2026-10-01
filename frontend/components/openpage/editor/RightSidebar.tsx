@@ -10,11 +10,13 @@ import { PropertiesPanel } from './PropertiesPanel'
 import { StylePanel } from './StylePanel'
 import { TypographyPanel } from './TypographyPanel'
 import { AdvancedPanel } from './AdvancedPanel'
+import { ElementStylePanel } from './ElementStylePanel'
 
 const tabs: { id: RightSidebarTab; label: string; icon: typeof AlignLeft; color: string }[] = [
   { id: 'properties', label: 'Content', icon: AlignLeft, color: "#38bdf8" },
   { id: 'style', label: 'Style', icon: Palette, color: "#e879f9" },
   { id: 'typography', label: 'Type', icon: Type, color: "#f59e0b" },
+  { id: 'element', label: 'Element', icon: MousePointer2, color: "#22d3ee" },
   { id: 'advanced', label: 'More', icon: Settings2, color: "#a78bfa" },
 ]
 
@@ -36,9 +38,15 @@ export function RightSidebar() {
   const selectedBlock = selectedBlockId ? findBlock(blocks, selectedBlockId) : undefined
   const selectedLoc = selectedBlockId ? findBlockLocation(blocks, selectedBlockId) : undefined
 
+  const selectedElement = useEditorStore((s) => s.selectedElement)
+  const selectedElementId = selectedElement?.elementId ?? null
+
+  // Switching blocks should land on Content, but keep the Element tab while the
+  // user is working inside an element of the block they just selected.
   useEffect(() => {
+    if (selectedElementId) return
     if (selectedBlock) setRightSidebarTab('properties')
-  }, [selectedBlock?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedBlock?.id, selectedElementId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="hidden md:flex w-[300px] h-full min-h-0 bg-bg-1 border-l border-border-default flex-col shrink-0 overflow-hidden">
@@ -116,6 +124,23 @@ export function RightSidebar() {
           <StylePanel block={selectedBlock} />
         ) : rightSidebarTab === 'typography' ? (
           <TypographyPanel block={selectedBlock} />
+        ) : rightSidebarTab === 'element' ? (
+          selectedElementId ? (
+            <ElementStylePanel block={selectedBlock} elementId={selectedElementId} />
+          ) : (
+            <div className="flex flex-col items-center justify-center text-center px-6 py-16 gap-3">
+              <div className="w-11 h-11 rounded-xl bg-bg-3 border border-border-default flex items-center justify-center">
+                <MousePointer2 size={18} className="text-text-3" />
+              </div>
+              <div>
+                <p className="text-text-1 text-[12px] font-medium">No element selected</p>
+                <p className="text-text-3 text-[11px] mt-1">
+                  Click any element on the canvas — a heading, paragraph, button, image or list card — to style it
+                  independently of the section.
+                </p>
+              </div>
+            </div>
+          )
         ) : rightSidebarTab === 'advanced' ? (
           <AdvancedPanel block={selectedBlock} />
         ) : (

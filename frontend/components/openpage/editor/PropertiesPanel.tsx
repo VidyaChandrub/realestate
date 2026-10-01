@@ -5,6 +5,7 @@ import { Code } from "lucide-react";
 import type { BlockConfig, BlockType } from "@/components/openpage/blocks/types";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { Section } from "./shared-components";
+import { ElementListEditor } from "./ElementListEditor";
 import { MediaPicker } from "@/components/media-picker";
 import { type FormDefinition } from "@/lib/openpage/forms-store";
 import { useBuilderLeadForms } from "@/components/openpage/builder/forms-context";
@@ -14,20 +15,6 @@ interface FieldDef {
   label: string
   type: 'text' | 'textarea' | 'select' | 'array-strings' | 'array-items' | 'image' | 'icon' | 'form-select' | 'toggle' | 'nav-menu'
   options?: string[]
-}
-
-function mediaKindForKey(key: string): 'image' | 'icon' | null {
-  const k = key.toLowerCase()
-  if (k === 'icon' || k === 'iconimage') return 'icon'
-  if (
-    k === 'src' ||
-    k === 'image' ||
-    k === 'logoimage' ||
-    k === 'heroimage' ||
-    k === 'avatar' ||
-    k.endsWith('image')
-  ) return 'image'
-  return null
 }
 
 const blockFields: Partial<Record<BlockType, { sections: { title: string; fields: FieldDef[] }[] }>> = {
@@ -1017,7 +1004,10 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
       function createEmptyItem(): Record<string, string> {
         if (items.length > 0) {
           const template: Record<string, string> = {}
-          for (const key of Object.keys(items[0])) template[key] = ''
+          for (const key of Object.keys(items[0])) {
+            if (key === '_id') continue
+            template[key] = ''
+          }
           return template
         }
         // Fallback templates by block type + field key
@@ -1036,62 +1026,17 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
         return blockTemplates[block.type]?.[field.key] || { title: '', description: '' }
       }
 
+      // Delegated to the shared list editor so every dynamic list in the
+      // builder gets add / duplicate / delete / hide / drag-reorder plus a
+      // styling hand-off, not just append-and-remove.
       return (
         <div className="mb-2.5">
-          <label className="block text-[11.5px] text-text-2 mb-1 font-medium">{field.label}</label>
-          {items.map((item, i) => (
-            <div key={i} className="bg-bg-2 border border-border-default rounded p-2 mb-1.5">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] text-text-3 font-medium">Item {i + 1}</span>
-                <button
-                  onClick={() => onChange(items.filter((_, idx) => idx !== i))}
-                  className="text-[10px] text-text-3 hover:text-status-red transition-colors"
-                >
-                  Remove
-                </button>
-              </div>
-              {Object.entries(item).map(([key, val]) => {
-                const kind = mediaKindForKey(key)
-                return (
-                <div key={key} className="mb-1">
-                  {kind ? (
-                    <MediaPicker
-                      kind={kind}
-                      label={key}
-                      value={String(val ?? '')}
-                      compact
-                      onChange={(v) => {
-                        const updated = [...items]
-                        updated[i] = { ...updated[i], [key]: v }
-                        onChange(updated)
-                      }}
-                    />
-                  ) : (
-                    <>
-                      <label className="block text-[10px] text-text-3 mb-0.5">{key}</label>
-                      <input
-                        type="text"
-                        value={String(val)}
-                        onChange={(e) => {
-                          const updated = [...items]
-                          updated[i] = { ...updated[i], [key]: e.target.value }
-                          onChange(updated)
-                        }}
-                        className="w-full px-1.5 py-1 rounded border border-border-subtle bg-bg-3 text-text-0 text-[11px] outline-none focus:border-green"
-                      />
-                    </>
-                  )}
-                </div>
-                )
-              })}
-            </div>
-          ))}
-          <button
-            onClick={() => onChange([...items, createEmptyItem()])}
-            className="text-[10px] text-green hover:text-green-dim transition-colors"
-          >
-            + Add item
-          </button>
+          <ElementListEditor
+            block={block}
+            list={{ path: [field.key] }}
+            label={field.label}
+            template={createEmptyItem()}
+          />
         </div>
       )
     }

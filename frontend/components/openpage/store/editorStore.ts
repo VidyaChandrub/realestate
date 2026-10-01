@@ -5,7 +5,13 @@ import type { BlockStyle, BlockType, BlockConfig } from "@/components/openpage/b
 
 export type Viewport = 'desktop' | 'tablet' | 'mobile'
 
-export type RightSidebarTab = 'properties' | 'style' | 'typography' | 'advanced'
+export type RightSidebarTab = 'properties' | 'style' | 'typography' | 'advanced' | 'element'
+
+/** The individually-editable node currently being styled, if any. */
+export interface SelectedElement {
+  blockId: string
+  elementId: string
+}
 
 export interface DraggedItemInfo {
   kind: 'block' | 'preset' | 'global'
@@ -18,6 +24,7 @@ export interface DraggedItemInfo {
 interface EditorState {
   selectedBlockId: string | null
   selectedBlockIds: string[]
+  selectedElement: SelectedElement | null
   viewport: Viewport
   jsonDrawerOpen: boolean
   historyOpen: boolean
@@ -41,6 +48,8 @@ interface EditorState {
   generationPrompt: string | null
   generationError: string | null
   selectBlock: (id: string | null) => void
+  selectElement: (blockId: string, elementId: string) => void
+  clearElementSelection: () => void
   toggleBlockSelection: (id: string) => void
   selectMultipleBlocks: (ids: string[]) => void
   clearSelection: () => void
@@ -73,6 +82,7 @@ interface EditorState {
 export const useEditorStore = create<EditorState>()((set) => ({
   selectedBlockId: null,
   selectedBlockIds: [],
+  selectedElement: null,
   viewport: 'desktop',
   jsonDrawerOpen: false,
   historyOpen: false,
@@ -95,20 +105,23 @@ export const useEditorStore = create<EditorState>()((set) => ({
   isGenerating: false,
   generationPrompt: null,
   generationError: null,
-  selectBlock: (id) => set({ selectedBlockId: id, selectedBlockIds: id ? [id] : [] }),
+  selectBlock: (id) => set({ selectedBlockId: id, selectedBlockIds: id ? [id] : [], selectedElement: null }),
+  selectElement: (blockId, elementId) =>
+    set({ selectedBlockId: blockId, selectedBlockIds: [blockId], selectedElement: { blockId, elementId }, rightSidebarTab: 'element' }),
+  clearElementSelection: () => set({ selectedElement: null }),
   toggleBlockSelection: (id) => set((s) => {
     const ids = s.selectedBlockIds.includes(id)
       ? s.selectedBlockIds.filter((i) => i !== id)
       : [...s.selectedBlockIds, id]
     return { selectedBlockIds: ids, selectedBlockId: ids.length === 1 ? ids[0] : ids.length === 0 ? null : s.selectedBlockId }
   }),
-  selectMultipleBlocks: (ids) => set({ selectedBlockIds: ids, selectedBlockId: ids.length === 1 ? ids[0] : null }),
-  clearSelection: () => set({ selectedBlockId: null, selectedBlockIds: [] }),
+  selectMultipleBlocks: (ids) => set({ selectedBlockIds: ids, selectedBlockId: ids.length === 1 ? ids[0] : null, selectedElement: null }),
+  clearSelection: () => set({ selectedBlockId: null, selectedBlockIds: [], selectedElement: null }),
   setViewport: (vp) => set({ viewport: vp }),
   toggleJsonDrawer: () => set((s) => ({ jsonDrawerOpen: !s.jsonDrawerOpen })),
   toggleHistory: () => set((s) => ({ historyOpen: !s.historyOpen })),
   toggleShortcutsModal: () => set((s) => ({ shortcutsModalOpen: !s.shortcutsModalOpen })),
-  togglePreview: () => set((s) => ({ previewMode: !s.previewMode, ...(!s.previewMode ? { selectedBlockId: null, selectedBlockIds: [] } : {}) })),
+  togglePreview: () => set((s) => ({ previewMode: !s.previewMode, ...(!s.previewMode ? { selectedBlockId: null, selectedBlockIds: [], selectedElement: null } : {}) })),
   setActiveProject: (id) => set({ activeProjectId: id }),
   setRightSidebarTab: (tab) => set({ rightSidebarTab: tab }),
   toggleLeftSidebar: () => set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),

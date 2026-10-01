@@ -14,6 +14,11 @@ import {
   clampIndex,
   type BlockInsertTarget,
 } from "@/lib/openpage/block-tree";
+import { ITEM_ID_KEY } from "@/components/openpage/blocks/types";
+import type { Device } from "@/lib/openpage/types";
+import { newElementId, migrateBlocksListIds, ancestorItemIds, itemAt, listElementId, resolveList, type ListRef } from "@/lib/openpage/element-style";
+
+export type { ListRef };
 
 function ensurePages(config: SiteConfig): PageConfig[] {
   if (config.pages && config.pages.length > 0) return config.pages
@@ -47,6 +52,19 @@ interface ConfigState {
   updateBlock: (id: string, updates: Partial<BlockConfig>) => void
   updateBlockProps: (id: string, props: Record<string, unknown>) => void
   updateBlockStyle: (id: string, style: Partial<BlockStyle>) => void
+  /* ---- Per-element styling (ElementStyleMap) ---- */
+  setElementStyle: (blockId: string, elementId: string, style: Partial<BlockStyle>, device: Device) => void
+  resetElementStyle: (blockId: string, elementId: string, device?: Device) => void
+  clearElementSelectionStyle: (blockId: string, elementIds: string[]) => void
+  /* ---- Dynamic list operations ---- */
+  updateListItem: (blockId: string, ref: ListRef, itemId: string, patch: Record<string, unknown>) => void
+  addListItem: (blockId: string, ref: ListRef, template?: Record<string, unknown>, index?: number) => string | null
+  duplicateListItem: (blockId: string, ref: ListRef, itemId: string) => string | null
+  removeListItem: (blockId: string, ref: ListRef, itemId: string) => void
+  moveListItem: (blockId: string, ref: ListRef, from: number, to: number) => void
+  setListItemHidden: (blockId: string, ref: ListRef, itemId: string, hidden: boolean) => void
+  /** Look up the live list for a {@link ListRef} without mutating anything. */
+  readList: (blockId: string, ref: ListRef) => Array<Record<string, unknown>>
   addBlock: (block: BlockConfig, index?: number) => void
   removeBlock: (id: string) => void
   duplicateBlock: (id: string) => void
@@ -184,6 +202,63 @@ function withPages(config: SiteConfig): SiteConfig {
   return { ...config, pages }
 }
 
+/* -------------------------------------------------------------------------- */
+/*            Dynamic list addressing (shared by list mutations)              */
+/* -------------------------------------------------------------------------- */
+
+/** Resolve the array a {@link ListRef} points at inside a mutable props object. */
+const resolveListRef = resolveList;
+
+/** Assign a fresh `_id` to a list item, and to any lists nested inside it. */
+function withFreshItemId<T extends Record<string, unknown>>(item: T): T {
+  const next: Record<string, unknown> = { ...item, [ITEM_ID_KEY]: newElementId("it") };
+  for (const [key, value] of Object.entries(next)) {
+    if (key === ITEM_ID_KEY || !Array.isArray(value)) continue;
+    next[key] = (value as Array<Record<string, unknown>>).map((entry) =>
+      entry && typeof entry === "object" && !Array.isArray(entry) ? withFreshItemId(entry) : entry,
+    );
+  }
+  return next as T;
+}
+
+/**
+ * Shape for a newly added item: mirror the most recent existing item so the
+ * form shows the same fields, but with blank content.
+ */
+function lastItemTemplate(
+  list: Array<Record<string, unknown>>,
+): Record<string, unknown> | undefined {
+  const source = list[list.length - 1] ?? list[0]
+  if (!source) return undefined
+  const template: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(source)) {
+    if (key === ITEM_ID_KEY) continue
+    if (Array.isArray(value)) {
+      // Nested lists stay empty; the editor offers explicit "add" affordances.
+      template[key] = []
+    } else if (value === null) {
+      template[key] = ""
+    } else {
+      template[key] = typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+        ? ""
+        : value
+    }
+  }
+  return template
+}
+
+/** Drop element styles belonging to a deleted list item (and its children). */
+function pruneStylesForBlock(block: BlockConfig, ref: ListRef, itemId: string): void {
+  if (!block.elementStyles) return
+  const elementId = listElementId(ref, itemId)
+  const next: Record<string, BlockStyle> = {}
+  for (const [id, style] of Object.entries(block.elementStyles)) {
+    if (id === elementId || id.startsWith(`${elementId}/`)) continue
+    next[id] = style
+  }
+  block.elementStyles = next
+}
+
 function mutateActivePageBlocks(
   config: SiteConfig,
   activePageId: string,
@@ -204,7 +279,11 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
       redoStack: [],
 
       setConfig: (config) => {
-        const pages = ensurePages(config)
+        // Backfill stable ids so every dynamic list item can own its styles.
+        const pages = ensurePages(config).map((page) => ({
+          ...page,
+          blocks: migrateBlocksListIds(page.blocks),
+        }))
         set({ config: { ...config, pages }, activePageId: pages[0]?.id ?? 'page-home', undoStack: [], redoStack: [] })
       },
 
@@ -256,6 +335,251 @@ export const useConfigStore = create<ConfigState>()((set, get) => ({
             draft.blocks = page.blocks
           }),
         })),
+
+      /* ------------------------------------------------------------------ */
+      /*                Per-element styling (ElementStyleMap)                */
+      /* ------------------------------------------------------------------ */
+
+      setElementStyle: (blockId, elementId, style, device) =>
+        set((state) => ({
+          ...pushUndo(state, 'Update element style'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const located = findBlockLocation(page.blocks, blockId)
+            const block = located ? located.parentList[located.index] : undefined
+            if (!block) return
+
+            // Desktop owns the style root; tablet/mobile are overrides that are
+            // merged at render time, so editing one never leaks into another.
+            const container: BlockStyle =
+              device === "desktop"
+                ? (block.elementStyles?.[elementId] ?? ({} as BlockStyle))
+                : { ...(block.elementStyles?.[elementId] ?? ({} as BlockStyle)) };
+
+            if (device === "desktop") {
+              Object.assign(container, style)
+              delete container.responsive
+            } else {
+              const responsive = { ...(container.responsive || {}) }
+              const overrides: Partial<BlockStyle> = { ...(responsive[device] || {}) }
+              for (const [key, value] of Object.entries(style)) {
+                if (value === undefined) delete (overrides as Record<string, unknown>)[key]
+                else (overrides as Record<string, unknown>)[key] = value
+              }
+              responsive[device] = overrides
+              container.responsive = responsive
+            }
+
+            block.elementStyles = { ...(block.elementStyles || {}), [elementId]: container }
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      resetElementStyle: (blockId, elementId, device) =>
+        set((state) => ({
+          ...pushUndo(state, 'Reset element style'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const located = findBlockLocation(page.blocks, blockId)
+            const block = located ? located.parentList[located.index] : undefined
+            if (!block?.elementStyles?.[elementId]) return
+
+            if (!device || device === "desktop") {
+              delete block.elementStyles[elementId]
+            } else {
+              const container = { ...block.elementStyles[elementId] }
+              const responsive = { ...(container.responsive || {}) }
+              delete responsive[device]
+              if (Object.keys(responsive).length) container.responsive = responsive
+              else delete container.responsive
+              if (Object.keys(container).length) block.elementStyles[elementId] = container
+              else delete block.elementStyles[elementId]
+            }
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      clearElementSelectionStyle: (blockId, elementIds) =>
+        set((state) => ({
+          ...pushUndo(state, 'Reset element styles'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const located = findBlockLocation(page.blocks, blockId)
+            const block = located ? located.parentList[located.index] : undefined
+            if (!block?.elementStyles) return
+            const next = { ...block.elementStyles }
+            for (const id of elementIds) delete next[id]
+            block.elementStyles = next
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      /* ------------------------------------------------------------------ */
+      /*                     Dynamic list operations                          */
+      /* ------------------------------------------------------------------ */
+
+      updateListItem: (blockId, ref, itemId, patch) =>
+        set((state) => ({
+          ...pushUndo(state, 'Update item'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const located = findBlockLocation(page.blocks, blockId)
+            const block = located ? located.parentList[located.index] : undefined
+            if (!block) return
+            const list = resolveListRef(block.props as Record<string, unknown>, ref)
+            const item = itemAt(list, itemId)
+            if (!item) return
+            for (const [key, value] of Object.entries(patch)) {
+              if (value === undefined) delete item[key]
+              else item[key] = value
+            }
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      addListItem: (blockId, ref, template, index) => {
+        const newId = newElementId("it")
+        set((state) => ({
+          ...pushUndo(state, 'Add item'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const located = findBlockLocation(page.blocks, blockId)
+            const block = located ? located.parentList[located.index] : undefined
+            if (!block) return
+            const props = block.props as Record<string, unknown>
+            let list = resolveListRef(props, ref)
+
+            if (!list) {
+              // First item: create the missing list at the requested location by
+              // walking down through the ancestor items, creating keys as needed.
+              const ancestors = ancestorItemIds(ref);
+              let container: Record<string, unknown> = props;
+              for (let i = 0; i < ancestors.length && i < ref.path.length - 1; i++) {
+                const parentList = container[ref.path[i]];
+                if (!Array.isArray(parentList)) return;
+                const parent = itemAt(parentList, ancestors[i]);
+                if (!parent) return;
+                container = parent;
+              }
+              const key = ref.path[ref.path.length - 1];
+              if (!key) return;
+              container[key] = [];
+              list = container[key] as Array<Record<string, unknown>>;
+            }
+
+            const source = template ?? lastItemTemplate(list)
+            const item = withFreshItemId({ ...(source as Record<string, unknown>), [ITEM_ID_KEY]: newId })
+            const at = index === undefined ? list.length : clampIndex(index, list.length)
+            list.splice(at, 0, item)
+            draft.blocks = page.blocks
+          }),
+        }))
+        return newId
+      },
+
+      duplicateListItem: (blockId, ref, itemId) => {
+        const newId = newElementId("it")
+        set((state) => ({
+          ...pushUndo(state, 'Duplicate item'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const located = findBlockLocation(page.blocks, blockId)
+            const block = located ? located.parentList[located.index] : undefined
+            if (!block) return
+            const list = resolveListRef(block.props as Record<string, unknown>, ref)
+            if (!list) return
+            const index = list.findIndex((entry) => entry[ITEM_ID_KEY] === itemId)
+            if (index === -1) return
+            const clone = withFreshItemId(list[index])
+            list.splice(index + 1, 0, clone)
+            draft.blocks = page.blocks
+          }),
+        }))
+        return newId
+      },
+
+      removeListItem: (blockId, ref, itemId) =>
+        set((state) => ({
+          ...pushUndo(state, 'Remove item'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const located = findBlockLocation(page.blocks, blockId)
+            const block = located ? located.parentList[located.index] : undefined
+            if (!block) return
+            const list = resolveListRef(block.props as Record<string, unknown>, ref)
+            if (!list) return
+            const index = list.findIndex((entry) => entry[ITEM_ID_KEY] === itemId)
+            if (index === -1) return
+            list.splice(index, 1)
+            pruneStylesForBlock(block, ref, itemId)
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      moveListItem: (blockId, ref, from, to) =>
+        set((state) => ({
+          ...pushUndo(state, 'Reorder items'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const located = findBlockLocation(page.blocks, blockId)
+            const block = located ? located.parentList[located.index] : undefined
+            if (!block) return
+            const list = resolveListRef(block.props as Record<string, unknown>, ref)
+            if (!list) return
+            const target = clampIndex(to, list.length)
+            if (from === target || from < 0 || from >= list.length) return
+            const [moved] = list.splice(from, 1)
+            list.splice(target, 0, moved)
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      setListItemHidden: (blockId, ref, itemId, hidden) =>
+        set((state) => ({
+          ...pushUndo(state, hidden ? 'Hide item' : 'Show item'),
+          config: produce(withPages(state.config), (draft) => {
+            const page = draft.pages!.find((p) => p.id === state.activePageId)
+            if (!page) return
+            const located = findBlockLocation(page.blocks, blockId)
+            const block = located ? located.parentList[located.index] : undefined
+            if (!block) return
+            const list = resolveListRef(block.props as Record<string, unknown>, ref)
+            const item = itemAt(list, itemId)
+            if (!item) return
+            if (hidden) item.hidden = true
+            else delete item.hidden
+            const elementId = listElementId(ref, itemId)
+            const existing = block.elementStyles?.[elementId]
+            if (existing) {
+              const next = { ...block.elementStyles }
+              if (hidden) next[elementId] = { ...existing, hidden: true }
+              else {
+                const { hidden: _hidden, ...rest } = existing;
+                void _hidden;
+                if (Object.keys(rest).length) next[elementId] = rest
+                else delete next[elementId]
+              }
+              block.elementStyles = next
+            }
+            draft.blocks = page.blocks
+          }),
+        })),
+
+      readList: (blockId, ref) => {
+        const blocks = getPageBlocks(get().config, get().activePageId)
+        const located = findBlockLocation(blocks, blockId)
+        const block = located ? located.parentList[located.index] : undefined
+        if (!block) return []
+        return resolveListRef(block.props as Record<string, unknown>, ref) ?? []
+      },
 
       addBlock: (block, index) =>
         set((state) => ({
