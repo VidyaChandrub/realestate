@@ -24,7 +24,6 @@ export default function OrgCallingQueuePage() {
         active="queue"
         actions={
           <>
-            <button className="btn btn-ghost">Filters</button>
             <button className="btn btn-primary">Start calling ▶</button>
           </>
         }

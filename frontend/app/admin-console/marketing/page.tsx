@@ -281,13 +281,6 @@ export default function SuperAdminMarketingPage() {
               </div>
               <button
                 type="button"
-                className="btn btn-ghost btn-sm mkt-admin-icon-btn"
-                title="Filter"
-              >
-                <Icon name="filter" size={14} />
-              </button>
-              <button
-                type="button"
                 className="btn btn-primary btn-sm"
                 onClick={() => {
                   setShowAdd(true);

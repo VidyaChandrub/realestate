@@ -1505,7 +1505,8 @@ export default function OrgLandingPagesPage() {
         </div>
       )}
 
-      {/* Bottom Pagination Bar */}
+      {/* Bottom Pagination Bar — only when there is more than one page */}
+      {totalPages > 1 || page > 1 ? (
       <div className="lp-pagination">
         <div>
           Showing {filteredRows.length > 0 ? `${(page - 1) * LIMIT + 1}–${(page - 1) * LIMIT + filteredRows.length}` : "0"} of {total} landing pages
@@ -1542,6 +1543,7 @@ export default function OrgLandingPagesPage() {
           </button>
         </div>
       </div>
+      ) : null}
 
       {/* Template Preview Modal */}
       {templatePreviewId && (

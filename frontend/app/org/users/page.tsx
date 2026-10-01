@@ -798,7 +798,8 @@ export default function OrgUsersPage() {
             </table>
           </div>
 
-          {/* Pagination Footer */}
+          {/* Pagination Footer — only when there is more than one page */}
+          {totalPages > 1 || page > 1 ? (
           <div className="usr-pagination-bar" style={{ justifyContent: "flex-end" }}>
             <div className="usr-page-nav">
               <span>
@@ -823,6 +824,7 @@ export default function OrgUsersPage() {
               </button>
             </div>
           </div>
+          ) : null}
         </div>
       </Reveal>
 

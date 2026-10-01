@@ -577,27 +577,6 @@ export default function SuperAdminAdminsPage() {
                   <Icon name="search" size={15} />
                 </span>
               </div>
-              <button
-                type="button"
-                style={{
-                  height: 38,
-                  padding: "0 14px",
-                  borderRadius: 10,
-                  border: "1px solid #e2e8f0",
-                  background: "#ffffff",
-                  color: "#475569",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  cursor: "pointer",
-                }}
-              >
-                <Icon name="filter" size={14} />
-                <span>Filter</span>
-                <Icon name="chevron-down" size={12} style={{ color: "#94a3b8" }} />
-              </button>
             </div>
           </div>
 
@@ -830,7 +809,8 @@ export default function SuperAdminAdminsPage() {
             </table>
           </div>
 
-          {/* Table Footer */}
+          {/* Table Footer — only when there is more than one page */}
+          {totalPages > 1 || page > 1 ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: "1px solid #f1f5f9" }}>
             <div style={{ fontSize: 12.5, color: "#64748b" }}>
               {total === 0
@@ -871,6 +851,7 @@ export default function SuperAdminAdminsPage() {
               </PagerButton>
             </div>
           </div>
+          ) : null}
         </div>
       ) : null}
 

@@ -298,8 +298,10 @@ export default function OrgTemplatesPage() {
     !!previewId &&
     (rows.some((r) => r.id === previewId) || (previewedTmpl?.isAssigned ?? false));
 
+  const availablePlans = availableData?.plans ?? [];
   const filteredAvailable = (availableData?.data ?? []).filter((t) => {
-    if (addModalTierFilter !== "all" && (t.tier ?? "free") !== addModalTierFilter) return false;
+    // The plan filter holds a subscription plan id: keep templates that plan unlocks.
+    if (addModalTierFilter !== "all" && !(t.planIds ?? []).includes(addModalTierFilter)) return false;
     if (addModalCategoryFilter !== "all" && t.category !== addModalCategoryFilter) return false;
     return true;
   });
@@ -543,23 +545,25 @@ export default function OrgTemplatesPage() {
                   <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
                     <select
                       className="inp"
-                      style={{ width: 150, height: 36 }}
+                      style={{ width: 170 }}
                       value={addModalTierFilter}
                       onChange={(e) => setAddModalTierFilter(e.target.value)}
                     >
-                      <option value="all">All Tiers</option>
-                      <option value="free">Free Plan</option>
-                      <option value="paid">Paid Plans</option>
-                      <option value="premium">Premium Plans</option>
+                      <option value="all">All Plans</option>
+                      {availablePlans.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
                     </select>
                     <select
                       className="inp"
-                      style={{ width: 180, height: 36 }}
+                      style={{ width: 200 }}
                       value={addModalCategoryFilter}
                       onChange={(e) => setAddModalCategoryFilter(e.target.value)}
                     >
                       <option value="all">All Categories</option>
-                      {allCategories.map((c) => (
+                      {(availableData.categories ?? allCategories).map((c) => (
                         <option key={c} value={c}>
                           {c}
                         </option>
@@ -581,6 +585,23 @@ export default function OrgTemplatesPage() {
                     {filteredAvailable.map((tmpl) => {
                       const isAssigned = tmpl.isAssigned;
                       const isQuotaFull = availableData.remainingQuota === 0 && !isAssigned;
+                      // Corner badge: the user's own plan when it covers this
+                      // template, otherwise the plans that would unlock it.
+                      const unlockNames = availablePlans
+                        .filter((p) => (tmpl.planIds ?? []).includes(p.id))
+                        .map((p) => p.name);
+                      const planBadge = !tmpl.isLocked
+                        ? { cls: "b-green", label: availableData.planName, title: "Included in your current plan" }
+                        : unlockNames.length > 0
+                          ? {
+                              cls: "b-indigo",
+                              label:
+                                unlockNames.length <= 2
+                                  ? unlockNames.join(", ")
+                                  : `${unlockNames.slice(0, 2).join(", ")} +${unlockNames.length - 2}`,
+                              title: `Available on: ${unlockNames.join(", ")}`,
+                            }
+                          : null;
 
                       return (
                         <div
@@ -598,7 +619,17 @@ export default function OrgTemplatesPage() {
                           <div style={{ position: "relative" }}>
                             <TemplateCover thumbnail={tmpl.thumbnail ?? "hero"} accent={isAssigned ? "#0f1424" : "#94a3b8"} height={150}>
                               <div style={{ position: "absolute", top: 8, left: 8 }}>
-                                <TierBadge tier={tmpl.tier} />
+                                {planBadge ? (
+                                  <span
+                                    className={`badge ${planBadge.cls}`}
+                                    title={planBadge.title}
+                                    style={{ textTransform: "none", fontWeight: 600 }}
+                                  >
+                                    {planBadge.label}
+                                  </span>
+                                ) : (
+                                  <TierBadge tier={tmpl.tier} />
+                                )}
                               </div>
                               {tmpl.isLocked && (
                                 <div

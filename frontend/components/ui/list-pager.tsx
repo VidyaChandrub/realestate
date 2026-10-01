@@ -80,7 +80,8 @@ function PagerButton({
 
 /**
  * "Showing X–Y of Z" + numbered pager, driven by a server-side total.
- * Renders nothing when there are no rows.
+ * Renders nothing when everything fits on one page (the `page > 1` guard
+ * keeps the pager reachable if a list shrinks while on a later page).
  */
 export function ListPager({
   page,
@@ -97,7 +98,7 @@ export function ListPager({
   loading?: boolean;
   noun?: string;
 }) {
-  if (total <= 0) return null;
+  if (total <= 0 || (total <= pageSize && page <= 1)) return null;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const from = (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);

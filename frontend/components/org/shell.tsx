@@ -841,6 +841,8 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                     My Profile
                   </Link>
 
+                  {/* Same gate as the sidebar's Settings item. */}
+                  {hasPermission("settings", "view") ? (
                   <Link
                     href="/org/settings"
                     onClick={() => setProfileMenuOpen(false)}
@@ -860,6 +862,7 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                     </span>
                     Settings
                   </Link>
+                  ) : null}
 
                   <button
                     type="button"

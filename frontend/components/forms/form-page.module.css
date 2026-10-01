@@ -17,13 +17,10 @@
   --fp-danger: #dc2626;
   --fp-danger-line: #fca5a5;
 
+  /* No card of its own: both console shells (.superadmin .page / .org .page)
+     already wrap every page in one, so the form sits directly on it. */
   width: 100%;
   box-sizing: border-box;
-  background: #ffffff;
-  border: 1px solid #eef2f6;
-  border-radius: 20px;
-  padding: clamp(16px, 3vw, 28px);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
   color: var(--fp-ink);
 }
 
@@ -88,11 +85,13 @@
 }
 
 /* ---------- Form panel ---------- */
+/* Borderless on purpose: the form sits directly on the page card, so every
+   create / edit page reads as a single card instead of a card in a card. */
 .page .panel {
-  border: 1px solid #eef2f6;
-  border-radius: 16px;
-  padding: clamp(16px, 3vw, 28px);
-  background: #ffffff;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 
 .page .grid {
@@ -491,46 +490,57 @@
   line-height: 1.5;
 }
 
-/* ---------- Quick-start preset cards (role page) ---------- */
-.page .presets {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.page .preset {
-  text-align: left;
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid var(--fp-line);
-  background: #ffffff;
-  color: var(--fp-text);
-  font: inherit;
-  cursor: pointer;
-  line-height: 1.4;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.page .preset:hover {
-  border-color: #cbd5e1;
-}
-
-.page .preset[aria-pressed="true"] {
-  border-color: var(--fp-brand);
-  background: #eff6ff;
-  color: var(--fp-ink);
-}
-
+/* ---------- Quick-start presets (role pages) ---------- */
 .page .presetTitle {
+  display: block;
   font-weight: 600;
   font-size: 14px;
   margin-bottom: 2px;
 }
 
 .page .presetDesc {
+  display: block;
   font-size: 12.5px;
   color: var(--fp-muted);
+}
+
+/* Presets render as plain radio options, not cards. */
+.page .presetRadios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px 24px;
+  margin: 0 0 20px;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.page .presetRadio {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+  line-height: 1.4;
+  color: var(--fp-text);
+}
+
+.page .presetRadio input {
+  margin: 2px 0 0;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: var(--fp-brand);
+  cursor: pointer;
+}
+
+.page .presetRadio input:focus-visible {
+  outline: 2px solid var(--fp-brand);
+  outline-offset: 2px;
+}
+
+.page .presetRadio input:checked + span .presetTitle {
+  color: var(--fp-ink);
 }
 
 .page .chip {

@@ -562,27 +562,6 @@ export default function OrgProjectsPage() {
             </button>
           </div>
 
-          {/* Filter button */}
-          <button
-            type="button"
-            title="More filters"
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 9,
-              border: "1px solid #e2e8f0",
-              background: "#fff",
-              color: "#64748b",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <Icon name="filter" size={15} />
-          </button>
-
           {/* Refresh button */}
           <button
             type="button"

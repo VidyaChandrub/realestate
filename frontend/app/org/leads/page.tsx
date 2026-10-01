@@ -426,10 +426,6 @@ export default function OrgLeadsPage() {
                 </select>
               )}
 
-              <button className="lc-icon-btn" type="button" title="Filter options">
-                <Icon name="filter" size={15} />
-              </button>
-
               <button className="lc-icon-btn" type="button" onClick={load} title="Refresh leads">
                 <Icon name="refresh" size={15} />
               </button>
