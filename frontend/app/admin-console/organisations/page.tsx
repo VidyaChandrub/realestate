@@ -23,8 +23,9 @@ import { ReasonInfoPopover } from "@/components/superadmin/reason-info-popover";
 // The "Rejected / Disabled" pill's status param covers both admin-disabled and
 // rejected orgs (see the backend's list() query) — labelled to match.
 // "Draft" is a separate bucket for abandoned self-serve signups and any
-// Super-Admin-precreated org never assigned an admin. Drafts also appear in
-// "All" so incomplete onboarding attempts remain visible to Super Admin.
+// Super-Admin-precreated org never assigned an admin. It has no pill of its
+// own; drafts appear in "All" so incomplete onboarding attempts remain
+// visible to Super Admin.
 const LIMIT = 10;
 
 function formatDate(iso: string): string {
@@ -134,7 +135,6 @@ const STATUS_PILLS: { value: string; label: string }[] = [
   { value: "active", label: "Active" },
   { value: "pending", label: "Pending" },
   { value: "disabled", label: "Rejected / Disabled" },
-  { value: "draft", label: "Draft" },
 ];
 
 // Not an Organisation.status value — a separate mode entirely. These rows
@@ -569,9 +569,7 @@ export default function SuperAdminOrganisationsPage() {
                     ? summary?.pending
                     : p.value === "disabled"
                       ? summary?.disabled
-                      : p.value === "draft"
-                        ? summary?.draft
-                        : undefined;
+                      : undefined;
             return (
               <button
                 key={p.value}
@@ -638,26 +636,6 @@ export default function SuperAdminOrganisationsPage() {
             <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }}>
               <Icon name="search" size={15} />
             </span>
-          </div>
-
-          <div
-            style={{
-              height: 38,
-              padding: "0 12px",
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              background: "#ffffff",
-              color: "#334155",
-              fontSize: 13,
-              fontWeight: 500,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              cursor: "pointer",
-            }}
-          >
-            <span>{LIMIT} per page</span>
-            <Icon name="chevron-down" size={13} style={{ color: "#94a3b8" }} />
           </div>
 
           <button
