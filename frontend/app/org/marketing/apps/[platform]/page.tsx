@@ -86,7 +86,7 @@ function PlatformDetailInner() {
         );
       } else if (key === "instagram") {
         setMessage(
-          "Instagram connected via Meta. New Lead Ads still appear under Facebook attribution in Lead Center for now. Use Sync Now to import recent form leads.",
+          "Instagram connected via Meta. Lead ads are labelled Instagram in Lead Center when Meta reports the placement; Lead Ads Testing Tool leads show as Facebook. Use Sync Now to import recent form leads.",
         );
       } else {
         setMessage(
@@ -278,7 +278,7 @@ function PlatformDetailInner() {
                   {key === "whatsapp"
                     ? "Connect via Meta Page OAuth to store this connection. Dedicated WhatsApp lead ingest is not live yet — Facebook Lead Ads remain the production capture path."
                     : key === "instagram"
-                      ? "Connect via Meta Page OAuth (same as Facebook). Instant Form leads currently appear under Facebook attribution in Lead Center. Sync Now imports recent form leads."
+                      ? "Connect via Meta Page OAuth (same as Facebook). Lead ads are labelled Instagram in Lead Center when Meta reports the placement; Lead Ads Testing Tool leads show as Facebook. Sync Now imports recent form leads."
                       : "Connect a Facebook Page so Lead Ad form submissions flow into Lead Center in realtime. Sync Now re-subscribes the Page and imports recent form leads so you can see them in Lead Center."}
                 </p>
                 {detail?.metaConfig && !detail.metaConfig.configured ? (

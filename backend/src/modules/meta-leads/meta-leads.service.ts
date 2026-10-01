@@ -32,11 +32,25 @@ type MetaLeadPayload = {
   adset_id?: string;
   campaign_id?: string;
   form_id?: string;
-  page_id?: string;
   ad_name?: string;
   adset_name?: string;
   campaign_name?: string;
+  platform?: string;
+  is_organic?: boolean;
 };
+
+export type MetaChannel = 'instagram' | 'facebook';
+
+/**
+ * Map the Graph Lead `platform` value onto a CRM channel. Tolerant on purpose:
+ * the exact Instagram value is not pinned down yet, and Lead Ads Testing Tool
+ * leads return no platform at all — anything unrecognised stays Facebook.
+ */
+export function resolveMetaChannel(platform?: string | null): MetaChannel {
+  const value = (platform ?? '').trim().toLowerCase();
+  if (value === 'ig' || value.startsWith('instagram')) return 'instagram';
+  return 'facebook';
+}
 
 type GraphPage = {
   id: string;
@@ -187,7 +201,7 @@ export class MetaLeadsService {
     const pages = await this.fetchUserPages(longLived);
     if (pages.length === 0) {
       throw new BadRequestException(
-        'No Facebook Pages were returned. Ensure the account manages at least one Page with Lead Access.',
+        'No Facebook Pages were shared with iPixxel. Click Connect again, choose Edit settings, and tick your Page (and its business portfolio if asked).',
       );
     }
 
@@ -497,22 +511,39 @@ export class MetaLeadsService {
     const fieldMap = this.fieldDataToMap(payload.field_data ?? []);
     const data = normalizeLeadData(fieldMap);
 
+    const channel = resolveMetaChannel(payload.platform);
+    const channelLabel = channel === 'instagram' ? 'Instagram' : 'Facebook';
+    this.logger.log(
+      `Meta lead ${input.leadgenId}: platform=${JSON.stringify(payload.platform ?? null)} is_organic=${String(payload.is_organic ?? null)} -> ${channel}`,
+    );
+
     const attribution: LeadAttribution = resolveAttribution(data, {
-      source: 'Facebook',
-      platform: 'meta',
-      medium: 'Paid Social',
+      source: channelLabel,
+      platform: channel === 'instagram' ? 'instagram' : 'meta',
+      medium: payload.is_organic === true ? 'Organic Social' : 'Paid Social',
       campaign: payload.campaign_name ?? null,
       campaignId: payload.campaign_id ?? input.campaignId ?? null,
       adSet: payload.adset_name ?? null,
       adSetId: payload.adset_id ?? input.adSetId ?? null,
       ad: payload.ad_name ?? null,
       adId: payload.ad_id ?? input.adId ?? null,
-      utmSource: 'Facebook',
+      utmSource: channelLabel,
       utmMedium: 'Paid',
       utmCampaign: payload.campaign_name ?? null,
-      firstTouchSource: 'Facebook',
-      lastTouchSource: 'Facebook',
+      firstTouchSource: channelLabel,
+      lastTouchSource: channelLabel,
     });
+
+    // Keep what Meta actually reported next to the form answers (no dedicated
+    // column yet). Added after attribution is resolved so it can't feed it.
+    const rawPlatform = payload.platform?.trim();
+    const leadData: Record<string, unknown> = {
+      ...data,
+      ...(rawPlatform ? { metaPlatform: rawPlatform } : {}),
+      ...(typeof payload.is_organic === 'boolean'
+        ? { metaIsOrganic: payload.is_organic }
+        : {}),
+    };
 
     // Enrich names from Graph when only IDs arrived on the webhook.
     if (attribution.adId && !attribution.ad) {
@@ -550,8 +581,8 @@ export class MetaLeadsService {
           formName: payload.form_id
             ? `Meta Lead Form ${payload.form_id}`
             : 'Meta Lead Ad',
-          source: attribution.source ?? 'Facebook',
-          data: data as Prisma.InputJsonValue,
+          source: attribution.source ?? channelLabel,
+          data: leadData as Prisma.InputJsonValue,
           configurations: [],
           tags: [],
           metaLeadgenId: input.leadgenId,
@@ -569,8 +600,8 @@ export class MetaLeadsService {
           leadId: lead.id,
           type: 'status_updated',
           text: assignedToId
-            ? 'Lead captured from Facebook Lead Ads and assigned automatically'
-            : 'Lead captured from Facebook Lead Ads',
+            ? `Lead captured from ${channelLabel} Lead Ads and assigned automatically`
+            : `Lead captured from ${channelLabel} Lead Ads`,
         },
       });
 
@@ -627,21 +658,118 @@ export class MetaLeadsService {
     return json.access_token;
   }
 
+  /**
+   * Pages the user shared with the app. `/me/accounts` is the primary source;
+   * it comes back empty for Pages owned by a business portfolio, so fall back
+   * to the Page IDs listed in the token's granular scopes.
+   */
   private async fetchUserPages(userToken: string): Promise<GraphPage[]> {
-    const url = new URL(`${GRAPH_BASE}/me/accounts`);
-    url.searchParams.set('fields', 'id,name,access_token');
-    url.searchParams.set('access_token', userToken);
-    const res = await fetch(url);
-    const json = (await res.json()) as {
-      data?: GraphPage[];
-      error?: { message?: string };
-    };
-    if (!res.ok) {
-      throw new BadRequestException(
-        json.error?.message ?? 'Failed to list Facebook Pages',
-      );
+    const byId = new Map<string, GraphPage>();
+
+    const first = new URL(`${GRAPH_BASE}/me/accounts`);
+    first.searchParams.set('fields', 'id,name,access_token');
+    first.searchParams.set('access_token', userToken);
+    let nextUrl: string | null = first.toString();
+    // Bounded so a misbehaving paging cursor can't loop forever.
+    for (let i = 0; nextUrl && i < 20; i++) {
+      const res = await fetch(nextUrl);
+      const json = (await res.json()) as {
+        data?: GraphPage[];
+        paging?: { next?: string };
+        error?: { message?: string };
+      };
+      if (!res.ok) {
+        throw new BadRequestException(
+          json.error?.message ?? 'Failed to list Facebook Pages',
+        );
+      }
+      for (const page of json.data ?? []) {
+        if (page?.id) byId.set(page.id, page);
+      }
+      nextUrl = json.paging?.next ?? null;
     }
-    return json.data ?? [];
+
+    if (byId.size === 0) {
+      for (const page of await this.fetchPagesFromGranularScopes(userToken)) {
+        byId.set(page.id, page);
+      }
+    }
+    return [...byId.values()];
+  }
+
+  /**
+   * Facebook Login for Business tokens carry granular scopes naming the Page
+   * IDs the user ticked. Resolve each to a Page access token; a Page that
+   * can't be read is skipped so the others still connect.
+   */
+  private async fetchPagesFromGranularScopes(
+    userToken: string,
+  ): Promise<GraphPage[]> {
+    const pageIds = new Set<string>();
+    try {
+      const url = new URL(`${GRAPH_BASE}/debug_token`);
+      url.searchParams.set('input_token', userToken);
+      url.searchParams.set(
+        'access_token',
+        `${this.appId()}|${this.appSecret()}`,
+      );
+      const res = await fetch(url);
+      const json = (await res.json()) as {
+        data?: {
+          granular_scopes?: Array<{ scope?: string; target_ids?: string[] }>;
+        };
+        error?: { message?: string };
+      };
+      if (!res.ok) {
+        this.logger.warn(
+          `Meta debug_token failed: ${json.error?.message ?? res.status}`,
+        );
+        return [];
+      }
+      const pageScopes = [
+        'pages_show_list',
+        'leads_retrieval',
+        'pages_manage_metadata',
+      ];
+      for (const entry of json.data?.granular_scopes ?? []) {
+        if (!entry.scope || !pageScopes.includes(entry.scope)) continue;
+        for (const id of entry.target_ids ?? []) {
+          if (id) pageIds.add(String(id));
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Meta debug_token failed: ${message}`);
+      return [];
+    }
+
+    const pages: GraphPage[] = [];
+    for (const pageId of pageIds) {
+      try {
+        const url = new URL(`${GRAPH_BASE}/${pageId}`);
+        url.searchParams.set('fields', 'id,name,access_token');
+        url.searchParams.set('access_token', userToken);
+        const res = await fetch(url);
+        const json = (await res.json()) as Partial<GraphPage> & {
+          error?: { message?: string };
+        };
+        if (!res.ok || !json.id || !json.access_token) {
+          this.logger.warn(
+            `Could not read Facebook Page ${pageId}: ${json.error?.message ?? 'no Page access token returned'}`,
+          );
+          continue;
+        }
+        pages.push({
+          id: json.id,
+          name: json.name ?? json.id,
+          access_token: json.access_token,
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Could not read Facebook Page ${pageId}: ${message}`);
+      }
+    }
+    return pages;
   }
 
   /**
@@ -770,7 +898,7 @@ export class MetaLeadsService {
     const url = new URL(`${GRAPH_BASE}/${leadgenId}`);
     url.searchParams.set(
       'fields',
-      'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id,ad_name,adset_name,campaign_name',
+      'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id,ad_name,adset_name,campaign_name,platform,is_organic',
     );
     url.searchParams.set('access_token', pageToken);
     const res = await fetch(url);
