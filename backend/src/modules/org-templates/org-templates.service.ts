@@ -138,6 +138,26 @@ export class OrgTemplatesService {
       }),
     ]);
 
+    // Filter options for the org's "Add templates" view: the live
+    // subscription plans and the super admin's template categories.
+    const [activePlans, categories] = await Promise.all([
+      this.prisma.plan.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          priceMonthly: true,
+          capabilities: true,
+        },
+        orderBy: [{ priceMonthly: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.templateCategory.findMany({
+        select: { name: true },
+        orderBy: { name: 'asc' },
+      }),
+    ]);
+
     const assignedSet = new Set(assignedRecords.map((a) => a.templateId));
     const assignedCount = assignedSet.size;
     const remainingQuota = Number.isFinite(maxAllowed)
@@ -165,6 +185,15 @@ export class OrgTemplatesService {
       } else {
         access = canPlanAccessTier(plan, t.tier);
       }
+      // Which plans unlock this template — same rule as `access` above
+      // (explicit plan grants win, otherwise the tier), applied per plan.
+      const planIds = activePlans
+        .filter((p) =>
+          allowedPlanIds.length > 0
+            ? allowedPlanIds.includes(p.id)
+            : canPlanAccessTier(p, t.tier).allowed,
+        )
+        .map((p) => p.id);
       return {
         id: mapped.id,
         name: mapped.name,
@@ -179,6 +208,7 @@ export class OrgTemplatesService {
         landingPageCount: landingPageCounts.get(t.id) ?? 0,
         isLocked: !access.allowed,
         lockReason: access.reason ?? null,
+        planIds,
       };
     });
 
@@ -188,6 +218,8 @@ export class OrgTemplatesService {
       maxAllowed: Number.isFinite(maxAllowed) ? maxAllowed : null,
       remainingQuota,
       planName: plan?.name ?? 'Free Plan',
+      plans: activePlans.map((p) => ({ id: p.id, name: p.name })),
+      categories: categories.map((c) => c.name),
     };
   }
 

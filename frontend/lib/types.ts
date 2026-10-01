@@ -2633,6 +2633,8 @@ export interface AvailableTemplateSummary extends OrgTemplateSummary {
   isAssigned: boolean;
   isLocked?: boolean;
   lockReason?: string | null;
+  /** Ids of the active subscription plans that unlock this template. */
+  planIds?: string[];
 }
 
 export interface AvailableTemplatesResponse {
@@ -2641,6 +2643,10 @@ export interface AvailableTemplatesResponse {
   maxAllowed: number | null;
   remainingQuota: number | null;
   planName: string;
+  /** Active subscription plans, cheapest first — the plan filter options. */
+  plans?: { id: string; name: string }[];
+  /** Every template category the super admin has created, A–Z. */
+  categories?: string[];
 }
 
 // --- Media Library --------------------------------------------------------
