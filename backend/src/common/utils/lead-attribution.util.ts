@@ -162,7 +162,7 @@ export function resolveAttribution(
 export function inferPlatformKey(source: string | null | undefined): string {
   const s = (source ?? '').trim().toLowerCase();
   if (!s) return 'website';
-  if (s.includes('facebook') || s.includes('meta') || s === 'instagram') {
+  if (s.includes('facebook') || s.includes('meta') || s.includes('instagram')) {
     return s.includes('instagram') ? 'instagram' : 'meta';
   }
   if (s.includes('google')) return 'google_ads';
@@ -301,7 +301,7 @@ export const DEFAULT_MARKETING_PLATFORMS: Array<{
     key: 'instagram',
     name: 'Instagram',
     description:
-      'Connect via Meta Page OAuth; Instant Form leads currently attributed as Facebook',
+      'Connect via Meta Page OAuth; lead ads are labelled Instagram when Meta reports the placement (Lead Ads Testing Tool leads show as Facebook)',
     sortOrder: 20,
     enabled: true,
     supportsOAuth: true,

@@ -32,11 +32,25 @@ type MetaLeadPayload = {
   adset_id?: string;
   campaign_id?: string;
   form_id?: string;
-  page_id?: string;
   ad_name?: string;
   adset_name?: string;
   campaign_name?: string;
+  platform?: string;
+  is_organic?: boolean;
 };
+
+export type MetaChannel = 'instagram' | 'facebook';
+
+/**
+ * Map the Graph Lead `platform` value onto a CRM channel. Tolerant on purpose:
+ * the exact Instagram value is not pinned down yet, and Lead Ads Testing Tool
+ * leads return no platform at all — anything unrecognised stays Facebook.
+ */
+export function resolveMetaChannel(platform?: string | null): MetaChannel {
+  const value = (platform ?? '').trim().toLowerCase();
+  if (value === 'ig' || value.startsWith('instagram')) return 'instagram';
+  return 'facebook';
+}
 
 type GraphPage = {
   id: string;
@@ -497,22 +511,39 @@ export class MetaLeadsService {
     const fieldMap = this.fieldDataToMap(payload.field_data ?? []);
     const data = normalizeLeadData(fieldMap);
 
+    const channel = resolveMetaChannel(payload.platform);
+    const channelLabel = channel === 'instagram' ? 'Instagram' : 'Facebook';
+    this.logger.log(
+      `Meta lead ${input.leadgenId}: platform=${JSON.stringify(payload.platform ?? null)} is_organic=${String(payload.is_organic ?? null)} -> ${channel}`,
+    );
+
     const attribution: LeadAttribution = resolveAttribution(data, {
-      source: 'Facebook',
-      platform: 'meta',
-      medium: 'Paid Social',
+      source: channelLabel,
+      platform: channel === 'instagram' ? 'instagram' : 'meta',
+      medium: payload.is_organic === true ? 'Organic Social' : 'Paid Social',
       campaign: payload.campaign_name ?? null,
       campaignId: payload.campaign_id ?? input.campaignId ?? null,
       adSet: payload.adset_name ?? null,
       adSetId: payload.adset_id ?? input.adSetId ?? null,
       ad: payload.ad_name ?? null,
       adId: payload.ad_id ?? input.adId ?? null,
-      utmSource: 'Facebook',
+      utmSource: channelLabel,
       utmMedium: 'Paid',
       utmCampaign: payload.campaign_name ?? null,
-      firstTouchSource: 'Facebook',
-      lastTouchSource: 'Facebook',
+      firstTouchSource: channelLabel,
+      lastTouchSource: channelLabel,
     });
+
+    // Keep what Meta actually reported next to the form answers (no dedicated
+    // column yet). Added after attribution is resolved so it can't feed it.
+    const rawPlatform = payload.platform?.trim();
+    const leadData: Record<string, unknown> = {
+      ...data,
+      ...(rawPlatform ? { metaPlatform: rawPlatform } : {}),
+      ...(typeof payload.is_organic === 'boolean'
+        ? { metaIsOrganic: payload.is_organic }
+        : {}),
+    };
 
     // Enrich names from Graph when only IDs arrived on the webhook.
     if (attribution.adId && !attribution.ad) {
@@ -550,8 +581,8 @@ export class MetaLeadsService {
           formName: payload.form_id
             ? `Meta Lead Form ${payload.form_id}`
             : 'Meta Lead Ad',
-          source: attribution.source ?? 'Facebook',
-          data: data as Prisma.InputJsonValue,
+          source: attribution.source ?? channelLabel,
+          data: leadData as Prisma.InputJsonValue,
           configurations: [],
           tags: [],
           metaLeadgenId: input.leadgenId,
@@ -569,8 +600,8 @@ export class MetaLeadsService {
           leadId: lead.id,
           type: 'status_updated',
           text: assignedToId
-            ? 'Lead captured from Facebook Lead Ads and assigned automatically'
-            : 'Lead captured from Facebook Lead Ads',
+            ? `Lead captured from ${channelLabel} Lead Ads and assigned automatically`
+            : `Lead captured from ${channelLabel} Lead Ads`,
         },
       });
 
@@ -770,7 +801,7 @@ export class MetaLeadsService {
     const url = new URL(`${GRAPH_BASE}/${leadgenId}`);
     url.searchParams.set(
       'fields',
-      'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id,ad_name,adset_name,campaign_name',
+      'id,created_time,field_data,ad_id,adset_id,campaign_id,form_id,ad_name,adset_name,campaign_name,platform,is_organic',
     );
     url.searchParams.set('access_token', pageToken);
     const res = await fetch(url);

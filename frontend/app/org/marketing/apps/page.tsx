@@ -64,7 +64,7 @@ const PLATFORM_COPY: Record<
   },
   instagram: {
     blurb:
-      "Instagram connects through the same Meta Page login as Facebook. Instant Form leads still arrive under Facebook attribution until distinct Instagram labelling ships.",
+      "Instagram connects through the same Meta Page login as Facebook. Lead ads are labelled Instagram when Meta reports the placement; Lead Ads Testing Tool leads show as Facebook.",
     primaryLabel: "Connect with Instagram (Meta)",
     secondaryLabel: "Open details",
     secondaryHref: "/org/marketing/apps/instagram",
@@ -72,7 +72,7 @@ const PLATFORM_COPY: Record<
       { icon: "sync", label: "Shared Meta Connect", tip: "Same Page OAuth" },
       { icon: "target", label: "Lead Ads Path", tip: "Via Facebook Page" },
       { icon: "bolt", label: "Realtime Capture", tip: "When forms fire" },
-      { icon: "link", label: "Attribution today", tip: "Shows as Facebook" },
+      { icon: "link", label: "Attribution today", tip: "Shows as Instagram" },
     ],
     steps: [
       {
@@ -89,7 +89,7 @@ const PLATFORM_COPY: Record<
       },
       {
         title: "Connect here",
-        body: "Use Connect with Instagram — OAuth reuses the Meta Graph flow. Leads appear as Facebook in Lead Center for now.",
+        body: "Use Connect with Instagram — OAuth reuses the Meta Graph flow. Leads appear as Instagram in Lead Center when Meta reports the placement; Lead Ads Testing Tool leads show as Facebook.",
       },
     ],
     guideHref: "/org/marketing/apps/instagram",
