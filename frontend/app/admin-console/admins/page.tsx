@@ -577,27 +577,6 @@ export default function SuperAdminAdminsPage() {
                   <Icon name="search" size={15} />
                 </span>
               </div>
-              <button
-                type="button"
-                style={{
-                  height: 38,
-                  padding: "0 14px",
-                  borderRadius: 10,
-                  border: "1px solid #e2e8f0",
-                  background: "#ffffff",
-                  color: "#475569",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  cursor: "pointer",
-                }}
-              >
-                <Icon name="filter" size={14} />
-                <span>Filter</span>
-                <Icon name="chevron-down" size={12} style={{ color: "#94a3b8" }} />
-              </button>
             </div>
           </div>
 

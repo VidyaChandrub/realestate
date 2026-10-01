@@ -732,24 +732,6 @@ export default function SuperAdminOrgDomainsPage() {
             />
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 38,
-              height: 38,
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              background: "#fff",
-              color: "#64748b",
-              cursor: "pointer",
-            }}
-            title="Filter"
-          >
-            <Icon name="filter" size={16} />
-          </div>
-
           <select
             value={pageSize}
             onChange={(e) => setPageSize(Number(e.target.value))}

@@ -640,25 +640,6 @@ export default function SuperAdminOrganisationsPage() {
             </span>
           </div>
 
-          <button
-            type="button"
-            style={{
-              height: 38,
-              padding: "0 12px",
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              background: "#ffffff",
-              color: "#64748b",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-            }}
-            title="Filter"
-          >
-            <Icon name="filter" size={15} />
-          </button>
-
           <div
             style={{
               height: 38,
