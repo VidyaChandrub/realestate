@@ -201,7 +201,7 @@ export class MetaLeadsService {
     const pages = await this.fetchUserPages(longLived);
     if (pages.length === 0) {
       throw new BadRequestException(
-        'No Facebook Pages were returned. Ensure the account manages at least one Page with Lead Access.',
+        'No Facebook Pages were shared with iPixxel. Click Connect again, choose Edit settings, and tick your Page (and its business portfolio if asked).',
       );
     }
 
@@ -658,21 +658,118 @@ export class MetaLeadsService {
     return json.access_token;
   }
 
+  /**
+   * Pages the user shared with the app. `/me/accounts` is the primary source;
+   * it comes back empty for Pages owned by a business portfolio, so fall back
+   * to the Page IDs listed in the token's granular scopes.
+   */
   private async fetchUserPages(userToken: string): Promise<GraphPage[]> {
-    const url = new URL(`${GRAPH_BASE}/me/accounts`);
-    url.searchParams.set('fields', 'id,name,access_token');
-    url.searchParams.set('access_token', userToken);
-    const res = await fetch(url);
-    const json = (await res.json()) as {
-      data?: GraphPage[];
-      error?: { message?: string };
-    };
-    if (!res.ok) {
-      throw new BadRequestException(
-        json.error?.message ?? 'Failed to list Facebook Pages',
-      );
+    const byId = new Map<string, GraphPage>();
+
+    const first = new URL(`${GRAPH_BASE}/me/accounts`);
+    first.searchParams.set('fields', 'id,name,access_token');
+    first.searchParams.set('access_token', userToken);
+    let nextUrl: string | null = first.toString();
+    // Bounded so a misbehaving paging cursor can't loop forever.
+    for (let i = 0; nextUrl && i < 20; i++) {
+      const res = await fetch(nextUrl);
+      const json = (await res.json()) as {
+        data?: GraphPage[];
+        paging?: { next?: string };
+        error?: { message?: string };
+      };
+      if (!res.ok) {
+        throw new BadRequestException(
+          json.error?.message ?? 'Failed to list Facebook Pages',
+        );
+      }
+      for (const page of json.data ?? []) {
+        if (page?.id) byId.set(page.id, page);
+      }
+      nextUrl = json.paging?.next ?? null;
     }
-    return json.data ?? [];
+
+    if (byId.size === 0) {
+      for (const page of await this.fetchPagesFromGranularScopes(userToken)) {
+        byId.set(page.id, page);
+      }
+    }
+    return [...byId.values()];
+  }
+
+  /**
+   * Facebook Login for Business tokens carry granular scopes naming the Page
+   * IDs the user ticked. Resolve each to a Page access token; a Page that
+   * can't be read is skipped so the others still connect.
+   */
+  private async fetchPagesFromGranularScopes(
+    userToken: string,
+  ): Promise<GraphPage[]> {
+    const pageIds = new Set<string>();
+    try {
+      const url = new URL(`${GRAPH_BASE}/debug_token`);
+      url.searchParams.set('input_token', userToken);
+      url.searchParams.set(
+        'access_token',
+        `${this.appId()}|${this.appSecret()}`,
+      );
+      const res = await fetch(url);
+      const json = (await res.json()) as {
+        data?: {
+          granular_scopes?: Array<{ scope?: string; target_ids?: string[] }>;
+        };
+        error?: { message?: string };
+      };
+      if (!res.ok) {
+        this.logger.warn(
+          `Meta debug_token failed: ${json.error?.message ?? res.status}`,
+        );
+        return [];
+      }
+      const pageScopes = [
+        'pages_show_list',
+        'leads_retrieval',
+        'pages_manage_metadata',
+      ];
+      for (const entry of json.data?.granular_scopes ?? []) {
+        if (!entry.scope || !pageScopes.includes(entry.scope)) continue;
+        for (const id of entry.target_ids ?? []) {
+          if (id) pageIds.add(String(id));
+        }
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Meta debug_token failed: ${message}`);
+      return [];
+    }
+
+    const pages: GraphPage[] = [];
+    for (const pageId of pageIds) {
+      try {
+        const url = new URL(`${GRAPH_BASE}/${pageId}`);
+        url.searchParams.set('fields', 'id,name,access_token');
+        url.searchParams.set('access_token', userToken);
+        const res = await fetch(url);
+        const json = (await res.json()) as Partial<GraphPage> & {
+          error?: { message?: string };
+        };
+        if (!res.ok || !json.id || !json.access_token) {
+          this.logger.warn(
+            `Could not read Facebook Page ${pageId}: ${json.error?.message ?? 'no Page access token returned'}`,
+          );
+          continue;
+        }
+        pages.push({
+          id: json.id,
+          name: json.name ?? json.id,
+          access_token: json.access_token,
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Could not read Facebook Page ${pageId}: ${message}`);
+      }
+    }
+    return pages;
   }
 
   /**
