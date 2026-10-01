@@ -830,7 +830,8 @@ export default function SuperAdminAdminsPage() {
             </table>
           </div>
 
-          {/* Table Footer */}
+          {/* Table Footer — only when there is more than one page */}
+          {totalPages > 1 || page > 1 ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderTop: "1px solid #f1f5f9" }}>
             <div style={{ fontSize: 12.5, color: "#64748b" }}>
               {total === 0
@@ -871,6 +872,7 @@ export default function SuperAdminAdminsPage() {
               </PagerButton>
             </div>
           </div>
+          ) : null}
         </div>
       ) : null}
 
