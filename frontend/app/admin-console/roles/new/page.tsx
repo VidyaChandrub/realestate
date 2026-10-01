@@ -13,6 +13,7 @@ import {
   FormNote,
   FormPage,
   FormSection,
+  PresetRadios,
   TextArea,
   TextInput,
   formPageStyles,
@@ -68,20 +69,14 @@ export default function CreateOrgRolePage() {
         <FormAlert message={error} />
 
         <FormSection title="Quick presets (click to pre-fill)" />
-        <div className={formPageStyles.presets}>
-          {ORG_PRESETS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              className={formPageStyles.preset}
-              aria-pressed={form.key === p.key}
-              onClick={() => setForm({ name: p.name, key: p.key, description: p.desc })}
-            >
-              <div className={formPageStyles.presetTitle}>＋ {p.name}</div>
-              <div className={formPageStyles.presetDesc}>{p.desc}</div>
-            </button>
-          ))}
-        </div>
+        <PresetRadios
+          name="or-preset"
+          label="Quick presets"
+          options={ORG_PRESETS}
+          selected={(p) => form.key === p.key}
+          disabled={submitting}
+          onSelect={(p) => setForm({ name: p.name, key: p.key, description: p.desc })}
+        />
 
         <FormSection title="Role details" />
         <FormGrid>

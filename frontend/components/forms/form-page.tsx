@@ -137,6 +137,52 @@ export function CheckCard({
   );
 }
 
+/**
+ * Quick-start presets as a radio group. Picking an option calls `onSelect`
+ * (the page pre-fills its fields); `selected` is derived from the form by the
+ * page, so the radio clears once the fields no longer match a preset.
+ */
+export function PresetRadios<T extends { name: string; desc: string }>({
+  name,
+  label,
+  options,
+  selected,
+  disabled,
+  onSelect,
+}: {
+  /** Radio group name — must be unique on the page. */
+  name: string;
+  label: string;
+  options: readonly T[];
+  selected: (option: T) => boolean;
+  disabled?: boolean;
+  onSelect: (option: T) => void;
+}) {
+  return (
+    <div className={styles.presetRadios} role="radiogroup" aria-label={label}>
+      {options.map((option) => (
+        <label key={option.name} className={styles.presetRadio}>
+          {/* onClick as well as onChange: re-clicking the selected option
+              re-applies the preset after manual edits. */}
+          <input
+            type="radio"
+            name={name}
+            value={option.name}
+            checked={selected(option)}
+            disabled={disabled}
+            onChange={() => onSelect(option)}
+            onClick={() => onSelect(option)}
+          />
+          <span>
+            <span className={styles.presetTitle}>{option.name}</span>
+            <span className={styles.presetDesc}>{option.desc}</span>
+          </span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 /** Removable pill list (e.g. plan feature bullets). */
 export function TagList({
   items,

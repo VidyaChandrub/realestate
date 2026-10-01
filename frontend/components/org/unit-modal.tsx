@@ -152,16 +152,8 @@ export function UnitDesignPage({
             style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 24, alignItems: "start" }}
           >
             {/* === LEFT COLUMN: template-driven form (from the page) === */}
-            <div
-              style={{
-                background: "#ffffff",
-                borderRadius: 16,
-                border: "1px solid #e2e8f0",
-                padding: "18px 22px",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
-                minWidth: 0,
-              }}
-            >
+            {/* No card of its own — the fields sit on the page card. */}
+            <div style={{ minWidth: 0 }}>
               {children}
             </div>
 

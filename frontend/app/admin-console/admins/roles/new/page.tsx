@@ -13,6 +13,7 @@ import {
   FormGrid,
   FormPage,
   FormSection,
+  PresetRadios,
   TextArea,
   TextInput,
   formPageStyles,
@@ -90,23 +91,17 @@ export default function CreatePlatformRolePage() {
         <FormAlert message={formError} />
 
         <FormSection title="Quick start" />
-        <div className={formPageStyles.presets}>
-          {PRESETS.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              className={formPageStyles.preset}
-              aria-pressed={form.key === p.key}
-              onClick={() => {
-                setForm({ name: p.name, key: p.key, description: p.desc });
-                setNameError(undefined);
-              }}
-            >
-              <div className={formPageStyles.presetTitle}>{p.name}</div>
-              <div className={formPageStyles.presetDesc}>{p.desc}</div>
-            </button>
-          ))}
-        </div>
+        <PresetRadios
+          name="pr-preset"
+          label="Quick start"
+          options={PRESETS}
+          selected={(p) => form.key === p.key}
+          disabled={submitting}
+          onSelect={(p) => {
+            setForm({ name: p.name, key: p.key, description: p.desc });
+            setNameError(undefined);
+          }}
+        />
 
         <FormSection title="Role details" />
         <Field htmlFor="pr-name" label="Role name *" icon="shield" error={nameError}>

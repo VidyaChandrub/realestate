@@ -12,6 +12,7 @@ import {
   FormAlert,
   FormPage,
   FormSection,
+  PresetRadios,
   TextArea,
   TextInput,
   formPageStyles,
@@ -80,23 +81,17 @@ function CreateOrgRoleForm() {
         <FormAlert message={createRoleError} />
 
         <FormSection title="Quick presets (click to pre-fill)" />
-        <div className={formPageStyles.presets}>
-          {PRESETS.map((preset) => (
-            <button
-              key={preset.name}
-              type="button"
-              className={formPageStyles.preset}
-              aria-pressed={newRoleName === preset.name}
-              onClick={() => {
-                setNewRoleName(preset.name);
-                setNewRoleDescription(preset.desc);
-              }}
-            >
-              <div className={formPageStyles.presetTitle}>＋ {preset.name}</div>
-              <div className={formPageStyles.presetDesc}>{preset.desc}</div>
-            </button>
-          ))}
-        </div>
+        <PresetRadios
+          name="nr-preset"
+          label="Quick presets"
+          options={PRESETS}
+          selected={(preset) => newRoleName === preset.name}
+          disabled={creatingRole}
+          onSelect={(preset) => {
+            setNewRoleName(preset.name);
+            setNewRoleDescription(preset.desc);
+          }}
+        />
 
         <FormSection title="Role details" />
         <Field htmlFor="nr-name" label="Role name *" icon="shield">
