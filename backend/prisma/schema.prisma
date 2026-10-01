@@ -197,6 +197,9 @@ model Organisation {
   teamMessages          TeamMessage[]
   packageChangeRequests PackageChangeRequest[]
   mediaFiles            MediaFile[]
+  metaPageConnections   MetaPageConnection[]
+  marketingConnections  MarketingConnection[]
+  marketingOrgAccess    MarketingOrgPlatformAccess[]
 
   @@map("organisations")
   @@schema("identity")
@@ -1219,9 +1222,31 @@ model Lead {
   parking          String?
   requirementNotes String?  @map("requirement_notes")
   campaign         String?
+  // Marketing channel medium (e.g. Paid Social) — distinct from utmMedium.
+  medium           String?
+  campaignId       String?  @map("campaign_id")
+  adSet            String?  @map("ad_set")
+  adSetId          String?  @map("ad_set_id")
+  ad               String?
+  adId             String?  @map("ad_id")
   utmSource        String?  @map("utm_source")
   utmMedium        String?  @map("utm_medium")
   utmCampaign      String?  @map("utm_campaign")
+  utmTerm          String?  @map("utm_term")
+  utmContent       String?  @map("utm_content")
+  landingPageUrl   String?  @map("landing_page_url")
+  fbclid           String?
+  gclid            String?
+  // Marketing platform key (meta, google_ads, website, …) for Lead Center Source.
+  platform         String?
+  referrer         String?
+  landingPage      String?  @map("landing_page")
+  firstTouchSource String?  @map("first_touch_source")
+  lastTouchSource  String?  @map("last_touch_source")
+  // Meta Lead Ads identity — used for idempotent webhook ingest.
+  metaLeadgenId    String?  @unique @map("meta_leadgen_id")
+  metaFormId       String?  @map("meta_form_id")
+  metaPageId       String?  @map("meta_page_id")
   temperature      String?
   tags             String[] @default([]) @map("tags")
   consentWhatsapp  Boolean  @default(false) @map("consent_whatsapp")
@@ -1240,8 +1265,248 @@ model Lead {
   @@index([assignedToId])
   @@index([status])
   @@index([createdAt])
+  @@index([utmSource])
+  @@index([campaignId])
+  @@index([platform])
   @@map("leads")
   @@schema("templates")
+}
+
+// ---------------------------------------------------------------------------
+// Platform-level attribution / tracking labels. Super Admin enables or
+// disables each key; enabled labels surface in org Lead Center and on new
+// lead capture. Keys are stable (source, medium, campaign, …); `label` is
+// the display name orgs see (Organisation Labels).
+// ---------------------------------------------------------------------------
+
+model PlatformAttributionLabel {
+  id        String   @id @default(uuid())
+  // Stable machine key — matches Lead column / capture field names.
+  key       String   @unique
+  label     String
+  sortOrder Int      @default(0) @map("sort_order")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([enabled])
+  @@map("platform_attribution_labels")
+  @@schema("identity")
+}
+
+// ---------------------------------------------------------------------------
+// Facebook / Instagram Lead Ads — org-connected Pages. Platform Meta App
+// credentials live in env (META_APP_ID / META_APP_SECRET); each org OAuth-
+// connects one or more Pages whose leadgen webhooks create CRM leads.
+// ---------------------------------------------------------------------------
+
+model MetaPageConnection {
+  id           String   @id @default(uuid())
+  orgId        String   @map("org_id")
+  pageId       String   @map("page_id")
+  pageName     String   @map("page_name")
+  // Long-lived Page access token (never returned raw to the client).
+  accessToken  String   @map("access_token")
+  // Optional default project for leads from this Page.
+  projectId    String?  @map("project_id")
+  connectedBy  String?  @map("connected_by")
+  connectedAt  DateTime @default(now()) @map("connected_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  organisation Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@unique([orgId, pageId])
+  @@index([pageId])
+  @@index([orgId])
+  @@map("meta_page_connections")
+  @@schema("identity")
+}
+
+// ---------------------------------------------------------------------------
+// Marketing Integration Hub — platform-agnostic connections, synced campaign
+// hierarchy, metrics, and sync logs. Campaign creation stays on the official
+// platforms; we only sync and attribute.
+// ---------------------------------------------------------------------------
+
+model MarketingPlatform {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  name        String
+  description String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  enabled     Boolean  @default(true)
+  // Whether orgs may attempt OAuth (false = website-only / stub).
+  supportsOAuth   Boolean @default(false) @map("supports_oauth")
+  supportsWebhook Boolean @default(false) @map("supports_webhook")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  connections MarketingConnection[]
+  orgAccess   MarketingOrgPlatformAccess[]
+
+  @@index([enabled])
+  @@map("marketing_platforms")
+  @@schema("identity")
+}
+
+model MarketingOrgPlatformAccess {
+  id           String  @id @default(uuid())
+  orgId        String  @map("org_id")
+  platformKey  String  @map("platform_key")
+  allowed      Boolean @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  organisation Organisation      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  platform     MarketingPlatform @relation(fields: [platformKey], references: [key], onDelete: Cascade)
+
+  @@unique([orgId, platformKey])
+  @@index([orgId])
+  @@map("marketing_org_platform_access")
+  @@schema("identity")
+}
+
+model MarketingConnection {
+  id                  String    @id @default(uuid())
+  orgId               String    @map("org_id")
+  platformKey         String    @map("platform_key")
+  status              String    @default("connected") // connected | error | disconnected
+  externalAccountId   String    @map("external_account_id")
+  externalAccountName String    @map("external_account_name")
+  accessToken         String?   @map("access_token")
+  refreshToken        String?   @map("refresh_token")
+  projectId           String?   @map("project_id")
+  metadata            Json?
+  lastSyncAt          DateTime? @map("last_sync_at")
+  lastError           String?   @map("last_error")
+  connectedBy         String?   @map("connected_by")
+  connectedAt         DateTime  @default(now()) @map("connected_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  organisation Organisation      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  platform     MarketingPlatform @relation(fields: [platformKey], references: [key], onDelete: Restrict)
+  project      Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  campaigns    MarketingCampaign[]
+  syncLogs     MarketingSyncLog[]
+
+  @@unique([orgId, platformKey, externalAccountId])
+  @@index([orgId])
+  @@index([platformKey])
+  @@index([externalAccountId])
+  @@map("marketing_connections")
+  @@schema("identity")
+}
+
+model MarketingCampaign {
+  id               String   @id @default(uuid())
+  orgId            String   @map("org_id")
+  connectionId     String   @map("connection_id")
+  platformKey      String   @map("platform_key")
+  externalId       String   @map("external_id")
+  name             String
+  status           String?
+  spend            Decimal  @default(0) @db.Decimal(14, 2)
+  impressions      BigInt   @default(0)
+  clicks           BigInt   @default(0)
+  leadsCount       Int      @default(0) @map("leads_count")
+  metadata         Json?
+  syncedAt         DateTime @default(now()) @map("synced_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  connection MarketingConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  adSets     MarketingAdSet[]
+
+  @@unique([orgId, platformKey, externalId])
+  @@index([orgId])
+  @@index([connectionId])
+  @@map("marketing_campaigns")
+  @@schema("identity")
+}
+
+model MarketingAdSet {
+  id           String  @id @default(uuid())
+  orgId        String  @map("org_id")
+  campaignId   String  @map("campaign_id")
+  externalId   String  @map("external_id")
+  name         String
+  status       String?
+  spend        Decimal @default(0) @db.Decimal(14, 2)
+  impressions  BigInt  @default(0)
+  clicks       BigInt  @default(0)
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  campaign MarketingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  ads      MarketingAd[]
+
+  @@unique([campaignId, externalId])
+  @@index([orgId])
+  @@map("marketing_ad_sets")
+  @@schema("identity")
+}
+
+model MarketingAd {
+  id          String  @id @default(uuid())
+  orgId       String  @map("org_id")
+  adSetId     String  @map("ad_set_id")
+  externalId  String  @map("external_id")
+  name        String
+  status      String?
+  spend       Decimal @default(0) @db.Decimal(14, 2)
+  impressions BigInt  @default(0)
+  clicks      BigInt  @default(0)
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  adSet MarketingAdSet @relation(fields: [adSetId], references: [id], onDelete: Cascade)
+
+  @@unique([adSetId, externalId])
+  @@index([orgId])
+  @@map("marketing_ads")
+  @@schema("identity")
+}
+
+model MarketingMetricSnapshot {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  platformKey String   @map("platform_key")
+  date        DateTime @db.Date
+  spend       Decimal  @default(0) @db.Decimal(14, 2)
+  impressions BigInt   @default(0)
+  clicks      BigInt   @default(0)
+  leadsCount  Int      @default(0) @map("leads_count")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([orgId, platformKey, date])
+  @@index([orgId])
+  @@map("marketing_metric_snapshots")
+  @@schema("identity")
+}
+
+model MarketingSyncLog {
+  id           String   @id @default(uuid())
+  orgId        String?  @map("org_id")
+  connectionId String?  @map("connection_id")
+  platformKey  String   @map("platform_key")
+  direction    String   @default("inbound") // inbound | outbound
+  status       String // success | failed
+  message      String?
+  detail       Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  connection MarketingConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
+  @@index([platformKey])
+  @@index([createdAt])
+  @@index([status])
+  @@map("marketing_sync_logs")
+  @@schema("identity")
 }
 
 // ---------------------------------------------------------------------------
@@ -1530,6 +1795,8 @@ model Project {
   salesAgents  ProjectSalesAgent[]
   leads        Lead[]
   teams        TeamProject[]
+  metaPageConnections MetaPageConnection[]
+  marketingConnections MarketingConnection[]
 
   @@index([orgId])
   @@index([managerId])

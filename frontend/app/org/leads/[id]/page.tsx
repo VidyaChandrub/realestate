@@ -9,9 +9,10 @@ import { LeadStatusSelect } from "@/components/org/lead-status-select";
 import { StageBadge } from "@/lib/lead-stages";
 import { useAuth } from "@/lib/auth-context";
 import { isOrgAdmin } from "@/lib/session";
-import { addCrmLeadNote, assignCrmLead, getCrmLead, updateCrmLead, updateCrmLeadNextAction } from "@/lib/api";
-import type { CrmLead, CrmLeadStatus } from "@/lib/types";
+import { addCrmLeadNote, assignCrmLead, getCrmLead, getOrgAttributionLabels, updateCrmLead, updateCrmLeadNextAction } from "@/lib/api";
+import type { AttributionLabel, CrmLead, CrmLeadStatus } from "@/lib/types";
 import { leadField, leadDisplaySource } from "@/lib/lead-display";
+import { attributionRows } from "@/lib/lead-attribution";
 import "@/app/org/org.css";
 
 const field = leadField;
@@ -65,6 +66,7 @@ export default function OrgLeadDetailPage() {
   const id = Array.isArray(routeId) ? routeId[0] : routeId;
   const { user, isLoading: authLoading, hasPermission } = useAuth();
   const [lead, setLead] = useState<CrmLead | null>(null);
+  const [attributionLabels, setAttributionLabels] = useState<AttributionLabel[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -110,6 +112,9 @@ export default function OrgLeadDetailPage() {
       })
       .catch((err) => setLoadError(err instanceof Error ? err.message : "Failed to load lead."))
       .finally(() => setLoading(false));
+    getOrgAttributionLabels()
+      .then(setAttributionLabels)
+      .catch(() => setAttributionLabels([]));
   }, [id, authLoading, user]);
 
   async function confirmStatus(status: CrmLeadStatus, statusNote: string) {
@@ -624,6 +629,33 @@ export default function OrgLeadDetailPage() {
               </div>
             </div>
           </Reveal>
+
+          {/* Attribution — Organisation Labels enabled by Super Admin */}
+          {lead && attributionRows(lead, attributionLabels).length > 0 ? (
+            <Reveal delay={1}>
+              <div className="ld-card">
+                <div className="ld-card-head">
+                  <h3 className="ld-card-title">Marketing Attribution</h3>
+                </div>
+                <div className="ld-card-body">
+                  {attributionRows(lead, attributionLabels).map((row) => (
+                    <div className="ld-row" key={row.key}>
+                      <span className="ld-row-key">{row.label}</span>
+                      <span className="ld-row-val">
+                        {row.key === "landing_page_url" ? (
+                          <a href={row.value} target="_blank" rel="noreferrer">
+                            {row.value}
+                          </a>
+                        ) : (
+                          row.value
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+          ) : null}
 
           {/* Card 2: Pipeline Status */}
           <Reveal delay={2}>

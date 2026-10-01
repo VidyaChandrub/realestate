@@ -114,6 +114,7 @@ import type {
   LeadImportResult,
 } from "./types";
 import type { LeadImportRow } from "./lead-import";
+import { getStoredAttribution } from "./openpage/form-runtime";
 
 const API_BASE = "/api";
 
@@ -587,7 +588,10 @@ export async function submitLead(input: LeadSubmission): Promise<void> {
       ...(unitId ? { unitId } : {}),
       formName: input.formName,
       source: input.source,
-      data: input.fields ?? {},
+      data: {
+        ...(input.fields ?? {}),
+        ...(typeof window !== "undefined" ? getStoredAttribution() : {}),
+      },
     }),
   });
 }
@@ -1150,6 +1154,20 @@ export async function deleteStandaloneUnit(
   });
 }
 
+/** List org projects (paginated). */
+export async function getOrgProjects(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}): Promise<{ data: import("./types").Project[]; total?: number }> {
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.search) q.set("search", params.search);
+  const s = q.toString();
+  return apiFetch(`/org/projects${s ? `?${s}` : "?page=1&limit=100"}`);
+}
+
 // --- Project sales agents (Step 7 of the onboarding wizard) ---
 
 export async function getProjectSalesAgents(
@@ -1291,6 +1309,263 @@ export async function sendOrgSmtpTestEmail(
       body: JSON.stringify(input),
     },
   );
+}
+
+// --- Attribution labels (Super Admin + org Lead Center) ---
+
+export async function getAdminAttributionLabels(): Promise<
+  import("./types").AttributionLabel[]
+> {
+  return apiFetch("/admin/attribution-labels");
+}
+
+export async function createAdminAttributionLabel(input: {
+  key: string;
+  label: string;
+  enabled?: boolean;
+  sortOrder?: number;
+}): Promise<import("./types").AttributionLabel> {
+  return apiFetch("/admin/attribution-labels", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAdminAttributionLabel(
+  id: string,
+  input: { enabled?: boolean; label?: string; sortOrder?: number },
+): Promise<import("./types").AttributionLabel> {
+  return apiFetch(`/admin/attribution-labels/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteAdminAttributionLabel(
+  id: string,
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/admin/attribution-labels/${id}`, { method: "DELETE" });
+}
+
+export async function getOrgAttributionLabels(): Promise<
+  import("./types").AttributionLabel[]
+> {
+  return apiFetch("/org/attribution-labels");
+}
+
+// --- Facebook / Meta Lead Ads ---
+
+export async function getAdminMetaConfig(): Promise<
+  import("./types").MetaPublicConfig
+> {
+  return apiFetch("/admin/meta/config");
+}
+
+export async function getOrgMetaConfig(): Promise<
+  import("./types").MetaPublicConfig
+> {
+  return apiFetch("/org/meta/config");
+}
+
+export async function getMetaConnectUrl(): Promise<{
+  url: string;
+  state: string;
+}> {
+  return apiFetch("/org/meta/connect");
+}
+
+export async function getMetaConnections(): Promise<
+  import("./types").MetaPageConnection[]
+> {
+  return apiFetch("/org/meta/connections");
+}
+
+export async function updateMetaConnection(
+  id: string,
+  input: { projectId?: string | null },
+): Promise<import("./types").MetaPageConnection> {
+  return apiFetch(`/org/meta/connections/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function disconnectMetaConnection(
+  id: string,
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/org/meta/connections/${id}`, { method: "DELETE" });
+}
+
+export async function connectMetaWithToken(input: {
+  pageId: string;
+  pageName: string;
+  accessToken: string;
+  projectId?: string | null;
+}): Promise<import("./types").MetaPageConnection & { imported?: number }> {
+  return apiFetch("/org/meta/connect-token", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// --- Marketing Integration Hub ---
+
+export async function getMarketingDashboard(): Promise<
+  import("./types").MarketingDashboard
+> {
+  return apiFetch("/org/marketing/dashboard");
+}
+
+export async function getMarketingPlatforms(): Promise<
+  import("./types").MarketingPlatformCard[]
+> {
+  return apiFetch("/org/marketing/platforms");
+}
+
+export async function getMarketingAppsOverview(): Promise<
+  import("./types").MarketingAppsOverview
+> {
+  return apiFetch("/org/marketing/apps-overview");
+}
+
+export async function getMarketingPlatform(
+  key: string,
+): Promise<
+  import("./types").MarketingPlatformCard & {
+    metaConfig?: import("./types").MetaPublicConfig | null;
+    oauthConfigured?: boolean;
+    webhookUrl?: string | null;
+  }
+> {
+  return apiFetch(`/org/marketing/platforms/${encodeURIComponent(key)}`);
+}
+
+export async function getMarketingConnectUrl(
+  key: string,
+): Promise<{ url: string; state: string; webhookUrl?: string }> {
+  return apiFetch(`/org/marketing/platforms/${encodeURIComponent(key)}/connect`);
+}
+
+export async function connectMarketingCredentials(
+  key: string,
+  input: {
+    externalAccountId: string;
+    externalAccountName?: string;
+    accessToken: string;
+    refreshToken?: string;
+    projectId?: string | null;
+  },
+): Promise<import("./types").MarketingConnection> {
+  return apiFetch(
+    `/org/marketing/platforms/${encodeURIComponent(key)}/connect-credentials`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function getOrgMarketingSyncLogs(
+  limit = 50,
+): Promise<import("./types").MarketingSyncLog[]> {
+  return apiFetch(`/org/marketing/sync-logs?limit=${limit}`);
+}
+
+export async function getMarketingConnections(
+  platformKey?: string,
+): Promise<import("./types").MarketingConnection[]> {
+  const q = platformKey
+    ? `?platformKey=${encodeURIComponent(platformKey)}`
+    : "";
+  return apiFetch(`/org/marketing/connections${q}`);
+}
+
+export async function updateMarketingConnection(
+  id: string,
+  input: { projectId?: string | null },
+): Promise<import("./types").MarketingConnection> {
+  return apiFetch(`/org/marketing/connections/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function disconnectMarketingConnection(
+  id: string,
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/org/marketing/connections/${id}`, { method: "DELETE" });
+}
+
+export async function syncMarketingPlatform(key: string): Promise<{
+  ok: boolean;
+  synced: number;
+  failed: number;
+  results: Array<{ ok: boolean; message: string; connectionId: string }>;
+}> {
+  return apiFetch(
+    `/org/marketing/platforms/${encodeURIComponent(key)}/sync`,
+    { method: "POST" },
+  );
+}
+
+export async function syncMarketingConnection(id: string): Promise<{
+  ok: boolean;
+  message: string;
+  connectionId: string;
+  platformKey: string;
+}> {
+  return apiFetch(`/org/marketing/connections/${encodeURIComponent(id)}/sync`, {
+    method: "POST",
+  });
+}
+
+export async function getAdminMarketingPlatforms(): Promise<
+  import("./types").MarketingPlatformAdmin[]
+> {
+  return apiFetch("/admin/marketing/platforms");
+}
+
+export async function createAdminMarketingPlatform(input: {
+  key: string;
+  name: string;
+  description?: string | null;
+  enabled?: boolean;
+  supportsOAuth?: boolean;
+  supportsWebhook?: boolean;
+}): Promise<import("./types").MarketingPlatformAdmin> {
+  return apiFetch("/admin/marketing/platforms", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAdminMarketingPlatform(
+  id: string,
+  input: { enabled?: boolean; name?: string; description?: string | null },
+): Promise<import("./types").MarketingPlatformAdmin> {
+  return apiFetch(`/admin/marketing/platforms/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteAdminMarketingPlatform(
+  id: string,
+): Promise<{ ok: boolean }> {
+  return apiFetch(`/admin/marketing/platforms/${id}`, { method: "DELETE" });
+}
+
+export async function getAdminMarketingSyncLogs(params?: {
+  status?: string;
+  platformKey?: string;
+  limit?: number;
+}): Promise<import("./types").MarketingSyncLog[]> {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.platformKey) q.set("platformKey", params.platformKey);
+  if (params?.limit) q.set("limit", String(params.limit));
+  const s = q.toString();
+  return apiFetch(`/admin/marketing/sync-logs${s ? `?${s}` : ""}`);
 }
 
 export async function getOrgEmailLogs(params?: {

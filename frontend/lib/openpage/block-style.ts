@@ -1,5 +1,10 @@
 import type { CSSProperties } from "react";
-import type { BlockConfig, BlockStyle } from "@/components/openpage/blocks/types";
+import type {
+  BlockConfig,
+  BlockInteractionState,
+  BlockStyle,
+  BlockTypography,
+} from "@/components/openpage/blocks/types";
 import type { Device } from "@/lib/openpage/types";
 
 /** Merge the device-specific value overrides over the desktop style. */
@@ -61,6 +66,35 @@ export function applyBlockStyle(style?: BlockStyle): CSSProperties {
   if (style.overflow) s.overflow = style.overflow as CSSProperties["overflow"];
   if (style.zIndex) s.zIndex = Number.parseInt(style.zIndex, 10);
 
+  /* Layout */
+  if (style.display) s.display = style.display as CSSProperties["display"];
+  if (style.flexDirection) s.flexDirection = style.flexDirection as CSSProperties["flexDirection"];
+  if (style.flexWrap) s.flexWrap = style.flexWrap as CSSProperties["flexWrap"];
+  if (style.flex) s.flex = style.flex;
+  if (style.justifyContent) s.justifyContent = style.justifyContent as CSSProperties["justifyContent"];
+  if (style.alignItems) s.alignItems = style.alignItems as CSSProperties["alignItems"];
+  if (style.alignSelf) s.alignSelf = style.alignSelf as CSSProperties["alignSelf"];
+  if (style.alignContent) s.alignContent = style.alignContent as CSSProperties["alignContent"];
+  if (style.gap) s.gap = formatUnit(style.gap);
+  if (style.rowGap) s.rowGap = formatUnit(style.rowGap);
+  if (style.columnGap) s.columnGap = formatUnit(style.columnGap);
+  if (style.height) s.height = formatUnit(style.height);
+  if (style.minWidth) s.minWidth = formatUnit(style.minWidth);
+  if (style.maxHeight) s.maxHeight = formatUnit(style.maxHeight);
+  if (style.position) s.position = style.position as CSSProperties["position"];
+  if (style.top) s.top = formatUnit(style.top);
+  if (style.right) s.right = formatUnit(style.right);
+  if (style.bottom) s.bottom = formatUnit(style.bottom);
+  if (style.left) s.left = formatUnit(style.left);
+  if (style.objectFit) s.objectFit = style.objectFit as CSSProperties["objectFit"];
+  if (style.objectPosition) s.objectPosition = style.objectPosition;
+  if (style.aspectRatio) s.aspectRatio = style.aspectRatio;
+  if (style.transform) s.transform = style.transform;
+  if (style.filter) s.filter = style.filter;
+  if (style.transition) s.transition = style.transition;
+  if (style.cursor) s.cursor = style.cursor;
+  if (style.hidden) s.display = "none";
+
   if (style.sectionPadding) s.padding = style.sectionPadding;
   if (style.sectionMaxWidth) s.maxWidth = style.sectionMaxWidth;
   if (style.sectionAlignment) s.textAlign = style.sectionAlignment as CSSProperties["textAlign"];
@@ -73,8 +107,10 @@ export function applyBlockStyle(style?: BlockStyle): CSSProperties {
   if (typo?.fontFamily) s.fontFamily = `"${typo.fontFamily}", sans-serif`;
   if (typo?.fontSize) s.fontSize = formatUnit(typo.fontSize);
   if (typo?.fontWeight) s.fontWeight = typo.fontWeight as CSSProperties["fontWeight"];
+  if (typo?.fontStyle) s.fontStyle = typo.fontStyle as CSSProperties["fontStyle"];
   if (typo?.lineHeight) s.lineHeight = typo.lineHeight;
   if (typo?.letterSpacing) s.letterSpacing = formatUnit(typo.letterSpacing);
+  if (typo?.wordSpacing) s.wordSpacing = formatUnit(typo.wordSpacing);
   if (typo?.textTransform) s.textTransform = typo.textTransform as CSSProperties["textTransform"];
   if (typo?.textDecoration) s.textDecoration = typo.textDecoration as CSSProperties["textDecoration"];
   if (typo?.color) s.color = typo.color;
@@ -140,8 +176,6 @@ export function applyBlockStyleForDevice(
   return css;
 }
 
-const BLOCK_TEXT_SELECTOR = "h1,h2,h3,h4,h5,h6,p,span,li,label,small,strong,em,figcaption,blockquote";
-
 /**
  * Scoped `!important` stylesheet so user styles actually beat the block's own
  * utility classes. Without this, `font-size`/`color` on the section wrapper are
@@ -175,6 +209,33 @@ export function blockStyleTag(blockId: string, style?: BlockStyle): string {
   if (style.boxShadow) rootRules.push(`box-shadow:${style.boxShadow} !important`);
   if (style.opacity) rootRules.push(`opacity:${style.opacity} !important`);
 
+  if (style.display) rootRules.push(`display:${style.display} !important`);
+  if (style.flexDirection) rootRules.push(`flex-direction:${style.flexDirection} !important`);
+  if (style.flexWrap) rootRules.push(`flex-wrap:${style.flexWrap} !important`);
+  if (style.flex) rootRules.push(`flex:${style.flex} !important`);
+  if (style.justifyContent) rootRules.push(`justify-content:${style.justifyContent} !important`);
+  if (style.alignItems) rootRules.push(`align-items:${style.alignItems} !important`);
+  if (style.alignSelf) rootRules.push(`align-self:${style.alignSelf} !important`);
+  if (style.alignContent) rootRules.push(`align-content:${style.alignContent} !important`);
+  if (style.gap) rootRules.push(`gap:${formatUnit(style.gap)} !important`);
+  if (style.rowGap) rootRules.push(`row-gap:${formatUnit(style.rowGap)} !important`);
+  if (style.columnGap) rootRules.push(`column-gap:${formatUnit(style.columnGap)} !important`);
+  if (style.height) rootRules.push(`height:${formatUnit(style.height)} !important`);
+  if (style.minWidth) rootRules.push(`min-width:${formatUnit(style.minWidth)} !important`);
+  if (style.maxHeight) rootRules.push(`max-height:${formatUnit(style.maxHeight)} !important`);
+  if (style.position) rootRules.push(`position:${style.position} !important`);
+  if (style.top) rootRules.push(`top:${formatUnit(style.top)} !important`);
+  if (style.right) rootRules.push(`right:${formatUnit(style.right)} !important`);
+  if (style.bottom) rootRules.push(`bottom:${formatUnit(style.bottom)} !important`);
+  if (style.left) rootRules.push(`left:${formatUnit(style.left)} !important`);
+  if (style.objectFit) rootRules.push(`object-fit:${style.objectFit} !important`);
+  if (style.objectPosition) rootRules.push(`object-position:${style.objectPosition} !important`);
+  if (style.aspectRatio) rootRules.push(`aspect-ratio:${style.aspectRatio} !important`);
+  if (style.transform) rootRules.push(`transform:${style.transform} !important`);
+  if (style.filter) rootRules.push(`filter:${style.filter} !important`);
+  if (style.transition) rootRules.push(`transition:${style.transition} !important`);
+  if (style.cursor) rootRules.push(`cursor:${style.cursor} !important`);
+
   const t = style.typography;
   if (t?.color) {
     textRules.push(`color:${t.color} !important`);
@@ -193,8 +254,13 @@ export function blockStyleTag(blockId: string, style?: BlockStyle): string {
     textRules.push(`font-weight:${t.fontWeight} !important`);
     rootRules.push(`font-weight:${t.fontWeight} !important`);
   }
+  if (t?.fontStyle) {
+    textRules.push(`font-style:${t.fontStyle} !important`);
+    rootRules.push(`font-style:${t.fontStyle} !important`);
+  }
   if (t?.lineHeight) textRules.push(`line-height:${t.lineHeight} !important`);
   if (t?.letterSpacing) textRules.push(`letter-spacing:${formatUnit(t.letterSpacing)} !important`);
+  if (t?.wordSpacing) textRules.push(`word-spacing:${formatUnit(t.wordSpacing)} !important`);
   if (t?.textTransform) textRules.push(`text-transform:${t.textTransform} !important`);
   if (t?.textDecoration) textRules.push(`text-decoration:${t.textDecoration} !important`);
   if (t?.textAlign) {
@@ -228,6 +294,177 @@ export function blockStyleTag(blockId: string, style?: BlockStyle): string {
       `[data-block-id="${blockId}"] small`,
     ].join(", ");
     parts.push(`${textSelectors} { ${textRules.join("; ")}; }`);
+  }
+  if (style.hover) {
+    const hv = stateDecls(style.hover);
+    if (hv.length) {
+      const hoverSel = [
+        `[data-block-id="${blockId}"]`,
+        `[data-block-id="${blockId}"] > *`,
+        `[data-block-id="${blockId}"] section`,
+      ].join(", ");
+      parts.push(`${hoverSel}:hover { ${hv.join("; ")}; }`);
+    }
+  }
+  return parts.join("\n");
+}
+
+/* -------------------------------------------------------------------------- */
+/*                     Shared declaration builders                            */
+/* -------------------------------------------------------------------------- */
+
+/** Declarations for an interaction state (hover / active). */
+export function stateDecls(state?: BlockInteractionState): string[] {
+  if (!state) return [];
+  const out: string[] = [];
+  if (state.color) out.push(`color:${state.color} !important`);
+  if (state.backgroundColor) out.push(`background-color:${state.backgroundColor} !important`);
+  if (state.borderColor) out.push(`border-color:${state.borderColor} !important`);
+  if (state.boxShadow) out.push(`box-shadow:${state.boxShadow} !important`);
+  if (state.opacity) out.push(`opacity:${state.opacity} !important`);
+  if (state.transform) out.push(`transform:${state.transform} !important`);
+  if (state.textDecoration) out.push(`text-decoration:${state.textDecoration} !important`);
+  return out;
+}
+
+/** Typography declarations shared by block and element scopes. */
+function typographyDecls(t?: BlockTypography, withRoot = false): string[] {
+  if (!t) return [];
+  const out: string[] = [];
+  if (t.color) out.push(`color:${t.color} !important`);
+  if (t.fontSize && t.fontSize.trim()) out.push(`font-size:${formatUnit(t.fontSize)} !important`);
+  if (t.fontFamily) out.push(`font-family:"${t.fontFamily}", -apple-system, system-ui, sans-serif !important`);
+  if (t.fontWeight) out.push(`font-weight:${t.fontWeight} !important`);
+  if (t.fontStyle) out.push(`font-style:${t.fontStyle} !important`);
+  if (t.lineHeight) out.push(`line-height:${t.lineHeight} !important`);
+  if (t.letterSpacing) out.push(`letter-spacing:${formatUnit(t.letterSpacing)} !important`);
+  if (t.wordSpacing) out.push(`word-spacing:${formatUnit(t.wordSpacing)} !important`);
+  if (t.textTransform) out.push(`text-transform:${t.textTransform} !important`);
+  if (t.textDecoration) out.push(`text-decoration:${t.textDecoration} !important`);
+  if (t.textAlign) out.push(`text-align:${t.textAlign} !important`);
+  void withRoot;
+  return out;
+}
+
+const FLEX_PROPS: Array<[keyof BlockStyle, string]> = [
+  ["display", "display"],
+  ["flexDirection", "flex-direction"],
+  ["flexWrap", "flex-wrap"],
+  ["flex", "flex"],
+  ["justifyContent", "justify-content"],
+  ["alignItems", "align-items"],
+  ["alignSelf", "align-self"],
+  ["alignContent", "align-content"],
+  ["objectFit", "object-fit"],
+  ["objectPosition", "object-position"],
+  ["position", "position"],
+  ["transform", "transform"],
+  ["filter", "filter"],
+  ["transition", "transition"],
+  ["cursor", "cursor"],
+];
+
+const LENGTH_PROPS: Array<[keyof BlockStyle, string]> = [
+  ["width", "width"],
+  ["height", "height"],
+  ["minWidth", "min-width"],
+  ["minHeight", "min-height"],
+  ["maxWidth", "max-width"],
+  ["maxHeight", "max-height"],
+  ["gap", "gap"],
+  ["rowGap", "row-gap"],
+  ["columnGap", "column-gap"],
+  ["marginTop", "margin-top"],
+  ["marginBottom", "margin-bottom"],
+  ["marginLeft", "margin-left"],
+  ["marginRight", "margin-right"],
+  ["paddingTop", "padding-top"],
+  ["paddingBottom", "padding-bottom"],
+  ["paddingLeft", "padding-left"],
+  ["paddingRight", "padding-right"],
+  ["top", "top"],
+  ["right", "right"],
+  ["bottom", "bottom"],
+  ["left", "left"],
+  ["borderRadius", "border-radius"],
+  ["borderWidth", "border-width"],
+];
+
+const PLAIN_PROPS: Array<[keyof BlockStyle, string]> = [
+  ["backgroundColor", "background-color"],
+  ["backgroundImage", "background-image"],
+  ["backgroundSize", "background-size"],
+  ["backgroundPosition", "background-position"],
+  ["backgroundRepeat", "background-repeat"],
+  ["borderColor", "border-color"],
+  ["borderStyle", "border-style"],
+  ["boxShadow", "box-shadow"],
+  ["opacity", "opacity"],
+  ["overflow", "overflow"],
+  ["zIndex", "z-index"],
+  ["aspectRatio", "aspect-ratio"],
+];
+
+/**
+ * Every declaration for a style object, used by the element scope. Background
+ * images accept either a raw URL or an already-formed `url(...)` value.
+ */
+function allDecls(style: BlockStyle): string[] {
+  const out: string[] = [];
+  for (const [key, prop] of FLEX_PROPS) {
+    const value = style[key];
+    if (typeof value === "string" && value) out.push(`${prop}:${value} !important`);
+  }
+  for (const [key, prop] of LENGTH_PROPS) {
+    const value = style[key];
+    if (typeof value === "string" && value) out.push(`${prop}:${formatUnit(value)} !important`);
+  }
+  for (const [key, prop] of PLAIN_PROPS) {
+    const value = style[key];
+    if (typeof value === "string" && value) {
+      const v = prop === "background-image" && !value.startsWith("url(") ? `url(${value})` : value;
+      out.push(`${prop}:${v} !important`);
+    }
+  }
+  if (style.alignment) out.push(`text-align:${style.alignment} !important`);
+  out.push(...typographyDecls(style.typography));
+  return out;
+}
+
+/**
+ * Repeat the attribute selector so deeper elements always outrank the
+ * block-level `!important` rules and their own ancestors, independent of the
+ * order in which the `<style>` tags happen to appear in the DOM.
+ */
+function specificity(base: string, depth: number): string {
+  return `${Array.from({ length: Math.max(1, depth) }, () => base).join("")}`;
+}
+
+/**
+ * Element-scoped stylesheet. Element rules must use `!important` (like block
+ * rules) because both compete with the section's Tailwind utility classes.
+ */
+export function elementStyleTag(
+  key: string,
+  style: BlockStyle | undefined,
+  depth = 1,
+): string {
+  if (!style) return "";
+  const base = `[data-el-id="${key}"]`;
+  const sel = specificity(base, depth + 1);
+  const parts: string[] = [];
+
+  const decls = allDecls(style);
+  if (style.hidden) decls.push("display:none !important");
+  if (decls.length) parts.push(`${sel} { ${decls.join("; ")}; }`);
+
+  if (style.hover) {
+    const hv = stateDecls(style.hover);
+    if (hv.length) parts.push(`${sel}:hover { ${hv.join("; ")}; }`);
+  }
+  if (style.active) {
+    const ac = stateDecls(style.active);
+    if (ac.length) parts.push(`${sel}:active, ${sel}[data-active="true"] { ${ac.join("; ")}; }`);
   }
   return parts.join("\n");
 }

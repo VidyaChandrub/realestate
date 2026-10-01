@@ -167,6 +167,36 @@ export class UpdateLeadDto {
   @IsOptional()
   @IsString()
   @MaxLength(160)
+  medium?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  campaignId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  adSet?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  adSetId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  ad?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  adId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
   utmSource?: string | null;
 
   @IsOptional()
@@ -178,6 +208,31 @@ export class UpdateLeadDto {
   @IsString()
   @MaxLength(160)
   utmCampaign?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  utmTerm?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  utmContent?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  landingPageUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  fbclid?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  gclid?: string | null;
 
   // --- Status & scoring (temperature only; status stays on /assign) ---
   @IsOptional()

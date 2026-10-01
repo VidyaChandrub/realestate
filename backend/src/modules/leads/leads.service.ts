@@ -19,6 +19,10 @@ import {
   leadContactFromData,
   normalizeLeadData,
 } from '../../common/utils/lead-data.util';
+import {
+  attributionToPrismaData,
+  resolveAttribution,
+} from '../../common/utils/lead-attribution.util';
 import { isValidLoosePhone } from '../../common/utils/phone.util';
 import {
   actorLeadOrClauses,
@@ -293,6 +297,26 @@ export class LeadsService implements OnModuleInit {
       unitId: dto.unitId,
       projectName,
     });
+
+    // Promote UTM / ad params from the form blob onto structured columns so
+    // Lead Center attribution and reporting stay filterable.
+    // Do not force platform:'website' — UTM / referrer / source infer via
+    // Integration Engine attribution (fbclid → meta, gclid → google_ads, etc.).
+    const attribution = resolveAttribution(data as Record<string, unknown>, {
+      source: dto.source ?? 'website',
+      landingPageUrl:
+        typeof (data as Record<string, unknown>).landingPageUrl === 'string'
+          ? String((data as Record<string, unknown>).landingPageUrl)
+          : typeof (data as Record<string, unknown>).landing_page_url ===
+              'string'
+            ? String((data as Record<string, unknown>).landing_page_url)
+            : null,
+      referrer:
+        typeof (data as Record<string, unknown>).referrer === 'string'
+          ? String((data as Record<string, unknown>).referrer)
+          : null,
+    });
+
     const existing = await this.findRecentDuplicate(orgId, projectId, data);
     if (existing) {
       if (resolvedLandingPageId) {
@@ -305,6 +329,9 @@ export class LeadsService implements OnModuleInit {
           },
         }).catch(() => {});
       }
+      const attrData = attributionToPrismaData(attribution);
+      // Preserve original first-touch on duplicate merges.
+      delete attrData.firstTouchSource;
       return this.prisma.lead.update({
         where: { id: existing.id },
         data: {
@@ -312,7 +339,8 @@ export class LeadsService implements OnModuleInit {
           landingPageId: resolvedLandingPageId ?? existing.landingPageId,
           projectId: projectId ?? existing.projectId,
           formName: dto.formName ?? existing.formName,
-          source: dto.source ?? existing.source,
+          source: attribution.source ?? dto.source ?? existing.source,
+          ...attrData,
         },
       });
     }
@@ -325,10 +353,11 @@ export class LeadsService implements OnModuleInit {
         landingPageId: resolvedLandingPageId,
         projectId,
         formName: dto.formName ?? null,
-        source: dto.source ?? 'website',
+        source: attribution.source ?? dto.source ?? 'website',
         data: data as Prisma.InputJsonValue,
         configurations: [],
         tags: [],
+        ...attributionToPrismaData(attribution),
         ...(assignedToId ? { assignedToId } : {}),
       },
     });
@@ -1028,9 +1057,25 @@ export class LeadsService implements OnModuleInit {
     parking: string | null;
     requirementNotes: string | null;
     campaign: string | null;
+    medium?: string | null;
+    campaignId?: string | null;
+    adSet?: string | null;
+    adSetId?: string | null;
+    ad?: string | null;
+    adId?: string | null;
     utmSource: string | null;
     utmMedium: string | null;
     utmCampaign: string | null;
+    utmTerm?: string | null;
+    utmContent?: string | null;
+    landingPageUrl?: string | null;
+    landingPage?: string | null;
+    platform?: string | null;
+    referrer?: string | null;
+    firstTouchSource?: string | null;
+    lastTouchSource?: string | null;
+    fbclid?: string | null;
+    gclid?: string | null;
     temperature: string | null;
     tags: string[];
     consentWhatsapp: boolean;
@@ -1054,9 +1099,25 @@ export class LeadsService implements OnModuleInit {
       parking: lead.parking,
       requirementNotes: lead.requirementNotes,
       campaign: lead.campaign,
+      medium: lead.medium ?? null,
+      campaignId: lead.campaignId ?? null,
+      adSet: lead.adSet ?? null,
+      adSetId: lead.adSetId ?? null,
+      ad: lead.ad ?? null,
+      adId: lead.adId ?? null,
       utmSource: lead.utmSource,
       utmMedium: lead.utmMedium,
       utmCampaign: lead.utmCampaign,
+      utmTerm: lead.utmTerm ?? null,
+      utmContent: lead.utmContent ?? null,
+      landingPageUrl: lead.landingPageUrl ?? null,
+      landingPage: lead.landingPage ?? null,
+      platform: lead.platform ?? null,
+      referrer: lead.referrer ?? null,
+      firstTouchSource: lead.firstTouchSource ?? null,
+      lastTouchSource: lead.lastTouchSource ?? null,
+      fbclid: lead.fbclid ?? null,
+      gclid: lead.gclid ?? null,
       temperature: lead.temperature,
       tags: lead.tags,
       consentWhatsapp: lead.consentWhatsapp,
@@ -1165,9 +1226,22 @@ export class LeadsService implements OnModuleInit {
         ...(has('projectId') ? { projectId: dto.projectId ?? null } : {}),
         ...(has('source') ? { source: dto.source ?? null } : {}),
         ...(has('campaign') ? { campaign: dto.campaign ?? null } : {}),
+        ...(has('medium') ? { medium: dto.medium ?? null } : {}),
+        ...(has('campaignId') ? { campaignId: dto.campaignId ?? null } : {}),
+        ...(has('adSet') ? { adSet: dto.adSet ?? null } : {}),
+        ...(has('adSetId') ? { adSetId: dto.adSetId ?? null } : {}),
+        ...(has('ad') ? { ad: dto.ad ?? null } : {}),
+        ...(has('adId') ? { adId: dto.adId ?? null } : {}),
         ...(has('utmSource') ? { utmSource: dto.utmSource ?? null } : {}),
         ...(has('utmMedium') ? { utmMedium: dto.utmMedium ?? null } : {}),
         ...(has('utmCampaign') ? { utmCampaign: dto.utmCampaign ?? null } : {}),
+        ...(has('utmTerm') ? { utmTerm: dto.utmTerm ?? null } : {}),
+        ...(has('utmContent') ? { utmContent: dto.utmContent ?? null } : {}),
+        ...(has('landingPageUrl')
+          ? { landingPageUrl: dto.landingPageUrl ?? null }
+          : {}),
+        ...(has('fbclid') ? { fbclid: dto.fbclid ?? null } : {}),
+        ...(has('gclid') ? { gclid: dto.gclid ?? null } : {}),
         ...(has('temperature') ? { temperature: dto.temperature ?? null } : {}),
         ...(has('assignedToId')
           ? { assignedToId: dto.assignedToId ?? null }
@@ -1513,6 +1587,16 @@ export class LeadsService implements OnModuleInit {
     project?: { id: string; name: string } | null;
     formName: string | null;
     source: string | null;
+    platform?: string | null;
+    medium?: string | null;
+    campaign?: string | null;
+    campaignId?: string | null;
+    adSet?: string | null;
+    ad?: string | null;
+    utmSource?: string | null;
+    utmMedium?: string | null;
+    utmCampaign?: string | null;
+    landingPageUrl?: string | null;
     data: unknown;
     status: string;
     assignedTo?: {
@@ -1536,6 +1620,16 @@ export class LeadsService implements OnModuleInit {
       project: lead.project ?? null,
       formName: lead.formName,
       source: lead.source,
+      platform: lead.platform ?? null,
+      medium: lead.medium ?? null,
+      campaign: lead.campaign ?? null,
+      campaignId: lead.campaignId ?? null,
+      adSet: lead.adSet ?? null,
+      ad: lead.ad ?? null,
+      utmSource: lead.utmSource ?? null,
+      utmMedium: lead.utmMedium ?? null,
+      utmCampaign: lead.utmCampaign ?? null,
+      landingPageUrl: lead.landingPageUrl ?? null,
       data,
       status: lead.status,
       assignedTo: lead.assignedTo

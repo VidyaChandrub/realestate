@@ -53,6 +53,16 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    grp: "Marketing",
+    items: [
+      { href: "/org/marketing", icon: "trending", label: "Marketing Dashboard", tip: "Marketing Dashboard" },
+      { href: "/org/marketing/apps", icon: "integrations", label: "Connected Apps", tip: "Connected Apps" },
+      { href: "/org/marketing/campaigns", icon: "flag", label: "Campaigns", tip: "Campaigns" },
+      { href: "/org/marketing/sources", icon: "target", label: "Lead Sources", tip: "Lead Sources" },
+      { href: "/org/marketing/utm", icon: "link", label: "UTM Tracking", tip: "UTM Tracking" },
+    ],
+  },
+  {
     grp: "Communication",
     items: [
       { href: "/org/calling", icon: "phone", label: "Calling", tip: "Calling" },
@@ -80,7 +90,6 @@ const NAV_GROUPS: NavGroup[] = [
   {
     grp: "System",
     items: [
-      { href: "/org/integrations", icon: "integrations", label: "Integrations", tip: "Integrations" },
       { href: "/org/settings", icon: "settings", label: "Settings", tip: "Organisation Settings" },
       { href: "/org/support", icon: "flag", label: "Support & Help", tip: "Support & Help" },
     ],
@@ -107,10 +116,12 @@ export function isOrgNavItemAllowed(
   // the commented-out nav item above still resolves if it is restored.
   if (href.startsWith("/org/sales-agents")) return hasPermission("sales_agents", "view");
   if (href.startsWith("/org/reports")) return hasPermission("crm", "view") || hasPermission("dashboard", "view");
+  if (href.startsWith("/org/marketing") || href.startsWith("/org/integrations")) {
+    return hasPermission("crm", "view") || hasPermission("integrations", "view");
+  }
   if (href.startsWith("/org/teams") || href.startsWith("/org/team-chat")) return hasPermission("teams", "view");
   if (href.startsWith("/org/users")) return hasPermission("users", "view");
   if (href.startsWith("/org/roles-permissions")) return hasPermission("roles_permissions", "view");
-  if (href.startsWith("/org/integrations")) return hasPermission("integrations", "view");
   if (href.startsWith("/org/settings")) return hasPermission("settings", "view");
   if (href.startsWith("/org/support")) return hasPermission("support", "view");
   return false;
@@ -133,6 +144,12 @@ export function firstAllowedOrgPath(
 const CRUMB_MAP: Record<string, string> = {
   "/org": "Dashboard",
   "/org/leads": "Lead Center",
+  "/org/marketing": "Marketing Dashboard",
+  "/org/marketing/apps": "Connected Apps",
+  "/org/marketing/apps/logs": "Integration Logs",
+  "/org/marketing/campaigns": "Campaigns",
+  "/org/marketing/sources": "Lead Sources",
+  "/org/marketing/utm": "UTM Tracking",
   "/org/projects": "Projects",
   "/org/calling": "Calling",
   "/org/calling/ai-agents": "AI Agents",
@@ -535,7 +552,21 @@ export function OrgAdminShell({ children }: { children: ReactNode }) {
                 <ul className="nav-group" key={group.grp}>
                   <li className="grp">{group.grp}</li>
                   {visibleItems.map((item) => {
-                    const isActive = pathname === item.href || (item.href !== "/org" && pathname.startsWith(`${item.href}/`));
+                    const matches =
+                      pathname === item.href ||
+                      (item.href !== "/org" && pathname.startsWith(`${item.href}/`));
+                    const longerMatch = matches
+                      ? NAV_GROUPS.some((g) =>
+                          g.items.some(
+                            (other) =>
+                              other.href !== item.href &&
+                              other.href.length > item.href.length &&
+                              (pathname === other.href ||
+                                pathname.startsWith(`${other.href}/`)),
+                          ),
+                        )
+                      : false;
+                    const isActive = matches && !longerMatch;
                     return (
                       <li key={item.href}>
                         <Link

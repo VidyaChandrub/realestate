@@ -1516,9 +1516,25 @@ export interface CrmLeadEditFields {
   parking: string | null;
   requirementNotes: string | null;
   campaign: string | null;
+  medium: string | null;
+  campaignId: string | null;
+  adSet: string | null;
+  adSetId: string | null;
+  ad: string | null;
+  adId: string | null;
   utmSource: string | null;
   utmMedium: string | null;
   utmCampaign: string | null;
+  utmTerm: string | null;
+  utmContent: string | null;
+  landingPageUrl: string | null;
+  landingPage: string | null;
+  platform: string | null;
+  referrer: string | null;
+  firstTouchSource: string | null;
+  lastTouchSource: string | null;
+  fbclid: string | null;
+  gclid: string | null;
   temperature: string | null;
   tags: string[];
   consentWhatsapp: boolean;
@@ -1542,6 +1558,7 @@ export interface CrmLead extends Partial<CrmLeadEditFields> {
   project: { id: string; name: string } | null;
   formName: string | null;
   source: string | null;
+  platform?: string | null;
   data: Record<string, unknown>;
   status: CrmLeadStatus;
   assignedTo: CrmAssignee | null;
@@ -2812,4 +2829,158 @@ export interface OrgProjectTypeInput {
   projectFields?: unknown[];
   unitFields?: unknown[];
   sortOrder?: number;
+}
+
+/** Platform Organisation Labels for lead attribution (Super Admin catalog). */
+export interface AttributionLabel {
+  id: string;
+  key: string;
+  label: string;
+  sortOrder: number;
+  enabled?: boolean;
+}
+
+export interface MetaPublicConfig {
+  configured: boolean;
+  appId: string | null;
+  webhookCallbackUrl: string;
+  oauthRedirectUri: string;
+}
+
+export interface MetaPageConnection {
+  id: string;
+  orgId: string;
+  pageId: string;
+  pageName: string;
+  projectId: string | null;
+  connectedAt: string;
+  updatedAt: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface MarketingConnection {
+  id: string;
+  orgId: string;
+  platformKey: string;
+  status: string;
+  externalAccountId: string;
+  externalAccountName: string;
+  projectId: string | null;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  connectedAt: string;
+  updatedAt: string;
+  project?: { id: string; name: string } | null;
+}
+
+export interface MarketingPlatformCard {
+  key: string;
+  name: string;
+  description: string | null;
+  supportsOAuth: boolean;
+  supportsWebhook: boolean;
+  ready: boolean;
+  category?: string;
+  configured?: boolean;
+  connections: MarketingConnection[];
+  connectionCount: number;
+  lastSyncAt: string | null;
+  status: string;
+  metrics?: {
+    leadsCount: number;
+    spend: number;
+    clicks: number;
+    impressions: number;
+    conversionRate: number;
+    sessions?: number;
+  };
+}
+
+export interface MarketingAppsOverview {
+  kpis: {
+    connectedApps: number;
+    newConnectionsThisMonth: number;
+    totalLeads: number;
+    spend: number;
+    clicks: number;
+    impressions: number;
+    conversionRate: number;
+  };
+  platforms: MarketingPlatformCard[];
+  webhookUrl?: string;
+}
+
+export interface MarketingDashboard {
+  kpis: {
+    totalLeads: number;
+    convertedLeads: number;
+    spend: number;
+    clicks: number;
+    impressions: number;
+    cpl: number;
+    conversionRate: number;
+    revenue: number;
+    totalLeadsChange?: number;
+    convertedChange?: number;
+    spendChange?: number;
+    clicksChange?: number;
+    impressionsChange?: number;
+    cplChange?: number;
+    conversionChange?: number;
+  };
+  leadsByPlatform: Array<{ key: string; label: string; count: number }>;
+  leadsBySource: Array<{ key: string; label: string; count: number }>;
+  leadsByCampaign: Array<{ key: string; label: string; count: number }>;
+  leadsByAd: Array<{ key: string; label: string; count: number }>;
+  leadTrend?: Array<{ date: string; count: number }>;
+  connectedApps?: Array<{
+    key: string;
+    name: string;
+    status: string;
+    ready: boolean;
+    connectionCount: number;
+    lastSyncAt: string | null;
+  }>;
+  campaignPerformance: Array<{
+    id: string;
+    name: string;
+    platformKey: string;
+    status: string | null;
+    spend: number;
+    impressions: number;
+    clicks: number;
+    leadsCount: number;
+    cpl: number;
+    conversion?: number;
+  }>;
+  topCampaigns?: Array<{
+    id: string;
+    name: string;
+    platformKey: string;
+    leadsCount: number;
+    cpl: number;
+    conversion: number;
+  }>;
+}
+
+export interface MarketingPlatformAdmin {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  sortOrder: number;
+  enabled: boolean;
+  supportsOAuth: boolean;
+  supportsWebhook: boolean;
+}
+
+export interface MarketingSyncLog {
+  id: string;
+  orgId: string | null;
+  connectionId: string | null;
+  platformKey: string;
+  direction: string;
+  status: string;
+  message: string | null;
+  createdAt: string;
 }

@@ -2,11 +2,16 @@ import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { json, urlencoded, type Request, type Response } from 'express';
 import { AppModule } from './app.module';
 import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Disable Nest's built-in body parser so we can capture rawBody for Meta
+  // webhook HMAC verification, then re-enable JSON/urlencoded ourselves.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
   app.enableCors({
     origin: true,
     credentials: true,
@@ -14,10 +19,17 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads',
   });
+
+  const rawBodySaver = {
+    verify: (req: Request & { rawBody?: Buffer }, _res: Response, buf: Buffer) => {
+      if (buf?.length) req.rawBody = buf;
+    },
+  };
   // Template/landing-page content (sections + config, often with embedded
   // thumbnail data) regularly exceeds Express's 100kb default body limit.
-  app.useBodyParser('json', { limit: '15mb' });
-  app.useBodyParser('urlencoded', { extended: true, limit: '15mb' });
+  app.use(json({ limit: '15mb', ...rawBodySaver }));
+  app.use(urlencoded({ extended: true, limit: '15mb', ...rawBodySaver }));
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

@@ -48,3 +48,46 @@ force IPv4:
 DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5433/realestate?schema=public" \
   npx prisma migrate dev
 ```
+
+## Demo / dummy marketing data
+
+Re-run the database seed to populate the Skyline Developers demo org with
+Connected Apps, campaigns, sync logs, metric snapshots, and attributed leads
+(Facebook Lead Ads, Google Ads, website):
+
+```bash
+cd backend
+npx prisma db seed
+```
+
+Login as `rohan@skylinedev.in` (password from `SEED_USER_PASSWORD`, default
+`Welcome@123`). Demo connections are marked `metadata.demo=true` so Sync Now
+does not call live Meta/Google APIs.
+
+Primary product path: **Marketing → Connected Apps** (Facebook / Instagram /
+WhatsApp). Settings → CRM and project Integrations still expose the legacy Meta
+card. Manager-facing overview: `docs/social-media-connection.md`.
+
+1. Create a Meta App with **Facebook Login** + **Webhooks** + **Lead Ads** products.
+2. Copy `META_APP_ID`, `META_APP_SECRET`, and a random `META_WEBHOOK_VERIFY_TOKEN`
+   into `backend/.env` (see `backend/env.example`).
+3. Expose the API with a tunnel (ngrok, Cloudflare Tunnel, etc.) and set
+   `BACKEND_PUBLIC_URL` to that public base (no trailing slash).
+4. In Meta App settings:
+   - Valid OAuth Redirect URI: `{BACKEND_PUBLIC_URL}/org/meta/oauth/callback`
+   - Webhook callback URL: `{BACKEND_PUBLIC_URL}/webhooks/meta`
+   - Verify token: same as `META_WEBHOOK_VERIFY_TOKEN`
+   - Subscribe the app to the `leadgen` field on Page.
+5. Super Admin → Marketing / Lead Attribution confirms Meta env is loaded and
+   the org is allowed to use Meta platforms if access is restricted.
+6. Org admin connects from **Marketing → Connected Apps** (or legacy
+   Settings → CRM / project Integrations). Prefer Connected Apps.
+7. Without a public tunnel, use **Connect with Page token** (Graph API Explorer
+   long-lived Page token) instead of OAuth.
+8. **Verify:** connect from Connected Apps, then click **Sync Now** (imports
+   recent form leads) or send a Meta test lead → confirm rows in Lead Center
+   with Source = Facebook, Medium = Paid Social, and Marketing Attribution on
+   the lead detail page.
+9. Honest limits for demos: Instagram/WhatsApp share Meta OAuth but leads are
+   still attributed as Facebook/Meta today; Google Ads connect stores tokens
+   only (no lead or spend sync yet).

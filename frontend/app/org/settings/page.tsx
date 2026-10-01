@@ -9,6 +9,7 @@ import { DEFAULT_LEAD_STAGES, LEAD_STAGE_ORDER, useLeadStages } from "@/lib/lead
 import type { IconName } from "@/components/icons";
 import { Icon } from "@/components/icons";
 import { OrgSmtpSettings } from "@/components/org/org-smtp-settings";
+import { MetaLeadAdsCard } from "@/components/org/meta-lead-ads-card";
 import { SETTINGS_ACTIONS } from "@/lib/permissions";
 import { FieldRolesPanel, TypedFieldEditor } from "@/components/org/typed-field-editor";
 import { FIELD_ROLES, fieldsToRows, groupNoun, roleBaselineOf, rowsToFields, templateTraits, validateFieldRows, type FieldRole, type FieldRow } from "@/lib/field-template";
@@ -86,6 +87,11 @@ const NAV_GROUPS = [
     ]
   },
   {
+    grp: "MARKETING", items: [
+      { s: "marketing", icon: "trending" as IconName, t: "Marketing Hub" },
+    ]
+  },
+  {
     grp: "COMMUNICATION", items: [
       { s: "email", icon: "mail" as IconName, t: "Email & SMTP" },
       // Hidden for now — uncomment to bring WhatsApp Settings back.
@@ -111,6 +117,7 @@ const SECTION_META: Record<string, { icon: IconName; title: string; sub: string 
   // localization: { icon: "globe", title: "Formats & language", sub: "Regional preferences for your workspace" },
   domain: { icon: "globe", title: "Landing Page Domains", sub: "Configure custom domains for each landing page" },
   crm: { icon: "crm", title: "CRM & leads", sub: "How leads are captured and handled" },
+  marketing: { icon: "trending", title: "Marketing Hub", sub: "Ad platforms, UTM tracking and lead attribution" },
   fields: { icon: "puzzle", title: "Custom attributes", sub: "Add your own fields to leads, contacts, projects & bookings" },
   pipeline: { icon: "modules", title: "Pipeline & sources", sub: "Stages, lost reasons and lead sources" },
   catalogs: { icon: "properties", title: "Project catalogs", sub: "Your own option lists, and how unit pricing is measured" },
@@ -1549,6 +1556,9 @@ export default function OrgSettingsPage() {
     if (s === "domain") return canViewDomain;
     if (s === "billing") return canViewBilling;
     if (s === "crm" || s === "catalogs") return canViewProjects;
+    if (s === "marketing") {
+      return hasPermission("crm", "view") || hasPermission("integrations", "view") || canViewSettings;
+    }
     return canViewSettings;
   };
   useEffect(() => {
@@ -2283,6 +2293,57 @@ export default function OrgSettingsPage() {
                 }}
               />
             ) : null}
+          </div>
+
+          {/* MARKETING */}
+          <div className={`os-section${activeSection === "marketing" ? " on" : ""}`}>
+            <SectionHead section="marketing" />
+            <div className="card" style={{ marginBottom: 14 }}>
+              <div className="card-h">
+                <span className="t">Marketing workspace</span>
+              </div>
+              <div className="card-b">
+                <p className="muted" style={{ marginTop: 0 }}>
+                  Manage ad platforms, campaigns, sources and UTM tracking from the
+                  Marketing section in the sidebar.
+                </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                    gap: 10,
+                  }}
+                >
+                  {[
+                    ["/org/marketing", "Marketing Dashboard", "KPIs, charts and campaign performance"],
+                    ["/org/marketing/apps", "Connected Apps", "Meta, Google Ads, LinkedIn, Website"],
+                    ["/org/marketing/campaigns", "Campaigns", "Synced campaign performance"],
+                    ["/org/marketing/sources", "Lead Sources", "Where leads originated"],
+                    ["/org/marketing/utm", "UTM Tracking", "Website attribution parameters"],
+                  ].map(([href, title, sub]) => (
+                    <a
+                      key={href}
+                      href={href}
+                      className="card"
+                      style={{
+                        textDecoration: "none",
+                        color: "inherit",
+                        padding: "12px 14px",
+                        border: "1px solid var(--border, #e2e8f0)",
+                        borderRadius: 10,
+                        display: "block",
+                      }}
+                    >
+                      <strong style={{ fontSize: 13 }}>{title}</strong>
+                      <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                        {sub}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <MetaLeadAdsCard />
           </div>
 
           {/* FIELDS */}
