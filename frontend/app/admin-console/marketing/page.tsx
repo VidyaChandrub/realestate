@@ -102,10 +102,13 @@ export default function SuperAdminMarketingPage() {
     metaAppId: "",
     metaAppSecret: "",
     metaWebhookVerifyToken: "",
+    googleClientId: "",
+    googleClientSecret: "",
     googleAdsClientId: "",
     googleAdsClientSecret: "",
     googleAdsDeveloperToken: "",
     metaConfigured: false,
+    googleAuthConfigured: false,
     googleAdsConfigured: false,
   });
   const [initialCreds, setInitialCreds] = useState<MarketingCredentials | null>(null);
@@ -168,8 +171,10 @@ export default function SuperAdminMarketingPage() {
           metaAppId: (partial?.metaAppId !== undefined ? partial.metaAppId : creds.metaAppId).trim(),
           metaAppSecret: (partial?.metaAppSecret !== undefined ? partial.metaAppSecret : creds.metaAppSecret).trim(),
           metaWebhookVerifyToken: (partial?.metaWebhookVerifyToken !== undefined ? partial.metaWebhookVerifyToken : creds.metaWebhookVerifyToken).trim(),
-          googleAdsClientId: (partial?.googleAdsClientId !== undefined ? partial.googleAdsClientId : creds.googleAdsClientId).trim(),
-          googleAdsClientSecret: (partial?.googleAdsClientSecret !== undefined ? partial.googleAdsClientSecret : creds.googleAdsClientSecret).trim(),
+          googleClientId: (partial?.googleClientId !== undefined ? partial.googleClientId : (creds.googleClientId || creds.googleAdsClientId || "")).trim(),
+          googleClientSecret: (partial?.googleClientSecret !== undefined ? partial.googleClientSecret : (creds.googleClientSecret || creds.googleAdsClientSecret || "")).trim(),
+          googleAdsClientId: (partial?.googleAdsClientId !== undefined ? partial.googleAdsClientId : (creds.googleAdsClientId || creds.googleClientId || "")).trim(),
+          googleAdsClientSecret: (partial?.googleAdsClientSecret !== undefined ? partial.googleAdsClientSecret : (creds.googleAdsClientSecret || creds.googleClientSecret || "")).trim(),
           googleAdsDeveloperToken: (partial?.googleAdsDeveloperToken !== undefined ? partial.googleAdsDeveloperToken : creds.googleAdsDeveloperToken).trim(),
         };
         const updated = await updateAdminMarketingCredentials(payload);
@@ -1340,9 +1345,9 @@ export default function SuperAdminMarketingPage() {
                 <div className="mkt-admin-cred-head">
                   <div className="mkt-admin-cred-title">
                     <PlatformBrandIcon platformKey="google_ads" size={26} />
-                    <span>Google Ads Integration</span>
+                    <span>Google OAuth (Sign-In &amp; Google Ads)</span>
                   </div>
-                  {creds.googleAdsClientId && creds.googleAdsClientSecret ? (
+                  {(creds.googleClientId || creds.googleAdsClientId) && (creds.googleClientSecret || creds.googleAdsClientSecret) ? (
                     <span className="badge b-green">Active • Configured</span>
                   ) : (
                     <span className="badge b-amber">Setup Required</span>
@@ -1350,22 +1355,23 @@ export default function SuperAdminMarketingPage() {
                 </div>
 
                 <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-                  Google Cloud OAuth 2.0 client credentials enabling organisation managers to connect their Google Ads accounts for attribution and metrics.
+                  Google Cloud OAuth 2.0 client credentials enabling organisation admins to sign up &amp; log in with Google, plus Google Ads attribution. Managed directly here — no .env required.
                 </p>
 
                 <div className="mkt-admin-cred-form">
                   <div className="mkt-admin-cred-field">
                     <label>
-                      Google Ads Client ID
+                      Google Client ID
                       <span className="hint">From Google Cloud Console</span>
                     </label>
                     <input
                       className="inp mono"
                       placeholder="e.g. 123456789-xxx.apps.googleusercontent.com"
-                      value={creds.googleAdsClientId}
+                      value={creds.googleClientId || creds.googleAdsClientId || ""}
                       onChange={(e) =>
                         setCreds((c) => ({
                           ...c,
+                          googleClientId: e.target.value,
                           googleAdsClientId: e.target.value,
                         }))
                       }
@@ -1374,7 +1380,7 @@ export default function SuperAdminMarketingPage() {
 
                   <div className="mkt-admin-cred-field">
                     <label>
-                      Google Ads Client Secret
+                      Google Client Secret
                       <span className="hint">OAuth 2.0 Client Secret</span>
                     </label>
                     <div className="mkt-admin-input-group">
@@ -1382,10 +1388,11 @@ export default function SuperAdminMarketingPage() {
                         type={showSecretGoogle ? "text" : "password"}
                         className="inp mono"
                         placeholder="e.g. GOCSPX-..."
-                        value={creds.googleAdsClientSecret}
+                        value={creds.googleClientSecret || creds.googleAdsClientSecret || ""}
                         onChange={(e) =>
                           setCreds((c) => ({
                             ...c,
+                            googleClientSecret: e.target.value,
                             googleAdsClientSecret: e.target.value,
                           }))
                         }
@@ -1404,7 +1411,7 @@ export default function SuperAdminMarketingPage() {
                   <div className="mkt-admin-cred-field">
                     <label>
                       Developer Token <span className="hint">(Optional)</span>
-                      <span className="hint">For Ads API spend/metrics</span>
+                      <span className="hint">For Google Ads API spend/metrics</span>
                     </label>
                     <input
                       className="inp mono"
@@ -1417,6 +1424,13 @@ export default function SuperAdminMarketingPage() {
                         }))
                       }
                     />
+                  </div>
+
+                  <div style={{ marginTop: 6, padding: "10px 12px", background: "#f8fafc", borderRadius: 8, fontSize: 12, border: "1px solid #e2e8f0" }}>
+                    <div style={{ fontWeight: 600, color: "#334155", marginBottom: 4 }}>Authorized Redirect URI:</div>
+                    <code style={{ fontSize: 11.5, wordBreak: "break-all", color: "#2563eb" }}>
+                      {typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}/auth/google/callback
+                    </code>
                   </div>
                 </div>
 

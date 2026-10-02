@@ -4,12 +4,15 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import type { OnboardingStep, Role, User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -53,6 +56,7 @@ import {
   SYSTEM_ORG_ID,
 } from '../../common/utils/permissions.util';
 import { EmailService } from '../email/email.service';
+import { frontendBaseUrl } from '../../common/utils/app-url.util';
 
 const BCRYPT_COST_FACTOR = 12;
 
@@ -404,7 +408,32 @@ export class AuthService {
       };
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_COST_FACTOR);
+    let isGoogleVerified = false;
+    if (dto.googleToken) {
+      try {
+        const decoded = this.jwtService.verify<{ email?: string; purpose?: string }>(dto.googleToken);
+        if (decoded?.purpose === 'google_signup' && decoded.email?.toLowerCase().trim() === dto.work_email.toLowerCase().trim()) {
+          isGoogleVerified = true;
+        }
+      } catch {
+        try {
+          const gUser = await this.verifyGoogleCredential(dto.googleToken);
+          if (gUser.email.toLowerCase().trim() === dto.work_email.toLowerCase().trim()) {
+            isGoogleVerified = true;
+          }
+        } catch {}
+      }
+    }
+
+    if (!dto.password && !isGoogleVerified) {
+      throw new BadRequestException('Password is required');
+    }
+
+    const passwordToHash =
+      dto.password ||
+      crypto.randomUUID() + crypto.randomBytes(16).toString('hex');
+    const passwordHash = await bcrypt.hash(passwordToHash, BCRYPT_COST_FACTOR);
+
     const user = await this.prisma.user.create({
       data: {
         firstName: dto.first_name,
@@ -415,20 +444,23 @@ export class AuthService {
         passwordHash,
         status: 'active',
         onboardingStep: 'account',
+        emailVerifiedAt: isGoogleVerified ? new Date() : null,
       },
     });
 
     // No roles yet — the admin role is assigned once the organisation
     // exists, at Step 2.
     const tokens = await this.issueTokens(user.id, null, []);
-    await this.issueEmailVerification(user);
+    if (!isGoogleVerified) {
+      await this.issueEmailVerification(user);
+    }
 
     return {
       status: 'created' as const,
       user: toSafeUser(user),
       onboardingStep: user.onboardingStep,
       nextStep: nextOnboardingStep(user.onboardingStep),
-      email_verification_required: true,
+      email_verification_required: !isGoogleVerified,
       ...tokens,
     };
   }
@@ -1413,4 +1445,469 @@ export class AuthService {
       throw new ConflictException(`Domain "${host}" is currently in use or pending.`);
     }
   }
+
+  private apiPublicUrl() {
+    const explicit = (process.env.BACKEND_PUBLIC_URL ?? '').trim();
+    if (explicit) return explicit.replace(/\/$/, '');
+    return `${frontendBaseUrl()}/api`;
+  }
+
+  async getGoogleClientCredentials(): Promise<{ clientId: string; clientSecret: string }> {
+    let clientId = '';
+    let clientSecret = '';
+
+    // 1. Prioritize Super Admin configuration saved in database
+    try {
+      const rows: any[] = await this.prisma.$queryRawUnsafe(`
+        SELECT "google_client_id", "google_client_secret", "google_ads_client_id", "google_ads_client_secret"
+        FROM "identity"."marketing_settings"
+        WHERE "id" = 'default' LIMIT 1
+      `);
+      const row = rows && rows.length > 0 ? rows[0] : null;
+      if (row) {
+        clientId = String(row.google_client_id || row.google_ads_client_id || '').trim();
+        clientSecret = String(row.google_client_secret || row.google_ads_client_secret || '').trim();
+      }
+    } catch {
+      // Table may not exist yet or different schema
+    }
+
+    // 2. Optional fallback to environment variables if database row is empty
+    if (!clientId) {
+      clientId = (process.env.GOOGLE_CLIENT_ID ?? process.env.GOOGLE_ADS_CLIENT_ID ?? '').trim();
+    }
+    if (!clientSecret) {
+      clientSecret = (process.env.GOOGLE_CLIENT_SECRET ?? process.env.GOOGLE_ADS_CLIENT_SECRET ?? '').trim();
+    }
+
+    return { clientId, clientSecret };
+  }
+
+  async getGoogleAuthConfig() {
+    const { clientId } = await this.getGoogleClientCredentials();
+    return {
+      enabled: Boolean(clientId),
+      clientId: clientId || null,
+    };
+  }
+
+  async verifyGoogleCredential(credential: string): Promise<{
+    email: string;
+    emailVerified: boolean;
+    firstName: string;
+    lastName: string;
+    picture?: string;
+    googleId: string;
+  }> {
+    try {
+      const res = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+      );
+      if (!res.ok) {
+        throw new UnauthorizedException('Invalid Google ID token');
+      }
+      const data = (await res.json()) as {
+        email?: string;
+        email_verified?: string | boolean;
+        given_name?: string;
+        family_name?: string;
+        name?: string;
+        picture?: string;
+        sub?: string;
+        aud?: string;
+      };
+      if (!data.email) {
+        throw new UnauthorizedException('No email address provided by Google account');
+      }
+      const isVerified = data.email_verified === true || data.email_verified === 'true';
+      if (!isVerified) {
+        throw new UnauthorizedException('Google email is not verified');
+      }
+      return {
+        email: data.email.toLowerCase().trim(),
+        emailVerified: true,
+        firstName: data.given_name || (data.name ? data.name.split(' ')[0] : 'User'),
+        lastName: data.family_name || (data.name ? data.name.split(' ').slice(1).join(' ') : ''),
+        picture: data.picture,
+        googleId: data.sub || '',
+      };
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Google token verification failed: ${message}`);
+      throw new UnauthorizedException('Failed to verify Google account');
+    }
+  }
+
+  async exchangeGoogleCode(code: string, redirectUri: string): Promise<{
+    email: string;
+    emailVerified: boolean;
+    firstName: string;
+    lastName: string;
+    picture?: string;
+    googleId: string;
+  }> {
+    const { clientId, clientSecret } = await this.getGoogleClientCredentials();
+    if (!clientId || !clientSecret) {
+      throw new ServiceUnavailableException('Google OAuth credentials are not configured on server');
+    }
+    const body = new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+    });
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    });
+    const tokenData = (await res.json()) as {
+      access_token?: string;
+      id_token?: string;
+      error?: string;
+      error_description?: string;
+    };
+    if (!res.ok || !tokenData.access_token) {
+      throw new UnauthorizedException(
+        tokenData.error_description || tokenData.error || 'Failed to exchange Google OAuth code',
+      );
+    }
+
+    if (tokenData.id_token) {
+      try {
+        return await this.verifyGoogleCredential(tokenData.id_token);
+      } catch {
+        // Fall back to userinfo
+      }
+    }
+
+    const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    if (!userInfoRes.ok) {
+      throw new UnauthorizedException('Failed to fetch Google profile');
+    }
+    const data = (await userInfoRes.json()) as {
+      email?: string;
+      email_verified?: boolean | string;
+      given_name?: string;
+      family_name?: string;
+      name?: string;
+      picture?: string;
+      sub?: string;
+    };
+    if (!data.email) {
+      throw new UnauthorizedException('No email returned by Google');
+    }
+    return {
+      email: data.email.toLowerCase().trim(),
+      emailVerified: data.email_verified === true || data.email_verified === 'true',
+      firstName: data.given_name || (data.name ? data.name.split(' ')[0] : 'User'),
+      lastName: data.family_name || (data.name ? data.name.split(' ').slice(1).join(' ') : ''),
+      picture: data.picture,
+      googleId: data.sub || '',
+    };
+  }
+
+  async getGoogleAuthUrl(
+    mode: 'login' | 'register' = 'login',
+    portal: 'organisation' | 'platform' = 'organisation',
+    customRedirectUri?: string,
+  ) {
+    const { clientId } = await this.getGoogleClientCredentials();
+    if (!clientId) {
+      throw new ServiceUnavailableException('Google OAuth is not configured');
+    }
+    const redirectUri =
+      customRedirectUri || `${this.apiPublicUrl()}/auth/google/callback`;
+    const state = Buffer.from(
+      JSON.stringify({
+        mode,
+        portal,
+        redirectUri,
+        ts: Date.now(),
+      }),
+      'utf8',
+    ).toString('base64url');
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'offline',
+      prompt: 'select_account',
+      state,
+    });
+
+    return {
+      url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
+      state,
+    };
+  }
+
+  async handleGoogleAuth(dto: GoogleAuthDto) {
+    let googleUser: {
+      email: string;
+      emailVerified: boolean;
+      firstName: string;
+      lastName: string;
+      picture?: string;
+      googleId: string;
+    };
+
+    if (dto.credential) {
+      googleUser = await this.verifyGoogleCredential(dto.credential);
+    } else if (dto.code) {
+      const redirectUri =
+        dto.redirectUri || `${this.apiPublicUrl()}/auth/google/callback`;
+      googleUser = await this.exchangeGoogleCode(dto.code, redirectUri);
+    } else {
+      throw new BadRequestException('Google credential or OAuth code is required');
+    }
+
+    const email = googleUser.email.toLowerCase().trim();
+    const mode = dto.mode || 'login';
+
+    const existing = await this.findLoginUser(email);
+
+    if (existing) {
+      if (existing.status === 'disabled') {
+        throw new UnauthorizedException(
+          'Your account access has been revoked. Please contact your administrator.',
+        );
+      }
+      if (existing.status === 'pending' && !existing.approvedAt) {
+        throw new UnauthorizedException(
+          'Your account is pending approval by your organisation administrator.',
+        );
+      }
+
+      const belongsToPlatform = !existing.orgId;
+      if (
+        (dto.portal === 'organisation' && belongsToPlatform) ||
+        (dto.portal === 'platform' && !belongsToPlatform)
+      ) {
+        throw new UnauthorizedException('email Invalid ID or email');
+      }
+
+      if (existing.orgId && isLegacyOnboardingStep(existing.onboardingStep)) {
+        try {
+          await finalizeLegacyOnboardingDraft(this.prisma, existing.orgId, existing.id);
+          existing.onboardingStep = 'completed';
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`Legacy onboarding finalize failed: ${message}`);
+        }
+      }
+
+      if (existing.orgId) {
+        const org = await this.prisma.organisation.findUnique({
+          where: { id: existing.orgId },
+          select: { status: true },
+        });
+        if (org && org.status === 'pending' && existing.onboardingStep === 'completed') {
+          throw new UnauthorizedException(
+            'Organisation pending approval — please wait for super admin approval',
+          );
+        }
+        if (org && org.status === 'disabled') {
+          throw new UnauthorizedException('Organisation is disabled');
+        }
+        if (org && org.status === 'rejected') {
+          throw new UnauthorizedException('Organisation registration was rejected');
+        }
+      }
+
+      await this.prisma.user
+        .update({
+          where: { id: existing.id },
+          data: {
+            emailVerifiedAt: new Date(),
+            firstName: existing.firstName || googleUser.firstName,
+            lastName: existing.lastName || googleUser.lastName,
+          },
+        })
+        .catch(() => undefined);
+
+      const roles = existing.roles;
+      const isSuperAdmin = roles.includes('super_admin');
+      const tokens = await this.issueTokens(existing.id, existing.orgId, roles);
+      const safeUser = toSafeUser(existing);
+      const stillInDraftSignup = !isSuperAdmin && existing.onboardingStep !== 'completed';
+
+      return {
+        status: stillInDraftSignup
+          ? ('exists_incomplete' as const)
+          : ('authenticated' as const),
+        user: safeUser,
+        roles,
+        onboarding_incomplete: stillInDraftSignup,
+        onboardingStep: existing.onboardingStep,
+        googleUser,
+        ...tokens,
+      };
+    }
+
+    if (mode === 'login') {
+      return {
+        status: 'not_found' as const,
+        email,
+        firstName: googleUser.firstName,
+        lastName: googleUser.lastName,
+        picture: googleUser.picture,
+        message:
+          'No account found with this Google email. Please register your organisation first.',
+      };
+    }
+
+    // mode === 'register'
+    if (dto.phoneNumber && dto.country) {
+      const normalizedPhone = normalizePhoneNumber(dto.phoneNumber);
+      const existingByPhone = await this.prisma.user.findFirst({
+        where: { phoneNumber: normalizedPhone },
+      });
+      if (existingByPhone) {
+        if (existingByPhone.onboardingStep === 'completed') {
+          throw new ConflictException(
+            'This phone number is already registered to another account.',
+          );
+        }
+        return {
+          status: 'exists_incomplete' as const,
+          existingUserId: existingByPhone.id,
+          firstName: existingByPhone.firstName,
+          lastName: existingByPhone.lastName,
+          onboardingStep: existingByPhone.onboardingStep,
+        };
+      }
+
+      const randomPassword =
+        crypto.randomUUID() + crypto.randomBytes(16).toString('hex');
+      const passwordHash = await bcrypt.hash(randomPassword, BCRYPT_COST_FACTOR);
+
+      const user = await this.prisma.user.create({
+        data: {
+          firstName: dto.firstName?.trim() || googleUser.firstName,
+          lastName: dto.lastName?.trim() || googleUser.lastName,
+          email,
+          phoneNumber: normalizedPhone,
+          country: dto.country,
+          passwordHash,
+          status: 'active',
+          onboardingStep: 'account',
+          emailVerifiedAt: new Date(),
+        },
+      });
+
+      const tokens = await this.issueTokens(user.id, null, []);
+
+      return {
+        status: 'created' as const,
+        user: toSafeUser(user),
+        onboardingStep: user.onboardingStep,
+        nextStep: nextOnboardingStep(user.onboardingStep),
+        email_verification_required: false,
+        googleUser,
+        ...tokens,
+      };
+    }
+
+    const googleToken =
+      dto.credential ||
+      this.jwtService.sign(
+        { email, purpose: 'google_signup' },
+        { expiresIn: '15m' },
+      );
+
+    return {
+      status: 'needs_profile' as const,
+      email,
+      firstName: googleUser.firstName,
+      lastName: googleUser.lastName,
+      picture: googleUser.picture,
+      googleVerified: true,
+      googleToken,
+    };
+  }
+
+  async handleGoogleCallback(
+    code: string,
+    state: string,
+    error?: string,
+  ): Promise<string> {
+    const fe = frontendBaseUrl();
+    let mode: 'login' | 'register' = 'login';
+    let portal: 'organisation' | 'platform' = 'organisation';
+    let redirectUri = `${this.apiPublicUrl()}/auth/google/callback`;
+
+    if (state) {
+      try {
+        const parsed = JSON.parse(
+          Buffer.from(state, 'base64url').toString('utf8'),
+        );
+        if (parsed.mode === 'register') mode = 'register';
+        if (parsed.portal) portal = parsed.portal;
+        if (parsed.redirectUri) redirectUri = parsed.redirectUri;
+      } catch {}
+    }
+
+    if (error || !code) {
+      const msg = error || 'Google sign in was cancelled';
+      return `${fe}/${mode}?google_error=${encodeURIComponent(msg)}`;
+    }
+
+    try {
+      const result = await this.handleGoogleAuth({
+        code,
+        redirectUri,
+        mode,
+        portal,
+      });
+
+      if (
+        result.status === 'authenticated' ||
+        result.status === 'exists_incomplete' ||
+        result.status === 'created'
+      ) {
+        const tokens = result as {
+          access_token: string;
+          refresh_token: string;
+          onboarding_incomplete?: boolean;
+          user: unknown;
+        };
+        const params = new URLSearchParams({
+          token: tokens.access_token,
+          refresh: tokens.refresh_token,
+          incomplete: tokens.onboarding_incomplete ? '1' : '0',
+          mode,
+        });
+        return `${fe}/auth/google/callback?${params.toString()}`;
+      }
+
+      if (result.status === 'needs_profile') {
+        const params = new URLSearchParams({
+          google_email: result.email,
+          google_fn: result.firstName,
+          google_ln: result.lastName,
+          google_token: result.googleToken || '',
+          google_verified: '1',
+        });
+        return `${fe}/register?${params.toString()}`;
+      }
+
+      if (result.status === 'not_found') {
+        return `${fe}/login?google_not_found=1&email=${encodeURIComponent(result.email)}`;
+      }
+
+      return `${fe}/${mode}`;
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Google authentication failed';
+      return `${fe}/${mode}?google_error=${encodeURIComponent(message)}`;
+    }
+  }
 }
+

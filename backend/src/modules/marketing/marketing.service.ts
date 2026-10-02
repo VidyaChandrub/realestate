@@ -105,6 +105,8 @@ export class MarketingService implements OnModuleInit {
           "meta_app_id" TEXT,
           "meta_app_secret" TEXT,
           "meta_webhook_verify_token" TEXT,
+          "google_client_id" TEXT,
+          "google_client_secret" TEXT,
           "google_ads_client_id" TEXT,
           "google_ads_client_secret" TEXT,
           "google_ads_developer_token" TEXT,
@@ -112,6 +114,16 @@ export class MarketingService implements OnModuleInit {
           CONSTRAINT "marketing_settings_pkey" PRIMARY KEY ("id")
         );
       `);
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `ALTER TABLE "identity"."marketing_settings" ADD COLUMN IF NOT EXISTS "google_client_id" TEXT;`,
+        );
+      } catch {}
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `ALTER TABLE "identity"."marketing_settings" ADD COLUMN IF NOT EXISTS "google_client_secret" TEXT;`,
+        );
+      } catch {}
     } catch (err: unknown) {
       this.logger.warn(`Could not verify marketing_settings table: ${err}`);
     }
@@ -138,13 +150,17 @@ export class MarketingService implements OnModuleInit {
             ? r.meta_webhook_verify_token
             : (process.env.META_WEBHOOK_VERIFY_TOKEN ?? '');
         const googleAdsClientId =
-          typeof r.google_ads_client_id === 'string'
+          typeof r.google_ads_client_id === 'string' && r.google_ads_client_id
             ? r.google_ads_client_id
-            : (process.env.GOOGLE_ADS_CLIENT_ID ?? '');
+            : (typeof r.google_client_id === 'string' && r.google_client_id
+                ? r.google_client_id
+                : (process.env.GOOGLE_ADS_CLIENT_ID ?? ''));
         const googleAdsClientSecret =
-          typeof r.google_ads_client_secret === 'string'
+          typeof r.google_ads_client_secret === 'string' && r.google_ads_client_secret
             ? r.google_ads_client_secret
-            : (process.env.GOOGLE_ADS_CLIENT_SECRET ?? '');
+            : (typeof r.google_client_secret === 'string' && r.google_client_secret
+                ? r.google_client_secret
+                : (process.env.GOOGLE_ADS_CLIENT_SECRET ?? ''));
         const googleAdsDeveloperToken =
           typeof r.google_ads_developer_token === 'string'
             ? r.google_ads_developer_token
@@ -203,14 +219,30 @@ export class MarketingService implements OnModuleInit {
       row && typeof row.meta_webhook_verify_token === 'string'
         ? row.meta_webhook_verify_token
         : (process.env.META_WEBHOOK_VERIFY_TOKEN ?? '');
+    const googleClientId =
+      row && typeof row.google_client_id === 'string'
+        ? row.google_client_id
+        : (row && typeof row.google_ads_client_id === 'string'
+            ? row.google_ads_client_id
+            : (process.env.GOOGLE_CLIENT_ID ?? ''));
+    const googleClientSecret =
+      row && typeof row.google_client_secret === 'string'
+        ? row.google_client_secret
+        : (row && typeof row.google_ads_client_secret === 'string'
+            ? row.google_ads_client_secret
+            : (process.env.GOOGLE_CLIENT_SECRET ?? ''));
     const googleAdsClientId =
       row && typeof row.google_ads_client_id === 'string'
         ? row.google_ads_client_id
-        : (process.env.GOOGLE_ADS_CLIENT_ID ?? '');
+        : (row && typeof row.google_client_id === 'string'
+            ? row.google_client_id
+            : (process.env.GOOGLE_ADS_CLIENT_ID ?? ''));
     const googleAdsClientSecret =
       row && typeof row.google_ads_client_secret === 'string'
         ? row.google_ads_client_secret
-        : (process.env.GOOGLE_ADS_CLIENT_SECRET ?? '');
+        : (row && typeof row.google_client_secret === 'string'
+            ? row.google_client_secret
+            : (process.env.GOOGLE_ADS_CLIENT_SECRET ?? ''));
     const googleAdsDeveloperToken =
       row && typeof row.google_ads_developer_token === 'string'
         ? row.google_ads_developer_token
@@ -220,10 +252,13 @@ export class MarketingService implements OnModuleInit {
       metaAppId,
       metaAppSecret,
       metaWebhookVerifyToken,
+      googleClientId,
+      googleClientSecret,
       googleAdsClientId,
       googleAdsClientSecret,
       googleAdsDeveloperToken,
       metaConfigured: Boolean(metaAppId && metaAppSecret),
+      googleAuthConfigured: Boolean((googleClientId || googleAdsClientId) && (googleClientSecret || googleAdsClientSecret)),
       googleAdsConfigured: Boolean(googleAdsClientId && googleAdsClientSecret),
     };
   }
@@ -235,26 +270,43 @@ export class MarketingService implements OnModuleInit {
     const metaAppId = dto.metaAppId !== undefined ? dto.metaAppId.trim() : current.metaAppId;
     const metaAppSecret = dto.metaAppSecret !== undefined ? dto.metaAppSecret.trim() : current.metaAppSecret;
     const metaWebhookVerifyToken = dto.metaWebhookVerifyToken !== undefined ? dto.metaWebhookVerifyToken.trim() : current.metaWebhookVerifyToken;
-    const googleAdsClientId = dto.googleAdsClientId !== undefined ? dto.googleAdsClientId.trim() : current.googleAdsClientId;
-    const googleAdsClientSecret = dto.googleAdsClientSecret !== undefined ? dto.googleAdsClientSecret.trim() : current.googleAdsClientSecret;
+    const googleClientId =
+      dto.googleClientId !== undefined
+        ? dto.googleClientId.trim()
+        : (dto.googleAdsClientId !== undefined ? dto.googleAdsClientId.trim() : current.googleClientId);
+    const googleClientSecret =
+      dto.googleClientSecret !== undefined
+        ? dto.googleClientSecret.trim()
+        : (dto.googleAdsClientSecret !== undefined ? dto.googleAdsClientSecret.trim() : current.googleClientSecret);
+    const googleAdsClientId =
+      dto.googleAdsClientId !== undefined
+        ? dto.googleAdsClientId.trim()
+        : (dto.googleClientId !== undefined ? dto.googleClientId.trim() : current.googleAdsClientId);
+    const googleAdsClientSecret =
+      dto.googleAdsClientSecret !== undefined
+        ? dto.googleAdsClientSecret.trim()
+        : (dto.googleClientSecret !== undefined ? dto.googleClientSecret.trim() : current.googleAdsClientSecret);
     const googleAdsDeveloperToken = dto.googleAdsDeveloperToken !== undefined ? dto.googleAdsDeveloperToken.trim() : current.googleAdsDeveloperToken;
 
     await this.prisma.$executeRawUnsafe(`
       INSERT INTO "identity"."marketing_settings" (
         "id", "meta_app_id", "meta_app_secret", "meta_webhook_verify_token",
+        "google_client_id", "google_client_secret",
         "google_ads_client_id", "google_ads_client_secret", "google_ads_developer_token", "updated_at"
       ) VALUES (
-        'default', $1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP
+        'default', $1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP
       )
       ON CONFLICT ("id") DO UPDATE SET
         "meta_app_id" = EXCLUDED."meta_app_id",
         "meta_app_secret" = EXCLUDED."meta_app_secret",
         "meta_webhook_verify_token" = EXCLUDED."meta_webhook_verify_token",
+        "google_client_id" = EXCLUDED."google_client_id",
+        "google_client_secret" = EXCLUDED."google_client_secret",
         "google_ads_client_id" = EXCLUDED."google_ads_client_id",
         "google_ads_client_secret" = EXCLUDED."google_ads_client_secret",
         "google_ads_developer_token" = EXCLUDED."google_ads_developer_token",
         "updated_at" = CURRENT_TIMESTAMP;
-    `, metaAppId, metaAppSecret, metaWebhookVerifyToken, googleAdsClientId, googleAdsClientSecret, googleAdsDeveloperToken);
+    `, metaAppId, metaAppSecret, metaWebhookVerifyToken, googleClientId, googleClientSecret, googleAdsClientId, googleAdsClientSecret, googleAdsDeveloperToken);
 
     this.metaLeads.setCredentials(metaAppId, metaAppSecret, metaWebhookVerifyToken);
     const googleAds = this.registry.get('google_ads') as GoogleAdsAdapter | undefined;

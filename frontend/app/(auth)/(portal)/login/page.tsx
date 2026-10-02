@@ -7,14 +7,16 @@ import { useAuth } from "@/lib/auth-context";
 import { dashboardPathFor } from "@/lib/mock/sessions";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordInput } from "@/components/auth/password-input";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { mapApiFieldErrors } from "@/lib/form-errors";
 import { applyThemeVariables } from "@/components/global-theme-provider";
+import type { GoogleAuthResponse } from "@/lib/types";
 
 const FIELD_KEYS = ["email", "password"];
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
 
   const [email, setEmail] = useState("admin@skylinedev.com");
   const [password, setPassword] = useState("");
@@ -22,6 +24,11 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [googleUnregistered, setGoogleUnregistered] = useState<{
+    email: string;
+    firstName: string;
+    lastName: string;
+  } | null>(null);
 
   // Read the browser-only query string after hydration so the server and
   // client render the same initial markup.
@@ -35,7 +42,23 @@ export default function LoginPage() {
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
-    const reason = new URLSearchParams(window.location.search).get("reason");
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get("reason");
+    const googleErr = params.get("google_error");
+    const googleNotFound = params.get("google_not_found");
+    const notFoundEmail = params.get("email");
+
+    if (googleErr) {
+      setGeneralError(googleErr);
+    }
+    if (googleNotFound === "1" && notFoundEmail) {
+      setGoogleUnregistered({
+        email: notFoundEmail,
+        firstName: "",
+        lastName: "",
+      });
+    }
+
     if (reason === "org_inactive") {
       setNotice(
         "You were signed out because your organisation's access was changed. Contact your administrator if this is unexpected.",
@@ -59,6 +82,64 @@ export default function LoginPage() {
       .catch(() => undefined);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
+
+  async function handleGoogleSuccess(res: GoogleAuthResponse) {
+    setGeneralError(null);
+    setGoogleUnregistered(null);
+
+    if (res.status === "authenticated") {
+      try {
+        const session = await loginWithGoogle(res);
+        router.push(
+          session.must_change_password
+            ? "/change-password"
+            : dashboardPathFor(session.role),
+        );
+        router.refresh();
+      } catch (err: unknown) {
+        setGeneralError(err instanceof Error ? err.message : "Failed to establish session");
+      }
+      return;
+    }
+
+    if (res.status === "exists_incomplete") {
+      try {
+        await loginWithGoogle(res);
+        try {
+          window.sessionStorage.setItem("register_resume_intent", "1");
+        } catch {}
+        router.push("/register");
+        router.refresh();
+      } catch (err: unknown) {
+        setGeneralError(err instanceof Error ? err.message : "Failed to resume signup");
+      }
+      return;
+    }
+
+    if (res.status === "not_found") {
+      setGoogleUnregistered({
+        email: res.email,
+        firstName: res.firstName,
+        lastName: res.lastName,
+      });
+      return;
+    }
+
+    if (res.status === "exists_completed") {
+      setGeneralError(res.message || "An account with this email is already registered.");
+      return;
+    }
+
+    if (res.status === "needs_profile") {
+      const q = new URLSearchParams({
+        google_email: res.email,
+        google_fn: res.firstName,
+        google_ln: res.lastName,
+        google_verified: "1",
+      });
+      router.push(`/register?${q.toString()}`);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -137,7 +218,55 @@ export default function LoginPage() {
           {notice}
         </p>
       ) : null}
-      <form style={{ marginTop: 24 }} onSubmit={handleSubmit} noValidate>
+
+      <div style={{ marginTop: 20 }}>
+        <GoogleSignInButton
+          mode="login"
+          portal="organisation"
+          text="Sign in with Google"
+          disabled={isSubmitting}
+          onSuccess={handleGoogleSuccess}
+          onError={(err) => setGeneralError(err)}
+        />
+      </div>
+
+      {googleUnregistered ? (
+        <div
+          role="status"
+          style={{
+            marginTop: 14,
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            color: "#1e3a8a",
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>
+            No account found for {googleUnregistered.email}
+          </div>
+          <div>
+            Would you like to register your organisation with this Google account?
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <Link
+              href={`/register?google_email=${encodeURIComponent(googleUnregistered.email)}&google_fn=${encodeURIComponent(googleUnregistered.firstName)}&google_ln=${encodeURIComponent(googleUnregistered.lastName)}&google_verified=1`}
+              className="btn btn-primary btn-sm"
+              style={{ textDecoration: "none", display: "inline-block" }}
+            >
+              Register organisation →
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="auth-divider">
+        <span>or sign in with email</span>
+      </div>
+
+      <form onSubmit={handleSubmit} noValidate>
         <div className="field">
           <label>Work email</label>
           <input

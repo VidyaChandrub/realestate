@@ -114,4 +114,12 @@ export class UpdateMarketingCredentialsDto {
   @IsOptional()
   @IsString()
   googleAdsDeveloperToken?: string;
+
+  @IsOptional()
+  @IsString()
+  googleClientId?: string;
+
+  @IsOptional()
+  @IsString()
+  googleClientSecret?: string;
 }

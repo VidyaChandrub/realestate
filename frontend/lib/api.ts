@@ -61,6 +61,9 @@ import type {
   UpdateUnitInput,
   UnitStatus,
   ProjectSalesAgent,
+  GoogleAuthConfig,
+  GoogleAuthInput,
+  GoogleAuthResponse,
   OnboardingAccountInput,
   OnboardingOrganisationInput,
   OrgDomainInfo,
@@ -2231,3 +2234,30 @@ export async function addCommonProjectTypes(): Promise<{ created: number; types:
     method: "POST",
   });
 }
+
+/** Get Google Auth configuration (whether Google OAuth client ID is set). */
+export async function getGoogleAuthConfig(): Promise<GoogleAuthConfig> {
+  return apiFetch<GoogleAuthConfig>("/auth/google/config");
+}
+
+/** Get Google OAuth authorization URL for redirect flow. */
+export async function getGoogleAuthUrl(
+  mode: "login" | "register" = "login",
+  portal: "organisation" | "platform" = "organisation",
+  redirectUri?: string,
+): Promise<{ url: string; state: string }> {
+  const params = new URLSearchParams({ mode, portal });
+  if (redirectUri) params.set("redirectUri", redirectUri);
+  return apiFetch<{ url: string; state: string }>(`/auth/google/url?${params.toString()}`);
+}
+
+/** Authenticate or initiate registration with Google credential / code. */
+export async function authenticateWithGoogle(
+  input: GoogleAuthInput,
+): Promise<GoogleAuthResponse> {
+  return apiFetch<GoogleAuthResponse>("/auth/google", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+

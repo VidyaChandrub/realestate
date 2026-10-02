@@ -20,8 +20,9 @@ import {
   verifyEmail,
   resendVerification,
 } from "@/lib/api";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { callingCodeForCountry, validatePhoneForCountry } from "@/lib/phone";
-import type { OnboardingStep, OrgIndustry, ResumeSignupResponse } from "@/lib/types";
+import type { GoogleAuthResponse, OnboardingStep, OrgIndustry, ResumeSignupResponse } from "@/lib/types";
 import { COUNTRY_META, COUNTRIES } from "@/lib/countries";
 
 const FIELD_KEYS = [
@@ -160,6 +161,8 @@ export default function RegisterPage() {
   } | null>(null);
   const [draftBusy, setDraftBusy] = useState<"resume" | "restart" | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [googleVerified, setGoogleVerified] = useState(false);
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
 
   function update(field: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,13 +201,13 @@ export default function RegisterPage() {
     setGeneralError(null);
     if (n === 1) {
       const required: (keyof typeof form)[] = ["first_name", "last_name", "work_email", "country", "phone_number"];
-      if (!resumingDraft) required.push("password");
+      if (!resumingDraft && !googleVerified) required.push("password");
       for (const k of required) {
         if (!form[k]?.trim()) { setGeneralError(`${STEP1_FIELD_LABELS[k] ?? k.replace(/_/g, " ")} is required`); return false; }
       }
       const phoneError = validatePhoneForCountry(form.phone_number, form.country);
       if (phoneError) { setGeneralError(phoneError); return false; }
-      if (!resumingDraft && form.password.length < 8) { setGeneralError("Password must be at least 8 characters"); return false; }
+      if (!resumingDraft && !googleVerified && form.password.length < 8) { setGeneralError("Password must be at least 8 characters"); return false; }
       return true;
     }
     if (n === 2) {
@@ -275,6 +278,12 @@ export default function RegisterPage() {
         return true;
       }
 
+      const passwordToSubmit =
+        form.password ||
+        (googleVerified
+          ? Math.random().toString(36).slice(2) + "A1!" + Math.random().toString(36).slice(2)
+          : form.password);
+
       const res = await signupStep1({
         first_name: form.first_name,
         last_name: form.last_name,
@@ -284,8 +293,9 @@ export default function RegisterPage() {
         // Country selector) is prefixed here so what's persisted is a
         // fully-qualified number, not just the digits.
         phone_number: phoneCallingCode ? `${phoneCallingCode} ${form.phone_number}` : form.phone_number,
-        password: form.password,
+        password: passwordToSubmit,
         country: form.country,
+        googleToken: googleToken || undefined,
       });
       if (res.status === "exists_completed") {
         setAccountExists(true);
@@ -306,7 +316,7 @@ export default function RegisterPage() {
       }
       applyTokens(res.user, res);
       resumedAccountIdRef.current = res.user.id;
-      if (res.email_verification_required || !res.user.email_verified_at) {
+      if (!googleVerified && (res.email_verification_required || !res.user.email_verified_at)) {
         setAwaitingVerification(true);
         setVerifyCode("");
         setVerifyError(null);
@@ -387,6 +397,28 @@ export default function RegisterPage() {
 
   const didResumeRef = useRef(false);
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gEmail = params.get("google_email");
+    const gFn = params.get("google_fn");
+    const gLn = params.get("google_ln");
+    const gVerified = params.get("google_verified") === "1";
+    const gToken = params.get("google_token");
+    const gError = params.get("google_error");
+
+    if (gError) {
+      setGeneralError(gError);
+    }
+    if (gEmail) {
+      setForm((prev) => ({
+        ...prev,
+        work_email: gEmail,
+        first_name: gFn || prev.first_name,
+        last_name: gLn || prev.last_name,
+      }));
+      if (gVerified) setGoogleVerified(true);
+      if (gToken) setGoogleToken(gToken);
+    }
+
     if (didResumeRef.current) return;
     if (!user || user.role === "super_admin") return;
     if (user.onboarding_step === "completed") return;
@@ -461,6 +493,62 @@ export default function RegisterPage() {
     // when an incomplete user reaches the wizard from login or /org.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.onboarding_step]);
+
+  function handleGoogleRegisterSuccess(res: GoogleAuthResponse) {
+    setGeneralError(null);
+
+    if (res.status === "created") {
+      didResumeRef.current = true;
+      applyTokens(res.user, res);
+      resumedAccountIdRef.current = res.user.id;
+      setGoogleVerified(true);
+      setCur(1);
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (res.status === "exists_incomplete") {
+      didResumeRef.current = true;
+      applyTokens(res.user, res);
+      resumedAccountIdRef.current = res.existingUserId || res.user.id;
+      setResumingDraft(true);
+      setGoogleVerified(true);
+      setForm((prev) => ({
+        ...prev,
+        work_email: res.user.email || prev.work_email,
+        first_name: res.firstName || res.user.first_name || prev.first_name,
+        last_name: res.lastName || res.user.last_name || prev.last_name,
+      }));
+      setCur(1);
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    if (res.status === "exists_completed") {
+      setAccountExists(true);
+      setForm((prev) => ({ ...prev, work_email: res.email }));
+      setGeneralError("An account with this email is already fully registered. Please sign in.");
+      return;
+    }
+
+    if (res.status === "authenticated") {
+      router.push("/org");
+      return;
+    }
+
+    if (res.status === "needs_profile" || res.status === "not_found") {
+      setForm((prev) => ({
+        ...prev,
+        work_email: res.email,
+        first_name: res.firstName || prev.first_name,
+        last_name: res.lastName || prev.last_name,
+      }));
+      setGoogleVerified(true);
+      if ("googleToken" in res && res.googleToken) {
+        setGoogleToken(res.googleToken);
+      }
+    }
+  }
 
   // 60s resend cooldown, kept in sessionStorage (keyed by email) rather than
   // plain component state — a page refresh mid-cooldown re-reads the same
@@ -644,6 +732,8 @@ export default function RegisterPage() {
       setFieldErrors({});
       setGeneralError(null);
       setDraftCollision(null);
+      setGoogleVerified(false);
+      setGoogleToken(null);
       setCur(0);
       window.scrollTo(0, 0);
     } catch (err) {
@@ -833,6 +923,33 @@ export default function RegisterPage() {
           {/* STEP 1 — account */}
           <div className={`wpane${cur === 0 ? " on" : ""}`}>
             <div>
+              {!resumingDraft ? (
+                <div style={{ marginBottom: 14 }}>
+                  <GoogleSignInButton
+                    mode="register"
+                    text="Sign up with Google"
+                    extraData={{
+                      country: form.country,
+                      phoneNumber: form.phone_number,
+                      firstName: form.first_name,
+                      lastName: form.last_name,
+                    }}
+                    onSuccess={handleGoogleRegisterSuccess}
+                    onError={(err) => setGeneralError(err)}
+                  />
+                  <div className="auth-divider">
+                    <span>or register with email</span>
+                  </div>
+                </div>
+              ) : null}
+
+              {googleVerified ? (
+                <div className="google-verified-badge">
+                  <Icon name="check" size={13} />
+                  <span>Google Account Verified &bull; {form.work_email}</span>
+                </div>
+              ) : null}
+
               <div className="row2">
                 <div className="field">
                   <label>First name <span className="req">*</span></label>
@@ -845,7 +962,15 @@ export default function RegisterPage() {
               </div>
               <div className="field">
                 <label>Work email <span className="req">*</span></label>
-                <input className="inp" type="email" value={form.work_email} onChange={update("work_email")} placeholder="admin@skylinedev.com" />
+                <input
+                  className="inp"
+                  type="email"
+                  value={form.work_email}
+                  onChange={update("work_email")}
+                  placeholder="admin@skylinedev.com"
+                  readOnly={googleVerified}
+                  style={googleVerified ? { background: "#f8fafc", cursor: "default" } : undefined}
+                />
                 {fieldErrors.work_email ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.work_email}</div> : null}
               </div>
               <div className="row2">
@@ -875,9 +1000,13 @@ export default function RegisterPage() {
                 </div>
               </div>
               {!resumingDraft ? <div className="field" style={{ marginBottom: 0 }}>
-                <label>Password <span className="req">*</span></label>
+                <label>
+                  Password {googleVerified ? <span className="muted" style={{ fontWeight: 400 }}>(optional)</span> : <span className="req">*</span>}
+                </label>
                 <PasswordInput value={form.password} onChange={update("password")} placeholder="••••••••••" autoComplete="new-password" />
-                <div className="hint">Min 8 characters.</div>
+                <div className="hint">
+                  {googleVerified ? "Leave blank to log in with Google, or set a password." : "Min 8 characters."}
+                </div>
                 {fieldErrors.password ? <div className="hint" style={{ color: "var(--rose)" }}>{fieldErrors.password}</div> : null}
               </div> : null}
             </div>
