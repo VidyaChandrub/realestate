@@ -89,3 +89,29 @@ export class ConnectMarketingCredentialsDto {
   @IsUUID()
   projectId?: string | null;
 }
+
+export class UpdateMarketingCredentialsDto {
+  @IsOptional()
+  @IsString()
+  metaAppId?: string;
+
+  @IsOptional()
+  @IsString()
+  metaAppSecret?: string;
+
+  @IsOptional()
+  @IsString()
+  metaWebhookVerifyToken?: string;
+
+  @IsOptional()
+  @IsString()
+  googleAdsClientId?: string;
+
+  @IsOptional()
+  @IsString()
+  googleAdsClientSecret?: string;
+
+  @IsOptional()
+  @IsString()
+  googleAdsDeveloperToken?: string;
+}

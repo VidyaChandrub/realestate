@@ -327,6 +327,16 @@ export const DEFAULT_MARKETING_PLATFORMS: Array<{
     supportsOAuth: true,
     supportsWebhook: false,
   },
+  {
+    key: 'google_sheets',
+    name: 'Google Sheets & Drive',
+    description:
+      'Auto-sync all incoming Lead Center leads directly to your Google Sheet in Google Drive as per org authorization',
+    sortOrder: 50,
+    enabled: true,
+    supportsOAuth: true,
+    supportsWebhook: false,
+  },
 ];
 
 /** Platforms retained in Connected Apps / Integration Engine. */

@@ -243,14 +243,13 @@ export default function SuperAdminAttributionPage() {
               <i /> Active
             </span>
           ) : (
-            <span className="badge b-amber">Env vars required</span>
+            <span className="badge b-amber">Setup required</span>
           )}
         </div>
 
         <p className="muted attr-meta-help">
-          Set <code>META_APP_ID</code>, <code>META_APP_SECRET</code>, and{" "}
-          <code>META_WEBHOOK_VERIFY_TOKEN</code> on the API. Orgs then connect
-          their Facebook Pages from Marketing → Connected Apps.
+          Configure Meta App ID, App Secret, and Webhook Verify Token in Marketing
+          Settings. Orgs can then connect their Facebook Pages from Marketing → Connected Apps.
         </p>
 
         <div className="attr-meta-fields">
@@ -319,11 +318,11 @@ export default function SuperAdminAttributionPage() {
         <div className="attr-meta-foot">
           <span className="attr-env-note">
             {meta?.configured
-              ? "Configured via META_* environment variables"
-              : "Save required — add META_* vars to the API .env and restart"}
+              ? "Configured via Marketing Settings in database"
+              : "Setup required — configure Meta credentials in Marketing Settings"}
           </span>
-          <a className="btn btn-primary btn-sm" href="/admin-console/marketing">
-            <Icon name="settings" size={14} /> Open Marketing Platforms
+          <a className="btn btn-primary btn-sm" href="/admin-console/marketing?tab=settings">
+            <Icon name="settings" size={14} /> Open Marketing Settings
           </a>
         </div>
       </div>

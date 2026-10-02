@@ -1361,6 +1361,93 @@ export async function getAdminMetaConfig(): Promise<
   return apiFetch("/admin/meta/config");
 }
 
+export async function getAdminMarketingCredentials(): Promise<
+  import("./types").MarketingCredentials
+> {
+  return apiFetch("/admin/marketing/credentials");
+}
+
+export async function updateAdminMarketingCredentials(
+  data: Partial<import("./types").MarketingCredentials>,
+): Promise<import("./types").MarketingCredentials> {
+  return apiFetch("/admin/marketing/credentials", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getMarketingCredentials(): Promise<
+  import("./types").MarketingCredentials
+> {
+  return apiFetch<import("./types").MarketingCredentials>("/org/marketing/credentials").catch(() =>
+    getAdminMarketingCredentials(),
+  );
+}
+
+export async function updateMarketingCredentials(
+  data: Partial<import("./types").MarketingCredentials>,
+): Promise<import("./types").MarketingCredentials> {
+  return apiFetch<import("./types").MarketingCredentials>("/org/marketing/credentials", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  }).catch(() => updateAdminMarketingCredentials(data));
+}
+
+export async function createOrgGoogleSheet(title?: string): Promise<{
+  ok: boolean;
+  spreadsheetId: string;
+  spreadsheetUrl: string;
+  sheetName: string;
+}> {
+  return apiFetch("/org/marketing/google-sheets/create-sheet", {
+    method: "POST",
+    body: JSON.stringify({ title }),
+  });
+}
+
+export async function linkOrgGoogleSheet(
+  sheetInput: string,
+  sheetName?: string,
+): Promise<{
+  ok: boolean;
+  spreadsheetId: string;
+  spreadsheetUrl: string;
+  sheetName: string;
+  title?: string;
+}> {
+  return apiFetch("/org/marketing/google-sheets/link-sheet", {
+    method: "POST",
+    body: JSON.stringify({ sheetInput, sheetName }),
+  });
+}
+
+export async function syncAllOrgGoogleSheetsLeads(): Promise<{
+  ok: boolean;
+  synced: number;
+  message: string;
+  spreadsheetUrl?: string;
+}> {
+  return apiFetch("/org/marketing/google-sheets/sync-all", {
+    method: "POST",
+  });
+}
+
+export async function updateOrgGoogleSheetSettings(settings: {
+  autoSync?: boolean;
+  sheetName?: string;
+}): Promise<{ ok: boolean; metadata: any }> {
+  return apiFetch("/org/marketing/google-sheets/settings", {
+    method: "PATCH",
+    body: JSON.stringify(settings),
+  });
+}
+
+export async function disconnectOrgGoogleSheet(): Promise<{ ok: boolean }> {
+  return apiFetch("/org/marketing/google-sheets", {
+    method: "DELETE",
+  });
+}
+
 export async function getOrgMetaConfig(): Promise<
   import("./types").MetaPublicConfig
 > {

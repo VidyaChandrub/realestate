@@ -19,10 +19,13 @@ import {
   UpdateMarketingConnectionDto,
   UpdateMarketingPlatformDto,
   UpdateOrgPlatformAccessDto,
+  UpdateMarketingCredentialsDto,
 } from './dto/marketing.dto';
 import { MetaLeadsService } from '../meta-leads/meta-leads.service';
 import { PlatformAdapterRegistry } from './adapters/platform-adapter.registry';
+import { GoogleAdsAdapter } from './adapters/google-ads.adapter';
 import { MarketingSyncService } from './marketing-sync.service';
+import { GoogleSheetsService } from './google-sheets.service';
 
 @Injectable()
 export class MarketingService implements OnModuleInit {
@@ -33,11 +36,14 @@ export class MarketingService implements OnModuleInit {
     private readonly metaLeads: MetaLeadsService,
     private readonly registry: PlatformAdapterRegistry,
     private readonly syncService: MarketingSyncService,
+    private readonly googleSheets: GoogleSheetsService,
   ) {}
 
   async onModuleInit() {
     try {
+      await this.ensureSettingsTable();
       await this.ensurePlatforms();
+      await this.loadSettingsOnBoot();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(`Could not seed marketing platforms: ${message}`);
@@ -68,11 +74,210 @@ export class MarketingService implements OnModuleInit {
         },
       });
     }
-    // Hide LinkedIn / TikTok / GA / website / webhook from Connected Apps.
+    // Clean up obsolete/unsupported platforms with no connections
+    try {
+      await this.prisma.marketingPlatform.deleteMany({
+        where: {
+          key: { notIn: ACTIVE_MARKETING_PLATFORM_KEYS },
+          connections: { none: {} },
+        },
+      });
+    } catch {
+      // Ignore if relations prevent deletion
+    }
+    // Hide any remaining non-active platforms from Connected Apps
     await this.prisma.marketingPlatform.updateMany({
       where: { key: { notIn: ACTIVE_MARKETING_PLATFORM_KEYS } },
       data: { enabled: false },
     });
+  }
+
+  // --- Marketing Credentials & Settings Storage ------------------------------
+
+  private async ensureSettingsTable() {
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `CREATE SCHEMA IF NOT EXISTS "identity";`,
+      );
+      await this.prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "identity"."marketing_settings" (
+          "id" TEXT NOT NULL DEFAULT 'default',
+          "meta_app_id" TEXT,
+          "meta_app_secret" TEXT,
+          "meta_webhook_verify_token" TEXT,
+          "google_ads_client_id" TEXT,
+          "google_ads_client_secret" TEXT,
+          "google_ads_developer_token" TEXT,
+          "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "marketing_settings_pkey" PRIMARY KEY ("id")
+        );
+      `);
+    } catch (err: unknown) {
+      this.logger.warn(`Could not verify marketing_settings table: ${err}`);
+    }
+  }
+
+  async loadSettingsOnBoot() {
+    try {
+      await this.ensureSettingsTable();
+      const rows: any[] = await this.prisma.$queryRawUnsafe(`
+        SELECT * FROM "identity"."marketing_settings" WHERE "id" = 'default' LIMIT 1
+      `);
+      if (rows && rows.length > 0) {
+        const r = rows[0];
+        const metaAppId =
+          typeof r.meta_app_id === 'string'
+            ? r.meta_app_id
+            : (process.env.META_APP_ID ?? '');
+        const metaAppSecret =
+          typeof r.meta_app_secret === 'string'
+            ? r.meta_app_secret
+            : (process.env.META_APP_SECRET ?? '');
+        const metaWebhookVerifyToken =
+          typeof r.meta_webhook_verify_token === 'string'
+            ? r.meta_webhook_verify_token
+            : (process.env.META_WEBHOOK_VERIFY_TOKEN ?? '');
+        const googleAdsClientId =
+          typeof r.google_ads_client_id === 'string'
+            ? r.google_ads_client_id
+            : (process.env.GOOGLE_ADS_CLIENT_ID ?? '');
+        const googleAdsClientSecret =
+          typeof r.google_ads_client_secret === 'string'
+            ? r.google_ads_client_secret
+            : (process.env.GOOGLE_ADS_CLIENT_SECRET ?? '');
+        const googleAdsDeveloperToken =
+          typeof r.google_ads_developer_token === 'string'
+            ? r.google_ads_developer_token
+            : (process.env.GOOGLE_ADS_DEVELOPER_TOKEN ?? '');
+
+        this.metaLeads.setCredentials(
+          metaAppId,
+          metaAppSecret,
+          metaWebhookVerifyToken,
+        );
+        const googleAds = this.registry.get('google_ads') as
+          | GoogleAdsAdapter
+          | undefined;
+        if (googleAds?.setCredentials) {
+          googleAds.setCredentials(
+            googleAdsClientId,
+            googleAdsClientSecret,
+            googleAdsDeveloperToken,
+          );
+        }
+        process.env.GOOGLE_ADS_CLIENT_ID = googleAdsClientId;
+        process.env.GOOGLE_ADS_CLIENT_SECRET = googleAdsClientSecret;
+        process.env.GOOGLE_ADS_DEVELOPER_TOKEN = googleAdsDeveloperToken;
+        process.env.META_APP_ID = metaAppId;
+        process.env.META_APP_SECRET = metaAppSecret;
+        process.env.META_WEBHOOK_VERIFY_TOKEN = metaWebhookVerifyToken;
+      }
+    } catch (err: unknown) {
+      this.logger.warn(`Could not load marketing settings: ${err}`);
+    }
+  }
+
+  async getMarketingCredentials() {
+    await this.ensureSettingsTable();
+    let row: any = null;
+    try {
+      const rows: any[] = await this.prisma.$queryRawUnsafe(`
+        SELECT * FROM "identity"."marketing_settings" WHERE "id" = 'default' LIMIT 1
+      `);
+      if (rows && rows.length > 0) {
+        row = rows[0];
+      }
+    } catch (err: unknown) {
+      this.logger.warn(`Could not read marketing_settings: ${err}`);
+    }
+
+    const metaAppId =
+      row && typeof row.meta_app_id === 'string'
+        ? row.meta_app_id
+        : (process.env.META_APP_ID ?? '');
+    const metaAppSecret =
+      row && typeof row.meta_app_secret === 'string'
+        ? row.meta_app_secret
+        : (process.env.META_APP_SECRET ?? '');
+    const metaWebhookVerifyToken =
+      row && typeof row.meta_webhook_verify_token === 'string'
+        ? row.meta_webhook_verify_token
+        : (process.env.META_WEBHOOK_VERIFY_TOKEN ?? '');
+    const googleAdsClientId =
+      row && typeof row.google_ads_client_id === 'string'
+        ? row.google_ads_client_id
+        : (process.env.GOOGLE_ADS_CLIENT_ID ?? '');
+    const googleAdsClientSecret =
+      row && typeof row.google_ads_client_secret === 'string'
+        ? row.google_ads_client_secret
+        : (process.env.GOOGLE_ADS_CLIENT_SECRET ?? '');
+    const googleAdsDeveloperToken =
+      row && typeof row.google_ads_developer_token === 'string'
+        ? row.google_ads_developer_token
+        : (process.env.GOOGLE_ADS_DEVELOPER_TOKEN ?? '');
+
+    return {
+      metaAppId,
+      metaAppSecret,
+      metaWebhookVerifyToken,
+      googleAdsClientId,
+      googleAdsClientSecret,
+      googleAdsDeveloperToken,
+      metaConfigured: Boolean(metaAppId && metaAppSecret),
+      googleAdsConfigured: Boolean(googleAdsClientId && googleAdsClientSecret),
+    };
+  }
+
+  async updateMarketingCredentials(dto: UpdateMarketingCredentialsDto) {
+    await this.ensureSettingsTable();
+    const current = await this.getMarketingCredentials();
+
+    const metaAppId = dto.metaAppId !== undefined ? dto.metaAppId.trim() : current.metaAppId;
+    const metaAppSecret = dto.metaAppSecret !== undefined ? dto.metaAppSecret.trim() : current.metaAppSecret;
+    const metaWebhookVerifyToken = dto.metaWebhookVerifyToken !== undefined ? dto.metaWebhookVerifyToken.trim() : current.metaWebhookVerifyToken;
+    const googleAdsClientId = dto.googleAdsClientId !== undefined ? dto.googleAdsClientId.trim() : current.googleAdsClientId;
+    const googleAdsClientSecret = dto.googleAdsClientSecret !== undefined ? dto.googleAdsClientSecret.trim() : current.googleAdsClientSecret;
+    const googleAdsDeveloperToken = dto.googleAdsDeveloperToken !== undefined ? dto.googleAdsDeveloperToken.trim() : current.googleAdsDeveloperToken;
+
+    await this.prisma.$executeRawUnsafe(`
+      INSERT INTO "identity"."marketing_settings" (
+        "id", "meta_app_id", "meta_app_secret", "meta_webhook_verify_token",
+        "google_ads_client_id", "google_ads_client_secret", "google_ads_developer_token", "updated_at"
+      ) VALUES (
+        'default', $1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP
+      )
+      ON CONFLICT ("id") DO UPDATE SET
+        "meta_app_id" = EXCLUDED."meta_app_id",
+        "meta_app_secret" = EXCLUDED."meta_app_secret",
+        "meta_webhook_verify_token" = EXCLUDED."meta_webhook_verify_token",
+        "google_ads_client_id" = EXCLUDED."google_ads_client_id",
+        "google_ads_client_secret" = EXCLUDED."google_ads_client_secret",
+        "google_ads_developer_token" = EXCLUDED."google_ads_developer_token",
+        "updated_at" = CURRENT_TIMESTAMP;
+    `, metaAppId, metaAppSecret, metaWebhookVerifyToken, googleAdsClientId, googleAdsClientSecret, googleAdsDeveloperToken);
+
+    this.metaLeads.setCredentials(metaAppId, metaAppSecret, metaWebhookVerifyToken);
+    const googleAds = this.registry.get('google_ads') as GoogleAdsAdapter | undefined;
+    if (googleAds?.setCredentials) {
+      googleAds.setCredentials(googleAdsClientId, googleAdsClientSecret, googleAdsDeveloperToken);
+    }
+    process.env.GOOGLE_ADS_CLIENT_ID = googleAdsClientId;
+    process.env.GOOGLE_ADS_CLIENT_SECRET = googleAdsClientSecret;
+    process.env.GOOGLE_ADS_DEVELOPER_TOKEN = googleAdsDeveloperToken;
+    process.env.META_APP_ID = metaAppId;
+    process.env.META_APP_SECRET = metaAppSecret;
+    process.env.META_WEBHOOK_VERIFY_TOKEN = metaWebhookVerifyToken;
+
+    return {
+      metaAppId,
+      metaAppSecret,
+      metaWebhookVerifyToken,
+      googleAdsClientId,
+      googleAdsClientSecret,
+      googleAdsDeveloperToken,
+      metaConfigured: Boolean(metaAppId && metaAppSecret),
+      googleAdsConfigured: Boolean(googleAdsClientId && googleAdsClientSecret),
+    };
   }
 
   // --- Super Admin -----------------------------------------------------------
@@ -80,6 +285,7 @@ export class MarketingService implements OnModuleInit {
   async listPlatformsAdmin() {
     await this.ensurePlatforms();
     return this.prisma.marketingPlatform.findMany({
+      where: { key: { in: ACTIVE_MARKETING_PLATFORM_KEYS } },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
   }
@@ -441,7 +647,7 @@ export class MarketingService implements OnModuleInit {
     const adapter = this.registry.get(platformKey);
     if (!adapter?.getConnectUrl) {
       throw new ServiceUnavailableException(
-        `${platformDisplayLabel(platformKey)} OAuth is not available. Add API credentials in Super Admin env, or connect with an access token on the app detail page.`,
+        `${platformDisplayLabel(platformKey)} OAuth is not available. Configure API credentials in Admin Console > Marketing, or connect with an access token on the app detail page.`,
       );
     }
     return adapter.getConnectUrl(orgId, userId);
@@ -555,13 +761,23 @@ export class MarketingService implements OnModuleInit {
   }
 
   async handleGoogleOAuthCallback(code: string, state: string) {
+    let parsedState: { orgId?: string; userId?: string; platformKey?: string } = {};
+    try {
+      parsedState = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
+    } catch {}
+
+    if (parsedState.platformKey === 'google_sheets') {
+      return this.googleSheets.handleOAuthCallback(code, state);
+    }
+
     return this.finishGenericOAuth({
       code,
       state,
       platformKeyFallback: 'google_ads',
       tokenExchange: async (parsed) => {
-        const clientId = (process.env.GOOGLE_ADS_CLIENT_ID ?? '').trim();
-        const clientSecret = (process.env.GOOGLE_ADS_CLIENT_SECRET ?? '').trim();
+        const creds = await this.getMarketingCredentials();
+        const clientId = creds.googleAdsClientId;
+        const clientSecret = creds.googleAdsClientSecret;
         const redirectUri = `${this.apiPublicUrl()}/org/marketing/oauth/google/callback`;
         const body = new URLSearchParams({
           code,
@@ -1043,6 +1259,7 @@ export class MarketingService implements OnModuleInit {
     lastError: string | null;
     connectedAt: Date;
     updatedAt: Date;
+    metadata?: unknown;
   }) {
     return {
       id: row.id,
@@ -1056,6 +1273,7 @@ export class MarketingService implements OnModuleInit {
       lastError: row.lastError,
       connectedAt: row.connectedAt,
       updatedAt: row.updatedAt,
+      metadata: (row as { metadata?: unknown }).metadata ?? null,
     };
   }
 }

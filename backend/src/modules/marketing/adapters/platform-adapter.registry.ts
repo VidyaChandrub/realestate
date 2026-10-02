@@ -4,6 +4,7 @@ import { MetaAdapter } from './meta.adapter';
 import { InstagramAdapter } from './instagram.adapter';
 import { WhatsappAdapter } from './whatsapp.adapter';
 import { GoogleAdsAdapter } from './google-ads.adapter';
+import { GoogleSheetsAdapter } from './google-sheets.adapter';
 
 @Injectable()
 export class PlatformAdapterRegistry implements OnModuleInit {
@@ -15,6 +16,7 @@ export class PlatformAdapterRegistry implements OnModuleInit {
     private readonly instagram: InstagramAdapter,
     private readonly whatsapp: WhatsappAdapter,
     private readonly googleAds: GoogleAdsAdapter,
+    private readonly googleSheets: GoogleSheetsAdapter,
   ) {}
 
   onModuleInit() {
@@ -23,6 +25,7 @@ export class PlatformAdapterRegistry implements OnModuleInit {
       this.instagram,
       this.whatsapp,
       this.googleAds,
+      this.googleSheets,
     ]) {
       this.register(adapter);
     }

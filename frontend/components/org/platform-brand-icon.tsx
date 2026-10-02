@@ -46,6 +46,17 @@ const LOGO: Record<
       </>
     ),
   },
+  google_sheets: {
+    bg: "#E6F4EA",
+    viewBox: "0 0 24 24",
+    paths: (
+      <>
+        <path fill="#0F9D58" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+        <path fill="#87CEAC" d="M14 2v6h6" />
+        <path fill="#fff" d="M8 12h8v1.8H8zm0 3.2h8V17H8zm0-6.4h5v1.8H8z" />
+      </>
+    ),
+  },
   ga: {
     bg: "#FEF3C7",
     viewBox: "0 0 24 24",

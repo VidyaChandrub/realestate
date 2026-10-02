@@ -60,6 +60,7 @@ export class MetaAdapter implements PlatformAdapter {
       accessToken: string;
       projectId?: string | null;
     },
+    platformKey = 'meta',
   ) {
     await this.meta.connectWithToken(orgId, userId, {
       pageId: input.externalAccountId,
@@ -70,7 +71,7 @@ export class MetaAdapter implements PlatformAdapter {
     const marketing = await this.prisma.marketingConnection.findFirst({
       where: {
         orgId,
-        platformKey: 'meta',
+        platformKey,
         externalAccountId: input.externalAccountId.trim(),
       },
       orderBy: { connectedAt: 'desc' },

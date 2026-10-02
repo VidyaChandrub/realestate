@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { MetaLeadsModule } from '../meta-leads/meta-leads.module';
+import { GoogleSheetsModule } from './google-sheets.module';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { MarketingService } from './marketing.service';
 import { MarketingSyncService } from './marketing-sync.service';
@@ -14,9 +15,10 @@ import { MetaAdapter } from './adapters/meta.adapter';
 import { InstagramAdapter } from './adapters/instagram.adapter';
 import { WhatsappAdapter } from './adapters/whatsapp.adapter';
 import { GoogleAdsAdapter } from './adapters/google-ads.adapter';
+import { GoogleSheetsAdapter } from './adapters/google-sheets.adapter';
 
 @Module({
-  imports: [AuthModule, forwardRef(() => MetaLeadsModule)],
+  imports: [AuthModule, GoogleSheetsModule, forwardRef(() => MetaLeadsModule)],
   controllers: [
     AdminMarketingController,
     OrgMarketingController,
@@ -31,7 +33,13 @@ import { GoogleAdsAdapter } from './adapters/google-ads.adapter';
     InstagramAdapter,
     WhatsappAdapter,
     GoogleAdsAdapter,
+    GoogleSheetsAdapter,
   ],
-  exports: [MarketingService, MarketingSyncService, PlatformAdapterRegistry],
+  exports: [
+    MarketingService,
+    MarketingSyncService,
+    GoogleSheetsModule,
+    PlatformAdapterRegistry,
+  ],
 })
 export class MarketingModule {}

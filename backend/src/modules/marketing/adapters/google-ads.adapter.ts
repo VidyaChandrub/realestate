@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import type {
   AdapterConnectResult,
   AdapterSyncResult,
@@ -22,15 +22,71 @@ function apiPublicUrl() {
 }
 
 @Injectable()
-export class GoogleAdsAdapter implements PlatformAdapter {
+export class GoogleAdsAdapter implements PlatformAdapter, OnModuleInit {
   readonly key = 'google_ads';
   readonly category = 'paid_ads' as const;
   readonly displayName = 'Google Ads';
 
+  private cachedClientId = '';
+  private cachedClientSecret = '';
+  private cachedDeveloperToken = '';
+  private dbLoaded = false;
+
   constructor(private readonly prisma: PrismaService) {}
 
+  async onModuleInit() {
+    await this.loadCredentialsFromDb();
+  }
+
+  async loadCredentialsFromDb(): Promise<void> {
+    try {
+      const rows: any[] = await this.prisma.$queryRawUnsafe(`
+        SELECT "google_ads_client_id", "google_ads_client_secret", "google_ads_developer_token"
+        FROM "identity"."marketing_settings"
+        WHERE "id" = 'default' LIMIT 1
+      `);
+      if (rows && rows.length > 0) {
+        const r = rows[0];
+        this.dbLoaded = true;
+        if (typeof r.google_ads_client_id === 'string') {
+          this.cachedClientId = r.google_ads_client_id.trim();
+        }
+        if (typeof r.google_ads_client_secret === 'string') {
+          this.cachedClientSecret = r.google_ads_client_secret.trim();
+        }
+        if (typeof r.google_ads_developer_token === 'string') {
+          this.cachedDeveloperToken = r.google_ads_developer_token.trim();
+        }
+      }
+    } catch {
+      // Table may not exist yet on fresh database before ensureSettingsTable
+    }
+  }
+
+  setCredentials(clientId?: string, clientSecret?: string, developerToken?: string) {
+    this.dbLoaded = true;
+    if (clientId !== undefined) this.cachedClientId = (clientId ?? '').trim();
+    if (clientSecret !== undefined) this.cachedClientSecret = (clientSecret ?? '').trim();
+    if (developerToken !== undefined) this.cachedDeveloperToken = (developerToken ?? '').trim();
+  }
+
+  clientId() {
+    if (this.dbLoaded) return this.cachedClientId;
+    return this.cachedClientId || (process.env.GOOGLE_ADS_CLIENT_ID ?? '').trim();
+  }
+
+  clientSecret() {
+    if (this.dbLoaded) return this.cachedClientSecret;
+    return this.cachedClientSecret || (process.env.GOOGLE_ADS_CLIENT_SECRET ?? '').trim();
+  }
+
+  developerToken() {
+    if (this.dbLoaded) return this.cachedDeveloperToken;
+    return this.cachedDeveloperToken || (process.env.GOOGLE_ADS_DEVELOPER_TOKEN ?? '').trim();
+  }
+
   isConfigured() {
-    return Boolean(env('GOOGLE_ADS_CLIENT_ID') && env('GOOGLE_ADS_CLIENT_SECRET'));
+    return Boolean(this.clientId() && this.clientSecret());
   }
 
   supportsOAuth() {
@@ -48,7 +104,7 @@ export class GoogleAdsAdapter implements PlatformAdapter {
   getConnectUrl(orgId: string, userId: string): AdapterConnectResult {
     if (!this.isConfigured()) {
       throw new ServiceUnavailableException(
-        'Google Ads is not configured. Set GOOGLE_ADS_CLIENT_ID and GOOGLE_ADS_CLIENT_SECRET.',
+        'Google Ads is not configured. Ask a Super Admin to configure Google Ads credentials in Admin Console > Marketing.',
       );
     }
     const redirectUri = `${apiPublicUrl()}/org/marketing/oauth/google/callback`;
@@ -62,7 +118,7 @@ export class GoogleAdsAdapter implements PlatformAdapter {
       'utf8',
     ).toString('base64url');
     const params = new URLSearchParams({
-      client_id: env('GOOGLE_ADS_CLIENT_ID'),
+      client_id: this.clientId(),
       redirect_uri: redirectUri,
       response_type: 'code',
       access_type: 'offline',
@@ -117,14 +173,14 @@ export class GoogleAdsAdapter implements PlatformAdapter {
             ? (connection.metadata as Record<string, unknown>)
             : {}),
           syncNote:
-            'OAuth connected. Campaign metrics sync requires GOOGLE_ADS_DEVELOPER_TOKEN + customer id.',
+            'OAuth connected. Campaign metrics sync requires Developer Token configured in Admin Console > Marketing.',
         },
       },
     });
     return {
       ok: true,
       message:
-        'Google Ads connection verified. Add GOOGLE_ADS_DEVELOPER_TOKEN to enable metrics sync.',
+        'Google Ads connection verified. Configure Developer Token in Admin Console > Marketing to enable metrics sync.',
       campaignsUpserted: 0,
     };
   }
