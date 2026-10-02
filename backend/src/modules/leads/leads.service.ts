@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
@@ -29,6 +30,7 @@ import {
   canSeeAllLeads,
 } from '../../common/utils/lead-scope.util';
 import { listLeadAssignableUsers } from '../../common/utils/lead-assignee.util';
+import { GoogleSheetsService } from '../marketing/google-sheets.service';
 
 /** The unit a lead is about — stored as `data.unitId` (Lead has no column). */
 function leadUnitId(data: unknown): string | null {
@@ -133,7 +135,10 @@ function toActivity(row: ActivityRow) {
 
 @Injectable()
 export class LeadsService implements OnModuleInit {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly googleSheets?: GoogleSheetsService,
+  ) {}
 
   async onModuleInit() {
     try {
@@ -362,6 +367,10 @@ export class LeadsService implements OnModuleInit {
       },
     });
 
+    if (this.googleSheets) {
+      void this.googleSheets.appendLeadRow(orgId, lead).catch(() => {});
+    }
+
     if (resolvedLandingPageId) {
       this.prisma.trackingEvent.create({
         data: {
@@ -550,7 +559,7 @@ export class LeadsService implements OnModuleInit {
       activityText: string;
     },
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const lead = await tx.lead.create({
         data: {
           orgId,
@@ -582,6 +591,12 @@ export class LeadsService implements OnModuleInit {
 
       return lead;
     });
+
+    if (this.googleSheets) {
+      void this.googleSheets.appendLeadRow(orgId, created).catch(() => {});
+    }
+
+    return created;
   }
 
   /**

@@ -9,7 +9,10 @@ import {
   assignCrmLead,
   getCrmAssignableUsers,
   getCrmLeads,
+  getMarketingPlatform,
+  syncAllOrgGoogleSheetsLeads,
 } from "@/lib/api";
+import { Modal, ModalActions } from "@/components/ui/modal";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import type { CrmLead, CrmLeadStatus } from "@/lib/types";
@@ -62,6 +65,76 @@ export default function OrgLeadsPage() {
   const { toast } = useToast();
   // Success message from the Add lead page (the list reloads itself on mount).
   useFlash(LEADS_FLASH_KEY, (flash) => toast({ title: flash.message, variant: "success" }));
+
+  // Google Sheets Sync state
+  const [syncingSheets, setSyncingSheets] = useState(false);
+  const [sheetUrl, setSheetUrl] = useState<string | null>(null);
+  const [sheetsConnected, setSheetsConnected] = useState<boolean | null>(null);
+  const [showConnectModal, setShowConnectModal] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    getMarketingPlatform("google_sheets")
+      .then((res) => {
+        if (!mounted) return;
+        const isConn = res?.status === "connected" && (res.connections?.length ?? 0) > 0;
+        setSheetsConnected(isConn);
+        const conn = res?.connections?.[0];
+        const meta = (conn?.metadata as any) ?? {};
+        const url =
+          meta?.spreadsheetUrl ||
+          (meta?.spreadsheetId
+            ? `https://docs.google.com/spreadsheets/d/${meta.spreadsheetId}/edit`
+            : null);
+        if (url) setSheetUrl(url);
+      })
+      .catch(() => {
+        // Silently skip if marketing permissions are restricted
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleSyncGoogleSheets = async () => {
+    if (sheetsConnected === false) {
+      setShowConnectModal(true);
+      return;
+    }
+
+    setSyncingSheets(true);
+    try {
+      const res = await syncAllOrgGoogleSheetsLeads();
+      if (res.spreadsheetUrl) {
+        setSheetUrl(res.spreadsheetUrl);
+      }
+      setSheetsConnected(true);
+      toast({
+        title: "Google Sheets Synced",
+        description:
+          res.message ||
+          `Successfully synced ${res.synced} lead${res.synced === 1 ? "" : "s"} to Google Sheets.`,
+        variant: "success",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to sync with Google Sheet";
+      if (
+        msg.toLowerCase().includes("not connected") ||
+        msg.toLowerCase().includes("not linked")
+      ) {
+        setSheetsConnected(false);
+        setShowConnectModal(true);
+      } else {
+        toast({
+          title: "Sync Failed",
+          description: msg,
+          variant: "error",
+        });
+      }
+    } finally {
+      setSyncingSheets(false);
+    }
+  };
 
   const filterKey = `${search}|${statusFilter}|${assigneeFilter}`;
   const [pageFor, setPageFor] = useState({ key: filterKey, page: 1 });
@@ -210,6 +283,38 @@ export default function OrgLeadsPage() {
 
         {admin || canAdd ? (
           <div className="lc-head-actions">
+            {sheetUrl ? (
+              <a
+                href={sheetUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="lc-btn-outline"
+                style={{ textDecoration: "none" }}
+                title="Open connected Google Sheet"
+              >
+                <Icon name="external" size={13} /> Open Sheet ↗
+              </a>
+            ) : null}
+
+            <button
+              className="lc-btn-outline"
+              type="button"
+              disabled={syncingSheets}
+              onClick={() => void handleSyncGoogleSheets()}
+              title="Sync all leads to Google Sheets"
+            >
+              {syncingSheets ? (
+                <Icon name="refresh" size={14} className="lc-spin" />
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                  <path fill="#0F9D58" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                  <path fill="#87CEAC" d="M14 2v6h6" />
+                  <path fill="#fff" d="M8 12h8v1.8H8zm0 3.2h8V17H8zm0-6.4h5v1.8H8z" />
+                </svg>
+              )}
+              {syncingSheets ? "Syncing…" : "Sync with Google Sheet"}
+            </button>
+
             <button className="lc-btn-outline" type="button" onClick={() => router.push("/org/leads/import")}>
               <Icon name="document" size={14} /> Import CSV
             </button>
@@ -636,6 +741,67 @@ export default function OrgLeadsPage() {
           )}
         </div>
       </Reveal>
+
+      {/* Connect Google Sheets Setup Modal */}
+      <Modal
+        open={showConnectModal}
+        onClose={() => setShowConnectModal(false)}
+        title="Google Sheets Not Connected"
+        description="Connect your Google account and link a spreadsheet to sync leads."
+        size="md"
+        footer={
+          <ModalActions>
+            <button
+              type="button"
+              className="lc-btn-outline"
+              onClick={() => setShowConnectModal(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="lc-btn-primary"
+              onClick={() => {
+                setShowConnectModal(false);
+                router.push("/org/marketing/apps/google_sheets");
+              }}
+            >
+              <Icon name="link" size={14} /> Setup Google Sheets ↗
+            </button>
+          </ModalActions>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "14px 16px",
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              borderRadius: 10,
+            }}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <path fill="#0F9D58" d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+              <path fill="#87CEAC" d="M14 2v6h6" />
+              <path fill="#fff" d="M8 12h8v1.8H8zm0 3.2h8V17H8zm0-6.4h5v1.8H8z" />
+            </svg>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14, color: "#166534" }}>
+                Seamless Google Sheets Integration
+              </div>
+              <div style={{ fontSize: 13, color: "#15803d", marginTop: 2 }}>
+                Export your captured leads, customer contact details, and marketing attribution directly to Google Sheets.
+              </div>
+            </div>
+          </div>
+          <p style={{ margin: 0, fontSize: 13.5, color: "#475569", lineHeight: 1.5 }}>
+            To enable one-click lead sync and real-time streaming, connect your Google account and select a target sheet in <strong>Connected Apps</strong>.
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }

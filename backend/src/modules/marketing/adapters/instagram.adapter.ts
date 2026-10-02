@@ -55,7 +55,12 @@ export class InstagramAdapter implements PlatformAdapter {
       projectId?: string | null;
     },
   ) {
-    return this.metaAdapter.connectCredentials(orgId, userId, input);
+    return this.metaAdapter.connectCredentials(
+      orgId,
+      userId,
+      input,
+      'instagram',
+    );
   }
 
   syncConnection(connection: MarketingConnectionRow): Promise<AdapterSyncResult> {

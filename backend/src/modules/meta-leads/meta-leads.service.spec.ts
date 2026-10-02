@@ -10,6 +10,13 @@ describe('resolveMetaChannel', () => {
     },
   );
 
+  it.each(['wa', 'WA', 'whatsapp', 'WhatsApp ', 'whatsapp_business'])(
+    'maps %p to whatsapp',
+    (value) => {
+      expect(resolveMetaChannel(value)).toBe('whatsapp');
+    },
+  );
+
   it.each(['fb', 'facebook', '', undefined, null, 'something_else'])(
     'maps %p to facebook',
     (value) => {

@@ -55,7 +55,12 @@ export class WhatsappAdapter implements PlatformAdapter {
       projectId?: string | null;
     },
   ) {
-    return this.metaAdapter.connectCredentials(orgId, userId, input);
+    return this.metaAdapter.connectCredentials(
+      orgId,
+      userId,
+      input,
+      'whatsapp',
+    );
   }
 
   syncConnection(connection: MarketingConnectionRow): Promise<AdapterSyncResult> {

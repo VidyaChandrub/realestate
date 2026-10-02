@@ -132,7 +132,9 @@ export function MetaLeadAdsCard() {
           {config?.configured ? (
             <span className="badge b-green">Platform ready</span>
           ) : (
-            <span className="badge b-amber">Ask Super Admin to configure Meta App</span>
+            <Link href="/org/marketing/apps/meta" className="badge b-amber" style={{ textDecoration: "none" }}>
+              Configure Meta App Credentials →
+            </Link>
           )}
         </span>
       </div>

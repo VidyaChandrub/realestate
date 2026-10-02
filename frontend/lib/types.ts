@@ -2853,6 +2853,17 @@ export interface MetaPublicConfig {
   oauthRedirectUri: string;
 }
 
+export interface MarketingCredentials {
+  metaAppId: string;
+  metaAppSecret: string;
+  metaWebhookVerifyToken: string;
+  googleAdsClientId: string;
+  googleAdsClientSecret: string;
+  googleAdsDeveloperToken: string;
+  metaConfigured: boolean;
+  googleAdsConfigured: boolean;
+}
+
 export interface MetaPageConnection {
   id: string;
   orgId: string;
@@ -2876,6 +2887,7 @@ export interface MarketingConnection {
   lastError: string | null;
   connectedAt: string;
   updatedAt: string;
+  metadata?: Record<string, any> | null;
   project?: { id: string; name: string } | null;
 }
 

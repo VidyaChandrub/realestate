@@ -2,10 +2,12 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Res,
   UseGuards,
@@ -17,10 +19,12 @@ import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 import { MarketingService } from './marketing.service';
+import { GoogleSheetsService } from './google-sheets.service';
 import {
   ConnectMarketingCredentialsDto,
   CreateMarketingPlatformDto,
   UpdateMarketingConnectionDto,
+  UpdateMarketingCredentialsDto,
   UpdateMarketingPlatformDto,
   UpdateOrgPlatformAccessDto,
 } from './dto/marketing.dto';
@@ -29,6 +33,16 @@ import {
 @Controller('admin/marketing')
 export class AdminMarketingController {
   constructor(private readonly service: MarketingService) {}
+
+  @Get('credentials')
+  getCredentials() {
+    return this.service.getMarketingCredentials();
+  }
+
+  @Put('credentials')
+  updateCredentials(@Body() dto: UpdateMarketingCredentialsDto) {
+    return this.service.updateMarketingCredentials(dto);
+  }
 
   @Get('platforms')
   listPlatforms() {
@@ -80,7 +94,30 @@ export class AdminMarketingController {
 @UseGuards(JwtAuthGuard, OrgApprovedGuard)
 @Controller('org/marketing')
 export class OrgMarketingController {
-  constructor(private readonly service: MarketingService) {}
+  constructor(
+    private readonly service: MarketingService,
+    private readonly googleSheets: GoogleSheetsService,
+  ) {}
+
+  @Get('credentials')
+  getCredentials() {
+    return this.service.getMarketingCredentials();
+  }
+
+  @Put('credentials')
+  updateCredentials(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdateMarketingCredentialsDto,
+  ) {
+    const isAllowed =
+      user.roles?.includes('super_admin') || user.roles?.includes('admin');
+    if (!isAllowed) {
+      throw new ForbiddenException(
+        'Only administrators can configure marketing platform credentials',
+      );
+    }
+    return this.service.updateMarketingCredentials(dto);
+  }
 
   @Get('dashboard')
   dashboard(@CurrentUser() user: JwtPayload) {
@@ -179,6 +216,46 @@ export class OrgMarketingController {
   disconnect(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.service.disconnect(user.orgId as string, id);
   }
+
+  // --- Google Sheets & Drive dedicated endpoints -----------------------------
+
+  @Post('google-sheets/create-sheet')
+  createGoogleSheet(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: { title?: string },
+  ) {
+    return this.googleSheets.createNewSheetForOrg(user.orgId as string, dto?.title);
+  }
+
+  @Post('google-sheets/link-sheet')
+  linkGoogleSheet(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: { sheetInput: string; sheetName?: string },
+  ) {
+    return this.googleSheets.linkExistingSheet(
+      user.orgId as string,
+      dto.sheetInput,
+      dto?.sheetName,
+    );
+  }
+
+  @Post('google-sheets/sync-all')
+  syncAllGoogleSheets(@CurrentUser() user: JwtPayload) {
+    return this.googleSheets.syncAllLeadsToSheet(user.orgId as string);
+  }
+
+  @Patch('google-sheets/settings')
+  updateGoogleSheetsSettings(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: { autoSync?: boolean; sheetName?: string },
+  ) {
+    return this.googleSheets.updateSettings(user.orgId as string, dto);
+  }
+
+  @Delete('google-sheets')
+  disconnectGoogleSheets(@CurrentUser() user: JwtPayload) {
+    return this.googleSheets.disconnect(user.orgId as string);
+  }
 }
 
 /** Public OAuth callbacks (no JWT — state carries org context). */
@@ -193,26 +270,30 @@ export class MarketingOAuthController {
     @Query('error') error: string | undefined,
     @Res() res: Response,
   ) {
+    const fe = (process.env.FRONTEND_URL ?? 'http://localhost:3001').replace(
+      /\/$/,
+      '',
+    );
+    let returnKey = 'google_ads';
+    if (state) {
+      try {
+        const parsed = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
+        if (parsed.platformKey === 'google_sheets') returnKey = 'google_sheets';
+      } catch {}
+    }
+
     if (error || !code || !state) {
-      const fe = (process.env.FRONTEND_URL ?? 'http://localhost:3001').replace(
-        /\/$/,
-        '',
-      );
       return res.redirect(
-        `${fe}/org/marketing/apps/google_ads?connected=0&message=${encodeURIComponent(error || 'OAuth cancelled')}`,
+        `${fe}/org/marketing/apps/${returnKey}?connected=0&message=${encodeURIComponent(error || 'OAuth cancelled')}`,
       );
     }
     try {
       const result = await this.service.handleGoogleOAuthCallback(code, state);
       return res.redirect(result.redirectTo);
     } catch (err: unknown) {
-      const fe = (process.env.FRONTEND_URL ?? 'http://localhost:3001').replace(
-        /\/$/,
-        '',
-      );
       const message = err instanceof Error ? err.message : 'Google connect failed';
       return res.redirect(
-        `${fe}/org/marketing/apps/google_ads?connected=0&message=${encodeURIComponent(message)}`,
+        `${fe}/org/marketing/apps/${returnKey}?connected=0&message=${encodeURIComponent(message)}`,
       );
     }
   }

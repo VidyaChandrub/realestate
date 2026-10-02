@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -27,7 +28,7 @@ import {
 
 @Controller('webhooks/meta')
 export class MetaWebhookController {
-  constructor(private readonly service: MetaLeadsService) {}
+  constructor(private readonly service: MetaLeadsService) { }
 
   @Get()
   verify(
@@ -67,7 +68,7 @@ export class MetaWebhookController {
  */
 @Controller('org/meta/oauth')
 export class MetaOAuthCallbackController {
-  constructor(private readonly service: MetaLeadsService) {}
+  constructor(private readonly service: MetaLeadsService) { }
 
   @Get('callback')
   async oauthCallbackGet(
@@ -109,7 +110,7 @@ export class MetaOAuthCallbackController {
 @UseGuards(JwtAuthGuard, OrgApprovedGuard)
 @Controller('org/meta')
 export class OrgMetaLeadsController {
-  constructor(private readonly service: MetaLeadsService) {}
+  constructor(private readonly service: MetaLeadsService) { }
 
   @Get('config')
   config() {
@@ -155,10 +156,18 @@ export class OrgMetaLeadsController {
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 @Controller('admin/meta')
 export class AdminMetaLeadsController {
-  constructor(private readonly service: MetaLeadsService) {}
+  constructor(private readonly service: MetaLeadsService) { }
 
   @Get('config')
   config() {
+    return this.service.getPublicConfig();
+  }
+
+  @Put('config')
+  async updateConfig(
+    @Body() dto: { appId?: string; appSecret?: string; verifyToken?: string },
+  ) {
+    await this.service.persistCredentials(dto.appId, dto.appSecret, dto.verifyToken);
     return this.service.getPublicConfig();
   }
 }

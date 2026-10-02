@@ -9007,36 +9007,101 @@
   }
 }
 
-/* ---------- Marketing Platforms (Super Admin) ---------- */
+/* ---------- Marketing Platforms (Super Admin) Redesign ---------- */
 .superadmin .mkt-admin-hero {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   flex-wrap: wrap;
+  padding: 24px 28px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.04) 0%, rgba(99, 102, 241, 0.06) 50%, rgba(248, 250, 252, 0.9) 100%);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: 16px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
 }
 
+.superadmin .mkt-admin-hero::before {
+  content: "";
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.superadmin .mkt-admin-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--brand, #2563eb);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.superadmin .mkt-admin-hero-eyebrow i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+.superadmin .mkt-admin-hero h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 6px;
+  letter-spacing: -0.02em;
+}
+
+.superadmin .mkt-admin-hero .sub {
+  font-size: 13.5px;
+  color: #64748b;
+  max-width: 620px;
+  line-height: 1.5;
+}
+
+/* 4-Platform Orbital Showcase */
 .superadmin .mkt-admin-hero-art {
   position: relative;
-  width: min(360px, 100%);
-  height: 118px;
+  width: 320px;
+  height: 110px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .superadmin .mkt-admin-hero-hub {
   position: absolute;
   left: 50%;
-  top: 40%;
+  top: 50%;
   transform: translate(-50%, -50%);
-  width: 50px;
-  height: 50px;
-  border-radius: 15px;
-  background: linear-gradient(135deg, var(--brand, #2563eb), #6366f1);
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2563eb, #6366f1);
   color: #fff;
   display: grid;
   place-items: center;
-  box-shadow: 0 10px 28px -10px rgba(37, 99, 235, 0.55);
+  box-shadow: 0 10px 24px -6px rgba(37, 99, 235, 0.5);
   z-index: 2;
+  transition: transform 0.3s ease;
+}
+
+.superadmin .mkt-admin-hero-hub:hover {
+  transform: translate(-50%, -50%) scale(1.05);
 }
 
 .superadmin .mkt-admin-hero-orbit {
@@ -9045,89 +9110,226 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 2px;
+  padding: 4px 16px;
   pointer-events: none;
 }
 
 .superadmin .mkt-admin-hero-plat {
   display: inline-flex;
-  filter: drop-shadow(0 4px 10px rgba(15, 23, 42, 0.12));
-}
-
-.superadmin .mkt-admin-hero-plat:nth-child(odd) { align-self: flex-start; }
-.superadmin .mkt-admin-hero-plat:nth-child(even) { align-self: flex-end; margin-bottom: 4px; }
-
-.superadmin .mkt-admin-hero-card {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  background: #fff;
-  border: 1px solid var(--line, #e2e8f0);
+  padding: 4px;
+  background: #ffffff;
   border-radius: 12px;
-  padding: 10px 12px;
-  box-shadow: 0 8px 24px -12px rgba(15, 23, 42, 0.25);
-  font-size: 11px;
-  max-width: 160px;
-  z-index: 3;
+  box-shadow: 0 6px 18px -4px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.8);
+  pointer-events: auto;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
 }
 
-.superadmin .mkt-admin-hero-card b {
-  display: block;
-  font-size: 11.5px;
-  line-height: 1.3;
-  margin-bottom: 8px;
+.superadmin .mkt-admin-hero-plat:hover {
+  transform: translateY(-3px) scale(1.08);
+  box-shadow: 0 10px 24px -4px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(37, 99, 235, 0.3);
 }
 
-.superadmin .mkt-admin-hero-bars {
-  display: block;
-  height: 26px;
-  border-radius: 6px;
-  background:
-    linear-gradient(#3b82f6, #3b82f6) 8% 100% / 12% 45% no-repeat,
-    linear-gradient(#60a5fa, #60a5fa) 30% 100% / 12% 70% no-repeat,
-    linear-gradient(#2563eb, #2563eb) 52% 100% / 12% 55% no-repeat,
-    linear-gradient(#93c5fd, #93c5fd) 74% 100% / 12% 85% no-repeat,
-    #eff6ff;
+.superadmin .mkt-admin-hero-plat:nth-child(1) { align-self: flex-start; }
+.superadmin .mkt-admin-hero-plat:nth-child(2) { align-self: flex-end; margin-bottom: 2px; }
+.superadmin .mkt-admin-hero-plat:nth-child(3) { align-self: flex-start; }
+.superadmin .mkt-admin-hero-plat:nth-child(4) { align-self: flex-end; margin-bottom: 2px; }
+
+/* KPI Metrics Grid */
+.superadmin .mkt-admin-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.superadmin .mkt-admin-kpi-card {
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.superadmin .mkt-admin-kpi-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 18px -4px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.superadmin .mkt-admin-kpi-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.superadmin .mkt-admin-kpi-icon.blue { background: #eff6ff; color: #2563eb; }
+.superadmin .mkt-admin-kpi-icon.green { background: #f0fdf4; color: #16a34a; }
+.superadmin .mkt-admin-kpi-icon.purple { background: #faf5ff; color: #9333ea; }
+.superadmin .mkt-admin-kpi-icon.amber { background: #fffbeb; color: #d97706; }
+
+.superadmin .mkt-admin-kpi-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.superadmin .mkt-admin-kpi-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.superadmin .mkt-admin-kpi-lbl {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tabs & Action bar */
+.superadmin .mkt-admin-tabs-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+  margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .superadmin .mkt-admin-tabs {
   display: flex;
+  align-items: center;
+  gap: 6px;
   flex-wrap: wrap;
-  gap: 4px;
-  border-bottom: 1px solid var(--line, #e2e8f0);
-  margin-bottom: 16px;
 }
 
 .superadmin .mkt-admin-tab {
   border: 0;
   background: transparent;
-  padding: 10px 14px;
-  font-size: 13px;
+  padding: 10px 16px;
+  font-size: 13.5px;
   font-weight: 600;
   color: #64748b;
   cursor: pointer;
+  border-radius: 10px 10px 0 0;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.superadmin .mkt-admin-tab:hover {
+  color: #1e293b;
+  background: rgba(241, 245, 249, 0.6);
 }
 
 .superadmin .mkt-admin-tab.on {
   color: var(--brand, #2563eb);
   border-bottom-color: var(--brand, #2563eb);
+  background: #ffffff;
 }
 
+.superadmin .mkt-admin-tab-chip {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.superadmin .mkt-admin-tab.on .mkt-admin-tab-chip {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.superadmin .mkt-admin-attribution-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  margin-bottom: 6px;
+}
+
+.superadmin .mkt-admin-attribution-link:hover {
+  background: #f1f5f9;
+  color: var(--brand, #2563eb);
+  border-color: #cbd5e1;
+}
+
+/* Table Toolbar */
 .superadmin .mkt-admin-table-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+  background: #ffffff;
   flex-wrap: wrap;
+}
+
+.superadmin .mkt-admin-table-head .t {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .superadmin .mkt-admin-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
+}
+
+.superadmin .mkt-admin-filter-group {
+  display: inline-flex;
+  padding: 3px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  gap: 2px;
+}
+
+.superadmin .mkt-admin-filter-btn {
+  border: 0;
+  background: transparent;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.superadmin .mkt-admin-filter-btn.on {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .superadmin .mkt-admin-search {
@@ -9135,112 +9337,432 @@
   align-items: center;
   gap: 8px;
   border: 1px solid var(--line, #e2e8f0);
-  background: #fff;
+  background: #ffffff;
   border-radius: 10px;
-  padding: 0 10px;
-  min-width: 180px;
+  padding: 0 12px;
+  min-width: 220px;
   color: #94a3b8;
+  transition: border-color 0.15s ease;
+}
+
+.superadmin .mkt-admin-search:focus-within {
+  border-color: var(--brand, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .superadmin .mkt-admin-search input {
   border: 0;
   outline: none;
   background: transparent;
-  padding: 8px 0;
+  padding: 7px 0;
   font-size: 13px;
   width: 100%;
   color: var(--ink, #0f172a);
 }
 
-.superadmin .mkt-admin-add {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.4fr auto;
-  gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--line, #eef2f7);
-  background: #f8fafc;
-  align-items: end;
-}
-
-.superadmin .mkt-admin-add-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding-bottom: 2px;
+/* Table Design */
+.superadmin .mkt-admin-tbl {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .superadmin .mkt-admin-tbl th {
+  padding: 12px 18px;
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: #64748b;
+  font-weight: 700;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+}
+
+.superadmin .mkt-admin-tbl td {
+  padding: 16px 18px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.superadmin .mkt-admin-tbl tr:last-child td {
+  border-bottom: 0;
+}
+
+.superadmin .mkt-admin-tbl tr:hover td {
+  background: #f8fafc;
 }
 
 .superadmin .mkt-admin-plat-cell {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+}
+
+.superadmin .mkt-admin-plat-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 4px 10px -2px rgba(15, 23, 42, 0.06);
+  flex-shrink: 0;
+}
+
+.superadmin .mkt-admin-plat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.superadmin .mkt-admin-plat-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.superadmin .mkt-admin-plat-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .superadmin .mkt-admin-key {
   display: inline-block;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 999px;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
   background: #f1f5f9;
   color: #475569;
+  font-weight: 600;
+}
+
+.superadmin .mkt-admin-protocol {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.superadmin .mkt-admin-caps {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.superadmin .mkt-admin-cap-pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid rgba(191, 219, 254, 0.6);
 }
 
 .superadmin .mkt-admin-status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.superadmin .mkt-admin-status i {
-  width: 7px;
-  height: 7px;
+.superadmin .mkt-admin-status.active {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.superadmin .mkt-admin-status.active i {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: currentColor;
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+}
+
+.superadmin .mkt-admin-status.disabled {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.superadmin .mkt-admin-status.disabled i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
 }
 
 .superadmin .mkt-admin-actions {
   display: flex;
   align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.superadmin .mkt-admin-action-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line, #e2e8f0);
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
 }
 
-.superadmin .mkt-admin-icon-btn {
-  padding: 6px 8px !important;
+.superadmin .mkt-admin-action-btn:hover {
+  background: #f8fafc;
+  color: var(--brand, #2563eb);
+  border-color: #cbd5e1;
 }
 
-.superadmin .mkt-admin-icon-btn.is-danger {
-  color: #e11d48;
+.superadmin .mkt-admin-action-btn.danger {
+  color: #dc2626;
 }
 
-.superadmin .mkt-admin-icon-btn.is-danger:hover {
-  background: #fff1f2;
-  border-color: #fecdd3;
-  color: #be123c;
+.superadmin .mkt-admin-action-btn.danger:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
 }
 
-.superadmin .mkt-admin-meta {
-  padding: 18px 20px;
+/* Modern Integrations Grid Layout */
+.superadmin .mkt-admin-integrations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 18px;
 }
 
-.superadmin .mkt-admin-meta-head {
+.superadmin .mkt-admin-int-card {
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 16px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.superadmin .mkt-admin-int-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 28px -6px rgba(15, 23, 42, 0.09);
+  transform: translateY(-2px);
+}
+
+.superadmin .mkt-admin-int-card.disabled {
+  background: #fbfcfe;
+  border-color: #e2e8f0;
+  opacity: 0.85;
+}
+
+.superadmin .mkt-admin-int-card.disabled:hover {
+  opacity: 1;
+}
+
+.superadmin .mkt-admin-int-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.superadmin .mkt-admin-int-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.superadmin .mkt-admin-int-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.superadmin .mkt-admin-int-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.superadmin .mkt-admin-int-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.superadmin .mkt-admin-int-toggle-wrap {
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.superadmin .mkt-admin-int-desc {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.55;
+  margin: 0;
+  min-height: 40px;
+}
+
+.superadmin .mkt-admin-int-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+  margin-top: auto;
+  flex-wrap: wrap;
+}
+
+.superadmin .mkt-admin-int-provider {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.superadmin .mkt-admin-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 20px;
+  color: #64748b;
+  gap: 12px;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* 4 Platform Detail Cards Grid */
+.superadmin .mkt-admin-channels-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.superadmin .mkt-admin-channel-card {
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+
+.superadmin .mkt-admin-channel-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 20px -6px rgba(15, 23, 42, 0.08);
+}
+
+.superadmin .mkt-admin-channel-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
 }
 
-.superadmin .mkt-admin-meta-fields {
+.superadmin .mkt-admin-channel-desc {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.superadmin .mkt-admin-channel-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+  margin-top: auto;
+}
+
+/* Meta App Tab */
+.superadmin .mkt-admin-meta-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 22px;
+  border-radius: 14px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.superadmin .mkt-admin-meta-banner.ready {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(240, 253, 244, 0.95));
+  border: 1px solid rgba(187, 247, 208, 0.9);
+}
+
+.superadmin .mkt-admin-meta-banner.needs-config {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(255, 251, 235, 0.95));
+  border: 1px solid rgba(254, 215, 170, 0.9);
+}
+
+.superadmin .mkt-admin-meta-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.superadmin .mkt-admin-meta-banner-text h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 3px;
+}
+
+.superadmin .mkt-admin-meta-banner-text p {
+  font-size: 13px;
+  color: #475569;
+  margin: 0;
+}
+
+.superadmin .mkt-admin-meta-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.superadmin .mkt-admin-copy-card {
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.superadmin .mkt-admin-copy-card label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .superadmin .mkt-admin-copy-field {
@@ -9252,43 +9774,243 @@
 .superadmin .mkt-admin-copy-field .inp {
   flex: 1;
   min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: #f8fafc;
 }
 
-.superadmin .mkt-admin-settings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-}
-
-.superadmin .mkt-admin-settings-card {
+.superadmin .mkt-admin-steps-card {
+  background: #ffffff;
   border: 1px solid var(--line, #e2e8f0);
+  border-radius: 14px;
+  padding: 22px;
+  margin-top: 20px;
+}
+
+.superadmin .mkt-admin-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.superadmin .mkt-admin-step-box {
+  padding: 16px;
+  background: #f8fafc;
   border-radius: 12px;
-  padding: 14px;
+  border: 1px solid #eef2f7;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: #fff;
 }
 
-.superadmin .mkt-admin-settings-card b {
-  font-size: 13px;
-}
-
-.superadmin .mkt-admin-settings-card .muted {
+.superadmin .mkt-admin-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #ffffff;
   font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
 }
 
+.superadmin .mkt-admin-step-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.superadmin .mkt-admin-step-desc {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+/* Credentials Grid */
+.superadmin .mkt-admin-creds-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.superadmin .mkt-admin-cred-box {
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 14px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.superadmin .mkt-admin-cred-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.superadmin .mkt-admin-cred-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.superadmin .mkt-admin-vars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.superadmin .mkt-admin-var-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #334155;
+}
+
+/* Interactive Credentials Form */
+.superadmin .mkt-admin-cred-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.superadmin .mkt-admin-cred-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.superadmin .mkt-admin-cred-field label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.superadmin .mkt-admin-cred-field label span.hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.superadmin .mkt-admin-input-group {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+}
+
+.superadmin .mkt-admin-input-group .inp {
+  width: 100%;
+  padding-right: 42px;
+}
+
+.superadmin .mkt-admin-input-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.superadmin .mkt-admin-input-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.superadmin .mkt-admin-helper-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.superadmin .mkt-admin-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+  flex-wrap: wrap;
+}
+
+.superadmin .mkt-admin-save-bar-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.superadmin .mkt-admin-save-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Inline / Modal forms */
+.superadmin .mkt-admin-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px;
+}
+
+/* Responsive adjustments */
 @media (max-width: 1100px) {
-  .superadmin .mkt-admin-add {
-    grid-template-columns: 1fr 1fr;
+  .superadmin .mkt-admin-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .superadmin .mkt-admin-meta-fields {
+  .superadmin .mkt-admin-channels-grid,
+  .superadmin .mkt-admin-creds-grid,
+  .superadmin .mkt-admin-steps-grid {
+    grid-template-columns: 1fr;
+  }
+  .superadmin .mkt-admin-meta-cards {
     grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 820px) {
   .superadmin .mkt-admin-hero-art {
     display: none;
   }
+  .superadmin .mkt-admin-kpi-grid {
+    grid-template-columns: 1fr;
+  }
 }
+

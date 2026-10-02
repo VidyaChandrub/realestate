@@ -3,6 +3,8 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -18,6 +20,7 @@ import {
   MetaManualTokenDto,
   UpdateMetaConnectionDto,
 } from './dto/meta-leads.dto';
+import { GoogleSheetsService } from '../marketing/google-sheets.service';
 
 const GRAPH_VERSION = 'v21.0';
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
@@ -39,16 +42,16 @@ type MetaLeadPayload = {
   is_organic?: boolean;
 };
 
-export type MetaChannel = 'instagram' | 'facebook';
+export type MetaChannel = 'instagram' | 'facebook' | 'whatsapp';
 
 /**
  * Map the Graph Lead `platform` value onto a CRM channel. Tolerant on purpose:
- * the exact Instagram value is not pinned down yet, and Lead Ads Testing Tool
- * leads return no platform at all — anything unrecognised stays Facebook.
+ * maps Instagram or WhatsApp if reported by Meta, and defaults to Facebook.
  */
 export function resolveMetaChannel(platform?: string | null): MetaChannel {
   const value = (platform ?? '').trim().toLowerCase();
   if (value === 'ig' || value.startsWith('instagram')) return 'instagram';
+  if (value === 'wa' || value.includes('whatsapp')) return 'whatsapp';
   return 'facebook';
 }
 
@@ -59,21 +62,111 @@ type GraphPage = {
 };
 
 @Injectable()
-export class MetaLeadsService {
+export class MetaLeadsService implements OnModuleInit {
   private readonly logger = new Logger(MetaLeadsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly googleSheets?: GoogleSheetsService,
+  ) {}
+
+  private cachedAppId = '';
+  private cachedAppSecret = '';
+  private cachedVerifyToken = '';
+  private dbLoaded = false;
+
+  async onModuleInit() {
+    await this.loadCredentialsFromDb();
+  }
+
+  async loadCredentialsFromDb(): Promise<void> {
+    try {
+      const rows: any[] = await this.prisma.$queryRawUnsafe(`
+        SELECT "meta_app_id", "meta_app_secret", "meta_webhook_verify_token"
+        FROM "identity"."marketing_settings"
+        WHERE "id" = 'default' LIMIT 1
+      `);
+      if (rows && rows.length > 0) {
+        const r = rows[0];
+        this.dbLoaded = true;
+        if (typeof r.meta_app_id === 'string') {
+          this.cachedAppId = r.meta_app_id.trim();
+          process.env.META_APP_ID = this.cachedAppId;
+        }
+        if (typeof r.meta_app_secret === 'string') {
+          this.cachedAppSecret = r.meta_app_secret.trim();
+          process.env.META_APP_SECRET = this.cachedAppSecret;
+        }
+        if (typeof r.meta_webhook_verify_token === 'string') {
+          this.cachedVerifyToken = r.meta_webhook_verify_token.trim();
+          process.env.META_WEBHOOK_VERIFY_TOKEN = this.cachedVerifyToken;
+        }
+      }
+    } catch {
+      // Table may not exist yet on fresh database before ensureSettingsTable
+    }
+  }
+
+  setCredentials(appId?: string, appSecret?: string, verifyToken?: string) {
+    this.dbLoaded = true;
+    if (appId !== undefined) {
+      this.cachedAppId = (appId ?? '').trim();
+      process.env.META_APP_ID = this.cachedAppId;
+    }
+    if (appSecret !== undefined) {
+      this.cachedAppSecret = (appSecret ?? '').trim();
+      process.env.META_APP_SECRET = this.cachedAppSecret;
+    }
+    if (verifyToken !== undefined) {
+      this.cachedVerifyToken = (verifyToken ?? '').trim();
+      process.env.META_WEBHOOK_VERIFY_TOKEN = this.cachedVerifyToken;
+    }
+  }
+
+  async persistCredentials(appId?: string, appSecret?: string, verifyToken?: string): Promise<void> {
+    this.setCredentials(appId, appSecret, verifyToken);
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        CREATE SCHEMA IF NOT EXISTS "identity";
+        CREATE TABLE IF NOT EXISTS "identity"."marketing_settings" (
+          "id" VARCHAR(64) PRIMARY KEY,
+          "meta_app_id" TEXT,
+          "meta_app_secret" TEXT,
+          "meta_webhook_verify_token" TEXT,
+          "google_ads_client_id" TEXT,
+          "google_ads_client_secret" TEXT,
+          "google_ads_developer_token" TEXT,
+          "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+      await this.prisma.$executeRawUnsafe(`
+        INSERT INTO "identity"."marketing_settings" ("id", "meta_app_id", "meta_app_secret", "meta_webhook_verify_token")
+        VALUES ('default', $1, $2, $3)
+        ON CONFLICT ("id") DO UPDATE SET
+          "meta_app_id" = EXCLUDED."meta_app_id",
+          "meta_app_secret" = EXCLUDED."meta_app_secret",
+          "meta_webhook_verify_token" = EXCLUDED."meta_webhook_verify_token",
+          "updated_at" = NOW();
+      `, this.cachedAppId, this.cachedAppSecret, this.cachedVerifyToken);
+    } catch (err) {
+      this.logger.error('Failed to persist Meta credentials to database', err);
+    }
+  }
 
   private appId() {
-    return (process.env.META_APP_ID ?? '').trim();
+    if (this.dbLoaded) return this.cachedAppId;
+    return this.cachedAppId || (process.env.META_APP_ID ?? '').trim();
   }
 
   private appSecret() {
-    return (process.env.META_APP_SECRET ?? '').trim();
+    if (this.dbLoaded) return this.cachedAppSecret;
+    return this.cachedAppSecret || (process.env.META_APP_SECRET ?? '').trim();
   }
 
   private verifyToken() {
-    return (process.env.META_WEBHOOK_VERIFY_TOKEN ?? '').trim();
+    if (this.dbLoaded) return this.cachedVerifyToken;
+    return this.cachedVerifyToken || (process.env.META_WEBHOOK_VERIFY_TOKEN ?? '').trim();
   }
 
   private frontendUrl() {
@@ -108,7 +201,7 @@ export class MetaLeadsService {
   getConnectUrl(orgId: string, userId: string, platformKey = 'meta') {
     if (!this.isConfigured()) {
       throw new ServiceUnavailableException(
-        'Facebook Lead Ads is not configured. Ask a Super Admin to set META_APP_ID and META_APP_SECRET.',
+        'Facebook Lead Ads is not configured. Ask a Super Admin to configure Meta credentials in Admin Console > Marketing.',
       );
     }
     const redirectUri = `${this.apiPublicUrl()}/org/meta/oauth/callback`;
@@ -266,7 +359,14 @@ export class MetaLeadsService {
       if (!project) throw new NotFoundException('Project not found');
     }
 
-    await this.subscribePageToLeadgen(dto.pageId, dto.accessToken.trim());
+    try {
+      await this.subscribePageToLeadgen(dto.pageId, dto.accessToken.trim());
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Could not subscribe Page ${dto.pageId} to leadgen webhooks during token connect: ${msg}`,
+      );
+    }
 
     const row = await this.prisma.metaPageConnection.upsert({
       where: { orgId_pageId: { orgId, pageId: dto.pageId.trim() } },
@@ -387,7 +487,7 @@ export class MetaLeadsService {
     const expected = this.verifyToken();
     if (!expected) {
       throw new ServiceUnavailableException(
-        'META_WEBHOOK_VERIFY_TOKEN is not configured',
+        'Meta Webhook Verify Token is not configured. Configure it in Admin Console > Marketing.',
       );
     }
     if (mode === 'subscribe' && token === expected && challenge) {
@@ -512,14 +612,24 @@ export class MetaLeadsService {
     const data = normalizeLeadData(fieldMap);
 
     const channel = resolveMetaChannel(payload.platform);
-    const channelLabel = channel === 'instagram' ? 'Instagram' : 'Facebook';
+    const channelLabel =
+      channel === 'instagram'
+        ? 'Instagram'
+        : channel === 'whatsapp'
+          ? 'WhatsApp'
+          : 'Facebook';
     this.logger.log(
       `Meta lead ${input.leadgenId}: platform=${JSON.stringify(payload.platform ?? null)} is_organic=${String(payload.is_organic ?? null)} -> ${channel}`,
     );
 
     const attribution: LeadAttribution = resolveAttribution(data, {
       source: channelLabel,
-      platform: channel === 'instagram' ? 'instagram' : 'meta',
+      platform:
+        channel === 'instagram'
+          ? 'instagram'
+          : channel === 'whatsapp'
+            ? 'whatsapp'
+            : 'meta',
       medium: payload.is_organic === true ? 'Organic Social' : 'Paid Social',
       campaign: payload.campaign_name ?? null,
       campaignId: payload.campaign_id ?? input.campaignId ?? null,
@@ -592,6 +702,10 @@ export class MetaLeadsService {
           ...(assignedToId ? { assignedToId } : {}),
         },
       });
+
+      if (this.googleSheets) {
+        void this.googleSheets.appendLeadRow(connection.orgId, lead).catch(() => {});
+      }
 
       await this.prisma.activityEvent.create({
         data: {

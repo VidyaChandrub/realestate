@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { GoogleSheetsModule } from '../marketing/google-sheets.module';
 import { OrgApprovedGuard } from '../../common/guards/org-approved.guard';
 import { MetaLeadsService } from './meta-leads.service';
 import {
@@ -10,7 +11,7 @@ import {
 } from './meta-leads.controller';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, GoogleSheetsModule],
   controllers: [
     MetaWebhookController,
     MetaOAuthCallbackController,
