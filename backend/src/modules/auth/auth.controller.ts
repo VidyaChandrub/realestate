@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Headers, HttpCode, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -22,6 +24,43 @@ import type { JwtPayload } from '../../common/types/jwt-payload.interface';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Get('google/config')
+  @HttpCode(200)
+  getGoogleConfig() {
+    return this.authService.getGoogleAuthConfig();
+  }
+
+  @Get('google/url')
+  @HttpCode(200)
+  getGoogleAuthUrl(
+    @Query('mode') mode?: 'login' | 'register',
+    @Query('portal') portal?: 'organisation' | 'platform',
+    @Query('redirectUri') redirectUri?: string,
+  ) {
+    return this.authService.getGoogleAuthUrl(
+      mode || 'login',
+      portal || 'organisation',
+      redirectUri,
+    );
+  }
+
+  @Post('google')
+  @HttpCode(200)
+  googleAuth(@Body() dto: GoogleAuthDto) {
+    return this.authService.handleGoogleAuth(dto);
+  }
+
+  @Get('google/callback')
+  async googleCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Query('error') error: string | undefined,
+    @Res() res: Response,
+  ) {
+    const target = await this.authService.handleGoogleCallback(code, state, error);
+    return res.redirect(target);
+  }
 
   @Post('signup')
   signup(@Body() dto: SignupDto) {

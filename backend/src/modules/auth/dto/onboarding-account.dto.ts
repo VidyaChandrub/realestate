@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 // Signup wizard — Step 1 (Account). Creates the User; no Organisation
 // exists yet, so nothing org-related belongs here.
@@ -21,10 +21,10 @@ export class OnboardingAccountDto {
   @MaxLength(30)
   phone_number: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(72)
-  password: string;
+  password?: string;
 
   // Stored on User (not Organisation — none exists yet) purely so a resume
   // before Step 2 can restore the Country select and strip the dial code
@@ -33,4 +33,8 @@ export class OnboardingAccountDto {
   @IsNotEmpty()
   @MaxLength(100)
   country: string;
+
+  @IsOptional()
+  @IsString()
+  googleToken?: string;
 }

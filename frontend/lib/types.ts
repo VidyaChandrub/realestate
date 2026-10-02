@@ -115,8 +115,9 @@ export interface OnboardingAccountInput {
   last_name: string;
   work_email: string;
   phone_number: string;
-  password: string;
+  password?: string;
   country: string;
+  googleToken?: string;
 }
 
 export type SignupStep1Response =
@@ -2857,10 +2858,13 @@ export interface MarketingCredentials {
   metaAppId: string;
   metaAppSecret: string;
   metaWebhookVerifyToken: string;
+  googleClientId?: string;
+  googleClientSecret?: string;
   googleAdsClientId: string;
   googleAdsClientSecret: string;
   googleAdsDeveloperToken: string;
   metaConfigured: boolean;
+  googleAuthConfigured?: boolean;
   googleAdsConfigured: boolean;
 }
 
@@ -3002,3 +3006,93 @@ export interface MarketingSyncLog {
   message: string | null;
   createdAt: string;
 }
+
+export interface GoogleAuthConfig {
+  enabled: boolean;
+  clientId: string | null;
+}
+
+export interface GoogleAuthInput {
+  credential?: string;
+  code?: string;
+  redirectUri?: string;
+  mode?: "login" | "register";
+  portal?: "organisation" | "platform";
+  country?: string;
+  phoneNumber?: string;
+  firstName?: string;
+  lastName?: string;
+  host?: string;
+}
+
+export type GoogleAuthResponse =
+  | {
+      status: "authenticated";
+      user: SafeUser;
+      roles: string[];
+      access_token: string;
+      refresh_token: string;
+      token_type?: string;
+      expires_in?: number;
+      onboarding_incomplete: false;
+      googleUser?: {
+        email: string;
+        firstName: string;
+        lastName: string;
+        picture?: string;
+      };
+    }
+  | {
+      status: "exists_incomplete";
+      user: SafeUser;
+      roles: string[];
+      access_token: string;
+      refresh_token: string;
+      token_type?: string;
+      expires_in?: number;
+      onboarding_incomplete: true;
+      onboardingStep: OnboardingStep;
+      existingUserId?: string;
+      firstName?: string;
+      lastName?: string;
+    }
+  | {
+      status: "created";
+      user: SafeUser;
+      access_token: string;
+      refresh_token: string;
+      token_type?: string;
+      expires_in?: number;
+      onboardingStep: OnboardingStep;
+      nextStep?: OnboardingStep;
+      email_verification_required: boolean;
+      googleUser?: {
+        email: string;
+        firstName: string;
+        lastName: string;
+        picture?: string;
+      };
+    }
+  | {
+      status: "exists_completed";
+      email: string;
+      message: string;
+    }
+  | {
+      status: "not_found";
+      email: string;
+      firstName: string;
+      lastName: string;
+      picture?: string;
+      message: string;
+    }
+  | {
+      status: "needs_profile";
+      email: string;
+      firstName: string;
+      lastName: string;
+      picture?: string;
+      googleVerified: true;
+      googleToken?: string;
+    };
+

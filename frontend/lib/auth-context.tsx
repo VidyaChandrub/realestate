@@ -57,6 +57,13 @@ interface AuthContextValue {
   isLoading: boolean;
   isMock: boolean;
   login: (input: LoginInput) => Promise<SessionUser>;
+  loginWithGoogle: (response: {
+    user: SafeUser;
+    access_token: string;
+    refresh_token: string;
+    roles?: string[];
+    onboarding_incomplete?: boolean;
+  }) => Promise<SessionUser>;
   signup: (input: SignupInput) => Promise<SessionUser>;
   // Persists a session from a SafeUser + token pair returned by any of the
   // signup-wizard step endpoints (Step 1, resume, Step 2's reissue) —
@@ -180,6 +187,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }),
       });
 
+      let permissions: Permissions = {};
+      let roleKeys = response.roles ?? [];
+      let platformUnrestricted = roleKeys.includes("super_admin");
+
+      if (
+        !response.user.org_id &&
+        response.user.onboarding_step === "completed"
+      ) {
+        try {
+          const meRes = await apiFetch<{
+            permissions: Permissions;
+            unrestricted?: boolean;
+            roles?: { key: string; name: string }[];
+          }>("/admin/platform-roles/me", {
+            headers: { Authorization: `Bearer ${response.access_token}` },
+          });
+          if (meRes.permissions) permissions = meRes.permissions;
+          if (typeof meRes.unrestricted === "boolean") {
+            platformUnrestricted = meRes.unrestricted;
+          }
+          if (meRes.roles?.length) {
+            roleKeys = meRes.roles.map((r) => r.key);
+            if (roleKeys.includes("super_admin")) platformUnrestricted = true;
+          }
+        } catch {
+          permissions = {};
+        }
+      } else if (
+        response.user.org_id &&
+        response.user.onboarding_step === "completed" &&
+        !response.onboarding_incomplete
+      ) {
+        try {
+          const meRes = await apiFetch<{
+            permissions: Permissions;
+            role?: string | null;
+            roleName?: string | null;
+            roles?: string[];
+          }>("/org/permissions/me", {
+            headers: { Authorization: `Bearer ${response.access_token}` },
+          });
+          if (meRes.permissions) {
+            permissions = meRes.permissions;
+          }
+          if (meRes.roles?.length) roleKeys = meRes.roles;
+          else if (meRes.role) roleKeys = [meRes.role];
+        } catch {
+          permissions = {};
+        }
+      }
+
+      const session = toSessionUser(
+        response.user,
+        permissions,
+        roleKeys,
+        platformUnrestricted,
+      );
+      if (!response.onboarding_incomplete && session.role !== "super_admin") {
+        session.onboarding_step = "completed";
+      }
+      persist(session, response.access_token, response.refresh_token);
+      return session;
+    },
+    [persist, toSessionUser],
+  );
+
+  const loginWithGoogle = useCallback(
+    async (response: {
+      user: SafeUser;
+      access_token: string;
+      refresh_token: string;
+      roles?: string[];
+      onboarding_incomplete?: boolean;
+    }) => {
       let permissions: Permissions = {};
       let roleKeys = response.roles ?? [];
       let platformUnrestricted = roleKeys.includes("super_admin");
@@ -503,6 +584,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       isMock: true,
       login,
+      loginWithGoogle,
       signup,
       applyAuthTokens,
       logout,
@@ -517,6 +599,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accessToken,
       isLoading,
       login,
+      loginWithGoogle,
       signup,
       applyAuthTokens,
       logout,
