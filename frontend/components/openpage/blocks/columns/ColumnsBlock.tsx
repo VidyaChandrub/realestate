@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useState } from "react";
+import { Fragment, useCallback, useState, useRef } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -12,6 +12,7 @@ import { createBlockFromType, createBlockFromPresetId } from "@/lib/openpage/blo
 import { resolveBlockStyleForDevice, isHiddenOnViewport } from "@/lib/openpage/block-style";
 import { Plus, GripVertical, Type, Image as ImageIcon, Sparkles, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { ColumnResizer } from "./ColumnResizer";
 
 interface ColumnsProps {
   columns?: Array<{ width: number; blocks: BlockConfig[] }>;
@@ -402,6 +403,7 @@ function DroppableColumn({
 }
 
 export function ColumnsBlock({ block }: { block: BlockConfig }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const p = block.props as ColumnsProps;
   const gap = p.gap || "24px";
 
@@ -415,15 +417,29 @@ export function ColumnsBlock({ block }: { block: BlockConfig }) {
 
   return (
     <div className="px-6 py-6">
-      <div className="max-w-6xl mx-auto flex flex-wrap" style={{ gap }}>
+      <div
+        ref={containerRef}
+        className="max-w-6xl mx-auto flex flex-wrap items-stretch"
+        style={{ gap }}
+      >
         {columns.map((col, i) => (
-          <DroppableColumn
-            key={i}
-            sectionBlockId={block.id}
-            colIndex={i}
-            col={col}
-            gap={gap}
-          />
+          <Fragment key={i}>
+            <DroppableColumn
+              sectionBlockId={block.id}
+              colIndex={i}
+              col={col}
+              gap={gap}
+            />
+            {i < columns.length - 1 && (
+              <ColumnResizer
+                sectionBlockId={block.id}
+                leftIndex={i}
+                leftWidth={col.width}
+                rightWidth={columns[i + 1]?.width ?? 50}
+                containerRef={containerRef}
+              />
+            )}
+          </Fragment>
         ))}
       </div>
     </div>

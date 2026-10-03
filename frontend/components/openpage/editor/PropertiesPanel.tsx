@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Code } from "lucide-react";
+import { Code, Plus, Trash2, Check, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 import type { BlockConfig, BlockType } from "@/components/openpage/blocks/types";
 import { useConfigStore } from "@/components/openpage/store/configStore";
 import { Section } from "./shared-components";
@@ -9,6 +10,7 @@ import { ElementListEditor } from "./ElementListEditor";
 import { MediaPicker } from "@/components/media-picker";
 import { type FormDefinition } from "@/lib/openpage/forms-store";
 import { useBuilderLeadForms } from "@/components/openpage/builder/forms-context";
+import { DynamicDataPicker } from "./DynamicDataPicker";
 
 interface FieldDef {
   key: string
@@ -680,6 +682,56 @@ const blockFields: Partial<Record<BlockType, { sections: { title: string; fields
   },
 }
 
+const TYPE_ALIASES: Record<string, BlockType> = {
+  're-hero': 'project-banner',
+  'hero-re': 'project-banner',
+  're-project-banner': 'project-banner',
+  're-overview': 'project-overview',
+  're-project-overview': 'project-overview',
+  're-highlights': 'project-highlights',
+  're-project-highlights': 'project-highlights',
+  're-amenities': 'amenities',
+  're-floor-plans': 'floor-plans',
+  're-pricing': 're-pricing',
+  'pricing-re': 're-pricing',
+  're-location': 'location',
+  're-developer': 'developer',
+  're-site-visit': 'site-visit',
+  're-lead-form': 'lead-form',
+  're-specifications': 'property-details',
+  'specifications': 'property-details',
+  're-construction-status': 'construction-status',
+  're-offers': 'offers',
+  're-banner': 'project-banner',
+  're-unit-config': 'unit-config',
+  're-gallery': 'gallery',
+  'gallery-re': 'gallery',
+  're-faq': 'faq',
+  're-testimonials': 'testimonials',
+  're-contact': 'contact',
+};
+
+const KNOWN_VARIANTS: Record<string, string[]> = {
+  'project-banner': ['split-form', 'overlay', 'centered', 'editorial', 'framed', 'asymmetric', 'info-bar', 'framed-center', 'split-curve', 'stats'],
+  'project-overview': ['split', 'centered', 'cards', 'timeline'],
+  'property-details': ['grid', 'table', 'two-column', 'checklist'],
+  'project-highlights': ['grid', 'table', 'two-column', 'checklist'],
+  'amenities': ['grid', 'chips', 'icon-grid', 'featured'],
+  'floor-plans': ['cards', 'list', 'showcase'],
+  'unit-config': ['cards', 'table'],
+  're-pricing': ['cards', 'simple', 'comparison', 'banner'],
+  'location': ['split-map', 'list', 'map-only', 'cards'],
+  'developer': ['default', 'split', 'stats', 'band'],
+  'lead-form': ['card', 'split', 'inline', 'default'],
+  'download-brochure': ['split', 'card', 'banner', 'minimal'],
+  'testimonials': ['cards', 'carousel', 'spotlight', 'band'],
+  'stats': ['grid', 'bar', 'counter'],
+  'hero': ['centered', 'split', 'gradient', 'minimal'],
+  'features': ['grid', 'list', 'alternating'],
+  'cta': ['simple', 'split'],
+  'footer': ['simple', 'multi-column', 'minimal', 'premium', 'contact'],
+};
+
 function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }) {
   const updateBlockProps = useConfigStore((s) => s.updateBlockProps)
   const updateBlock = useConfigStore((s) => s.updateBlock)
@@ -909,7 +961,10 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
     case 'text':
       return (
         <div className="mb-2.5">
-          <label className="block text-[11.5px] text-text-2 mb-1 font-medium">{field.label}</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[11.5px] text-text-2 font-medium">{field.label}</label>
+            <DynamicDataPicker onSelectTag={(tag) => onChange(tag)} />
+          </div>
           <input
             type="text"
             value={String(value || '')}
@@ -922,7 +977,10 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
     case 'textarea':
       return (
         <div className="mb-2.5">
-          <label className="block text-[11.5px] text-text-2 mb-1 font-medium">{field.label}</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[11.5px] text-text-2 font-medium">{field.label}</label>
+            <DynamicDataPicker onSelectTag={(tag) => onChange(tag)} />
+          </div>
           <textarea
             value={String(value || '')}
             onChange={(e) => onChange(e.target.value)}
@@ -1048,46 +1106,236 @@ function PropertyField({ field, block }: { field: FieldDef; block: BlockConfig }
 
 export function PropertiesPanel({ block }: { block: BlockConfig }) {
   const [showJson, setShowJson] = useState(false)
-  const schema = blockFields[block.type]
+  const [jsonText, setJsonText] = useState("")
+  const [jsonError, setJsonError] = useState<string | null>(null)
+  const [showAddProp, setShowAddProp] = useState(false)
+  const [newPropKey, setNewPropKey] = useState("")
+  const [newPropType, setNewPropType] = useState<"text" | "textarea" | "image" | "toggle">("text")
+
   const updateColumnWidth = useConfigStore((s) => s.updateColumnWidth)
   const addColumn = useConfigStore((s) => s.addColumn)
   const removeColumn = useConfigStore((s) => s.removeColumn)
+  const updateBlockProps = useConfigStore((s) => s.updateBlockProps)
+  const updateBlock = useConfigStore((s) => s.updateBlock)
 
-  const columns = block.type === 'columns'
+  // Normalize block type via aliases
+  const normalizedType = TYPE_ALIASES[block.type] || block.type
+  const schema = blockFields[normalizedType as BlockType] || blockFields[block.type as BlockType]
+
+  // Collect all keys covered in predefined schema
+  const predefinedKeys = new Set<string>()
+  if (schema) {
+    for (const section of schema.sections) {
+      for (const field of section.fields) {
+        predefinedKeys.add(field.key)
+      }
+    }
+  }
+
+  // Check if variant switcher is already present in schema
+  const variants = KNOWN_VARIANTS[normalizedType] || KNOWN_VARIANTS[block.type]
+  const hasVariantInSchema = predefinedKeys.has("variant")
+
+  // Discover all extra properties from block.props that aren't in schema
+  const extraFields: FieldDef[] = []
+  const propsObj = (block.props || {}) as Record<string, unknown>
+  const propKeys = Object.keys(propsObj)
+
+  for (const key of propKeys) {
+    if (predefinedKeys.has(key)) continue
+    if (key === "columns" && block.type === "columns") continue
+
+    const val = propsObj[key]
+    const lowerKey = key.toLowerCase()
+    const label = key
+      .replace(/([A-Z])/g, " $1")
+      .replace(/[_-]/g, " ")
+      .replace(/^\w/, (c) => c.toUpperCase())
+
+    if (typeof val === "boolean") {
+      extraFields.push({ key, label, type: "toggle" })
+    } else if (
+      lowerKey.includes("image") ||
+      lowerKey.includes("img") ||
+      lowerKey.includes("photo") ||
+      lowerKey.includes("logo") ||
+      lowerKey.includes("banner") ||
+      lowerKey.includes("avatar") ||
+      lowerKey.includes("src") ||
+      (typeof val === "string" && /\.(jpg|jpeg|png|webp|avif|svg)$/i.test(val))
+    ) {
+      extraFields.push({ key, label, type: "image" })
+    } else if (lowerKey.includes("formid") || lowerKey === "form") {
+      extraFields.push({ key, label, type: "form-select" })
+    } else if (Array.isArray(val)) {
+      if (val.length === 0 || typeof val[0] === "string") {
+        extraFields.push({ key, label, type: "array-strings" })
+      } else {
+        extraFields.push({ key, label, type: "array-items" })
+      }
+    } else if (
+      typeof val === "string" &&
+      (val.length > 50 || val.includes("\n") || lowerKey.includes("body") || lowerKey.includes("desc") || lowerKey.includes("content") || lowerKey.includes("bio") || lowerKey.includes("address"))
+    ) {
+      extraFields.push({ key, label, type: "textarea" })
+    } else {
+      extraFields.push({ key, label, type: "text" })
+    }
+  }
+
+  const columns = block.type === "columns"
     ? ((block.props.columns as Array<{ width: number; blocks: BlockConfig[] }>) ?? [])
     : []
+
+  const handleAddCustomProperty = () => {
+    const cleanKey = newPropKey.trim().replace(/\s+/g, "_")
+    if (!cleanKey) {
+      toast.error("Please enter a property key")
+      return
+    }
+    let initialVal: unknown = ""
+    if (newPropType === "toggle") initialVal = false
+    updateBlockProps(block.id, { [cleanKey]: initialVal })
+    setNewPropKey("")
+    setShowAddProp(false)
+    toast.success(`Property "${cleanKey}" added to block`)
+  }
+
+  const handleApplyJson = () => {
+    try {
+      const parsed = JSON.parse(jsonText)
+      if (parsed.props) updateBlockProps(block.id, parsed.props)
+      if (parsed.variant) updateBlock(block.id, { variant: parsed.variant })
+      setJsonError(null)
+      toast.success("Block updated from JSON")
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Invalid JSON"
+      setJsonError(msg)
+      toast.error(`JSON Error: ${msg}`)
+    }
+  }
 
   return (
     <>
       {/* Header */}
-      <div className="px-3.5 py-3 border-b border-border-default flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-text-2">
-          Content
-        </span>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-glow text-green font-semibold">
-          {block.type}
-        </span>
+      <div className="px-3.5 py-3 border-b border-border-default flex items-center justify-between bg-white">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-text-2">
+            Content
+          </span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green/10 text-green font-semibold">
+            {block.type}
+          </span>
+        </div>
+        <button
+          onClick={() => setShowAddProp(!showAddProp)}
+          className="text-[10px] flex items-center gap-1 px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-text-1 font-medium transition-colors"
+          title="Add a custom property to this block"
+        >
+          <Plus size={11} />
+          <span>Add Field</span>
+        </button>
       </div>
 
-      {/* Property sections */}
+      {/* Add Custom Field Form Drawer */}
+      {showAddProp && (
+        <div className="p-3 bg-slate-50 border-b border-border-default space-y-2 animate-in fade-in duration-150">
+          <div className="text-[11px] font-semibold text-text-0">Add Custom Property</div>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <input
+              type="text"
+              placeholder="e.g. badge, carpetArea, rera"
+              value={newPropKey}
+              onChange={(e) => setNewPropKey(e.target.value)}
+              className="px-2.5 py-1.5 text-xs rounded border border-border-default bg-white text-text-0 focus:outline-none focus:border-green"
+            />
+            <select
+              value={newPropType}
+              onChange={(e) => setNewPropType(e.target.value as any)}
+              className="px-2 py-1.5 text-xs rounded border border-border-default bg-white text-text-0 focus:outline-none focus:border-green"
+            >
+              <option value="text">Text</option>
+              <option value="textarea">Long Text</option>
+              <option value="image">Image</option>
+              <option value="toggle">Toggle</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-1.5 pt-1">
+            <button
+              onClick={() => setShowAddProp(false)}
+              className="px-2.5 py-1 text-[11px] text-text-2 hover:text-text-0"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddCustomProperty}
+              className="px-3 py-1 text-[11px] rounded bg-green text-white font-medium hover:bg-green-dim shadow-sm"
+            >
+              Save Field
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Variant Selector (if block has variants and not explicitly in schema) */}
+      {!hasVariantInSchema && variants && variants.length > 0 && (
+        <Section title="Layout & Variant">
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-text-3 uppercase font-medium">Block Layout</label>
+            <select
+              value={block.variant || variants[0]}
+              onChange={(e) => updateBlock(block.id, { variant: e.target.value })}
+              className="w-full px-2.5 py-1.5 text-xs rounded border border-border-default bg-white text-text-0 focus:outline-none focus:border-green cursor-pointer font-medium"
+            >
+              {variants.map((v) => (
+                <option key={v} value={v}>
+                  {v.replace(/([A-Z])/g, " $1").replace(/[_-]/g, " ").replace(/^\w/, (c) => c.toUpperCase())}
+                </option>
+              ))}
+            </select>
+          </div>
+        </Section>
+      )}
+
+      {/* Predefined Schema Sections */}
       {schema?.sections.map((section) => (
         <Section key={section.title} title={section.title}>
           {section.fields.map((field) => (
             <PropertyField key={field.key} field={field} block={block} />
           ))}
         </Section>
-      )) || (
-        <div className="p-3.5 text-[11px] text-text-3">
-          No editable properties defined for this block type.
+      ))}
+
+      {/* Extra / Dynamic Auto-Discovered Properties */}
+      {extraFields.length > 0 && (
+        <Section title={schema ? "Additional Properties" : "Block Properties"}>
+          {extraFields.map((field) => (
+            <PropertyField key={field.key} field={field} block={block} />
+          ))}
+        </Section>
+      )}
+
+      {/* Empty State Fallback if zero properties exist anywhere */}
+      {!schema && extraFields.length === 0 && (
+        <div className="p-4 text-center space-y-2">
+          <p className="text-[11px] text-text-2">
+            No properties currently found on this block.
+          </p>
+          <button
+            onClick={() => setShowAddProp(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green text-white text-xs font-semibold hover:bg-green-dim transition-colors shadow-sm"
+          >
+            <Plus size={13} /> Add First Property
+          </button>
         </div>
       )}
 
       {/* Column Width Editor */}
-      {block.type === 'columns' && (
+      {block.type === "columns" && (
         <Section title="Columns">
           <div className="space-y-2">
             {columns.map((col, i) => (
-              <div key={i} className="bg-bg-2 border border-border-default rounded p-2">
+              <div key={i} className="bg-slate-50 border border-border-default rounded p-2">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] text-text-3 font-medium">Column {i + 1}</span>
                   <div className="flex items-center gap-1">
@@ -1109,7 +1357,7 @@ export function PropertiesPanel({ block }: { block: BlockConfig }) {
                   max={90}
                   value={col.width}
                   onChange={(e) => updateColumnWidth(block.id, i, Number(e.target.value))}
-                  className="w-full h-1.5 rounded-full appearance-none bg-bg-4 cursor-pointer accent-green"
+                  className="w-full h-1.5 rounded-full appearance-none bg-slate-200 cursor-pointer accent-green"
                 />
                 <div className="text-[9px] text-text-3 mt-0.5">{col.blocks.length} widget(s) in this column</div>
               </div>
@@ -1126,19 +1374,59 @@ export function PropertiesPanel({ block }: { block: BlockConfig }) {
         </Section>
       )}
 
-      {/* View JSON toggle */}
-      <div className="border-t border-border-subtle">
+      {/* View & Edit JSON Drawer */}
+      <div className="border-t border-border-subtle bg-white">
         <button
-          onClick={() => setShowJson(!showJson)}
-          className="w-full px-3.5 py-2 flex items-center gap-1.5 text-[10px] text-text-3 hover:text-text-2 transition-colors"
+          onClick={() => {
+            if (!showJson) {
+              setJsonText(JSON.stringify({ id: block.id, type: block.type, variant: block.variant, props: block.props }, null, 2))
+              setJsonError(null)
+            }
+            setShowJson(!showJson)
+          }}
+          className="w-full px-3.5 py-2 flex items-center justify-between text-[10px] text-text-3 hover:text-text-2 transition-colors"
         >
-          <Code size={11} />
-          {showJson ? 'Hide' : 'View'} Block JSON
+          <span className="flex items-center gap-1.5">
+            <Code size={11} />
+            {showJson ? "Hide" : "Manage Raw"} Block JSON
+          </span>
+          <span className="text-[9px] font-mono text-text-3">{showJson ? "▲ Close" : "▼ Edit JSON"}</span>
         </button>
         {showJson && (
-          <pre className="px-3.5 pb-3 text-[10px] font-mono text-text-2 leading-relaxed overflow-x-auto max-h-48 overflow-y-auto">
-            {JSON.stringify({ id: block.id, type: block.type, variant: block.variant, props: block.props }, null, 2)}
-          </pre>
+          <div className="px-3 pb-3 space-y-2">
+            <textarea
+              value={jsonText}
+              onChange={(e) => {
+                setJsonText(e.target.value)
+                setJsonError(null)
+              }}
+              rows={8}
+              className="w-full p-2 text-[10px] font-mono text-text-0 bg-slate-50 border border-border-default rounded focus:outline-none focus:border-green resize-y"
+            />
+            {jsonError && (
+              <div className="flex items-center gap-1 text-[10px] text-status-red">
+                <AlertCircle size={11} />
+                <span>{jsonError}</span>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setJsonText(JSON.stringify({ id: block.id, type: block.type, variant: block.variant, props: block.props }, null, 2))
+                  setJsonError(null)
+                }}
+                className="px-2.5 py-1 text-[10px] rounded border border-border-default text-text-2 hover:text-text-0"
+              >
+                Reset
+              </button>
+              <button
+                onClick={handleApplyJson}
+                className="px-3 py-1 text-[10px] rounded bg-green text-white font-medium hover:bg-green-dim shadow-sm flex items-center gap-1"
+              >
+                <Check size={11} /> Apply Changes
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </>

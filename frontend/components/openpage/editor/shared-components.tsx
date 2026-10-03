@@ -70,7 +70,7 @@ export function ColorInput({
   onChange,
   showPresets = true,
 }: {
-  label: string;
+  label?: string;
   value?: string;
   onChange: (v: string) => void;
   showPresets?: boolean;
@@ -80,22 +80,30 @@ export function ColorInput({
     ? value.slice(0, 7)
     : "#000000";
 
+  const hasHeader = Boolean(label || (value && value !== "transparent"));
+
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <label className="text-[10px] font-semibold uppercase tracking-wider text-text-3">{label}</label>
-        {value && value !== "transparent" && (
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            className="text-[9.5px] text-text-3 hover:text-status-red flex items-center gap-0.5 transition-colors"
-            title="Reset color"
-          >
-            <X size={10} />
-            <span>Reset</span>
-          </button>
-        )}
-      </div>
+      {hasHeader && (
+        <div className="flex items-center justify-between">
+          {label ? (
+            <label className="text-[10px] font-semibold uppercase tracking-wider text-text-3">{label}</label>
+          ) : (
+            <span />
+          )}
+          {value && value !== "transparent" && (
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="text-[9.5px] text-text-3 hover:text-status-red flex items-center gap-0.5 transition-colors"
+              title="Reset color"
+            >
+              <X size={10} />
+              <span>Reset</span>
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         {/* Swatch with hidden color input */}
@@ -105,7 +113,7 @@ export function ColorInput({
             value={hexValue}
             onChange={(e) => onChange(e.target.value)}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-            title={`Pick ${label}`}
+            title={label ? `Pick ${label}` : "Pick color"}
           />
           <div
             className="w-8 h-8 rounded-lg border border-border-default shadow-sm flex items-center justify-center overflow-hidden transition-all group-hover/swatch:border-green group-hover/swatch:scale-105"

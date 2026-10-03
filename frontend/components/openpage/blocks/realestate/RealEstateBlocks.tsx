@@ -27,7 +27,10 @@ function scrollToAnchor(id: string) {
 }
 
 function SectionShell({ children, className = "", id }: { children: React.ReactNode; className?: string; id?: string }) {
-  return <section id={id} className={`px-6 @md:px-10 py-16 @md:py-20 ${className}`}>{children}</section>;
+  const cleanClass = className
+    .replace(/\bbg-bg-[0-5]\b/g, "bg-white")
+    .replace(/\bbg-black\b/g, "bg-white");
+  return <section id={id} className={`px-6 @md:px-10 py-16 @md:py-20 bg-white text-text-0 ${cleanClass}`}>{children}</section>;
 }
 
 function Title({ title, subtitle }: { title?: string; subtitle?: string }) {
@@ -219,30 +222,30 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
   /* PDF 8 — Aurelia editorial: left copy + pill CTAs + floating label/value bar */
   if (block.variant === "editorial") {
     return (
-      <section className="relative min-h-[88vh] flex flex-col overflow-hidden bg-bg-0">
+      <section className="relative min-h-[88vh] flex flex-col overflow-hidden bg-white">
         {str(p.image) ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={str(p.image)} alt="" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-bg-3 to-bg-2" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-slate-100" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/15" />
+        {str(p.image) && <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/15" />}
         <div className="relative z-10 flex-1 flex flex-col justify-center px-6 @md:px-12 @lg:px-16 pt-28 pb-36 max-w-3xl">
           {str(p.badge) ? (
-            <p className="text-[11px] uppercase tracking-[0.28em] text-white/75 font-medium mb-5">{str(p.badge)}</p>
+            <p className={`text-[11px] uppercase tracking-[0.28em] font-medium mb-5 ${str(p.image) ? "text-white/80" : "text-green"}`}>{str(p.badge)}</p>
           ) : null}
-          <h1 className="font-display text-4xl @md:text-6xl @lg:text-[4.25rem] font-medium text-white leading-[1.08] tracking-tight mb-5">
+          <h1 className={`font-display text-4xl @md:text-6xl @lg:text-[4.25rem] font-medium leading-[1.08] tracking-tight mb-5 ${str(p.image) ? "text-white" : "text-text-0"}`}>
             {str(p.headline, "Architecture Crafted For Generations.")}
           </h1>
           {str(p.description) ? (
-            <p className="text-white/80 text-base @md:text-lg leading-relaxed max-w-xl mb-8">{str(p.description)}</p>
+            <p className={`text-base @md:text-lg leading-relaxed max-w-xl mb-8 ${str(p.image) ? "text-white/80" : "text-text-1"}`}>{str(p.description)}</p>
           ) : null}
           <div className="flex flex-wrap gap-3">
             {str(p.primaryCta) ? (
               <button
                 type="button"
                 onClick={onPrimary}
-                className="px-7 py-3 rounded-full bg-white text-text-0 text-[12px] font-semibold uppercase tracking-[0.12em] hover:bg-white/90 transition-colors"
+                className="px-7 py-3 rounded-full bg-green text-white text-[12px] font-semibold uppercase tracking-[0.12em] hover:bg-green-dim transition-colors shadow-sm"
               >
                 {str(p.primaryCta)}
               </button>
@@ -251,7 +254,9 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
               <button
                 type="button"
                 onClick={onSecondary}
-                className="px-7 py-3 rounded-full border border-white/55 text-white text-[12px] font-semibold uppercase tracking-[0.12em] hover:bg-white/10 transition-colors"
+                className={`px-7 py-3 rounded-full border text-[12px] font-semibold uppercase tracking-[0.12em] transition-colors ${
+                  str(p.image) ? "border-white/55 text-white hover:bg-white/10" : "border-border-default text-text-0 hover:bg-slate-50"
+                }`}
               >
                 {str(p.secondaryCta)}
               </button>
@@ -260,11 +265,11 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
         </div>
         {stats.length ? (
           <div className="absolute bottom-6 left-6 right-6 @md:left-12 @md:right-12 @lg:left-16 @lg:right-16 z-20">
-            <div className="rounded-2xl bg-[#2a2a2a]/72 backdrop-blur-md border border-white/10 grid grid-cols-2 @md:grid-cols-4 divide-x divide-white/10 overflow-hidden">
+            <div className="rounded-2xl bg-white/95 backdrop-blur-md border border-border-default shadow-lg grid grid-cols-2 @md:grid-cols-4 divide-x divide-border-subtle overflow-hidden">
               {stats.map((s, i) => (
-                <div key={i} className="px-5 @md:px-7 py-5 text-white">
-                  <div className="text-[10px] uppercase tracking-[0.22em] text-white/55 mb-2">{s.label}</div>
-                  <div className="font-display text-xl @md:text-2xl font-medium">{s.value || "—"}</div>
+                <div key={i} className="px-5 @md:px-7 py-5 text-text-0">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-text-2 mb-2 font-medium">{s.label}</div>
+                  <div className="font-display text-xl @md:text-2xl font-semibold text-text-0">{s.value || "—"}</div>
                 </div>
               ))}
             </div>
@@ -277,7 +282,7 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
   /* PDF 3 — Framed rounded hero with glass 2×2 stats */
   if (block.variant === "framed") {
     return (
-      <section className="bg-bg-0 px-3 @md:px-5 pt-3 @md:pt-4 pb-10">
+      <section className="bg-white px-3 @md:px-5 pt-3 @md:pt-4 pb-10">
         <div className="relative min-h-[560px] @md:min-h-[640px] rounded-[28px] @md:rounded-[36px] overflow-hidden">
           {str(p.image) ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -321,7 +326,7 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
   /* PDF 5 — Asymmetric: headline + floating stats card over photo */
   if (block.variant === "asymmetric") {
     return (
-      <section className="bg-bg-0 px-6 @md:px-10 @lg:px-14 pt-10 @md:pt-14 pb-16">
+      <section className="bg-white px-6 @md:px-10 @lg:px-14 pt-10 @md:pt-14 pb-16">
         <div className="max-w-6xl mx-auto grid @lg:grid-cols-[1.15fr_0.85fr] gap-8 @lg:gap-10 items-start">
           <div className="relative order-2 @lg:order-1">
             <div className="relative rounded-[28px] overflow-hidden aspect-[4/3] @lg:aspect-[5/4] bg-bg-2">
@@ -388,7 +393,7 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
   /* PDF 6 — Centered over image + overlapping info bar */
   if (block.variant === "info-bar") {
     return (
-      <section className="relative pb-24 @md:pb-28 bg-bg-0">
+      <section className="relative pb-24 @md:pb-28 bg-white">
         <div className="relative min-h-[520px] @md:min-h-[600px] overflow-hidden">
           {str(p.image) ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -425,7 +430,7 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
   /* PDF 1 — Centered copy inside large rounded framed hero */
   if (block.variant === "framed-center") {
     return (
-      <section className="bg-bg-0 px-4 @md:px-8 pt-3 @md:pt-5 pb-10">
+      <section className="bg-white px-4 @md:px-8 pt-3 @md:pt-5 pb-10">
         <div className="relative min-h-[520px] @md:min-h-[620px] rounded-[28px] @md:rounded-[36px] overflow-hidden flex items-center justify-center text-center">
           {str(p.image) ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -460,7 +465,7 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
   /* PDF 2 — Split curve: photo left with large bottom-right radius, cream stats panel */
   if (block.variant === "split-curve") {
     return (
-      <section className="bg-bg-0 grid @lg:grid-cols-2 min-h-[560px] @lg:min-h-[640px]">
+      <section className="bg-white grid @lg:grid-cols-2 min-h-[560px] @lg:min-h-[640px]">
         <div className="relative min-h-[360px] @lg:min-h-full overflow-hidden rounded-br-[120px] @lg:rounded-br-[180px]">
           {str(p.image) ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -469,7 +474,7 @@ export function ProjectBannerBlock({ block }: { block: BlockConfig }) {
             <div className="absolute inset-0 bg-gradient-to-br from-bg-3 to-bg-2" />
           )}
         </div>
-        <div className="flex flex-col justify-center px-8 @md:px-12 @lg:px-14 py-12 @lg:py-16 bg-bg-0">
+        <div className="flex flex-col justify-center px-8 @md:px-12 @lg:px-14 py-12 @lg:py-16 bg-white">
           <h1 className="font-display text-3xl @md:text-4xl @lg:text-[2.75rem] font-medium text-text-0 leading-[1.15] mb-8">
             {str(p.headline, "4 BHK Luxury Flat")}
           </h1>

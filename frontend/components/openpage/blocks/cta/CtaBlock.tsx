@@ -70,25 +70,25 @@ function CtaBooking({ props }: { props: CtaProps }) {
     window.location.href = url;
   };
   return (
-    <section className="px-4 @md:px-8 py-10 @md:py-14 bg-bg-0">
-      <div className="max-w-6xl mx-auto rounded-[28px] @md:rounded-[32px] overflow-hidden bg-[#141414] grid @lg:grid-cols-2 min-h-[320px]">
+    <section className="px-4 @md:px-8 py-10 @md:py-14 bg-white">
+      <div className="max-w-6xl mx-auto rounded-[28px] @md:rounded-[32px] overflow-hidden bg-slate-50 border border-border-default grid @lg:grid-cols-2 min-h-[320px] shadow-sm">
         <div className="relative min-h-[220px] @lg:min-h-full">
           {props.image ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={props.image} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90" />
+            <img src={props.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-bg-4 to-bg-5" />
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#141414]/80 @lg:block hidden" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-slate-50/80 @lg:block hidden" />
         </div>
-        <div className="flex flex-col justify-center px-8 @md:px-12 py-10 @md:py-14 text-white">
-          <h2 className="font-display text-3xl @md:text-4xl font-medium mb-3">{props.headline}</h2>
-          {props.subheadline ? <p className="text-white/75 text-sm @md:text-base mb-8 max-w-md">{props.subheadline}</p> : null}
+        <div className="flex flex-col justify-center px-8 @md:px-12 py-10 @md:py-14 text-text-0">
+          <h2 className="font-display text-3xl @md:text-4xl font-medium mb-3 text-text-0">{props.headline}</h2>
+          {props.subheadline ? <p className="text-text-1 text-sm @md:text-base mb-8 max-w-md">{props.subheadline}</p> : null}
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
               onClick={onClick}
-              className="px-6 py-3 rounded-full bg-white text-text-0 text-sm font-semibold hover:bg-white/90 transition-colors"
+              className="px-6 py-3 rounded-full bg-green text-white text-sm font-semibold hover:bg-green-dim transition-colors shadow-sm"
             >
               {props.buttonText}
             </button>
@@ -96,7 +96,7 @@ function CtaBooking({ props }: { props: CtaProps }) {
               <button
                 type="button"
                 onClick={onSecondary}
-                className="px-6 py-3 rounded-full border border-white/35 text-white text-sm font-semibold hover:bg-white/10 transition-colors"
+                className="px-6 py-3 rounded-full border border-border-default text-text-0 text-sm font-semibold hover:bg-white transition-colors"
               >
                 {props.secondaryButtonText}
               </button>
