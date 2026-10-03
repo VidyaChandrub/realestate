@@ -1,23 +1,23 @@
 import type { ThemeConfig } from "@/components/openpage/blocks/types";
 
 export const defaultTheme: ThemeConfig = {
-  bg0: '#09090b',
-  bg1: '#0f0f12',
-  bg2: '#18181b',
-  bg3: '#1e1e23',
-  bg4: '#27272a',
-  bg5: '#303036',
-  text0: '#fafafa',
-  text1: '#a1a1aa',
-  text2: '#71717a',
-  text3: '#52525b',
-  accent: '#22c55e',
-  accentDim: '#16a34a',
-  borderDefault: '#2a2a2f',
-  borderSubtle: '#1f1f24',
-  borderHover: '#3a3a3f',
-  fontSans: 'DM Sans',
-  fontDisplay: 'Space Grotesk',
+  bg0: '#ffffff',
+  bg1: '#ffffff',
+  bg2: '#ffffff',
+  bg3: '#f8fafc',
+  bg4: '#f1f5f9',
+  bg5: '#e2e8f0',
+  text0: '#0f172a',
+  text1: '#1e293b',
+  text2: '#475569',
+  text3: '#64748b',
+  accent: '#2563eb',
+  accentDim: '#1d4ed8',
+  borderDefault: '#e2e8f0',
+  borderSubtle: '#f1f5f9',
+  borderHover: '#cbd5e1',
+  fontSans: 'Plus Jakarta Sans',
+  fontDisplay: 'Outfit',
   fontMono: 'JetBrains Mono',
   radius: 8,
   radiusLg: 12,
@@ -32,7 +32,7 @@ export interface ThemePreset {
 export const themePresets: ThemePreset[] = [
   {
     id: 'default',
-    name: 'Dark Minimal',
+    name: 'Clean White',
     theme: { ...defaultTheme },
   },
   {
@@ -451,9 +451,47 @@ export const themePresets: ThemePreset[] = [
   },
 ]
 
+export function isDarkColor(hex?: string): boolean {
+  if (!hex || typeof hex !== 'string') return true;
+  const clean = hex.replace('#', '');
+  if (clean.length === 3) {
+    const r = parseInt(clean[0] + clean[0], 16);
+    const g = parseInt(clean[1] + clean[1], 16);
+    const b = parseInt(clean[2] + clean[2], 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) < 140;
+  }
+  if (clean.length >= 6) {
+    const r = parseInt(clean.slice(0, 2), 16);
+    const g = parseInt(clean.slice(2, 4), 16);
+    const b = parseInt(clean.slice(4, 6), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) < 140;
+  }
+  return false;
+}
+
 export function resolveTheme(partial?: Partial<ThemeConfig>): ThemeConfig {
-  if (!partial) return defaultTheme
-  return { ...defaultTheme, ...partial }
+  if (!partial) return defaultTheme;
+  const isDarkFallback = !partial.bg0 || isDarkColor(partial.bg0) || partial.bg0 === '#09090b' || partial.bg0 === '#000000' || partial.bg0 === '#0f0f12' || partial.bg0 === '#18181b';
+  if (isDarkFallback) {
+    return {
+      ...defaultTheme,
+      ...partial,
+      bg0: '#ffffff',
+      bg1: '#ffffff',
+      bg2: '#f8fafc',
+      bg3: '#f1f5f9',
+      bg4: '#e2e8f0',
+      bg5: '#cbd5e1',
+      text0: '#0f172a',
+      text1: '#1e293b',
+      text2: '#475569',
+      text3: '#64748b',
+      borderDefault: '#e2e8f0',
+      borderSubtle: '#f1f5f9',
+      borderHover: '#cbd5e1',
+    };
+  }
+  return { ...defaultTheme, ...partial };
 }
 
 export function hexToRgb(hex: string): string {
@@ -467,6 +505,8 @@ export function hexToRgb(hex: string): string {
 export function themeToCSS(theme: ThemeConfig): Record<string, string> {
   const rgb = hexToRgb(theme.accent)
   return {
+    '--op-bg': theme.bg0,
+    '--op-text': theme.text0,
     '--color-bg-0': theme.bg0,
     '--color-bg-1': theme.bg1,
     '--color-bg-2': theme.bg2,

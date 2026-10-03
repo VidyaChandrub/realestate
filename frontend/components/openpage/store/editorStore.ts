@@ -47,6 +47,10 @@ interface EditorState {
   isGenerating: boolean
   generationPrompt: string | null
   generationError: string | null
+  showGrid: boolean
+  spotlightOpen: boolean
+  toggleShowGrid: () => void
+  toggleSpotlight: () => void
   selectBlock: (id: string | null) => void
   selectElement: (blockId: string, elementId: string) => void
   clearElementSelection: () => void
@@ -143,4 +147,8 @@ export const useEditorStore = create<EditorState>()((set) => ({
   setGenerating: (prompt) => set({ isGenerating: !!prompt, generationPrompt: prompt, generationError: null }),
   setGenerationError: (err) => set({ generationError: err }),
   clearGeneration: () => set({ isGenerating: false, generationPrompt: null }),
+  showGrid: false,
+  spotlightOpen: false,
+  toggleShowGrid: () => set((s) => ({ showGrid: !s.showGrid })),
+  toggleSpotlight: () => set((s) => ({ spotlightOpen: !s.spotlightOpen })),
 }))

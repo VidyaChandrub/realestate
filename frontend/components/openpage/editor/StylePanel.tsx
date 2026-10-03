@@ -32,6 +32,9 @@ import { useConfigStore } from "@/components/openpage/store/configStore";
 import { useEditorStore } from "@/components/openpage/store/editorStore";
 import { resolveBlockStyleForDevice } from "@/lib/openpage/block-style";
 import { Section, ColorInput } from "./shared-components";
+import { BoxModelWidget } from "./BoxModelWidget";
+import { BackgroundControls } from "./BackgroundControls";
+import { EffectsControls } from "./EffectsControls";
 
 function AlignButtons({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
   const options = [
@@ -375,189 +378,63 @@ export function StylePanel({ block }: { block: BlockConfig }) {
           </div>
         </Section>
 
-        {/* Spacing */}
-        <Section title="Spacing (Margin & Padding)" icon={<Maximize2 size={12} />}>
-          <div className="space-y-4">
-            <SpacingControl
-              title="Outer Margin"
-              top={effectiveStyle.marginTop}
-              right={effectiveStyle.marginRight}
-              bottom={effectiveStyle.marginBottom}
-              left={effectiveStyle.marginLeft}
-              onChange={(v) =>
-                set({
-                  marginTop: v.top,
-                  marginRight: v.right,
-                  marginBottom: v.bottom,
-                  marginLeft: v.left,
-                })
-              }
-            />
-
-            <SpacingControl
-              title="Inner Padding"
-              top={effectiveStyle.paddingTop}
-              right={effectiveStyle.paddingRight}
-              bottom={effectiveStyle.paddingBottom}
-              left={effectiveStyle.paddingLeft}
-              onChange={(v) =>
-                set({
-                  paddingTop: v.top,
-                  paddingRight: v.right,
-                  paddingBottom: v.bottom,
-                  paddingLeft: v.left,
-                })
-              }
-            />
-          </div>
+        {/* Spacing (Elementor Pro Visual Box Model) */}
+        <Section title="Spacing (Box Model)" icon={<Maximize2 size={12} />}>
+          <BoxModelWidget
+            marginTop={effectiveStyle.marginTop}
+            marginRight={effectiveStyle.marginRight}
+            marginBottom={effectiveStyle.marginBottom}
+            marginLeft={effectiveStyle.marginLeft}
+            paddingTop={effectiveStyle.paddingTop}
+            paddingRight={effectiveStyle.paddingRight}
+            paddingBottom={effectiveStyle.paddingBottom}
+            paddingLeft={effectiveStyle.paddingLeft}
+            onChangeMargin={(m) =>
+              set({
+                marginTop: m.top,
+                marginRight: m.right,
+                marginBottom: m.bottom,
+                marginLeft: m.left,
+              })
+            }
+            onChangePadding={(p) =>
+              set({
+                paddingTop: p.top,
+                paddingRight: p.right,
+                paddingBottom: p.bottom,
+                paddingLeft: p.left,
+              })
+            }
+          />
         </Section>
 
-        {/* Background */}
+        {/* Background System */}
         <Section title="Background" icon={<Palette size={12} />}>
-          <div className="space-y-3">
-            <ColorInput
-              label="Background Color"
-              value={effectiveStyle.backgroundColor}
-              onChange={(v) => set({ backgroundColor: v })}
-            />
-
-            <DimensionField
-              label="Background Image URL"
-              value={effectiveStyle.backgroundImage}
-              onChange={(v) => set({ backgroundImage: v })}
-              placeholder="https://... or url(...)"
-            />
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-wider text-text-3 mb-1">
-                  Size
-                </label>
-                <select
-                  value={effectiveStyle.backgroundSize || ""}
-                  onChange={(e) => set({ backgroundSize: e.target.value })}
-                  className="w-full px-2 py-1.5 rounded-lg border border-border-default bg-bg-2 text-text-0 text-[11px] outline-none focus:border-green"
-                >
-                  <option value="">Auto</option>
-                  <option value="cover">Cover (fill)</option>
-                  <option value="contain">Contain (fit)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-wider text-text-3 mb-1">
-                  Repeat
-                </label>
-                <select
-                  value={effectiveStyle.backgroundRepeat || ""}
-                  onChange={(e) => set({ backgroundRepeat: e.target.value })}
-                  className="w-full px-2 py-1.5 rounded-lg border border-border-default bg-bg-2 text-text-0 text-[11px] outline-none focus:border-green"
-                >
-                  <option value="">Repeat</option>
-                  <option value="no-repeat">No Repeat</option>
-                  <option value="repeat-x">Repeat X</option>
-                  <option value="repeat-y">Repeat Y</option>
-                </select>
-              </div>
-            </div>
-          </div>
+          <BackgroundControls
+            backgroundColor={effectiveStyle.backgroundColor}
+            backgroundImage={effectiveStyle.backgroundImage}
+            backgroundSize={effectiveStyle.backgroundSize}
+            backgroundPosition={effectiveStyle.backgroundPosition}
+            backgroundRepeat={effectiveStyle.backgroundRepeat}
+            overlayColor={effectiveStyle.overlayColor}
+            overlayOpacity={effectiveStyle.overlayOpacity}
+            onChange={(updates) => set(updates)}
+          />
         </Section>
 
-        {/* Border & Corners */}
-        <Section title="Border & Corners" defaultOpen={false} icon={<Layers size={12} />}>
-          <div className="space-y-3">
-            {/* Radius */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[10px] font-semibold uppercase tracking-wider text-text-3">Corner Radius</label>
-                <div className="flex items-center gap-1">
-                  {radiusPresets.map((r) => (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => set({ borderRadius: r.value })}
-                      className={`text-[9px] px-1.5 py-0.5 rounded border transition-all ${
-                        effectiveStyle.borderRadius === r.value
-                          ? "bg-green/15 border-green/40 text-green font-medium"
-                          : "border-border-default text-text-3 hover:text-text-1 hover:bg-bg-3"
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <input
-                type="text"
-                value={effectiveStyle.borderRadius || ""}
-                onChange={(e) => set({ borderRadius: e.target.value })}
-                placeholder="e.g. 12px or 9999px"
-                className="w-full px-2.5 py-1.5 rounded-lg border border-border-default bg-bg-2/80 text-text-0 text-[11px] font-mono outline-none hover:border-border-hover focus:border-green"
-              />
-            </div>
-
-            {/* Border Width & Style */}
-            <div className="grid grid-cols-2 gap-2">
-              <DimensionField
-                label="Border Width"
-                value={effectiveStyle.borderWidth}
-                onChange={(v) => set({ borderWidth: v })}
-                presets={["1px", "2px"]}
-                placeholder="0px"
-              />
-              <div>
-                <label className="block text-[10px] font-semibold uppercase tracking-wider text-text-3 mb-1">
-                  Border Style
-                </label>
-                <select
-                  value={effectiveStyle.borderStyle || ""}
-                  onChange={(e) => set({ borderStyle: e.target.value })}
-                  className="w-full px-2 py-1.5 rounded-lg border border-border-default bg-bg-2 text-text-0 text-[11px] outline-none focus:border-green"
-                >
-                  <option value="">None</option>
-                  <option value="solid">Solid</option>
-                  <option value="dashed">Dashed</option>
-                  <option value="dotted">Dotted</option>
-                </select>
-              </div>
-            </div>
-
-            <ColorInput
-              label="Border Color"
-              value={effectiveStyle.borderColor}
-              onChange={(v) => set({ borderColor: v })}
-            />
-
-            {/* Box Shadow */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[10px] font-semibold uppercase tracking-wider text-text-3">Shadow</label>
-                <div className="flex items-center gap-1">
-                  {shadowPresets.map((s) => (
-                    <button
-                      key={s.label}
-                      type="button"
-                      onClick={() => set({ boxShadow: s.value })}
-                      className={`text-[9px] px-1.5 py-0.5 rounded border transition-all ${
-                        effectiveStyle.boxShadow === s.value
-                          ? "bg-green/15 border-green/40 text-green font-medium"
-                          : "border-border-default text-text-3 hover:text-text-1 hover:bg-bg-3"
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <input
-                type="text"
-                value={effectiveStyle.boxShadow || ""}
-                onChange={(e) => set({ boxShadow: e.target.value })}
-                placeholder="none / 0 4px 12px rgba(0,0,0,0.15)"
-                className="w-full px-2.5 py-1.5 rounded-lg border border-border-default bg-bg-2/80 text-text-0 text-[11px] font-mono outline-none hover:border-border-hover focus:border-green"
-              />
-            </div>
-          </div>
+        {/* Borders, Shadows & Transforms */}
+        <Section title="Borders, Shadows & Transforms" defaultOpen={false} icon={<Layers size={12} />}>
+          <EffectsControls
+            borderWidth={effectiveStyle.borderWidth}
+            borderStyle={effectiveStyle.borderStyle}
+            borderColor={effectiveStyle.borderColor}
+            borderRadius={effectiveStyle.borderRadius}
+            boxShadow={effectiveStyle.boxShadow}
+            transform={effectiveStyle.transform}
+            filter={effectiveStyle.filter}
+            opacity={effectiveStyle.opacity}
+            onChange={(updates) => set(updates)}
+          />
         </Section>
 
         {/* Effects */}

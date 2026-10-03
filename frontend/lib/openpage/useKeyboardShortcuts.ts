@@ -7,7 +7,7 @@ import { useConfigStore } from "@/components/openpage/store/configStore";
 import { findBlock, findBlockLocation } from "@/lib/openpage/block-tree";
 
 export function useOpenPageKeyboard() {
-  const { toggleJsonDrawer, toggleHistory, toggleShortcutsModal, togglePreview, toggleTemplates, selectBlock, setClipboardStyle, setRightSidebarTab } = useEditorStore();
+  const { toggleJsonDrawer, toggleHistory, toggleShortcutsModal, togglePreview, toggleTemplates, toggleSpotlight, selectBlock, setClipboardStyle, setRightSidebarTab } = useEditorStore();
   const { undo, redo, removeBlock, duplicateBlock } = useConfigStore();
 
   useEffect(() => {
@@ -88,9 +88,19 @@ export function useOpenPageKeyboard() {
         return;
       }
 
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        toggleTemplates();
+        toggleSpotlight();
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        const selectedId = useEditorStore.getState().selectedBlockId;
+        if (selectedId) {
+          duplicateBlock(selectedId);
+          toast("Block duplicated");
+        }
         return;
       }
 
@@ -136,6 +146,11 @@ export function useOpenPageKeyboard() {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
       }
 
       if ((e.metaKey || e.ctrlKey) && e.key === "c") {

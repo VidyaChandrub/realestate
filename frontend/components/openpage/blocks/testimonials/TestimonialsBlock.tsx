@@ -206,7 +206,7 @@ function TestimonialsSpotlight({ props }: { props: TestimonialsProps }) {
 function TestimonialsBand({ props }: { props: TestimonialsProps }) {
   const items = props.items || defaultTestimonials
   return (
-    <section className="px-6 @md:px-10 py-14 bg-bg-2 border-y border-border-default">
+    <section className="px-6 @md:px-10 py-14 bg-white border-y border-border-default">
       <div className="max-w-6xl mx-auto">
         {(props.title || props.subtitle) ? (
           <div className="text-center mb-8">

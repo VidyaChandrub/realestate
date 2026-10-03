@@ -187,7 +187,7 @@ function snapshot(state: ConfigState): { pages?: PageConfig[]; blocks: BlockConf
   }
 }
 
-const MAX_UNDO = 50
+const MAX_UNDO = 100
 
 function pushUndo(state: ConfigState, label: string): Partial<ConfigState> {
   const snap = snapshot(state)

@@ -135,7 +135,7 @@ export function Canvas() {
   const moveBlock = useConfigStore((s) => s.moveBlock);
   const moveBlockInColumn = useConfigStore((s) => s.moveBlockInColumn);
   const moveBlockTo = useConfigStore((s) => s.moveBlockTo);
-  const { selectedBlockId, selectBlock, viewport, setIsDragging } = useEditorStore();
+  const { selectedBlockId, selectBlock, viewport, setIsDragging, showGrid } = useEditorStore();
 
   const resolved = useMemo(() => resolveTheme(theme), [theme]);
   const cssVars = useMemo(() => themeToCSS(resolved), [resolved]);
@@ -353,6 +353,30 @@ export function Canvas() {
           backgroundSize: "20px 20px",
         }}
       />
+
+      {showGrid && (
+        <>
+          {/* Alignment Grid Overlay */}
+          <div
+            className="absolute inset-0 z-10 pointer-events-none opacity-30"
+            style={{
+              backgroundImage:
+                "linear-gradient(to right, rgba(59, 130, 246, 0.25) 1px, transparent 1px), linear-gradient(to bottom, rgba(59, 130, 246, 0.25) 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+            }}
+          />
+          {/* Top Ruler Indicator */}
+          <div className="absolute top-0 left-0 right-0 h-4 bg-bg-2/90 border-b border-border-default z-20 flex items-center px-6 text-[9px] font-mono text-text-3 select-none justify-between">
+            <span>0px</span>
+            <span>200px</span>
+            <span>400px</span>
+            <span>600px</span>
+            <span>800px</span>
+            <span>1000px</span>
+            <span>1200px</span>
+          </div>
+        </>
+      )}
 
       {viewport === "tablet" ? (
         <div className="relative z-[1]">

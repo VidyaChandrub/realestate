@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Undo2, Redo2, Grid, Search, Monitor, Tablet, Smartphone } from "lucide-react";
 import { useConfigStore } from "@/components/openpage/store/configStore";
+import { useEditorStore } from "@/components/openpage/store/editorStore";
 import type { PageConfig } from "@/components/openpage/blocks/types";
+import { SpotlightSearch } from "./SpotlightSearch";
 
 function AddPagePopover({ onAdd, onClose }: { onAdd: (name: string, path: string) => void; onClose: () => void }) {
   const [name, setName] = useState('')
@@ -145,10 +147,22 @@ export function CanvasToolbar() {
   const renamePage = useConfigStore((s) => s.renamePage)
   const [showAddPage, setShowAddPage] = useState(false)
 
+  const undo = useConfigStore((s) => s.undo);
+  const redo = useConfigStore((s) => s.redo);
+  const canUndo = useConfigStore((s) => s.canUndo());
+  const canRedo = useConfigStore((s) => s.canRedo());
+
+  const viewport = useEditorStore((s) => s.viewport);
+  const setViewport = useEditorStore((s) => s.setViewport);
+  const showGrid = useEditorStore((s) => s.showGrid);
+  const toggleShowGrid = useEditorStore((s) => s.toggleShowGrid);
+  const spotlightOpen = useEditorStore((s) => s.spotlightOpen);
+  const toggleSpotlight = useEditorStore((s) => s.toggleSpotlight);
+
   return (
-    <div className="h-10 bg-bg-1 border-b border-border-default flex items-center px-3 gap-1">
+    <div className="h-10 bg-bg-1 border-b border-border-default flex items-center px-3 gap-2 justify-between">
       {/* Page tabs */}
-      <div className="flex items-center gap-0.5 relative overflow-x-auto flex-1">
+      <div className="flex items-center gap-0.5 relative overflow-x-auto min-w-0">
         {pages.map((page) => (
           <PageTab
             key={page.id}
@@ -177,6 +191,105 @@ export function CanvasToolbar() {
           )}
         </div>
       </div>
+
+      {/* Right controls: Viewport, Grid, Spotlight & History */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Spotlight Search (Ctrl+K) */}
+        <button
+          id="op-spotlight-trigger"
+          type="button"
+          onClick={toggleSpotlight}
+          className="px-2 py-1 rounded-md bg-bg-2 hover:bg-bg-3 border border-border-default text-text-2 hover:text-white flex items-center gap-1.5 text-xs transition-colors"
+          title="Spotlight Search (Ctrl+K)"
+        >
+          <Search size={12} className="text-text-3" />
+          <span className="hidden sm:inline text-[11px]">Search...</span>
+          <kbd className="hidden sm:inline text-[9px] px-1 rounded bg-bg-3 font-mono text-text-3 border border-border-subtle">
+            ⌘K
+          </kbd>
+        </button>
+
+        <div className="w-[1px] h-4 bg-border-subtle mx-0.5" />
+
+        {/* Viewport switch */}
+        <div className="flex items-center rounded-lg border border-border-default bg-bg-2 p-0.5">
+          <button
+            type="button"
+            onClick={() => setViewport("desktop")}
+            className={`p-1 rounded transition-colors ${
+              viewport === "desktop"
+                ? "bg-green/15 text-green"
+                : "text-text-3 hover:text-text-1"
+            }`}
+            title="Desktop View"
+          >
+            <Monitor size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewport("tablet")}
+            className={`p-1 rounded transition-colors ${
+              viewport === "tablet"
+                ? "bg-green/15 text-green"
+                : "text-text-3 hover:text-text-1"
+            }`}
+            title="Tablet View"
+          >
+            <Tablet size={13} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewport("mobile")}
+            className={`p-1 rounded transition-colors ${
+              viewport === "mobile"
+                ? "bg-green/15 text-green"
+                : "text-text-3 hover:text-text-1"
+            }`}
+            title="Mobile View"
+          >
+            <Smartphone size={13} />
+          </button>
+        </div>
+
+        {/* Snap Grid Toggle */}
+        <button
+          type="button"
+          onClick={toggleShowGrid}
+          className={`p-1.5 rounded-lg border transition-colors ${
+            showGrid
+              ? "bg-blue-500/20 border-blue-500/40 text-blue-400"
+              : "bg-bg-2 border-border-default text-text-3 hover:text-text-1"
+          }`}
+          title={showGrid ? "Hide Alignment Grid" : "Show Alignment Grid"}
+        >
+          <Grid size={13} />
+        </button>
+
+        <div className="w-[1px] h-4 bg-border-subtle mx-0.5" />
+
+        {/* Undo / Redo */}
+        <button
+          type="button"
+          disabled={!canUndo}
+          onClick={undo}
+          className="p-1.5 rounded-lg border border-border-default bg-bg-2 text-text-3 hover:text-text-1 hover:bg-bg-3 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          title="Undo (Ctrl+Z)"
+        >
+          <Undo2 size={13} />
+        </button>
+        <button
+          type="button"
+          disabled={!canRedo}
+          onClick={redo}
+          className="p-1.5 rounded-lg border border-border-default bg-bg-2 text-text-3 hover:text-text-1 hover:bg-bg-3 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+          title="Redo (Ctrl+Y)"
+        >
+          <Redo2 size={13} />
+        </button>
+      </div>
+
+      {/* Spotlight Command Modal */}
+      <SpotlightSearch isOpen={spotlightOpen} onClose={toggleSpotlight} />
     </div>
-  )
+  );
 }
